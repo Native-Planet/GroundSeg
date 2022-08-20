@@ -1,0 +1,7 @@
+{
+   "minio_name":"minio",
+   "minio_version":"latest",
+   "http_port":9000,
+   "console_port":9001
+}
+
