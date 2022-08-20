@@ -1,0 +1,23 @@
+<!doctype html>
+<head>
+<title>NativePlanet</title>
+<body>
+
+<div>
+<div class="pier">
+
+<h2> {{ name }}</h2>
+You can access your currently running pier by clicking the link below:</br>
+<a href="/urbit/access?pier={{ name }}">Access your Urbit!➡️</a>
+<div><div class="box">
+<p> Please copy your +code to login: </p>
+<p><b>{{ code }}</b></p>
+
+<form action = "/urbit/stop" method="POST">
+   <input type="submit" value="stop" name="{{ name }}" />
+</form>
+
+</div>
+</div>
+
+</body>

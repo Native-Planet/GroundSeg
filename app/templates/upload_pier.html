@@ -1,0 +1,35 @@
+<!doctype html>
+<head>
+<title>NativePlanet</title>
+    <link rel="stylesheet" 
+     href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/dropzone.min.css"/>
+
+    <link rel="stylesheet" 
+     href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/basic.min.css"/>
+
+    <script type="application/javascript" 
+     src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/dropzone.min.js">
+    </script>
+<body>
+
+<div class="box">
+<div>
+<h2>Upload a pier folder</h2>
+   <p>Should be zip'd or tar'd. When finished please refresh page. </p>
+<form method="POST" action='/launch/upload_pier' class="dropzone dz-clickable" 
+      id="dropper" enctype="multipart/form-data">
+</form>
+
+<script type="application/javascript">
+   Dropzone.options.dropper = {
+      paramName: 'file',
+      chunking: true,
+      forceChunking: true,
+      url: '/launch/upload_pier',
+      maxFilesize: 11000000, // megabytes
+      chunkSize: 50000000 // bytes
+      }
+</script>
+</div></div>
+
+</body>

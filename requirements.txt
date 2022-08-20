@@ -1,3 +1,4 @@
 flask
 requests
-docker-py
+docker
+json

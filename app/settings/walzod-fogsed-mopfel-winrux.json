@@ -1,0 +1,7 @@
+{
+    "pier_name": "walzod-fogsed-mopfel-winrux",
+    "http_port": 8080,
+    "ames_port": 34343,
+    "urbit_version": "latest",
+    "network": "wireguard"
+}
