@@ -22,13 +22,21 @@
 
 <script type="application/javascript">
    Dropzone.options.dropper = {
+      init: function () {
+        this.on("complete", function(file) {
+         if (this.getUploadingFiles().length === 0 && this.getQueuedFiles().length === 0) {
+             window.location = "{{ url_for('mainscreen') }}";
+         }
+        });
+      },
       paramName: 'file',
+      acceptedFiles: '.zip, .tar, .tgz',
       chunking: true,
       forceChunking: true,
       url: '/upload/pier',
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
-      }
+  }
 </script>
 </div></div>
 

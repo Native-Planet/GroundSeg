@@ -29,7 +29,7 @@ app.register_blueprint(urbit_api.app)
 app.register_blueprint(upload_api.app)
 app.register_blueprint(settings_api.app)
 
-@app.route("/")
+@app.route("/", methods=['POST','GET'])
 def mainscreen():
     piers = orchestrator.getUrbits()
     return render_template('urbit.html', piers = piers)

@@ -2,7 +2,6 @@ import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
 from flask import render_template, make_response
 from flask import current_app
-from flask_dropzone import Dropzone
 
 import os
 import zipfile, tarfile
@@ -51,7 +50,6 @@ def uploadKey():
 @app.route('/upload/pier', methods=['GET','POST'])
 def uploadPier():
     if request.method == 'GET':
-        print('wtf')
         return render_template('upload_pier.html')
     if request.method == 'POST':
 
@@ -63,6 +61,7 @@ def uploadPier():
         
         if os.path.exists(save_path) and current_chunk == 0:
             # 400 and 500s will tell dropzone that an error occurred and show an error
+            os.remove(os.path.join(current_app.config['TEMP_FOLDER'], filename))
             return make_response(('File already exists', 400))
 
         try:
@@ -109,7 +108,8 @@ def uploadPier():
                 shutil.rmtree(os.path.join(current_app.config['TEMP_FOLDER'], patp))
                 current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
 
-                return redirect(url_for("mainscreen"))
+                print('wtf')
+                return redirect('/')
         else:
             print(f'Chunk {current_chunk + 1} of {total_chunks} '
                       f'for file {file.filename} complete')
