@@ -1,11 +1,27 @@
 <!doctype html>
 <head>
 <title>NativePlanet</title>
-<body>
+<style>
+.greendot {
+  height: 25px;
+  width: 25px;
+  background-color: #0f0;
+  border-radius: 50%;
+  display: inline-block;
+}
 
+.reddot {
+  height: 25px;
+  width: 25px;
+  background-color: #f00;
+  border-radius: 50%;
+  display: inline-block;
+}
+</style>
+
+<body>
 <div>
 <div class="boot">
-<h2>Select a pier</h2>
    <form action = "/upload/pier" method = "GET" enctype = "multipart/form-data">
       <input type = "submit" value="Boot an existing Urbit ID >" name="existing" id="submit" />
    </form>
@@ -16,26 +32,40 @@
 
 <div>
    <div class="urbit">
-      <h2> Select a Pier to Boot </h2>
-      <h3> Running Piers </h3>
+      <h2> Installed Piers </h2>
       
+      {% for pier in piers %}
+         {% if pier['running'] %}
+            <span class="greendot"></span>
+         {% else %}
+            <span class="reddot"> </span>
+         {% endif %}
+         <a href="/urbit/pier?pier={{ pier['name'] }}">{{ pier['name'] }}</a> </br>
+      {% endfor %}
+
+      <!--
       <form action = "/urbit/stop" method="POST" enctype = "multipart/form-data">
       {% for pier in running_piers %}
       <a href="/urbit/pier?pier={{ pier }}">{{ pier }}</a> 
-      <input type="submit" value="stop" name="{{ pier }}" />
+      <input type="submit" value="stop" name="{{ pier }}" /> </br>
       {% endfor %}
       </form>
 
 
-      <h3> Start Piers </h3>
+      <h3> Stopped Piers </h3>
       <form action = "/urbit/start" method="POST" enctype = "multipart/form-data">
       {% for pier in stopped_piers %}
       <input type = "submit" value="{{ pier }}" name="boot" id="{{ pier }}" /></br>
       {% endfor %}
       </form>
-
+      -->
    </div>
 </div>
 
-
+<div>
+   <div class="urbit">
+      </br>
+      <a href="/settings">Settings</a>
+   </div>
+</div>
 </body>

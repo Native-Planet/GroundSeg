@@ -2,3 +2,5 @@ flask
 requests
 docker
 json
+psutil
+flask-dropzone

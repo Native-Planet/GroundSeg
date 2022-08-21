@@ -6,16 +6,40 @@
 <div>
 <div class="pier">
 
-<h2> {{ name }}</h2>
+<h2> {{ pier['name'] }}</h2>
+
+{% if pier['running'] %}
 You can access your currently running pier by clicking the link below:</br>
-<a href="/urbit/access?pier={{ name }}">Access your Urbit!➡️</a>
+<a href="/urbit/access?pier={{ pier['name'] }}">Access your Urbit!➡️</a>
+
 <div><div class="box">
 <p> Please copy your +code to login: </p>
-<p><b>{{ code }}</b></p>
+<p><b>{{ pier['code'] }}</b></p>
+
 
 <form action = "/urbit/stop" method="POST">
-   <input type="submit" value="stop" name="{{ name }}" />
+   <input type="submit" value="stop" name="{{ pier['name'] }}" />
 </form>
+
+{% else %}
+</br></br></br>
+<form action = "/urbit/start" method="POST">
+   <input type="submit" value="start" name="{{ pier['name'] }}" />
+</form>
+
+
+
+{% endif %}
+
+<form action = "/urbit/eject" method="POST">
+   <input type="submit" value="eject" name="{{ pier['name'] }}" />
+</form>
+
+<form action = "/urbit/delete" method="POST">
+   <input type="submit" value="delete" name="{{ pier['name'] }}" />
+</form>
+
+
 
 </div>
 </div>

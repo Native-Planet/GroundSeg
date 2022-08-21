@@ -1,0 +1,66 @@
+<!doctype html>
+<head>
+<title>NativePlanet</title>
+<body>
+   <h1> Settings </h1>
+
+<div>
+<div class="internet">
+   <h2> WiFi / Connection Settings </h2>
+</div>
+</div>
+
+<div>
+<div class="anchor">
+   <h2> Anchor Settings </h2>
+</div>
+</div>
+
+<div>
+<div class="bitcoin">
+   <h2> Bitcoin Location </h2>
+   TODO
+</div>
+</div>
+
+<div>
+<div class="sys_info">
+   <h2> System Dashboard </h2>
+   <h3> RAM </h3>
+      {{ ram }}%
+   <h3> Storage </h3> 
+      {{ '%0.2f'| format(disk.used / 1e9)  }} GB / {{ '%0.2f'| format(disk.total /1e9) }} GB
+   <h3> CPU Temp </h3>
+     {{ temp }} &deg;C
+</div>
+</div>
+
+<div>
+<div class="shutdown">
+   <h2> Shutdown/ Restart </h2>
+   <form action = "/settings/shutdown" method="POST">
+      <input type = "submit" value="Shutdown" /></br>
+   </form>
+   <form action = "/settings/restart" method="POST">
+      <input type = "submit" value="Restart" /></br>
+   </form>
+</div>
+</div>
+
+<div>
+<div class="log">
+   <h2> Export Logs </h2>
+   <form action = "/settings/logs" method="POST" enctype = "multipart/form-data">
+      <select name="logs">
+         <option value="{{ container_logs[0] }}" selected>{{ container_logs[0] }}</option>
+      {% for container in container_logs[1:] %}
+         <option value="{{ container }}">{{ container }}</option>
+      {% endfor %}
+      </select>
+      <input type = "submit" value="View" name="logs" /></br>
+   </form>
+</div>
+</div>
+
+
+</body>

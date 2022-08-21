@@ -1,7 +1,7 @@
 {
-   "pier_name":"famwyl-lavlyr-mopfel-winrux",
-   "http_port":8080,
-   "ames_port":34343,
-   "urbit_version":"latest",
-   "network":"wireguard"
+    "pier_name": "famwyl-lavlyr-mopfel-winrux",
+    "http_port": 8081,
+    "ames_port": 34344,
+    "urbit_version": "latest",
+    "network": "wireguard"
 }

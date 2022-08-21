@@ -45,8 +45,9 @@ class UrbitDocker:
         self.buildContainer()
     
     def removeUrbit(self):
-        self.volume.remove()
+        self.stop()
         self.container.remove()
+        self.volume.remove()
 
     def addKey(self, key_value):
         with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
@@ -63,6 +64,7 @@ class UrbitDocker:
         return self.container.exec_run('/bin/reset-urbit-code').output.strip()
 
     def start(self):
+        print(self.config)
         self.container.start()
         self.running=True
 
