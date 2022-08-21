@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 
 from orchestrator import Orchestrator
 import urbit_docker
-#import urbit_options
+import upload_api
 
 
 def signal_handler(sig, frame):
@@ -20,8 +20,13 @@ orchestrator = Orchestrator("settings/system.json")
 
 
 app = Flask(__name__)
+
+app.config['ORCHESTRATOR'] = orchestrator
+app.config['TEMP_FOLDER'] = './tmp/'
+
+
 #app.register_blueprint(system_setup.app)
-#app.register_blueprint(urbit_options.app)
+app.register_blueprint(upload_api.app)
 
 @app.route("/")
 def main():
@@ -42,26 +47,6 @@ def pier_info():
     code = urbit.get_code().decode('utf-8')
 
     return render_template('pier.html', name=pier, code = code, running = urbit.isRunning())
-
-@app.route('/upload/key',methods=['GET','POST'])
-def uploadKey():
-    if request.method == 'GET':
-        return render_template('upload_key.html')
-    if request.method == 'POST':
-        patp = request.form['patp']
-        key = request.form['key']
-
-        data = copy.deepcopy(urbit_docker.default_pier_config)
-        data['pier_name'] = patp
-        with open(f'settings/{patp}.json', 'w') as f:
-            json.dump(data, f, indent = 4)
-        
-        urbit = urbit_docker.UrbitDocker(data)
-        urbit.addKey(key)
-        orchestrator.addUrbit(patp, urbit)
-        return redirect("/")
-
-
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
     if request.method == 'POST':
@@ -82,7 +67,6 @@ def stop_pier():
             urbit.stop()
         
     return redirect("/")
-
 
 @app.route("/main")
 def mainscreen():

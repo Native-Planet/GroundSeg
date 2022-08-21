@@ -16,7 +16,7 @@
 <div>
 <h2>Upload a pier folder</h2>
    <p>Should be zip'd or tar'd. When finished please refresh page. </p>
-<form method="POST" action='/launch/upload_pier' class="dropzone dz-clickable" 
+<form method="POST" action='upload/pier' class="dropzone dz-clickable" 
       id="dropper" enctype="multipart/form-data">
 </form>
 
@@ -25,7 +25,7 @@
       paramName: 'file',
       chunking: true,
       forceChunking: true,
-      url: '/launch/upload_pier',
+      url: '/upload/pier',
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
       }

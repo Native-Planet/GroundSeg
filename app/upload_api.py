@@ -1,23 +1,60 @@
+import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
 from flask import render_template, make_response
-import requests
+from flask import current_app
+
+import os
+import zipfile, tarfile
+import glob
+from werkzeug.utils import secure_filename
+
+from orchestrator import Orchestrator
+
+import urbit_docker
 
 #import system_info as sys_info
 
+
 app = Blueprint('urbit', __name__, template_folder='templates')
+
+
+def make_urbit(patp):
+    data = copy.deepcopy(urbit_docker.default_pier_config)
+    data['pier_name'] = patp
+    with open(f'settings/{patp}.json', 'w') as f:
+        json.dump(data, f, indent = 4)
+    
+    urbit = urbit_docker.UrbitDocker(data)
+    return urbit
+
+
+@app.route('/upload/key',methods=['GET','POST'])
+def uploadKey():
+    if request.method == 'GET':
+        return render_template('upload_key.html')
+    if request.method == 'POST':
+        patp = request.form['patp']
+        key = request.form['key']
+
+        urbit = make_urbit(patp)
+        urbit.addKey(key)
+        current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
+        return redirect("/")
+
+
 
 @app.route('/upload/pier', methods=['GET','POST'])
 def uploadPier():
-    return render_template('upload_pier.html')
-
-@app.route('/launch/upload_pier', methods=['GET','POST'])
-def upload_pier():
+    if request.method == 'GET':
+        return render_template('upload_pier.html')
     if request.method == 'POST':
 
         file = request.files['file']
 
         filename = secure_filename(file.filename)
-        fn = save_path = os.path.join(app.config['UPLOAD_PIER'],filename)
+        fn = save_path = os.path.join(current_app.config['TEMP_FOLDER'],filename)
+        print(os.getcwd())
+        print(save_path)
         current_chunk = int(request.form['dzchunkindex'])
         
         if os.path.exists(save_path) and current_chunk == 0:
@@ -49,22 +86,25 @@ def upload_pier():
                 print(f'File {file.filename} has been uploaded successfully')
                 if filename.endswith("zip"):
                     with zipfile.ZipFile(fn) as zip_ref:
-                        zip_ref.extractall(app.config['UPLOAD_PIER']);
+                        zip_ref.extractall(current_app.config['TEMP_FOLDER']);
                 elif filename.endswith("tar.gz") or filename.endswith("tgz"):
                     tar = tarfile.open(fn,"r:gz")
-                    tar.extractall(app.config['UPLOAD_PIER'])
+                    tar.extractall(app.config['TMP_FOLDER'])
                     print("extracted")
                     tar.close()
 
 
-                os.remove(os.path.join(app.config['UPLOAD_PIER'], filename))
+                os.remove(os.path.join(current_app.config['TEMP_FOLDER'], filename))
                 timeout = 10000
+                
+                patp = filename[:-4]
+                urbit = make_urbit(patp)
+                urbit.copyFolder(current_app.config['TEMP_FOLDER'])
+                shutil.rmtree(os.path.join(current_app.config['TEMP_FOLDER'], patp))
+                current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
+
                 return redirect("/")
         else:
             print(f'Chunk {current_chunk + 1} of {total_chunks} '
                       f'for file {file.filename} complete')
-
-        return make_response(("Chunk upload successful", 200))
-    else:
-        return redirect("/")
 
