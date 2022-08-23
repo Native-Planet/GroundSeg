@@ -2,9 +2,26 @@
 <head>
 <title>NativePlanet</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
+<script>
+function copyCode() {
+  /* Get the text field */
+  var copyText = document.getElementById("code");
+
+  /* Select the text field */
+  copyText.select();
+  copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+   /* Copy the text inside the text field */
+  navigator.clipboard.writeText(copyText.value);
+
+  /* Alert the copied text */
+  alert("Copied the text: " + copyText.value);
+}
+</script>
 <style>
 
 body {
+  font-family:Inter;
   background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
   -webkit-background-size: contain;
   -moz-background-size: contain;
@@ -12,62 +29,53 @@ body {
   background-size: contain;
   background-color: #050505;
 }
-
-.wrapper {
-  width: calc((100% - 100px) / 5);
-  margin-left: calc(-1*(100% - 100px) / 10);
-  background: rgba(109,109,109,0.5);
-  padding: 20px 24px;
-  opacity: 1;
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-  overflow: hidden;
-}
-
-
 </style>
 
 <body>
+<a href="/">
+   <img class='home' src={{ url_for('static', filename='home.png') }} />
+</a>
 
 <div class="wrapper">
 
+   <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
 <h2>~{{ pier['name'] }}</h2>
+   <hr class='rounded'>
 
 {% if pier['running'] %}
 <a href="/urbit/access?pier={{ pier['name'] }}">
    <input class='blue-btn' type="submit" value="Access your Urbit!" name="{{ pier['name'] }}"/>
 </a>
 
-<div><div class="box">
+<div class="box">
 <p> Please copy your +code to login: </p>
-<p><b>{{ pier['code'] }}</b></p>
+   <input readonly id='code' class='code' type="text" value="{{ pier['code'] }}">
+   <!--
+      <button onclick="copyCode()">
+      <img class='copy' src={{ url_for('static', filename='copy.png') }} />
+   </button>
+   -->
 
 
 <form action = "/urbit/stop" method="POST">
-   <input class='stop-btn' type="submit" value="stop" name="{{ pier['name'] }}" />
+   <input class='stop-btn' type="submit" value="Stop" name="{{ pier['name'] }}" />
 </form>
 
 {% else %}
 </br></br></br>
 <form action = "/urbit/start" method="POST">
-   <input class='start-btn' type="submit" value="start" name="{{ pier['name'] }}" />
+   <input class='start-btn' type="submit" value="Start" name="{{ pier['name'] }}" />
 </form>
 
 {% endif %}
-</br>
+<hr class="rounded">
 
 <form action = "/urbit/eject" method="POST">
-   <input class='eject-btn' ype="submit" value="eject" name="{{ pier['name'] }}" />
+   <input class='eject-btn' type="submit" value="Eject" name="{{ pier['name'] }}" />
 </form>
-</br>
 
 <form action = "/urbit/delete" method="POST">
-   <input class='delete-btn' type="submit" value="delete" name="{{ pier['name'] }}" />
+   <input class='delete-btn' type="submit" value="Delete" name="{{ pier['name'] }}" />
 </form>
 
 

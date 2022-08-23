@@ -1,3 +1,24 @@
+.wrapper {
+  width: 20%;
+  min-width:384px;
+  transform: translateY(150px);
+  margin: auto;
+  background: rgba(109,109,109,0.5);
+  padding: 20px 24px;
+  opacity: 1;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+
+@font-face{
+   font-family: Inter;
+   src: url('/static/Inter-SemiBold.otf');
+}
+
+p { color: rgba(255,255,255,0.7);}
+h2 { color: rgba(255,255,255,1);}
+h3 { color: rgba(255,255,255,0.7);}
 
 .greendot {
   height: 25px;
@@ -15,8 +36,25 @@
   display: inline-block;
 }
 
-.eject-btn {
- background-color: #ff7979;
+.stopped-pier {
+ background-color: #B45656;
+ width: 80%;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.running-pier {
+ background-color: green;
+ width: 80%;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -25,11 +63,29 @@
  font-size: 16px;
  border-radius: 6px;
  color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.stop-btn {
+ background-color: #B45656;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 
-.stop-btn {
- background: rgba(255,173,129,1.0);
+.eject-btn {
+ background-color: #A77121;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -37,11 +93,14 @@
  display: inline-block;
  font-size: 16px;
  border-radius: 6px;
- color: #fff;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .start-btn {
- background-color: #79FFE3;
+ background-color: #118F35;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -49,7 +108,10 @@
  display: inline-block;
  font-size: 16px;
  border-radius: 6px;
- color: #fff;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .delete-btn {
@@ -61,7 +123,10 @@
  display: inline-block;
  font-size: 16px;
  border-radius: 6px;
- color: #fff;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .shutdown-btn {
@@ -74,6 +139,9 @@
  font-size: 16px;
  border-radius: 6px;
  color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .grey-btn {
@@ -87,6 +155,7 @@
  font-size: 16px;
  border-radius: 6px;
  color: #fff;
+ font-family: Inter;
 }
 
 .log-select {
@@ -102,6 +171,7 @@
  border-bottom-left-radius: 6px;
  border-bottom-right-radius: 6px;
  color: #fff;
+ font-family: Inter;
 }
 .green-btn {
  width:100%;
@@ -112,11 +182,11 @@
  text-decoration: none;
  display: inline-block;
  font-size: 16px;
- border-top-left-radius: 6px;
- border-top-right-radius: 6px;
- border-bottom-left-radius: 6px;
- border-bottom-right-radius: 6px;
+ border-radius: 6px;
  color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .blue-btn {
@@ -128,11 +198,11 @@
  text-decoration: none;
  display: inline-block;
  font-size: 16px;
- border-top-left-radius: 6px;
- border-top-right-radius: 6px;
- border-bottom-left-radius: 6px;
- border-bottom-right-radius: 6px;
+ border-radius: 6px;
  color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 
@@ -145,11 +215,11 @@
  text-decoration: none;
  display: inline-block;
  font-size: 16px;
- border-top-left-radius: 6px;
- border-top-right-radius: 6px;
- border-bottom-left-radius: 6px;
- border-bottom-right-radius: 6px;
+ border-radius: 6px;
  color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
 }
 
 .settings {
@@ -157,10 +227,54 @@
    height: auto;
 }
 
-.home {
+.copy {
+   width: auto;
+   height: 30px;
+   margin-left: 10px;
+   transform: translateY(10px);
+}
+
+.logo {
    width: 40px;
    height: auto;
 }
 
 
+.home {
+   width: 20px;
+   height: auto;
+}
 
+
+.upload-key {
+  padding: 12px 20px;
+  width: 100%;
+  margin: 8px auto;
+  display: inline-block;
+  border: none;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: Inter;
+  font-size: 16px;
+  color: white;
+  background: rgba(251,251,251,0.3);
+}
+.code {
+  padding: 12px 20px;
+  width: 100%;
+  margin: 8px auto;
+  display: inline-block;
+  border: none;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: Inter;
+  font-size: 16px;
+  text-align: center;
+  background: rgba(251,251,251,0.3);
+}
+
+/* Rounded border */
+hr.rounded {
+  border-top: 8px solid #bbb;
+  border-radius: 5px;
+}

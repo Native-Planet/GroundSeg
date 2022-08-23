@@ -5,6 +5,7 @@
 <style>
 
 body {
+  font-family:Inter;
   background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
   -webkit-background-size: contain;
   -moz-background-size: contain;
@@ -12,23 +13,6 @@ body {
   background-size: contain;
   background-color: #050505;
 }
-
-.wrapper {
-  width: calc((100% - 100px) / 5);
-  margin-left: calc(-1*(100% - 100px) / 10);
-  background: rgba(109,109,109,0.5);
-  padding: 20px 24px;
-  opacity: 1;
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-  overflow: hidden;
-}
-
 </style>
 
 <body>
@@ -37,25 +21,33 @@ body {
 </a>
 
 <div class='wrapper'>
+   <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
+   <hr class='rounded'>
+
    <div class="boot">
       <form action = "/upload/pier" method = "GET" enctype = "multipart/form-data">
-         <input class='black-btn' type = "submit" value="Boot an existing Urbit ID >" name="existing" id="submit" />
+         <input class='black-btn' font-family="Inter" type = "submit" value="Boot an existing Urbit ID >" name="existing" id="submit" />
       </form>
       <form action = "/upload/key" method = "GET" enctype = "multipart/form-data">
          <input class='green-btn' type = "submit" value="Boot a new Urbit ID >" name="existing" id="submit" />
       </form>
    </div>
+   <hr class="rounded">
 
    <div class="urbit">
       <h2> Installed Piers </h2>
       
       {% for pier in piers %}
          {% if pier['running'] %}
-            <span class="greendot"></span>
+            <a href="/urbit/pier?pier={{ pier['name'] }}">
+               <input class='running-pier' type="submit" value="{{ pier['name'] }}"/>
+            </a>
          {% else %}
-            <span class="reddot"> </span>
+            <a href="/urbit/pier?pier={{ pier['name'] }}">
+               <input class='stopped-pier' type="submit" value="{{ pier['name'] }}"/>
+            </a>
          {% endif %}
-         <a href="/urbit/pier?pier={{ pier['name'] }}">{{ pier['name'] }}</a> </br>
+         </br>
       {% endfor %}
 
    </div>

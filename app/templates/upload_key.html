@@ -1,14 +1,35 @@
 <!doctype html>
 <head>
 <title>NativePlanet</title>
-<body>
+<link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
+<style>
 
-<div>
+body {
+  font-family:Inter;
+  background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
+  -webkit-background-size: contain;
+  -moz-background-size: contain;
+  -o-background-size: contain;
+  background-size: contain;
+  background-color: #050505;
+}
+</style>
+
+<body>
+<a href="/">
+   <img class='home' src={{ url_for('static', filename='home.png') }} />
+</a>
+
+<div class='wrapper'>
+   <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
+   <hr class='rounded'>
 <div class="upload">
    <form action="/upload/key" method = "POST" enctype = "multipart/form-data">
-      <p> Pier Name <input type="text" name='patp' /></p>
-      <p> Pier Key  <input type="text" name="key" /></p>
-      <input type="submit" value="submit" />
+      <p> Pier Name </br> 
+      <input class='upload-key' type="text" name='patp' /></p>
+      <p> Pier Key  </br>
+      <input class='upload-key' type="text" name="key" /></p>
+      <input class='blue-btn' type="submit" value="Submit" />
    </form>
 </div>
 </div>

@@ -1,18 +1,56 @@
 <!doctype html>
 <head>
 <title>NativePlanet</title>
-    <link rel="stylesheet" 
-     href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/dropzone.min.css"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
 
-    <link rel="stylesheet" 
-     href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/basic.min.css"/>
+<link rel="stylesheet" 
+href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/dropzone.min.css"/>
 
-    <script type="application/javascript" 
+<link rel="stylesheet" 
+href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/basic.min.css"/>
+
+<script type="application/javascript" 
      src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.4.0/min/dropzone.min.js">
-    </script>
-<body>
+</script>
 
-<div class="box">
+<style>
+
+body {
+  font-family:Inter;
+  background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
+  -webkit-background-size: contain;
+  -moz-background-size: contain;
+  -o-background-size: contain;
+  background-size: contain;
+  background-color: #050505;
+}
+
+.wrapper {
+  width: 20%;
+  min-width:384px;
+  transform: translateY(150px);
+  margin: auto;
+  background: rgba(109,109,109,0.5);
+  padding: 20px 24px;
+  opacity: 1;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.dropzone {
+    border: 1px solid rgba(0,0,0,0.3);
+    background: rgba(0,0,0,0); 
+    color:rgba(255,255,255,0.7);
+}
+</style>
+
+<body>
+<a href="/">
+   <img class='home' src={{ url_for('static', filename='home.png') }} />
+</a>
+
+<div class="wrapper">
+   <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
+   <hr class='rounded'>
 <div>
 <h2>Upload a pier folder</h2>
    <p>Should be zip'd or tar'd. When finished please refresh page. </p>
