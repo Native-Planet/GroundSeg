@@ -29,6 +29,7 @@ class Wireguard:
         if response['error']==1:
             self.wg_config = self.create_wireguard(patp).decode('utf-8')
         else:
+            print(response)
             self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
 
         self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])

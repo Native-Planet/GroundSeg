@@ -23,8 +23,31 @@ body {
 </a>
 
 <div class='wrapper'>
-   <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
+   <a href="/">
+      <img class='logo' src={{ url_for('static', filename='nplogo.png') }} />
+   </a>
    <hr class='rounded'>
+
+   {% if piers|length > 0 %}
+   <div class="urbit">
+      {% for pier in piers %}
+      <div>
+         {% if pier['running'] %}
+            <a href="/urbit/access?pier={{ pier['name'] }}">
+               <input class='running-pier' type="submit" value="{{ pier['name'] }}"/>
+            </a>
+         {% else %}
+            <input class='stopped-pier' type="submit" value="{{ pier['name'] }}"/>
+         {% endif %}
+         <a href="/urbit/pier?pier={{ pier['name'] }}">
+            <input class='pier-settings' type="image" 
+                   src={{ url_for('static', filename='pier_settings.png') }} />
+         </a>
+      </div>
+      {% endfor %}
+      <hr class="rounded">
+   </div>
+   {% endif %}
 
    <div class="boot">
       <form action = "/upload/pier" method = "GET" enctype = "multipart/form-data">
@@ -34,24 +57,7 @@ body {
          <input class='gray-btn' type = "submit" value="Boot a new Urbit ID >" name="existing" id="submit" />
       </form>
    </div>
-   <hr class="rounded">
 
-   <div class="urbit">
-      <h2> Installed Piers </h2>
-      
-      {% for pier in piers %}
-         {% if pier['running'] %}
-            <a href="/urbit/pier?pier={{ pier['name'] }}">
-               <input class='running-pier' type="submit" value="{{ pier['name'] }}"/>
-            </a>
-         {% else %}
-            <a href="/urbit/pier?pier={{ pier['name'] }}">
-               <input class='stopped-pier' type="submit" value="{{ pier['name'] }}"/>
-            </a>
-         {% endif %}
-         </br>
-      {% endfor %}
 
-   </div>
 </div>
 </body>

@@ -3,5 +3,5 @@
     "http_port": 8082,
     "ames_port": 34345,
     "urbit_version": "latest",
-    "network": "wireguard"
+    "network": "none"
 }

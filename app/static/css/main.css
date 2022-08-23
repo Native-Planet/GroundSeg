@@ -38,7 +38,7 @@ h3 { color: rgba(255,255,255,0.7);}
 
 .stopped-pier {
  background-color: #B45656;
- width: 80%;
+ width: 85%;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -54,7 +54,7 @@ h3 { color: rgba(255,255,255,0.7);}
 
 .running-pier {
  background-color: green;
- width: 80%;
+ width: 85%;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -66,6 +66,13 @@ h3 { color: rgba(255,255,255,0.7);}
  font-family: Inter;
  margin-top: 5px;
  margin-bottom: 5px;
+}
+
+.pier-settings {
+ width: 7%;
+ border: none;
+ padding: 10px 10px;
+ float:right;
 }
 
 .stop-btn {
@@ -115,7 +122,7 @@ h3 { color: rgba(255,255,255,0.7);}
 }
 
 .delete-btn {
- background-color: red;
+ background-color: #732222;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -130,7 +137,7 @@ h3 { color: rgba(255,255,255,0.7);}
 }
 
 .shutdown-btn {
- background-color: red;
+ background-color: #732222;
  border: none;
  padding: 10px 10px;
  text-align: center;
@@ -275,6 +282,6 @@ h3 { color: rgba(255,255,255,0.7);}
 
 /* Rounded border */
 hr.rounded {
-  border-top: 8px solid #bbb;
+  border-top: 3px solid #bbb;
   border-radius: 5px;
 }

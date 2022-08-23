@@ -1,5 +1,6 @@
 import docker
 import json
+import shutil
 
 client = docker.from_env()
 default_pier_config = json.load(open('settings/default_urbit.json'))
@@ -21,8 +22,12 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
+                shutil.copy('./settings/start_urbit.sh', 
+                        f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
         self.volume = client.volumes.create(name=self.pier_name)
+        shutil.copy('./settings/start_urbit.sh', 
+                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
@@ -30,13 +35,27 @@ class UrbitDocker:
             if(self.pier_name == c.name):
                 self.container = c
                 return
-        self.container = client.containers.create(f'tloncorp/urbit:{self.config["urbit_version"]}',
+        command = f'/urbit/start_urbit.sh --http-port={self.config["http_port"]} --port={self.config["ames_port"]}'
+        if(self.config["network"] != "none"):
+            self.container = client.containers.create(
+                                    f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    command=command, 
                                     #ports = {'80/tcp':self.config['http_port'], 
                                      #        '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
                                     mounts = [self.mount],
                                     detach=True)
+        else:
+            self.container = client.containers.create(
+                                    f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    ports = {'80/tcp':self.config['http_port'], 
+                                             '34343/udp':self.config['ames_port']},
+                                    name = self.pier_name,
+                                    mounts = [self.mount],
+                                    detach=True)
+
+
 
 
     def buildUrbit(self):
@@ -82,7 +101,12 @@ class UrbitDocker:
 
 
 if __name__ == '__main__':
-    filename = "famwyl-lavlyr-mopfel-winrux.json"
+    filename = "settings/walzod-fogsed-mopfel-winrux.json"
     f = open(filename)
     data = json.load(f)
     urdock = UrbitDocker(data)
+    urdock.start()
+    import time
+    time.sleep(2)
+    print(urdock.logs().decode('utf-8'))
+    urdock.stop()
