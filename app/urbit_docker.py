@@ -31,10 +31,10 @@ class UrbitDocker:
                 self.container = c
                 return
         self.container = client.containers.create(f'tloncorp/urbit:{self.config["urbit_version"]}',
-                                    ports = {'80/tcp':self.config['http_port'], 
-                                             '34343/udp':self.config['ames_port']},
+                                    #ports = {'80/tcp':self.config['http_port'], 
+                                     #        '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
-                                    #network_mode = f'container:{self.config["network"]}',
+                                    network = f'container:{self.config["network"]}',
                                     mounts = [self.mount],
                                     detach=True)
 

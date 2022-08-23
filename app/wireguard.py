@@ -27,10 +27,11 @@ class Wireguard:
         # Setup the wireguard server
         response = self.check_wireguard();
         if response['error']==1:
-            self.wg_config = self.create_wireguard(patp)
+            self.wg_config = self.create_wireguard(patp).decode('utf-8')
         else:
-            self.wg_config = base64.b64decode(response['conf'])
+            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
 
+        self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
         # Setup and start the local wg client
         self.wg_docker.addConfig(self.wg_config)
 
@@ -41,10 +42,11 @@ class Wireguard:
             "patp" : f"{patp}",
             "pubkey":self.config['pubkey']
         }
+        headers = {"Content-Type": "application/json"}
 
         response = None
         try:
-            response = requests.post(f'{url}/create', json = update_data, headers=headers).json()
+            response = requests.post(f'{self._url}/create', json = update_data, headers=headers).json()
         except Exception as e:
             print(e)
             return None
@@ -52,18 +54,20 @@ class Wireguard:
         # wait for it to be created
         while response['status'] != 'ready':
             try:
-                response = requests.get(f'{url}/retrieve?pubkey={pubkey}', headers=headers).json()
+                response = requests.get(f'{self._url}/retrieve?pubkey={update_data["pubkey"]}', headers=headers).json()
+                print(response)
             except Exception as e:
                 print(e)
-                return None
             print("Waiting for endpoint to be created")
-        time.sleep(60)
+            if(response['status'] != 'ready'):
+                time.sleep(60)
 
         return base64.b64decode(response['conf'])
 
 
     def check_wireguard(self):
         response = None
+        headers = {"Content-Type": "application/json"}
         try:
             response = requests.get(f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
                                     headers=headers).json()

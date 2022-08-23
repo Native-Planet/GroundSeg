@@ -36,6 +36,10 @@ class WireguardDocker:
                 image = f'{self._wireguard_img}:{self.config["wireguard_version"]}',
                 name = self.wireguard_name,
                 mounts = [self.mount],
+                hostname = self.wireguard_name, 
+                volumes = self.config['volumes'],
+                cap_add = self.config['cap_add'],
+                sysctls = self.config['sysctls'],
                 detach=True)
 
     def buildWireguard(self):
@@ -44,8 +48,9 @@ class WireguardDocker:
         self.buildContainer()
     
     def removeWireguard(self):
-        self.volume.remove()
+        wg.stop()
         self.container.remove()
+        self.volume.remove()
 
     def addConfig(self, config):
         with open(f'{self._volume_directory}/{self.wireguard_name}/_data/wg0.conf', 'w') as f:
@@ -65,7 +70,7 @@ class WireguardDocker:
 
 
 if __name__ == '__main__':
-    filename = "wireguard.json"
+    filename = "settings/wireguard.json"
     f = open(filename)
     data = json.load(f)
     wg = WireguardDocker(data)

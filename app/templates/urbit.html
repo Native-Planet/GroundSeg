@@ -1,36 +1,51 @@
 <!doctype html>
 <head>
 <title>NativePlanet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
 <style>
-.greendot {
-  height: 25px;
-  width: 25px;
-  background-color: #0f0;
-  border-radius: 50%;
-  display: inline-block;
+
+body {
+  background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
+  -webkit-background-size: contain;
+  -moz-background-size: contain;
+  -o-background-size: contain;
+  background-size: contain;
+  background-color: #050505;
 }
 
-.reddot {
-  height: 25px;
-  width: 25px;
-  background-color: #f00;
-  border-radius: 50%;
-  display: inline-block;
+.wrapper {
+  width: calc((100% - 100px) / 5);
+  margin-left: calc(-1*(100% - 100px) / 10);
+  background: rgba(109,109,109,0.5);
+  padding: 20px 24px;
+  opacity: 1;
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  overflow: hidden;
 }
+
 </style>
 
 <body>
-<div>
-<div class="boot">
-   <form action = "/upload/pier" method = "GET" enctype = "multipart/form-data">
-      <input type = "submit" value="Boot an existing Urbit ID >" name="existing" id="submit" />
-   </form>
-   <form action = "/upload/key" method = "GET" enctype = "multipart/form-data">
-      <input type = "submit" value="Boot a new Urbit ID >" name="existing" id="submit" />
-   </form>
-</div></div>
+<a href="/settings">
+   <img class='settings' src={{ url_for('static', filename='settings.png') }} />
+</a>
 
-<div>
+<div class='wrapper'>
+   <div class="boot">
+      <form action = "/upload/pier" method = "GET" enctype = "multipart/form-data">
+         <input class='black-btn' type = "submit" value="Boot an existing Urbit ID >" name="existing" id="submit" />
+      </form>
+      <form action = "/upload/key" method = "GET" enctype = "multipart/form-data">
+         <input class='green-btn' type = "submit" value="Boot a new Urbit ID >" name="existing" id="submit" />
+      </form>
+   </div>
+
    <div class="urbit">
       <h2> Installed Piers </h2>
       
@@ -43,29 +58,6 @@
          <a href="/urbit/pier?pier={{ pier['name'] }}">{{ pier['name'] }}</a> </br>
       {% endfor %}
 
-      <!--
-      <form action = "/urbit/stop" method="POST" enctype = "multipart/form-data">
-      {% for pier in running_piers %}
-      <a href="/urbit/pier?pier={{ pier }}">{{ pier }}</a> 
-      <input type="submit" value="stop" name="{{ pier }}" /> </br>
-      {% endfor %}
-      </form>
-
-
-      <h3> Stopped Piers </h3>
-      <form action = "/urbit/start" method="POST" enctype = "multipart/form-data">
-      {% for pier in stopped_piers %}
-      <input type = "submit" value="{{ pier }}" name="boot" id="{{ pier }}" /></br>
-      {% endfor %}
-      </form>
-      -->
-   </div>
-</div>
-
-<div>
-   <div class="urbit">
-      </br>
-      <a href="/settings">Settings</a>
    </div>
 </div>
 </body>

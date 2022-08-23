@@ -1,3 +1,6 @@
+from wireguard_docker import WireguardDocker
+from urbit_docker import UrbitDocker
+
 import requests
 import subprocess
 import base64
@@ -8,14 +11,16 @@ import minio_docker
 
 import sys
 import time
+import json
 
 ## systme setup
-patp='famwyl-lavlyr-mopfel-winrux'
+patp='walzod-fogsed-mopfel-winrux'
 
 ## Setup Wireguard pubkey
-subprocess.run("wg genkey > privkey", shell=True)
-subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
+#subprocess.run("wg genkey > privkey", shell=True)
+#subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
 
+"""
 with open('pubkey') as f:
     pubkey = f.read().strip()
 with open('privkey') as f:
@@ -43,7 +48,7 @@ except Exception as e:
 
 
 # If does not exist
-if response['error']==1:
+if response['error']==1 or response['status'] != 'ready':
     # create it
     try:
         response = requests.post(f'{url}/create', json = update_data, headers=headers).json()
@@ -51,27 +56,29 @@ if response['error']==1:
     except Exception as e:
         print(e)
 
-    sys.exit()
+#    sys.exit()
 
     # wait for it to be created
     while response['status'] != 'ready':
         try:
             response = requests.get(f'{url}/retrieve?pubkey={pubkey}', headers=headers).json()
+            print(response)
         except Exception as e:
             print(e)
         print("Waiting for endpoint to be created")
-        time.sleep(60)
+        if(response['status'] != 'ready'):
+            time.sleep(60)
 
 
 # get and decode configuration
-config = base64.b64decode(response['conf'])
+config = base64.b64decode(response['conf']).decode('utf-8')
 
 config = config.replace('privkey', privkey)
 
-
+"""
 
 ## Start WG docker
-filename = "wireguard.json"
+filename = "settings/wireguard.json"
 f = open(filename)
 data = json.load(f)
 wg = WireguardDocker(data)
@@ -80,8 +87,8 @@ wg.start()
 
 
 ## Start Urbit
-filename = "famwyl-lavlyr-mopfel-winrux.json"
+filename = "settings/walzod-fogsed-mopfel-winrux.json"
 f = open(filename)
 data = json.load(f)
 urdock = UrbitDocker(data)
-
+urdock.start()

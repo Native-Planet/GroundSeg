@@ -22,6 +22,9 @@ class Orchestrator:
 
         self.wireguard = Wireguard(self.config)
         self.load_urbits()
+        if(len(self._urbits.keys())>0):
+            self.wireguard.setupWireguard(list(self._urbits.keys())[0])
+            self.wireguard.start()
 
     def load_urbits(self):
         for p in self.config['piers']:
@@ -65,6 +68,18 @@ class Orchestrator:
         containers.append('minio')
         return containers
 
+    def getOpenUrbitPort(self):
+        http_port = 0
+        ames_port = 34343
+
+        for u in self._urbits.values:
+            if(u.config['http_port'] >= http_port):
+                http_port = u.config['http_port']
+            if(u.config['ames_port'] >= ames_port):
+                ames_port = u.config['ames_port']
+
+        return http_port+1, ames_port+1
+
     def getLogs(self, container):
         if container == 'wireguard':
             return self.wireguard.wg_docker.logs()
@@ -85,7 +100,7 @@ class Orchestrator:
         with open('privkey') as f:
            self.config['privkey'] = f.read().strip()
         #clean up files
-        #subprocess.run("rm privkey pubkey", shell =True)
+        subprocess.run("rm privkey pubkey", shell =True)
    
 
     def save_config(self):

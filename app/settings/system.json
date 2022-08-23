@@ -2,8 +2,9 @@
     "firstBoot": false,
     "piers": [
         "walzod-fogsed-mopfel-winrux",
-        "famwyl-lavlyr-mopfel-winrux"
+        "famwyl-lavlyr-mopfel-winrux",
+        "tabtes-sorlec-mopfel-winrux"
     ],
-    "pubkey": "SkxHTTFZRWxKNmpLSngzU0k0dmxMSjFsYUQyMWM2UUZvYUJqZjQxd3F6MD0K",
-    "privkey": "GH/c4yT4hJsNA5mKDu5LAgHg1PlX3vnBdQ8tKn0i+kM="
+    "pubkey": "czA5NVpSUE1zV0lJYSsraGNOT0l6VEVIWGRkdHVHQy9LU0tsQk1XVVlTZz0K",
+    "privkey": "kNXUh8xn6EcVO9wIonsC0Q4vjdvdIxzrwtYGkOmQtFs="
 }

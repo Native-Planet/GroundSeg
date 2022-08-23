@@ -1,0 +1,166 @@
+
+.greendot {
+  height: 25px;
+  width: 25px;
+  background-color: green;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.reddot {
+  height: 25px;
+  width: 25px;
+  background-color: red;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.eject-btn {
+ background-color: #ff7979;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+
+.stop-btn {
+ background: rgba(255,173,129,1.0);
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+.start-btn {
+ background-color: #79FFE3;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+.delete-btn {
+ background-color: red;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+.shutdown-btn {
+ background-color: red;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+.grey-btn {
+ background: rgba(255,255,255,0.3);
+ background-color: grey;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+}
+
+.log-select {
+ background-color: grey;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-top-left-radius: 6px;
+ border-top-right-radius: 6px;
+ border-bottom-left-radius: 6px;
+ border-bottom-right-radius: 6px;
+ color: #fff;
+}
+.green-btn {
+ width:100%;
+ background-color: green;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-top-left-radius: 6px;
+ border-top-right-radius: 6px;
+ border-bottom-left-radius: 6px;
+ border-bottom-right-radius: 6px;
+ color: #fff;
+}
+
+.blue-btn {
+ width:100%;
+ background-color: #28B8ED;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-top-left-radius: 6px;
+ border-top-right-radius: 6px;
+ border-bottom-left-radius: 6px;
+ border-bottom-right-radius: 6px;
+ color: #fff;
+}
+
+
+.black-btn {
+ width:100%;
+ background-color: #000;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-top-left-radius: 6px;
+ border-top-right-radius: 6px;
+ border-bottom-left-radius: 6px;
+ border-bottom-right-radius: 6px;
+ color: #fff;
+}
+
+.settings {
+   width: 40px;
+   height: auto;
+}
+
+.home {
+   width: 40px;
+   height: auto;
+}
+
+
+

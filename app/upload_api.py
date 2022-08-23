@@ -38,8 +38,7 @@ def uploadKey():
         patp = request.form['patp']
         key = request.form['key']
 
-        http_port = len(current_app.config['ORCHESTRATOR']._urbits)+8080
-        ames_port = len(current_app.config['ORCHESTRATOR']._urbits)+34343
+        http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPorts()
         urbit = make_urbit(patp, http_port, ames_port)
         urbit.addKey(key)
         current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
@@ -101,8 +100,7 @@ def uploadPier():
                 timeout = 10000
                 
                 patp = filename[:-4]
-                http_port = len(current_app.config['ORCHESTRATOR']._urbits)+8080
-                ames_port = len(current_app.config['ORCHESTRATOR']._urbits)+34343
+                http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPorts()
                 urbit = make_urbit(patp, http_port, ames_port)
                 urbit.copyFolder(current_app.config['TEMP_FOLDER'])
                 shutil.rmtree(os.path.join(current_app.config['TEMP_FOLDER'], patp))

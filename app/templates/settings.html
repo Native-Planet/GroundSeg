@@ -1,63 +1,85 @@
 <!doctype html>
 <head>
 <title>NativePlanet</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
+<style>
+
+body {
+  background: url({{ url_for('static', filename='background.png') }}) no-repeat center center fixed; 
+  -webkit-background-size: contain;
+  -moz-background-size: contain;
+  -o-background-size: contain;
+  background-size: contain;
+  background-color: #050505;
+}
+
+.wrapper {
+  width: calc((100% - 100px) / 5);
+  margin-left: calc(-1*(100% - 100px) / 10);
+  background: rgba(109,109,109,0.5);
+  padding: 20px 24px;
+  opacity: 1;
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  overflow: hidden;
+}
+
+
+</style>
+
+
 <body>
-   <h1> Settings </h1>
+<a href="/">
+   <img class='home' src={{ url_for('static', filename='home.png') }} />
+</a>
+<div class='wrapper'>
+   <h3> Settings </h3>
 
-<div>
 <div class="internet">
-   <h2> WiFi / Connection Settings </h2>
-</div>
+   <h3> WiFi / Connection Settings </h3>
 </div>
 
-<div>
 <div class="anchor">
-   <h2> Anchor Settings </h2>
-</div>
+   <h3> Anchor Settings </h3>
 </div>
 
-<div>
 <div class="bitcoin">
-   <h2> Bitcoin Location </h2>
+   <h3> Bitcoin Location </h3>
    TODO
 </div>
-</div>
 
-<div>
 <div class="sys_info">
-   <h2> System Dashboard </h2>
-   <h3> RAM </h3>
-      {{ ram }}%
-   <h3> Storage </h3> 
-      {{ '%0.2f'| format(disk.used / 1e9)  }} GB / {{ '%0.2f'| format(disk.total /1e9) }} GB
-   <h3> CPU Temp </h3>
-     {{ temp }} &deg;C
-</div>
+   <h3> System Information </h3>
+   <p> <b>RAM:</b> {{ ram }} %  </p>
+   <p> <b>Storage:</b> {{ '%0.2f'| format(disk.used / 1e9)  }} GB / {{ '%0.2f'| format(disk.total /1e9) }} GB</p> 
+   <p> <b>CPU Temp:</b> {{ temp }} &deg;C </p>
 </div>
 
-<div>
 <div class="shutdown">
    <h2> Shutdown/ Restart </h2>
    <form action = "/settings/shutdown" method="POST">
-      <input type = "submit" value="Shutdown" /></br>
+      <input class='shutdown-btn' type = "submit" value="Shutdown" /></br>
    </form>
    <form action = "/settings/restart" method="POST">
-      <input type = "submit" value="Restart" /></br>
+      <input class='grey-btn' type = "submit" value="Restart" /></br>
    </form>
 </div>
-</div>
 
-<div>
 <div class="log">
    <h2> Export Logs </h2>
    <form action = "/settings/logs" method="POST" enctype = "multipart/form-data">
-      <select name="logs">
+      <select class='log-select' name="logs">
          <option value="{{ container_logs[0] }}" selected>{{ container_logs[0] }}</option>
-      {% for container in container_logs[1:] %}
-         <option value="{{ container }}">{{ container }}</option>
-      {% endfor %}
+         {% for container in container_logs[1:] %}
+            <option value="{{ container }}">{{ container }}</option>
+         {% endfor %}
       </select>
-      <input type = "submit" value="View" name="logs" /></br>
+      <input class='grey-btn' type = "submit" value="View" name="logs" /></br>
    </form>
 </div>
 </div>
