@@ -174,3 +174,6 @@ tags
 # Persistent undo
 [._]*.un~
 shell
+
+# Svelte
+**/node_modules
