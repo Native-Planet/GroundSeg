@@ -1,0 +1,250 @@
+
+a { text-decoration: none; }
+p { color: rgba(255,255,255,0.7);}
+h2 { color: rgba(255,255,255,1);}
+h3 { color: rgba(255,255,255,0.7);}
+
+.greendot {
+  height: 25px;
+  width: 25px;
+  background-color: green;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.reddot {
+  height: 25px;
+  width: 25px;
+  background-color: red;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.running-pier {
+ background-color: green;
+ width: 85%;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.pier-settings {
+ width: 7%;
+ border: none;
+ padding: 10px 10px;
+ float:right;
+}
+
+.stop-btn {
+ background-color: #B45656;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+
+.eject-btn {
+ background-color: #A77121;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.start-btn {
+ background-color: #118F35;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.delete-btn {
+ background-color: #732222;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: rgba(255,255,255,0.7);
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.shutdown-btn {
+ background-color: #732222;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.gray-btn {
+ background: rgba(255,255,255,0.3);
+ background-color: grey;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+}
+
+.log-select {
+ background-color: grey;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-top-left-radius: 6px;
+ border-top-right-radius: 6px;
+ border-bottom-left-radius: 6px;
+ border-bottom-right-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+}
+.green-btn {
+ width:100%;
+ background-color: green;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.blue-btn {
+ width:100%;
+ background-color: #28B8ED;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+
+.black-btn {
+ width:100%;
+ background-color: #000;
+ border: none;
+ padding: 10px 10px;
+ text-align: center;
+ text-decoration: none;
+ display: inline-block;
+ font-size: 16px;
+ border-radius: 6px;
+ color: #fff;
+ font-family: Inter;
+ margin-top: 5px;
+ margin-bottom: 5px;
+}
+
+.copy {
+   width: auto;
+   height: 30px;
+   margin-left: 10px;
+   transform: translateY(10px);
+}
+
+.logo {
+   width: 40px;
+   height: auto;
+}
+
+
+.home {
+   width: 20px;
+   height: auto;
+}
+
+
+.upload-key {
+  padding: 12px 20px;
+  width: 100%;
+  margin: 8px auto;
+  display: inline-block;
+  border: none;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: Inter;
+  font-size: 16px;
+  color: white;
+  background: rgba(251,251,251,0.3);
+}
+.code {
+  padding: 12px 20px;
+  width: 100%;
+  margin: 8px auto;
+  display: inline-block;
+  border: none;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: Inter;
+  font-size: 16px;
+  text-align: center;
+  background: rgba(251,251,251,0.3);
+}
+
+/* Rounded border */
+hr.rounded {
+  border-top: 3px solid #bbb;
+  border-radius: 5px;
+}

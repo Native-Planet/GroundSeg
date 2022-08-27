@@ -1,10 +1,5 @@
-<script>
-  import Nav from '/src/Home/Nav.svelte'
-</script>
 
-<div class="container">
-  <Nav page="System Settings" />
-</div>
+<a href="/">home</a>
 <div class="container inputs">
   <div class="title">Todo</div>
 </div>
