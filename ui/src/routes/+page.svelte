@@ -1,27 +1,36 @@
 <script>
+  import { onMount } from 'svelte'
   import Logo from '/src/Components/Buttons/Logo.svelte'
   import Boot from '/src/Components/Buttons/Boot.svelte'
-  let piers = [
-    'dister-dozzod-donpub-datdux',
-    'tabtes-sorlec-mopfel-winrux',
-    'famwyl-lavlyr-mopfel-winrux'
-  ]
+
+  let piers
+
+  onMount(async () => {
+    fetch("http://localhost:5000/")
+      .then(res => res.json())
+      .then(data => piers = data)
+  })
+
 </script>
 
 <div class="home">
   <Logo />
   <div class="list">
-    {#each piers as p}
-      <div class="pier">
-        <div class="sigil">
+    {#if piers}
+      {#each piers as p}
+        <div class="pier">
+          <div class="sigil">
+          </div>
+          <div class="info">
+            <div class="patp">~{p.name}</div>
+            <div class="status">
+              {p.running ? "Running" : "Stopped"}
+            </div>
+          </div>
+          <img class="gear" src="/pier_settings.png" alt="gear" />
         </div>
-        <div class="info">
-          <div class="patp">~{p}</div>
-          <div class="status">Stopped</div>
-        </div>
-        <img class="gear" src="/pier_settings.png" alt="gear" />
-      </div>
-    {/each}
+      {/each}
+    {/if}
   </div>
   <Boot />
 </div>
