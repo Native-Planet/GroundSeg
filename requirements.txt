@@ -3,3 +3,4 @@ requests
 docker
 psutil
 flask-dropzone
+flask-cors
