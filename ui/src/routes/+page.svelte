@@ -1,14 +1,11 @@
 <script>
   import { onMount } from 'svelte'
+  import { url, piers } from '/src/Scripts/server'
   import Logo from '/src/Components/Buttons/Logo.svelte'
   import Boot from '/src/Components/Buttons/Boot.svelte'
 
-  let piers
-
   onMount(async () => {
-    fetch("http://localhost:5000/")
-      .then(res => res.json())
-      .then(data => piers = data)
+    fetch(url).then(r => r.json()).then(d => piers.set(d))
   })
 
 </script>
@@ -16,17 +13,19 @@
 <div class="home">
   <Logo />
   <div class="list">
-    {#if piers}
-      {#each piers as p}
+    {#if $piers}
+      {#each $piers as p}
         <div class="pier">
           <div class="sigil">
           </div>
-          <div class="info">
+          <a class="info"
+            href={p.running ? p.url : ""}
+            target={p.running ? "_blank" : ""}>
             <div class="patp">~{p.name}</div>
             <div class="status">
               {p.running ? "Running" : "Stopped"}
             </div>
-          </div>
+          </a>
           <img class="gear" src="/pier_settings.png" alt="gear" />
         </div>
       {/each}

@@ -1,49 +1,44 @@
 <script>
-  import Nav from '/src/Home/Nav.svelte'
+  import Logo from '/src/Components/Buttons/Logo.svelte'
 </script>
 
-<div class="container">
-  <Nav page="Boot an existing Urbit ID" />
-</div>
-<div class="container upload">
+<Logo />
+<div class="pier">
   <div class="title">Upload a pier folder</div>
   <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
   <div class="drop">
     <div class="text">Drop files here to upload</div>
   </div>
+  <a href="/">Cancel</a>
 </div>
 <style>
-  .container {
-    margin: auto;
-    width: 600px;
-    margin-top: 6em;
-  }
-  .upload {
-    background-color: rgba(19,19,19,0.6);
-    margin-top: 1em;
-    border-radius: 12px;
-    box-shadow: 0 0 12px #fff;
+
+  .pier {
+    display: flex;
+    flex-direction: column;
     color: inherit;
-    padding: 1em;
-    width: calc(600px - 2em);
+    padding: 20px;
+    width: 460px;
+    max-width: calc(80vw - 40px);
   }
+
   .title {
-    font-size: 1.2em;
-    font-weight: 600;
-    padding: .3em 0 0 20px;
+    font-size: 1.3em;
+    font-weight: 700;
+    padding-bottom: 6px;
     text-align: left;
   }
   .subtitle {
-    padding: .6em 0 0 20px;
-    opacity: .8;
-    font-weight: 600;
+    opacity: .7;
+    font-weight: 700;
+    font-size: .9em;
+    padding-bottom: 24px;
   }
   .drop {
     position: relative;
-    margin: 2em 2em 1em 2em;
-    height: 8em;
+    height: 120px;
     text-align: center;
-    border: 1px solid #444;
+    border: 1px solid #ffffff80;
   }
   .text {
     position: absolute;
@@ -51,4 +46,15 @@
     width: 100%;
     margin: auto;
   }
+  a {
+    margin-top: 24px;
+    padding: 12px 20px 12px 20px;
+    color: inherit;
+    text-align: center;
+    font-weight: 500;
+    border-radius: 8px;
+    background: #FFFFFF4D; 
+    font-size: 16px;
+  }
+
 </style>

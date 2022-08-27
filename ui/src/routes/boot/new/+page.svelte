@@ -1,53 +1,54 @@
 <script>
-  import Nav from '/src/Home/Nav.svelte'
+  import Logo from '/src/Components/Buttons/Logo.svelte'
+  import NewPier from '/src/Components/Buttons/NewPier.svelte'
+
+  let name, key
+
 </script>
 
-<div class="container">
-  <Nav page="Boot a new Urbit ID" />
-</div>
-<div class="container inputs">
-  <div class="title">Pier Name</div>
-  <input />
-  <div class="title">Pier Key</div>
-  <input />
-  <button class="submit">Submit</button>
+<Logo />
+<div class="key">
+  <div class="info">
+    <div class="title">Pier Name</div>
+    <input spellcheck="false" bind:value={name}/>
+  </div>
+  <div class="info">
+    <div class="title">Pier Key</div>
+    <input spellcheck="false" bind:value={key}/>
+  </div>
+  <NewPier {name} {key}/>
 </div>
 <style>
-  .container {
-    margin: auto;
-    width: 600px;
-    margin-top: 6em;
-  }
-  .inputs {
+  .key {
     display: flex;
     flex-direction: column;
-    background-color: rgba(19,19,19,0.6);
-    margin-top: 1em;
-    border-radius: 12px;
-    box-shadow: 0 0 12px #fff;
+    gap: 18px;
     color: inherit;
-    padding: 1em;
-    width: calc(600px - 2em);
+    padding: 20px;
+    width: 460px;
+    max-width: calc(80vw - 40px);
+  }
+  .info {
+    display: flex;
+    flex-direction: column;
   }
   .title {
-    font-size: 1em;
-    font-weight: 600;
-    padding: .3em 0 0 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
     text-align: left;
   }
   input {
-    margin: .6em 20px .6em 20px;
-  }
-  .submit {
-    padding: 1em;
-    background: #443cf4;
-    margin: 2em 20px .6em 20px;
-  }
-  .submit:hover {
+    flex: 1;
+    padding: 12px;
+    font-size: 16px;
     color: inherit;
-    opacity: .8;
+    font-weight: 700;
+    background: #FBFBFB80;
+    outline: none;
+    border: none;
+    border-radius: 6px;
   }
-  .submit:active {
-    opacity: .6;
+  input:focus {
+    background: #EBEBEB80;
   }
 </style>
