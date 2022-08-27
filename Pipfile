@@ -9,6 +9,7 @@ requests = "*"
 docker = "*"
 psutil = "*"
 flask-dropzone = "*"
+flask-cors = "*"
 
 [dev-packages]
 
