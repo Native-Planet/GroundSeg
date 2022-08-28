@@ -33,7 +33,7 @@
       </div>
       <div class="warning-content">
         <span>
-          Once your ship is booted on your Native Planet device, proceede to delete the Pier File on your other hosting device or service.
+          Once your ship is booted on your Native Planet device, proceed to delete the Pier File on your other hosting device or service.
         </span>
       </div>
       <div class="warning-content">
