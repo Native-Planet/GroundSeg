@@ -1,6 +1,6 @@
 import copy, json
-from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, jsonify
-from flask import render_template, make_response
+from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response
+from flask import render_template, make_response, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
@@ -38,7 +38,3 @@ def mainscreen():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
-
-
-print(orchestrator.getUrbits())
-
