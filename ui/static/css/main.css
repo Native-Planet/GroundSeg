@@ -1,5 +1,5 @@
 
-a { text-decoration: none; }
+a { text-decoration: none; color: inherit;}
 p { color: rgba(255,255,255,0.7);}
 h2 { color: rgba(255,255,255,1);}
 h3 { color: rgba(255,255,255,0.7);}

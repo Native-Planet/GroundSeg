@@ -21,12 +21,14 @@
           <a class="info"
             href={p.running ? p.url : ""}
             target={p.running ? "_blank" : ""}>
-            <div class="patp">~{p.name}</div>
+            <div class="patp">{p.name}</div>
             <div class="status">
               {p.running ? "Running" : "Stopped"}
             </div>
           </a>
-          <img class="gear" src="/pier_settings.png" alt="gear" />
+          <a href={p.name}>
+            <img class="gear" src="/pier_settings.png" alt="gear" />
+          </a>
         </div>
       {/each}
     {/if}

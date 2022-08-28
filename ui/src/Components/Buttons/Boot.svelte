@@ -28,7 +28,7 @@
   }
 
   .new {
-    background: #6e7f80;
+    background: #8599ad8e;
   }
 
 </style>
