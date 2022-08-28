@@ -1,6 +1,6 @@
 import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response
+from flask import render_template, make_response, jsonify
 from flask import current_app
 
 import os
@@ -38,10 +38,10 @@ def uploadKey():
         patp = request.form['patp']
         key = request.form['key']
 
-        http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPorts()
-        urbit = make_urbit(patp, http_port, ames_port)
-        urbit.addKey(key)
-        current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
+#        http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPorts()
+#        urbit = make_urbit(patp, http_port, ames_port)
+#        urbit.addKey(key)
+#        current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
         return redirect("/")
 
 
