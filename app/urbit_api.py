@@ -1,6 +1,6 @@
 import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response, send_file
+from flask import render_template, make_response, send_file, jsonify
 from flask import current_app
 
 
@@ -42,7 +42,7 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    return render_template('pier.html', pier = urbit)
+    return jsonify(urbit) #render_template('pier.html', pier = urbit)
 
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
