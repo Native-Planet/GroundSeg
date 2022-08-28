@@ -1,6 +1,31 @@
 <script>
   import Logo from '/src/Components/Buttons/Logo.svelte'
+  import Dropzone from "svelte-file-dropzone";
 
+  let files = {
+    accepted: [],
+    rejected: []
+  };
+
+  function handleFilesSelect(e) {
+    const { acceptedFiles, fileRejections } = e.detail;
+    files.accepted = [...files.accepted, ...acceptedFiles];
+    files.rejected = [...files.rejected, ...fileRejections];
+    if (files.accepted.length === 1) {
+      console.log(files)
+    /*
+    const f = new FormData()
+    f.append("patp", name)
+    f.append("key", key)
+    const r = fetch(url, {
+      method: 'POST',
+      body: f
+    })
+    */
+    // handle redirect after success
+    // .then(res => console.log(res))
+    }
+  }
   let warningCheck = false
 
 </script>
@@ -10,7 +35,8 @@
   {#if warningCheck}
     <div class="title">Upload a pier folder</div>
     <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
-    <div class="drop">
+    <Dropzone on:drop={handleFilesSelect} accept="application/zip, application/gzip"/>
+    <div id="dropper" class="drop">
       <div class="text">Drop files here to upload</div>
     </div>
     <a class="cancel-button" href="/">Cancel</a>
@@ -42,7 +68,7 @@
         </span>
       </div>
     </div>
-    <a class="learn" href="#">Learn more</a>
+    <a class="learn" href="">Learn more</a>
     <div class="buttons">
       <a href="/" class="back-button">Back</a>
       <button class="accept-button" on:click={()=> warningCheck = !warningCheck}>I Understand</button>

@@ -39,7 +39,7 @@
       <input spellcheck="false" bind:value={access}/>
     </div>
     <div class="commands">
-      <button class="cmd launch">Start Ship</button>
+      <button class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
       <button class="cmd eject">Eject/Migrate Pier</button>
       <button class="cmd delete">Delete Ship</button>
     </div>

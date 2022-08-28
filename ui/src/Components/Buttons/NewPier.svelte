@@ -4,12 +4,10 @@
 
   const boot = () => {
     const f = new FormData()
+    const u = url + "/upload/key"
     f.append("patp", name)
     f.append("key", key)
-    const r = fetch(url, {
-      method: 'POST',
-      body: f
-    })
+    const r = fetch(u, {method: 'POST',body: f})
     // handle redirect after success
     // .then(res => console.log(res))
   }
