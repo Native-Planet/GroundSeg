@@ -1,5 +1,12 @@
 <script>
   import Logo from '/src/Components/Buttons/Logo.svelte'
+  import SysInfo from '/src/Components/SysInfo.svelte'
+  import Power from '/src/Components/Power.svelte'
+  import Network from '/src/Components/Network.svelte'
+  import Anchor from '/src/Components/Anchor.svelte'
+  import Bitcoin from '/src/Components/Bitcoin.svelte'
+  import Logs from '/src/Components/Logs.svelte'
+
 </script>
 
 <div class="head">
@@ -7,40 +14,16 @@
   <div class="title">Settings</div>
 </div>
 <div class="container">
-
-  <div class="sys">
-    <div class="sys-title">System Information</div>
-    <div class="ram">RAM 12.5%</div>
-    <div class="storage">Storage 123 GB / 133 GB</div>
-    <div class="temp">CPU Temp 36 &deg C</div>
+  <div class="left-panel">
+    <Power />
+    <SysInfo />
+    <Network />
   </div>
-
-  <div class="setting">
-    <div class="setting-title">WiFi/Connection Settings</div>
+  <div class="right-panel">
+    <Anchor />
+    <Bitcoin />
+    <Logs />
   </div>
-
-  <div class="setting">
-    <div class="setting-title">Anchor Settings</div>
-  </div>
-
-  <div class="setting">
-    <div class="setting-title">Bitcoin Location</div>
-  </div>
-
-  <div class="control">
-    <div class="control-title">Power</div>
-    <div class="power-buttons">
-      <button class="shutdown">Shutdown</button>
-      <button class="restart">Restart</button>
-    </div>
-  </div>
-
-  <div class="logs">
-    <div class="logs-title">Export Logs</div>
-    <a class="view" href="#">View</a>
-    <button class="export">Export</button>
-  </div>
-
 </div>
 
 <style>
@@ -50,26 +33,26 @@
   }
   .container {
     padding: 20px;
-    width: 480px;
+    width: 800px;
     max-width: calc(100vw - 40px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .title {
     font-size: 24px;
     padding: 0 0 4px 16px;
   }
-  .setting {
-    padding: 8px 0 8px 0;
-  }
-  .setting-title {
-    font-size: 18px;
-  }
-  .sys {
-  padding-bottom: 12px;
-  }
-  .sys-title {
-    font-size: 18px;
-  }
-
 </style>
 
 
