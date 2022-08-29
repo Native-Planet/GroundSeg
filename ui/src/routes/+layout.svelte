@@ -5,11 +5,12 @@
 <Settings />
 <div class="container">
   <div class='slot'>
-    <slot />
+      <slot />
   </div>
 </div>
 
 <style>
+
   .container {
     position: fixed;
     top: 50%;

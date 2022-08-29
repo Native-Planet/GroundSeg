@@ -6,12 +6,15 @@
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
-  let pier, access, key
+  let pier, access, key, minIO
+  let local = true
 
   onMount(async () => {
     const u = url + "/urbit/pier?pier=" + path
     fetch(u).then(r => r.json()).then(d => pier = d)
   })
+
+  const toggleLocal = () => { local = !local }
 
 </script>
 
@@ -37,6 +40,17 @@
     <div class="info">
       <div class="title">External Access URL</div>
       <input spellcheck="false" bind:value={access}/>
+    </div>
+    <div class="info">
+      <div class="title">MinIO Bucket</div>
+      <input spellcheck="false" bind:value={minIO}/>
+    </div>
+    <div class="info">
+      <div class="title">Access</div>
+      <div class="access-options">
+        <button class="option" class:access-active={local} on:click={toggleLocal}>Local</button>
+        <button class="option" class:access-active={!local} on:click={toggleLocal}>Anchor</button>
+      </div>
     </div>
     <div class="commands">
       <button class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
@@ -96,8 +110,8 @@
   }
   input {
     flex: 1;
-    padding: 12px;
-    font-size: 16px;
+    padding: 8px;
+    font-size: 12px;
     color: inherit;
     font-weight: 700;
     background: #FBFBFB80;
@@ -108,7 +122,26 @@
   input:focus {
     background: #EBEBEB80;
   }
-
+  .access-options {
+    display: flex;
+    width: 240px;
+    border-radius: 8px;
+    background: #ffffff4d;
+    gap: 2px;
+  }
+  .option {
+    color: inherit;
+    font-size: 14px;
+    flex: 1;
+    padding: 8px 0 8px 0;
+    background: none;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+  }
+  .access-active {
+    background: #008eff;
+  }
   .commands {
     display: flex;
     flex-direction: column;
