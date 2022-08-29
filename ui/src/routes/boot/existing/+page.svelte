@@ -35,7 +35,9 @@
   {#if warningCheck}
     <div class="title">Upload a pier folder</div>
     <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
+    <!--
     <Dropzone on:drop={handleFilesSelect} accept="application/zip, application/gzip"/>
+    -->
     <div id="dropper" class="drop">
       <div class="text">Drop files here to upload</div>
     </div>
