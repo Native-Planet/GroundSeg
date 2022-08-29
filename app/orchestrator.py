@@ -22,9 +22,9 @@ class Orchestrator:
 
         self.wireguard = Wireguard(self.config)
         self.load_urbits()
-        if(len(self._urbits.keys())>0):
-            self.wireguard.setupWireguard(list(self._urbits.keys())[0])
-            self.wireguard.start()
+#        if(len(self._urbits.keys())>0):
+#            self.wireguard.setupWireguard(list(self._urbits.keys())[0])
+#            self.wireguard.start()
 
     def load_urbits(self):
         for p in self.config['piers']:
