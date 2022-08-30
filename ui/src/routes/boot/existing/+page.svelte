@@ -1,19 +1,6 @@
 <script>
-  import { onMount } from 'svelte'
-  import { url } from '/src/Scripts/server'
   import Logo from '/src/Components/Buttons/Logo.svelte'
-  import Dropzone from "dropzone"
-
-  onMount(()=> {
-    let myDropzone = new Dropzone("#dropper", {
-      paramName: "file", // The name that will be used to transfer the file
-      acceptedFiles: '.zip, .tar, .tgz, .gz',
-      chunking: true,
-      forceChunking: true,
-      url: url + '/upload/pier',
-      maxFilesize: 11000000, // megabytes
-      chunkSize: 50000000 // bytes
-  })})
+  import Dropzone from '/src/Components/Dropzone.svelte'
 
   let warningCheck = false
 
@@ -21,11 +8,10 @@
 
 <Logo />
 <div class="pier">
-  {#if !warningCheck}
+  {#if warningCheck}
     <div class="title">Upload a pier folder</div>
     <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
-    <div id="dropper" class="drop">
-    </div>
+    <Dropzone />
     <a class="cancel-button" href="/">Cancel</a>
   {:else}
     <div class="warning-title">
