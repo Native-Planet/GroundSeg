@@ -8,7 +8,6 @@
     flex-direction: column;
     background: #0000006d;
     width: 300px;
-    max-width: calc(100% - 80px);
     padding: 40px;
     border-radius: 15px;
     font-size: 18px;

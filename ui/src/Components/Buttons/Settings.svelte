@@ -1,5 +1,5 @@
 <a href="/settings" class="settings">
-  <img src="/settings.png" alt="settings logo" />
+  <img src="/settings.svg" alt="settings logo" />
 </a>
 
 <style>
@@ -16,7 +16,8 @@
   }
 
   img {
-    height: 60px;
-    width: 60px;
+    height: 24px;
+    width: 24px;
+    opacity: .6;
   }
 </style>

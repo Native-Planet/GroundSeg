@@ -1,17 +1,42 @@
+<script>
+  import { onMount } from 'svelte'
+  import { url } from '/src/Scripts/server'
+
+  let info
+
+  const update = () => {
+    fetch(url + "/settings").then(r => r.json()).then(d => info = d)
+    setTimeout(update, 1000)
+  }
+
+  onMount( async ()=> {
+    update()
+  })
+
+</script>
+
   <div class="sys">
     <div class="sys-title">System Information</div>
+    {#if info}
     <div class="hw">
       <div class="word">RAM</div>
-      <div class="data">12.5%</div>
+      <div class="data">{info.ram}%</div>
     </div>
     <div class="hw">
       <div class="word">CPU Temperature</div>
-      <div class="data">36 &deg C</div>
+      <div class="data">{info.temp} &deg C</div>
     </div>
     <div class="hw">
       <div class="word">Storage</div>
-      <div class="data">123 GB / 133 GB</div>
+      <div class="data">
+        <span>{(info.disk[1] / (1000 * 1000 * 1000)).toFixed(1)}</span> 
+        <span>GB / </span>
+        <span>
+          {(info.disk[0] / (1000 * 1000 * 1000)).toFixed(1)} GB
+        </span>
+      </div>
     </div>
+    {/if}
   </div>
 
 <style>
@@ -20,7 +45,6 @@
     flex-direction: column;
     background: #0000006d;
     width: 300px;
-    max-width: calc(100% - 80px);
     padding: 40px;
     border-radius: 15px;
     font-size: 18px;

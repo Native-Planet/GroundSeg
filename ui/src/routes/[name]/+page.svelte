@@ -15,10 +15,16 @@
   })
 
   const toggleLocal = () => { local = !local }
+  const togglePier = () => {
+    const u = url + "/urbit/"
+    const f = "dist"
+    const r = fetch(u, {method: 'POST',body: f})
+
+  }
 
 </script>
 
-<Logo />
+<Logo t="Pier Settings" back=true />
 <div class="ship">
   {#if pier}
     <div class="card">
@@ -33,6 +39,7 @@
         </div>
       </div>
     </div>
+    {#if pier.running}
     <div class="info">
       <div class="title">Login Key</div>
       <input spellcheck="false" type="password" bind:value={key}/>
@@ -52,8 +59,9 @@
         <button class="option" class:access-active={!local} on:click={toggleLocal}>Anchor</button>
       </div>
     </div>
+    {/if}
     <div class="commands">
-      <button class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
+      <button on:click={togglePier} class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
       <button class="cmd eject">Eject/Migrate Pier</button>
       <button class="cmd delete">Delete Ship</button>
     </div>

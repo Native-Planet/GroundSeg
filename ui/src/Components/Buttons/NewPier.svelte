@@ -7,9 +7,13 @@
     const u = url + "/upload/key"
     f.append("patp", name)
     f.append("key", key)
-    const r = fetch(u, {method: 'POST',body: f})
-    // handle redirect after success
-    // .then(res => console.log(res))
+    fetch(u, {method: 'POST',body: f})
+      .then(d => d.json())
+      .then(res => {
+        if (res === 200) {
+          window.location.href = "/"
+        }
+      })
   }
 </script>
 

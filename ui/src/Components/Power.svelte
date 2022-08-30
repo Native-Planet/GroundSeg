@@ -1,8 +1,8 @@
 <script>
   import Fa from 'svelte-fa'
   import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
-</script>
 
+</script>
 <div class="control">
   <div class="control-title">Power</div>
   <button class="shutdown">
@@ -20,7 +20,6 @@
     display: flex;
     background: #0000006d;
     width: 300px;
-    max-width: calc(100% - 80px);
     padding: 10px 40px 10px 40px;
     border-radius: 15px;
     font-size: 18px;

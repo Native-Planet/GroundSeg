@@ -1,5 +1,5 @@
   <div class="network">
-    <div class="network-title">Bitcoin Location</div>
+    <div class="network-title">MinIO Settings</div>
   </div>
 
 <style>

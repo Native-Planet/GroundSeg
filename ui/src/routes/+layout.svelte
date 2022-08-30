@@ -1,8 +1,12 @@
 <script>
   import Settings from '/src/Components/Buttons/Settings.svelte'
+  import { page } from '$app/stores';
+
 </script>
 
-<Settings />
+{#if !($page.url.pathname === "/settings")}
+  <Settings />
+{/if}
 <div class="container">
   <div class='slot'>
       <slot />
@@ -17,6 +21,8 @@
     left: 50%;
     transform: translate(-50%, -50%);
     color: #fff;
+    overflow: auto;
+    max-height: calc(100vh - 120px);
   }
   
   .slot {
