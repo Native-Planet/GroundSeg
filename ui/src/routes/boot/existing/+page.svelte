@@ -1,45 +1,30 @@
 <script>
+  import { onMount } from 'svelte'
+  import { url } from '/src/Scripts/server'
   import Logo from '/src/Components/Buttons/Logo.svelte'
-  import Dropzone from "svelte-file-dropzone";
+  import Dropzone from "dropzone"
 
-  let files = {
-    accepted: [],
-    rejected: []
-  };
+  onMount(()=> {
+    let myDropzone = new Dropzone("#dropper", {
+      paramName: "file", // The name that will be used to transfer the file
+      acceptedFiles: '.zip, .tar, .tgz, .gz',
+      chunking: true,
+      forceChunking: true,
+      url: url + '/upload/pier',
+      maxFilesize: 11000000, // megabytes
+      chunkSize: 50000000 // bytes
+  })})
 
-  function handleFilesSelect(e) {
-    const { acceptedFiles, fileRejections } = e.detail;
-    files.accepted = [...files.accepted, ...acceptedFiles];
-    files.rejected = [...files.rejected, ...fileRejections];
-    if (files.accepted.length === 1) {
-      console.log(files)
-    /*
-    const f = new FormData()
-    f.append("patp", name)
-    f.append("key", key)
-    const r = fetch(url, {
-      method: 'POST',
-      body: f
-    })
-    */
-    // handle redirect after success
-    // .then(res => console.log(res))
-    }
-  }
   let warningCheck = false
 
 </script>
 
 <Logo />
 <div class="pier">
-  {#if warningCheck}
+  {#if !warningCheck}
     <div class="title">Upload a pier folder</div>
     <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
-    <!--
-    <Dropzone on:drop={handleFilesSelect} accept="application/zip, application/gzip"/>
-    -->
     <div id="dropper" class="drop">
-      <div class="text">Drop files here to upload</div>
     </div>
     <a class="cancel-button" href="/">Cancel</a>
   {:else}
