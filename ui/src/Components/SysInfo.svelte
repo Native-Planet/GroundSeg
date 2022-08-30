@@ -1,18 +1,5 @@
 <script>
-  import { onMount } from 'svelte'
-  import { url } from '/src/Scripts/server'
-
-  let info
-
-  const update = () => {
-    fetch(url + "/settings").then(r => r.json()).then(d => info = d)
-    setTimeout(update, 1000)
-  }
-
-  onMount( async ()=> {
-    update()
-  })
-
+  export let info
 </script>
 
   <div class="sys">
