@@ -64,6 +64,7 @@ def start_pier():
 def stop_pier():
     url = "/"
     if request.method == 'POST':
+        print(request.form)
         for p in request.form:
             urbit = current_app.config['ORCHESTRATOR']._urbits[p]
             if(urbit==None):
@@ -71,7 +72,8 @@ def stop_pier():
             urbit.stop()
             url = f'/urbit/pier?pier={urbit.pier_name}'
             
-    return redirect(url)
+    # pier stopped
+    return jsonify(200)
 
 @app.route("/urbit/eject", methods=['POST'])
 def eject_pier():
