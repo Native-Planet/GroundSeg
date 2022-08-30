@@ -42,7 +42,8 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    return jsonify(urbit) #render_template('pier.html', pier = urbit)
+    # pier exists
+    return jsonify(urbit)
 
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
@@ -56,7 +57,8 @@ def start_pier():
             url = f'/urbit/pier?pier={urbit.pier_name}'
             time.sleep(2)
             
-    return redirect(url)
+    # pier started
+    return jsonify(200)
 
 @app.route("/urbit/stop", methods=['POST'])
 def stop_pier():
