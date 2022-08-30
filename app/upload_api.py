@@ -42,7 +42,9 @@ def uploadKey():
 #        urbit = make_urbit(patp, http_port, ames_port)
 #        urbit.addKey(key)
 #        current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
-        return redirect("/")
+        
+        # success
+        return jsonify(200)
 
 
 
