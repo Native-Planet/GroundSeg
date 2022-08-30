@@ -28,6 +28,7 @@ def settings():
     disk = shutil.disk_usage("/")
 
     return jsonify({
+        "containerLogs": container_logs,
         "ram": ram.percent,
         "disk" : disk,
         "temp" : temp,
