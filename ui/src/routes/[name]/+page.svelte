@@ -3,31 +3,89 @@
   import { url } from '/src/Scripts/server'
   import { page } from '$app/stores';
   import Logo from '/src/Components/Buttons/Logo.svelte'
+  import DeleteWarning from '/src/Components/DeleteWarning.svelte'
+  import Sigil from '/src/Components/Sigil.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
-  let access, key, minIO
-  let data = {'nw_label': '', 'pier':{}}
+
+  let access, key, minIO,
+    loading = false,
+    ejecting = false,
+    deleteCheck = false,
+    data = {'nw_label': '', 'pier':{}}
 
   onMount(async () => {
+    getPierData()
+  })
+  
+  const getPierData = () => {
     const u = url + "/urbit/pier?pier=" + path
     fetch(u).then(r => r.json()).then(d => data = d)
-  })
+  }
+
+  const ejectPier = () => {
+    ejecting = true
+    let u = url + "/urbit/eject"
+    const f = new FormData()
+    f.append(data.pier.name, 'eject')
+
+    fetch(u, {method: 'POST',body: f})
+    .then(res => { return res.blob(); })
+    .then(d => {
+      ejecting = false
+      var a = document.createElement("a")
+      a.href = window.URL.createObjectURL(d)
+      a.download = data.pier.name
+      a.click()
+    })}
 
   const toggleNetwork = () => { console.log("POST placeholder") }
-  const togglePier = () => {
-    const u = url + "/urbit/"
-    const f = "dist"
-    const r = fetch(u, {method: 'POST',body: f})
 
+  const togglePier = () => {
+    loading = true
+    let u = url + "/urbit/"
+    const f = new FormData()
+    if (data.pier.running) {
+      f.append(data.pier.name, 'stop')
+      u = u + 'stop'
+    }
+
+    if (!data.pier.running) {
+      f.append(data.pier.name, 'start')
+      u = u + 'start'
+    }
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => {
+        if (d == 200) {
+          getPierData()
+          loading = false
+      }})
   }
+
+  const deletePier = () => {
+    let u = url + "/urbit/delete"
+    const f = new FormData()
+    f.append(data.pier.name, 'delete')
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        window.location.href = "/"
+   }})}
+
 
 </script>
 <Logo t="Pier Settings" />
 <div class="ship">
   {#if data}
+  {#if deleteCheck}
+    <DeleteWarning on:back={()=>deleteCheck = false} on:delete={deletePier} name={data.pier.name} />
+  {:else}
     <div class="card">
-      <div class="sigil"></div>
+      <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
         <div class="status {data.pier.running ? "running" : ""}">
           {data.pier.running ? "Running" : "Stopped"} 
@@ -59,10 +117,17 @@
     </div>
     {/if}
     <div class="commands">
-      <button on:click={togglePier} class="cmd launch">{data.pier.running ? "Suspend" : "Start"} Ship</button>
-      <button class="cmd eject">Eject/Migrate Pier</button>
-      <button class="cmd delete">Delete Ship</button>
+      <button on:click={togglePier} class="cmd launch">
+        {data.pier.running ? "Suspend" : "Start"}{loading ? "ing" : " Ship"}
+      </button>
+      <button 
+        on:click={ejectPier}
+        class="cmd eject">
+        Eject{ejecting ? "ing" : " Pier"}
+      </button>
+      <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
     </div>
+  {/if}
   {/if}
 </div>
 
@@ -77,13 +142,6 @@
     gap: 20px;
     align-items: end;
     margin-bottom: 24px;
-  }
-  .sigil {
-    width: 87px;
-    height: 87px;
-    max-height: 87px;
-    background: #111;
-    border-radius: 15px;
   }
   .status {
     opacity: .8;

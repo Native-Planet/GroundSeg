@@ -3,6 +3,7 @@
   import { url, piers } from '/src/Scripts/server'
   import Logo from '/src/Components/Buttons/Logo.svelte'
   import Boot from '/src/Components/Buttons/Boot.svelte'
+  import Sigil from '/src/Components/Sigil.svelte'
 
   onMount(async () => {
     fetch(url).then(r => r.json()).then(d => piers.set(d))
@@ -16,8 +17,7 @@
     {#if $piers}
       {#each $piers as p}
         <div class="pier">
-          <div class="sigil">
-          </div>
+          <Sigil patp={p.name} size="60px" rad="8px" />
           <a class="info"
             href={p.running ? p.url : ""}
             target={p.running ? "_blank" : ""}>
