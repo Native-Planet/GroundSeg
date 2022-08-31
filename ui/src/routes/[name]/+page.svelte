@@ -6,15 +6,15 @@
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
-  let pier, access, key, minIO
-  let local = true
+  let access, key, minIO
+  let data = {'nw_label': '', 'pier':{}}
 
   onMount(async () => {
     const u = url + "/urbit/pier?pier=" + path
-    fetch(u).then(r => r.json()).then(d => pier = d)
+    fetch(u).then(r => r.json()).then(d => data = d)
   })
 
-  const toggleLocal = () => { local = !local }
+  const toggleNetwork = () => { console.log("POST placeholder") }
   const togglePier = () => {
     const u = url + "/urbit/"
     const f = "dist"
@@ -23,23 +23,21 @@
   }
 
 </script>
-
-<Logo t="Pier Settings" back=true />
+<Logo t="Pier Settings" />
 <div class="ship">
-  {#if pier}
+  {#if data}
     <div class="card">
       <div class="sigil"></div>
       <div class="info">
-        <div class="status {pier.running ? "running" : ""}">
-          {pier.running ? "Running" : "Stopped"} 
+        <div class="status {data.pier.running ? "running" : ""}">
+          {data.pier.running ? "Running" : "Stopped"} 
         </div>
         <div class="patp">
-          {pier.name}
-          <span class="nick">Nickname</span>
+          {data.pier.name}
         </div>
       </div>
     </div>
-    {#if pier.running}
+    {#if data.pier.running}
     <div class="info">
       <div class="title">Login Key</div>
       <input spellcheck="false" type="password" bind:value={key}/>
@@ -55,13 +53,13 @@
     <div class="info">
       <div class="title">Access</div>
       <div class="access-options">
-        <button class="option" class:access-active={local} on:click={toggleLocal}>Local</button>
-        <button class="option" class:access-active={!local} on:click={toggleLocal}>Anchor</button>
+        <button class="option" class:access-active={data.nw_label === 'Local'} on:click={toggleNetwork}>Local</button>
+        <button class="option" class:access-active={data.nw_label === 'Remote'} on:click={toggleNetwork}>Remote</button>
       </div>
     </div>
     {/if}
     <div class="commands">
-      <button on:click={togglePier} class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
+      <button on:click={togglePier} class="cmd launch">{data.pier.running ? "Suspend" : "Start"} Ship</button>
       <button class="cmd eject">Eject/Migrate Pier</button>
       <button class="cmd delete">Delete Ship</button>
     </div>
@@ -96,11 +94,6 @@
   }
   .running {
     color: lime;
-  }
-  .nick {
-    padding-left: 6px;
-    font-style: oblique;
-    font-size: 14px;
   }
   .patp {
     font-size: 16px;
