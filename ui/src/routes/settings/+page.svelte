@@ -24,7 +24,7 @@
 
 </script>
 
-<Logo t="System Settings" back=true />
+<Logo t="System Settings" />
 <div class="container">
   <div class="panel">
     <Power />
