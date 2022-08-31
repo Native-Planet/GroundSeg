@@ -56,6 +56,29 @@ class UrbitDocker:
                                     detach=True)
 
 
+    def setNetworking(self, url, port, network):
+        running = False
+        if(self.isRunning()):
+            self.stop()
+            running = True
+        
+        self.container.remove()
+        self.settings['network']=network
+        self.settings['url'] = url
+        if(network=='wireguard'):
+            self.settings['wg_port'] = port
+        else:
+            self.settings['http_port'] = port
+        self.buildContainer()
+        self.save_config()
+
+        if(running):
+            self.start()
+
+    def save_config(self):
+        with open(f'settings/{self.pier_name}.json', 'w') as f:
+            json.dump(self.config, f, indent = 4)
+
 
 
     def buildUrbit(self):
@@ -83,7 +106,6 @@ class UrbitDocker:
         return self.container.exec_run('/bin/reset-urbit-code').output.strip()
 
     def start(self):
-        print(self.config)
         self.container.start()
         self.running=True
 

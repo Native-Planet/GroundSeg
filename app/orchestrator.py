@@ -59,6 +59,7 @@ class Orchestrator:
                 u['code'] = urbit.get_code().decode('utf-8')
             else:
                 u['code'] = ""
+            u['network'] = urbit.config['network']
             urbits.append(u)
         return urbits
     
@@ -67,6 +68,12 @@ class Orchestrator:
         containers.append('wireguard')
         containers.append('minio')
         return containers
+
+    def switchUrbitNetwork(self, urbit_name):
+        urbit = self._urbits[urbit_name]
+        
+
+        urbit.setNetworking(url, port, network);
 
     def getOpenUrbitPort(self):
         http_port = 0

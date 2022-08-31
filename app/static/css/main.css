@@ -8,6 +8,7 @@
   opacity: 1;
   border-radius: 20px;
   overflow: hidden;
+  backdrop-filter: blur(60px);
 }
 
 
