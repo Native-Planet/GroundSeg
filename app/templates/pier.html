@@ -2,6 +2,7 @@
 <head>
 <title>NativePlanet</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='./css/main.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='./css/switch.css') }}">
 <script>
 function copyCode() {
   /* Get the text field */
@@ -58,6 +59,7 @@ body {
       <img class='copy' src={{ url_for('static', filename='copy.png') }} />
    </button>
    -->
+<hr class="rounded">
 
 
 <form action = "/urbit/stop" method="POST">
@@ -65,13 +67,15 @@ body {
 </form>
 
 {% else %}
-</br></br></br>
 <form action = "/urbit/start" method="POST">
    <input class='start-btn' type="submit" value="Start" name="{{ pier['name'] }}" />
 </form>
 
 {% endif %}
-<hr class="rounded">
+
+<form action = "/urbit/network" method="POST">
+   <input class='start-btn' type="submit" value="Set to {{ nw_label }} Network" name="{{ pier['name'] }}" />
+</form>
 
 <form action = "/urbit/eject" method="POST">
    <input class='eject-btn' type="submit" value="Eject" name="{{ pier['name'] }}" />

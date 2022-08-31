@@ -42,7 +42,17 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    return render_template('pier.html', pier = urbit)
+    print(u)
+    nw_label = "Local"
+    if(u['network'] != 'none'):
+        nw_label = "Remote"
+
+    return render_template('pier.html', pier = urbit, nw_label = nw_label)
+
+@app.route("/urbit/network", methods=['POST'])
+def set_network():
+    for pier in request.form:
+        return redirect(f'/urbit/pier?pier={pier}')
 
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
