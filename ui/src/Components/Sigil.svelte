@@ -4,6 +4,6 @@
 
 <img
   src="/sigil.svg" 
-  alt="urbit sigil"
+  alt="urbit sigil: {patp}"
   style="border-radius: {rad}"
   width={size}/>
