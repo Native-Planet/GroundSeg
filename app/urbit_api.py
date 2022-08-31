@@ -47,7 +47,13 @@ def pier_info():
     if(u['network'] != 'none'):
         nw_label = "Remote"
 
-    return render_template('pier.html', pier = urbit, nw_label = nw_label)
+    p = dict()
+    p['nw_label'] = nw_label
+    p['pier'] = urbit
+
+    return(jsonify(p))
+
+    #return render_template('pier.html', pier = urbit, nw_label = nw_label)
 
 @app.route("/urbit/network", methods=['POST'])
 def set_network():
