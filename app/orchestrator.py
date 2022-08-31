@@ -22,9 +22,9 @@ class Orchestrator:
 
         self.wireguard = Wireguard(self.config)
         self.load_urbits()
-#        if(len(self._urbits.keys())>0):
-#            self.wireguard.setupWireguard(list(self._urbits.keys())[0])
-#            self.wireguard.start()
+        if(len(self._urbits.keys())>0):
+            self.wireguard.setupWireguard(list(self._urbits.keys())[0])
+            self.wireguard.start()
 
     def load_urbits(self):
         for p in self.config['piers']:
@@ -54,12 +54,11 @@ class Orchestrator:
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
-            u['url'] = f'http;//192.168.0.229:{urbit.config["http_port"]}'
+            u['url'] = f'http://192.168.0.172:{urbit.config["http_port"]}'
             if(urbit.isRunning()):
                 u['code'] = urbit.get_code().decode('utf-8')
             else:
                 u['code'] = ""
-            u['network'] = urbit.config['network']
             urbits.append(u)
         return urbits
     
@@ -69,21 +68,16 @@ class Orchestrator:
         containers.append('minio')
         return containers
 
-    def switchUrbitNetwork(self, urbit_name):
-        urbit = self._urbits[urbit_name]
-        
-
-        urbit.setNetworking(url, port, network);
-
     def getOpenUrbitPort(self):
         http_port = 0
         ames_port = 34343
 
-        for u in self._urbits.values:
-            if(u.config['http_port'] >= http_port):
-                http_port = u.config['http_port']
-            if(u.config['ames_port'] >= ames_port):
-                ames_port = u.config['ames_port']
+
+        #for u in self._urbits.values:
+        #    if(u.config['http_port'] >= http_port):
+        #        http_port = u.config['http_port']
+        #    if(u.config['ames_port'] >= ames_port):
+        #        ames_port = u.config['ames_port']
 
         return http_port+1, ames_port+1
 
