@@ -42,10 +42,9 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    print(u)
     nw_label = "Local"
-    if(u['network'] != 'none'):
-        nw_label = "Remote"
+#    if(u['network'] != 'none'):
+#        nw_label = "Remote"
 
     p = dict()
     p['nw_label'] = nw_label
@@ -64,6 +63,7 @@ def set_network():
 def start_pier():
     url = "/"
     if request.method == 'POST':
+        print(request.form)
         for p in request.form:
             urbit = current_app.config['ORCHESTRATOR']._urbits[p]
             if(urbit==None):
@@ -123,7 +123,8 @@ def delete_pier():
         for p in request.form:
             current_app.config['ORCHESTRATOR'].removeUrbit(p)
              
-    return redirect('/')
+    # pier deleted
+    return jsonify(200)
 
 
 
