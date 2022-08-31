@@ -149,7 +149,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-top: 12px;
+    padding-top: 18px;
   }
   .cmd {
     background: none;
