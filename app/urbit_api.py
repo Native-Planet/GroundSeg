@@ -42,9 +42,6 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    # pier exists
-    return jsonify(urbit)
-
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
     url = "/"
