@@ -69,15 +69,14 @@ class Orchestrator:
         return containers
 
     def getOpenUrbitPort(self):
-        http_port = 0
+        http_port = 8080
         ames_port = 34343
-
-
-        #for u in self._urbits.values:
-        #    if(u.config['http_port'] >= http_port):
-        #        http_port = u.config['http_port']
-        #    if(u.config['ames_port'] >= ames_port):
-        #        ames_port = u.config['ames_port']
+        
+        for u in self._urbits.values():
+            if(u.config['http_port'] >= http_port):
+                http_port = u.config['http_port']
+            if(u.config['ames_port'] >= ames_port):
+                ames_port = u.config['ames_port']
 
         return http_port+1, ames_port+1
 

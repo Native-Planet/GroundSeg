@@ -1,0 +1,9 @@
+{
+    "pier_name": "solsel-divneb-nallux-dozryl",
+    "http_port": 8081,
+    "ames_port": 34345,
+    "wg_http": 80,
+    "urbit_version": "latest",
+    "network": "none",
+    "url": "none"
+}

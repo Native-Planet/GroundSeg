@@ -1,7 +1,10 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { url } from '/src/Scripts/server'
   import { page } from '$app/stores';
+  import Fa from 'svelte-fa'
+  import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
+
   import Logo from '/src/Components/Buttons/Logo.svelte'
   import DeleteWarning from '/src/Components/DeleteWarning.svelte'
   import Sigil from '/src/Components/Sigil.svelte'
@@ -13,15 +16,19 @@
   let loading = false,
     ejecting = false,
     deleteCheck = false,
-    data = {'nw_label': '', 'pier':{}}
+    data = {'nw_label': '', 'pier':{}},
+    advanced = false,
+    shown = true
 
-  onMount(async () => {
-    getPierData()
-  })
+  onMount(() => getPierData())
+  onDestroy(() => shown = false)
   
   const getPierData = () => {
-    const u = url + "/urbit/pier?pier=" + path
-    fetch(u).then(r => r.json()).then(d => data = d)
+    if (shown) {
+      const u = url + "/urbit/pier?pier=" + path
+      fetch(u).then(r => r.json()).then(d => data = d)
+      setTimeout(getPierData, 1000)
+    }
   }
 
   const ejectPier = () => {
@@ -60,7 +67,6 @@
       .then(r => r.json())
       .then(d => {
         if (d == 200) {
-          getPierData()
           loading = false
       }})
   }
@@ -87,13 +93,19 @@
     <div class="card">
       <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
-        <div class="status {data.pier.running ? "running" : ""}">
-          {data.pier.running ? "Running" : "Stopped"} 
-        </div>
+        {#if data.pier.running}
+          {#if data.pier.code.length < 1}
+            <div class="status booting">Booting</div>
+          {:else}
+            <div class="status running">Running</div>
+          {/if}
+        {:else}
+          <div class="status">Stopped</div>
+        {/if}
         <div class="patp">{data.pier.name}</div>
       </div>
     </div>
-    {#if data.pier.running}
+    {#if data.pier.running && data.pier.code.length > 1}
       <PierCredentials
         code={data.pier.code}
         ext={data.pier.url}
@@ -103,12 +115,18 @@
       <button on:click={togglePier} class="cmd launch">
         {data.pier.running ? "Suspend" : "Start"}{loading ? "ing" : " Ship"}
       </button>
-      <button 
-        on:click={ejectPier}
-        class="cmd eject">
-        Eject{ejecting ? "ing" : " Pier"}
-      </button>
-      <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+      <span class="advanced" on:click={()=> advanced = !advanced}>
+        Advance Options
+        <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
+      </span>
+      {#if advanced}
+        <button 
+          on:click={ejectPier}
+          class="cmd eject">
+          Eject{ejecting ? "ing" : " Pier"}
+        </button>
+        <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+      {/if}
     </div>
   {/if}
   {/if}
@@ -132,6 +150,9 @@
     font-size: .8em;
     padding-bottom: 6px;
     color: red;
+  }
+  .booting {
+    color: orange;
   }
   .running {
     color: lime;
@@ -160,6 +181,13 @@
     border-radius: 8px;
     padding: 9px;
     width: 180px;
+    cursor: pointer;
+  }
+
+  .advanced {
+    font-size: 14px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     cursor: pointer;
   }
 
