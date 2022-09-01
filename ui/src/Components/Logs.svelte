@@ -1,16 +1,53 @@
 <script>
+  import { onMount } from 'svelte'
+  import { url } from '/src/Scripts/server'
+  import Select from 'svelte-select'
   import Fa from 'svelte-fa'
-  import { faChevronDown } from '@fortawesome/free-solid-svg-icons/index.es'
-</script>
 
+  let container = null, logs = [], data = []
+
+  onMount(() => {
+    fetch(url + "/settings/logs").then(r => r.json()).then(d => {
+      for (let i = 0; i < d.length; i++) {
+        let value = d[i]
+        let label = d[i].charAt(0).toUpperCase() + d[i].slice(1)
+        logs[i] = {value: value, label: label}
+      }
+      data = d
+  })})
+
+  const inc = c => !(data.includes(c))
+
+  const exportLog = c => {
+    const u = url + "/settings/logs"
+    const f = new FormData()
+    f.append('logs', container)
+    fetch(u, {method: 'POST', body: f})
+      .then(r => r.json()).then(d => {
+          var element = document.createElement('a')
+          element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(d))
+          element.setAttribute('download', container)
+          element.style.display = 'none'
+          document.body.appendChild(element)
+          element.click()
+          document.body.removeChild(element)
+    })}
+
+</script>
   <div class="network">
     <div class="network-title">Export Logs</div>
-    <select>
-      <option>dister-dozzod-donpub-datdux</option>
-    </select>
+    <div class="select">
+      <Select
+          items={logs}
+          on:clear={()=> container = null}
+          on:select={e => container = e.detail.value} />
+    </div>
     <div class="buttons">
-      <a class="view" href="#">View</a>
-      <button class="export">Export</button>
+      <a class="view" class:disabled={inc(container)} href="/logs/{container}">View</a>
+      <button
+        on:click={exportLog(container)}
+        class="export"
+        class:disabled={inc(container)}>Export</button>
     </div>
   </div>
 
@@ -29,23 +66,21 @@
     font-size: 18px;
     padding-bottom: 8px;
   }
-  select {
-    border: none;
-    background: #ffffff4d;
-    color: inherit;
-    padding: 12px;
+  .select {
+    --background: #ffffff4d;
+    --border: none;
+    --borderRadius: 8px;
+    --inputColor: #ffffff;
+    --inputPadding: 12px;
+    --listBackground: #3d3d3d;
+    --itemHoverBG: #0000004d;
+    --itemIsActiveBG: #000;
+    --placeholderColor: #fff;
     font-size: 14px;
     font-weight: 700;
     border-radius: 8px;
     appearance: none;
-    background-image: url("/chevron-down-solid.svg");
-    background-repeat: no-repeat;
-    background-position: top 50% right 12px;
-    background-size: 13px;
-    margin-bottom: 8px;
-  }
-  select:focus {
-    outline: none;
+    margin-bottom: 12px;
   }
   .buttons {
     display: flex;
@@ -70,5 +105,10 @@
     cursor: pointer;
     border: none;
     color: white;
+  }
+
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

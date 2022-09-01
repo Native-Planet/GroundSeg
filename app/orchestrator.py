@@ -98,6 +98,7 @@ class Orchestrator:
             u['network'] = urbit.config['network']
             
             urbits.append(u)
+
         return urbits
     
     def getContainers(self):
