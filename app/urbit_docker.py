@@ -35,13 +35,12 @@ class UrbitDocker:
             if(self.pier_name == c.name):
                 self.container = c
                 return
-        command = f'/urbit/start_urbit.sh --http-port={self.config["http_port"]} --port={self.config["ames_port"]}'
         if(self.config["network"] != "none"):
+            command = f'/urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
+                                          --port={self.config["wg_ames_port"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     command=command, 
-                                    #ports = {'80/tcp':self.config['http_port'], 
-                                     #        '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
                                     mounts = [self.mount],
@@ -56,21 +55,40 @@ class UrbitDocker:
                                     detach=True)
 
 
-    def setNetworking(self, url, port, network):
+    def setWireguardNetwork(self, url, http_port, ames_port, s3_port):
+        self.config['wg_url'] = url
+        self.config['wg_http_port'] = http_port
+        self.config['wg_ames_port'] = ames_port
+        self.config['wg_s3_port'] = s3_port
+        self.config['network'] = 'wireguard'
+        self.save_config()
+
+        running = False
+        
+        if(self.isRunning()):
+            self.stop()
+            running = True
+
+        self.container.remove()
+        
+        self.buildContainer()
+        if(running):
+            self.start()
+
+    def setNetwork(self, network):
+        if(self.config['network'] == network):
+            return
+
         running = False
         if(self.isRunning()):
             self.stop()
             running = True
         
         self.container.remove()
-        self.settings['network']=network
-        self.settings['url'] = url
-        if(network=='wireguard'):
-            self.settings['wg_port'] = port
-        else:
-            self.settings['http_port'] = port
-        self.buildContainer()
+        self.config['network']=network
         self.save_config()
+
+        self.buildContainer()
 
         if(running):
             self.start()

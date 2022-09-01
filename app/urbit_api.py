@@ -25,9 +25,13 @@ app = Blueprint('urbit', __name__, template_folder='templates')
 def pier_access():
     pier = request.args.get('pier')
     urbit = current_app.config['ORCHESTRATOR']._urbits[pier]
-    port = urbit.config['http_port']
 
-    return redirect(f"http://192.168.0.229:{port}") # TODO dont hardcode this
+    url = f"http://nativeplanet.local:{urbit.config['http_port']}"
+    
+    if(urbit.config['network']=='wireguard'):
+        url = f"http://{urbit.config['wg_url']}"
+    
+    return redirect(url)
 
 @app.route('/urbit/pier', methods=['GET'])
 def pier_info():
@@ -44,7 +48,7 @@ def pier_info():
 
     print(u)
     nw_label = "Local"
-    if(u['network'] != 'none'):
+    if(u['network'] == 'none'):
         nw_label = "Remote"
 
     return render_template('pier.html', pier = urbit, nw_label = nw_label)
@@ -52,7 +56,9 @@ def pier_info():
 @app.route("/urbit/network", methods=['POST'])
 def set_network():
     for pier in request.form:
+        current_app.config['ORCHESTRATOR'].switchUrbitNetwork(pier)
         return redirect(f'/urbit/pier?pier={pier}')
+
 
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():

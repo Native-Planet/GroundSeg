@@ -13,6 +13,7 @@ class WireguardDocker:
         self.wireguard_name = self.config['wireguard_name']
 
         self.buildWireguard()
+        self.running = (self.container.attrs['State']['Status'] == 'running' )
 
 
 
@@ -58,13 +59,17 @@ class WireguardDocker:
 
     def start(self):
         self.container.start()
+        self.running=True
 
     def stop(self):
         self.container.stop()
+        self.running=False
 
     def logs(self):
         return self.container.logs()
 
+    def isRunning(self):
+        return self.running
      
 
 
