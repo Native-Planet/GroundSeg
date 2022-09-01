@@ -19,8 +19,10 @@
 		"@fortawesome/free-brands-svg-icons": "^6.1.2",
 		"@fortawesome/free-solid-svg-icons": "^6.1.2",
 		"@sveltejs/adapter-static": "^1.0.0-next.39",
+		"@tlon/sigil-js": "^1.4.5",
 		"cookie": "^0.4.1",
 		"dropzone": "^6.0.0-beta.2",
+		"svelte-fa": "^3.0.3",
 		"svelte-select": "^4.4.7"
 	}
 }

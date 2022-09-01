@@ -11,7 +11,9 @@
 </script>
 <div class="warning-title">WARNING:</div>
 <div class="warning">
-  <Sigil patp={name} size="87px" rad="15px"/>
+  <div class="sigil">
+    <Sigil patp={name} size="87px" rad="15px"/>
+  </div>
   <div class="warning-text">
     <div class="warning-content">
       Permanently delete ~{name}?
