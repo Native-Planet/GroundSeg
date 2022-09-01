@@ -1,0 +1,9 @@
+{
+    "pier_name": "rivpur-togsug-nallux-dozryl",
+    "http_port": 8084,
+    "ames_port": 34347,
+    "wg_http": 80,
+    "urbit_version": "latest",
+    "network": "none",
+    "url": "none"
+}

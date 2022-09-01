@@ -1,6 +1,7 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { url } from '/src/Scripts/server'
+  import { page } from '$app/stores';
   import Logo from '/src/Components/Buttons/Logo.svelte'
   import SysInfo from '/src/Components/SysInfo.svelte'
   import Power from '/src/Components/Power.svelte'
@@ -10,21 +11,20 @@
   import Bitcoin from '/src/Components/Bitcoin.svelte'
   import Logs from '/src/Components/Logs.svelte'
 
-  let info
+  let info, opened
 
   const update = () => {
-    fetch(url + "/settings").then(r => r.json()).then(d => info = d)
-    setTimeout(update, 1000)
-  }
+    if (opened) {
+      fetch(url + "/settings").then(r => r.json()).then(d => info = d)
+      setTimeout(update, 1000)
+  }}
 
-  onMount( async ()=> {
-    update()
-  })
-
+  onMount( ()=> {opened = true; update()})
+  onDestroy(() => opened = false)
 
 </script>
 
-<Logo t="System Settings" back=true />
+<Logo t="System Settings" />
 <div class="container">
   <div class="panel">
     <Power />
@@ -35,7 +35,9 @@
   <div class="panel">
     <Anchor />
     <Bitcoin />
-    <Logs />
+    {#if info}
+      <Logs />
+    {/if}
   </div>
 </div>
 

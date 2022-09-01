@@ -1,70 +1,134 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { url } from '/src/Scripts/server'
   import { page } from '$app/stores';
+  import Fa from 'svelte-fa'
+  import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
+
   import Logo from '/src/Components/Buttons/Logo.svelte'
+  import DeleteWarning from '/src/Components/DeleteWarning.svelte'
+  import Sigil from '/src/Components/Sigil.svelte'
+  import PierCredentials from '/src/Components/PierCredentials.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
-  let pier, access, key, minIO
-  let local = true
 
-  onMount(async () => {
-    const u = url + "/urbit/pier?pier=" + path
-    fetch(u).then(r => r.json()).then(d => pier = d)
-  })
+  let loading = false,
+    ejecting = false,
+    deleteCheck = false,
+    data = {'nw_label': '', 'pier':{}},
+    advanced = false,
+    shown = true
 
-  const toggleLocal = () => { local = !local }
-  const togglePier = () => {
-    const u = url + "/urbit/"
-    const f = "dist"
-    const r = fetch(u, {method: 'POST',body: f})
-
+  onMount(() => getPierData())
+  onDestroy(() => shown = false)
+  
+  const getPierData = () => {
+    if (shown) {
+      const u = url + "/urbit/pier?pier=" + path
+      fetch(u).then(r => r.json()).then(d => data = d)
+      setTimeout(getPierData, 1000)
+    }
   }
 
-</script>
+  const ejectPier = () => {
+    ejecting = true
+    let u = url + "/urbit/eject"
+    const f = new FormData()
+    f.append(data.pier.name, 'eject')
 
-<Logo t="Pier Settings" back=true />
+    fetch(u, {method: 'POST',body: f})
+    .then(res => { return res.blob(); })
+    .then(d => {
+      ejecting = false
+      var a = document.createElement("a")
+      a.href = window.URL.createObjectURL(d)
+      a.download = data.pier.name
+      a.click()
+    })}
+
+  const toggleNetwork = () => { console.log("POST placeholder") }
+
+  const togglePier = () => {
+    loading = true
+    let u = url + "/urbit/"
+    const f = new FormData()
+    if (data.pier.running) {
+      f.append(data.pier.name, 'stop')
+      u = u + 'stop'
+    }
+
+    if (!data.pier.running) {
+      f.append(data.pier.name, 'start')
+      u = u + 'start'
+    }
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => {
+        if (d == 200) {
+          loading = false
+      }})
+  }
+
+  const deletePier = () => {
+    let u = url + "/urbit/delete"
+    const f = new FormData()
+    f.append(data.pier.name, 'delete')
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        window.location.href = "/"
+   }})}
+
+
+</script>
+<Logo t="Pier Settings" />
 <div class="ship">
-  {#if pier}
+  {#if data.pier.name != undefined}
+  {#if deleteCheck}
+    <DeleteWarning on:back={()=>deleteCheck = false} on:delete={deletePier} name={data.pier.name} />
+  {:else}
     <div class="card">
-      <div class="sigil"></div>
+      <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
-        <div class="status {pier.running ? "running" : ""}">
-          {pier.running ? "Running" : "Stopped"} 
-        </div>
-        <div class="patp">
-          {pier.name}
-          <span class="nick">Nickname</span>
-        </div>
+        {#if data.pier.running}
+          {#if data.pier.code.length < 1}
+            <div class="status booting">Booting</div>
+          {:else}
+            <div class="status running">Running</div>
+          {/if}
+        {:else}
+          <div class="status">Stopped</div>
+        {/if}
+        <div class="patp">{data.pier.name}</div>
       </div>
     </div>
-    {#if pier.running}
-    <div class="info">
-      <div class="title">Login Key</div>
-      <input spellcheck="false" type="password" bind:value={key}/>
-    </div>
-    <div class="info">
-      <div class="title">External Access URL</div>
-      <input spellcheck="false" bind:value={access}/>
-    </div>
-    <div class="info">
-      <div class="title">MinIO Bucket</div>
-      <input spellcheck="false" bind:value={minIO}/>
-    </div>
-    <div class="info">
-      <div class="title">Access</div>
-      <div class="access-options">
-        <button class="option" class:access-active={local} on:click={toggleLocal}>Local</button>
-        <button class="option" class:access-active={!local} on:click={toggleLocal}>Anchor</button>
-      </div>
-    </div>
+    {#if data.pier.running && data.pier.code.length > 1}
+      <PierCredentials
+        code={data.pier.code}
+        ext={data.pier.url}
+        nw_label={data.nw_label} />
     {/if}
     <div class="commands">
-      <button on:click={togglePier} class="cmd launch">{pier.running ? "Suspend" : "Start"} Ship</button>
-      <button class="cmd eject">Eject/Migrate Pier</button>
-      <button class="cmd delete">Delete Ship</button>
+      <button on:click={togglePier} class="cmd launch">
+        {data.pier.running ? "Suspend" : "Start"}{loading ? "ing" : " Ship"}
+      </button>
+      <span class="advanced" on:click={()=> advanced = !advanced}>
+        Advance Options
+        <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
+      </span>
+      {#if advanced}
+        <button 
+          on:click={ejectPier}
+          class="cmd eject">
+          Eject{ejecting ? "ing" : " Pier"}
+        </button>
+        <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+      {/if}
     </div>
+  {/if}
   {/if}
 </div>
 
@@ -80,13 +144,6 @@
     align-items: end;
     margin-bottom: 24px;
   }
-  .sigil {
-    width: 87px;
-    height: 87px;
-    max-height: 87px;
-    background: #111;
-    border-radius: 15px;
-  }
   .status {
     opacity: .8;
     font-weight: 400;
@@ -94,13 +151,11 @@
     padding-bottom: 6px;
     color: red;
   }
+  .booting {
+    color: orange;
+  }
   .running {
     color: lime;
-  }
-  .nick {
-    padding-left: 6px;
-    font-style: oblique;
-    font-size: 14px;
   }
   .patp {
     font-size: 16px;
@@ -111,50 +166,11 @@
     flex-direction: column;
     margin-bottom: 12px;
   }
-  .title {
-    font-weight: 700;
-    margin-bottom: 6px;
-    text-align: left;
-  }
-  input {
-    flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    color: inherit;
-    font-weight: 700;
-    background: #FBFBFB80;
-    outline: none;
-    border: none;
-    border-radius: 6px;
-  }
-  input:focus {
-    background: #EBEBEB80;
-  }
-  .access-options {
-    display: flex;
-    width: 240px;
-    border-radius: 8px;
-    background: #ffffff4d;
-    gap: 2px;
-  }
-  .option {
-    color: inherit;
-    font-size: 14px;
-    flex: 1;
-    padding: 8px 0 8px 0;
-    background: none;
-    border-radius: 8px;
-    border: none;
-    font-weight: 700;
-  }
-  .access-active {
-    background: #008eff;
-  }
   .commands {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding-top: 12px;
+    padding-top: 18px;
   }
   .cmd {
     background: none;
@@ -165,6 +181,13 @@
     border-radius: 8px;
     padding: 9px;
     width: 180px;
+    cursor: pointer;
+  }
+
+  .advanced {
+    font-size: 14px;
+    padding-top: 6px;
+    padding-bottom: 6px;
     cursor: pointer;
   }
 
