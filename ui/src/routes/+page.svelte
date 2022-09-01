@@ -40,6 +40,8 @@
   .home {
     width: 500px;
     max-width: 80vw;
+    max-width: 100vw;
+
   }
   .list {
     margin: 24px 0 28px 0;

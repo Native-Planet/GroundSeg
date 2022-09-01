@@ -21,29 +21,32 @@ app = Blueprint('settings', __name__, template_folder='templates')
 @app.route('/settings',methods=['GET'])
 def settings():
     orchestrator = current_app.config['ORCHESTRATOR']
-    container_logs = orchestrator.getContainers()
+#    container_logs = orchestrator.getContainers()
     ram = psutil.virtual_memory()
     cpu = psutil.cpu_percent(interval=0.1)
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
 
     return jsonify({
-        "containerLogs": container_logs,
         "ram": ram.percent,
         "disk" : disk,
         "temp" : temp,
     })
     
 
-@app.route('/settings/logs',methods=['POST',])
+@app.route('/settings/logs',methods=['POST','GET'])
 def settings_logs():
     orchestrator = current_app.config['ORCHESTRATOR']
+    container_logs = orchestrator.getContainers()
+    if request.method == 'GET':
+        return jsonify(container_logs)
     if request.method == 'POST':
         container = request.form['logs']
         log = orchestrator.getLogs(container).decode('utf-8')
-        log = log.replace('\n','<br>')
+        #log = log.replace('\n','<br>')
 
-        return render_template('logs.html', container=container, log = log)
+        return jsonify(log)
+        #return render_template('logs.html', container=container, log = log)
 
 
 @app.route('/settings/shutdown',methods=['POST'])

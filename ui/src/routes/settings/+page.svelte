@@ -35,7 +35,9 @@
   <div class="panel">
     <Anchor />
     <Bitcoin />
-    <Logs />
+    {#if info}
+      <Logs />
+    {/if}
   </div>
 </div>
 
