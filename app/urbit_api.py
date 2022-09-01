@@ -1,6 +1,6 @@
 import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response, send_file
+from flask import render_template, make_response, send_file, jsonify
 from flask import current_app
 
 
@@ -14,8 +14,6 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 
 import urbit_docker
-
-#import system_info as sys_info
 
 
 app = Blueprint('urbit', __name__, template_folder='templates')
@@ -46,12 +44,12 @@ def pier_info():
     if(urbit == None):
         return Response("Pier not found", status=400)
 
-    print(u)
     nw_label = "Local"
     if(u['network'] == 'none'):
         nw_label = "Remote"
 
-    return render_template('pier.html', pier = urbit, nw_label = nw_label)
+    return jsonify(urbit)
+
 
 @app.route("/urbit/network", methods=['POST'])
 def set_network():
@@ -72,12 +70,14 @@ def start_pier():
             url = f'/urbit/pier?pier={urbit.pier_name}'
             time.sleep(2)
             
-    return redirect(url)
+    # pier started
+    return jsonify(200)
 
 @app.route("/urbit/stop", methods=['POST'])
 def stop_pier():
     url = "/"
     if request.method == 'POST':
+        print(request.form)
         for p in request.form:
             urbit = current_app.config['ORCHESTRATOR']._urbits[p]
             if(urbit==None):
@@ -85,7 +85,8 @@ def stop_pier():
             urbit.stop()
             url = f'/urbit/pier?pier={urbit.pier_name}'
             
-    return redirect(url)
+    # pier stopped
+    return jsonify(200)
 
 @app.route("/urbit/eject", methods=['POST'])
 def eject_pier():

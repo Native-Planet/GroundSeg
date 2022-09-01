@@ -1,6 +1,6 @@
 import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response
+from flask import render_template, make_response, jsonify
 from flask import current_app
 
 import os
@@ -27,11 +27,13 @@ def settings():
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
 
-    return render_template('settings.html', 
-                        container_logs=container_logs, 
-                        ram = ram.percent, 
-                        disk = disk,
-                        temp = temp)
+    return jsonify({
+        "containerLogs": container_logs,
+        "ram": ram.percent,
+        "disk" : disk,
+        "temp" : temp,
+    })
+    
 
 @app.route('/settings/logs',methods=['POST',])
 def settings_logs():

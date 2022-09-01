@@ -33,8 +33,6 @@ class Orchestrator:
 
         self.load_urbits()
 
-
-
     def load_urbits(self):
         for p in self.config['piers']:
             data = None

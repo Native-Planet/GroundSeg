@@ -1,6 +1,7 @@
 import copy, json
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response
-from flask import render_template, make_response
+from flask import render_template, make_response, jsonify
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 from orchestrator import Orchestrator
@@ -20,6 +21,7 @@ orchestrator = Orchestrator("settings/system.json")
 
 
 app = Flask(__name__)
+CORS(app)
 
 app.config['ORCHESTRATOR'] = orchestrator
 app.config['TEMP_FOLDER'] = './tmp/'
@@ -32,8 +34,7 @@ app.register_blueprint(settings_api.app)
 @app.route("/", methods=['POST','GET'])
 def mainscreen():
     piers = orchestrator.getUrbits()
-    return render_template('urbit.html', piers = piers)
-
+    return jsonify(piers)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
