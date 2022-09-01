@@ -1,8 +1,9 @@
 <script>
   import { url } from '/src/Scripts/server'
-  export let name, key
+  export let name, key, loading = false
 
   const boot = () => {
+    loading = true
     const f = new FormData()
     const u = url + "/upload/key"
     f.append("patp", name)
@@ -11,7 +12,7 @@
       .then(d => d.json())
       .then(res => {
         if (res === 200) {
-          window.location.href = "/"
+          window.location.href = "/" + name
         }
       })
   }
@@ -20,7 +21,7 @@
 <div>
   <a href="/">Cancel</a>
   <button on:click={boot}>
-    Boot Ship
+    {loading ? "Creating.." : "Create Pier"}
   </button>
 </div>
 

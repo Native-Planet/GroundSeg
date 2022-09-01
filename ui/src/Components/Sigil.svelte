@@ -3,6 +3,9 @@
   import { sigil, stringRenderer } from '@tlon/sigil-js'
   export let patp, size, rad, moon = false
 
+  const parser = new DOMParser();
+  const n = Math.floor(Math.random() * Math.pow(2, 32))
+
   const sig = () => {
     if (patp.length < 14) {
       return sigil({
@@ -26,18 +29,18 @@
   const renderSVG = (id,s) => {
     if (s != "comet") {
       var doc = new DOMParser().parseFromString(s, 'application/xml');
-      var el = document.getElementById(id)
+      var nid = id + "-" + patp + "-" + n
+      var el = document.getElementById(nid)
       el.appendChild(el.ownerDocument.importNode(doc.documentElement, true))
     }}
 
   onMount(()=> {
-    renderSVG('foo', sig())
+    renderSVG('sig', sig())
   })
 
 </script>
-
 <div
-    id='foo'
+    id='sig-{patp}-{n}'
     style="
       width:{size};
       height:{size};

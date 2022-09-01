@@ -1,7 +1,9 @@
 {
     "firstBoot": false,
     "piers": [
-        "lopfyr-tocwyd-nallux-dozryl"
+        "sanren-lispur-nallux-dozryl",
+        "labhus-patfyn-nallux-dozryl",
+        "rivpur-togsug-nallux-dozryl"
     ],
     "pubkey": "SHZjSGN4QzBDdStsOXlwKzlhSnI0VXl1LzlwcFlrVUwwWndPOUJ4SHVpWT0K",
     "privkey": "qLOPeTJ1hAmk5XwguZ0vUXz4wqNWCEmAni7AroeZNF8="
