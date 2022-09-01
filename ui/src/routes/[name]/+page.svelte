@@ -80,7 +80,7 @@
 </script>
 <Logo t="Pier Settings" />
 <div class="ship">
-  {#if data}
+  {#if data.pier.name != undefined}
   {#if deleteCheck}
     <DeleteWarning on:back={()=>deleteCheck = false} on:delete={deletePier} name={data.pier.name} />
   {:else}
