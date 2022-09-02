@@ -1,11 +1,13 @@
 <script>
-	import { createEventDispatcher } from 'svelte'
   import { url } from '/src/Scripts/server'
-  export let name
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
+  export let name, code, ext, nw_label
+
   const toggleNetwork = () => { 
+
+    isSwitching = true
     let u = url + "/urbit/network"
     const f = new FormData()
     f.append(name,'network')
@@ -13,20 +15,18 @@
     fetch(u, {method: 'POST',body: f})
       .then(r => r.json())
       .then(d => { if (d == 200) {
-        window.location.href = "/"+data.pier.name
+        isSwitching = false
    }})}
 
-
-  const dispatch = createEventDispatcher();
-  //const handleNetworkSwitch = () => dispatch('back', null)
-
-  faArrowUpRightFromSquare
-  export let code, ext, nw_label
   let viewLogin = false, clickedLogin = false,
     viewExt = false, clickedExt = false,
-    viewMinIO = false, clickedMinIO = false
+    viewMinIO = false, clickedMinIO = false,
+    isSwitching = false
 
+  // placeholder
   let minIO = "placeholder"
+
+  // Copy String to Clipboard
 
   const onCopyLogin = () => {
     navigator.clipboard.writeText(code)  
@@ -47,7 +47,6 @@
 
 
 </script>
-
     <div class="info">
       <div class="title">Login Key</div>
       <div class="login-key-wrapper">
@@ -101,7 +100,7 @@
 
     <div class="info" on:click={toggleNetwork}>
       <div class="title">Access</div>
-      <div class="access-options">
+      <div class="access-options" class:switching={isSwitching}>
         <button class="option" class:access-active={nw_label === 'Local'} >Local</button>
         <button class="option" class:access-active={nw_label === 'Remote'} >Remote</button>
       </div>
@@ -163,8 +162,10 @@
     border: none;
     font-weight: 700;
   }
+  .switching {
+    opacity: .6;
+  }
   .access-active {
     background: #008eff;
   }
-
 </style>
