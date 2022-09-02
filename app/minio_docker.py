@@ -64,8 +64,9 @@ class MinIODocker:
         return self.container.logs()
 
     def removeMinIO(self):
-        self.volume.remove()
+        self.stop()
         self.container.remove()
+        self.volume.remove()
 
 
 
