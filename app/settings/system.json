@@ -1,9 +1,10 @@
 {
     "firstBoot": false,
     "piers": [
-        "famwyl-lavlyr-mopfel-winrux"
+        "ripryg-mochec-nallux-dozryl",
+        "ripryg-mochec-nallux-dozryl"
     ],
-    "pubkey": "cG01QTRtSGszelduenhvNUhHRmIyS3c3QlhpdzdXOE1TZWJLMEZaS0gwST0K",
-    "privkey": "4FhJo8Dt9zArMfmJs0lDjSEeXFLmxUv/YLU1ACjfZVY=",
-    "reg_key": "Blush3-Spotless-Womb-Ooze"
+    "pubkey": "Zlg1WHFKV0hRamdKZWpLMUxmN0p2eWYwcVlnY3UxREliWWM2S3lhRnlSUT0K",
+    "privkey": "CPpQoLon2Nsc+dCVqiXhQRISjnBQY+zZjkloKivrIEg=",
+    "reg_key": "ezoO-bmoW-sseltopS-3hsulB"
 }

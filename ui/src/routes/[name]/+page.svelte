@@ -9,6 +9,7 @@
   import DeleteWarning from '/src/Components/DeleteWarning.svelte'
   import Sigil from '/src/Components/Sigil.svelte'
   import PierCredentials from '/src/Components/PierCredentials.svelte'
+  import AccessToggle from '/src/Components/AccessToggle.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -93,7 +94,7 @@
       <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
         {#if data.pier.running}
-          {#if data.pier.code.length < 1}
+          {#if data.pier.code === undefined }
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -104,13 +105,14 @@
         <div class="patp">{data.pier.name}</div>
       </div>
     </div>
-    {#if data.pier.running && data.pier.code.length > 1}
+    {#if data.pier.running && data.pier.code !== undefined}
       <PierCredentials
-        name={data.pier.name}
         code={data.pier.code}
-        ext={data.pier.url}
-        nw_label={data.nw_label} />
+        ext={data.pier.url} />
     {/if}
+    <AccessToggle 
+      name={data.pier.running ? data.pier.name : "Local"}
+      nw_label={data.nw_label} />
     <div class="commands">
       <button on:click={togglePier} class="cmd launch">
         {data.pier.running ? "Suspend" : "Start"}{loading ? "ing" : " Ship"}

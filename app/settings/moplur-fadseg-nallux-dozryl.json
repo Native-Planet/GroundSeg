@@ -1,0 +1,14 @@
+{
+    "pier_name": "moplur-fadseg-nallux-dozryl",
+    "http_port": 8082,
+    "ames_port": 34345,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "none",
+    "wg_http": 80,
+    "url": "none",
+    "wg_url": "moplur-fadseg-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 758,
+    "wg_ames_port": 31610,
+    "wg_s3_port": 11349
+}

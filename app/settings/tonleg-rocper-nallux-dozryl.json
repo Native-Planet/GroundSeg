@@ -1,0 +1,13 @@
+{
+    "pier_name": "tonleg-rocper-nallux-dozryl",
+    "http_port": 8081,
+    "ames_port": 34344,
+    "wg_http": 80,
+    "urbit_version": "latest",
+    "network": "wireguard",
+    "url": "none",
+    "wg_url": "tonleg-rocper-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 1999,
+    "wg_ames_port": 32779,
+    "wg_s3_port": 14190
+}
