@@ -1,7 +1,13 @@
 {
-    "pier_name": "dister-dozzod-donpub-datdux",
-    "http_port": 8088,
-    "ames_port": 34349,
+    "pier_name": "famwyl-lavlyr-mopfel-winrux",
+    "http_port": 8081,
+    "ames_port": 34344,
     "urbit_version": "latest",
-    "network": "none"
+    "minio_version": "latest",
+    "network": "none",
+    "wg_url": "famwyl-lavlyr-mopfel-winrux.nativeplanet.live",
+    "wg_http_port": 247,
+    "wg_ames_port": 36200,
+    "wg_s3_port": 14728,
+    "wg_console_port": 12336
 }
