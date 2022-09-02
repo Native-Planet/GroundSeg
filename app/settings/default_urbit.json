@@ -1,9 +1,0 @@
-{
-   "pier_name":"",
-   "http_port":8080,
-   "ames_port":34343,
-   "wg_http":80,
-   "urbit_version":"latest",
-   "network":"none",
-   "url": "none"
-}
