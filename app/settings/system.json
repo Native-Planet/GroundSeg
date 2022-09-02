@@ -1,10 +1,9 @@
 {
     "firstBoot": false,
     "piers": [
-        "walzod-fogsed-mopfel-winrux"
+        "famwyl-lavlyr-mopfel-winrux"
     ],
-    "pubkey": "SHZjSGN4QzBDdStsOXlwKzlhSnI0VXl1LzlwcFlrVUwwWndPOUJ4SHVpWT0K",
-    "privkey": "qLOPeTJ1hAmk5XwguZ0vUXz4wqNWCEmAni7AroeZNF8=",
+    "pubkey": "cG01QTRtSGszelduenhvNUhHRmIyS3c3QlhpdzdXOE1TZWJLMEZaS0gwST0K",
+    "privkey": "4FhJo8Dt9zArMfmJs0lDjSEeXFLmxUv/YLU1ACjfZVY=",
     "reg_key": "Blush3-Spotless-Womb-Ooze"
 }
-

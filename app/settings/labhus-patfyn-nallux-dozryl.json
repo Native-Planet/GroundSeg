@@ -1,9 +1,0 @@
-{
-    "pier_name": "labhus-patfyn-nallux-dozryl",
-    "http_port": 8083,
-    "ames_port": 34346,
-    "wg_http": 80,
-    "urbit_version": "latest",
-    "network": "none",
-    "url": "none"
-}
