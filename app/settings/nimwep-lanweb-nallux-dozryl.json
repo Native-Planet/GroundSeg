@@ -1,0 +1,13 @@
+{
+    "pier_name": "nimwep-lanweb-nallux-dozryl",
+    "http_port": 8082,
+    "ames_port": 34345,
+    "wg_http": 80,
+    "urbit_version": "latest",
+    "network": "none",
+    "url": "none",
+    "wg_url": "nimwep-lanweb-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 2030,
+    "wg_ames_port": 37596,
+    "wg_s3_port": 10450
+}

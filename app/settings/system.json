@@ -1,10 +1,9 @@
 {
     "firstBoot": false,
     "piers": [
-        "walzod-fogsed-mopfel-winrux"
+        "nimwep-lanweb-nallux-dozryl"
     ],
-    "pubkey": "SHZjSGN4QzBDdStsOXlwKzlhSnI0VXl1LzlwcFlrVUwwWndPOUJ4SHVpWT0K",
-    "privkey": "qLOPeTJ1hAmk5XwguZ0vUXz4wqNWCEmAni7AroeZNF8=",
+    "pubkey": "TU5TV05sWUsvQ0N5TU95R1pkMEgxTDgvc09FTDZpbzhIWmY4aW9xb3NGaz0K",
+    "privkey": "GOHXdH5kwUtS+qSYxo7ik2YewX6XDkWPl7Bmmjb5oX4=",
     "reg_key": "Blush3-Spotless-Womb-Ooze"
 }
-

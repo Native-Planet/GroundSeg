@@ -50,6 +50,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .container::-webkit-scrollbar {
+    display: none;
   }
   .panel {
     display: flex;

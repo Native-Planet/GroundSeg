@@ -39,6 +39,7 @@
     <div class="select">
       <Select
           items={logs}
+          listPlacement="top"
           on:clear={()=> container = null}
           on:select={e => container = e.detail.value} />
     </div>
