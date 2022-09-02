@@ -1,0 +1,8 @@
+{
+   "pier_name":"",
+   "http_port":8080,
+   "ames_port":34343,
+   "urbit_version":"latest",
+   "minio_version":"latest",
+   "network":"none"
+}

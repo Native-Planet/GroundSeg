@@ -1,6 +1,7 @@
 import docker
 import json
 import shutil
+from minio_docker import MinIODocker
 
 client = docker.from_env()
 default_pier_config = json.load(open('settings/default_urbit.json'))
@@ -16,6 +17,11 @@ class UrbitDocker:
         self.pier_name = self.config['pier_name']
         self.buildUrbit()
         self.running = (self.container.attrs['State']['Status'] == 'running' )
+        
+
+
+
+
 
     def buildVolume(self):
         volumes = client.volumes.list()
@@ -36,7 +42,7 @@ class UrbitDocker:
                 self.container = c
                 return
         if(self.config["network"] != "none"):
-            command = f'/urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
+            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
@@ -55,11 +61,13 @@ class UrbitDocker:
                                     detach=True)
 
 
-    def setWireguardNetwork(self, url, http_port, ames_port, s3_port):
+    def setWireguardNetwork(self, url, http_port, ames_port, s3_port, console_port):
         self.config['wg_url'] = url
         self.config['wg_http_port'] = http_port
         self.config['wg_ames_port'] = ames_port
         self.config['wg_s3_port'] = s3_port
+        self.config['wg_console_port'] = console_port
+
         #self.config['network'] = 'wireguard'
         self.save_config()
 
