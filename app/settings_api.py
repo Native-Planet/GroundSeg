@@ -42,6 +42,7 @@ def settings_logs():
         return jsonify(container_logs)
     if request.method == 'POST':
         container = request.form['logs']
+        print(container)
         log = orchestrator.getLogs(container).decode('utf-8')
 
         return jsonify(log)
