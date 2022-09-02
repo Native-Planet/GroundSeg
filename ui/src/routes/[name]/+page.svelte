@@ -47,7 +47,6 @@
       a.click()
     })}
 
-  const toggleNetwork = () => { console.log("POST placeholder") }
 
   const togglePier = () => {
     loading = true
@@ -107,6 +106,7 @@
     </div>
     {#if data.pier.running && data.pier.code.length > 1}
       <PierCredentials
+        name={data.pier.name}
         code={data.pier.code}
         ext={data.pier.url}
         nw_label={data.nw_label} />

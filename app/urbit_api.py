@@ -45,7 +45,7 @@ def pier_info():
         return Response("Pier not found", status=400)
 
     nw_label = "Local"
-    if(u['network'] == 'none'):
+    if(u['network'] == 'wireguard'):
         nw_label = "Remote"
 
     p = dict()

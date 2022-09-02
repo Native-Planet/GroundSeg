@@ -1,7 +1,21 @@
 <script>
 	import { createEventDispatcher } from 'svelte'
+  import { url } from '/src/Scripts/server'
+  export let name
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
+
+  const toggleNetwork = () => { 
+    let u = url + "/urbit/network"
+    const f = new FormData()
+    f.append(name,'network')
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        window.location.href = "/"+data.pier.name
+   }})}
+
 
   const dispatch = createEventDispatcher();
   //const handleNetworkSwitch = () => dispatch('back', null)
@@ -85,7 +99,7 @@
       </div>
     </div>
 
-    <div class="info">
+    <div class="info" on:click={toggleNetwork}>
       <div class="title">Access</div>
       <div class="access-options">
         <button class="option" class:access-active={nw_label === 'Local'} >Local</button>
