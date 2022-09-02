@@ -60,7 +60,7 @@ class UrbitDocker:
         self.config['wg_http_port'] = http_port
         self.config['wg_ames_port'] = ames_port
         self.config['wg_s3_port'] = s3_port
-        self.config['network'] = 'wireguard'
+        #self.config['network'] = 'wireguard'
         self.save_config()
 
         running = False
