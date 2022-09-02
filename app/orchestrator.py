@@ -74,10 +74,11 @@ class Orchestrator:
                 console_port = ep['port']
 
         urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-        urbit.setupMinIO()
-        print(urbit.config)
+
         self._urbits[patp] = urbit
+        self._minios[patp] = MinIODocker(urbit.config)
         self.save_config()
+        self._minios[patp].start()
         urbit.start()
         
 
@@ -91,7 +92,7 @@ class Orchestrator:
         minio.removeMinIO()
         minio = self._minios.pop(patp)
 
-        self.config['piers'].pop(patp)
+        self.config['piers'] = self.config['piers'].remove(patp)
         self.save_config()
 
 

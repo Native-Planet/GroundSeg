@@ -4,7 +4,7 @@
     "ames_port": 34344,
     "urbit_version": "latest",
     "minio_version": "latest",
-    "network": "none",
+    "network": "wireguard",
     "wg_url": "famwyl-lavlyr-mopfel-winrux.nativeplanet.live",
     "wg_http_port": 247,
     "wg_ames_port": 36200,
