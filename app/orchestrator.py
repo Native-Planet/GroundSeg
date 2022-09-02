@@ -1,12 +1,14 @@
 import json, subprocess, requests
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker
+from minio_docker import MinIODocker
 import time
 import sys
 
 class Orchestrator:
     
     _urbits = {}
+    _minios = {}
 
 
     def __init__(self, config_file):
@@ -39,6 +41,7 @@ class Orchestrator:
             with open(f'settings/{p}.json') as f:
                 data = json.load(f)
             self._urbits[p] = UrbitDocker(data)
+            self._minios[p] = MinIODocker(data)
 
     def registerUrbit(self, patp):
        for ep in self.anchor_config['subdomains']:
@@ -57,6 +60,8 @@ class Orchestrator:
         http_port = None
         ames_port = None
         s3_port = None
+        console_port = None
+
         for ep in self.anchor_config['subdomains']:
             if(f'{patp}.nativeplanet.live' == ep['url']):
                 url = ep['url']
@@ -65,17 +70,28 @@ class Orchestrator:
                 ames_port = ep['port']
             elif(f's3.{patp}.nativeplanet.live' == ep['url']):
                 s3_port = ep['port']
+            elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
+                console_port = ep['port']
 
-        urbit.setWireguardNetwork(url, http_port, ames_port, s3_port)
+        urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+        urbit.setupMinIO()
+        print(urbit.config)
         self._urbits[patp] = urbit
         self.save_config()
+        urbit.start()
         
 
     def removeUrbit(self, patp):
         urb = self._urbits[patp]
         urb.removeUrbit()
         urb = self._urbits.pop(patp)
-        self.config['piers'].remove(patp)
+        
+        time.sleep(2)
+        minio = self._minios[patp]
+        minio.removeMinIO()
+        minio = self._minios.pop(patp)
+
+        self.config['piers'].pop(patp)
         self.save_config()
 
 
@@ -91,7 +107,10 @@ class Orchestrator:
             else:
                 u['url'] = f'http://nativeplanet.local:{urbit.config["http_port"]}'
             if(urbit.isRunning()):
-                u['code'] = urbit.get_code().decode('utf-8')
+                try:
+                    u['code'] = urbit.get_code().decode('utf-8')
+                except Exception as e:
+                    print(e)
             else:
                 u['code'] = ""
 
@@ -102,9 +121,12 @@ class Orchestrator:
         return urbits
     
     def getContainers(self):
+        minio = list(self._minios.keys())
         containers = list(self._urbits.keys())
         containers.append('wireguard')
-        containers.append('minio')
+        for m in minio:
+            containers.append(f"minio_{m}")
+        print(containers)
         return containers
 
     def switchUrbitNetwork(self, urbit_name):
@@ -114,7 +136,7 @@ class Orchestrator:
 
         if(urbit.config['network'] == 'none'):
             network = 'wireguard'
-            url = urbit.config['url']
+            url = urbit.config['wg_url']
 
         urbit.setNetwork(network);
         time.sleep(2)
@@ -136,8 +158,8 @@ class Orchestrator:
     def getLogs(self, container):
         if container == 'wireguard':
             return self.wireguard.wg_docker.logs()
-        if container == 'minio':
-            return "" #TODO add minio container to orch
+        if 'minio_' in container:
+            return self._minios[container[6:]].logs()
         if container in self._urbits.keys():
             return self._urbits[container].logs()
         return ""
