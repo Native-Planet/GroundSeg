@@ -87,7 +87,7 @@ class Orchestrator:
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
             if(urbit.config['network']=='wireguard'):
-                u['url'] = urbit.config['wg_url']
+                u['url'] = f"http://{urbit.config['wg_url']}"
             else:
                 u['url'] = f'http://nativeplanet.local:{urbit.config["http_port"]}'
             if(urbit.isRunning()):
