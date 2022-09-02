@@ -1,6 +1,6 @@
 import requests, copy, json, shutil
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response
+from flask import render_template, make_response, jsonify
 from flask import current_app
 
 import os
@@ -42,9 +42,9 @@ def uploadKey():
         urbit = make_urbit(patp, http_port, ames_port)
         urbit.addKey(key)
         current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
-        return redirect("/")
 
-
+        return jsonify(200)
+        
 
 @app.route('/upload/pier', methods=['GET','POST'])
 def uploadPier():

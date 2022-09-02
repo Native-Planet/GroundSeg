@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/nplogo.svg" />
+    <link rel="stylesheet" href="/css/main.css" />
+		<meta name="viewport" content="width=device-width" />
+    <title>Native Planet</title>
+    <style>
+      @font-face {
+        font-family: Inter;
+        src: url("/Inter-SemiBold.otf");
+      }
+      body {
+      font-family:Inter;
+      background: url("/background.png") no-repeat center center fixed; 
+      -webkit-background-size: contain;
+      -moz-background-size: contain;
+      -o-background-size: contain;
+      background-size: contain;
+      background-color: #040404;
+    }
+    </style>
+		%sveltekit.head%
+	</head>
+	<body>
+		<div>%sveltekit.body%</div>
+
+	</body>
+</html>
