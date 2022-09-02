@@ -120,9 +120,11 @@ class Orchestrator:
         return urbits
     
     def getContainers(self):
-        containers = ['wireguard']
+        minio = list(self._minios.keys())
         containers = list(self._urbits.keys())
-        containers.append(list(self._minios.keys()))
+        containers.append('wireguard')
+        for m in minio:
+            containers.append(f"minio_{m}")
         print(containers)
         return containers
 
@@ -155,8 +157,8 @@ class Orchestrator:
     def getLogs(self, container):
         if container == 'wireguard':
             return self.wireguard.wg_docker.logs()
-        if container in self._minios.keys():
-            return self._minios[container].logs()
+        if 'minio_' in container:
+            return self._minios[container[6:]].logs()
         if container in self._urbits.keys():
             return self._urbits[container].logs()
         return ""
