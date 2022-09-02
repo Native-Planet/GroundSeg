@@ -85,11 +85,15 @@ class Wireguard:
         except Exception as e:
             print(e)
 
-        self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
+        try:
+            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
 
-        self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
-        # Setup and start the local wg client
-        self.wg_docker.addConfig(self.wg_config)
+            self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
+            # Setup and start the local wg client
+            self.wg_docker.addConfig(self.wg_config)
+        except Exception as e:
+            print(e)
+
         return response
  
 
