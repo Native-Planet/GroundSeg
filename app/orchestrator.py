@@ -86,11 +86,12 @@ class Orchestrator:
         urb.removeUrbit()
         urb = self._urbits.pop(patp)
         
+        time.sleep(2)
         minio = self._minios[patp]
         minio.removeMinIO()
         minio = self._minios.pop(patp)
 
-        self.config['piers'].remove(patp)
+        self.config['piers'].pop(patp)
         self.save_config()
 
 

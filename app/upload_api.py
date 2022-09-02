@@ -100,7 +100,7 @@ def uploadPier():
                 timeout = 10000
                 
                 patp = filename[:-4]
-                http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPorts()
+                http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPort()
                 urbit = make_urbit(patp, http_port, ames_port)
                 urbit.copyFolder(current_app.config['TEMP_FOLDER'])
                 shutil.rmtree(os.path.join(current_app.config['TEMP_FOLDER'], patp))

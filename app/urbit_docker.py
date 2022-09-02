@@ -42,7 +42,7 @@ class UrbitDocker:
                 self.container = c
                 return
         if(self.config["network"] != "none"):
-            command = f'/urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
+            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
