@@ -42,11 +42,10 @@ def settings_logs():
         return jsonify(container_logs)
     if request.method == 'POST':
         container = request.form['logs']
+        print(container)
         log = orchestrator.getLogs(container).decode('utf-8')
-        #log = log.replace('\n','<br>')
 
         return jsonify(log)
-        #return render_template('logs.html', container=container, log = log)
 
 
 @app.route('/settings/shutdown',methods=['POST'])
