@@ -83,10 +83,6 @@ class UrbitDocker:
         if(running):
             self.start()
 
-    def setupMinIO(self):
-        self.minio = MinIODocker(self.config)
-        self.minio.start()
-
     def setNetwork(self, network):
         if(self.config['network'] == network):
             return
