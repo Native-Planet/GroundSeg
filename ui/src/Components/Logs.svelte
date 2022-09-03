@@ -44,7 +44,7 @@
           on:select={e => container = e.detail.value} />
     </div>
     <div class="buttons">
-      <a class="view" class:disabled={inc(container)} href="/logs/{container}">View</a>
+      <a class="view" class:disabled={inc(container)} href="/logs/{container}#latest">View</a>
       <button
         on:click={exportLog(container)}
         class="export"

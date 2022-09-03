@@ -94,7 +94,7 @@
       <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
         {#if data.pier.running}
-          {#if data.pier.code === undefined }
+          {#if data.pier.code === "" }
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -105,7 +105,7 @@
         <div class="patp">{data.pier.name}</div>
       </div>
     </div>
-    {#if data.pier.running && data.pier.code !== undefined}
+    {#if data.pier.running && data.pier.code !== ""}
       <PierCredentials
         code={data.pier.code}
         ext={data.pier.url} />

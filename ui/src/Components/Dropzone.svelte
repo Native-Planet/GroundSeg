@@ -10,6 +10,7 @@
       chunking: true,
       forceChunking: true,
       url: url + '/upload/pier',
+      disablePreviews: true,
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
   })})

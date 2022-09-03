@@ -1,0 +1,13 @@
+{
+    "pier_name": "nacmec-faspec-nallux-dozryl",
+    "http_port": 8084,
+    "ames_port": 34347,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "none",
+    "wg_url": "nacmec-faspec-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 321,
+    "wg_ames_port": 30424,
+    "wg_s3_port": 11637,
+    "wg_console_port": 12993
+}

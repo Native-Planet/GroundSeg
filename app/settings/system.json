@@ -1,9 +1,6 @@
 {
     "firstBoot": false,
-    "piers": [
-        "ripryg-mochec-nallux-dozryl",
-        "ripryg-mochec-nallux-dozryl"
-    ],
+    "piers": null,
     "pubkey": "Zlg1WHFKV0hRamdKZWpLMUxmN0p2eWYwcVlnY3UxREliWWM2S3lhRnlSUT0K",
     "privkey": "CPpQoLon2Nsc+dCVqiXhQRISjnBQY+zZjkloKivrIEg=",
     "reg_key": "ezoO-bmoW-sseltopS-3hsulB"
