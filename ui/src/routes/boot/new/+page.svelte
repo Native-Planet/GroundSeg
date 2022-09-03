@@ -26,7 +26,7 @@
     color: inherit;
     padding: 20px;
     width: 460px;
-    max-width: calc(80vw - 40px);
+    max-width: calc(100vw - 40px);
   }
   .info {
     display: flex;

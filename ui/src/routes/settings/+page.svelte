@@ -8,7 +8,6 @@
   import Network from '/src/Components/Network.svelte'
   import MinIO from '/src/Components/MinIO.svelte'
   import Anchor from '/src/Components/Anchor.svelte'
-  import Bitcoin from '/src/Components/Bitcoin.svelte'
   import Logs from '/src/Components/Logs.svelte'
 
   let info, opened
@@ -27,17 +26,16 @@
 <Logo t="System Settings" />
 <div class="container">
   <div class="panel">
-    <Power />
     <SysInfo {info} />
     <Network />
-    <MinIO />
   </div>
   <div class="panel">
     <Anchor />
-    <Bitcoin />
+    <MinIO />
     {#if info}
       <Logs />
     {/if}
+    <Power />
   </div>
 </div>
 

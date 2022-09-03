@@ -1,8 +1,0 @@
-{
-    "pier_name": "ripryg-mochec-nallux-dozryl",
-    "http_port": 8085,
-    "ames_port": 34348,
-    "urbit_version": "latest",
-    "minio_version": "latest",
-    "network": "none"
-}

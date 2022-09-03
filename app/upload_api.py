@@ -107,7 +107,7 @@ def uploadPier():
                 current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
 
                 print('wtf')
-                return redirect('/')
+                return jsonify(200)
         else:
             print(f'Chunk {current_chunk + 1} of {total_chunks} '
                       f'for file {file.filename} complete')
