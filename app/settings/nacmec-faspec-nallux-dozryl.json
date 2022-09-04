@@ -1,8 +1,0 @@
-{
-    "pier_name": "nacmec-faspec-nallux-dozryl",
-    "http_port": 8081,
-    "ames_port": 34344,
-    "urbit_version": "latest",
-    "minio_version": "latest",
-    "network": "none"
-}

@@ -1,7 +1,9 @@
 {
     "firstBoot": false,
-    "piers": null,
-    "pubkey": "V2lMZUpvZktjcGJtNnVOS2JYRTVuU044cUlwUTljU2EvUkNYaGE4emNWOD0K",
-    "privkey": "EOdtm0nv/73/xSAJQ8Sf7D8acmX183+EdNI2o2Qqgn8=",
-    "reg_key": "ezoO-bmoW-sseltopS-3hsulB"
+    "piers": [
+        "famwyl-lavlyr-mopfel-winrux"
+    ],
+    "pubkey": "cG01QTRtSGszelduenhvNUhHRmIyS3c3QlhpdzdXOE1TZWJLMEZaS0gwST0K",
+    "privkey": "4FhJo8Dt9zArMfmJs0lDjSEeXFLmxUv/YLU1ACjfZVY=",
+    "reg_key": "Blush3-Spotless-Womb-Ooze"
 }

@@ -39,12 +39,11 @@
     <div class="select">
       <Select
           items={logs}
-          listPlacement="top"
           on:clear={()=> container = null}
           on:select={e => container = e.detail.value} />
     </div>
     <div class="buttons">
-      <a class="view" class:disabled={inc(container)} href="/logs/{container}#latest">View</a>
+      <a class="view" class:disabled={inc(container)} href="/logs/{container}">View</a>
       <button
         on:click={exportLog(container)}
         class="export"
