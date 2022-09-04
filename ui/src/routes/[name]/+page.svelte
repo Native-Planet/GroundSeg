@@ -92,8 +92,13 @@
     <div class="card">
       <Sigil patp={data.pier.name} size="87px" rad="15px" />
       <div class="info">
-        {#if data.pier.running}
-          {#if data.pier.code.length < 1}
+        <div on:click={togglePier} class="switch-wrapper">
+          <div class="switch {data.pier.running ? "on" : "off"}"></div>
+        </div>
+        {#if loading}
+          <div class="status loading">Loading...</div>
+        {:else if data.pier.running}
+          {#if data.pier.code == undefined}
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -104,19 +109,16 @@
         <div class="patp">{data.pier.name}</div>
       </div>
     </div>
-    {#if data.pier.running && data.pier.code.length > 1}
+    {#if data.pier.running && !(data.pier.code == undefined)}
       <PierCredentials
         name={data.pier.name}
+        nw_label={data.nw_label}
         code={data.pier.code}
-        ext={data.pier.url}
-        nw_label={data.nw_label} />
+        ext={data.pier.url} />
     {/if}
     <div class="commands">
-      <button on:click={togglePier} class="cmd launch">
-        {data.pier.running ? "Suspend" : "Start"}{loading ? "ing" : " Ship"}
-      </button>
       <span class="advanced" on:click={()=> advanced = !advanced}>
-        Advance Options
+        Advanced Options
         <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
       </span>
       {#if advanced}
@@ -144,12 +146,38 @@
     align-items: end;
     margin-bottom: 24px;
   }
+  .switch-wrapper {
+    border-radius: 8px;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
+    margin-bottom: 6px;
+  }
+  .switch {
+    height: 100%;
+    width: 19px;
+    border-radius: 6px;
+  }
+  .on {
+    background: #008eff;
+    float: right;
+  }
+  .off {
+    background: #000;
+    float: left;
+    opacity: .2;
+  }
   .status {
     opacity: .8;
     font-weight: 400;
     font-size: .8em;
     padding-bottom: 6px;
     color: red;
+  }
+  .loading {
+    color: inherit;
+    font-style: italic;
   }
   .booting {
     color: orange;
@@ -159,7 +187,6 @@
   }
   .patp {
     font-size: 16px;
-    padding-bottom: 8px;
   }
   .info {
     display: flex;
@@ -189,10 +216,6 @@
     padding-top: 6px;
     padding-bottom: 6px;
     cursor: pointer;
-  }
-
-  .launch {
-    background: #008EFF;
   }
 
   .eject {

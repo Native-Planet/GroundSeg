@@ -26,7 +26,7 @@
     color: inherit;
     padding: 20px;
     width: 460px;
-    max-width: calc(80vw - 40px);
+    max-width: calc(100vw - 40px);
   }
   .info {
     display: flex;
@@ -43,12 +43,9 @@
     font-size: 16px;
     color: inherit;
     font-weight: 700;
-    background: #FBFBFB80;
+    background: #ffffff4d;
     outline: none;
     border: none;
     border-radius: 6px;
-  }
-  input:focus {
-    background: #EBEBEB80;
   }
 </style>

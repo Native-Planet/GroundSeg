@@ -1,32 +1,19 @@
 <script>
-	import { createEventDispatcher } from 'svelte'
   import { url } from '/src/Scripts/server'
-  export let name
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
-  const toggleNetwork = () => { 
-    let u = url + "/urbit/network"
-    const f = new FormData()
-    f.append(name,'network')
+  export let name, nw_label, code, ext
 
-    fetch(u, {method: 'POST',body: f})
-      .then(r => r.json())
-      .then(d => { if (d == 200) {
-        window.location.href = "/"+data.pier.name
-   }})}
-
-
-  const dispatch = createEventDispatcher();
-  //const handleNetworkSwitch = () => dispatch('back', null)
-
-  faArrowUpRightFromSquare
-  export let code, ext, nw_label
   let viewLogin = false, clickedLogin = false,
     viewExt = false, clickedExt = false,
-    viewMinIO = false, clickedMinIO = false
+    viewMinIO = false, clickedMinIO = false,
+    isSwitching = false
 
+  // placeholder
   let minIO = "placeholder"
+
+  // Copy String to Clipboard
 
   const onCopyLogin = () => {
     navigator.clipboard.writeText(code)  
@@ -45,9 +32,22 @@
     setTimeout(()=> clickedMinIO = false, 1000)
   }
 
+  // Network switching
+
+  const toggleNetwork = () => { 
+    isSwitching = true
+    let u = url + "/urbit/network"
+    const f = new FormData()
+    f.append(name,'network')
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        isSwitching = false
+   }})}
+
 
 </script>
-
     <div class="info">
       <div class="title">Login Key</div>
       <div class="login-key-wrapper">
@@ -99,7 +99,7 @@
       </div>
     </div>
 
-    <div class="info" on:click={toggleNetwork}>
+    <div class="info"class:switching={isSwitching} on:click={toggleNetwork}>
       <div class="title">Access</div>
       <div class="access-options">
         <button class="option" class:access-active={nw_label === 'Local'} >Local</button>
@@ -131,7 +131,7 @@
     font-style: italic;
     font-size: 12px;
     padding: 8px;
-    background: #FBFBFB80;
+    background: #ffffff4d;
     border-radius: 6px;
     flex: 1;
   }
@@ -162,6 +162,11 @@
     border-radius: 8px;
     border: none;
     font-weight: 700;
+    cursor: pointer;
+  }
+  .switching {
+    opacity: .6;
+    pointer-events: none;
   }
   .access-active {
     background: #008eff;
