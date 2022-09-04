@@ -1,11 +1,11 @@
 <script>
-  import Settings from '/src/Components/Buttons/Settings.svelte'
+  import { layout } from '$lib/components'
   import { page } from '$app/stores';
 
 </script>
 
 {#if !($page.url.pathname === "/settings")}
-  <Settings />
+  <svelte:component this={layout.settings} />
 {/if}
 <div class="container">
   <div class='slot'>

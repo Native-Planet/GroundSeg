@@ -1,13 +1,11 @@
 <script>
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import Dropzone from '/src/Components/Dropzone.svelte'
-
+  import { existingID } from '$lib/components'
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
 
 </script>
 
-<Logo />
+<svelte:component this={existingID.logo} />
 <div class="pier">
   {#if !warningCheck}
     <div class="title">Upload a pier folder</div>
@@ -17,7 +15,7 @@
         <div class="file-type">{f}</div>
       {/each}
     </div>
-    <Dropzone />
+    <svelte:component this={existingID.dropzone} />
     <a class="cancel-button" href="/">Cancel</a>
   {:else}
     <div class="warning-title">

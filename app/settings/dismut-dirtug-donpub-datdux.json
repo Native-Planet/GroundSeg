@@ -1,0 +1,13 @@
+{
+    "pier_name": "dismut-dirtug-donpub-datdux",
+    "http_port": 8083,
+    "ames_port": 34346,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "wireguard",
+    "wg_url": "dismut-dirtug-donpub-datdux.nativeplanet.live",
+    "wg_http_port": 6567,
+    "wg_ames_port": 39551,
+    "wg_s3_port": 11062,
+    "wg_console_port": 11851
+}

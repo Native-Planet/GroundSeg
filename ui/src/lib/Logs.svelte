@@ -77,19 +77,19 @@
     --itemHoverBG: #0000004d;
     --itemIsActiveBG: #000;
     --placeholderColor: #fff;
-    font-size: 14px;
+    --height: 32px;
+    font-size: 12px;
     font-weight: 700;
     border-radius: 8px;
     appearance: none;
-    margin-bottom: 12px;
   }
   .buttons {
     display: flex;
   }
   .view {
     background: #ffffff4d;
-    padding: 8px;
-    font-size: 14px;
+    padding: 6px;
+    font-size: 12px;
     border-radius: 6px;
     width: 60px;
     text-align: center;
@@ -98,8 +98,8 @@
     font-weight: 700;
     margin-left: auto;
     background: #008eff;
-    padding: 8px;
-    font-size: 14px;
+    padding: 6px;
+    font-size: 12px;
     border-radius: 6px;
     width: 80px;
     text-align: center;

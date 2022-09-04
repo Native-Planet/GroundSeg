@@ -1,14 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
+  import { settings } from '$lib/components'
   import { url } from '/src/Scripts/server'
   import { page } from '$app/stores';
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import SysInfo from '/src/Components/SysInfo.svelte'
-  import Power from '/src/Components/Power.svelte'
-  import Network from '/src/Components/Network.svelte'
-  import MinIO from '/src/Components/MinIO.svelte'
-  import Anchor from '/src/Components/Anchor.svelte'
-  import Logs from '/src/Components/Logs.svelte'
 
   let info, opened
 
@@ -23,20 +17,22 @@
 
 </script>
 
-<Logo t="System Settings" />
+<svelte:component this={settings.logo} t="System settings" />
+
 <div class="container">
+
   <div class="panel">
-    <SysInfo {info} />
-    <Network />
+    <svelte:component this={settings.sysInfo} {info} />
+    <svelte:component this={settings.network} />
   </div>
+
   <div class="panel">
-    <Anchor />
-    <MinIO />
-    {#if info}
-      <Logs />
-    {/if}
-    <Power />
+    <svelte:component this={settings.anchor} />
+    <svelte:component this={settings.minIO} />
+    <svelte:component this={settings.logs} />
+    <svelte:component this={settings.power} />
   </div>
+
 </div>
 
 <style>

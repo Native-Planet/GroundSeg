@@ -1,6 +1,6 @@
 <script>
 	import { createEventDispatcher } from 'svelte'
-  import Sigil from '/src/Components/Sigil.svelte'
+  import Sigil from '$lib/Sigil.svelte'
   export let name, deleting = false
 
   const dispatch = createEventDispatcher();

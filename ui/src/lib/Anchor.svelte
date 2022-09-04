@@ -1,63 +1,74 @@
 <script>
-  let key = '', view = false, key2
+  let key = '', view = false, key2, isAnchorOff = false
 
   const toggleView = () => {
     view = !view
-    key2 = key
-
+    document.querySelector('#input').type = view ? 'text' : 'password'
   }
+
+  const toggleAnchor = () => {
+    isAnchorOff = !isAnchorOff
+  }
+
 </script>
 
-  <div class="network">
-    <div class="network-title">Anchor Settings</div>
-    <div class="switch">
-      <button class="toggle active">On</button>
-      <button class="toggle">Off</button>
+  <div class="anchor">
+
+    <div class="title-wrapper">
+      <div class="title">Anchor</div>
+      <div on:click={toggleAnchor} class="switch-wrapper">
+        <div class="switch {isAnchorOff ? "off" : "on"}"></div>
+      </div>
     </div>
+
     <div class="reg-key-wrapper">
       <div class="reg-title">Key Registration</div>
       <div class="reg-key">
-        <input type="text" bind:value={key} />
-        <img on:click={()=> view = !view} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+        <input id='input' type="password" bind:value={key} />
+        <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
       </div>
       <button class="submit" class:disabled={key == ''}>Submit</button>
     </div>
+
   </div>
 
 <style>
-  .network {
-    display: flex;
-    flex-direction: column;
+  .anchor {
     background: #0000006d;
     width: 300px;
     padding: 40px;
     border-radius: 15px;
     font-size: 18px;
-    gap: 12px;
   }
-  .network-title {
+  .title-wrapper {
+    display: flex;
+    align-items: center;
+  }
+  .title {
     font-size: 18px;
-    padding-bottom: 8px;
+    flex: 1;
+  }
+  .switch-wrapper {
+    border-radius: 8px;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
   }
   .switch {
-    display: flex;
-    gap: 6px;
-    padding: 2px;
+    height: 100%;
+    width: 19px;
     border-radius: 6px;
-    background: #ffffff4d;
-    width: 90px;
-    height: 30px;
+    margin-top: auto;
   }
-  .toggle {
-    background: none;
-    border: none;
-    border-radius: 4px;
-    color: inherit;
-    flex: 1;
-    padding: 2px;
-  }
-  .active {
+  .on {
     background: #008eff;
+    float: right;
+  }
+  .off {
+    background: #000;
+    float: left;
+    opacity: .2;
   }
   .reg-key-wrapper {
     display: flex;

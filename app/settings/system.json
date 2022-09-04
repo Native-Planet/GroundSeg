@@ -1,6 +1,9 @@
 {
     "firstBoot": false,
-    "piers": null,
+    "piers": [
+        "pidmyl-faswer-donpub-datdux",
+        "dismut-dirtug-donpub-datdux"
+    ],
     "pubkey": "aFhqTFkxcVJKbkVHUkRWeVRMY2Ntakg1Sm42Sm5lUlJqR09kbDFMczlCZz0K",
     "privkey": "6KZVU2hXuYp7r/MM89KJyAKOUdM1zv4o7iHxqecdGng=",
     "reg_key": "ezoO-bmoW-sseltopS-3hsulB"

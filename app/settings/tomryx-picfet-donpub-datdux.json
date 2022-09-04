@@ -4,7 +4,7 @@
     "ames_port": 34345,
     "urbit_version": "latest",
     "minio_version": "latest",
-    "network": "none",
+    "network": "wireguard",
     "wg_url": "tomryx-picfet-donpub-datdux.nativeplanet.live",
     "wg_http_port": 9775,
     "wg_ames_port": 39769,

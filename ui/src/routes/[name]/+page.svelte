@@ -1,14 +1,10 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { url } from '/src/Scripts/server'
-  import { page } from '$app/stores';
+  import { page } from '$app/stores'
+  import { profile } from '$lib/components'
   import Fa from 'svelte-fa'
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
-
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import DeleteWarning from '/src/Components/DeleteWarning.svelte'
-  import Sigil from '/src/Components/Sigil.svelte'
-  import PierCredentials from '/src/Components/PierCredentials.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -83,34 +79,60 @@
 
 
 </script>
-<Logo t="Pier Settings" />
+
+<svelte:component this={profile.logo} t="Pier Settings" />
+
 <div class="ship">
   {#if data.pier.name != undefined}
-  {#if deleteCheck}
-    <DeleteWarning on:back={()=>deleteCheck = false} on:delete={deletePier} name={data.pier.name} />
+
+    {#if deleteCheck}
+
+      <svelte:component
+        this={profile.warning}
+        on:back={()=>deleteCheck = false}
+        on:delete={deletePier}
+        name={data.pier.name} />
+
   {:else}
+
     <div class="card">
-      <Sigil patp={data.pier.name} size="87px" rad="15px" />
+
+      <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
+
       <div class="info">
         <div on:click={togglePier} class="switch-wrapper">
           <div class="switch {data.pier.running ? "on" : "off"}"></div>
         </div>
+
         {#if loading}
+
           <div class="status loading">Loading...</div>
+
         {:else if data.pier.running}
-          {#if data.pier.code == undefined}
+
+          {#if (data.pier.code == undefined || data.pier.code == '')}
+
             <div class="status booting">Booting</div>
+
           {:else}
+
             <div class="status running">Running</div>
+
           {/if}
+
         {:else}
+
           <div class="status">Stopped</div>
+
         {/if}
+
         <div class="patp">{data.pier.name}</div>
+
       </div>
+
     </div>
-    {#if data.pier.running && !(data.pier.code == undefined)}
-      <PierCredentials
+    {#if data.pier.running && (!(data.pier.code == undefined) && !(data.pier.code == ""))}
+      <svelte:component this={profile.credentials}
         name={data.pier.name}
         nw_label={data.nw_label}
         code={data.pier.code}

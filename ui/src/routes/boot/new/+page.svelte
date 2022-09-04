@@ -1,12 +1,9 @@
 <script>
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import NewPier from '/src/Components/Buttons/NewPier.svelte'
-
+  import { newID } from '$lib/components'
   let name, key
-
 </script>
 
-<Logo />
+<svelte:component this={newID.logo} />
 <div class="key">
   <div class="info">
     <div class="title">Pier Name</div>
@@ -16,7 +13,7 @@
     <div class="title">Pier Key</div>
     <input spellcheck="false" bind:value={key}/>
   </div>
-  <NewPier {name} {key}/>
+  <svelte:component this={newID.newPier} {name} {key}/>
 </div>
 <style>
   .key {
