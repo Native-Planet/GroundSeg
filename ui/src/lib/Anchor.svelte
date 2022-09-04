@@ -6,9 +6,7 @@
     document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
-  const toggleAnchor = () => {
-    isAnchorOff = !isAnchorOff
-  }
+  const toggleAnchor = () => isAnchorOff = !isAnchorOff
 
 </script>
 
@@ -106,6 +104,8 @@
     border: none;
     border-radius: 6px;
     font-family: inherit;
+    width: 80px;
+    margin-top: 6px;
   }
   .disabled {
     opacity: .6;
