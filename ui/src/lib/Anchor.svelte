@@ -1,5 +1,5 @@
 <script>
-  let key = '', view = false, key2, isAnchorOff = false
+  let key = '', view = false, isAnchorOff = false
 
   const toggleView = () => {
     view = !view

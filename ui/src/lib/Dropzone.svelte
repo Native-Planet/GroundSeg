@@ -37,15 +37,6 @@
     }
   }
 
-  const stall = c => {
-    if (c < 100) {
-      return true
-    }
-    if (c = 100) {
-      setTimeout(()=>{return false}, 1000)
-    }
-  }
-
 </script>
 
 <div id="dropper" class={isUploading ? "disabled" : "drop"}>
@@ -56,9 +47,17 @@
         <div class="bar" style="width:{curProgress}%"></div>
         <div class="uploaded">
           {#if totalSize > (1000 * 1000 * 1000)}
-            {parseFloat((uploadedAmount / (1000 * 1000 * 1000)).toFixed(2))} GB / {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
+            {#if curProgress == 100}
+              {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB}
+            {:else}
+              {parseFloat((uploadedAmount / (1000 * 1000 * 1000)).toFixed(2))} GB / {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
+            {/if}
           {:else}
-            {parseFloat((uploadedAmount / (1000 * 1000)).toFixed(2))} MB / {parseFloat((totalSize / (1000 * 1000)).toFixed(2))} MB
+            {#if curProgress == 100}
+              {(totalSize / (1000 * 1000)).toFixed(2)} MB
+            {:else}
+              {parseFloat((uploadedAmount / (1000 * 1000)).toFixed(2))} MB / {parseFloat((totalSize / (1000 * 1000)).toFixed(2))} MB
+            {/if}
           {/if}
         </div>
         <div class="percent">{curProgress.toFixed(0)}%</div>

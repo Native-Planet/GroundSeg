@@ -20,7 +20,7 @@
 
 <div>
   <a href="/">Cancel</a>
-  <button on:click={boot}>
+  <button on:click={boot} class:disabled={(name == '') || (key == '')}>
     {loading ? "Creating.." : "Create Pier"}
   </button>
 </div>
@@ -52,7 +52,10 @@
     font-family: inherit;
     margin-left: auto;
     cursor: pointer;
-
   }
-
+  
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
 </style>
