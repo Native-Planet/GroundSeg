@@ -1,39 +1,62 @@
 <script>
   import { api } from '$lib/api'
+
   export let info
 
-  let key = '', view = false, isAnchorOn = info.anchor
+  let key = '', view = false, loading = false
 
   const toggleView = () => {
     view = !view
     document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
-  const toggleAnchor = () => isAnchorOn = !isAnchorOn
+  const toggleAnchor = () => {
+    loading = true
+    const f = new FormData()
+    const u = api + "/settings/anchor"
+    f.append('anchor', !info.anchor)
+    fetch(u, {method: 'POST',body: f})
+      .then(d => d.json())
+      .then(res => {
+        if (res === 200) {
+          loading = false
+        }
+      })
+  }
+
 
 </script>
 
-  <div class="anchor">
-
-    <div class="title-wrapper">
-      <div class="title">Anchor</div>
-      <div on:click={toggleAnchor} class="switch-wrapper">
-        <div class="switch {isAnchorOn ? "on" : "off"}"></div>
+<div class="anchor">
+  <div class="title-wrapper">
+    <div class="title">Anchor</div>
+    {#if info}
+      <div
+        on:click={toggleAnchor}
+        class:disabled={loading}
+        class="switch-wrapper">
+        <div class="switch {info.anchor ? "on" : "off"}"></div>
       </div>
-    </div>
-
-    <div class="reg-key-wrapper">
-      <div class="reg-title">Key Registration</div>
-      <div class="reg-key">
-        <input id='input' type="password" bind:value={key} />
-        <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
-      </div>
-      <button class="submit" class:disabled={key == ''}>Submit</button>
-    </div>
-
+    {:else}
+      <div class="blurred"><br></div>
+    {/if}
   </div>
+  <div class="reg-key-wrapper">
+    <div class="reg-title">Key Registration</div>
+    <div class="reg-key">
+      <input id='input' type="password" bind:value={key} />
+      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+    </div>
+    <button class="submit" class:disabled={key == ''}>Submit</button>
+  </div>
+</div>
 
 <style>
+  @keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
   .anchor {
     background: #0000006d;
     width: 300px;
@@ -55,6 +78,14 @@
     height: 12px;
     background: #ffffff4d;
     padding: 2px;
+    cursor: pointer;
+  }
+  .blurred {
+    width: 36px;
+    animation: breathe 2s infinite;
+    background: #ffffff4d;
+    filter: blur(6px);
+    border-radius: 8px;
   }
   .switch {
     height: 100%;
