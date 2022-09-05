@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   import { page } from '$app/stores'
   import { profile } from '$lib/components'
   import Fa from 'svelte-fa'
@@ -21,7 +21,7 @@
   
   const getPierData = () => {
     if (shown) {
-      const u = url + "/urbit/pier?pier=" + path
+      const u = api + "/urbit/pier?pier=" + path
       fetch(u).then(r => r.json()).then(d => data = d)
       setTimeout(getPierData, 1000)
     }
@@ -29,7 +29,7 @@
 
   const ejectPier = () => {
     ejecting = true
-    let u = url + "/urbit/eject"
+    let u = api + "/urbit/eject"
     const f = new FormData()
     f.append(data.pier.name, 'eject')
 
@@ -46,7 +46,7 @@
 
   const togglePier = () => {
     loading = true
-    let u = url + "/urbit/"
+    let u = api + "/urbit/"
     const f = new FormData()
     if (data.pier.running) {
       f.append(data.pier.name, 'stop')
@@ -67,7 +67,7 @@
   }
 
   const deletePier = () => {
-    let u = url + "/urbit/delete"
+    let u = api + "/urbit/delete"
     const f = new FormData()
     f.append(data.pier.name, 'delete')
 

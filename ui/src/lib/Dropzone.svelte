@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   import Dropzone from "dropzone"
 
   let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = 'dister-dister-dister-dister.zip'
@@ -11,7 +11,7 @@
       acceptedFiles: '.zip, .tar, .tgz, .gz',
       chunking: true,
       forceChunking: true,
-      url: url + '/upload/pier',
+      url: api + '/upload/pier',
       disablePreviews: true,
       uploadprogress: checkUpdate,
       success: onSuccess,

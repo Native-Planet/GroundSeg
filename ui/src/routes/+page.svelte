@@ -1,13 +1,13 @@
 <script>
   import { onMount } from 'svelte'
-  import { url, piers } from '/src/Scripts/server'
+  import { api, piers } from '$lib/api'
   import { home } from '$lib/components'
   import Fa from 'svelte-fa'
   import { faGear } from '@fortawesome/free-solid-svg-icons/index.es'
 
 
   onMount(async () => {
-    fetch(url).then(r => r.json()).then(d => piers.set(d))
+    fetch(api).then(r => r.json()).then(d => piers.set(d))
   })
 
 </script>

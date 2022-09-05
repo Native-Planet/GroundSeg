@@ -1,5 +1,5 @@
 <script>
-  import { url, scrollDown } from '/src/Scripts/server'
+  import { api, scrollDown } from '$lib/api'
   import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte'
 
@@ -13,7 +13,7 @@
 
   const getLog = () => {
     if (shown) {
-      const u = url + "/settings/logs"
+      const u = api + "/settings/logs"
       const f = new FormData()
       f.append('logs', log)
       fetch(u, {method: 'POST', body: f})

@@ -1,14 +1,14 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { settings } from '$lib/components'
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   import { page } from '$app/stores';
 
   let info, opened
 
   const update = () => {
     if (opened) {
-      fetch(url + "/settings").then(r => r.json()).then(d => info = d)
+      fetch(api + "/settings").then(r => r.json()).then(d => info = d)
       setTimeout(update, 1000)
   }}
 

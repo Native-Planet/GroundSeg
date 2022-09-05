@@ -1,5 +1,5 @@
 <script>
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
@@ -36,7 +36,7 @@
 
   const toggleNetwork = () => { 
     isSwitching = true
-    let u = url + "/urbit/network"
+    let u = api + "/urbit/network"
     const f = new FormData()
     f.append(name,'network')
 

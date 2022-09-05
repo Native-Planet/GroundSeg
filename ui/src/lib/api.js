@@ -1,7 +1,8 @@
 import { writable } from 'svelte/store';
+import cfg from '/src/config.json' assert {type: 'json'}
 
-// config
-export const url = "http://192.168.0.172:5000"
+// api url
+export const api = cfg.url + ":" + cfg.port
 
 // stores
 export const piers = writable(null)
