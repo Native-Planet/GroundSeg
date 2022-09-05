@@ -21,7 +21,6 @@ app = Blueprint('settings', __name__, template_folder='templates')
 @app.route('/settings',methods=['GET'])
 def settings():
     orchestrator = current_app.config['ORCHESTRATOR']
-#    container_logs = orchestrator.getContainers()
     ram = psutil.virtual_memory()
     cpu = psutil.cpu_percent(interval=0.1)
     temp = psutil.sensors_temperatures()['coretemp'][0].current
@@ -31,21 +30,61 @@ def settings():
         "ram": ram.percent,
         "disk" : disk,
         "temp" : temp,
-        "anchor" : orchestrator.wireguard.isRunning()
+        "anchor" : orchestrator.wireguard.isRunning(),
+        # TODO
+        "eth-only" : False,
+        "connected" : "Native Planet 5G", 
+        "networks" : ["John's Wifi","City Wok","Native Planet 5G"],
+        "minio" : True # true if online
     })
     
 @app.route('/settings/anchor',methods=['POST'])
 def anchor_status():
     orchestrator = current_app.config['ORCHESTRATOR']
     isOn = request.form['anchor']
-    if(isOn):
+    # isOn gets sent as a string
+    if isOn == 'true':
         orchestrator.wireguard.start()
     else:
         orchestrator.wireguard.stop()
 
     return jsonify(200)
 
+# register anchor key
+@app.route('/settings/anchor/register',methods=['POST'])
+def anchor_register():
+    key = request.form['key']
+    # TODO
+    # return jsonify(400) # needed for fail?
+    return jsonify(200)
 
+# toggle ethernet only
+@app.route('/settings/eth-only',methods=['POST'])
+def ethernet_only():
+    isEthOnly = request.form['ethernet']
+    if isEthOnly == 'true':
+        print('set to ethernet only')
+        # toggle ethernet only
+    else:
+        print('set to wifi and ethernet')
+        # toggle wifi and ethernet
+
+    return jsonify(200)
+
+# connect to wifi network
+@app.route('/settings/connect',methods=['POST'])
+def connect_wifi():
+    network = request.form['network']
+    password = request.form['password']
+    # connect to network
+    
+    return jsonify(200)
+
+# restart minIO
+@app.route('/settings/minio',methods=['POST'])
+def restart_minio():
+    # restart minio
+    return jsonify(200)
 
 @app.route('/settings/logs',methods=['POST','GET'])
 def settings_logs():
