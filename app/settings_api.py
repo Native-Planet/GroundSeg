@@ -47,13 +47,12 @@ def settings_logs():
 
         return jsonify(log)
 
-
 @app.route('/settings/shutdown',methods=['POST'])
 def shutdown():
-    #TODO write shutdown code
-    return redirect('/')
+    os.system('shutdown now')
+    return jsonify(200)
 
 @app.route('/settings/restart',methods=['POST'])
 def restart():
-    #TODO write restart code
-    return redirect('/')
+    os.system('shutdown -r -h `date --date "now + 30 seconds"`')
+    return jsonify(200)
