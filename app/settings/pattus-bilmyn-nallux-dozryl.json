@@ -1,0 +1,13 @@
+{
+    "pier_name": "pattus-bilmyn-nallux-dozryl",
+    "http_port": 8084,
+    "ames_port": 34347,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "wireguard",
+    "wg_url": "pattus-bilmyn-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 1562,
+    "wg_ames_port": 31171,
+    "wg_s3_port": 13404,
+    "wg_console_port": 11215
+}

@@ -2,6 +2,9 @@
   import { onMount } from 'svelte'
   import { url, piers } from '/src/Scripts/server'
   import { home } from '$lib/components'
+  import Fa from 'svelte-fa'
+  import { faGear } from '@fortawesome/free-solid-svg-icons/index.es'
+
 
   onMount(async () => {
     fetch(url).then(r => r.json()).then(d => piers.set(d))
@@ -35,7 +38,9 @@
                 <div class="patp">{p.name}</div>
                 <div class="status">{p.running ? "Running" : "Stopped"}</div>
               </a>
-              <a href={p.name}><img class="gear" src="/pier_settings.png" alt="gear" /></a>
+              <a href={p.name}>
+                <Fa icon={faGear} size="1.2x" />
+              </a>
             </div>
           {/each}
         </div>
@@ -63,10 +68,20 @@
     padding-bottom: 40px; 
   }
   .list {
-    margin: 24px 0 28px 0;
+    margin-bottom: 28px;
+    margin-top: 8px;
     display: flex;
     flex-direction: column;
+    max-height: 284px;
+    overflow: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
+
+  .list::-webkit-scrollbar {
+    display: none;
+  }
+
   .loading {
     height: 80px;
     animation: breathe 2s infinite;
