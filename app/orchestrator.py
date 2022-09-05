@@ -92,7 +92,7 @@ class Orchestrator:
         minio.removeMinIO()
         minio = self._minios.pop(patp)
 
-        self.config['piers'] = self.config['piers'].remove(patp)
+        self.config['piers'].remove(patp)
         self.save_config()
 
 
@@ -103,6 +103,7 @@ class Orchestrator:
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
+            u['s3_url'] = f"http://console.s3.{urbit.config['wg_url']}"
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"http://{urbit.config['wg_url']}"
             else:

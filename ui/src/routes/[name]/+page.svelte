@@ -136,6 +136,7 @@
     </div>
     {#if data.pier.running && (!(data.pier.code == undefined) && !(data.pier.code == ""))}
       <svelte:component this={profile.credentials}
+        minIO={data.pier.s3_url}
         name={data.pier.name}
         nw_label={data.nw_label}
         code={data.pier.code}

@@ -3,15 +3,13 @@
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
-  export let name, nw_label, code, ext
+  export let name, nw_label, code, ext, minIO
 
   let viewLogin = false, clickedLogin = false,
     viewExt = false, clickedExt = false,
     viewMinIO = false, clickedMinIO = false,
     isSwitching = false
 
-  // placeholder
-  let minIO = "placeholder"
 
   // Copy String to Clipboard
 
@@ -84,7 +82,7 @@
     </div>
 
     <div class="info">
-      <div class="title">MinIO Bucket</div>
+      <div class="title">MinIO Console</div>
       <div class="login-key-wrapper">
         <div on:click={onCopyMinIO} class="login-key">
           {
@@ -93,6 +91,9 @@
             : "click to copy"
           }
         </div>
+        <a class="newtab" href={minIO} target="_blank">
+          <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
+        </a>
         <button on:click={()=> viewMinIO = !viewMinIO}>
           <img class="eye" src={viewMinIO ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
         </button>
