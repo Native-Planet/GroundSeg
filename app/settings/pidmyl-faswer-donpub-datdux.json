@@ -1,0 +1,13 @@
+{
+    "pier_name": "pidmyl-faswer-donpub-datdux",
+    "http_port": 8082,
+    "ames_port": 34345,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "wireguard",
+    "wg_url": "pidmyl-faswer-donpub-datdux.nativeplanet.live",
+    "wg_http_port": 7152,
+    "wg_ames_port": 38945,
+    "wg_s3_port": 14255,
+    "wg_console_port": 13170
+}

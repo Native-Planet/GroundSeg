@@ -131,6 +131,7 @@ class Orchestrator:
         return containers
 
     def switchUrbitNetwork(self, urbit_name):
+        print(urbit_name)
         urbit = self._urbits[urbit_name]
         network = 'none'
         url = f"nativeplanet.local:{urbit.config['http_port']}"

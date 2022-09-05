@@ -1,13 +1,13 @@
 <script>
   import { onMount } from 'svelte'
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   import Select from 'svelte-select'
   import Fa from 'svelte-fa'
 
   let container = null, logs = [], data = []
 
   onMount(() => {
-    fetch(url + "/settings/logs").then(r => r.json()).then(d => {
+    fetch(api + "/settings/logs").then(r => r.json()).then(d => {
       for (let i = 0; i < d.length; i++) {
         let value = d[i]
         let label = d[i].charAt(0).toUpperCase() + d[i].slice(1)
@@ -39,11 +39,12 @@
     <div class="select">
       <Select
           items={logs}
+          listPlacement="top"
           on:clear={()=> container = null}
           on:select={e => container = e.detail.value} />
     </div>
     <div class="buttons">
-      <a class="view" class:disabled={inc(container)} href="/logs/{container}">View</a>
+      <a class="view" class:disabled={inc(container)} href="/logs/{container}#latest">View</a>
       <button
         on:click={exportLog(container)}
         class="export"
@@ -76,19 +77,19 @@
     --itemHoverBG: #0000004d;
     --itemIsActiveBG: #000;
     --placeholderColor: #fff;
-    font-size: 14px;
+    --height: 32px;
+    font-size: 12px;
     font-weight: 700;
     border-radius: 8px;
     appearance: none;
-    margin-bottom: 12px;
   }
   .buttons {
     display: flex;
   }
   .view {
     background: #ffffff4d;
-    padding: 8px;
-    font-size: 14px;
+    padding: 6px;
+    font-size: 12px;
     border-radius: 6px;
     width: 60px;
     text-align: center;
@@ -97,8 +98,8 @@
     font-weight: 700;
     margin-left: auto;
     background: #008eff;
-    padding: 8px;
-    font-size: 14px;
+    padding: 6px;
+    font-size: 12px;
     border-radius: 6px;
     width: 80px;
     text-align: center;

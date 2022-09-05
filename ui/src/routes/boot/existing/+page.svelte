@@ -1,17 +1,21 @@
 <script>
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import Dropzone from '/src/Components/Dropzone.svelte'
-
+  import { existingID } from '$lib/components'
   let warningCheck = false
+  let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
 
 </script>
 
-<Logo />
+<svelte:component this={existingID.logo} />
 <div class="pier">
-  {#if warningCheck}
+  {#if !warningCheck}
     <div class="title">Upload a pier folder</div>
-    <div class="subtitle">Should be zip'd or tar'd. When finished please refresh page.</div>
-    <Dropzone />
+    <div class="subtitle">
+      <div>Accepted Extensions:</div>
+      {#each fileTypes as f}
+        <div class="file-type">{f}</div>
+      {/each}
+    </div>
+    <svelte:component this={existingID.dropzone} />
     <a class="cancel-button" href="/">Cancel</a>
   {:else}
     <div class="warning-title">
@@ -60,7 +64,7 @@
     color: inherit;
     padding: 20px;
     width: 460px;
-    max-width: calc(80vw - 40px);
+    max-width: calc(100vw - 40px);
   }
 
   .title {
@@ -70,10 +74,19 @@
     text-align: left;
   }
   .subtitle {
-    opacity: .7;
     font-weight: 700;
     font-size: .9em;
     padding-bottom: 24px;
+    display: flex;
+    margin-top: 12px;
+    gap: 6px;
+    align-items: center;
+  }
+  .file-type {
+    background: #000;
+    font-size: 10px;
+    padding: 4px 8px 4px 8px;
+    border-radius: 6px;
   }
   .drop {
     position: relative;

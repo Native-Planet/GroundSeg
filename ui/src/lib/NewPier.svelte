@@ -1,11 +1,11 @@
 <script>
-  import { url } from '/src/Scripts/server'
+  import { api } from '$lib/api'
   export let name, key, loading = false
 
   const boot = () => {
     loading = true
     const f = new FormData()
-    const u = url + "/upload/key"
+    const u = api + "/upload/key"
     f.append("patp", name)
     f.append("key", key)
     fetch(u, {method: 'POST',body: f})
@@ -20,7 +20,7 @@
 
 <div>
   <a href="/">Cancel</a>
-  <button on:click={boot}>
+  <button on:click={boot} class:disabled={(name == '') || (key == '')}>
     {loading ? "Creating.." : "Create Pier"}
   </button>
 </div>
@@ -52,7 +52,10 @@
     font-family: inherit;
     margin-left: auto;
     cursor: pointer;
-
   }
-
+  
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
 </style>

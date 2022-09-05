@@ -2,9 +2,9 @@
   export let info
 </script>
 
-  <div class="sys">
-    <div class="sys-title">System Information</div>
-    {#if info}
+<div class="sys">
+  <div class="sys-title">System Information</div>
+  {#if info}
     <div class="hw">
       <div class="word">RAM</div>
       <div class="data">{info.ram}%</div>
@@ -23,10 +23,29 @@
         </span>
       </div>
     </div>
-    {/if}
-  </div>
+    {:else}
+    <div class="hw">
+      <div class="word">RAM</div>
+      <div class="data blurred"></div>
+    </div>
+    <div class="hw">
+      <div class="word">CPU Temperature</div>
+      <div class="data blurred"></div>
+    </div>
+    <div class="hw">
+      <div class="word">Storage</div>
+      <div class="data blurred-long"></div>
+    </div>
+  {/if}
+</div>
 
 <style>
+  @keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
+
   .sys {
     display: flex;
     flex-direction: column;
@@ -48,5 +67,20 @@
   }
   .word {
     flex: 1;
+  }
+
+  .blurred {
+    width: 60px;
+    animation: breathe 2s infinite;
+    background: #ffffff4d;
+    filter: blur(6px);
+    border-radius: 8px;
+  }
+  .blurred-long {
+    width: 160px;
+    animation: breathe 2s infinite;
+    background: #ffffff4d;
+    filter: blur(6px);
+    border-radius: 8px;
   }
 </style>

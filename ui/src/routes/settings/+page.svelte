@@ -1,21 +1,14 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { url } from '/src/Scripts/server'
+  import { settings } from '$lib/components'
+  import { api } from '$lib/api'
   import { page } from '$app/stores';
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import SysInfo from '/src/Components/SysInfo.svelte'
-  import Power from '/src/Components/Power.svelte'
-  import Network from '/src/Components/Network.svelte'
-  import MinIO from '/src/Components/MinIO.svelte'
-  import Anchor from '/src/Components/Anchor.svelte'
-  import Bitcoin from '/src/Components/Bitcoin.svelte'
-  import Logs from '/src/Components/Logs.svelte'
 
   let info, opened
 
   const update = () => {
     if (opened) {
-      fetch(url + "/settings").then(r => r.json()).then(d => info = d)
+      fetch(api + "/settings").then(r => r.json()).then(d => info = d)
       setTimeout(update, 1000)
   }}
 
@@ -24,21 +17,22 @@
 
 </script>
 
-<Logo t="System Settings" />
+<svelte:component this={settings.logo} t="System settings" />
+
 <div class="container">
+
   <div class="panel">
-    <Power />
-    <SysInfo {info} />
-    <Network />
-    <MinIO />
+    <svelte:component this={settings.sysInfo} {info} />
+    <svelte:component this={settings.network} />
   </div>
+
   <div class="panel">
-    <Anchor />
-    <Bitcoin />
-    {#if info}
-      <Logs />
-    {/if}
+    <svelte:component this={settings.anchor} />
+    <svelte:component this={settings.minIO} />
+    <svelte:component this={settings.logs} />
+    <svelte:component this={settings.power} />
   </div>
+
 </div>
 
 <style>
@@ -50,6 +44,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .container::-webkit-scrollbar {
+    display: none;
   }
   .panel {
     display: flex;

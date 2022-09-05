@@ -15,7 +15,8 @@
    margin: 20px 0 0 20px;
  }
  .logo {
-  width: 48px;
+  height: 48px;
+  width: auto;
  }
   .title {
     font-size: 18px;

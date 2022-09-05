@@ -1,22 +1,28 @@
 <script>
-  import Logo from '/src/Components/Buttons/Logo.svelte'
-  import NewPier from '/src/Components/Buttons/NewPier.svelte'
+  import { newID } from '$lib/components'
+  let name, key, view = false
 
-  let name, key
+  const toggleView = () => {
+    view = !view
+    document.querySelector('#input').type = view ? 'text' : 'password'
+  }
 
 </script>
 
-<Logo />
+<svelte:component this={newID.logo} />
 <div class="key">
   <div class="info">
     <div class="title">Pier Name</div>
-    <input spellcheck="false" bind:value={name}/>
+    <input spellcheck="false" placeholder="sampel-palnet" bind:value={name}/>
   </div>
   <div class="info">
     <div class="title">Pier Key</div>
-    <input spellcheck="false" bind:value={key}/>
+    <div class="pass-wrapper">
+      <input spellcheck="false" id="input" type="password" bind:value={key}/>
+      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+    </div>
   </div>
-  <NewPier {name} {key}/>
+  <svelte:component this={newID.newPier} {name} {key}/>
 </div>
 <style>
   .key {
@@ -26,7 +32,7 @@
     color: inherit;
     padding: 20px;
     width: 460px;
-    max-width: calc(80vw - 40px);
+    max-width: calc(100vw - 40px);
   }
   .info {
     display: flex;
@@ -37,18 +43,22 @@
     margin-bottom: 6px;
     text-align: left;
   }
+  .pass-wrapper {
+    display: flex;
+  }
   input {
     flex: 1;
-    padding: 12px;
-    font-size: 16px;
+    padding: 8px;
+    font-size: 12px;
     color: inherit;
     font-weight: 700;
-    background: #FBFBFB80;
+    background: #ffffff4d;
     outline: none;
     border: none;
     border-radius: 6px;
   }
-  input:focus {
-    background: #EBEBEB80;
+  .pass-wrapper > img {
+    padding-left: 12px;
   }
+
 </style>

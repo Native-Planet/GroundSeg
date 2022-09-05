@@ -1,0 +1,13 @@
+{
+    "pier_name": "pardyt-navlut-nallux-dozryl",
+    "http_port": 8081,
+    "ames_port": 34344,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "none",
+    "wg_url": "pardyt-navlut-nallux-dozryl.nativeplanet.live",
+    "wg_http_port": 6418,
+    "wg_ames_port": 39303,
+    "wg_s3_port": 10548,
+    "wg_console_port": 11226
+}
