@@ -96,6 +96,7 @@
   }
   .reg-key > img {
     padding-left: 12px;
+    opacity: .8;
   }
   .submit {
     background: #008eff;

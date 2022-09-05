@@ -1,7 +1,7 @@
 {
     "pier_name": "nolnyr-rolzod-nallux-dozryl",
-    "http_port": 8083,
-    "ames_port": 34346,
+    "http_port": 8086,
+    "ames_port": 34349,
     "urbit_version": "latest",
     "minio_version": "latest",
     "network": "none",

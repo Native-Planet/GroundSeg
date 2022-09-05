@@ -135,6 +135,7 @@
   }
   .wifi-pass > img {
     padding-left: 12px;
+    opacity: .8;
   }
   .connect {
     background: #008eff;

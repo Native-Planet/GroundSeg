@@ -84,9 +84,7 @@
 
 
 </script>
-
 <svelte:component this={profile.logo} t="Pier Settings" />
-
 <div class="ship">
   {#if data.pier.name != undefined}
 
@@ -157,11 +155,18 @@
         <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
       {/if}
     </div>
-  {/if}
+    {/if}
+  {:else}
+    <div class="block"></div>
   {/if}
 </div>
 
 <style>
+  @keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
   .ship {
     padding: 20px;
     width: 480px;
@@ -243,6 +248,10 @@
     padding-top: 6px;
     padding-bottom: 6px;
     cursor: pointer;
+    width: 150px;
+  }
+  .advanced:hover {
+    opacity: .6;
   }
 
   .eject {
@@ -252,5 +261,11 @@
   .delete {
     background: #f48399;
   }
-
+  .block {
+    background: #ffffff4d;
+    height: 158px;
+    width: 100%;
+    filter: blur(20px);
+    animation: breathe 2s infinite;
+  }
 </style>
