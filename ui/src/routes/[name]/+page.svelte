@@ -22,9 +22,14 @@
   const getPierData = () => {
     if (shown) {
       const u = api + "/urbit/pier?pier=" + path
-      fetch(u).then(r => r.json()).then(d => data = d)
+      fetch(u).then(r => r.json()).then(d => handleData(d))
       setTimeout(getPierData, 1000)
     }
+  }
+
+  const handleData = d => {
+    if (d == 400) { window.location.href = "/" }
+    if (d.pier.name == path) { data = d }
   }
 
   const ejectPier = () => {

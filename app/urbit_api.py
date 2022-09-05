@@ -42,7 +42,7 @@ def pier_info():
             urbit = u
 
     if(urbit == None):
-        return Response("Pier not found", status=400)
+        return jsonify(400)
 
     nw_label = "Local"
     if(u['network'] == 'wireguard'):
