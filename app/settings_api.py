@@ -31,8 +31,21 @@ def settings():
         "ram": ram.percent,
         "disk" : disk,
         "temp" : temp,
+        "anchor" : orchestrator.wireguard.isRunning()
     })
     
+@app.route('/settings/anchor',methods=['POST'])
+def anchor_status():
+    orchestrator = current_app.config['ORCHESTRATOR']
+    isOn = request.form['anchor']
+    if(isOn):
+        orchestrator.wireguard.start()
+    else:
+        orchestrator.wireguard.stop()
+
+    return jsonify(200)
+
+
 
 @app.route('/settings/logs',methods=['POST','GET'])
 def settings_logs():

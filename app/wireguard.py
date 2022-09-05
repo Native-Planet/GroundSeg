@@ -8,9 +8,6 @@ class Wireguard:
 
     _headers = {"Content-Type": "application/json"}
 
-    _service_type = ['minio','urbit-web','urbit-ames']
-
-
 
     def __init__(self, config):
         self.config = config
@@ -26,6 +23,8 @@ class Wireguard:
 
     def start(self):
         self.wg_docker.start()
+    def stop(self):
+        self.wg_docker.stop()
 
 
     def registerDevice(self, reg_code):
@@ -109,4 +108,7 @@ class Wireguard:
         self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
         # Setup and start the local wg client
         self.wg_docker.addConfig(self.wg_config)
+
+    def isRunning(self):
+        return self.wg_docker.isRunning()
 

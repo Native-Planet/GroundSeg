@@ -1,12 +1,15 @@
 <script>
-  let key = '', view = false, isAnchorOff = false
+  import { api } from '$lib/api'
+  export let info
+
+  let key = '', view = false, isAnchorOn = info.anchor
 
   const toggleView = () => {
     view = !view
     document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
-  const toggleAnchor = () => isAnchorOff = !isAnchorOff
+  const toggleAnchor = () => isAnchorOn = !isAnchorOn
 
 </script>
 
@@ -15,7 +18,7 @@
     <div class="title-wrapper">
       <div class="title">Anchor</div>
       <div on:click={toggleAnchor} class="switch-wrapper">
-        <div class="switch {isAnchorOff ? "off" : "on"}"></div>
+        <div class="switch {isAnchorOn ? "on" : "off"}"></div>
       </div>
     </div>
 

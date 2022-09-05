@@ -28,12 +28,20 @@ class Orchestrator:
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
-        # TODO add this as a function so that a key can be sent through web interface
+        self.load_urbits()
+
+
+    def registerDevice(self, reg_key):
+        self.config['reg_key'] = reg_key
         self.wireguard.registerDevice(self.config['reg_key']) 
         self.anchor_config = self.wireguard.getStatus()
         self.wireguard.start()
 
-        self.load_urbits()
+        for p in self.config['piers']:
+           self.registerUrbit(p)
+
+        self.save_config()
+
 
     def load_urbits(self):
         for p in self.config['piers']:
