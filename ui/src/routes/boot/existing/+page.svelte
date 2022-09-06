@@ -7,7 +7,7 @@
 
 <svelte:component this={existingID.logo} />
 <div class="pier">
-  {#if !warningCheck}
+  {#if warningCheck}
     <div class="title">Upload a pier folder</div>
     <div class="subtitle">
       <div>Accepted Extensions:</div>
@@ -87,18 +87,6 @@
     font-size: 10px;
     padding: 4px 8px 4px 8px;
     border-radius: 6px;
-  }
-  .drop {
-    position: relative;
-    height: 120px;
-    text-align: center;
-    border: 1px solid #ffffff80;
-  }
-  .text {
-    position: absolute;
-    top: calc(50% - .5em);
-    width: 100%;
-    margin: auto;
   }
   .cancel-button {
     margin-top: 24px;

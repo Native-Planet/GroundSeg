@@ -97,12 +97,6 @@
   .pier:hover {
     background: #00000080;
   }
-  .sigil {
-    width: 60px;
-    height: 60px;
-    background: salmon;
-    border-radius: 8px;
-  }
   .info {
     display: flex;
     flex-direction: column;
@@ -117,10 +111,5 @@
     opacity: .8;
     font-weight: 400;
     font-size: .8em;
-
-  }
-  img, .gear {
-    width: 28px;
-    height: 28px;
   }
 </style>

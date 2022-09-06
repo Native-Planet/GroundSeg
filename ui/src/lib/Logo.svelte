@@ -24,12 +24,4 @@
     margin-top: auto;
     padding-bottom: 8px;
   }
-  .right {
-    margin-left: auto;
-    padding-right: 20px;
-  }
-  .home {
-    width: 32px;
-  }
-
 </style>
