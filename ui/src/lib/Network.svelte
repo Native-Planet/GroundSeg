@@ -1,9 +1,27 @@
 <script>
+  import { api } from '$lib/api'
   import Select from 'svelte-select'
 
-  let ethOnly = false, nw = null, pw = '', view = false
+  export let info
 
-  const toggleEth = () => ethOnly = !ethOnly
+  let ethSwapping = false,
+    nw = null, pw = '',
+    view = false
+
+  const toggleEth = () =>  {
+
+    ethSwapping = true
+
+    let u = api + "/settings/eth-only"
+    const f = new FormData()
+    f.append('ethernet', !info.ethOnly)
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        ethSwapping = false
+        console.log("swapped")
+   }})}
 
   const toggleView = () => {
     view = !view
@@ -15,37 +33,42 @@
 
 </script>
 
+  {JSON.stringify(info)}
+{#if info}
   <div class="network">
     <div class="network-title">Connectivity</div>
     <div class="ethernet">
-      <div class="ethernet-text" class:disabled={!ethOnly}>Ethernet Only</div>
+      <div class="ethernet-text" class:disabled={!info.ethOnly}>Ethernet Only</div>
       <div on:click={toggleEth} class="switch-wrapper">
-        <div class="switch {ethOnly ? "on" : "off"}"></div>
+        <div class="switch {info.ethOnly ? "on" : "off"}"></div>
       </div>
     </div>
 
-    {#if !ethOnly}
+    {#if !info.ethOnly}
       <div class="wifi">
         <div class="select">
           <Select
-            items={ssid}
+            items={info.networks}
             listPlacement="auto"
             placeholder="Select Network"
             on:clear={()=> nw = null}
             on:select={e => nw = e.detail.value} />
         </div>
 
-        <div class="wifi-pass-wrapper">
-          <div class="pass-text">Wifi Password</div>
-          <div class="wifi-pass">
-            <input id='pass' type="password" bind:value={pw} />
-            <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+        {#if info.connected !== nw}
+          <div class="wifi-pass-wrapper">
+            <div class="pass-text">Wifi Password</div>
+            <div class="wifi-pass">
+              <input id='pass' type="password" bind:value={pw} />
+              <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+            </div>
+            <button class="connect" class:disabled={(pw == '') || (nw == null)}>Connect</button>
           </div>
-          <button class="connect" class:disabled={(pw == '') || (nw == null)}>Connect</button>
-        </div>
+        {/if}
       </div>
     {/if}
   </div>
+{/if}
 
 <style>
   .network {

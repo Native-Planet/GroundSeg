@@ -25,7 +25,7 @@
 
   <div class="panel">
     <svelte:component this={settings.sysInfo} {info} />
-    <svelte:component this={settings.network} />
+    <svelte:component this={settings.network} {info} />
   </div>
 
   <div class="panel">
