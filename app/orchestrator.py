@@ -9,6 +9,7 @@ class Orchestrator:
     
     _urbits = {}
     _minios = {}
+    minIO_on = False
 
 
     def __init__(self, config_file):
@@ -28,6 +29,9 @@ class Orchestrator:
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
+        if(self.config['reg_key']!= None):
+           self.wireguard.start()
+
         self.load_urbits()
 
 
@@ -50,6 +54,17 @@ class Orchestrator:
                 data = json.load(f)
             self._urbits[p] = UrbitDocker(data)
             self._minios[p] = MinIODocker(data)
+        self.startMinIOs()
+
+    def startMinIOs(self):
+      for m in self._minios.values():
+         m.start()
+      self.minIO_on = True
+
+    def stopMinIOs(self):
+      for m in self._minios:
+         m.stop()
+      self.minIO_on = False
 
     def registerUrbit(self, patp):
        for ep in self.anchor_config['subdomains']:
