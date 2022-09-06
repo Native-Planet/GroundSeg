@@ -80,6 +80,7 @@
     width: 19px;
     border-radius: 6px;
     margin-top: auto;
+    cursor: pointer;
   }
   .on {
     background: #008eff;
@@ -136,6 +137,7 @@
   .wifi-pass > img {
     padding-left: 12px;
     opacity: .8;
+    cursor: pointer;
   }
   .connect {
     background: #008eff;
@@ -146,6 +148,7 @@
     font-family: inherit;
     width: 80px;
     margin-top: 6px;
+    cursor: pointer;
   }
   .disabled {
     opacity: .6;
