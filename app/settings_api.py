@@ -12,11 +12,13 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 
 import urbit_docker
-
-#import system_info as sys_info
+from wifi import Cell, Scheme
+from pprint import pprint
 
 
 app = Blueprint('settings', __name__, template_folder='templates')
+
+glob_network=[]
 
 @app.route('/settings',methods=['GET'])
 def settings():
@@ -25,6 +27,34 @@ def settings():
     cpu = psutil.cpu_percent(interval=0.1)
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
+    eth = True
+    wifi = 'wlp1s0'
+    net = psutil.net_if_stats()
+
+    for k,v in net.items():
+        if 'wlp' in k:
+            wifi = k
+            if(v.isup):
+                eth = False
+                break
+            
+
+
+    global glob_network
+    networks = []
+    try:
+        n = list(Cell.all(wifi))
+        for c in n:
+            if((c.ssid !='') and ('\\x00\\x00' not in c.ssid )):
+                if(c.ssid not in networks):
+                    networks.append(c.ssid)
+        glob_network = networks
+    except Exception as e:
+        networks = glob_network
+        pass
+
+    print(networks)
+
 
     return jsonify({
         "ram": ram.percent,
@@ -32,10 +62,10 @@ def settings():
         "temp" : temp,
         "anchor" : orchestrator.wireguard.isRunning(),
         # TODO
-        "eth-only" : False,
+        "eth-only" : eth,
         "connected" : "Native Planet 5G", 
-        "networks" : ["John's Wifi","City Wok","Native Planet 5G"],
-        "minio" : True # true if online
+        "networks" : networks,
+        "minio" : orchestrator.minIO_on
     })
     
 @app.route('/settings/anchor',methods=['POST'])
@@ -54,6 +84,8 @@ def anchor_status():
 @app.route('/settings/anchor/register',methods=['POST'])
 def anchor_register():
     key = request.form['key']
+    orchestrator = current_app.config['ORCHESTRATOR']
+    orchestrator.registerDevice(key)
     # TODO
     # return jsonify(400) # needed for fail?
     return jsonify(200)
