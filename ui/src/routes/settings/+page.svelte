@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { settings } from '$lib/components'
-  import { api } from '$lib/api'
+  import { power, api } from '$lib/api'
   import { page } from '$app/stores';
 
   let info, opened
@@ -14,6 +14,8 @@
 
   onMount( ()=> {opened = true; update()})
   onDestroy(() => opened = false)
+
+  power.set(null)
 
 </script>
 

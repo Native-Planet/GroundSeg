@@ -32,34 +32,35 @@
 {#if !($page.url.pathname === "/settings")}
   <svelte:component this={layout.settings} />
 {/if}
-<div class="container" class:frozen={($power === 'shutdown') || ($power === 'restart')}>
+<div class="container" class:frozen={($page.url.pathname === "/settings") && (($power === 'shutdown') || ($power === 'restart'))}>
   <div class='slot'>
       <slot />
   </div>
 </div>
-{#if $power === 'shutdown'}
-  <div class="power">
-    <div class="text">Are you sure you want to shut down the device?</div>
-    <div class="buttons">
-      <button class="cancel" on:click={cancel}>Cancel</button>
-      <button class="shutdown" on:click={shutdown}>
-        <Fa icon={faPowerOff} size="0.85x" />
-        <span>Shutdown</span>
-      </button>
+{#if $page.url.pathname === "/settings"}
+  {#if $power === 'shutdown'}
+    <div class="power">
+      <div class="text">Are you sure you want to shut down the device?</div>
+      <div class="buttons">
+        <button class="cancel" on:click={cancel}>Cancel</button>
+        <button class="shutdown" on:click={shutdown}>
+          <Fa icon={faPowerOff} size="0.85x" />
+          <span>Shutdown</span>
+        </button>
+      </div>
     </div>
-  </div>
-{:else if $power === 'restart'}
-  <div class="power">
-    <div class="text">Are you sure you want to restart the device?</div>
-    <div class="buttons">
-      <button class="cancel" on:click={cancel}>Cancel</button>
-      <button class="restart" on:click={restart}>
-        <Fa icon={faRotateRight} size="0.85x" />
-        <span>Restart</span>
-      </button>
+  {:else if $power === 'restart'}
+    <div class="power">
+      <div class="text">Are you sure you want to restart the device?</div>
+      <div class="buttons">
+        <button class="cancel" on:click={cancel}>Cancel</button>
+        <button class="restart" on:click={restart}>
+          <Fa icon={faRotateRight} size="0.85x" />
+          <span>Restart</span>
+        </button>
+      </div>
     </div>
-  </div>
-
+  {/if}
 {/if}
 
 <style>
