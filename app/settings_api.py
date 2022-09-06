@@ -32,7 +32,7 @@ def settings():
         "temp" : temp,
         "anchor" : orchestrator.wireguard.isRunning(),
         # TODO
-        "ethOnly" : False,
+        "eth-only" : False,
         "connected" : "Native Planet 5G", 
         "networks" : ["John's Wifi","City Wok","Native Planet 5G"],
         "minio" : True # true if online
