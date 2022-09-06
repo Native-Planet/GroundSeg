@@ -7,3 +7,4 @@ export const api = cfg.url + ":" + cfg.port
 // stores
 export const piers = writable(null)
 export const scrollDown = writable(true)
+export const power = writable(null)

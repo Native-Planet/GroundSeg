@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
   import { settings } from '$lib/components'
-  import { api } from '$lib/api'
+  import { power, api } from '$lib/api'
   import { page } from '$app/stores';
 
   let info, opened
@@ -15,6 +15,8 @@
   onMount( ()=> {opened = true; update()})
   onDestroy(() => opened = false)
 
+  power.set(null)
+
 </script>
 
 <svelte:component this={settings.logo} t="System settings" />
@@ -23,12 +25,12 @@
 
   <div class="panel">
     <svelte:component this={settings.sysInfo} {info} />
-    <svelte:component this={settings.network} />
+    <svelte:component this={settings.network} {info} />
   </div>
 
   <div class="panel">
     <svelte:component this={settings.anchor} {info} />
-    <svelte:component this={settings.minIO} />
+    <svelte:component this={settings.minIO} {info} />
     <svelte:component this={settings.logs} />
     <svelte:component this={settings.power} />
   </div>

@@ -20,10 +20,18 @@
       .then(res => {
         if (res === 200) {
           loading = false
-        }
-      })
-  }
+    }})}
 
+  const registerKey = () => {
+    const f = new FormData()
+    const u = api + "/settings/anchor/register"
+    f.append('key', key)
+    fetch(u, {method: 'POST',body: f})
+      .then(d => d.json())
+      .then(res => {
+        if (res === 200) {
+          console.log("success: do nothing")
+    }})}
 
 </script>
 
@@ -47,7 +55,7 @@
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
-    <button class="submit" class:disabled={key == ''}>Submit</button>
+    <button on:click={registerKey} class="submit" class:disabled={key == ''}>Submit</button>
   </div>
 </div>
 
@@ -131,6 +139,7 @@
   .reg-key > img {
     padding-left: 12px;
     opacity: .8;
+    cursor: pointer;
   }
   .submit {
     background: #008eff;
@@ -141,6 +150,7 @@
     font-family: inherit;
     width: 80px;
     margin-top: 6px;
+    cursor: pointer;
   }
   .disabled {
     opacity: .6;

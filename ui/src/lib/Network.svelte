@@ -1,53 +1,102 @@
 <script>
+  import { api } from '$lib/api'
+  import { onMount, onDestroy } from 'svelte'
   import Select from 'svelte-select'
 
-  let ethOnly = false, nw = null, pw = '', view = false
+  export let info
 
-  const toggleEth = () => ethOnly = !ethOnly
+  let opened = true, refreshing = false, networks
+
+  let ethSwapping = false,
+    nw = '', pw = '',
+    view = false
+
+  onMount(()=> {;getNetworks()})
+  onDestroy(()=> opened = false)
+
+
+  const toggleEth = () =>  {
+
+    ethSwapping = true
+
+    let u = api + "/settings/eth-only"
+    const f = new FormData()
+    f.append('ethernet', !info.ethOnly)
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        ethSwapping = false
+        console.log("swapped")
+   }})}
 
   const toggleView = () => {
     view = !view
     document.querySelector('#pass').type = view ? 'text' : 'password'
   }
 
-  // placeholder
-  let ssid = ["John's Wifi","Native Planet 5G","City Wok"]
+  const getNetworks = () => {
+    if (opened) {
+      fetch(api + "/settings/networks").then(r => r.json()).then(d => networks = d)
+      setTimeout(getNetworks, 60000)
+   }}
 
 </script>
 
+{#if info}
   <div class="network">
     <div class="network-title">Connectivity</div>
     <div class="ethernet">
-      <div class="ethernet-text" class:disabled={!ethOnly}>Ethernet Only</div>
+      <div class="ethernet-text" class:disabled={!info.ethOnly}>Ethernet Only</div>
       <div on:click={toggleEth} class="switch-wrapper">
-        <div class="switch {ethOnly ? "on" : "off"}"></div>
+        <div class="switch {info.ethOnly ? "on" : "off"}"></div>
       </div>
     </div>
 
-    {#if !ethOnly}
+    {#if !info.ethOnly}
       <div class="wifi">
         <div class="select">
           <Select
-            items={ssid}
+            items={networks}
             listPlacement="auto"
             placeholder="Select Network"
-            on:clear={()=> nw = null}
+            value={nw == '' ? info.connected : nw}
+            on:clear={()=> nw = ''}
             on:select={e => nw = e.detail.value} />
         </div>
 
-        <div class="wifi-pass-wrapper">
-          <div class="pass-text">Wifi Password</div>
-          <div class="wifi-pass">
-            <input id='pass' type="password" bind:value={pw} />
-            <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+        {#if (info.connected !== nw) && (nw.length > 0)}
+          <div class="wifi-pass-wrapper">
+            <div class="pass-text">Wifi Password</div>
+            <div class="wifi-pass">
+              <input id='pass' type="password" bind:value={pw} />
+              <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+            </div>
+            <button class="connect" class:disabled={(pw == '') || (nw == null)}>Connect</button>
           </div>
-          <button class="connect" class:disabled={(pw == '') || (nw == null)}>Connect</button>
-        </div>
+        {/if}
       </div>
     {/if}
   </div>
+{:else}
+  <div class="network">
+    <div class="network-title">Connectivity</div>
+    <div class="ethernet">
+      <div class="ethernet-text" class:disabled={true}>Ethernet Only</div>
+      <div class="switch-wrapper-blurred"></div>
+    </div>
+    <div class="blurred"></div>
+
+
+  </div>
+{/if}
 
 <style>
+@keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
   .network {
     background: #0000006d;
     width: 300px;
@@ -75,11 +124,30 @@
     background: #ffffff4d;
     padding: 2px;
   }
+  .switch-wrapper-blurred {
+    border-radius: 8px;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
+    filter: blur(10px);
+    animation: breathe 2s infinite;
+  }
+  .blurred {
+    height: 32px;
+    width: 100%;
+    background: #ffffff4d;
+    border-radius: 8px;
+    margin-top: 20px;
+    filter: blur(10px);
+    animation: breathe 2s infinite;
+  }
   .switch {
     height: 100%;
     width: 19px;
     border-radius: 6px;
     margin-top: auto;
+    cursor: pointer;
   }
   .on {
     background: #008eff;
@@ -136,6 +204,7 @@
   .wifi-pass > img {
     padding-left: 12px;
     opacity: .8;
+    cursor: pointer;
   }
   .connect {
     background: #008eff;
@@ -146,6 +215,7 @@
     font-family: inherit;
     width: 80px;
     margin-top: 6px;
+    cursor: pointer;
   }
   .disabled {
     opacity: .6;
