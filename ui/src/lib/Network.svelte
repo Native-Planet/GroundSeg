@@ -1,12 +1,19 @@
 <script>
   import { api } from '$lib/api'
+  import { onMount, onDestroy } from 'svelte'
   import Select from 'svelte-select'
 
   export let info
 
+  let opened = true, refreshing = false, networks
+
   let ethSwapping = false,
-    nw = null, pw = '',
+    nw = '', pw = '',
     view = false
+
+  onMount(()=> {;getNetworks()})
+  onDestroy(()=> opened = false)
+
 
   const toggleEth = () =>  {
 
@@ -28,12 +35,14 @@
     document.querySelector('#pass').type = view ? 'text' : 'password'
   }
 
-  // placeholder
-  let ssid = ["John's Wifi","Native Planet 5G","City Wok"]
+  const getNetworks = () => {
+    if (opened) {
+      fetch(api + "/settings/networks").then(r => r.json()).then(d => networks = d)
+      setTimeout(getNetworks, 60000)
+   }}
 
 </script>
 
-  {JSON.stringify(info)}
 {#if info}
   <div class="network">
     <div class="network-title">Connectivity</div>
@@ -48,14 +57,15 @@
       <div class="wifi">
         <div class="select">
           <Select
-            items={info.networks}
+            items={networks}
             listPlacement="auto"
             placeholder="Select Network"
-            on:clear={()=> nw = null}
+            value={nw == '' ? info.connected : nw}
+            on:clear={()=> nw = ''}
             on:select={e => nw = e.detail.value} />
         </div>
 
-        {#if info.connected !== nw}
+        {#if (info.connected !== nw) && (nw.length > 0)}
           <div class="wifi-pass-wrapper">
             <div class="pass-text">Wifi Password</div>
             <div class="wifi-pass">
@@ -68,9 +78,25 @@
       </div>
     {/if}
   </div>
+{:else}
+  <div class="network">
+    <div class="network-title">Connectivity</div>
+    <div class="ethernet">
+      <div class="ethernet-text" class:disabled={true}>Ethernet Only</div>
+      <div class="switch-wrapper-blurred"></div>
+    </div>
+    <div class="blurred"></div>
+
+
+  </div>
 {/if}
 
 <style>
+@keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
   .network {
     background: #0000006d;
     width: 300px;
@@ -97,6 +123,24 @@
     height: 12px;
     background: #ffffff4d;
     padding: 2px;
+  }
+  .switch-wrapper-blurred {
+    border-radius: 8px;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
+    filter: blur(10px);
+    animation: breathe 2s infinite;
+  }
+  .blurred {
+    height: 32px;
+    width: 100%;
+    background: #ffffff4d;
+    border-radius: 8px;
+    margin-top: 20px;
+    filter: blur(10px);
+    animation: breathe 2s infinite;
   }
   .switch {
     height: 100%;

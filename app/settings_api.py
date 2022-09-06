@@ -28,7 +28,6 @@ def settings():
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
     eth = True
-    wifi = 'wlp1s0'
     net = psutil.net_if_stats()
 
     for k,v in net.items():
@@ -39,9 +38,26 @@ def settings():
                 break
             
 
+    return jsonify({
+        "ram": ram.percent,
+        "disk" : disk,
+        "temp" : temp,
+        "anchor" : orchestrator.wireguard.isRunning(),
+        # TODO
+        "eth-only" : eth,
+        "connected" : "Native Planet 5G", 
+        "minio" : orchestrator.minIO_on
+    })
+    
+@app.route('/settings/networks', methods=['GET'])
+def list_networks():
+    wifi = 'wlo1'
 
     global glob_network
     networks = []
+
+    print(list(Cell.all(wifi)))
+
     try:
         n = list(Cell.all(wifi))
         for c in n:
@@ -54,20 +70,8 @@ def settings():
         pass
 
     print(networks)
+    return jsonify(networks)
 
-
-    return jsonify({
-        "ram": ram.percent,
-        "disk" : disk,
-        "temp" : temp,
-        "anchor" : orchestrator.wireguard.isRunning(),
-        # TODO
-        "eth-only" : eth,
-        "connected" : "Native Planet 5G", 
-        "networks" : networks,
-        "minio" : orchestrator.minIO_on
-    })
-    
 @app.route('/settings/anchor',methods=['POST'])
 def anchor_status():
     orchestrator = current_app.config['ORCHESTRATOR']
