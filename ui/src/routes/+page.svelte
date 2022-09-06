@@ -72,7 +72,7 @@
     margin-top: 8px;
     display: flex;
     flex-direction: column;
-    max-height: 284px;
+    max-height: 264px;
     overflow: auto;
     -ms-overflow-style: none;
     scrollbar-width: none;

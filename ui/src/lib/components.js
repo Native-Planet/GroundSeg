@@ -52,3 +52,7 @@
     sigil:Sigil,
     credentials:PierCredentials
   }
+
+  export const logs = {
+    logo:Logo
+  }

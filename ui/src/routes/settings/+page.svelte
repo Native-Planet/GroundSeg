@@ -21,7 +21,8 @@
 
 <svelte:component this={settings.logo} t="System settings" />
 
-<div class="container">
+<div class="wrapper">
+<div class="content">
 
   <div class="panel">
     <svelte:component this={settings.sysInfo} {info} />
@@ -36,20 +37,21 @@
   </div>
 
 </div>
-
+</div>
 <style>
-  .container {
+  .content {
     padding: 20px;
     width: 772px;
-    max-width: calc(100vw - 40px);
     overflow: auto;
+    max-width: calc(100vw - 40px);
+    max-height: 60vh;
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .container::-webkit-scrollbar {
+  .content::-webkit-scrollbar {
     display: none;
   }
   .panel {

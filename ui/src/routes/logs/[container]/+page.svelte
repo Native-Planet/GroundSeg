@@ -1,15 +1,22 @@
 <script>
   import { api, scrollDown } from '$lib/api'
+  import { logs } from '$lib/components'
   import { page } from '$app/stores';
   import { onMount, onDestroy } from 'svelte'
 
   let log = $page.params.container,
-    stream = [],
+    stream = null,
     shown = false
     
 
   onMount(() => {shown=true;getLog();})
   onDestroy(() => {shown=false;scrollDown.set(true);})
+
+  const handleScroll = e => {
+    if ((e.deltaY < 0) && (Array.isArray(stream))) {
+      scrollDown.set(false)
+    }
+  }
 
   const getLog = () => {
     if (shown) {
@@ -27,18 +34,67 @@
     }
   }
 </script>
-<svelte:window on:wheel={()=>scrollDown.set(false)} />
-<div>
-{#each stream as s}
-  <div class="content">{s}</div>
-{/each}
-<div id="jump"></div>
-{#if !$scrollDown}
-  <button class="latest" on:click={()=>{window.location.href="#jump";scrollDown.set(true)}}>Show Latest</button>
+
+<svelte:window on:wheel={handleScroll} />
+
+{#if Array.isArray(stream)}
+  <!-- detect mousewheel event -->
+
+  <div class="wrapper">
+
+    <svelte:component this={logs.logo} />
+
+    <!-- stream of selected log -->
+    <div class="logs">
+      {#each stream as s}<div class="content">{s}</div>{/each}
+      <div id="jump"></div>
+    </div>
+
+    <!-- send to bottom of screen -->
+    {#if !$scrollDown}
+      <button class="latest" on:click={()=>{window.location.href="#jump";scrollDown.set(true)}}>Show Latest</button>
+    {/if}
+
+  </div>
+{:else}
+  <div class="wrapper">
+
+    <svelte:component this={logs.logo} />
+
+    <div class="blurred"></div>
+
+  </div>
+
 {/if}
-</div>
 
 <style>
+  @keyframes breathe {
+    0% {opacity: .6}
+    50% {opacity: 0}
+    100% {opacity: .6}
+  }
+  .blurred {
+    height: 40vh;
+    background: #ffffff4d;
+    width: 800px;
+    margin: 20px;
+    border-radius: 15px;
+    filter: blur(20px);
+    animation: breathe 2s infinite;
+  }
+  .wrapper {
+  }
+  .logs {
+    max-height: calc(80vh - 92px);
+    overflow: auto;
+    margin-top: 20px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .logs::-webkit-scrollbar {
+    display: none;
+  }
+
   .content {
     margin-bottom: 4px;
     font-size: 12px;
@@ -48,14 +104,14 @@
     max-width: calc(100vw - 40px);
   }
   .latest {
-    position: sticky;
+    position: absolute;
     bottom: 0;
     width: 100%;
     background: #0a0a0a8d;
-    backdrop-filter: blur(30px);
+    backdrop-filter: blur(20px);
     color: inherit;
     border: none;
-    overflow: hidden;
     padding: 12px 0 12px 0;
+    border-radius: 15px;
   }
 </style>
