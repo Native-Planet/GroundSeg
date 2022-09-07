@@ -5,7 +5,7 @@
 
   export let info
 
-  let opened = true, refreshing = false, networks
+  let opened = true, refreshing = false, networks, connecting = false
 
   let ethSwapping = false,
     nw = '', pw = '',
@@ -28,6 +28,22 @@
       .then(d => { if (d == 200) {
         ethSwapping = false
         console.log("swapped")
+   }})}
+
+  const connectToNetwork = () =>  {
+
+    connecting = true
+
+    let u = api + "/settings/connect"
+    const f = new FormData()
+    f.append('network', nw)
+    f.append('password', pw)
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        //connecting = false
+        console.log("connected")
    }})}
 
   const toggleView = () => {
@@ -72,7 +88,7 @@
               <input id='pass' type="password" bind:value={pw} />
               <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
             </div>
-            <button class="connect" class:disabled={(pw == '') || (nw == null)}>Connect</button>
+            <button on:click={connectToNetwork} class="connect" class:disabled={(pw == '') || (nw == null)}>Connect{connecting ? "ing" : ""}</button>
           </div>
         {/if}
       </div>
@@ -213,7 +229,7 @@
     border: none;
     border-radius: 6px;
     font-family: inherit;
-    width: 80px;
+    width: 100px;
     margin-top: 6px;
     cursor: pointer;
   }
