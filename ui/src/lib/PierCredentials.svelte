@@ -1,5 +1,6 @@
 <script>
   import { api } from '$lib/api'
+  import Clipboard from 'clipboard'
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
@@ -10,25 +11,20 @@
     viewMinIO = false, clickedMinIO = false,
     isSwitching = false
 
-
   // Copy String to Clipboard
 
-  const onCopyLogin = () => {
-    navigator.clipboard.writeText(code)  
-    clickedLogin = true
-    setTimeout(()=> clickedLogin = false, 1000)
-  }
-  const onCopyExt = () => {
-    navigator.clipboard.writeText(ext)  
-    clickedExt = true
-    setTimeout(()=> clickedExt = false, 1000)
-  }
+  let copyLogin = new Clipboard('#login');
+  let copyExt = new Clipboard('#ext');
+  let copyMinIO = new Clipboard('#minio');
 
-  const onCopyMinIO = () => {
-    navigator.clipboard.writeText(minIO)  
-    clickedMinIO = true
-    setTimeout(()=> clickedMinIO = false, 1000)
-  }
+  copyLogin.on("success", ()=> {
+    clickedLogin = true; setTimeout(()=> clickedLogin = false, 1000)})
+
+  copyExt.on("success", ()=> {
+    clickedExt = true; setTimeout(()=> clickedExt = false, 1000)})
+
+  copyMinIO.on("success", ()=> {
+    clickedMinIO = true; setTimeout(()=> clickedMinIO = false, 1000)})
 
   // Network switching
 
@@ -49,7 +45,7 @@
     <div class="info">
       <div class="title">Login Key</div>
       <div class="login-key-wrapper">
-        <div on:click={onCopyLogin} class="login-key">
+        <div on:click={copyLogin} id="login" data-clipboard-text={code} class="login-key">
           {
             clickedLogin ? "copied!" 
             : viewLogin ? code
@@ -65,7 +61,7 @@
     <div class="info">
       <div class="title">External Access URL</div>
       <div class="login-key-wrapper">
-        <div on:click={onCopyExt} class="login-key">
+        <div on:click={copyExt} id="ext" data-clipboard-text={ext} class="login-key">
           {
             clickedExt ? "copied!" 
             : viewExt ? ext
@@ -84,7 +80,7 @@
     <div class="info">
       <div class="title">MinIO Console</div>
       <div class="login-key-wrapper">
-        <div on:click={onCopyMinIO} class="login-key">
+        <div on:click={copyMinIO} id="minio" data-clipboard-text={minIO} class="login-key">
           {
             clickedMinIO ? "copied!" 
             : viewMinIO ? minIO

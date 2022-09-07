@@ -29,9 +29,6 @@
 
 </script>
 
-{#if !($page.url.pathname === "/settings")}
-  <svelte:component this={layout.settings} />
-{/if}
 <div class="container" class:frozen={($page.url.pathname === "/settings") && (($power === 'shutdown') || ($power === 'restart'))}>
   <div class='slot'>
       <slot />
@@ -61,6 +58,9 @@
       </div>
     </div>
   {/if}
+{/if}
+{#if !($page.url.pathname === "/settings")}
+  <svelte:component this={layout.settings} />
 {/if}
 
 <style>
@@ -122,8 +122,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     color: #fff;
-    overflow: auto;
-    max-height: calc(100vh - 120px);
+    max-height: 80vh;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }

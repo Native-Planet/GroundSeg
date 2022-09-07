@@ -1,0 +1,8 @@
+{
+    "pier_name": "rospex-fonrys-donpub-datdux",
+    "http_port": 8087,
+    "ames_port": 34350,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "none"
+}
