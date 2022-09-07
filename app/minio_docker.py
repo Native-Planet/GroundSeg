@@ -28,8 +28,8 @@ class MinIODocker:
 
         for c in containers:
             if(self.minio_name == c.name):
-                self.container = c
-                return
+                c.stop()
+                c.remove()
 
         console_port = self.config['wg_console_port']
         s3_port = self.config['wg_s3_port']
