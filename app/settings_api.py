@@ -13,6 +13,7 @@ from orchestrator import Orchestrator
 
 import urbit_docker
 from wifi import Cell, Scheme
+from wifi_finder import Finder
 from pprint import pprint
 
 
@@ -61,8 +62,6 @@ def list_networks():
     global glob_network
     networks = []
 
-    print(list(Cell.all(wifi)))
-
     try:
         n = list(Cell.all(wifi))
         for c in n:
@@ -74,7 +73,6 @@ def list_networks():
         networks = glob_network
         pass
 
-    print(networks)
     return jsonify(networks)
 
 @app.route('/settings/anchor',methods=['POST'])
@@ -93,11 +91,13 @@ def anchor_status():
 @app.route('/settings/anchor/register',methods=['POST'])
 def anchor_register():
     key = request.form['key']
+    print(key)
     orchestrator = current_app.config['ORCHESTRATOR']
-    orchestrator.registerDevice(key)
-    # TODO
-    # return jsonify(400) # needed for fail?
-    return jsonify(200)
+    out =  orchestrator.registerDevice(key)
+    if out == 0:
+        return jsonify(200)
+    else:
+        return jsonify(400)
 
 # toggle ethernet only
 @app.route('/settings/eth-only',methods=['POST'])
@@ -117,9 +117,29 @@ def ethernet_only():
 def connect_wifi():
     network = request.form['network']
     password = request.form['password']
-    # connect to network
-    
-    return jsonify(200)
+    wifi = 'wl'
+    net = psutil.net_if_stats()
+
+    for k,v in net.items():
+        if 'wl' in k:
+            wifi = k
+            break
+
+    print("connecting "+wifi)
+    try:
+        F = Finder(server_name=network,
+                         password=password,
+                         interface=wifi)
+        while F.run() == None:
+            pass
+
+        return jsonify(200)
+
+    except Exception as e:
+        print('wtf')
+        print(e)
+     
+    return jsonify(400)
 
 # restart minIO
 @app.route('/settings/minio',methods=['POST'])
