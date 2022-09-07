@@ -31,7 +31,7 @@ def settings():
     net = psutil.net_if_stats()
 
     for k,v in net.items():
-        if 'wlp' in k:
+        if 'wl' in k:
             wifi = k
             if(v.isup):
                 eth = False
@@ -51,7 +51,12 @@ def settings():
     
 @app.route('/settings/networks', methods=['GET'])
 def list_networks():
-    wifi = 'wlo1'
+    wifi = 'wl'
+    net = psutil.net_if_stats()
+
+    for k,v in net.items():
+        if 'wl' in k:
+            wifi = k
 
     global glob_network
     networks = []
