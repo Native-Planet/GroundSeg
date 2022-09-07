@@ -140,7 +140,8 @@
         name={data.pier.name}
         nw_label={data.nw_label}
         code={data.pier.code}
-        ext={data.pier.url} />
+        ext={data.pier.url}
+        wg_reg={data.wg_reg} />
     {/if}
     <div class="commands">
       <span class="advanced" on:click={()=> advanced = !advanced}>

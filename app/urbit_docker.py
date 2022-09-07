@@ -17,11 +17,10 @@ class UrbitDocker:
         self.pier_name = self.config['pier_name']
         self.buildUrbit()
         self.running = (self.container.attrs['State']['Status'] == 'running' )
+        if(self.isRunning):
+            self.stop()
+            self.start()
         
-
-
-
-
 
     def buildVolume(self):
         volumes = client.volumes.list()

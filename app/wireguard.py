@@ -85,6 +85,7 @@ class Wireguard:
             print(e)
         
 
+
         try:
             self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
 
