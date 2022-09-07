@@ -13,6 +13,7 @@ from orchestrator import Orchestrator
 
 import urbit_docker
 from wifi import Cell, Scheme
+from wifi_finder import Finder
 from pprint import pprint
 
 
@@ -116,11 +117,29 @@ def ethernet_only():
 def connect_wifi():
     network = request.form['network']
     password = request.form['password']
-    print(network)
-    print(password)
-    # connect to network
-    
-    return jsonify(200)
+    wifi = 'wl'
+    net = psutil.net_if_stats()
+
+    for k,v in net.items():
+        if 'wl' in k:
+            wifi = k
+            break
+
+    print("connecting "+wifi)
+    try:
+        F = Finder(server_name=network,
+                         password=password,
+                         interface=wifi)
+        while F.run() == None:
+            pass
+
+        return jsonify(200)
+
+    except Exception as e:
+        print('wtf')
+        print(e)
+     
+    return jsonify(400)
 
 # restart minIO
 @app.route('/settings/minio',methods=['POST'])
