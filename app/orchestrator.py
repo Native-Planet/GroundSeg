@@ -10,6 +10,7 @@ class Orchestrator:
     _urbits = {}
     _minios = {}
     minIO_on = False
+    wireguard_reg = False
 
 
     def __init__(self, config_file):
@@ -31,6 +32,8 @@ class Orchestrator:
         self.wireguard = Wireguard(self.config)
         if('reg_key' in self.config.keys()):
            if(self.config['reg_key']!= None):
+              self.wireguard_reg = True
+              self.wireguard.stop()
               self.wireguard.start()
 
         self.load_urbits()
@@ -38,11 +41,12 @@ class Orchestrator:
 
     def registerDevice(self, reg_key):
         self.config['reg_key'] = reg_key
-        self.wireguard.registerDevice(self.config['reg_key']) 
+        x = self.wireguard.registerDevice(self.config['reg_key']) 
+        time.sleep(2)
         self.anchor_config = self.wireguard.getStatus()
-        print(self.anchor_config)
         if(self.anchor_config != None):
            self.wireguard.start()
+           self.wireguard_reg = True
            time.sleep(2)
 
            for p in self.config['piers']:
@@ -60,7 +64,8 @@ class Orchestrator:
                 data = json.load(f)
             self._urbits[p] = UrbitDocker(data)
             self._minios[p] = MinIODocker(data)
-        self.startMinIOs()
+        if self.wireguard_reg:
+           self.startMinIOs()
 
     def startMinIOs(self):
       for m in self._minios.values():
@@ -87,33 +92,34 @@ class Orchestrator:
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
-        self.anchor_config = self.wireguard.getStatus()
-        url = None
-        http_port = None
-        ames_port = None
-        s3_port = None
-        console_port = None
+        if self.wireguard_reg:
+           self.anchor_config = self.wireguard.getStatus()
+           url = None
+           http_port = None
+           ames_port = None
+           s3_port = None
+           console_port = None
 
 
-        print(self.anchor_config['subdomains'])
-        for ep in self.anchor_config['subdomains']:
-            if(f'{patp}.nativeplanet.live' == ep['url']):
-                url = ep['url']
-                http_port = ep['port']
-            elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
-                ames_port = ep['port']
-            elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
-                s3_port = ep['port']
-            elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
-                console_port = ep['port']
+           print(self.anchor_config['subdomains'])
+           for ep in self.anchor_config['subdomains']:
+               if(f'{patp}.nativeplanet.live' == ep['url']):
+                   url = ep['url']
+                   http_port = ep['port']
+               elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
+                   ames_port = ep['port']
+               elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
+                   s3_port = ep['port']
+               elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
+                   console_port = ep['port']
 
-        urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+           urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+           self._minios[patp] = MinIODocker(urbit.config)
+           self.wireguard.start()
+           self._minios[patp].start()
 
         self._urbits[patp] = urbit
-        self._minios[patp] = MinIODocker(urbit.config)
         self.save_config()
-        self.wireguard.start()
-        self._minios[patp].start()
         urbit.start()
         
 
@@ -138,7 +144,11 @@ class Orchestrator:
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
-            u['s3_url'] = f"http://console.s3.{urbit.config['wg_url']}"
+            if self.wireguard_reg:
+               u['s3_url'] = f"http://console.s3.{urbit.config['wg_url']}"
+            else:
+               u['s3_url'] = ""
+
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"http://{urbit.config['wg_url']}"
             else:
@@ -167,12 +177,11 @@ class Orchestrator:
         return containers
 
     def switchUrbitNetwork(self, urbit_name):
-        print(urbit_name)
         urbit = self._urbits[urbit_name]
         network = 'none'
         url = f"nativeplanet.local:{urbit.config['http_port']}"
 
-        if(urbit.config['network'] == 'none'):
+        if((urbit.config['network'] == 'none') and (self.wireguard_reg)):
             network = 'wireguard'
             url = urbit.config['wg_url']
 

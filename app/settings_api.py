@@ -46,7 +46,7 @@ def settings():
         "anchor" : orchestrator.wireguard.isRunning(),
         # TODO
         "eth-only" : eth,
-        "connected" : "Native Planet 5G", 
+        "connected" : "", 
         "minio" : orchestrator.minIO_on
     })
     
@@ -91,7 +91,6 @@ def anchor_status():
 @app.route('/settings/anchor/register',methods=['POST'])
 def anchor_register():
     key = request.form['key']
-    print(key)
     orchestrator = current_app.config['ORCHESTRATOR']
     out =  orchestrator.registerDevice(key)
     if out == 0:

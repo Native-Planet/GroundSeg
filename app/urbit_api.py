@@ -51,6 +51,7 @@ def pier_info():
     p = dict()
     p['nw_label'] = nw_label
     p['pier'] = urbit
+    p['wg_reg'] = current_app.config['ORCHESTRATOR'].wireguard_reg
 
     return(jsonify(p))
 
