@@ -10,6 +10,7 @@ class Orchestrator:
     _urbits = {}
     _minios = {}
     minIO_on = False
+    wireguard_reg = False
 
 
     def __init__(self, config_file):
@@ -31,6 +32,7 @@ class Orchestrator:
         self.wireguard = Wireguard(self.config)
         if('reg_key' in self.config.keys()):
            if(self.config['reg_key']!= None):
+              self.wireguard_reg = True
               self.wireguard.start()
 
         self.load_urbits()
@@ -40,9 +42,9 @@ class Orchestrator:
         self.config['reg_key'] = reg_key
         self.wireguard.registerDevice(self.config['reg_key']) 
         self.anchor_config = self.wireguard.getStatus()
-        print(self.anchor_config)
         if(self.anchor_config != None):
            self.wireguard.start()
+           self.wireguard_reg = True
            time.sleep(2)
 
            for p in self.config['piers']:
@@ -87,33 +89,34 @@ class Orchestrator:
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
-        self.anchor_config = self.wireguard.getStatus()
-        url = None
-        http_port = None
-        ames_port = None
-        s3_port = None
-        console_port = None
+        if self.wireguard_reg:
+           self.anchor_config = self.wireguard.getStatus()
+           url = None
+           http_port = None
+           ames_port = None
+           s3_port = None
+           console_port = None
 
 
-        print(self.anchor_config['subdomains'])
-        for ep in self.anchor_config['subdomains']:
-            if(f'{patp}.nativeplanet.live' == ep['url']):
-                url = ep['url']
-                http_port = ep['port']
-            elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
-                ames_port = ep['port']
-            elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
-                s3_port = ep['port']
-            elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
-                console_port = ep['port']
+           print(self.anchor_config['subdomains'])
+           for ep in self.anchor_config['subdomains']:
+               if(f'{patp}.nativeplanet.live' == ep['url']):
+                   url = ep['url']
+                   http_port = ep['port']
+               elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
+                   ames_port = ep['port']
+               elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
+                   s3_port = ep['port']
+               elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
+                   console_port = ep['port']
 
-        urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+           urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+           self._minios[patp] = MinIODocker(urbit.config)
+           self.wireguard.start()
+           self._minios[patp].start()
 
         self._urbits[patp] = urbit
-        self._minios[patp] = MinIODocker(urbit.config)
         self.save_config()
-        self.wireguard.start()
-        self._minios[patp].start()
         urbit.start()
         
 
