@@ -81,8 +81,10 @@ class Wireguard:
             response = requests.get(
                     f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
                     headers=headers).json()
+            print(response)
         except Exception as e:
             print(e)
+        
 
         try:
             self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
@@ -92,6 +94,7 @@ class Wireguard:
             self.wg_docker.addConfig(self.wg_config)
         except Exception as e:
             print(e)
+            return None
 
         return response
  

@@ -61,8 +61,6 @@ def list_networks():
     global glob_network
     networks = []
 
-    print(list(Cell.all(wifi)))
-
     try:
         n = list(Cell.all(wifi))
         for c in n:
@@ -74,7 +72,6 @@ def list_networks():
         networks = glob_network
         pass
 
-    print(networks)
     return jsonify(networks)
 
 @app.route('/settings/anchor',methods=['POST'])
@@ -93,11 +90,13 @@ def anchor_status():
 @app.route('/settings/anchor/register',methods=['POST'])
 def anchor_register():
     key = request.form['key']
+    print(key)
     orchestrator = current_app.config['ORCHESTRATOR']
-    orchestrator.registerDevice(key)
-    # TODO
-    # return jsonify(400) # needed for fail?
-    return jsonify(200)
+    out =  orchestrator.registerDevice(key)
+    if out == 0:
+        return jsonify(200)
+    else:
+        return jsonify(400)
 
 # toggle ethernet only
 @app.route('/settings/eth-only',methods=['POST'])
@@ -117,6 +116,8 @@ def ethernet_only():
 def connect_wifi():
     network = request.form['network']
     password = request.form['password']
+    print(network)
+    print(password)
     # connect to network
     
     return jsonify(200)

@@ -29,8 +29,9 @@ class Orchestrator:
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
-        if(self.config['reg_key']!= None):
-           self.wireguard.start()
+        if('reg_key' in self.config.keys()):
+           if(self.config['reg_key']!= None):
+              self.wireguard.start()
 
         self.load_urbits()
 
@@ -39,12 +40,17 @@ class Orchestrator:
         self.config['reg_key'] = reg_key
         self.wireguard.registerDevice(self.config['reg_key']) 
         self.anchor_config = self.wireguard.getStatus()
-        self.wireguard.start()
+        print(self.anchor_config)
+        if(self.anchor_config != None):
+           self.wireguard.start()
+           time.sleep(2)
 
-        for p in self.config['piers']:
-           self.registerUrbit(p)
+           for p in self.config['piers']:
+              self.registerUrbit(p)
 
-        self.save_config()
+           self.save_config()
+           return 0
+        return 1
 
 
     def load_urbits(self):
@@ -68,10 +74,11 @@ class Orchestrator:
 
     def registerUrbit(self, patp):
        self.anchor_config = self.wireguard.getStatus()
-       for ep in self.anchor_config['subdomains']:
-          if(patp in ep['url']):
-              print(f"{patp} already exists")
-              return
+       if(self.anchor_config != None):
+          for ep in self.anchor_config['subdomains']:
+             if(patp in ep['url']):
+                 print(f"{patp} already exists")
+                 return
 
        self.wireguard.registerService(f'{patp}','urbit')
        self.wireguard.registerService(f's3.{patp}','minio')
@@ -80,6 +87,7 @@ class Orchestrator:
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
+        self.anchor_config = self.wireguard.getStatus()
         print(self.anchor_config)
         url = None
         http_port = None
