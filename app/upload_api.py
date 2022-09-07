@@ -23,7 +23,7 @@ def make_urbit(patp, http_port, ames_port):
     data['pier_name'] = patp
     data['http_port'] = http_port
     data['ames_port'] = ames_port
-    with open(f'settings/{patp}.json', 'w') as f:
+    with open(f'settings/pier/{patp}.json', 'w') as f:
         json.dump(data, f, indent = 4)
     
     urbit = urbit_docker.UrbitDocker(data)

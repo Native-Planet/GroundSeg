@@ -50,7 +50,7 @@ class Orchestrator:
     def load_urbits(self):
         for p in self.config['piers']:
             data = None
-            with open(f'settings/{p}.json') as f:
+            with open(f'settings/pier/{p}.json') as f:
                 data = json.load(f)
             self._urbits[p] = UrbitDocker(data)
             self._minios[p] = MinIODocker(data)
@@ -62,28 +62,31 @@ class Orchestrator:
       self.minIO_on = True
 
     def stopMinIOs(self):
-      for m in self._minios:
+      for m in self._minios.values():
          m.stop()
       self.minIO_on = False
 
     def registerUrbit(self, patp):
+       self.anchor_config = self.wireguard.getStatus()
        for ep in self.anchor_config['subdomains']:
           if(patp in ep['url']):
+              print(f"{patp} already exists")
               return
 
-       self.wireguard.registerService(f'{patp}','urbit-web')
-       self.wireguard.registerService(f'ames.{patp}','urbit-ames')
+       self.wireguard.registerService(f'{patp}','urbit')
        self.wireguard.registerService(f's3.{patp}','minio')
        self.anchor_config = self.wireguard.getStatus()
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
+        print(self.anchor_config)
         url = None
         http_port = None
         ames_port = None
         s3_port = None
         console_port = None
+
 
         for ep in self.anchor_config['subdomains']:
             if(f'{patp}.nativeplanet.live' == ep['url']):
@@ -101,6 +104,7 @@ class Orchestrator:
         self._urbits[patp] = urbit
         self._minios[patp] = MinIODocker(urbit.config)
         self.save_config()
+        self.wireguard.start()
         self._minios[patp].start()
         urbit.start()
         

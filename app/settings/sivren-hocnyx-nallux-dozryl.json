@@ -1,8 +1,0 @@
-{
-    "pier_name": "sivren-hocnyx-nallux-dozryl",
-    "http_port": 8083,
-    "ames_port": 34346,
-    "urbit_version": "latest",
-    "minio_version": "latest",
-    "network": "none"
-}

@@ -124,7 +124,10 @@ def connect_wifi():
 # restart minIO
 @app.route('/settings/minio',methods=['POST'])
 def restart_minio():
-    # restart minio
+    orchestrator = current_app.config['ORCHESTRATOR']
+    orchestrator.stopMinIOs()
+    orchestrator.startMinIOs()
+
     return jsonify(200)
 
 @app.route('/settings/logs',methods=['POST','GET'])
