@@ -88,7 +88,6 @@ class Orchestrator:
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
         self.anchor_config = self.wireguard.getStatus()
-        print(self.anchor_config)
         url = None
         http_port = None
         ames_port = None
@@ -96,13 +95,14 @@ class Orchestrator:
         console_port = None
 
 
+        print(self.anchor_config['subdomains'])
         for ep in self.anchor_config['subdomains']:
             if(f'{patp}.nativeplanet.live' == ep['url']):
                 url = ep['url']
                 http_port = ep['port']
             elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
                 ames_port = ep['port']
-            elif(f's3.{patp}.nativeplanet.live' == ep['url']):
+            elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
                 s3_port = ep['port']
             elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
                 console_port = ep['port']

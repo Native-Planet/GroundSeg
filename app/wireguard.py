@@ -81,7 +81,6 @@ class Wireguard:
             response = requests.get(
                     f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
                     headers=headers).json()
-            print(response)
         except Exception as e:
             print(e)
         
