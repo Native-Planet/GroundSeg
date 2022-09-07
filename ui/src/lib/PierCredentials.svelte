@@ -131,6 +131,7 @@
     background: #ffffff4d;
     border-radius: 6px;
     flex: 1;
+    cursor: pointer;
   }
   .eye {
     height: 32px;
