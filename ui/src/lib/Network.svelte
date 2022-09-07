@@ -11,8 +11,8 @@
     nw = '', pw = '',
     view = false
 
-  onMount(()=> {;getNetworks()})
-  onDestroy(()=> opened = false)
+  onMount(()=> {getNetworks()})
+  onDestroy(()=> {opened = false})
 
 
   const toggleEth = () =>  {
@@ -38,7 +38,7 @@
   const getNetworks = () => {
     if (opened) {
       fetch(api + "/settings/networks").then(r => r.json()).then(d => networks = d)
-      setTimeout(getNetworks, 60000)
+      setTimeout(getNetworks, 10000)
    }}
 
 </script>

@@ -19,7 +19,7 @@
   const inc = c => !(data.includes(c))
 
   const exportLog = c => {
-    const u = url + "/settings/logs"
+    const u = api + "/settings/logs"
     const f = new FormData()
     f.append('logs', container)
     fetch(u, {method: 'POST', body: f})
