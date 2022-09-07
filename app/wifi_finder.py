@@ -27,6 +27,8 @@ class Finder:
                 if result:
                     print("Successfully connected to {}".format(name))
 
+        return 1
+
     def connection(self, name):
         try:
             os.system("nmcli d wifi connect {} password {}".format(name,
