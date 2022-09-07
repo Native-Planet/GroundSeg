@@ -29,8 +29,9 @@ class Orchestrator:
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
-        if(self.config['reg_key']!= None):
-           self.wireguard.start()
+        if('reg_key' in self.config.keys()):
+           if(self.config['reg_key']!= None):
+              self.wireguard.start()
 
         self.load_urbits()
 
@@ -39,18 +40,23 @@ class Orchestrator:
         self.config['reg_key'] = reg_key
         self.wireguard.registerDevice(self.config['reg_key']) 
         self.anchor_config = self.wireguard.getStatus()
-        self.wireguard.start()
+        print(self.anchor_config)
+        if(self.anchor_config != None):
+           self.wireguard.start()
+           time.sleep(2)
 
-        for p in self.config['piers']:
-           self.registerUrbit(p)
+           for p in self.config['piers']:
+              self.registerUrbit(p)
 
-        self.save_config()
+           self.save_config()
+           return 0
+        return 1
 
 
     def load_urbits(self):
         for p in self.config['piers']:
             data = None
-            with open(f'settings/{p}.json') as f:
+            with open(f'settings/pier/{p}.json') as f:
                 data = json.load(f)
             self._urbits[p] = UrbitDocker(data)
             self._minios[p] = MinIODocker(data)
@@ -62,36 +68,41 @@ class Orchestrator:
       self.minIO_on = True
 
     def stopMinIOs(self):
-      for m in self._minios:
+      for m in self._minios.values():
          m.stop()
       self.minIO_on = False
 
     def registerUrbit(self, patp):
-       for ep in self.anchor_config['subdomains']:
-          if(patp in ep['url']):
-              return
+       self.anchor_config = self.wireguard.getStatus()
+       if(self.anchor_config != None):
+          for ep in self.anchor_config['subdomains']:
+             if(patp in ep['url']):
+                 print(f"{patp} already exists")
+                 return
 
-       self.wireguard.registerService(f'{patp}','urbit-web')
-       self.wireguard.registerService(f'ames.{patp}','urbit-ames')
+       self.wireguard.registerService(f'{patp}','urbit')
        self.wireguard.registerService(f's3.{patp}','minio')
        self.anchor_config = self.wireguard.getStatus()
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
         self.registerUrbit(patp)
+        self.anchor_config = self.wireguard.getStatus()
         url = None
         http_port = None
         ames_port = None
         s3_port = None
         console_port = None
 
+
+        print(self.anchor_config['subdomains'])
         for ep in self.anchor_config['subdomains']:
             if(f'{patp}.nativeplanet.live' == ep['url']):
                 url = ep['url']
                 http_port = ep['port']
             elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
                 ames_port = ep['port']
-            elif(f's3.{patp}.nativeplanet.live' == ep['url']):
+            elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
                 s3_port = ep['port']
             elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
                 console_port = ep['port']
@@ -101,6 +112,7 @@ class Orchestrator:
         self._urbits[patp] = urbit
         self._minios[patp] = MinIODocker(urbit.config)
         self.save_config()
+        self.wireguard.start()
         self._minios[patp].start()
         urbit.start()
         

@@ -44,6 +44,7 @@ class UrbitDocker:
         if(self.config["network"] != "none"):
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
+            print(command)
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     command=command, 
@@ -68,6 +69,7 @@ class UrbitDocker:
         self.config['wg_s3_port'] = s3_port
         self.config['wg_console_port'] = console_port
 
+        print(self.config)
         #self.config['network'] = 'wireguard'
         self.save_config()
 
@@ -102,7 +104,7 @@ class UrbitDocker:
             self.start()
 
     def save_config(self):
-        with open(f'settings/{self.pier_name}.json', 'w') as f:
+        with open(f'settings/pier/{self.pier_name}.json', 'w') as f:
             json.dump(self.config, f, indent = 4)
 
 
@@ -149,7 +151,7 @@ class UrbitDocker:
 
 
 if __name__ == '__main__':
-    filename = "settings/walzod-fogsed-mopfel-winrux.json"
+    filename = "settings/pier/walzod-fogsed-mopfel-winrux.json"
     f = open(filename)
     data = json.load(f)
     urdock = UrbitDocker(data)
