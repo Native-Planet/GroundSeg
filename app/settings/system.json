@@ -1,7 +1,4 @@
 {
-    "firstBoot": false,
-    "piers": [],
-    "pubkey": "b3I5ZWEwNGRKVncyVGNQZjVLUzRlRHkzTW1iMVB1ajVCTUpkblFYeldSTT0K",
-    "privkey": "GHMT7h08gL4ZVUGH7UTiVuEblLw/3qhCNsusEA77HWg=",
-    "reg_key": "ezoO-bmoW-sseltopS-3hsulB"
+    "firstBoot": true,
+    "piers": []
 }

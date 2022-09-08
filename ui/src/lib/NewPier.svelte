@@ -1,9 +1,14 @@
 <script>
   import { api } from '$lib/api'
-  export let name, key, loading = false
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import LinkButton from '$lib/LinkButton.svelte'
+
+  export let name='', key=''
+
+  let buttonStatus = 'standard'
 
   const boot = () => {
-    loading = true
+    buttonStatus = 'loading'
     const f = new FormData()
     const u = api + "/upload/key"
     f.append("patp", name)
@@ -12,50 +17,38 @@
       .then(d => d.json())
       .then(res => {
         if (res === 200) {
-          window.location.href = "/" + name
+          buttonStatus = 'success'
+          setTimeout(window.location.href = "/" + name, 2000)
         }
       })
   }
 </script>
 
 <div>
-  <a href="/">Cancel</a>
-  <button on:click={boot} class:disabled={(name == '') || (key == '')}>
-    {loading ? "Creating.." : "Create Pier"}
-  </button>
+
+  {#if buttonStatus != 'loading'}
+    <LinkButton
+      text="Cancel"
+      src="/"
+      disabled={false}
+    />
+  {/if}
+
+  <PrimaryButton
+    on:click={boot}
+    standard="Create new pier"
+    success="Pier created. Redirecting..."
+    failure="Failed to create pier"
+    loading="Your pier is being created.."
+    status={(name == '') || (key == '') ? "disabled" : buttonStatus}
+    left={false}
+  />
+
 </div>
 
 <style>
   div {
     display: flex;
-    margin-top: 8px;
-  }
-
-  a {
-    padding: 12px 20px 12px 20px;
-    color: inherit;
-    text-align: center;
-    font-weight: 500;
-    border-radius: 8px;
-    background: #FFFFFF4D; 
-    font-size: 16px;
-  }
-
-  button {
-    padding: 12px 20px 12px 20px;
-    font-weight: 500;
-    background: #28B8ED;
-    color: inherit;
-    border-radius: 8px;
-    border: none;
-    font-size: 16px;
-    font-family: inherit;
-    margin-left: auto;
-    cursor: pointer;
-  }
-  
-  .disabled {
-    opacity: .6;
-    pointer-events: none;
+    margin-top: 24px;
   }
 </style>

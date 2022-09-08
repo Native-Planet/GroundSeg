@@ -1,7 +1,12 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
 
-  export let standard, success, failure, loading, status, top = 0
+  export let standard=null,
+    success=null,
+    failure=null,
+    loading=null,
+    status='standard', 
+    top=0, left=true
 
 	const dispatch = createEventDispatcher();
 
@@ -9,7 +14,7 @@
 
 </script>
 
-<div style="margin-top:{top}px">
+<div style="margin-top:{top}px;margin-{left ? "right" : "left"}:auto;">
 {#if status == 'standard'}
   <button on:click={handleClick}>
     {standard}
