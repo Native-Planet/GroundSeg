@@ -3,6 +3,7 @@
   import { api } from '$lib/api'
   import Select from 'svelte-select'
   import Fa from 'svelte-fa'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   let container = null, logs = [], data = []
 
@@ -44,11 +45,12 @@
           on:select={e => container = e.detail.value} />
     </div>
     <div class="buttons">
-      <a class="view" class:disabled={inc(container)} href="/logs/{container}#latest">View</a>
-      <button
+      <PrimaryButton
         on:click={exportLog(container)}
-        class="export"
-        class:disabled={inc(container)}>Export</button>
+        standard="Export"
+        status={inc(container) ? "disabled" : "standard"}
+        />
+      <a class="view" class:disabled={inc(container)} href="/logs/{container}#latest">View</a>
     </div>
   </div>
 
@@ -93,21 +95,8 @@
     border-radius: 6px;
     width: 60px;
     text-align: center;
-  }
-  .export {
-    font-weight: 700;
     margin-left: auto;
-    background: #008eff;
-    padding: 6px;
-    font-size: 12px;
-    border-radius: 6px;
-    width: 80px;
-    text-align: center;
-    cursor: pointer;
-    border: none;
-    color: white;
   }
-
   .disabled {
     opacity: .6;
     pointer-events: none;

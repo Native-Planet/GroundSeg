@@ -1,0 +1,13 @@
+{
+    "pier_name": "dapsel-podpyx-nallux-dozryl",
+    "http_port": 8081,
+    "ames_port": 34344,
+    "urbit_version": "latest",
+    "minio_version": "latest",
+    "network": "none",
+    "wg_url": "nan",
+    "wg_http_port": null,
+    "wg_ames_port": null,
+    "wg_s3_port": null,
+    "wg_console_port": null
+}

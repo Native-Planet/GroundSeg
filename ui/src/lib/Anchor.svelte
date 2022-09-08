@@ -1,9 +1,13 @@
 <script>
   import { api } from '$lib/api'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let info
 
-  let key = '', view = false, loading = false
+  let key = '',
+    view = false,
+    loading = false,
+    buttonStatus = 'standard'
 
   const toggleView = () => {
     view = !view
@@ -23,6 +27,7 @@
     }})}
 
   const registerKey = () => {
+    buttonStatus = 'loading'
     const f = new FormData()
     const u = api + "/settings/anchor/register"
     f.append('key', key)
@@ -30,8 +35,18 @@
       .then(d => d.json())
       .then(res => {
         if (res === 200) {
-          console.log("success: do nothing")
-    }})}
+          buttonStatus = 'success'
+          setTimeout(()=>{
+            buttonStatus = 'standard'
+            key = ''
+          }, 3000)
+        }
+        if (res === 400) {
+          buttonStatus = 'failure'
+          setTimeout(buttonStatus = 'standard', 3000)
+        }
+      })
+   }
 
 </script>
 
@@ -55,7 +70,14 @@
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
-    <button on:click={registerKey} class="submit" class:disabled={key == ''}>Submit</button>
+    <PrimaryButton
+        on:click={registerKey}
+        standard="Register"
+        success="Key registered"
+        failure="Registration failed"
+        loading="Processing..."
+        status={key == '' ? "disabled" : buttonStatus}
+        top="12" />
   </div>
 </div>
 
@@ -111,8 +133,6 @@
     opacity: .2;
   }
   .reg-key-wrapper {
-    display: flex;
-    flex-direction: column;
     gap: 6px;
     margin-top: 12px;
   }
@@ -139,17 +159,6 @@
   .reg-key > img {
     padding-left: 12px;
     opacity: .8;
-    cursor: pointer;
-  }
-  .submit {
-    background: #008eff;
-    padding: 8px;
-    color: inherit;
-    border: none;
-    border-radius: 6px;
-    font-family: inherit;
-    width: 80px;
-    margin-top: 6px;
     cursor: pointer;
   }
   .disabled {
