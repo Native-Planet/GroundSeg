@@ -3,17 +3,17 @@ This is the Control Software for the NP System.
 
 It expects a Linux Box with `systemd` and `apt` available.
 
-# Building
+## Building
 To build please run the `build.sh` script in the root directory.
 
 This will create a build folder which will contain the complete webapp
 
-# Installation
+## Installation
 To install build the software first and run the `install.sh` script in the root directory.
 
 This will copy the build directory to `/opt/nativeplanet/groundseg/` and the service file to the correct directory
 
-# Development Running
+## Development Running
 To run this for development use the `startup.sh` script. This will run the python flask app and the UI app as seperate systems.
 
 
