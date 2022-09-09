@@ -1,0 +1,11 @@
+[Unit]
+Description=NativePlanet GroundSeg controller
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+User=root
+WorkingDirectory=/opt/nativeplanet/groundseg/
+ExecStart=/usr/bin/python3 /opt/nativeplanet/groundseg/app.py
+[Install]
+WantedBy=multi-user.target
