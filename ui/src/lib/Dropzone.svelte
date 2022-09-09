@@ -2,8 +2,14 @@
   import { onMount } from 'svelte'
   import { api } from '$lib/api'
   import Dropzone from "dropzone"
+  import { sigil, stringRenderer } from '@tlon/sigil-js'
 
-  let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = 'dister-dister-dister-dister.zip'
+  let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = '', failed = false
+  let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+  let suffix = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+
+  prefix = prefix.match(/.{1,3}/g)
+  suffix = suffix.match(/.{1,3}/g)
 
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
@@ -15,10 +21,25 @@
       disablePreviews: true,
       uploadprogress: checkUpdate,
       success: onSuccess,
+      accept: checkPatp,
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
     })
   })
+
+  const checkPatp = (f,done) => {
+    let patp = f.name.split('.')[0]
+    let p= patp.split("-")
+    
+    for (let i = 0; i < p.length; i++) {
+      let ps = p[i].match(/.{1,3}/g)
+      if (!(prefix.includes(ps[0]) && suffix.includes(ps[1]))) {
+        failed = true
+        setTimeout(()=>failed = false, 2000) 
+        return "failed" 
+    }}
+    return done()
+  }
 
   const checkUpdate = (file,prog,sent) => {
     if (file.status === 'uploading') {
@@ -64,7 +85,11 @@
       </div>
     </div>
   {:else}
-    Drop pier here to upload
+    {#if failed}
+      <span style="color: red;">File is invalid</span>
+    {:else}
+      Drop pier here to upload
+    {/if}
   {/if}
 </div>
 

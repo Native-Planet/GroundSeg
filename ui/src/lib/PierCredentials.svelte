@@ -77,6 +77,7 @@
       </div>
     </div>
 
+    {#if nw_label == 'Remote'}
     <div class="info">
       <div class="title">MinIO Console</div>
       <div class="login-key-wrapper">
@@ -95,6 +96,7 @@
         </button>
       </div>
     </div>
+    {/if}
 
     {#if wg_reg}
     <div class="info"class:switching={isSwitching} on:click={toggleNetwork}>

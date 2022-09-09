@@ -1,13 +1,4 @@
 {
-    "firstBoot": false,
-    "piers": [
-        "pardyt-navlut-nallux-dozryl",
-        "nochex-hattug-donpub-datdux",
-        "pattus-bilmyn-nallux-dozryl",
-        "dalnes-ravpun-donpub-datdux",
-        "nolnyr-rolzod-nallux-dozryl"
-    ],
-    "pubkey": "QW1adTZnM21jSkUrWG5DRTVVeWdNRmRmN2RZM3dRN25FUGRmYnlQS1NGZz0K",
-    "privkey": "MPTShHC/PBmqw+QNEYN+ezKrEqfnmARR5+idXqcxw2U=",
-    "reg_key": "ezoO-bmoW-sseltopS-3hsulB"
+    "firstBoot": true,
+    "piers": []
 }

@@ -4,6 +4,13 @@ p { color: rgba(255,255,255,0.7);}
 h2 { color: rgba(255,255,255,1);}
 h3 { color: rgba(255,255,255,0.7);}
 
+@keyframes breathe {
+  0% {opacity: .6}
+  50% {opacity: 0}
+  100% {opacity: .6}
+}
+
+
 .greendot {
   height: 25px;
   width: 25px;

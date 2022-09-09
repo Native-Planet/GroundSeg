@@ -1,7 +1,15 @@
 <script>
   import { existingID } from '$lib/components'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import LinkButton from '$lib/LinkButton.svelte'
+
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
+
+
+  const uploadCheck = e => {
+    console.log(e.detail)
+  }
 
 </script>
 
@@ -15,8 +23,14 @@
         <div class="file-type">{f}</div>
       {/each}
     </div>
-    <svelte:component this={existingID.dropzone} />
-    <a class="cancel-button" href="/">Cancel</a>
+    <svelte:component this={existingID.dropzone} on:update={uploadCheck}/>
+    <LinkButton
+      top=24
+      left={false}
+      text="Cancel"
+      src="/"
+      disabled={false}
+    />
   {:else}
     <div class="warning-title">
       WARNING:
@@ -45,10 +59,18 @@
         </span>
       </div>
     </div>
-    <a class="learn" href="">Learn more</a>
+    <a class="learn" href="/boot/existing">Learn more</a>
     <div class="buttons">
-      <a href="/" class="back-button">Back</a>
-      <button class="accept-button" on:click={()=> warningCheck = !warningCheck}>I Understand</button>
+      <LinkButton
+        text="Back"
+        src="/"
+        disabled={false}
+      />
+      <PrimaryButton
+          on:click={()=>warningCheck = !warningCheck}
+          standard="I understand"
+          left={false}
+      />
     </div>
   {/if}
 </div>
@@ -88,17 +110,6 @@
     padding: 4px 8px 4px 8px;
     border-radius: 6px;
   }
-  .cancel-button {
-    margin-top: 24px;
-    padding: 12px 20px 12px 20px;
-    color: inherit;
-    text-align: center;
-    font-weight: 500;
-    border-radius: 8px;
-    background: #FFFFFF4D; 
-    font-size: 16px;
-  }
-
   .warning-title {
     font-size: 12px;
     font-weight: 700;
@@ -130,27 +141,4 @@
     display: flex;
     margin-top: 24px;
   }
-
-  .back-button {
-    padding: 12px 20px 12px 20px;
-    color: inherit;
-    text-align: center;
-    font-weight: 500;
-    border-radius: 8px;
-    background: #FFFFFF4D; 
-    font-size: 16px;
-  }
-  .accept-button {
-    padding: 12px 20px 12px 20px;
-    font-weight: 500;
-    background: #28B8ED;
-    color: inherit;
-    border-radius: 8px;
-    border: none;
-    font-size: 16px;
-    font-family: inherit;
-    margin-left: auto;
-    cursor: pointer;
-  }
-
 </style>

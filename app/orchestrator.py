@@ -57,6 +57,20 @@ class Orchestrator:
            self.wireguard.stop()
 
 
+    def wireguardStart(self):
+        if(self.wireguard.wg_docker.isRunning()==False):
+           self.wireguard.start()
+           self.startMinIOs() 
+
+    def wireguardStop(self):
+        if(self.wireguard.wg_docker.isRunning() == True):
+           for p in self._urbits.keys():
+              if(self._urbits[p].config['network'] == 'wireguard'):
+                 self.switchUrbitNetwork(p)
+           self.stopMinIOs()
+           self.wireguard.stop()
+
+
     def registerDevice(self, reg_key):
         self.config['reg_key'] = reg_key
         x = self.wireguard.registerDevice(self.config['reg_key']) 

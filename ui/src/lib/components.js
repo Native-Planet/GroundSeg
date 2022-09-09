@@ -5,7 +5,7 @@
   import Network from '$lib/Network.svelte'
   import MinIO from '$lib/MinIO.svelte'
   import Anchor from '$lib/Anchor.svelte'
-  import Logs from '$lib/Logs.svelte'
+  import ExportLogs from '$lib/ExportLogs.svelte'
   import Boot from '$lib/Boot.svelte'
   import Sigil from '$lib/Sigil.svelte'
   import NewPier from '$lib/NewPier.svelte'
@@ -27,7 +27,7 @@
     network:Network,
     minIO:MinIO,
     anchor:Anchor,
-    logs:Logs
+    exportLogs:ExportLogs
   }
 
   export const home = {

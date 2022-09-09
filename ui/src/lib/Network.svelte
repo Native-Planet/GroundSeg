@@ -2,10 +2,14 @@
   import { api } from '$lib/api'
   import { onMount, onDestroy } from 'svelte'
   import Select from 'svelte-select'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let info
 
-  let opened = true, refreshing = false, networks, connecting = false
+  let networks,
+    opened = true,
+    refreshing = false,
+    buttonStatus = 'standard'
 
   let ethSwapping = false,
     nw = '', pw = '',
@@ -32,7 +36,7 @@
 
   const connectToNetwork = () =>  {
 
-    connecting = true
+    buttonStatus = 'loading'
 
     let u = api + "/settings/connect"
     const f = new FormData()
@@ -42,8 +46,11 @@
     fetch(u, {method: 'POST',body: f})
       .then(r => r.json())
       .then(d => { if (d == 200) {
-        //connecting = false
-        console.log("connected")
+        buttonStatus = 'success'
+        setTimeout(()=>{
+          buttonStatus = 'standard'
+          nw = info.connected
+        }, 3000)
    }})}
 
   const toggleView = () => {
@@ -88,7 +95,14 @@
               <input id='pass' type="password" bind:value={pw} />
               <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
             </div>
-            <button on:click={connectToNetwork} class="connect" class:disabled={(pw == '') || (nw == null)}>Connect{connecting ? "ing" : ""}</button>
+            <PrimaryButton
+              on:click={connectToNetwork}
+              standard="Connect"
+              success="Connected to network"
+              failure="Connection failed"
+              loading="Connecting"
+              status={(pw == '') || (nw == null)? "disabled" : buttonStatus}
+              top="12" />
           </div>
         {/if}
       </div>
@@ -220,17 +234,6 @@
   .wifi-pass > img {
     padding-left: 12px;
     opacity: .8;
-    cursor: pointer;
-  }
-  .connect {
-    background: #008eff;
-    padding: 8px;
-    color: inherit;
-    border: none;
-    border-radius: 6px;
-    font-family: inherit;
-    width: 100px;
-    margin-top: 6px;
     cursor: pointer;
   }
   .disabled {
