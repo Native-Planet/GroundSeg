@@ -15,6 +15,9 @@ fi
 
 
 sudo mkdir -p /opt/nativeplanet/groundseg/
+
+sudo cp -r /opt/nativeplanet/groundseg/settings/* build/settings/
+
 sudo cp -r build/* /opt/nativeplanet/groundseg
 sudo cp groundseg.service /etc/systemd/system/
 

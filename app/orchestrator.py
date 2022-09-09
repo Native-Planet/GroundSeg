@@ -3,6 +3,7 @@ from wireguard import Wireguard
 from urbit_docker import UrbitDocker
 from minio_docker import MinIODocker
 from caddy_docker import CaddyDocker
+import socket
 import time
 import sys
 
@@ -41,7 +42,7 @@ class Orchestrator:
 
         self.caddy = CaddyDocker()
         self.caddy.start()
-
+        self.hostname = socket.gethostname()
 
     def wireguardStart(self):
         if(self.wireguard.wg_docker.isRunning()==False):
@@ -186,7 +187,7 @@ class Orchestrator:
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"http://{urbit.config['wg_url']}"
             else:
-                u['url'] = f'http://nativeplanet.local:{urbit.config["http_port"]}'
+                u['url'] = f'http://{self.hostname}.local:{urbit.config["http_port"]}'
             if(urbit.isRunning()):
                 try:
                     u['code'] = urbit.get_code().decode('utf-8')
@@ -213,7 +214,7 @@ class Orchestrator:
     def switchUrbitNetwork(self, urbit_name):
         urbit = self._urbits[urbit_name]
         network = 'none'
-        url = f"nativeplanet.local:{urbit.config['http_port']}"
+        url = f"{self.hostname}.local:{urbit.config['http_port']}"
 
         if((urbit.config['network'] == 'none') 
            and (self.wireguard_reg) 

@@ -10,6 +10,7 @@ import glob
 from io import BytesIO
 import zipfile
 from werkzeug.utils import secure_filename
+import socket
 
 from orchestrator import Orchestrator
 
@@ -24,7 +25,7 @@ def pier_access():
     pier = request.args.get('pier')
     urbit = current_app.config['ORCHESTRATOR']._urbits[pier]
 
-    url = f"http://nativeplanet.local:{urbit.config['http_port']}"
+    url = f"http://{socket.gethostname()}.local:{urbit.config['http_port']}"
     
     if(urbit.config['network']=='wireguard'):
         url = f"http://{urbit.config['wg_url']}"
