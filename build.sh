@@ -15,7 +15,7 @@ fi
 # Install Requirements
 sudo pip3 install -r requirements.txt
 
-sudo apt-get install npm wireguard docker nodejs
+sudo apt-get -y install npm wireguard docker nodejs
 sudo npm install -g node
 
 

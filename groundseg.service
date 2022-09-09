@@ -1,5 +1,5 @@
 [Unit]
-Description=NativePlanet GroundSeg controller
+Description=NativePlanet GroundSeg Controller
 After=multi-user.target
 [Service]
 Type=simple

@@ -18,6 +18,7 @@ sudo mkdir -p /opt/nativeplanet/groundseg/
 sudo cp -r build/* /opt/nativeplanet/groundseg
 sudo cp groundseg.service /etc/systemd/system/
 
+sudo systemctl stop groundseg
 sudo systemctl enable groundseg
 sudo systemctl daemon-reload
 sudo systemctl start groundseg
