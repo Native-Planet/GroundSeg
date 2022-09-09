@@ -2,6 +2,7 @@ import json, subprocess, requests
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker
 from minio_docker import MinIODocker
+from caddy_docker import CaddyDocker
 import time
 import sys
 
@@ -37,6 +38,9 @@ class Orchestrator:
               self.wireguard.start()
 
         self.load_urbits()
+
+        self.caddy = CaddyDocker()
+        self.caddy.start()
 
 
     def wireguardStart(self):
