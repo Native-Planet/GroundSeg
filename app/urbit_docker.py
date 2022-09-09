@@ -17,7 +17,7 @@ class UrbitDocker:
         self.pier_name = self.config['pier_name']
         self.buildUrbit()
         self.running = (self.container.attrs['State']['Status'] == 'running' )
-        if(self.isRunning):
+        if(self.isRunning()):
             self.stop()
             self.start()
         

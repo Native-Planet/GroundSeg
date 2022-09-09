@@ -81,9 +81,9 @@ def anchor_status():
     isOn = request.form['anchor']
     # isOn gets sent as a string
     if isOn == 'true':
-        orchestrator.wireguard.start()
+        orchestrator.wireguardStart()
     else:
-        orchestrator.wireguard.stop()
+        orchestrator.wireguardStop()
 
     return jsonify(200)
 
