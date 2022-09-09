@@ -5,6 +5,8 @@
   import { profile } from '$lib/components'
   import Fa from 'svelte-fa'
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
+  import Logs from '$lib/Logs.svelte'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -14,7 +16,8 @@
     deleteCheck = false,
     data = {'nw_label': '', 'pier':{}},
     advanced = false,
-    shown = true
+    shown = true,
+    showLogs = false
 
   onMount(() => getPierData())
   onDestroy(() => shown = false)
@@ -31,6 +34,8 @@
     if (d == 400) { window.location.href = "/" }
     if (d.pier.name == path) { data = d }
   }
+
+  const toggleLogs = () => showLogs = !showLogs
 
   const ejectPier = () => {
     ejecting = true
@@ -84,6 +89,31 @@
 
 
 </script>
+
+<div class="mega-wrapper">
+{#if showLogs}
+  <Logs log={data.pier.name} maxHeightOffset={100}/>
+  <div class="bottom-panel">
+      <svelte:component this={profile.sigil}  patp={data.pier.name} size="60px" rad="8px" />
+
+      <div class="info">
+        {#if loading}
+          <div class="status loading">Loading...</div>
+        {:else if data.pier.running}
+          {#if (data.pier.code == undefined || data.pier.code == '')}
+            <div class="status booting">Booting</div>
+          {:else}
+            <div class="status running">Running</div>
+          {/if}
+        {:else}
+          <div class="status">Stopped</div>
+        {/if}
+        <div class="patp-logs">{data.pier.name}</div>
+      </div>
+
+      <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
+  </div>
+{:else}
 <svelte:component this={profile.logo} t="Pier Settings" />
 <div class="ship">
   {#if data.pier.name != undefined}
@@ -99,7 +129,6 @@
   {:else}
 
     <div class="card">
-
       <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
 
       <div class="info">
@@ -108,32 +137,21 @@
         </div>
 
         {#if loading}
-
           <div class="status loading">Loading...</div>
-
         {:else if data.pier.running}
-
           {#if (data.pier.code == undefined || data.pier.code == '')}
-
             <div class="status booting">Booting</div>
-
           {:else}
-
             <div class="status running">Running</div>
-
           {/if}
-
         {:else}
-
           <div class="status">Stopped</div>
-
         {/if}
-
         <div class="patp">{data.pier.name}</div>
-
       </div>
 
     </div>
+
     {#if data.pier.running && (!(data.pier.code == undefined) && !(data.pier.code == ""))}
       <svelte:component this={profile.credentials}
         minIO={data.pier.s3_url}
@@ -149,6 +167,11 @@
         <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
       </span>
       {#if advanced}
+        <button
+          on:click={toggleLogs} 
+          class="cmd logs">
+          View Logs
+        </button>
         <button 
           on:click={ejectPier}
           class="cmd eject">
@@ -162,12 +185,24 @@
     <div class="block"></div>
   {/if}
 </div>
+{/if}
+</div>
 
 <style>
   @keyframes breathe {
     0% {opacity: .6}
     50% {opacity: 0}
     100% {opacity: .6}
+  }
+  .mega-wrapper {
+    max-height: 80vh;
+    overflow: auto;
+  }
+  .bottom-panel {
+    margin: 20px;
+    display: flex;
+    gap: 18px;
+    align-items: center;
   }
   .ship {
     padding: 20px;
@@ -222,6 +257,9 @@
   .patp {
     font-size: 16px;
   }
+  .patp-logs {
+    font-size: 12px;
+  }
   .info {
     display: flex;
     flex-direction: column;
@@ -255,7 +293,9 @@
   .advanced:hover {
     opacity: .6;
   }
-
+  .logs {
+    background: var(--action-color);
+  }
   .eject {
     background: #FFFFFF4D;
   }

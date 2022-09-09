@@ -32,7 +32,7 @@
   <div class="panel">
     <svelte:component this={settings.anchor} {info} />
     <svelte:component this={settings.minIO} {info} />
-    <svelte:component this={settings.logs} />
+    <svelte:component this={settings.exportLogs} />
     <svelte:component this={settings.power} />
   </div>
 

@@ -1,117 +1,16 @@
 <script>
-  import { api, scrollDown } from '$lib/api'
-  import { logs } from '$lib/components'
-  import { page } from '$app/stores';
-  import { onMount, onDestroy } from 'svelte'
-
-  let log = $page.params.container,
-    stream = null,
-    shown = false
-    
-
-  onMount(() => {shown=true;getLog();})
-  onDestroy(() => {shown=false;scrollDown.set(true);})
-
-  const handleScroll = e => {
-    if ((e.deltaY < 0) && (Array.isArray(stream))) {
-      scrollDown.set(false)
-    }
-  }
-
-  const getLog = () => {
-    if (shown) {
-      const u = api + "/settings/logs"
-      const f = new FormData()
-      f.append('logs', log)
-      fetch(u, {method: 'POST', body: f})
-        .then(r => r.json()).then(d => {
-          stream = d.split("\n")
-        })
-      if ($scrollDown) {
-        window.location.href="#jump"
-      }
-      setTimeout(getLog, 1000)
-    }
-  }
+  import { page } from '$app/stores'
+  import Logs from '$lib/Logs.svelte'
+  let log = $page.params.container
 </script>
 
-<svelte:window on:wheel={handleScroll} />
-
-{#if Array.isArray(stream)}
-  <!-- detect mousewheel event -->
-
-  <div class="wrapper">
-
-    <svelte:component this={logs.logo} />
-
-    <!-- stream of selected log -->
-    <div class="logs">
-      {#each stream as s}<div class="content">{s}</div>{/each}
-      <div id="jump"></div>
-    </div>
-
-    <!-- send to bottom of screen -->
-    {#if !$scrollDown}
-      <button class="latest" on:click={()=>{window.location.href="#jump";scrollDown.set(true)}}>Show Latest</button>
-    {/if}
-
-  </div>
-{:else}
-  <div class="wrapper">
-
-    <svelte:component this={logs.logo} />
-
-    <div class="blurred"></div>
-
-  </div>
-
-{/if}
+<div class="wrapper">
+  <Logs {log} />
+</div>
 
 <style>
-  @keyframes breathe {
-    0% {opacity: .6}
-    50% {opacity: 0}
-    100% {opacity: .6}
-  }
-  .blurred {
-    height: 40vh;
-    background: #ffffff4d;
-    width: 800px;
-    margin: 20px;
-    border-radius: 15px;
-    filter: blur(20px);
-    animation: breathe 2s infinite;
-  }
   .wrapper {
-  }
-  .logs {
-    max-height: calc(80vh - 92px);
-    overflow: auto;
-    margin-top: 20px;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .logs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .content {
-    margin-bottom: 4px;
-    font-size: 12px;
-    font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New;
     width: 800px;
-    padding: 0 20px 0 20px;
     max-width: calc(100vw - 40px);
-  }
-  .latest {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    background: #0a0a0a8d;
-    backdrop-filter: blur(20px);
-    color: inherit;
-    border: none;
-    padding: 12px 0 12px 0;
-    border-radius: 15px;
   }
 </style>
