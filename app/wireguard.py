@@ -39,7 +39,7 @@ class Wireguard:
         try:
             response = requests.post(f'{self._url}/register',json=update_data,headers=headers).json()
         except Exception as e:
-            print(e)
+            print(f"register device {e}")
             return None
 
         return(response['lease'])
@@ -93,7 +93,8 @@ class Wireguard:
             # Setup and start the local wg client
             self.wg_docker.addConfig(self.wg_config)
         except Exception as e:
-            print(e)
+            print(response)
+            print(f"get Status {e}")
             return None
 
         return response
