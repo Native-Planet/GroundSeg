@@ -39,6 +39,20 @@ class Orchestrator:
         self.load_urbits()
 
 
+    def wireguardStart(self):
+        if(self.wireguard.wg_docker.isRunning()==False):
+           self.wireguard.start()
+           self.startMinIOs() 
+
+    def wireguardStop(self):
+        if(self.wireguard.wg_docker.isRunning() == True):
+           for p in self._urbits.keys():
+              if(self._urbits[p].config['network'] == 'wireguard'):
+                 self.switchUrbitNetwork(p)
+           self.stopMinIOs()
+           self.wireguard.stop()
+
+
     def registerDevice(self, reg_key):
         self.config['reg_key'] = reg_key
         x = self.wireguard.registerDevice(self.config['reg_key']) 
@@ -129,9 +143,11 @@ class Orchestrator:
         urb = self._urbits.pop(patp)
         
         time.sleep(2)
-        minio = self._minios[patp]
-        minio.removeMinIO()
-        minio = self._minios.pop(patp)
+
+        if(patp in self._minios.keys()):
+           minio = self._minios[patp]
+           minio.removeMinIO()
+           minio = self._minios.pop(patp)
 
         self.config['piers'].remove(patp)
         self.save_config()
@@ -181,7 +197,9 @@ class Orchestrator:
         network = 'none'
         url = f"nativeplanet.local:{urbit.config['http_port']}"
 
-        if((urbit.config['network'] == 'none') and (self.wireguard_reg)):
+        if((urbit.config['network'] == 'none') 
+           and (self.wireguard_reg) 
+           and (self.wireguard.wg_docker.isRunning())):
             network = 'wireguard'
             url = urbit.config['wg_url']
 
