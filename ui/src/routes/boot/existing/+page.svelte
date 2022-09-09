@@ -6,6 +6,11 @@
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
 
+
+  const uploadCheck = e => {
+    console.log(e.detail)
+  }
+
 </script>
 
 <svelte:component this={existingID.logo} />
@@ -18,7 +23,7 @@
         <div class="file-type">{f}</div>
       {/each}
     </div>
-    <svelte:component this={existingID.dropzone} />
+    <svelte:component this={existingID.dropzone} on:update={uploadCheck}/>
     <LinkButton
       top=24
       left={false}
