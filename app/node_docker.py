@@ -4,33 +4,35 @@ import pathlib
 
 client = docker.from_env()
 
-class CaddyDocker:
-    _caddy_img = "caddy:latest"
+class NodeDocker:
+    _node_img = "node:latest"
 
     def __init__(self):
-        client.images.pull(f'{self._caddy_img}')
-        self.caddy_name = "ui_caddy"
+        client.images.pull(f'{self._node_img}')
+        self.node_name = "ui_nodejs"
 
-        self.buildCaddy()
+        self.buildNode()
 
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
 
         for c in containers:
-            if(self.caddy_name == c.name):
+            if(self.node_name == c.name):
                 c.stop()
                 c.remove()
 
         
         self.container = client.containers.create(
-                    image= f'{self._caddy_img}',
-                    ports = {'80/tcp':80}, 
-                    name = self.caddy_name,
-                    volumes = [f'{pathlib.Path(__file__).parent.resolve()}/ui/:/usr/share/caddy/'],
+                    command='node /home/node/app/build/index.js',
+                    image= f'{self._node_img}',
+                    ports = {'3000/tcp':80}, 
+                    name = self.node_name,
+                    volumes = [f'{pathlib.Path(__file__).parent.resolve()}/ui/:/home/node/app'],
                     detach=True)
 
-    def buildCaddy(self):
+
+    def buildNode(self):
         self.buildContainer()
     
     def start(self):
@@ -42,7 +44,7 @@ class CaddyDocker:
     def logs(self):
         return self.container.logs()
 
-    def removeCaddy(self):
+    def removeNode(self):
         self.stop()
         self.container.remove()
 
@@ -53,4 +55,4 @@ class CaddyDocker:
 
 
 if __name__ == '__main__':
-    caddy = CaddyDocker()
+    node = NodeDocker()
