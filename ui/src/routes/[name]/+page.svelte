@@ -166,7 +166,7 @@
         Advanced Options
         <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
       </div>
-      {#if !advanced}
+      {#if advanced}
         <div class="cmd-wrapper">
           <button
             on:click={toggleLogs} 
