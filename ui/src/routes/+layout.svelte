@@ -9,6 +9,8 @@
     let u = api + "/settings/shutdown"
     const f = new FormData()
 
+    setTimeout(()=> window.location.href = "/", 3000)
+
     fetch(u, {method: 'POST',body: f})
       .then(r => r.json())
       .then(d => { if (d == 200) {

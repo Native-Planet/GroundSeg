@@ -169,5 +169,5 @@ def shutdown():
 
 @app.route('/settings/restart',methods=['POST'])
 def restart():
-    os.system('shutdown -r -h `date --date "now + 30 seconds"`')
+    os.system('reboot')
     return jsonify(200)
