@@ -83,8 +83,16 @@ class Wireguard:
                     headers=headers).json()
         except Exception as e:
             print(e)
-        
 
+        count =0
+        while ((response['conf'] == None) and (count > 6)):
+            try:
+                response = requests.get(
+                        f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
+                        headers=headers).json()
+            except Exception as e:
+                print(e)
+            count = count +1
 
         try:
             self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
