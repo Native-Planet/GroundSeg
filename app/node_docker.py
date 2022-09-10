@@ -19,8 +19,8 @@ class NodeDocker:
 
         for c in containers:
             if(self.node_name == c.name):
-                c.stop()
-                c.remove()
+                self.container = c
+                return
 
         
         self.container = client.containers.create(
