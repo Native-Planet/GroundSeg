@@ -1,14 +1,19 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { api, piers } from '$lib/api'
   import { home } from '$lib/components'
   import Fa from 'svelte-fa'
   import { faGear } from '@fortawesome/free-solid-svg-icons/index.es'
 
+  let opened = true
 
-  onMount(async () => {
+  const update = () => {
     fetch(api).then(r => r.json()).then(d => piers.set(d))
-  })
+    setTimeout(update, 5000)
+
+  }
+  onMount(() => update())
+  onDestroy(() => opened = false)
 
 </script>
 

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { api } from '$lib/api'
+  import { api, isPatp } from '$lib/api'
   import Dropzone from "dropzone"
   import { sigil, stringRenderer } from '@tlon/sigil-js'
 
@@ -29,16 +29,14 @@
 
   const checkPatp = (f,done) => {
     let patp = f.name.split('.')[0]
-    let p= patp.split("-")
-    
-    for (let i = 0; i < p.length; i++) {
-      let ps = p[i].match(/.{1,3}/g)
-      if (!(prefix.includes(ps[0]) && suffix.includes(ps[1]))) {
-        failed = true
-        setTimeout(()=>failed = false, 2000) 
-        return "failed" 
-    }}
-    return done()
+
+    if (isPatp(patp)) {
+      console.log(isPatp(patp))
+      return done()
+    } else { 
+      failed = true
+      setTimeout(()=>failed = false, 2000) 
+    }
   }
 
   const checkUpdate = (file,prog,sent) => {

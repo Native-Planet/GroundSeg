@@ -1,6 +1,8 @@
 <script>
   import { newID } from '$lib/components'
-  let name, key, view = false
+  let name = '',
+    key = '',
+    view = false
 
   const toggleView = () => {
     view = !view
@@ -28,7 +30,7 @@
   .key {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 24px;
     color: inherit;
     padding: 20px;
     width: 460px;
@@ -39,8 +41,10 @@
     flex-direction: column;
   }
   .title {
+    font-family: inherit;
+    font-size: 13px;
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     text-align: left;
   }
   .pass-wrapper {

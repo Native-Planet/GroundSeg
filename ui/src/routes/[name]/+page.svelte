@@ -162,22 +162,24 @@
         wg_reg={data.wg_reg} />
     {/if}
     <div class="commands">
-      <span class="advanced" on:click={()=> advanced = !advanced}>
+      <div class="advanced" on:click={()=> advanced = !advanced}>
         Advanced Options
         <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
-      </span>
-      {#if advanced}
-        <button
-          on:click={toggleLogs} 
-          class="cmd logs">
-          View Logs
-        </button>
-        <button 
-          on:click={ejectPier}
-          class="cmd eject">
-          Eject{ejecting ? "ing" : " Pier"}
-        </button>
-        <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+      </div>
+      {#if !advanced}
+        <div class="cmd-wrapper">
+          <button
+            on:click={toggleLogs} 
+            class="cmd logs">
+            View Logs
+          </button>
+          <button 
+            on:click={ejectPier}
+            class="cmd eject">
+            Eject{ejecting ? "ing" : " Pier"}
+          </button>
+          <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+        </div>
       {/if}
     </div>
     {/if}
@@ -197,6 +199,11 @@
   .mega-wrapper {
     max-height: 80vh;
     overflow: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mega-wrapper::-webkit-scrollbar {
+    display: none;
   }
   .bottom-panel {
     margin: 20px;
@@ -266,27 +273,30 @@
     margin-bottom: 12px;
   }
   .commands {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
     padding-top: 18px;
   }
+  .cmd-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
   .cmd {
+    appearance: none;
     background: none;
     color: inherit;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
     border: none;
     border-radius: 8px;
     padding: 9px;
-    width: 180px;
+    width: 120px;
     cursor: pointer;
   }
 
   .advanced {
     font-size: 14px;
     padding-top: 6px;
-    padding-bottom: 6px;
+    padding-bottom: 24px;
     cursor: pointer;
     width: 150px;
   }

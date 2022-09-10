@@ -103,17 +103,4 @@
   .buttons {
     display: flex;
   }
-  .view {
-    background: #ffffff4d;
-    padding: 6px;
-    font-size: 12px;
-    border-radius: 6px;
-    width: 60px;
-    text-align: center;
-    margin-right: auto;
-  }
-  .disabled {
-    opacity: .6;
-    pointer-events: none;
-  }
 </style>
