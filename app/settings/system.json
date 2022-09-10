@@ -1,6 +1,4 @@
 {
-    "firstBoot": false,
-    "piers": [],
-    "pubkey": "UlR5OWlHajk5UElRV095S3JKTEpaSmNLTll3QUhEUUVqUWhxdVQ2Mjcxcz0K",
-    "privkey": "MCk5AtztX47eMzYVlDcvqMXRH82NCXm9WQk+tJ/4RXw="
+    "firstBoot": true,
+    "piers": []
 }
