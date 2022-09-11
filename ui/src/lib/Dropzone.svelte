@@ -21,6 +21,7 @@
       disablePreviews: true,
       uploadprogress: checkUpdate,
       success: onSuccess,
+      error: onError,
       accept: checkPatp,
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
@@ -33,7 +34,7 @@
       return done()
     } else { 
       failed = true
-      setTimeout(()=>failed = false, 2000) 
+      setTimeout(()=>failed = false, 2400) 
   }}
 
   const checkUpdate = (file,prog,sent) => {
@@ -51,6 +52,12 @@
       let name = file.name.split(".")[0]
       window.location.href="/" + name
   }}
+
+  const onError = () => {
+    isUploading = false
+    failed = true
+    setTimeout(()=>{failed = false}, 2400)
+  }
 
 </script>
 
