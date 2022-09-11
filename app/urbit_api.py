@@ -35,7 +35,8 @@ def pier_access():
 @app.route('/urbit/pier', methods=['GET'])
 def pier_info():
     pier = request.args.get('pier')
-    urbits = current_app.config['ORCHESTRATOR'].getUrbits()
+    orchestrator = current_app.config['ORCHESTRATOR']
+    urbits = orchestrator.getUrbits()
     
     urbit=None
     for u in urbits:
@@ -52,7 +53,8 @@ def pier_info():
     p = dict()
     p['nw_label'] = nw_label
     p['pier'] = urbit
-    p['wg_reg'] = current_app.config['ORCHESTRATOR'].wireguard_reg
+    p['wg_reg'] = orchestrator.wireguard_reg
+    p['wg_running'] = orchestrator.wireguard.isRunning()
 
     return(jsonify(p))
 

@@ -180,12 +180,12 @@ class Orchestrator:
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
             if self.wireguard_reg:
-               u['s3_url'] = f"http://console.s3.{urbit.config['wg_url']}"
+               u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
             else:
                u['s3_url'] = ""
 
             if(urbit.config['network']=='wireguard'):
-                u['url'] = f"http://{urbit.config['wg_url']}"
+                u['url'] = f"https://{urbit.config['wg_url']}"
             else:
                 u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
             if(urbit.isRunning()):

@@ -47,7 +47,8 @@ def settings():
         # TODO
         "eth-only" : eth,
         "connected" : "", 
-        "minio" : orchestrator.minIO_on
+        "minio" : orchestrator.minIO_on,
+        "wg_reg" : orchestrator.wireguard_reg
     })
     
 @app.route('/settings/networks', methods=['GET'])
