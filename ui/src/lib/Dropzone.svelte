@@ -24,20 +24,17 @@
       accept: checkPatp,
       maxFilesize: 11000000, // megabytes
       chunkSize: 50000000 // bytes
-    })
-  })
+  })})
 
   const checkPatp = (f,done) => {
     let patp = f.name.split('.')[0]
 
     if (isPatp(patp)) {
-      console.log(isPatp(patp))
       return done()
     } else { 
       failed = true
       setTimeout(()=>failed = false, 2000) 
-    }
-  }
+  }}
 
   const checkUpdate = (file,prog,sent) => {
     if (file.status === 'uploading') {
@@ -53,8 +50,7 @@
     if (res == 200) {
       let name = file.name.split(".")[0]
       window.location.href="/" + name
-    }
-  }
+  }}
 
 </script>
 
