@@ -7,7 +7,8 @@
   let key = '',
     view = false,
     loading = false,
-    buttonStatus = 'standard'
+    buttonStatus = 'standard',
+    reRegCheck = true
 
   const toggleView = () => {
     view = !view
@@ -43,7 +44,7 @@
         }
         if (res === 400) {
           buttonStatus = 'failure'
-          setTimeout(buttonStatus = 'standard', 3000)
+          setTimeout(()=>buttonStatus = 'standard', 3000)
         }
       })
    }
@@ -51,34 +52,61 @@
 </script>
 
 <div class="anchor">
+
+{#if info}
+
+  <!-- title and toggle button -->
   <div class="title-wrapper">
     <div class="title">Anchor</div>
-    {#if info}
+    {#if info.wg_reg}
       <div
         on:click={toggleAnchor}
         class:disabled={loading}
         class="switch-wrapper">
         <div class="switch {info.anchor ? "on" : "off"}"></div>
       </div>
-    {:else}
-      <div class="blurred"><br></div>
     {/if}
   </div>
+
   <div class="reg-key-wrapper">
-    <div class="reg-title">Key Registration</div>
-    <div class="reg-key">
-      <input id='input' type="password" bind:value={key} />
-      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
-    </div>
+    {#if !info.wg_reg}
+      <div class="reg-title">Key Registration</div>
+      <div class="reg-key">
+        <input id='input' type="password" bind:value={key} />
+        <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+      </div>
+    {:else}
+      {#if !reRegCheck}
+      <div class="reg-title">Key Registration</div>
+      <div class="reg-key">
+        <input id='input' type="password" bind:value={key} />
+        <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+      </div>
+      {/if}
+    {/if}
     <PrimaryButton
-        on:click={registerKey}
-        standard="Register"
-        success="Key registered"
-        failure="Registration failed"
-        loading="Processing..."
-        status={key == '' ? "disabled" : buttonStatus}
-        top="12" />
+      on:click={info.wg_reg && reRegCheck ? ()=>reRegCheck = false : registerKey }
+      standard="Register{info.wg_reg && reRegCheck ? " A New Key" : ""}"
+      success="Key registered"
+      failure="Registration failed"
+      loading="Processing..."
+      status={
+        info.wg_reg && reRegCheck ? buttonStatus :
+        key == '' ? "disabled" : buttonStatus
+      }
+      top="{info.wg_reg && reRegCheck ? "26" : "12"}"
+    />
   </div>
+
+{:else}
+
+  <div class="title-wrapper">
+    <div class="title">Anchor</div>
+    <div class="blurred"><br></div>
+  </div>
+  <div class="blurred-block"></div>
+
+{/if}
 </div>
 
 <style>
@@ -116,6 +144,17 @@
     background: #ffffff4d;
     filter: blur(6px);
     border-radius: 8px;
+  }
+  .blurred-block {
+    width: 80%;
+    padding-left: 10%;
+    padding-right: 10%;
+    background: #ffffff4d;
+    margin-top: 26px;
+    border-radius: 8px;
+    height: 30px;
+    filter: blur(10px);
+
   }
   .switch {
     height: 100%;

@@ -4,7 +4,7 @@
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
 
-  export let name, nw_label, code, ext, minIO, wg_reg
+  export let name, nw_label, code, ext, minIO, wg_reg, wg_running
 
   let viewLogin = false, clickedLogin = false,
     viewExt = false, clickedExt = false,
@@ -98,7 +98,7 @@
     </div>
     {/if}
 
-    {#if wg_reg}
+    {#if wg_reg && wg_running}
     <div class="info"class:switching={isSwitching} on:click={toggleNetwork}>
       <div class="title">Access</div>
       <div class="access-options">

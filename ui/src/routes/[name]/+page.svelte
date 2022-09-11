@@ -159,6 +159,7 @@
         nw_label={data.nw_label}
         code={data.pier.code}
         ext={data.pier.url}
+        wg_running={data.wg_running}
         wg_reg={data.wg_reg} />
     {/if}
     <div class="commands">
