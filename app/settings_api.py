@@ -1,4 +1,4 @@
-import requests, copy, json, shutil
+import requests, copy, json, shutil, time
 from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
 from flask import render_template, make_response, jsonify
 from flask import current_app
@@ -148,6 +148,7 @@ def restart_minio():
     orchestrator.stopMinIOs()
     orchestrator.startMinIOs()
 
+    time.sleep(1)
     return jsonify(200)
 
 @app.route('/settings/logs',methods=['POST','GET'])
