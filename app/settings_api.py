@@ -3,7 +3,7 @@ from flask import Flask, flash, request, redirect, url_for, send_from_directory,
 from flask import render_template, make_response, jsonify
 from flask import current_app
 
-import os
+import os, subprocess
 import zipfile, tarfile
 import glob
 import psutil
@@ -23,13 +23,24 @@ glob_network=[]
 
 @app.route('/settings',methods=['GET'])
 def settings():
+    
     orchestrator = current_app.config['ORCHESTRATOR']
     ram = psutil.virtual_memory()
     cpu = psutil.cpu_percent(interval=0.1)
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
-    eth = True
     net = psutil.net_if_stats()
+
+    check_connected = subprocess.Popen(['iwgetid','-r'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    connected, stderr = check_connected.communicate()
+
+    wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    ws, stderr = wifi_status.communicate()
+
+    if ws == b'enabled\n':
+        eth_only = False
+    else:
+        eth_only = True
 
     for k,v in net.items():
         if 'wl' in k:
@@ -44,9 +55,8 @@ def settings():
         "disk" : disk,
         "temp" : temp,
         "anchor" : orchestrator.wireguard.isRunning(),
-        # TODO
-        "eth-only" : eth,
-        "connected" : "", 
+        "ethOnly" : eth_only,
+        "connected" : connected.decode("utf-8"),
         "minio" : orchestrator.minIO_on,
         "wg_reg" : orchestrator.wireguard_reg
     })
@@ -104,11 +114,11 @@ def anchor_register():
 def ethernet_only():
     isEthOnly = request.form['ethernet']
     if isEthOnly == 'true':
+        os.system('nmcli radio wifi off')
         print('set to ethernet only')
-        # toggle ethernet only
     else:
+        os.system('nmcli radio wifi on')
         print('set to wifi and ethernet')
-        # toggle wifi and ethernet
 
     return jsonify(200)
 
