@@ -23,20 +23,21 @@
 
 <div class="minio">
   <div class="title-wrapper">
-    <div class="title">MinIO</div>
-      {#if info}
-        <div
-          on:click={restartMinIO}
-          class:disabled={!info.minio}
-          class:loading={loading}
-          class="switch">
-          <Fa icon={faRotateRight} size="1x" />
-        </div>
-      {:else}
-        <div class="blurred"></div>
-      {/if}
-    </div>
+    {#if info}
+      <div class="title" class:disabled={!info.minio}>MinIO</div>
+      <div
+        on:click={restartMinIO}
+        class:disabled={!info.minio}
+        class:loading={loading}
+        class="switch">
+        <Fa icon={faRotateRight} size="1x" />
+      </div>
+    {:else}
+      <div class="title">MinIO</div>
+      <div class="blurred"></div>
+    {/if}
   </div>
+</div>
 
 <style>
   @keyframes spin {
