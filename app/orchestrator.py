@@ -77,11 +77,14 @@ class Orchestrator:
         x = self.wireguard.registerDevice(self.config['reg_key']) 
         time.sleep(2)
         self.anchor_config = self.wireguard.getStatus()
+        print(self.anchor_config)
         if(self.anchor_config != None):
+           print("starting wg")
            self.wireguard.start()
            self.wireguard_reg = True
            time.sleep(2)
-
+           
+           print("reg urbits")
            for p in self.config['piers']:
               self.registerUrbit(p)
 
@@ -111,21 +114,20 @@ class Orchestrator:
       self.minIO_on = False
 
     def registerUrbit(self, patp):
-       self.anchor_config = self.wireguard.getStatus()
-       if(self.anchor_config != None):
-          for ep in self.anchor_config['subdomains']:
-             if(patp in ep['url']):
-                 print(f"{patp} already exists")
-                 return
+       if self.wireguard_reg:
+           self.anchor_config = self.wireguard.getStatus()
+           patp_reg = False
+           if(self.anchor_config != None):
+              for ep in self.anchor_config['subdomains']:
+                 if(patp in ep['url']):
+                     print(f"{patp} already exists")
+                     patp_reg = True
 
-       self.wireguard.registerService(f'{patp}','urbit')
-       self.wireguard.registerService(f's3.{patp}','minio')
-       self.anchor_config = self.wireguard.getStatus()
+           if(patp_reg == False):
+              self.wireguard.registerService(f'{patp}','urbit')
+              self.wireguard.registerService(f's3.{patp}','minio')
 
-    def addUrbit(self, patp, urbit):
-        self.config['piers'].append(patp)
-        self.registerUrbit(patp)
-        if self.wireguard_reg:
+
            self.anchor_config = self.wireguard.getStatus()
            url = None
            http_port = None
@@ -146,11 +148,15 @@ class Orchestrator:
                elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
                    console_port = ep['port']
 
-           urbit.setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-           self._minios[patp] = MinIODocker(urbit.config)
+           self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
+           self._minios[patp] = MinIODocker(self._urbits[patp].config)
            self.wireguard.start()
            self._minios[patp].start()
 
+    def addUrbit(self, patp, urbit):
+        self.config['piers'].append(patp)
+        self.registerUrbit(patp)
+        
         self._urbits[patp] = urbit
         self.save_config()
         urbit.start()
