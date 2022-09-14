@@ -19,14 +19,15 @@ class NodeDocker:
 
         for c in containers:
             if(self.node_name == c.name):
-                self.container = c
-                return
+                c.stop()
+                c.remove()
 
         
         self.container = client.containers.create(
                     command='node /home/node/app/build/index.js',
                     image= f'{self._node_img}',
-                    ports = {'3000/tcp':80}, 
+                    environment = ["PORT=80"],
+                    network='host',
                     name = self.node_name,
                     volumes = [f'{pathlib.Path(__file__).parent.resolve()}/ui/:/home/node/app'],
                     detach=True)
