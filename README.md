@@ -26,7 +26,7 @@ To run this for development use the `startup.sh` script. This will run the pytho
 5. After Urbit is booted allow user (with the press of a single button) to add S3 support and Bitcoin node support (if installed)
 6. Add functionality to check for and update system with the click of a button
 7. Add ability to completely turn on/off wifi from settings
-
+8. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container
 
 
 ## Notes
