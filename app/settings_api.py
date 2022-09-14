@@ -127,29 +127,27 @@ def ethernet_only():
 def connect_wifi():
     network = request.form['network']
     password = request.form['password']
-    wifi = 'wl'
-    net = psutil.net_if_stats()
+    connected = request.form['connected']
 
-    for k,v in net.items():
-        if 'wl' in k:
-            wifi = k
-            break
+    connect_attempt = subprocess.Popen(['nmcli','dev','wifi','connect',network,'password',password],
+            stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
 
-    print("connecting "+wifi)
-    try:
-        F = Finder(server_name=network,
-                         password=password,
-                         interface=wifi)
-        while F.run() == None:
-            pass
+    did_connect, stderr = connect_attempt.communicate()
+    did_connect = did_connect.decode("utf-8")[0:5]
+
+    if did_connect == 'Error':
+        print('400')
+        return jsonify(400)
+    else:
+        # for some reason deleting doesn't work
+        #if connected != '':
+            #del_connection = subprocess.Popen(['nmcli','con','del',connected],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+
+            #did_delete, delerr = del_connection.communicate()
+            #did_delete = did_delete.decode("utf-8")
+            #print(did_delete)
 
         return jsonify(200)
-
-    except Exception as e:
-        print('wtf')
-        print(e)
-     
-    return jsonify(400)
 
 # restart minIO
 @app.route('/settings/minio',methods=['POST'])
