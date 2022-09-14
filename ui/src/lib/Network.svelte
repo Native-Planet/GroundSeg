@@ -9,14 +9,13 @@
   let networks,
     opened = true,
     refreshing = false,
-    buttonStatus = 'standard'
-
-  let ethSwapping = false,
+    buttonStatus = 'standard',
+    ethSwapping = false,
     nw = '', pw = '',
     view = false
 
-  onMount(()=> {getNetworks()})
-  onDestroy(()=> {opened = false})
+  onMount(()=> getNetworks())
+  onDestroy(()=> opened = false)
 
 
   const toggleEth = () =>  {
@@ -31,7 +30,6 @@
       .then(r => r.json())
       .then(d => { if (d == 200) {
         ethSwapping = false
-        console.log("swapped")
    }})}
 
   const connectToNetwork = () =>  {
@@ -42,6 +40,7 @@
     const f = new FormData()
     f.append('network', nw)
     f.append('password', pw)
+    f.append('connected', info.connected)
 
     fetch(u, {method: 'POST',body: f})
       .then(r => r.json())
@@ -50,8 +49,14 @@
         setTimeout(()=>{
           buttonStatus = 'standard'
           nw = info.connected
+          pw = ''
         }, 3000)
-   }})}
+      } else {
+        buttonStatus = 'failure'
+        setTimeout(()=>{
+          buttonStatus = 'standard'
+        }, 3000)
+      }})}
 
   const toggleView = () => {
     view = !view
