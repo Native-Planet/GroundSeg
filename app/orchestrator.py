@@ -155,9 +155,10 @@ class Orchestrator:
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
-        self.registerUrbit(patp)
-        
         self._urbits[patp] = urbit
+
+        self.registerUrbit(patp)
+
         self.save_config()
         urbit.start()
         
