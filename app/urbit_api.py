@@ -47,7 +47,7 @@ def pier_info():
         return jsonify(400)
 
     nw_label = "Local"
-    if(u['network'] == 'wireguard'):
+    if(urbit['network'] == 'wireguard'):
         nw_label = "Remote"
 
     p = dict()
