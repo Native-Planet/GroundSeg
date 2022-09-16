@@ -39,7 +39,7 @@
     buttonStatus = 'loading'
     const f = new FormData()
     const u = api + "/settings/anchor/register"
-    f.append('key', key)
+    f.append('key', key.trim())
     fetch(u, {method: 'POST',body: f})
       .then(d => d.json())
       .then(res => {
@@ -71,7 +71,7 @@
     epButtonStatus = 'loading'
     const u = api + "/settings/anchor/endpoint"
     const f = new FormData()
-    f.append('new',epKey)
+    f.append('new',epKey.trim())
     fetch(u,{method:'POST',body:f})
       .then(d=>d.json()).then(r=>{
         if (r === 200) {
@@ -211,6 +211,7 @@
     border-radius: 8px;
   }
   .blurred-block {
+    animation: breathe 2s infinite;
     width: 80%;
     padding-left: 10%;
     padding-right: 10%;
