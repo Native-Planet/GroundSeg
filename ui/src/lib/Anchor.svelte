@@ -15,7 +15,7 @@
     advanced = false,
     epKey = '',
     curEpKey = '',
-    defaultEpKey = 'relay.nativeplanet.live',
+    defaultEpKey = 'api1.nativeplanet.live',
     epButtonStatus = 'standard'
 
   const toggleView = () => {
