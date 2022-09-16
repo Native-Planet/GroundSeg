@@ -1,6 +1,6 @@
 {
     "firstBoot": true,
     "piers": [],
-    "endpointUrl": "relay.nativeplanet.live",
+    "endpointUrl": "api1.nativeplanet.live",
     "apiVersion": "v1"
 }
