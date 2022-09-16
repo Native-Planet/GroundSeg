@@ -151,7 +151,7 @@
       {#if curEpKey != epKey}
         <PrimaryButton
           on:click={connectEndpoint}
-          standard="Connect to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
+          standard="Set to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
           success="Endpoint successfully changed"
           failure="Failed to change endpoint"
           loading="Connecting to your new endpoint.."
