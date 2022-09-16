@@ -224,6 +224,7 @@
     margin-bottom: 24px;
   }
   .switch-wrapper {
+    cursor: pointer;
     border-radius: 8px;
     width: 32px;
     height: 12px;

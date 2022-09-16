@@ -5,11 +5,10 @@
 
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
+  let allowCancel = true
 
 
-  const uploadCheck = e => {
-    console.log(e.detail)
-  }
+  const hideCancel = () => allowCancel = false
 
 </script>
 
@@ -23,14 +22,16 @@
         <div class="file-type">{f}</div>
       {/each}
     </div>
-    <svelte:component this={existingID.dropzone} on:update={uploadCheck}/>
-    <LinkButton
-      top=24
-      left={false}
-      text="Cancel"
-      src="/"
-      disabled={false}
-    />
+    <svelte:component this={existingID.dropzone} on:full={hideCancel}/>
+    {#if allowCancel}
+      <LinkButton
+        top=24
+        left={false}
+        text="Cancel"
+        src="/"
+        disabled={false}
+      />
+    {/if}
   {:else}
     <div class="warning-title">
       WARNING:
