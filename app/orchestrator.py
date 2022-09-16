@@ -74,9 +74,12 @@ class Orchestrator:
 
     def registerDevice(self, reg_key):
         self.config['reg_key'] = reg_key
-        x = self.wireguard.registerDevice(self.config['reg_key']) 
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f'https://{endpoint}/{api_version}'
+        x = self.wireguard.registerDevice(self.config['reg_key'], url) 
         time.sleep(2)
-        self.anchor_config = self.wireguard.getStatus()
+        self.anchor_config = self.wireguard.getStatus(url)
         print(self.anchor_config)
         if(self.anchor_config != None):
            print("starting wg")
@@ -92,6 +95,20 @@ class Orchestrator:
            return 0
         return 1
 
+    def getWireguardUrl(self):
+        endpoint = self.config['endpointUrl']
+        return endpoint
+
+    def changeWireguardUrl(self, url):
+        self.config['endpointUrl'] = url
+        self.config['reg_key'] = ''
+        self.wireguard_reg = False
+        self.save_config()
+
+        self.wireguardStop()
+
+        return 0
+        
 
     def load_urbits(self):
         for p in self.config['piers']:
@@ -114,8 +131,12 @@ class Orchestrator:
       self.minIO_on = False
 
     def registerUrbit(self, patp):
+       endpoint = self.config['endpointUrl']
+       api_version = self.config['apiVersion']
+       url = f'https://{endpoint}/{api_version}'
+
        if self.wireguard_reg:
-           self.anchor_config = self.wireguard.getStatus()
+           self.anchor_config = self.wireguard.getStatus(url)
            patp_reg = False
            if(self.anchor_config != None):
               for ep in self.anchor_config['subdomains']:
@@ -124,11 +145,11 @@ class Orchestrator:
                      patp_reg = True
 
            if(patp_reg == False):
-              self.wireguard.registerService(f'{patp}','urbit')
-              self.wireguard.registerService(f's3.{patp}','minio')
 
+              self.wireguard.registerService(f'{patp}','urbit',url)
+              self.wireguard.registerService(f's3.{patp}','minio',url)
 
-           self.anchor_config = self.wireguard.getStatus()
+           self.anchor_config = self.wireguard.getStatus(url)
            url = None
            http_port = None
            ames_port = None
@@ -137,15 +158,16 @@ class Orchestrator:
 
 
            print(self.anchor_config['subdomains'])
+           pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
            for ep in self.anchor_config['subdomains']:
-               if(f'{patp}.nativeplanet.live' == ep['url']):
+               if(f'{patp}.{pub_url}' == ep['url']):
                    url = ep['url']
                    http_port = ep['port']
-               elif(f'ames.{patp}.nativeplanet.live' == ep['url']):
+               elif(f'ames.{patp}.{pub_url}' == ep['url']):
                    ames_port = ep['port']
-               elif(f'bucket.s3.{patp}.nativeplanet.live' == ep['url']):
+               elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
                    s3_port = ep['port']
-               elif(f'console.s3.{patp}.nativeplanet.live' == ep['url']):
+               elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
                    console_port = ep['port']
 
            self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
