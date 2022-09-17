@@ -44,7 +44,13 @@
 
     <!-- stream of selected log -->
     <div class="logs" style="max-height: calc(80vh - 92px - {maxHeightOffset}px;">
-      {#each stream as s}<div class="content">{s}</div>{/each}
+      {#each stream as s}
+        {#if s.trim() != '[%e %authenticated-without-cookie]'}
+          <div class="content">
+            {s}
+          </div>
+        {/if}
+      {/each}
       <div id="jump"></div>
     </div>
 
