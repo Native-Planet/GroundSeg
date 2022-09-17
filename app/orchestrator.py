@@ -58,20 +58,6 @@ class Orchestrator:
            self.wireguard.stop()
 
 
-    def wireguardStart(self):
-        if(self.wireguard.wg_docker.isRunning()==False):
-           self.wireguard.start()
-           self.startMinIOs() 
-
-    def wireguardStop(self):
-        if(self.wireguard.wg_docker.isRunning() == True):
-           for p in self._urbits.keys():
-              if(self._urbits[p].config['network'] == 'wireguard'):
-                 self.switchUrbitNetwork(p)
-           self.stopMinIOs()
-           self.wireguard.stop()
-
-
     def registerDevice(self, reg_key):
         self.config['reg_key'] = reg_key
         endpoint = self.config['endpointUrl']
@@ -91,7 +77,10 @@ class Orchestrator:
            for p in self.config['piers']:
               self.registerUrbit(p)
 
+           print("starting minIOs")
+           self.startMinIOs()
            self.save_config()
+
            return 0
         return 1
 
@@ -208,6 +197,8 @@ class Orchestrator:
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
+            u['network'] = urbit.config['network']
+
             if self.wireguard_reg:
                u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
             else:
@@ -217,19 +208,20 @@ class Orchestrator:
                 u['url'] = f"https://{urbit.config['wg_url']}"
             else:
                 u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
-            if(urbit.isRunning()):
-                try:
-                    u['code'] = urbit.get_code().decode('utf-8')
-                except Exception as e:
-                    print(e)
-            else:
-                u['code'] = ""
 
-            u['network'] = urbit.config['network']
-            
             urbits.append(u)
 
         return urbits
+
+    def getCode(self,pier):
+        code = ''
+        for urbit in self._urbits.values():
+            if urbit.pier_name == pier:
+                try:
+                    code = urbit.get_code().decode('utf-8')
+                except Exception as e:
+                    print(e)
+        return code
     
     def getContainers(self):
         minio = list(self._minios.keys())

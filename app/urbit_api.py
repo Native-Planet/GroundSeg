@@ -58,6 +58,12 @@ def pier_info():
 
     return(jsonify(p))
 
+@app.route('/urbit/code', methods=['GET'])
+def pier_code():
+    pier = request.args.get('pier')
+    orchestrator = current_app.config['ORCHESTRATOR']
+    code = orchestrator.getCode(pier)
+    return jsonify(code)
 
 @app.route("/urbit/network", methods=['POST'])
 def set_network():

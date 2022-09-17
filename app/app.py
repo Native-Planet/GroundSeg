@@ -31,7 +31,7 @@ app.register_blueprint(urbit_api.app)
 app.register_blueprint(upload_api.app)
 app.register_blueprint(settings_api.app)
 
-@app.route("/", methods=['POST','GET'])
+@app.route("/", methods=['GET'])
 def mainscreen():
     piers = orchestrator.getUrbits()
     return jsonify(piers)
