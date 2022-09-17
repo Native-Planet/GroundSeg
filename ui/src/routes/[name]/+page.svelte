@@ -17,9 +17,10 @@
     data = {'nw_label': '', 'pier':{}},
     advanced = false,
     shown = true,
-    showLogs = false
+    showLogs = false,
+    code = ''
 
-  onMount(() => getPierData())
+  onMount(() => {getPierData(); getPierCode()})
   onDestroy(() => shown = false)
   
   const getPierData = () => {
@@ -30,10 +31,17 @@
     }
   }
 
+  const getPierCode = () => {
+    if (shown) {
+      const u = api + "/urbit/code?pier=" + path
+      fetch(u).then(r => r.json()).then(d => {
+        code = d
+        if (d.length == 27) {setTimeout(getPierCode, 1800000)}
+        else {setTimeout(getPierCode, 1000)}})}}
+
   const handleData = d => {
     if (d == 400) { window.location.href = "/" }
-    if (d.pier.name == path) { data = d }
-  }
+    if (d.pier.name == path) { data = d }}
 
   const toggleLogs = () => showLogs = !showLogs
 
@@ -100,7 +108,7 @@
         {#if loading}
           <div class="status loading">Loading...</div>
         {:else if data.pier.running}
-          {#if (data.pier.code == undefined || data.pier.code == '')}
+          {#if code.length != 27}
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -139,7 +147,7 @@
         {#if loading}
           <div class="status loading">Loading...</div>
         {:else if data.pier.running}
-          {#if (data.pier.code == undefined || data.pier.code == '')}
+          {#if (code == undefined || code == '')}
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -152,12 +160,12 @@
 
     </div>
 
-    {#if data.pier.running && (!(data.pier.code == undefined) && !(data.pier.code == ""))}
+    {#if (code.length == 27) && data.pier.running}
       <svelte:component this={profile.credentials}
         minIO={data.pier.s3_url}
         name={data.pier.name}
         nw_label={data.nw_label}
-        code={data.pier.code}
+        code={code}
         ext={data.pier.url}
         wg_running={data.wg_running}
         wg_reg={data.wg_reg} />

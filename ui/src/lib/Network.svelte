@@ -158,6 +158,7 @@
     height: 12px;
     background: #ffffff4d;
     padding: 2px;
+    cursor: pointer;
   }
   .switch-wrapper-blurred {
     border-radius: 8px;
@@ -182,7 +183,6 @@
     width: 19px;
     border-radius: 6px;
     margin-top: auto;
-    cursor: pointer;
   }
   .on {
     background: #008eff;
