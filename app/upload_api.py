@@ -30,10 +30,8 @@ def make_urbit(patp, http_port, ames_port):
     return urbit
 
 
-@app.route('/upload/key',methods=['GET','POST'])
+@app.route('/upload/key',methods=['POST'])
 def uploadKey():
-    if request.method == 'GET':
-        return render_template('upload_key.html')
     if request.method == 'POST':
         patp = request.form['patp']
         key = request.form['key']
@@ -46,10 +44,8 @@ def uploadKey():
         return jsonify(200)
         
 
-@app.route('/upload/pier', methods=['GET','POST'])
+@app.route('/upload/pier', methods=['POST'])
 def uploadPier():
-    if request.method == 'GET':
-        return render_template('upload_pier.html')
     if request.method == 'POST':
 
         file = request.files['file']

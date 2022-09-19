@@ -8,6 +8,7 @@ export const api = cfg.url + ":" + cfg.port
 export const piers = writable(null)
 export const scrollDown = writable(true)
 export const power = writable(null)
+export const codes = writable({})
 
 // Check if valid Patp - Supports galaxy to moon only
 

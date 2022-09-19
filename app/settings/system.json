@@ -1,4 +1,6 @@
 {
     "firstBoot": true,
-    "piers": []
+    "piers": [],
+    "endpointUrl": "api1.nativeplanet.live",
+    "apiVersion": "v1"
 }

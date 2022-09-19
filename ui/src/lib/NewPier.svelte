@@ -14,12 +14,14 @@
 
   const boot = () => {
     buttonStatus = 'loading'
+    const n = name.trim()
+    const k = key.trim()
     const f = new FormData()
     const u = api + "/upload/key"
 
-    if (isPatp(name)) {
-      f.append("patp", name.replace(/~/g,''))
-      f.append("key", key)
+    if (isPatp(n)) {
+      f.append("patp", n.replace(/~/g,''))
+      f.append("key", k)
       fetch(u, {method: 'POST',body: f})
         .then(d => d.json())
         .then(res => {

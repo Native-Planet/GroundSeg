@@ -3,6 +3,9 @@
   import { api, isPatp } from '$lib/api'
   import Dropzone from "dropzone"
   import { sigil, stringRenderer } from '@tlon/sigil-js'
+	import { createEventDispatcher } from 'svelte';
+
+	const dispatch = createEventDispatcher();
 
   let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = '', failed = false
   let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
@@ -41,6 +44,9 @@
     if (file.status === 'uploading') {
       isUploading = true
     }
+    if (prog == 100) {
+      dispatch('full')
+    }
     curProgress = prog
     totalSize = file.size
     fileName = file.name 
@@ -64,10 +70,10 @@
 <div id="dropper" class={isUploading ? "disabled" : "drop"}>
   {#if isUploading}
     <div class="content">
-      <div class="filename">{curProgress < 100 ? "Uploading" : "Processing"} {fileName}</div>
+      <div class="filename" class:processing={curProgress == 100}>{curProgress < 100 ? "Uploading" : "Processing"} {fileName}</div>
       <div class="bar-wrapper">
         <div class="bar" style="width:{curProgress}%"></div>
-        <div class="uploaded">
+        <div class="uploaded" class:processing={curProgress == 100}>
           {#if totalSize > (1000 * 1000 * 1000)}
             {#if curProgress == 100}
               {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB}
@@ -82,7 +88,7 @@
             {/if}
           {/if}
         </div>
-        <div class="percent">{curProgress.toFixed(0)}%</div>
+        <div class="percent" class:processing={curProgress == 100}>{curProgress.toFixed(0)}%</div>
       </div>
     </div>
   {:else}
@@ -151,6 +157,9 @@
   }
   .disabled {
     pointer-events: none;
+  }
+  .processing {
+     animation: breathe 2s infinite;
   }
 
 </style>

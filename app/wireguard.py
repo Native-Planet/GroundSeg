@@ -3,8 +3,6 @@ import requests, subprocess, base64, time, json
 from wireguard_docker import WireguardDocker
 
 class Wireguard:
-    _url = "https://api1.nativeplanet.live/v1"
-
 
     _headers = {"Content-Type": "application/json"}
 
@@ -27,7 +25,7 @@ class Wireguard:
         self.wg_docker.stop()
 
 
-    def registerDevice(self, reg_code):
+    def registerDevice(self, reg_code, url):
         # /v1/register
         update_data = {
             "reg_code" : f"{reg_code}",
@@ -37,14 +35,14 @@ class Wireguard:
 
         response = None
         try:
-            response = requests.post(f'{self._url}/register',json=update_data,headers=headers).json()
+            response = requests.post(f'{url}/register',json=update_data,headers=headers).json()
         except Exception as e:
             print(f"register device {e}")
             return None
 
         return(response['lease'])
 
-    def registerService(self, subdomain, service_type):
+    def registerService(self, subdomain, service_type, url):
         # /v1/create
         update_data = {
             "subdomain" : f"{subdomain}",
@@ -55,7 +53,7 @@ class Wireguard:
 
         response = None
         try:
-            response = requests.post(f'{self._url}/create',json=update_data,headers=headers).json()
+            response = requests.post(f'{url}/create',json=update_data,headers=headers).json()
         except Exception as e:
             print(e)
             return None
@@ -64,7 +62,7 @@ class Wireguard:
         while response['status'] == 'creating':
             try:
                 response = requests.get(
-                        f'{self._url}/retrieve?pubkey={update_data["pubkey"]}',
+                        f'{url}/retrieve?pubkey={update_data["pubkey"]}',
                         headers=headers).json()
             except Exception as e:
                 print(e)
@@ -74,12 +72,13 @@ class Wireguard:
 
         return response['status']
         
-    def getStatus(self):
+    def getStatus(self,url):
         headers = {"Content-Type": "application/json"}
         response = None
+
         try:
             response = requests.get(
-                    f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
+                    f'{url}/retrieve?pubkey={self.config["pubkey"]}',
                     headers=headers).json()
         except Exception as e:
             print(e)
@@ -88,7 +87,7 @@ class Wireguard:
         while ((response['conf'] == None) and (count > 6)):
             try:
                 response = requests.get(
-                        f'{self._url}/retrieve?pubkey={self.config["pubkey"]}',
+                        f'{url}/retrieve?pubkey={self.config["pubkey"]}',
                         headers=headers).json()
             except Exception as e:
                 print(e)

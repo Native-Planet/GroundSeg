@@ -109,6 +109,22 @@ def anchor_register():
     else:
         return jsonify(400)
 
+# change anchor endpoint
+@app.route('/settings/anchor/endpoint',methods=['GET','POST'])
+def anchor_endpoint():
+    orchestrator = current_app.config['ORCHESTRATOR']
+
+    if request.method == 'GET':
+        current_endpoint = orchestrator.getWireguardUrl() 
+        return jsonify(current_endpoint)
+
+    if request.method == 'POST':
+        endpoint = request.form['new']
+        x = orchestrator.changeWireguardUrl(endpoint)
+        if x == 0:
+            return jsonify(200)
+    return jsonify(400)
+
 # toggle ethernet only
 @app.route('/settings/eth-only',methods=['POST'])
 def ethernet_only():

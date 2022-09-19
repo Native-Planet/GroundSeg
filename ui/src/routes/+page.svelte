@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte'
-  import { api, piers } from '$lib/api'
+  import { api, piers, codes } from '$lib/api'
   import { home } from '$lib/components'
   import Fa from 'svelte-fa'
   import { faGear } from '@fortawesome/free-solid-svg-icons/index.es'
@@ -9,9 +9,21 @@
 
   const update = () => {
     fetch(api).then(r => r.json()).then(d => piers.set(d))
-    setTimeout(update, 5000)
+    setTimeout(update, 1000)}
 
-  }
+  const checkStatus = (n,r) => {
+    if (!r) {return 'Stopped'}
+    if ((n in $codes) && ($codes[n].length == 27)) {
+      return 'Running'}
+
+    const u = api + "/urbit/code?pier=" + n
+    fetch(u).then(x => x.json()).then(d => {
+      codes.update(c => {c[n] = d; return c})})
+
+    if ((n in $codes) && ($codes[n].length != 27)) {
+      return 'Booting'}
+    return 'Loading...'}
+
   onMount(() => update())
   onDestroy(() => opened = false)
 
@@ -38,10 +50,10 @@
             <div class="pier">
               <svelte:component this={home.sigil} patp={p.name} size="60px" rad="8px" />
               <a class="info"
-                href={p.running ? p.url : ""}
-                target={p.running ? "_blank" : ""}>
+                href={checkStatus(p.name,p.running) == 'Running' ? p.url : ""}
+                target={checkStatus(p.name,p.running) == 'Running' ? "_blank" : ""}>
                 <div class="patp">{p.name}</div>
-                <div class="status">{p.running ? "Running" : "Stopped"}</div>
+                <div class="status">{checkStatus(p.name,p.running)}</div>
               </a>
               <a href={p.name}>
                 <Fa icon={faGear} size="1.2x" />
