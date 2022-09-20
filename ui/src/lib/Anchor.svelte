@@ -15,7 +15,7 @@
     advanced = false,
     epKey = '',
     curEpKey = '',
-    defaultEpKey = 'api1.nativeplanet.live',
+    defaultEpKey = 'api.startram.io',
     epButtonStatus = 'standard'
 
   const toggleView = () => {

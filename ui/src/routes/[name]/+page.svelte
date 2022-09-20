@@ -168,6 +168,7 @@
         code={code}
         ext={data.pier.url}
         wg_running={data.wg_running}
+        minIO_reg={data.pier.minio_registered}
         wg_reg={data.wg_reg} />
     {/if}
     <div class="commands">

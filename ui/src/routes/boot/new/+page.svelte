@@ -2,11 +2,12 @@
   import { newID } from '$lib/components'
   let name = '',
     key = '',
-    view = false
+    minio = '',
+    viewKey = false
 
-  const toggleView = () => {
-    view = !view
-    document.querySelector('#input').type = view ? 'text' : 'password'
+  const toggleViewKey = () => {
+    viewKey = !viewKey
+    document.querySelector('#key').type = viewKey ? 'text' : 'password'
   }
 
 </script>
@@ -17,14 +18,17 @@
     <div class="title">Pier Name</div>
     <input spellcheck="false" placeholder="sampel-palnet" bind:value={name}/>
   </div>
+
   <div class="info">
     <div class="title">Pier Key</div>
     <div class="pass-wrapper">
-      <input spellcheck="false" id="input" type="password" bind:value={key}/>
-      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+      <input spellcheck="false" id="key" type="password" bind:value={key}/>
+      <img on:click={toggleViewKey} src="/eye-{viewKey ? "closed" : "open"}.svg" alt="eye" />
     </div>
   </div>
-  <svelte:component this={newID.newPier} {name} {key}/>
+
+  <svelte:component this={newID.newPier} {name} {key} />
+
 </div>
 <style>
   .key {
