@@ -78,7 +78,6 @@
 
 </script>
     
-    {buttonStatus}
     <!-- Landscape +code -->
     <div class="info">
       <div class="title">Login Key</div>
