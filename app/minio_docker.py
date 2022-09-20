@@ -35,8 +35,8 @@ class MinIODocker:
         s3_port = self.config['wg_s3_port']
         command = f'server /data --console-address ":{console_port}" --address ":{s3_port}"'
 
-        environment = [f"MINIO_ROOT_USER=nativeplanet", 
-                      f"MINIO_ROOT_PASSWORD=nativeplanet",
+        environment = [f"MINIO_ROOT_USER={self.config['pier_name']}", 
+                      f"MINIO_ROOT_PASSWORD={self.config['minio_password']}",
                       f"MINIO_DOMAIN=s3.{self.config['wg_url']}",
                       f"MINIO_SERVER_URL=https://s3.{self.config['wg_url']}"]
         

@@ -36,10 +36,12 @@ def uploadKey():
         patp = request.form['patp']
         key = request.form['key']
 
-        http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPort()
+        orchestrator = current_app.config['ORCHESTRATOR']
+
+        http_port, ames_port = orchestrator.getOpenUrbitPort()
         urbit = make_urbit(patp, http_port, ames_port)
         urbit.addKey(key)
-        current_app.config['ORCHESTRATOR'].addUrbit(patp, urbit)
+        orchestrator.addUrbit(patp, urbit)
 
         return jsonify(200)
         

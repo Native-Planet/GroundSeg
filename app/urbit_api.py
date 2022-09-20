@@ -19,19 +19,6 @@ import urbit_docker
 
 app = Blueprint('urbit', __name__, template_folder='templates')
 
-
-@app.route('/urbit/access', methods=['GET'])
-def pier_access():
-    pier = request.args.get('pier')
-    urbit = current_app.config['ORCHESTRATOR']._urbits[pier]
-
-    url = f"http://{socket.gethostname()}.local:{urbit.config['http_port']}"
-    
-    if(urbit.config['network']=='wireguard'):
-        url = f"http://{urbit.config['wg_url']}"
-    
-    return redirect(url)
-
 @app.route('/urbit/pier', methods=['GET'])
 def pier_info():
     pier = request.args.get('pier')
@@ -65,6 +52,19 @@ def pier_code():
     code = orchestrator.getCode(pier)
     return jsonify(code)
 
+@app.route('/urbit/minio/register', methods=['POST'])
+def register_minio():
+    patp = request.form['patp']
+    password = request.form['password']
+
+    orchestrator = current_app.config['ORCHESTRATOR']
+    x = orchestrator.registerMinIO(patp, password)
+
+    if x == 0:
+        return jsonify(200)
+
+    return jsonify(400)
+
 @app.route("/urbit/network", methods=['POST'])
 def set_network():
     for pier in request.form:
@@ -74,15 +74,14 @@ def set_network():
 @app.route("/urbit/start", methods=['POST'])
 def start_pier():
     url = "/"
-    if request.method == 'POST':
-        print(request.form)
-        for p in request.form:
-            urbit = current_app.config['ORCHESTRATOR']._urbits[p]
-            if(urbit==None):
-                return Response("Pier not found", status=400)
-            urbit.start()
-            url = f'/urbit/pier?pier={urbit.pier_name}'
-            time.sleep(2)
+    print(request.form)
+    for p in request.form:
+        urbit = current_app.config['ORCHESTRATOR']._urbits[p]
+        if(urbit==None):
+            return Response("Pier not found", status=400)
+        urbit.start()
+        url = f'/urbit/pier?pier={urbit.pier_name}'
+        time.sleep(2)
             
     # pier started
     return jsonify(200)
