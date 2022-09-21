@@ -154,7 +154,7 @@
           standard="Set to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
           success="Endpoint successfully changed"
           failure="Failed to change endpoint"
-          loading="Connecting to your new endpoint.."
+          loading="Changing to your new endpoint.."
           status={epButtonStatus}
           top="12"
         />

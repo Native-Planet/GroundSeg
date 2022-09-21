@@ -7,6 +7,7 @@
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
   import Logs from '$lib/Logs.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import Clipboard from 'clipboard'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -18,9 +19,18 @@
     advanced = false,
     shown = true,
     showLogs = false,
-    code = ''
+    code = '',
+    clickedPatp = false
+  
+  let copyPatp
 
-  onMount(() => {getPierData(); getPierCode()})
+  onMount(() => {
+    getPierData()
+    getPierCode()
+    copyPatp = new Clipboard('#patp')
+    copyPatp.on("success", ()=> {
+    clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
+  })
   onDestroy(() => shown = false)
   
   const getPierData = () => {
@@ -155,7 +165,13 @@
         {:else}
           <div class="status">Stopped</div>
         {/if}
-        <div class="patp">{data.pier.name}</div>
+        <div
+          on:click={copyPatp}
+          data-clipboard-text={data.pier.name}
+          id="patp"
+          class="patp">
+          {clickedPatp ? "copied!" : data.pier.name}
+        </div>
       </div>
 
     </div>
@@ -274,6 +290,7 @@
   }
   .patp {
     font-size: 16px;
+    cursor: pointer;
   }
   .patp-logs {
     font-size: 12px;

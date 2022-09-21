@@ -3,7 +3,7 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import Clipboard from 'clipboard'
   import Fa from 'svelte-fa'
-  import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons/index.es'
+  import { faArrowUpRightFromSquare, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons/index.es'
   import { faCircleQuestion } from '@fortawesome/free-regular-svg-icons'
 
   export let name, nw_label, code, ext, minIO, wg_reg, wg_running, minIO_reg
@@ -13,7 +13,7 @@
     viewMinIO = false, clickedMinIO = false,
     isSwitching = false, minioPassword = '', viewKey = false,
     viewConfirm = false, confirmPassword = '' , showMinIOInfo = false,
-    buttonStatus = 'failure', submitted = false, showButton = true
+    buttonStatus = 'failure', submitted = false, showButton = true, textToggle = 'none'
 
   // Toggle Password Visibility
   const toggleViewKey = () => {
@@ -24,6 +24,11 @@
   const toggleViewConfirm = () => {
     viewConfirm = !viewConfirm
     document.querySelector('#minio-password-1').type = viewConfirm ? 'text' : 'password'
+  }
+
+  const handleTextToggle = s => {
+    if (s == textToggle) {textToggle = 'none'}
+    else {textToggle = s}
   }
 
 
@@ -120,17 +125,23 @@
       <!-- Request for minIO password if not registered -->
       {#if !minIO_reg}
         <div class="info">
-          <div class="title">
+          <div class="setup-title">
             <span>Setup MinIO Password</span>
-            <button class="question-mark" on:click={()=> showMinIOInfo = !showMinIOInfo} >
+            <button class="question-mark" on:click={()=>handleTextToggle('info')} >
               <Fa icon={faCircleQuestion} size="1.2x" />
+            </button>
+            <button class="alert-mark" on:click={()=>handleTextToggle('alert')} >
+              <Fa icon={faTriangleExclamation} size="1.2x" />
             </button>
           </div>
 
-          {#if showMinIOInfo}
+          {#if textToggle == 'info' }
             <div class="minio-info">
               Store and share files on Urbit with MinIO. All data is stored locally on your device.
             </div>
+          {/if}
+          {#if textToggle == 'alert' }
+            <div class="minio-info s3-alert">Warning: if you switch between anchors, it will break your previous S3 links.</div>
           {/if}
           
           {#if (minioPassword.length > 0) && (minioPassword.length < 8)}
@@ -236,12 +247,18 @@
     margin-bottom: 12px;
     text-align: left;
   }
+  .setup-title {
+    font-weight: 700;
+    text-align: left;
+  }
+  .s3-alert {
+    color: orange;
+  }
   .title-smaller {
     font-weight: 70;
     margin-bottom: 6px;
     text-align: left;
     font-size: 12px;
-
   }
   .login-key-wrapper {
     display: flex;
@@ -277,9 +294,15 @@
     cursor: pointer;
     margin-left: 4px;
   }
+  .alert-mark {
+    color: orange;
+    cursor: pointer;
+    margin-left: 4px;
+  }
   .minio-info {
     font-size: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 12px;
+    padding-right: 30px;
   }
   .eye {
     height: 32px;

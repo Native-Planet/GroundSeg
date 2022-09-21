@@ -13,6 +13,7 @@
   import PierCredentials from '$lib/PierCredentials.svelte'
   import Dropzone from '$lib/Dropzone.svelte'
   import Settings from '$lib/Settings.svelte'
+  import Contact from '$lib/Contact.svelte'
 
   // Components used in each page in routes directory
 
@@ -25,6 +26,7 @@
     sysInfo:SysInfo,
     power:Power,
     network:Network,
+    contact:Contact,
     minIO:MinIO,
     anchor:Anchor,
     exportLogs:ExportLogs
