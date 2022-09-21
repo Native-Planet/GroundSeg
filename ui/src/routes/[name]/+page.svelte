@@ -20,16 +20,20 @@
     shown = true,
     showLogs = false,
     code = '',
-    clickedPatp = false
+    clickedPatp = false,
+    fresh = true
   
   let copyPatp
 
   onMount(() => {
-    getPierData()
+    fresh = true
     getPierCode()
+    getPierData()
     copyPatp = new Clipboard('#patp')
     copyPatp.on("success", ()=> {
     clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
+    setTimeout(()=> fresh = false, 2000)
+    setTimeout(()=> console.log("ha"),2000)
   })
   onDestroy(() => shown = false)
   
@@ -109,16 +113,20 @@
 </script>
 
 <div class="mega-wrapper">
-{#if showLogs}
-  <Logs log={data.pier.name} maxHeightOffset={100}/>
-  <div class="bottom-panel">
-      <svelte:component this={profile.sigil}  patp={data.pier.name} size="60px" rad="8px" />
 
+  {#if showLogs}
+
+    <!-- Logs -->
+    <Logs log={data.pier.name} maxHeightOffset={100}/>
+    <div class="bottom-panel">
+      <svelte:component this={profile.sigil}  patp={data.pier.name} size="60px" rad="8px" />
       <div class="info">
         {#if loading}
           <div class="status loading">Loading...</div>
         {:else if data.pier.running}
-          {#if code.length != 27}
+          {#if fresh}
+            <div classs="status loading">Loading...</div>
+          {:else if code.length != 27}
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -130,91 +138,101 @@
       </div>
 
       <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
-  </div>
-{:else}
-<svelte:component this={profile.logo} t="Pier Settings" />
-<div class="ship">
-  {#if data.pier.name != undefined}
-
-    {#if deleteCheck}
-
-      <svelte:component
-        this={profile.warning}
-        on:back={()=>deleteCheck = false}
-        on:delete={deletePier}
-        name={data.pier.name} />
-
-  {:else}
-
-    <div class="card">
-      <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
-
-      <div class="info">
-        <div on:click={togglePier} class="switch-wrapper">
-          <div class="switch {data.pier.running ? "on" : "off"}"></div>
-        </div>
-
-        {#if loading}
-          <div class="status loading">Loading...</div>
-        {:else if data.pier.running}
-          {#if (code == undefined || code == '')}
-            <div class="status booting">Booting</div>
-          {:else}
-            <div class="status running">Running</div>
-          {/if}
-        {:else}
-          <div class="status">Stopped</div>
-        {/if}
-        <div
-          on:click={copyPatp}
-          data-clipboard-text={data.pier.name}
-          id="patp"
-          class="patp">
-          {clickedPatp ? "copied!" : data.pier.name}
-        </div>
-      </div>
-
     </div>
 
-    {#if (code.length == 27) && data.pier.running}
-      <svelte:component this={profile.credentials}
-        minIO={data.pier.s3_url}
-        name={data.pier.name}
-        nw_label={data.nw_label}
-        code={code}
-        ext={data.pier.url}
-        wg_running={data.wg_running}
-        minIO_reg={data.pier.minio_registered}
-        wg_reg={data.wg_reg} />
-    {/if}
-    <div class="commands">
-      <div class="advanced" on:click={()=> advanced = !advanced}>
-        Advanced Options
-        <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
-      </div>
-      {#if advanced}
-        <div class="cmd-wrapper">
-          <button
-            on:click={toggleLogs} 
-            class="cmd logs">
-            View Logs
-          </button>
-          <button 
-            on:click={ejectPier}
-            class="cmd eject">
-            Eject{ejecting ? "ing" : " Pier"}
-          </button>
-          <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+  {:else}
+    
+    <svelte:component this={profile.logo} t="Pier Settings" />
+    <div class="ship">
+      {#if data.pier.name != undefined}
+
+        {#if deleteCheck}
+
+          <svelte:component
+            this={profile.warning}
+            on:back={()=>deleteCheck = false}
+            on:delete={deletePier}
+            name={data.pier.name} />
+
+        {:else}
+
+          <div class="card">
+            <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
+
+            <div class="info">
+             <div on:click={togglePier} class="switch-wrapper">
+                <div class="switch {data.pier.running ? "on" : "off"}"></div>
+              </div>
+
+              {#if loading}
+                <div class="status loading">Loading...</div>
+              {:else if data.pier.running}
+                {#if fresh}
+                  <div class="status loading">Loading...</div>
+                {:else if code.length != 27}
+                  <div class="status booting">Booting</div>
+                {:else}
+                  <div class="status running">Running</div>
+                {/if}
+              {:else}
+                <div class="status">Stopped</div>
+              {/if}
+
+              <div
+                on:click={copyPatp}
+                data-clipboard-text={data.pier.name}
+                id="patp"
+                class="patp">
+                {clickedPatp ? "copied!" : data.pier.name}
+              </div>
+            </div>
+          </div>
+
+          <!-- Pier Credentials -->
+          {#if (code.length == 27) && data.pier.running}
+            <svelte:component this={profile.credentials}
+              minIO={data.pier.s3_url}
+              name={data.pier.name}
+              nw_label={data.nw_label}
+              code={code}
+              ext={data.pier.url}
+              wg_running={data.wg_running}
+              minIO_reg={data.pier.minio_registered}
+              wg_reg={data.wg_reg} />
+          {/if}
+      
+          <div class="commands">
+            <div class="advanced" on:click={()=> advanced = !advanced}>
+              Advanced Options
+              <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
+          </div>
+
+          {#if advanced}
+            <div class="cmd-wrapper">
+              <button
+                on:click={toggleLogs} 
+                class="cmd logs">
+                View Logs
+              </button>
+
+              <button 
+                on:click={ejectPier}
+                class="cmd eject">
+                Eject{ejecting ? "ing" : " Pier"}
+              </button>
+
+              <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+            </div>
+          {/if}
         </div>
       {/if}
-    </div>
+
+    {:else}
+      <div class="block"></div>
     {/if}
-  {:else}
-    <div class="block"></div>
-  {/if}
-</div>
-{/if}
-</div>
+  </div>
+  {/if} <!-- End #if show logs -->
+</div> <!-- End mega wrapper -->
 
 <style>
   @keyframes breathe {
