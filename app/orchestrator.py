@@ -114,10 +114,29 @@ class Orchestrator:
     def registerMinIO(self, patp, password):
         self._urbits[patp].config['minio_password'] = password
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
-        self._minios[patp].start()
+        #self._minios[patp].start()
         self.minIO_on = True
 
         return 0
+
+    def setMinIOEndpoint(self, patp):
+        u = self._urbits[patp].config
+        endpoint = f"s3.{u['wg_url']}"
+        access_key = patp
+        secret = u['minio_password']
+        bucket = 'bucket'
+
+        for urbit in self._urbits.values():
+            if urbit.pier_name == patp:
+                try:
+                    urbit.set_minio_endpoint(endpoint,access_key,secret,bucket)
+                except Exception as e:
+                    print(e)
+
+    def getMinIOSecret(self, patp):
+        x = self._urbits[patp].config['minio_password']
+        return(x)
+
 
     def startMinIOs(self):
       for m in self._minios.values():

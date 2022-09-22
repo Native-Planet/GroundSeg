@@ -30,6 +30,9 @@ class UrbitDocker:
                 shutil.copy('./settings/start_urbit.sh', 
                         f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
+                shutil.copy('./settings/set_s3_endpoints.sh', 
+                        f'{self._volume_directory}/{self.pier_name}/_data/set_s3_endpoints.sh')
+
         self.volume = client.volumes.create(name=self.pier_name)
         shutil.copy('./settings/start_urbit.sh', 
                 f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
@@ -106,8 +109,6 @@ class UrbitDocker:
         with open(f'settings/pier/{self.pier_name}.json', 'w') as f:
             json.dump(self.config, f, indent = 4)
 
-
-
     def buildUrbit(self):
         self.buildVolume()
         self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
@@ -125,6 +126,14 @@ class UrbitDocker:
     def copyFolder(self,folder_loc):
         from distutils.dir_util import copy_tree
         copy_tree(folder_loc,f'{self._volume_directory}/{self.pier_name}/_data/')
+
+    def set_minio_endpoint(self, endpoint, access_key, secret, bucket):
+        self.container.exec_run('chmod +x /urbit/set_s3_endpoints.sh')
+        x = self.container.exec_run('/urbit/set_s3_endpoints.sh').output.strip()
+        #x = self.container.exec_run('/bin/get-urbit-code')
+        print(x)
+
+        #self.container.exec_run(command)
 
     def get_code(self):
         return self.container.exec_run('/bin/get-urbit-code').output.strip()
