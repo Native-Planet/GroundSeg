@@ -7,6 +7,7 @@
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
   import Logs from '$lib/Logs.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import UpdateInstructions from '$lib/UpdateInstructions.svelte'
   import Clipboard from 'clipboard'
 
   const cur = $page.url;
@@ -23,6 +24,7 @@
     clickedPatp = false,
     fresh = true
   
+  let showUpdateMinIO = false
   let copyPatp
 
   onMount(() => {
@@ -32,8 +34,7 @@
     copyPatp = new Clipboard('#patp')
     copyPatp.on("success", ()=> {
     clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
-    setTimeout(()=> fresh = false, 2000)
-    setTimeout(()=> console.log("ha"),2000)
+    setTimeout(()=> fresh = false, 1000)
   })
   onDestroy(() => shown = false)
   
@@ -109,6 +110,21 @@
         window.location.href = "/"
    }})}
 
+  const updateMinIO = () => {
+    /*
+    let u = api + "/urbit/minio_endpoint"
+    const f = new FormData()
+    f.append('pier', data.pier.name)
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        console.log('updated minio endpoints in ship')}
+        else {
+        console.log('failed to update minio endpoints')}})}
+    */
+    showUpdateMinIO = !showUpdateMinIO
+  }
 
 </script>
 
@@ -139,6 +155,13 @@
 
       <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
     </div>
+
+  {:else if showUpdateMinIO}
+    <UpdateInstructions
+      on:click={updateMinIO}
+      endpoint={data.pier.s3_url}
+      accessKey={data.pier.name}
+    />
 
   {:else}
     
@@ -215,6 +238,14 @@
                 View Logs
               </button>
 
+            {#if data.pier.minio_registered && (data.nw_label == 'Remote')}
+              <button
+                on:click={updateMinIO} 
+                class="cmd minio">
+                Update minIO
+              </button>
+            {/if}
+
               <button 
                 on:click={ejectPier}
                 class="cmd eject">
@@ -264,7 +295,7 @@
     display: flex;
     gap: 20px;
     align-items: end;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
   }
   .switch-wrapper {
     cursor: pointer;
@@ -319,12 +350,12 @@
     margin-bottom: 12px;
   }
   .commands {
-    padding-top: 18px;
+    padding-top: 6px;
   }
   .cmd-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
   }
   .cmd {
     appearance: none;
@@ -334,7 +365,7 @@
     font-weight: 700;
     border: none;
     border-radius: 8px;
-    padding: 9px;
+    padding: 8px;
     width: 120px;
     cursor: pointer;
   }
@@ -351,6 +382,9 @@
   }
   .logs {
     background: var(--action-color);
+  }
+  .minio {
+    background: orange;
   }
   .eject {
     background: #FFFFFF4D;
