@@ -36,6 +36,9 @@ rm -rf build/*
 
 cp -r app/* build/
 
+# Install mc
+curl https://dl.min.io/client/mc/release/linux-amd64/mc -o build/mc
+
 # Build Svelte UI
 cd ui
 npm install 

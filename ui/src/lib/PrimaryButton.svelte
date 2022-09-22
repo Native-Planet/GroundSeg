@@ -6,7 +6,7 @@
     failure=null,
     loading=null,
     status='standard', 
-    top=0, left=true
+    top=0, left=true, bottom=0
 
 	const dispatch = createEventDispatcher();
 
@@ -14,7 +14,7 @@
 
 </script>
 
-<div style="margin-top:{top}px;margin-{left ? "right" : "left"}:auto;">
+<div style="margin-bottom:{bottom}px;margin-top:{top}px;margin-{left ? "right" : "left"}:auto;">
 {#if status == 'standard'}
   <button on:click={handleClick}>
     {standard}

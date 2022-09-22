@@ -12,6 +12,13 @@
   prefix = prefix.match(/.{1,3}/g)
   suffix = suffix.match(/.{1,3}/g)
 
+  const isFilled = (n,k,m) => {
+    if (n == '') {return true}
+    if (k == '') {return true}
+
+    return false
+  }
+
   const boot = () => {
     buttonStatus = 'loading'
     const n = name.trim()
@@ -22,6 +29,7 @@
     if (isPatp(n)) {
       f.append("patp", n.replace(/~/g,''))
       f.append("key", k)
+
       fetch(u, {method: 'POST',body: f})
         .then(d => d.json())
         .then(res => {
@@ -54,7 +62,7 @@
     success="Pier created. Redirecting..."
     failure="Failed. Please check your @p and key"
     loading="Your pier is being created.."
-    status={(name == '') || (key == '') ? "disabled" : buttonStatus}
+    status={isFilled(name,key) ? "disabled" : buttonStatus}
     left={false}
   />
 

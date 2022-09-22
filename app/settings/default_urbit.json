@@ -4,6 +4,7 @@
    "ames_port":34343,
    "urbit_version":"latest",
    "minio_version":"latest",
+   "minio_password": "",
    "network":"none",
    "wg_url": "nan",
    "wg_http_port": null,

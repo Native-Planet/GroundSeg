@@ -15,7 +15,7 @@
     advanced = false,
     epKey = '',
     curEpKey = '',
-    defaultEpKey = 'api1.nativeplanet.live',
+    defaultEpKey = 'api.startram.io',
     epButtonStatus = 'standard'
 
   const toggleView = () => {
@@ -154,7 +154,7 @@
           standard="Set to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
           success="Endpoint successfully changed"
           failure="Failed to change endpoint"
-          loading="Connecting to your new endpoint.."
+          loading="Changing to your new endpoint.."
           status={epButtonStatus}
           top="12"
         />

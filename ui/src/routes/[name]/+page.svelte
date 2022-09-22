@@ -7,6 +7,8 @@
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons/index.es'
   import Logs from '$lib/Logs.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import UpdateInstructions from '$lib/UpdateInstructions.svelte'
+  import Clipboard from 'clipboard'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -18,9 +20,22 @@
     advanced = false,
     shown = true,
     showLogs = false,
-    code = ''
+    code = '',
+    clickedPatp = false,
+    fresh = true
+  
+  let showUpdateMinIO = false
+  let copyPatp
 
-  onMount(() => {getPierData(); getPierCode()})
+  onMount(() => {
+    fresh = true
+    getPierCode()
+    getPierData()
+    copyPatp = new Clipboard('#patp')
+    copyPatp.on("success", ()=> {
+    clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
+    setTimeout(()=> fresh = false, 1000)
+  })
   onDestroy(() => shown = false)
   
   const getPierData = () => {
@@ -95,20 +110,39 @@
         window.location.href = "/"
    }})}
 
+  const updateMinIO = () => {
+    /*
+    let u = api + "/urbit/minio_endpoint"
+    const f = new FormData()
+    f.append('pier', data.pier.name)
+
+    fetch(u, {method: 'POST',body: f})
+      .then(r => r.json())
+      .then(d => { if (d == 200) {
+        console.log('updated minio endpoints in ship')}
+        else {
+        console.log('failed to update minio endpoints')}})}
+    */
+    showUpdateMinIO = !showUpdateMinIO
+  }
 
 </script>
 
 <div class="mega-wrapper">
-{#if showLogs}
-  <Logs log={data.pier.name} maxHeightOffset={100}/>
-  <div class="bottom-panel">
-      <svelte:component this={profile.sigil}  patp={data.pier.name} size="60px" rad="8px" />
 
+  {#if showLogs}
+
+    <!-- Logs -->
+    <Logs log={data.pier.name} maxHeightOffset={100}/>
+    <div class="bottom-panel">
+      <svelte:component this={profile.sigil}  patp={data.pier.name} size="60px" rad="8px" />
       <div class="info">
         {#if loading}
           <div class="status loading">Loading...</div>
         {:else if data.pier.running}
-          {#if code.length != 27}
+          {#if fresh}
+            <div classs="status loading">Loading...</div>
+          {:else if code.length != 27}
             <div class="status booting">Booting</div>
           {:else}
             <div class="status running">Running</div>
@@ -120,84 +154,116 @@
       </div>
 
       <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
-  </div>
-{:else}
-<svelte:component this={profile.logo} t="Pier Settings" />
-<div class="ship">
-  {#if data.pier.name != undefined}
-
-    {#if deleteCheck}
-
-      <svelte:component
-        this={profile.warning}
-        on:back={()=>deleteCheck = false}
-        on:delete={deletePier}
-        name={data.pier.name} />
-
-  {:else}
-
-    <div class="card">
-      <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
-
-      <div class="info">
-        <div on:click={togglePier} class="switch-wrapper">
-          <div class="switch {data.pier.running ? "on" : "off"}"></div>
-        </div>
-
-        {#if loading}
-          <div class="status loading">Loading...</div>
-        {:else if data.pier.running}
-          {#if (code == undefined || code == '')}
-            <div class="status booting">Booting</div>
-          {:else}
-            <div class="status running">Running</div>
-          {/if}
-        {:else}
-          <div class="status">Stopped</div>
-        {/if}
-        <div class="patp">{data.pier.name}</div>
-      </div>
-
     </div>
 
-    {#if (code.length == 27) && data.pier.running}
-      <svelte:component this={profile.credentials}
-        minIO={data.pier.s3_url}
-        name={data.pier.name}
-        nw_label={data.nw_label}
-        code={code}
-        ext={data.pier.url}
-        wg_running={data.wg_running}
-        wg_reg={data.wg_reg} />
-    {/if}
-    <div class="commands">
-      <div class="advanced" on:click={()=> advanced = !advanced}>
-        Advanced Options
-        <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
-      </div>
-      {#if advanced}
-        <div class="cmd-wrapper">
-          <button
-            on:click={toggleLogs} 
-            class="cmd logs">
-            View Logs
-          </button>
-          <button 
-            on:click={ejectPier}
-            class="cmd eject">
-            Eject{ejecting ? "ing" : " Pier"}
-          </button>
-          <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+  {:else if showUpdateMinIO}
+    <UpdateInstructions
+      on:click={updateMinIO}
+      endpoint={data.pier.s3_url}
+      accessKey={data.pier.name}
+    />
+
+  {:else}
+    
+    <svelte:component this={profile.logo} t="Pier Settings" />
+    <div class="ship">
+      {#if data.pier.name != undefined}
+
+        {#if deleteCheck}
+
+          <svelte:component
+            this={profile.warning}
+            on:back={()=>deleteCheck = false}
+            on:delete={deletePier}
+            name={data.pier.name} />
+
+        {:else}
+
+          <div class="card">
+            <svelte:component this={profile.sigil}  patp={data.pier.name} size="87px" rad="15px" />
+
+            <div class="info">
+             <div on:click={togglePier} class="switch-wrapper">
+                <div class="switch {data.pier.running ? "on" : "off"}"></div>
+              </div>
+
+              {#if loading}
+                <div class="status loading">Loading...</div>
+              {:else if data.pier.running}
+                {#if fresh}
+                  <div class="status loading">Loading...</div>
+                {:else if code.length != 27}
+                  <div class="status booting">Booting</div>
+                {:else}
+                  <div class="status running">Running</div>
+                {/if}
+              {:else}
+                <div class="status">Stopped</div>
+              {/if}
+
+              <div
+                on:click={copyPatp}
+                data-clipboard-text={data.pier.name}
+                id="patp"
+                class="patp">
+                {clickedPatp ? "copied!" : data.pier.name}
+              </div>
+            </div>
+          </div>
+
+          <!-- Pier Credentials -->
+          {#if (code.length == 27) && data.pier.running}
+            <svelte:component this={profile.credentials}
+              minIO={data.pier.s3_url}
+              name={data.pier.name}
+              nw_label={data.nw_label}
+              code={code}
+              ext={data.pier.url}
+              wg_running={data.wg_running}
+              minIO_reg={data.pier.minio_registered}
+              wg_reg={data.wg_reg} />
+          {/if}
+      
+          <div class="commands">
+            <div class="advanced" on:click={()=> advanced = !advanced}>
+              Advanced Options
+              <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
+          </div>
+
+          {#if advanced}
+            <div class="cmd-wrapper">
+              <button
+                on:click={toggleLogs} 
+                class="cmd logs">
+                View Logs
+              </button>
+
+            {#if data.pier.minio_registered && (data.nw_label == 'Remote')}
+              <button
+                on:click={updateMinIO} 
+                class="cmd minio">
+                Update minIO
+              </button>
+            {/if}
+
+              <button 
+                on:click={ejectPier}
+                class="cmd eject">
+                Eject{ejecting ? "ing" : " Pier"}
+              </button>
+
+              <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
+            </div>
+          {/if}
         </div>
       {/if}
-    </div>
+
+    {:else}
+      <div class="block"></div>
     {/if}
-  {:else}
-    <div class="block"></div>
-  {/if}
-</div>
-{/if}
-</div>
+  </div>
+  {/if} <!-- End #if show logs -->
+</div> <!-- End mega wrapper -->
 
 <style>
   @keyframes breathe {
@@ -229,7 +295,7 @@
     display: flex;
     gap: 20px;
     align-items: end;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
   }
   .switch-wrapper {
     cursor: pointer;
@@ -273,6 +339,7 @@
   }
   .patp {
     font-size: 16px;
+    cursor: pointer;
   }
   .patp-logs {
     font-size: 12px;
@@ -283,12 +350,12 @@
     margin-bottom: 12px;
   }
   .commands {
-    padding-top: 18px;
+    padding-top: 6px;
   }
   .cmd-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
   }
   .cmd {
     appearance: none;
@@ -298,7 +365,7 @@
     font-weight: 700;
     border: none;
     border-radius: 8px;
-    padding: 9px;
+    padding: 8px;
     width: 120px;
     cursor: pointer;
   }
@@ -315,6 +382,9 @@
   }
   .logs {
     background: var(--action-color);
+  }
+  .minio {
+    background: orange;
   }
   .eject {
     background: #FFFFFF4D;

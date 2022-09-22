@@ -17,6 +17,7 @@
 	"dependencies": {
 		"@fontsource/fira-mono": "^4.5.0",
 		"@fortawesome/free-brands-svg-icons": "^6.1.2",
+		"@fortawesome/free-regular-svg-icons": "^6.1.2",
 		"@fortawesome/free-solid-svg-icons": "^6.1.2",
 		"@sveltejs/adapter-node": "^1.0.0-next.89",
 		"@sveltejs/adapter-static": "^1.0.0-next.39",

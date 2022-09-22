@@ -104,10 +104,39 @@ class Orchestrator:
             data = None
             with open(f'settings/pier/{p}.json') as f:
                 data = json.load(f)
+
             self._urbits[p] = UrbitDocker(data)
-            self._minios[p] = MinIODocker(data)
-        if self.wireguard_reg:
-           self.startMinIOs()
+
+            if data['minio_password'] != '':
+                self._minios[p] = MinIODocker(data)
+                self.startMinIOs()
+
+    def registerMinIO(self, patp, password):
+        self._urbits[patp].config['minio_password'] = password
+        self._minios[patp] = MinIODocker(self._urbits[patp].config)
+        #self._minios[patp].start()
+        self.minIO_on = True
+
+        return 0
+
+    def setMinIOEndpoint(self, patp):
+        u = self._urbits[patp].config
+        endpoint = f"s3.{u['wg_url']}"
+        access_key = patp
+        secret = u['minio_password']
+        bucket = 'bucket'
+
+        for urbit in self._urbits.values():
+            if urbit.pier_name == patp:
+                try:
+                    urbit.set_minio_endpoint(endpoint,access_key,secret,bucket)
+                except Exception as e:
+                    print(e)
+
+    def getMinIOSecret(self, patp):
+        x = self._urbits[patp].config['minio_password']
+        return(x)
+
 
     def startMinIOs(self):
       for m in self._minios.values():
@@ -160,9 +189,9 @@ class Orchestrator:
                    console_port = ep['port']
 
            self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-           self._minios[patp] = MinIODocker(self._urbits[patp].config)
+           #self._minios[patp] = MinIODocker(self._urbits[patp].config)
            self.wireguard.start()
-           self._minios[patp].start()
+           #self._minios[patp].start()
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
@@ -198,9 +227,13 @@ class Orchestrator:
             u['name'] = urbit.pier_name
             u['running'] = urbit.isRunning();
             u['network'] = urbit.config['network']
+            u['minio_registered'] = True
+
+            if urbit.config['minio_password'] == '':
+                u['minio_registered'] = False
 
             if self.wireguard_reg:
-               u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
+                u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
             else:
                u['s3_url'] = ""
 

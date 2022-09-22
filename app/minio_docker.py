@@ -1,5 +1,6 @@
 import docker
 import json
+import time, shutil
 
 client = docker.from_env()
 
@@ -31,23 +32,9 @@ class MinIODocker:
                 c.stop()
                 c.remove()
 
-        console_port = self.config['wg_console_port']
-        s3_port = self.config['wg_s3_port']
-        command = f'server /data --console-address ":{console_port}" --address ":{s3_port}"'
+        self.run()
 
-        environment = [f"MINIO_ROOT_USER=nativeplanet", 
-                      f"MINIO_ROOT_PASSWORD=nativeplanet",
-                      f"MINIO_DOMAIN=s3.{self.config['wg_url']}",
-                      f"MINIO_SERVER_URL=https://s3.{self.config['wg_url']}"]
-        
-        self.container = client.containers.create(
-                                image= f'{self._minio_img}:{self.config["minio_version"]}',
-                                command=command, 
-                                name = self.minio_name,
-                                environment = environment,
-                                network = f'container:wireguard',
-                                mounts = [self.mount],
-                                detach=True)
+        return 0
 
     def buildMinIO(self):
         self.buildVolume()
@@ -55,7 +42,37 @@ class MinIODocker:
         self.buildContainer()
     
     def start(self):
-        self.container.start()
+        self.container.stop()
+        self.container.remove()
+        self.run()
+
+    def run(self):
+
+        console_port = self.config['wg_console_port']
+        s3_port = self.config['wg_s3_port']
+        command = f'server /data --console-address ":{console_port}" --address ":{s3_port}"'
+
+        environment = [f"MINIO_ROOT_USER={self.config['pier_name']}", 
+                      f"MINIO_ROOT_PASSWORD={self.config['minio_password']}",
+                      f"MINIO_DOMAIN=s3.{self.config['wg_url']}",
+                      f"MINIO_SERVER_URL=https://s3.{self.config['wg_url']}"]
+
+        self.container = client.containers.run(
+                image= f'{self._minio_img}:{self.config["minio_version"]}',
+                command=command, 
+                name = self.minio_name,
+                environment = environment,
+                network = f'container:wireguard',
+                mounts = [self.mount],
+                detach=True)
+
+        self.container.exec_run('mkdir /data/bucket')
+
+        shutil.copy('./mc', f'/var/lib/docker/volumes/{self.minio_name}/_data/mc')
+
+        self.container.exec_run("chmod +x /data/mc")
+        self.container.exec_run(f"/data/mc alias set myminio http://localhost:{s3_port} {self.config['pier_name']} {self.config['minio_password']}")
+        self.container.exec_run("/data/mc anonymous set public myminio/bucket")
 
     def stop(self):
         self.container.stop()
