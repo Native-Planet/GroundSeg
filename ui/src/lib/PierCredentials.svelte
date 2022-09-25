@@ -221,9 +221,9 @@
 
     <!-- Toggle Network -->
     {#if wg_reg && wg_running}
-    <div class="info"class:switching={isSwitching} on:click={toggleNetwork}>
+    <div class="info"class:switching={isSwitching}>
       <div class="title">Access</div>
-      <div class="access-options">
+      <div class="access-options" on:click={toggleNetwork}>
         <button class="option" class:access-active={nw_label === 'Local'} >Local</button>
         <button class="option" class:access-active={nw_label === 'Remote'} >Remote</button>
       </div>
