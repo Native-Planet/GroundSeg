@@ -35,6 +35,7 @@ mkdir build
 rm -rf build/*
 
 cp -r app/* build/
+cp download.sh build/
 
 # Install mc
 curl https://dl.min.io/client/mc/release/linux-amd64/mc -o build/mc

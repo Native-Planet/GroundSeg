@@ -58,9 +58,22 @@ def settings():
         "ethOnly" : eth_only,
         "connected" : connected.decode("utf-8"),
         "minio" : orchestrator.minIO_on,
-        "wg_reg" : orchestrator.wireguard_reg
+        "wg_reg" : orchestrator.wireguard_reg,
+        "gsVersion" : orchestrator.config['gsVersion']
     })
     
+@app.route('/settings/update', methods=['GET','POST'])
+def has_update():
+    orchestrator = current_app.config['ORCHESTRATOR']
+
+    if request.method == 'GET':
+        x = orchestrator.checkForUpdate()
+        return jsonify(x)
+
+    if request.method == 'POST':
+        orchestrator.downloadUpdate()
+        return jsonify(200)
+
 @app.route('/settings/networks', methods=['GET'])
 def list_networks():
     wifi = 'wl'

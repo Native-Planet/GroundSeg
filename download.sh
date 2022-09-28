@@ -6,7 +6,7 @@ DIR='/tmp/nativeplanet'
 IFS='"'
 DOWNLOAD_URL=$(curl -s https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest | grep tarball_url)
 RELEASE_ID=$(curl -s https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest | grep \"id\")
-VERSION=$(curl -s https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest | grep tag_name)
+VERSION=$(curl -s https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest | grep \"name\")
 
 FILE_NAME="groundseg.tar.gz"
 UNTAR_DIR="groundseg"
@@ -15,8 +15,9 @@ UNTAR_DIR="groundseg"
 sudo rm -r $DIR
 mkdir -p $DIR
 
-# Download latesst release
+# Download latest release
 read -ra arr <<< "$DOWNLOAD_URL"
+echo "${arr[3]}"
 wget -O $DIR/$FILE_NAME ${arr[3]} 
 
 cd $DIR
@@ -39,11 +40,11 @@ read -ra arrthree <<< "${arrtwo[1]}"
 IFS='"'
 read -ra arrfour <<< "${VERSION}"
 
-./build.sh
+$DIR/build.sh
 
 sudo echo ${arrfour[3]} > build/version
 sudo echo ${arrthree[0]} > build/release_id
 
-./install.sh
+$DIR/install.sh
 
 echo "Installation completed"

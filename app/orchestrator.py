@@ -6,6 +6,7 @@ from node_docker import NodeDocker
 import socket
 import time
 import sys
+import os
 
 class Orchestrator:
     
@@ -22,11 +23,15 @@ class Orchestrator:
         with open(config_file) as f:
             self.config = json.load(f)
 
+
         # First boot setup
         if(self.config['firstBoot']):
             self.first_boot()
             self.config['firstBoot'] = False
             self.save_config()
+
+        # update config with current version
+        self.applyNewVersion()
 
         # get wireguard netowkring information
         # Load urbits with wg info
@@ -43,6 +48,23 @@ class Orchestrator:
         self.node = NodeDocker()
         self.node.start()
 
+    def applyNewVersion(self):
+        v = subprocess.run(["cat", "version"], capture_output=True).stdout.decode("utf-8").strip()
+        r = subprocess.run(["cat", "release_id"], capture_output=True).stdout.decode("utf-8").strip()
+
+        if v == '':
+            print('no new version to apply')
+        else:
+            self.config['gsVersion'] = v
+        if r == '':
+            print('no new release id to apply')
+        else:
+            self.config['releaseID'] = r
+
+        self.save_config()
+        subprocess.run(["rm", "version"])
+        subprocess.run(["rm", "release_id"])
+        print("current version saved in config")
 
     def wireguardStart(self):
         if(self.wireguard.wg_docker.isRunning()==False):
@@ -110,6 +132,18 @@ class Orchestrator:
             if data['minio_password'] != '':
                 self._minios[p] = MinIODocker(data)
                 self.startMinIOs()
+    def checkForUpdate(self):
+        #res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest')
+        #print(res)
+
+       return True
+
+    def downloadUpdate(self):
+        os.system('mkdir -p /tmp/nativeplanet && \
+                wget -O /tmp/nativeplanet/download.sh \
+                https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/download.sh && \
+                chmod +x /tmp/nativeplanet/download.sh && \
+                /tmp/nativeplanet/download.sh')
 
     def registerMinIO(self, patp, password):
         self._urbits[patp].config['minio_password'] = password
