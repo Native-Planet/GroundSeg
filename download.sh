@@ -45,3 +45,5 @@ sudo echo ${arrfour[3]} > build/version
 sudo echo ${arrthree[0]} > build/release_id
 
 ./install.sh
+
+echo "Installation completed"

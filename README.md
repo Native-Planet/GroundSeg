@@ -3,6 +3,14 @@ This is the Control Software for the NP System.
 
 It expects a Linux Box with `systemd` and `apt` available.
 
+# Single Command Installation
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/download.sh \
+https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/download.sh && \
+sudo chmod +x /tmp/nativeplanet/download.sh && \
+sudo /tmp/nativeplanet/download.sh
+```
 ## Building
 To build please run the `build.sh` script in the root directory.
 
