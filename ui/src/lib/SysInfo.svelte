@@ -23,6 +23,14 @@
         </span>
       </div>
     </div>
+
+    <div class="hw">
+      <div class="word">Version</div>
+      <div class="data">
+        <span>{info.gsVersion}</span>
+      </div>
+    </div>
+
     {:else}
     <div class="hw">
       <div class="word">RAM</div>
@@ -36,6 +44,11 @@
       <div class="word">Storage</div>
       <div class="data blurred-long"></div>
     </div>
+    <div class="hw">
+      <div class="word">Version</div>
+      <div class="data blurred"></div>
+    </div>
+
   {/if}
 </div>
 
