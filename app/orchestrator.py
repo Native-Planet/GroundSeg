@@ -137,8 +137,7 @@ class Orchestrator:
     def checkForUpdate(self):
         res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest').json()
 
-        print(res['id'])
-        if res['id'] == self.config['releaseID'] and res['name'] == self.config['gsVersion']:
+        if str(res['id']) == self.config['releaseID'] and res['name'] == self.config['gsVersion']:
             return False
 
         return True
