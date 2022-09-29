@@ -1,5 +1,14 @@
 <script>
-  export let info
+  import { onMount, createEventDispatcher } from 'svelte'
+  import Fa from 'svelte-fa'
+  import { faDownload } from '@fortawesome/free-solid-svg-icons/index.es'
+
+	const dispatch = createEventDispatcher();
+
+  export let info, hasUpdate = false
+
+  const downloadUpdate = () => dispatch('click')
+
 </script>
 
 <div class="sys">
@@ -24,11 +33,15 @@
       </div>
     </div>
 
-    <div class="hw">
+    <div class="hw-version">
       <div class="word">Version</div>
-      <div class="data">
-        <span>{info.gsVersion}</span>
-      </div>
+      <span>{info.gsVersion}</span>
+      {#if hasUpdate}
+        <button on:click={downloadUpdate} class="has-update">
+          <Fa icon={faDownload} size="1x" />
+          <span>Update to latest</span>
+        </button>
+      {/if}
     </div>
 
     {:else}
@@ -78,6 +91,11 @@
     display: flex;
     font-size: 14px;
   }
+  .hw-version {
+    display: flex;
+    font-size: 14px;
+    align-items: center;
+  }
   .word {
     flex: 1;
   }
@@ -96,4 +114,19 @@
     filter: blur(6px);
     border-radius: 8px;
   }
+  .has-update {
+    color: cyan;
+    font-size: 10px;
+    padding: 4px 12px 4px 12px;
+    border-radius: 8px;
+    background: none;
+    outline: none;
+    border: solid 1px cyan;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    cursor: pointer;
+    margin-left: 12px;
+  }
+
 </style>

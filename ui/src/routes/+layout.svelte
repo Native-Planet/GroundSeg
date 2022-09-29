@@ -1,12 +1,9 @@
 <script>
-  import { onMount } from 'svelte'
   import { layout } from '$lib/components'
   import { page } from '$app/stores'
   import { power, api } from '$lib/api'
   import Fa from 'svelte-fa'
-  import { faPowerOff, faRotateRight, faDownload } from '@fortawesome/free-solid-svg-icons/index.es'
-
-  let hasUpdate = false
+  import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
 
   const shutdown = () => {
     let u = api + "/settings/shutdown"
@@ -29,22 +26,10 @@
       .then(d => { if (d == 200) {
         window.location.href = "/"
    }})}
+
   const cancel  = () => {
     power.set(null)
   }
-
-  const update = () => {
-    let u = api + "/settings/update"
-    fetch(u).then(r => r.json()).then(d => hasUpdate = d)
-    setTimeout(update, (15 * 60 * 1000))}
-
-  const downloadUpdate = () => {
-    let u = api + "/settings/update"
-    const f = new FormData()
-    fetch(u, {method: 'POST',body: f})
-      .then(window.location.href = "/updater")}
-
-  onMount(()=> update())
 
 </script>
 
@@ -81,11 +66,6 @@
 {#if !($page.url.pathname === "/settings")}
   <svelte:component this={layout.settings} />
 {/if}
-
-{#if hasUpdate && !($page.routeId == 'updater')}
-  <button on:click={downloadUpdate} class="has-update"><Fa icon={faDownload} size="2x" /><span>Download new update!</span></button>
-{/if}
-
 <style>
 
   .power {
@@ -166,20 +146,4 @@
     pointer-events: none;
   }
 
-  .has-update {
-    color: cyan;
-    font-size: 12px;
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    padding: 8px;
-    border-radius: 8px;
-    background: none;
-    outline: none;
-    border: solid 1px cyan;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    cursor: pointer;
-  }
 </style>
