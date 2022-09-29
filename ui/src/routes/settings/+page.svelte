@@ -15,7 +15,7 @@
   const updateGS = () => {
     if (opened) {
       let u = api + "/settings/update"
-      fetch(u).then(r => r.json()).then(d => hasUpdate = !d)
+      fetch(u).then(r => r.json()).then(d => hasUpdate = d)
       setTimeout(updateGS, (15 * 60 * 1000))}}
 
   const downloadUpdate = () => {
