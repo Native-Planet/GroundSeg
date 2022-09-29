@@ -40,11 +40,11 @@ read -ra arrthree <<< "${arrtwo[1]}"
 IFS='"'
 read -ra arrfour <<< "${VERSION}"
 
-$DIR/build.sh
+./build.sh
 
 sudo echo ${arrfour[3]} > build/version
 sudo echo ${arrthree[0]} > build/release_id
 
-$DIR/install.sh
+./install.sh
 
 echo "Installation completed"
