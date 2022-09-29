@@ -42,11 +42,7 @@
     let u = api + "/settings/update"
     const f = new FormData()
     fetch(u, {method: 'POST',body: f})
-      .then(window.location.href = "/")}
-//      .then(r => r.json())
-//      .then(d => { if (d == 200) {
-//        window.location.href = "/"
-//   }})}
+      .then(window.location.href = "/updater")}
 
   onMount(()=> update())
 
@@ -86,7 +82,7 @@
   <svelte:component this={layout.settings} />
 {/if}
 
-{#if hasUpdate}
+{#if hasUpdate && !($page.routeId == 'updater')}
   <button on:click={downloadUpdate} class="has-update"><Fa icon={faDownload} size="2x" /><span>Download new update!</span></button>
 {/if}
 
