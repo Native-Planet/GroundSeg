@@ -36,5 +36,10 @@ def mainscreen():
     piers = orchestrator.getUrbits()
     return jsonify(piers)
 
+@app.route("/updater", methods=['GET'])
+def heartbeat():
+    status = orchestrator.app_status
+    return jsonify(status)
+
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=27016, use_reloader=False)

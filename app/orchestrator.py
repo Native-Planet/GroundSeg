@@ -14,6 +14,7 @@ class Orchestrator:
     _minios = {}
     minIO_on = False
     wireguard_reg = False
+    app_status = 'live'
 
 
     def __init__(self, config_file):
@@ -132,13 +133,18 @@ class Orchestrator:
             if data['minio_password'] != '':
                 self._minios[p] = MinIODocker(data)
                 self.startMinIOs()
-    def checkForUpdate(self):
-        #res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest')
-        #print(res)
 
-       return True
+    def checkForUpdate(self):
+        res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest').json()
+
+        print(res['id'])
+        if res['id'] == self.config['releaseID'] and res['name'] == self.config['gsVersion']:
+            return False
+
+        return True
 
     def downloadUpdate(self):
+        self.app_status = 'updating'
         os.system('mkdir -p /tmp/nativeplanet && \
                 wget -O /tmp/nativeplanet/download.sh \
                 https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/download.sh && \
