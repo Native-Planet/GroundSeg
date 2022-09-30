@@ -159,18 +159,27 @@ class Orchestrator:
         return 0
 
     def setMinIOEndpoint(self, patp):
-        u = self._urbits[patp].config
-        endpoint = f"s3.{u['wg_url']}"
-        access_key = patp
-        secret = u['minio_password']
-        bucket = 'bucket'
+        ak, sk = self._minios[patp].makeServiceAcc().split('\n')
+        u = self._urbits[patp]
 
-        for urbit in self._urbits.values():
-            if urbit.pier_name == patp:
-                try:
-                    urbit.set_minio_endpoint(endpoint,access_key,secret,bucket)
-                except Exception as e:
-                    print(e)
+        endpoint = f"s3.{u.config['wg_url']}"
+        bucket = 'bucket'
+        lens_port = self.getLoopbackAddr(patp)
+        access_key = ak.split(' ')[-1]
+        secret = sk.split(' ')[-1]
+
+        try:
+            u.set_minio_endpoint(endpoint,access_key,secret,bucket,lens_port)
+        except Exception as e:
+            print(e)
+
+    def getLoopbackAddr(self, patp):
+        log = self.getLogs(patp).decode('utf-8').split('\n')[::-1]
+        substr = 'http: loopback live on'
+
+        for ln in log:
+            if substr in ln:
+                return str(ln.split(' ')[-1])
 
     def getMinIOSecret(self, patp):
         x = self._urbits[patp].config['minio_password']
@@ -228,9 +237,7 @@ class Orchestrator:
                    console_port = ep['port']
 
            self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-           #self._minios[patp] = MinIODocker(self._urbits[patp].config)
            self.wireguard.start()
-           #self._minios[patp].start()
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
@@ -287,12 +294,12 @@ class Orchestrator:
 
     def getCode(self,pier):
         code = ''
-        for urbit in self._urbits.values():
-            if urbit.pier_name == pier:
-                try:
-                    code = urbit.get_code().decode('utf-8')
-                except Exception as e:
-                    print(e)
+        addr = self.getLoopbackAddr(pier)
+        try:
+            code = self._urbits[pier].get_code(addr)
+        except Exception as e:
+            print(e)
+
         return code
     
     def getContainers(self):

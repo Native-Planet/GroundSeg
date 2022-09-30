@@ -42,4 +42,5 @@ def heartbeat():
     return jsonify(status)
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=27016, use_reloader=False)
+    debug_mode = False
+    app.run(host='0.0.0.0', port=27016, debug=debug_mode, use_reloader=debug_mode)
