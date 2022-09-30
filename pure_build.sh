@@ -15,6 +15,8 @@ fi
 # Install Docker
 sudo apt-get update
 sudo apt-get -y install ca-certificates curl gnupg lsb-release docker.io
+sudo apt-get install avahi-daemon avahi-discover avahi-utils libnss-mdns mdns-scan
+
 
 # Get latest Nodejs
 curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash -
