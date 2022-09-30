@@ -162,60 +162,63 @@
         </div>
       {/if}
 
-      <!-- Confirm Password -->
-      {#if (minioPassword.length > 7) && !minIO_reg}
-        <div class="info">
-          <div class="title-smaller">Confirm Password</div>
+      {#if nw_label == 'Remote'}
   
-          <div class="login-key-wrapper">
-            <input
-              id="minio-password-1"
-              bind:value={confirmPassword}
-              class="minio-password"
-              type="password"
-              placeholder="Enter the password again" />
-            <button on:click={toggleViewConfirm}>
-              <img class="eye" src={viewConfirm ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
-            </button>
-          </div>
-        </div>
-      {/if}
-
-      <!-- Password Submit Button -->
-      {#if (confirmPassword.length > 0) && showButton}
-        <PrimaryButton
-          on:click={submitPassword}
-          top={24}
-          bottom={24}
-          standard="Create MinIO"
-          success="Setup complete! Toggle Remote Access to view your MinIO Console!"
-          failure={submitted ? "An error occured, refresh the page and try again" : "Passwords do not match"}
-          loading="Setting up MinIO for you..."
-          status={!submitted && (minioPassword == confirmPassword) ? 'standard' : buttonStatus}
-        />
-      {/if}
-
-      <!-- Show MinIO Console URL -->
-      {#if minIO_reg && (nw_label == 'Remote')}
-        <div class="info">
-          <div class="title">MinIO Console</div>
-
-          <div class="login-key-wrapper">
-            <div on:click={copyMinIO} id="minio" data-clipboard-text={minIO} class="login-key">
-              {
-                clickedMinIO ? "copied!" 
-                : viewMinIO ? minIO
-                : "click to copy"
-              }
+        <!-- Confirm Password -->
+        {#if (minioPassword.length > 7) && !minIO_reg}
+          <div class="info">
+            <div class="title-smaller">Confirm Password</div>
+  
+            <div class="login-key-wrapper">
+              <input
+                id="minio-password-1"
+                bind:value={confirmPassword}
+                class="minio-password"
+                type="password"
+                placeholder="Enter the password again" />
+              <button on:click={toggleViewConfirm}>
+                <img class="eye" src={viewConfirm ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
+              </button>
             </div>
-            <a class="newtab" href={minIO} target="_blank">
-              <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
-            </a>
-            <button on:click={()=> viewMinIO = !viewMinIO}>
-              <img class="eye" src={viewMinIO ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
-            </button>
           </div>
-        </div>
+        {/if}
+  
+        <!-- Password Submit Button -->
+        {#if (confirmPassword.length > 0) && showButton}
+          <PrimaryButton
+            on:click={submitPassword}
+            top={24}
+            bottom={24}
+            standard="Create MinIO"
+            success="Setup complete! Toggle Remote Access to view your MinIO Console!"
+            failure={submitted ? "An error occured, refresh the page and try again" : "Passwords do not match"}
+            loading="Setting up MinIO for you..."
+            status={!submitted && (minioPassword == confirmPassword) ? 'standard' : buttonStatus}
+          />
+        {/if}
+  
+        <!-- Show MinIO Console URL -->
+        {#if minIO_reg}
+          <div class="info">
+            <div class="title">MinIO Console</div>
+
+            <div class="login-key-wrapper">
+              <div on:click={copyMinIO} id="minio" data-clipboard-text={minIO} class="login-key">
+                {
+                  clickedMinIO ? "copied!" 
+                  : viewMinIO ? minIO
+                  : "click to copy"
+                }
+              </div>
+              <a class="newtab" href={minIO} target="_blank">
+                <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
+              </a>
+              <button on:click={()=> viewMinIO = !viewMinIO}>
+                <img class="eye" src={viewMinIO ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
+              </button>
+            </div>
+          </div>
+        {/if}
       {/if}
     {/if}
 
