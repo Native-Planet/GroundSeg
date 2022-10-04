@@ -46,8 +46,8 @@ class Orchestrator:
 
         self.load_urbits()
 
-        self.node = NodeDocker()
-        self.node.start()
+        #self.node = NodeDocker()
+        #self.node.start()
 
     def applyNewVersion(self):
         v = subprocess.run(["cat", "version"], capture_output=True).stdout.decode("utf-8").strip()

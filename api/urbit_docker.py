@@ -27,12 +27,12 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
-                shutil.copy('./settings/start_urbit.sh', 
+                shutil.copy('settings/start_urbit.sh', 
                         f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
 
         self.volume = client.volumes.create(name=self.pier_name)
-        shutil.copy('./settings/start_urbit.sh', 
+        shutil.copy('settings/start_urbit.sh', 
                 f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
 
     def buildContainer(self):

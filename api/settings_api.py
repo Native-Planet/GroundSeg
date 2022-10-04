@@ -31,23 +31,28 @@ def settings():
     disk = shutil.disk_usage("/")
     net = psutil.net_if_stats()
 
-    check_connected = subprocess.Popen(['iwgetid','-r'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    connected, stderr = check_connected.communicate()
+    #check_connected = subprocess.Popen(['iwgetid','-r'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    #connected, stderr = check_connected.communicate()
 
-    wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    ws, stderr = wifi_status.communicate()
+    #wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    #ws, stderr = wifi_status.communicate()
+
+    # temporary
+    ws = b'enabled\n'
+    connected = b''
+    
 
     if ws == b'enabled\n':
         eth_only = False
     else:
         eth_only = True
 
-    for k,v in net.items():
-        if 'wl' in k:
-            wifi = k
-            if(v.isup):
-                eth = False
-                break
+    #for k,v in net.items():
+    #    if 'wl' in k:
+    #        wifi = k
+    #        if(v.isup):
+    #            eth = False
+    #            break
             
 
     return jsonify({
