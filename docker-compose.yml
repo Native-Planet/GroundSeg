@@ -3,11 +3,13 @@ version: "3.9"
 services:
   api:
     build: ./api
+    privileged: true
     ports: 
       - 27016:27016
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - groundseg-api:/settings
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
       - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - groundseg-api:/settings
 volumes:
   groundseg-api:

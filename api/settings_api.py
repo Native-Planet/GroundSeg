@@ -30,30 +30,24 @@ def settings():
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
     net = psutil.net_if_stats()
+    connected = ''
 
-    #check_connected = subprocess.Popen(['iwgetid','-r'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    #connected, stderr = check_connected.communicate()
+    check_connected = subprocess.Popen(['nmcli', '-t', 'con', 'show'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    connections, stderr = check_connected.communicate()
+    connections_arr = connections.decode('utf-8').split('\n')
+    substr = 'wireless'
 
-    #wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    #ws, stderr = wifi_status.communicate()
+    for ln in connections_arr:
+        if substr in ln:
+            connected = ln.split(':')[0]
 
-    # temporary
-    ws = b'enabled\n'
-    connected = b''
-    
+    wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    ws, stderr = wifi_status.communicate()
 
     if ws == b'enabled\n':
         eth_only = False
     else:
         eth_only = True
-
-    #for k,v in net.items():
-    #    if 'wl' in k:
-    #        wifi = k
-    #        if(v.isup):
-    #            eth = False
-    #            break
-            
 
     return jsonify({
         "ram": ram.percent,
@@ -61,7 +55,7 @@ def settings():
         "temp" : temp,
         "anchor" : orchestrator.wireguard.isRunning(),
         "ethOnly" : eth_only,
-        "connected" : connected.decode("utf-8"),
+        "connected" : connected,
         "minio" : orchestrator.minIO_on,
         "wg_reg" : orchestrator.wireguard_reg,
         "gsVersion" : orchestrator.config['gsVersion']
@@ -81,26 +75,17 @@ def has_update():
 
 @app.route('/settings/networks', methods=['GET'])
 def list_networks():
-    wifi = 'wl'
-    net = psutil.net_if_stats()
 
-    for k,v in net.items():
-        if 'wl' in k:
-            wifi = k
+    available = subprocess.Popen(['nmcli', '-t', 'dev', 'wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    ssids, stderr = available.communicate()
+    ssids_cleaned = ssids.decode('utf-8').split('\n')
 
-    global glob_network
     networks = []
 
-    try:
-        n = list(Cell.all(wifi))
-        for c in n:
-            if((c.ssid !='') and ('\\x00\\x00' not in c.ssid )):
-                if(c.ssid not in networks):
-                    networks.append(c.ssid)
-        glob_network = networks
-    except Exception as e:
-        networks = glob_network
-        pass
+    for ln in ssids_cleaned[1:]:
+        info = ln.split(':')
+        if len(info) > 1:
+            networks.append(info[1])
 
     return jsonify(networks)
 
