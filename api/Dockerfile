@@ -14,6 +14,8 @@ RUN apt-get -y install docker-ce docker-ce-cli containerd.io docker-compose-plug
 COPY ./ /app
 RUN curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /app/mc
 RUN pip3 install -r /app/requirements.txt
+RUN mkdir -p /settings/pier
+RUN mkdir -p /app/tmp
 
 EXPOSE 27016
 ENTRYPOINT ["python3","/app/app.py"]

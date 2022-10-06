@@ -17,7 +17,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-orchestrator = Orchestrator("settings/system.json")
+orchestrator = Orchestrator("/settings/system.json")
 
 
 app = Flask(__name__)
@@ -42,5 +42,5 @@ def heartbeat():
     return jsonify(status)
 
 if __name__ == '__main__':
-    debug_mode = False
+    debug_mode = True
     app.run(host='0.0.0.0', port=27016, debug=debug_mode, use_reloader=debug_mode)

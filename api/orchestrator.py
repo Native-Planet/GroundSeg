@@ -18,12 +18,11 @@ class Orchestrator:
 
 
     def __init__(self, config_file):
-
+        # store config file location
         self.config_file = config_file
-        # Load config
-        with open(config_file) as f:
-            self.config = json.load(f)
 
+        # load existing or create new system.json
+        self.config = self.load_config(config_file)
 
         # First boot setup
         if(self.config['firstBoot']):
@@ -31,10 +30,7 @@ class Orchestrator:
             self.config['firstBoot'] = False
             self.save_config()
 
-        # update config with current version
-        self.applyNewVersion()
-
-        # get wireguard netowkring information
+        # get wireguard networking information
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
@@ -46,27 +42,26 @@ class Orchestrator:
 
         self.load_urbits()
 
-        #self.node = NodeDocker()
-        #self.node.start()
+    def load_config(self, config_file):
+        try:
+            with open(config_file) as f:
+                return json.load(f)
+        except Exception as e:
+            print(e)
+            print("creating new config file...")
+            system_json = dict()
+            system_json['firstBoot'] = True
+            system_json['piers'] = []
+            system_json['endpointUrl'] = "api.startram.io"
+            system_json['apiVersion'] = "v1"
+            system_json['gsVersion'] = ""
+            system_json['releaseID'] = "0"
 
-    def applyNewVersion(self):
-        v = subprocess.run(["cat", "version"], capture_output=True).stdout.decode("utf-8").strip()
-        r = subprocess.run(["cat", "release_id"], capture_output=True).stdout.decode("utf-8").strip()
+            with open(config_file,'w') as f :
+                json.dump(system_json, f)
 
-        if v == '':
-            print('no new version to apply')
-        else:
-            self.config['gsVersion'] = v
-        if r == '':
-            print('no new release id to apply')
-        else:
-            self.config['releaseID'] = r
-
-        self.save_config()
-        subprocess.run(["rm", "version"])
-        subprocess.run(["rm", "release_id"])
-        print("current version saved in config")
-
+            return system_json
+            
     def wireguardStart(self):
         if(self.wireguard.wg_docker.isRunning()==False):
            self.wireguard.start()

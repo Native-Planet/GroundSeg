@@ -4,7 +4,20 @@ import shutil
 from minio_docker import MinIODocker
 
 client = docker.from_env()
-default_pier_config = json.load(open('settings/default_urbit.json'))
+default_pier_config = {
+        "pier_name":"",
+        "http_port":8080,
+        "ames_port":34343,
+        "urbit_version":"latest",
+        "minio_version":"latest",
+        "minio_password": "",
+        "network":"none",
+        "wg_url": "nan",
+        "wg_http_port": None,
+        "wg_ames_port": None,
+        "wg_s3_port": None,
+        "wg_console_port": None
+        }
 
 class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'
@@ -27,13 +40,9 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
-                shutil.copy('settings/start_urbit.sh', 
+                shutil.copy('/app/start_urbit.sh', 
                         f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
-
-        self.volume = client.volumes.create(name=self.pier_name)
-        shutil.copy('settings/start_urbit.sh', 
-                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
@@ -185,17 +194,3 @@ class UrbitDocker:
     
     def isRunning(self):
         return self.running
-
-
-
-
-if __name__ == '__main__':
-    filename = "settings/pier/walzod-fogsed-mopfel-winrux.json"
-    f = open(filename)
-    data = json.load(f)
-    urdock = UrbitDocker(data)
-    urdock.start()
-    import time
-    time.sleep(2)
-    print(urdock.logs().decode('utf-8'))
-    urdock.stop()
