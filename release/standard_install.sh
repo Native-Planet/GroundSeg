@@ -10,6 +10,6 @@ wget -O $DOCKER_CONFIG/cli-plugins/docker-compose \
 chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
 
 wget -O /tmp/nativeplanet/groundseg_install.sh \
-	https://github.com/nallux-dozryl/GroundSeg/main/release/groundseg_install.sh
+	https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/release/groundseg_install.sh
 chmod +x /tmp/nativeplanet/groundseg_install.sh
 sudo /tmp/nativeplanet/groundseg_install.sh 
