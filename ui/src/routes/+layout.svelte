@@ -16,6 +16,7 @@
       .then(d => { if (d == 200) {
         window.location.href = "/"
    }})}
+
   const restart = () => {
     let u = api + "/settings/restart"
     const f = new FormData()
@@ -25,6 +26,7 @@
       .then(d => { if (d == 200) {
         window.location.href = "/"
    }})}
+
   const cancel  = () => {
     power.set(null)
   }
@@ -64,7 +66,6 @@
 {#if !($page.url.pathname === "/settings")}
   <svelte:component this={layout.settings} />
 {/if}
-
 <style>
 
   .power {
@@ -144,4 +145,5 @@
     opacity: 0;
     pointer-events: none;
   }
+
 </style>

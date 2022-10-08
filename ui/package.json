@@ -1,6 +1,6 @@
 {
-	"name": "ui",
-	"version": "0.0.1",
+	"name": "groundseg ui",
+	"version": "0.0.2",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -15,7 +15,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@fontsource/fira-mono": "^4.5.0",
 		"@fortawesome/free-brands-svg-icons": "^6.1.2",
 		"@fortawesome/free-regular-svg-icons": "^6.1.2",
 		"@fortawesome/free-solid-svg-icons": "^6.1.2",

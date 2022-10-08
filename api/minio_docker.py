@@ -68,7 +68,7 @@ class MinIODocker:
 
         self.container.exec_run('mkdir /data/bucket')
 
-        shutil.copy('./mc', f'/var/lib/docker/volumes/{self.minio_name}/_data/mc')
+        shutil.copy('/app/mc', f'/var/lib/docker/volumes/{self.minio_name}/_data/mc')
 
         self.container.exec_run("chmod +x /data/mc")
         self.container.exec_run(f"/data/mc alias set myminio http://localhost:{s3_port} {self.config['pier_name']} {self.config['minio_password']}")
@@ -85,11 +85,8 @@ class MinIODocker:
         self.container.remove()
         self.volume.remove()
 
-
-
-     
-
-
+    def makeServiceAcc(self):
+        return self.container.exec_run(f"/data/mc admin user svcacct add myminio {self.config['pier_name']}").output.decode('utf-8').strip()
 
 if __name__ == '__main__':
     filename = "minio.json"
