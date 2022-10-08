@@ -14,7 +14,6 @@ fi
 
 # Install Docker
 sudo apt-get update
-sudo apt-get install avahi-daemon avahi-discover avahi-utils libnss-mdns mdns-scan
 sudo apt-get -y install ca-certificates curl gnupg lsb-release
 sudo rm /etc/apt/keyrings/docker.gpg
 sudo mkdir -p /etc/apt/keyrings
