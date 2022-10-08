@@ -59,7 +59,7 @@
 		<!-- groundseg_webui version -->
     <div class="hw-version">
       <div class="word">Web UI Version</div>
-      <span>Beta-1.0.0</span>
+      <span>Beta-2.0.0</span>
     </div>
 
 		<!-- App update modes -->

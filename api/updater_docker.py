@@ -6,11 +6,6 @@ client = docker.from_env()
 
 class WatchtowerDocker:
     _wt_img = "containrrr/watchtower:latest"
-    environment = {
-                'WATCHTOWER_POLL_INTERVAL': 900,
-                'WATCHTOWER_LABEL_ENABLE': True,
-                'WATCHTOWER_CLEANUP': True
-            }
 
     def __init__(self, mode):
         client.images.pull(f'{self._wt_img}')
@@ -21,7 +16,7 @@ class WatchtowerDocker:
         containers = client.containers.list(all=True)
 
         env_args = {
-               'WATCHTOWER_POLL_INTERVAL': 900,
+               'WATCHTOWER_POLL_INTERVAL': 90,
                'WATCHTOWER_LABEL_ENABLE': True,
                'WATCHTOWER_CLEANUP': True
                }

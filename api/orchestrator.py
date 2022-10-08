@@ -16,7 +16,7 @@ class Orchestrator:
     minIO_on = False
     wireguard_reg = False
     app_status = 'live'
-    gs_version = 'Beta-1.0.0'
+    gs_version = 'Beta-2.0.0'
 
 
     def __init__(self, config_file):
