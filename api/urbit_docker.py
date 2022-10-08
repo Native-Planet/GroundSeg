@@ -53,10 +53,9 @@ class UrbitDocker:
         if(self.config["network"] != "none"):
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
-            print(command)
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
-                                    command=command, 
+                                    command = command, 
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
                                     mounts = [self.mount],
@@ -68,7 +67,7 @@ class UrbitDocker:
                                              '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
                                     mounts = [self.mount],
-                                    detach=True)
+                                    detach = True)
 
 
     def setWireguardNetwork(self, url, http_port, ames_port, s3_port, console_port):

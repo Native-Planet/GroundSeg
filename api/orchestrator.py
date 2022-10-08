@@ -2,7 +2,7 @@ import json, subprocess, requests
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker
 from minio_docker import MinIODocker
-from node_docker import NodeDocker
+from updater_docker import WatchtowerDocker
 import socket
 import time
 import sys
@@ -12,9 +12,11 @@ class Orchestrator:
     
     _urbits = {}
     _minios = {}
+    _watchtower = {}
     minIO_on = False
     wireguard_reg = False
     app_status = 'live'
+    gs_version = 'Beta-1.0.0'
 
 
     def __init__(self, config_file):
@@ -42,20 +44,27 @@ class Orchestrator:
 
         self.load_urbits()
 
+        # Start auto updater
+        if not 'updateMode' in self.config:
+           self.set_update_mode('auto')
+
+        self._watchtower = WatchtowerDocker(self.config['updateMode'])
+
     def load_config(self, config_file):
         try:
             with open(config_file) as f:
-                return json.load(f)
+                system_json = json.load(f)
+                system_json['gsVersion'] = self.gs_version
+                return system_json
         except Exception as e:
-            print(e)
             print("creating new config file...")
             system_json = dict()
             system_json['firstBoot'] = True
             system_json['piers'] = []
             system_json['endpointUrl'] = "api.startram.io"
             system_json['apiVersion'] = "v1"
-            system_json['gsVersion'] = ""
-            system_json['releaseID'] = "0"
+            system_json['gsVersion'] = self.gs_version
+            system_json['updateMode'] = "auto"
 
             with open(config_file,'w') as f :
                 json.dump(system_json, f)
@@ -129,26 +138,28 @@ class Orchestrator:
                 self._minios[p] = MinIODocker(data)
                 self.startMinIOs()
 
-    def checkForUpdate(self):
-        res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest').json()
+    def update_mode(self):
+        if "updateMode" in self.config:
+            return self.config['updateMode']
+        
+        res = self.set_update_mode('install')
+        
+        if res == 0:
+            return 'install'
+        return ''
 
-        if str(res['id']) == self.config['releaseID'] and res['name'] == self.config['gsVersion']:
-            return False
+    def set_update_mode(self, mode):
+        self.config['updateMode'] = mode
+        self.save_config()
 
-        return True
+        self._watchtower.remove()
+        self._watchtower = WatchtowerDocker(mode)
 
-    def downloadUpdate(self):
-        self.app_status = 'updating'
-        os.system('mkdir -p /tmp/nativeplanet && \
-                wget -O /tmp/nativeplanet/download.sh \
-                https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/download.sh && \
-                chmod +x /tmp/nativeplanet/download.sh && \
-                /tmp/nativeplanet/download.sh')
+        return 0
 
     def registerMinIO(self, patp, password):
         self._urbits[patp].config['minio_password'] = password
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
-        #self._minios[patp].start()
         self.minIO_on = True
 
         return 0
@@ -360,10 +371,3 @@ class Orchestrator:
     def save_config(self):
         with open(self.config_file, 'w') as f:
             json.dump(self.config, f, indent = 4)
-
-
-
-
-if __name__ == '__main__':
-    orchestrator = Orchestrator("settings/system.json")
-

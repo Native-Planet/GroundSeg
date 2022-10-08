@@ -12,8 +12,6 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 
 import urbit_docker
-from wifi import Cell, Scheme
-from wifi_finder import Finder
 from pprint import pprint
 
 
@@ -58,20 +56,23 @@ def settings():
         "connected" : connected,
         "minio" : orchestrator.minIO_on,
         "wg_reg" : orchestrator.wireguard_reg,
-        "gsVersion" : orchestrator.config['gsVersion']
+        "gsVersion" : orchestrator.config['gsVersion'],
+        "updateMode" : orchestrator.update_mode()
     })
-    
+
+
 @app.route('/settings/update', methods=['GET','POST'])
 def has_update():
     orchestrator = current_app.config['ORCHESTRATOR']
 
     if request.method == 'GET':
-        x = orchestrator.checkForUpdate()
+        x = True
         return jsonify(x)
 
     if request.method == 'POST':
-        orchestrator.downloadUpdate()
-        return jsonify(200)
+        mode = request.form['updateMode']
+        orchestrator.set_update_mode(mode)
+        return jsonify(mode)
 
 @app.route('/settings/networks', methods=['GET'])
 def list_networks():

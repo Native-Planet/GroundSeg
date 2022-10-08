@@ -2,8 +2,7 @@
 version: "3.9"
 services:
   api:
-    build: ./api
-    container_name: groundseg_api
+    image: nallux/grounseg_api:latest
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true
@@ -16,8 +15,7 @@ services:
       - settings:/settings
 
   webui:
-    build: ./ui
-    container_name: groundseg_webui
+    image: nallux/groundseg_webui:latest
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true
