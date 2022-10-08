@@ -2,7 +2,7 @@ import json, subprocess, requests
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker
 from minio_docker import MinIODocker
-from node_docker import NodeDocker
+from updater_docker import WatchtowerDocker
 import socket
 import time
 import sys
@@ -12,18 +12,19 @@ class Orchestrator:
     
     _urbits = {}
     _minios = {}
+    _watchtower = {}
     minIO_on = False
     wireguard_reg = False
     app_status = 'live'
+    gs_version = 'Beta-1.0.0'
 
 
     def __init__(self, config_file):
-
+        # store config file location
         self.config_file = config_file
-        # Load config
-        with open(config_file) as f:
-            self.config = json.load(f)
 
+        # load existing or create new system.json
+        self.config = self.load_config(config_file)
 
         # First boot setup
         if(self.config['firstBoot']):
@@ -31,10 +32,7 @@ class Orchestrator:
             self.config['firstBoot'] = False
             self.save_config()
 
-        # update config with current version
-        self.applyNewVersion()
-
-        # get wireguard netowkring information
+        # get wireguard networking information
         # Load urbits with wg info
         # start wireguard
         self.wireguard = Wireguard(self.config)
@@ -46,27 +44,33 @@ class Orchestrator:
 
         self.load_urbits()
 
-        self.node = NodeDocker()
-        self.node.start()
+        # Start auto updater
+        if not 'updateMode' in self.config:
+           self.set_update_mode('auto')
 
-    def applyNewVersion(self):
-        v = subprocess.run(["cat", "version"], capture_output=True).stdout.decode("utf-8").strip()
-        r = subprocess.run(["cat", "release_id"], capture_output=True).stdout.decode("utf-8").strip()
+        self._watchtower = WatchtowerDocker(self.config['updateMode'])
 
-        if v == '':
-            print('no new version to apply')
-        else:
-            self.config['gsVersion'] = v
-        if r == '':
-            print('no new release id to apply')
-        else:
-            self.config['releaseID'] = r
+    def load_config(self, config_file):
+        try:
+            with open(config_file) as f:
+                system_json = json.load(f)
+                system_json['gsVersion'] = self.gs_version
+                return system_json
+        except Exception as e:
+            print("creating new config file...")
+            system_json = dict()
+            system_json['firstBoot'] = True
+            system_json['piers'] = []
+            system_json['endpointUrl'] = "api.startram.io"
+            system_json['apiVersion'] = "v1"
+            system_json['gsVersion'] = self.gs_version
+            system_json['updateMode'] = "auto"
 
-        self.save_config()
-        subprocess.run(["rm", "version"])
-        subprocess.run(["rm", "release_id"])
-        print("current version saved in config")
+            with open(config_file,'w') as f :
+                json.dump(system_json, f)
 
+            return system_json
+            
     def wireguardStart(self):
         if(self.wireguard.wg_docker.isRunning()==False):
            self.wireguard.start()
@@ -134,43 +138,54 @@ class Orchestrator:
                 self._minios[p] = MinIODocker(data)
                 self.startMinIOs()
 
-    def checkForUpdate(self):
-        res = requests.get('https://api.github.com/repos/nallux-dozryl/GroundSeg/releases/latest').json()
+    def update_mode(self):
+        if "updateMode" in self.config:
+            return self.config['updateMode']
+        
+        res = self.set_update_mode('install')
+        
+        if res == 0:
+            return 'install'
+        return ''
 
-        if str(res['id']) == self.config['releaseID'] and res['name'] == self.config['gsVersion']:
-            return False
+    def set_update_mode(self, mode):
+        self.config['updateMode'] = mode
+        self.save_config()
 
-        return True
+        self._watchtower.remove()
+        self._watchtower = WatchtowerDocker(mode)
 
-    def downloadUpdate(self):
-        self.app_status = 'updating'
-        os.system('mkdir -p /tmp/nativeplanet && \
-                wget -O /tmp/nativeplanet/download.sh \
-                https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/download.sh && \
-                chmod +x /tmp/nativeplanet/download.sh && \
-                /tmp/nativeplanet/download.sh')
+        return 0
 
     def registerMinIO(self, patp, password):
         self._urbits[patp].config['minio_password'] = password
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
-        #self._minios[patp].start()
         self.minIO_on = True
 
         return 0
 
     def setMinIOEndpoint(self, patp):
-        u = self._urbits[patp].config
-        endpoint = f"s3.{u['wg_url']}"
-        access_key = patp
-        secret = u['minio_password']
-        bucket = 'bucket'
+        ak, sk = self._minios[patp].makeServiceAcc().split('\n')
+        u = self._urbits[patp]
 
-        for urbit in self._urbits.values():
-            if urbit.pier_name == patp:
-                try:
-                    urbit.set_minio_endpoint(endpoint,access_key,secret,bucket)
-                except Exception as e:
-                    print(e)
+        endpoint = f"s3.{u.config['wg_url']}"
+        bucket = 'bucket'
+        lens_port = self.getLoopbackAddr(patp)
+        access_key = ak.split(' ')[-1]
+        secret = sk.split(' ')[-1]
+
+        try:
+            u.set_minio_endpoint(endpoint,access_key,secret,bucket,lens_port)
+        except Exception as e:
+            print(e)
+
+    def getLoopbackAddr(self, patp):
+        log = self.getLogs(patp).decode('utf-8').split('\n')[::-1]
+        substr = 'http: loopback live on'
+
+        for ln in log:
+            if substr in ln:
+                return str(ln.split(' ')[-1])
 
     def getMinIOSecret(self, patp):
         x = self._urbits[patp].config['minio_password']
@@ -228,9 +243,7 @@ class Orchestrator:
                    console_port = ep['port']
 
            self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-           #self._minios[patp] = MinIODocker(self._urbits[patp].config)
            self.wireguard.start()
-           #self._minios[patp].start()
 
     def addUrbit(self, patp, urbit):
         self.config['piers'].append(patp)
@@ -287,12 +300,12 @@ class Orchestrator:
 
     def getCode(self,pier):
         code = ''
-        for urbit in self._urbits.values():
-            if urbit.pier_name == pier:
-                try:
-                    code = urbit.get_code().decode('utf-8')
-                except Exception as e:
-                    print(e)
+        addr = self.getLoopbackAddr(pier)
+        try:
+            code = self._urbits[pier].get_code(addr)
+        except Exception as e:
+            print(e)
+
         return code
     
     def getContainers(self):
@@ -358,10 +371,3 @@ class Orchestrator:
     def save_config(self):
         with open(self.config_file, 'w') as f:
             json.dump(self.config, f, indent = 4)
-
-
-
-
-if __name__ == '__main__':
-    orchestrator = Orchestrator("settings/system.json")
-

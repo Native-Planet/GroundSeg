@@ -6,6 +6,6 @@ Type=simple
 Restart=always
 User=root
 WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=/usr/bin/python3 /opt/nativeplanet/groundseg/app.py
+ExecStart=docker-compose up -d
 [Install]
 WantedBy=multi-user.target

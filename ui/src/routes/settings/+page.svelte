@@ -37,14 +37,14 @@
 <div class="content">
 
   <div class="panel">
-    <svelte:component this={settings.sysInfo} on:click={downloadUpdate} {info} {hasUpdate}/>
-    <svelte:component this={settings.minIO} {info} />
+    <svelte:component this={settings.sysInfo} {info}/>
     <svelte:component this={settings.network} {info} />
     <svelte:component this={settings.power} />
   </div>
 
   <div class="panel">
     <svelte:component this={settings.anchor} {info} />
+    <svelte:component this={settings.minIO} {info} />
     <svelte:component this={settings.exportLogs} />
     <svelte:component this={settings.contact} />
   </div>

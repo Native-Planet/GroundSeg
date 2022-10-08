@@ -1,27 +1,44 @@
 <script>
-  import { onMount, createEventDispatcher } from 'svelte'
-  import Fa from 'svelte-fa'
-  import { faDownload } from '@fortawesome/free-solid-svg-icons/index.es'
+	import { api } from '$lib/api'
+  import Select from 'svelte-select'
 
-	const dispatch = createEventDispatcher();
+  export let info
 
-  export let info, hasUpdate = false
+	const toggleUpdate = () => {
+    let u = api + "/settings/update"
+    const f = new FormData()
+		if (info.updateMode == 'auto') {
+    	f.append('updateMode', 'off')
+		} else {
+			f.append('updateMode', 'auto')
+		}
 
-  const downloadUpdate = () => dispatch('click')
+    fetch(u, {method: 'POST',body: f})
+			.then(r => r.json())
+      .then(d => console.log(d))
+	}
 
 </script>
 
 <div class="sys">
   <div class="sys-title">System Information</div>
+
+  <!-- If data is loaded -->
   {#if info}
+		
+		<!-- RAM info -->
     <div class="hw">
       <div class="word">RAM</div>
       <div class="data">{info.ram}%</div>
-    </div>
+		</div>
+
+		<!-- CPU info -->
     <div class="hw">
       <div class="word">CPU Temperature</div>
       <div class="data">{info.temp} &deg C</div>
-    </div>
+		</div>
+
+		<!-- Hard Disk storage -->
     <div class="hw">
       <div class="word">Storage</div>
       <div class="data">
@@ -33,18 +50,28 @@
       </div>
     </div>
 
+		<!-- groundseg_api version -->
     <div class="hw-version">
-      <div class="word">Version</div>
+      <div class="word">Api Version</div>
       <span>{info.gsVersion}</span>
-      {#if hasUpdate}
-        <button on:click={downloadUpdate} class="has-update">
-          <Fa icon={faDownload} size="1x" />
-          <span>Update to latest</span>
-        </button>
-      {/if}
     </div>
 
-    {:else}
+		<!-- groundseg_webui version -->
+    <div class="hw-version">
+      <div class="word">Web UI Version</div>
+      <span>Beta-1.0.0</span>
+    </div>
+
+		<!-- App update modes -->
+    <div class="hw-version">
+      <div class="word">Auto Update</div>
+      <div on:click={toggleUpdate} class="switch-wrapper">
+        <div class="switch {info.updateMode == 'auto' ? "on" : "off"}"></div>
+      </div>
+    </div>
+
+	<!-- If data is not loaded -->
+  {:else}
     <div class="hw">
       <div class="word">RAM</div>
       <div class="data blurred"></div>
@@ -114,19 +141,37 @@
     filter: blur(6px);
     border-radius: 8px;
   }
-  .has-update {
-    color: cyan;
-    font-size: 10px;
-    padding: 4px 12px 4px 12px;
+  .switch-wrapper {
     border-radius: 8px;
-    background: none;
-    outline: none;
-    border: solid 1px cyan;
-    display: flex;
-    gap: 6px;
-    align-items: center;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
     cursor: pointer;
-    margin-left: 12px;
+  }
+  .switch {
+    height: 100%;
+    width: 19px;
+    border-radius: 6px;
+    margin-top: auto;
+  }
+  .switch-wrapper-blurred {
+    border-radius: 8px;
+    width: 32px;
+    height: 12px;
+    background: #ffffff4d;
+    padding: 2px;
+    filter: blur(10px);
+    animation: breathe 2s infinite;
+  }
+  .on {
+    background: #008eff;
+    float: right;
+  }
+  .off {
+    background: #000;
+    float: left;
+    opacity: .2;
   }
 
 </style>

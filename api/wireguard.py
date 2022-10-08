@@ -9,15 +9,36 @@ class Wireguard:
 
     def __init__(self, config):
         self.config = config
+        data = None
+        filename = "/settings/wireguard.json"
+        
+        # Load existing or create new wireguard.json 
+        try:
+            with open(filename) as f:
+                data = json.load(f)
+        except Exception as e:
+            print(e)
+            print("creating new wireguard config file...")
+            wg_json = {
+                    "wireguard_name":"wireguard",
+                    "wireguard_version":"latest",
+                    "patp":"",
+                    "cap_add":["NET_ADMIN","SYS_MODULE"],
+                    "volumes":["/lib/modules:/lib/modules"],
+                    "sysctls":
+                    {
+                        "net.ipv4.conf.all.src_valid_mark":1
+                    }
+            }   
+            with open(filename,'w') as f :
+                json.dump(wg_json, f, indent=4)
+                data = wg_json
 
-        # load wireguard docker
-        filename = "settings/wireguard.json"
-        f = open(filename)
-        data = json.load(f)
+        # Load wireguard docker
         self.wg_docker = WireguardDocker(data)
         if(self.wg_docker.isRunning()):
             self.wg_docker.stop()
-        
+
 
     def start(self):
         self.wg_docker.start()

@@ -24,7 +24,6 @@
     clickedPatp = false,
     fresh = true
   
-  let showUpdateMinIO = false
   let copyPatp
 
   onMount(() => {
@@ -111,7 +110,6 @@
    }})}
 
   const updateMinIO = () => {
-    /*
     let u = api + "/urbit/minio_endpoint"
     const f = new FormData()
     f.append('pier', data.pier.name)
@@ -122,9 +120,6 @@
         console.log('updated minio endpoints in ship')}
         else {
         console.log('failed to update minio endpoints')}})}
-    */
-    showUpdateMinIO = !showUpdateMinIO
-  }
 
 </script>
 
@@ -155,13 +150,6 @@
 
       <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
     </div>
-
-  {:else if showUpdateMinIO}
-    <UpdateInstructions
-      on:click={updateMinIO}
-      endpoint={data.pier.s3_url}
-      accessKey={data.pier.name}
-    />
 
   {:else}
     
