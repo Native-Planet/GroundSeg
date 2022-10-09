@@ -162,7 +162,6 @@
         </div>
       {/if}
 
-      {#if nw_label == 'Remote'}
   
         <!-- Confirm Password -->
         {#if (minioPassword.length > 7) && !minIO_reg}
@@ -182,6 +181,7 @@
             </div>
           </div>
         {/if}
+
   
         <!-- Password Submit Button -->
         {#if (confirmPassword.length > 0) && showButton}
@@ -197,6 +197,8 @@
           />
         {/if}
   
+      {#if nw_label == 'Remote'}
+
         <!-- Show MinIO Console URL -->
         {#if minIO_reg}
           <div class="info">
@@ -320,14 +322,14 @@
   }
   .access-options {
     display: flex;
-    width: 240px;
+    width: 180px;
     border-radius: 8px;
     background: #ffffff4d;
     gap: 2px;
   }
   .option {
     color: inherit;
-    font-size: 14px;
+    font-size: 12px;
     flex: 1;
     padding: 8px 0 8px 0;
     background: none;
