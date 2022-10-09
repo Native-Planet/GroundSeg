@@ -86,10 +86,6 @@ class MinIODocker:
         self.volume.remove()
 
     def makeServiceAcc(self):
-        return self.container.exec_run(f"/data/mc admin user svcacct add myminio {self.config['pier_name']}").output.decode('utf-8').strip()
-
-if __name__ == '__main__':
-    filename = "minio.json"
-    f = open(filename)
-    data = json.load(f)
-    minio = MinIODocker(data)
+        x = self.container.exec_run(f"/data/mc admin user svcacct add myminio {self.config['pier_name']}").output.decode('utf-8').strip()
+        print(x)
+        return x

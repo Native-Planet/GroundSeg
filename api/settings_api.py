@@ -126,6 +126,8 @@ def anchor_endpoint():
         endpoint = request.form['new']
         x = orchestrator.changeWireguardUrl(endpoint)
         if x == 0:
+            #orchestrator.first_boot()
+            #orchestrator.save_config()
             return jsonify(200)
     return jsonify(400)
 
