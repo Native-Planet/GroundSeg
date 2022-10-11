@@ -6,7 +6,7 @@ Type=simple
 Restart=always
 User=root
 WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=export HOST_HOSTNAME=$(hostname) && docker-compose up -d
+ExecStart=./groundseg.sh
 ExecStop=docker-compose down
 [Install]
 WantedBy=multi-user.target
