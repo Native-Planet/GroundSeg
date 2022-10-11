@@ -1,3 +1,4 @@
+export HOST_HOSTNAME=$(hostname)
 sudo mkdir -p /opt/nativeplanet/groundseg/
 wget -O /opt/nativeplanet/groundseg/docker-compose.yml \
 	https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/release/docker-compose.yml

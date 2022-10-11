@@ -9,6 +9,8 @@ services:
       com.centurylinklabs.watchtower.enable: true
     ports: 
       - 27016:27016
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
@@ -19,6 +21,8 @@ services:
     build: ./ui
     container_name: groundseg_webui
     privileged: true
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
     labels:
       com.centurylinklabs.watchtower.enable: true
     ports: 
