@@ -6,7 +6,7 @@ Type=simple
 Restart=always
 User=root
 WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=./groundseg.sh
+ExecStart=/opt/nativeplanet/groundseg/groundseg.sh
 ExecStop=docker-compose down
 [Install]
 WantedBy=multi-user.target
