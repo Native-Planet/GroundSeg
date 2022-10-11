@@ -2,12 +2,11 @@
 Description=NativePlanet GroundSeg Controller
 After=multi-user.target
 [Service]
-Type=forking
+Type=simple
 Restart=always
 User=root
 WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStartPre=/opt/nativeplanet/groundseg/groundseg.sh
-ExecStart=docker-compose up
+ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker-compose up
 ExecStop=docker-compose down
 [Install]
 WantedBy=multi-user.target
