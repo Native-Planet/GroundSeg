@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte'
   import { layout } from '$lib/components'
   import { page } from '$app/stores'
   import { power, api } from '$lib/api'
@@ -6,7 +7,7 @@
   import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
 
   const shutdown = () => {
-    let u = api + "/settings/shutdown"
+    let u = $api + "/settings/shutdown"
     const f = new FormData()
 
     setTimeout(()=> window.location.href = "/", 3000)
@@ -18,7 +19,7 @@
    }})}
 
   const restart = () => {
-    let u = api + "/settings/restart"
+    let u = $api + "/settings/restart"
     const f = new FormData()
 
     fetch(u, {method: 'POST',body: f})
@@ -31,8 +32,10 @@
     power.set(null)
   }
 
-</script>
+  //onMount(()=>{api.set('http://nativeplanet.local:27016') console.log($page)})
+  onMount(()=>api.set('http://' + $page.url.origin.split('/')[2] + ':27016'))
 
+</script>
 <div class="container" class:frozen={($page.url.pathname === "/settings") && (($power === 'shutdown') || ($power === 'restart'))}>
   <div class='slot'>
       <slot />

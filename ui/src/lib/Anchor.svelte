@@ -26,7 +26,7 @@
   const toggleAnchor = () => {
     loading = true
     const f = new FormData()
-    const u = api + "/settings/anchor"
+    const u = $api + "/settings/anchor"
     f.append('anchor', !info.anchor)
     fetch(u, {method: 'POST',body: f})
       .then(d => d.json())
@@ -38,7 +38,7 @@
   const registerKey = () => {
     buttonStatus = 'loading'
     const f = new FormData()
-    const u = api + "/settings/anchor/register"
+    const u = $api + "/settings/anchor/register"
     f.append('key', key.trim())
     fetch(u, {method: 'POST',body: f})
       .then(d => d.json())
@@ -63,13 +63,13 @@
   }
   
   const getCurrentEndpoint = () =>  {
-    const u = api + "/settings/anchor/endpoint"
+    const u = $api + "/settings/anchor/endpoint"
     fetch(u).then(d=>d.json()).then(r=>{epKey=r;curEpKey=r})
   }
 
   const connectEndpoint = () => {
     epButtonStatus = 'loading'
-    const u = api + "/settings/anchor/endpoint"
+    const u = $api + "/settings/anchor/endpoint"
     const f = new FormData()
     f.append('new',epKey.trim())
     fetch(u,{method:'POST',body:f})

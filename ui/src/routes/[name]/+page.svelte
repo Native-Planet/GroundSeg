@@ -9,7 +9,7 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import UpdateInstructions from '$lib/UpdateInstructions.svelte'
   import Clipboard from 'clipboard'
-	import PierOptions from '$lib/PierOptions.svelte'
+  import PierOptions from '$lib/PierOptions.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -42,7 +42,7 @@
 
   const getPierData = () => {
     if (shown) {
-      const u = api + "/urbit/pier?pier=" + path
+      const u = $api + "/urbit/pier?pier=" + path
       fetch(u).then(r => r.json()).then(d => handleData(d))
       setTimeout(getPierData, 1000)
     }
@@ -50,7 +50,7 @@
 
   const getPierCode = () => {
     if (shown) {
-      const u = api + "/urbit/code?pier=" + path
+      const u = $api + "/urbit/code?pier=" + path
       fetch(u).then(r => r.json()).then(d => {
         code = d
         if (d.length == 27) {setTimeout(getPierCode, 1800000)}
@@ -63,7 +63,7 @@
 
   const togglePier = () => {
     loading = true
-    let u = api + "/urbit/"
+    let u = $api + "/urbit/"
     const f = new FormData()
     if (data.pier.running) {
       f.append(data.pier.name, 'stop')
@@ -84,7 +84,7 @@
   }
 
   const deletePier = () => {
-    let u = api + "/urbit/delete"
+    let u = $api + "/urbit/delete"
     const f = new FormData()
     f.append(data.pier.name, 'delete')
 

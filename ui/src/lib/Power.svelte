@@ -1,6 +1,6 @@
 <script>
   import Fa from 'svelte-fa'
-  import {power, api} from '$lib/api'
+  import {power} from '$lib/api'
   import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
 
   const restart = () => power.set('restart')

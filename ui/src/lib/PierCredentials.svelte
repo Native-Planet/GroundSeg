@@ -34,7 +34,7 @@
 
   // Submit MinIO pasword
   const submitPassword = () => {
-    let u = api + "/urbit/minio/register"
+    let u = $api + "/urbit/minio/register"
     const f = new FormData()
     f.append('patp', name)
     f.append('password', confirmPassword)
@@ -70,7 +70,7 @@
 
   const toggleNetwork = () => { 
     isSwitching = true
-    let u = api + "/urbit/network"
+    let u = $api + "/urbit/network"
     const f = new FormData()
     f.append(name,'network')
 

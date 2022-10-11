@@ -5,7 +5,7 @@
   export let info
 
 	const toggleUpdate = () => {
-    let u = api + "/settings/update"
+    let u = $api + "/settings/update"
     const f = new FormData()
 		if (info.updateMode == 'auto') {
     	f.append('updateMode', 'off')

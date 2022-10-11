@@ -14,7 +14,7 @@
 
   const updateMinIO = () => {
 		minIOLink = 'loading'
-    let u = api + "/urbit/minio_endpoint"
+    let u = $api + "/urbit/minio_endpoint"
     const f = new FormData()
     f.append('pier', patp)
 
@@ -30,7 +30,7 @@
 
   const ejectPier = () => {
     pierExport = 'loading'
-    let u = api + "/urbit/eject"
+    let u = $api + "/urbit/eject"
     const f = new FormData()
 					f.append(patp, 'eject')
 
@@ -46,7 +46,7 @@
 
   const ejectBucket = () => {
     bucketExport = 'loading'
-    let u = api + "/urbit/minio/eject"
+    let u = $api + "/urbit/minio/eject"
     const f = new FormData()
 					f.append('pier', patp)
 
@@ -62,7 +62,7 @@
 
 
   const exportLog = c => {
-    const u = api + "/settings/logs"
+    const u = $api + "/settings/logs"
     const f = new FormData()
     f.append('logs', patp)
     fetch(u, {method: 'POST', body: f})

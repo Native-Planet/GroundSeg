@@ -49,7 +49,7 @@
 
   const getMinIOSecret = () => {
     if (shown) {
-    let u = api + "/urbit/minio_secret"
+    let u = $api + "/urbit/minio_secret"
     const f = new FormData()
     f.append('patp',accessKey)
       fetch(u, {method: 'POST',body: f}).then(r => r.json()).then(d => {

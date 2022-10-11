@@ -7,7 +7,7 @@
 
   const checkHeartBeat = () => {
     if (opened) {
-    let u = api + "/updater"
+    let u = $api + "/updater"
     fetch(u).then(r => r.json()).then(d => heartBeat = d)
     setTimeout(checkHeartBeat, 1000)
     }}

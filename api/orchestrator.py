@@ -292,7 +292,7 @@ class Orchestrator:
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"https://{urbit.config['wg_url']}"
             else:
-                u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
+                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
 
             urbits.append(u)
 
