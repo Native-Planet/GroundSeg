@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Location of scripts
-ACC=nallux-dozryl
+ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=main
+BRANCH=beta_2
 
 mkdir -p /tmp/nativeplanet
 wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/

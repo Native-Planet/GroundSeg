@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Location of scripts
-ACC=nallux-dozryl
+ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=main
+BRANCH=beta_2
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg

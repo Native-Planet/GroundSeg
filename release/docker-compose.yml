@@ -2,7 +2,7 @@
 version: "3.9"
 services:
   api:
-    image: nallux/groundseg_api:latest
+    image: nativeplanet/groundseg_api:latest
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true
@@ -18,7 +18,7 @@ services:
       - settings:/settings
 
   webui:
-    image: nallux/groundseg_webui:latest
+    image: nativeplanet/groundseg_webui:latest
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true
