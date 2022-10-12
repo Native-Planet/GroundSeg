@@ -196,10 +196,10 @@ def settings_logs():
 
 @app.route('/settings/shutdown',methods=['POST'])
 def shutdown():
-    os.system('/')
+    os.system("echo 'shutdown -h now' > /commands")
     return jsonify(200)
 
 @app.route('/settings/restart',methods=['POST'])
 def restart():
-    os.system('reboot')
+    os.system("echo 'reboot' > /commands")
     return jsonify(200)
