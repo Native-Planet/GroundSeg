@@ -1,4 +1,10 @@
 #!/bin/bash
+
+# Location of scripts
+ACC=nallux-dozryl
+REPO=GroundSeg
+BRANCH=main
+
 mkdir -p /tmp/nativeplanet
 wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/
 chmod +x /tmp/nativeplanet/docker_install.sh
@@ -10,6 +16,9 @@ sudo wget -O /usr/local/lib/docker/cli-plugins/docker-compose \
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 wget -O /tmp/nativeplanet/groundseg_install.sh \
-	https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/release/groundseg_install.sh
+	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg_install.sh
+
 chmod +x /tmp/nativeplanet/groundseg_install.sh
 sudo /tmp/nativeplanet/groundseg_install.sh
+
+rm -r /tmp/nativeplanet
