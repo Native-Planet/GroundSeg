@@ -24,8 +24,12 @@ sudo mkfifo $SAVE_DIR/commands
 # systemd unit
 sudo wget -O /etc/systemd/system/groundseg.service \
 	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
+sudo wget -O /etc/systemd/system/gs-pipefile.service \
+	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/gs-pipefile.service
 
 # Load and start
 sudo systemctl enable groundseg
-sudo systemctl daemon-reload
+sudo systemctl enable gs-pipefile
+sudo systemctl daemon-reload 
 sudo systemctl restart groundseg
+sudo systemctl restart gs-pipefile
