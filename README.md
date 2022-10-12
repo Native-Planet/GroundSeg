@@ -5,7 +5,7 @@ Groundseg requires `docker` and `docker-compose`
 
 ## Installation
 
-**Disclaimer:** This software is installed with `sudo` as this is required for Groundseg to work properly.
+**Disclaimer:** This software is installed with `sudo` priveleges as this is required for Groundseg to work properly.
 
 ### Standard Installation (Recommended)
 This installs `docker`, `docker-compose` and the required images for GroundSeg to work.
@@ -13,7 +13,7 @@ This installs `docker`, `docker-compose` and the required images for GroundSeg t
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/standard_install.sh \
-https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/release/standard_install.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_install.sh && \
 sudo chmod +x /tmp/nativeplanet/standard_install.sh && \
 sudo /tmp/nativeplanet/standard_install.sh
 ```
@@ -24,7 +24,7 @@ This downloads and runs the compose file. Only use this if you already have `doc
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/groundseg_install.sh \
-https://raw.githubusercontent.com/nallux-dozryl/GroundSeg/main/release/groundseg_install.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_install.sh && \
 sudo chmod +x /tmp/nativeplanet/groundseg_install.sh && \
 sudo /tmp/nativeplanet/groundseg_install.sh
 ```

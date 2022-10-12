@@ -3,7 +3,7 @@
 # Location of scripts
 ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=beta_2
+BRANCH=main
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg

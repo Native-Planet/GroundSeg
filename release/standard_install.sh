@@ -3,7 +3,7 @@
 # Location of scripts
 ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=beta_2
+BRANCH=main
 
 mkdir -p /tmp/nativeplanet
 wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/
