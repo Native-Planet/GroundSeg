@@ -8,18 +8,18 @@
 
   const update = () => {
     if (opened) {
-      fetch(api + "/settings").then(r => r.json()).then(d => info = d)
+      fetch($api + "/settings").then(r => r.json()).then(d => info = d)
       setTimeout(update, 1000)
   }}
 
   const updateGS = () => {
     if (opened) {
-      let u = api + "/settings/update"
+      let u = $api + "/settings/update"
       fetch(u).then(r => r.json()).then(d => hasUpdate = d)
       setTimeout(updateGS, (15 * 60 * 1000))}}
 
   const downloadUpdate = () => {
-    let u = api + "/settings/update"
+    let u = $api + "/settings/update"
     const f = new FormData()
     fetch(u, {method: 'POST',body: f})
       .then(window.location.href = "/updater")}

@@ -126,6 +126,8 @@ def anchor_endpoint():
         endpoint = request.form['new']
         x = orchestrator.changeWireguardUrl(endpoint)
         if x == 0:
+            orchestrator.first_boot()
+            orchestrator.save_config()
             return jsonify(200)
     return jsonify(400)
 
@@ -194,10 +196,10 @@ def settings_logs():
 
 @app.route('/settings/shutdown',methods=['POST'])
 def shutdown():
-    os.system('shutdown now')
+    os.system("echo 'shutdown' > /commands")
     return jsonify(200)
 
 @app.route('/settings/restart',methods=['POST'])
 def restart():
-    os.system('reboot')
+    os.system("echo 'reboot' > /commands")
     return jsonify(200)

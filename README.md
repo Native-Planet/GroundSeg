@@ -46,7 +46,8 @@ Lastly, run either one of the install commands.
 
 ## Development and Building From Source
 1. Clone this repository
-2. Run `docker-compose up --build` in the root directory of the repository.
+2. `export HOST_HOSTNAME=$(hostname)` 
+3. Run `sudo -E docker-compose up --build` in the root directory of the repository.
 
 ## TODO 
 

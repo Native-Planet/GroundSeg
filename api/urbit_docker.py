@@ -61,6 +61,8 @@ class UrbitDocker:
                                     mounts = [self.mount],
                                     detach=True)
         else:
+            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
+                                          --port={self.config["wg_ames_port"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     ports = {'80/tcp':self.config['http_port'], 

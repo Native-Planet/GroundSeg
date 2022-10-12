@@ -22,7 +22,7 @@
 
     ethSwapping = true
 
-    let u = api + "/settings/eth-only"
+    let u = $api + "/settings/eth-only"
     const f = new FormData()
     f.append('ethernet', !info.ethOnly)
 
@@ -36,7 +36,7 @@
 
     buttonStatus = 'loading'
 
-    let u = api + "/settings/connect"
+    let u = $api + "/settings/connect"
     const f = new FormData()
     f.append('network', nw)
     f.append('password', pw)
@@ -65,7 +65,7 @@
 
   const getNetworks = () => {
     if (opened) {
-      fetch(api + "/settings/networks").then(r => r.json()).then(d => networks = d)
+      fetch($api + "/settings/networks").then(r => r.json()).then(d => networks = d)
       setTimeout(getNetworks, 10000)
    }}
 

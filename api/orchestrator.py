@@ -292,7 +292,7 @@ class Orchestrator:
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"https://{urbit.config['wg_url']}"
             else:
-                u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
+                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
 
             urbits.append(u)
 
@@ -308,6 +308,13 @@ class Orchestrator:
 
         return code
     
+    def has_bucket(self, patp):
+        minio = list(self._minios.keys())
+        for m in minio:
+            if m == patp:
+                return True
+        return False
+
     def getContainers(self):
         minio = list(self._minios.keys())
         containers = list(self._urbits.keys())
@@ -330,7 +337,6 @@ class Orchestrator:
 
         urbit.setNetwork(network);
         time.sleep(2)
-
         
 
     def getOpenUrbitPort(self):

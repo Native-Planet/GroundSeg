@@ -1,10 +1,12 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
 
-  export let standard=null,
+	export let standard=null,
+		noMargin=false,
     success=null,
     failure=null,
     loading=null,
+		background='var(--action-color)',
     status='standard', 
     top=0, left=true, bottom=0
 
@@ -14,9 +16,9 @@
 
 </script>
 
-<div style="margin-bottom:{bottom}px;margin-top:{top}px;margin-{left ? "right" : "left"}:auto;">
+<div style="margin-bottom:{bottom}px;margin-top:{top}px;margin-{left ? "right" : "left"}:auto; {noMargin ? 'margin:0' : null}">
 {#if status == 'standard'}
-  <button on:click={handleClick}>
+	<button style="background:{background}" on:click={handleClick}>
     {standard}
   </button>
 {/if}
@@ -36,7 +38,7 @@
 {/if}
 
 {#if status == 'disabled'}
-  <button class="disabled">
+  <button class="disabled" style="background:{background}" >
     {standard}
   </button>
 {/if}
@@ -45,7 +47,6 @@
 <style>
   button {
     color: var(--text-color);
-    background: var(--action-color);
     border: none;
     border-radius: 6px;
     padding: 8px 12px 8px 12px;

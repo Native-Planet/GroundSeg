@@ -9,7 +9,7 @@
   const restartMinIO = () => {
     loading = true
     const f = new FormData()
-    const u = api + "/settings/minio"
+    const u = $api + "/settings/minio"
     f.append('refresh', 'refresh')
     fetch(u, {method: 'POST',body: f})
       .then(d => d.json())
