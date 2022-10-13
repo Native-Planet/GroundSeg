@@ -53,5 +53,4 @@ Lastly, run either one of the install commands.
 
 1. Refactor the code to be a bit cleaner
 2. Add bitcoin node support
-3. After Urbit is booted allow user (with the press of a single button) to add S3 support and Bitcoin node support (if installed)
-4. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container
+3. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container
