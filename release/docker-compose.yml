@@ -1,0 +1,31 @@
+---
+version: "3.9"
+services:
+  api:
+    image: nativeplanet/groundseg_api:latest
+    privileged: true
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    ports: 
+      - 27016:27016
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - /opt/nativeplanet/groundseg/commands:/commands
+      - settings:/settings
+
+  webui:
+    image: nativeplanet/groundseg_webui:latest
+    privileged: true
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    ports: 
+      - 80:3000
+
+volumes:
+  settings:

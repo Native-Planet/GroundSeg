@@ -24,7 +24,7 @@
     const n = name.trim()
     const k = key.trim()
     const f = new FormData()
-    const u = api + "/upload/key"
+    const u = $api + "/upload/key"
 
     if (isPatp(n)) {
       f.append("patp", n.replace(/~/g,''))

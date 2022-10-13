@@ -42,6 +42,7 @@ def pier_info():
     p['pier'] = urbit
     p['wg_reg'] = orchestrator.wireguard_reg
     p['wg_running'] = orchestrator.wireguard.isRunning()
+    p['hasBucket'] = orchestrator.has_bucket(pier)
 
     return(jsonify(p))
 
@@ -144,6 +145,23 @@ def eject_pier():
                  as_attachment=True)
 
     return jsonify(400)
+
+@app.route("/urbit/minio/eject", methods=['POST'])
+def eject_minio():
+    p = request.form['pier']
+    m = current_app.config['ORCHESTRATOR']._minios[p]
+    
+    if(m==None):
+        return jsonify(400)
+        
+    file_name = f'bucket_{p}.zip'
+    bucket_path=f'/var/lib/docker/volumes/minio_{p}/_data/bucket'
+    shutil.make_archive(f'/app/tmp/bucket_{p}', 'zip', bucket_path)
+
+    return send_file(f'/app/tmp/{file_name}',
+            download_name=file_name,
+            as_attachment=True)
+
 
 
 @app.route("/urbit/delete", methods=['POST'])

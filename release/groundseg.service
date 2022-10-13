@@ -1,0 +1,12 @@
+[Unit]
+Description=NativePlanet GroundSeg Controller
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+User=root
+WorkingDirectory=/opt/nativeplanet/groundseg/
+ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
+ExecStop=docker compose down
+[Install]
+WantedBy=multi-user.target

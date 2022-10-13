@@ -3,9 +3,9 @@
   import { api, isPatp } from '$lib/api'
   import Dropzone from "dropzone"
   import { sigil, stringRenderer } from '@tlon/sigil-js'
-	import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
 
-	const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher();
 
   let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = '', failed = false
   let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
@@ -20,7 +20,7 @@
       acceptedFiles: '.zip, .tar, .tgz, .gz',
       chunking: true,
       forceChunking: true,
-      url: api + '/upload/pier',
+      url: $api + '/upload/pier',
       disablePreviews: true,
       uploadprogress: checkUpdate,
       success: onSuccess,

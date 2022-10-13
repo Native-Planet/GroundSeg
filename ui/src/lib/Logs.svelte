@@ -18,7 +18,7 @@
 
   const getLog = () => {
     if (shown) {
-      const u = api + "/settings/logs"
+      const u = $api + "/settings/logs"
       const f = new FormData()
       f.append('logs', log)
       fetch(u, {method: 'POST', body: f})

@@ -4,7 +4,20 @@ import shutil
 from minio_docker import MinIODocker
 
 client = docker.from_env()
-default_pier_config = json.load(open('settings/default_urbit.json'))
+default_pier_config = {
+        "pier_name":"",
+        "http_port":8080,
+        "ames_port":34343,
+        "urbit_version":"latest",
+        "minio_version":"latest",
+        "minio_password": "",
+        "network":"none",
+        "wg_url": "nan",
+        "wg_http_port": None,
+        "wg_ames_port": None,
+        "wg_s3_port": None,
+        "wg_console_port": None
+        }
 
 class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'
@@ -27,15 +40,9 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
-                shutil.copy('./settings/start_urbit.sh', 
+                shutil.copy('/app/start_urbit.sh', 
                         f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
-                shutil.copy('./settings/set_s3_endpoints.sh', 
-                        f'{self._volume_directory}/{self.pier_name}/_data/set_s3_endpoints.sh')
-
-        self.volume = client.volumes.create(name=self.pier_name)
-        shutil.copy('./settings/start_urbit.sh', 
-                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
@@ -46,22 +53,23 @@ class UrbitDocker:
         if(self.config["network"] != "none"):
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
-            print(command)
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
-                                    command=command, 
+                                    command = command, 
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
                                     mounts = [self.mount],
                                     detach=True)
         else:
+            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
+                                          --port={self.config["wg_ames_port"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
                                     mounts = [self.mount],
-                                    detach=True)
+                                    detach = True)
 
 
     def setWireguardNetwork(self, url, http_port, ames_port, s3_port, console_port):
@@ -127,19 +135,52 @@ class UrbitDocker:
         from distutils.dir_util import copy_tree
         copy_tree(folder_loc,f'{self._volume_directory}/{self.pier_name}/_data/')
 
-    def set_minio_endpoint(self, endpoint, access_key, secret, bucket):
-        self.container.exec_run('chmod +x /urbit/set_s3_endpoints.sh')
-        x = self.container.exec_run('/urbit/set_s3_endpoints.sh').output.strip()
-        #x = self.container.exec_run('/bin/get-urbit-code')
-        print(x)
+    def send_poke(self, command, data, lens_addr):
+        f_data = dict()
+        source = dict()
+        sink = dict()
 
-        #self.container.exec_run(command)
+        source['dojo'] = f"+landscape!s3-store/{command} '{data}'"
+        sink['app'] = "s3-store"
 
-    def get_code(self):
-        return self.container.exec_run('/bin/get-urbit-code').output.strip()
+        f_data['source'] = source
+        f_data['sink'] = sink
 
-    def reset_code(self):
-        return self.container.exec_run('/bin/reset-urbit-code').output.strip()
+        with open(f'{self._volume_directory}/{self.pier_name}/_data/{command}.json','w') as f :
+            json.dump(f_data, f)
+
+        x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}').output.strip()
+        print(f"{command} {x.decode('utf-8')}")
+
+        return x
+
+    def set_minio_endpoint(self, endpoint, access_key, secret, bucket, lens_addr):
+        self.send_poke('set-endpoint', endpoint, lens_addr)
+        self.send_poke('set-access-key-id', access_key, lens_addr)
+        self.send_poke('set-secret-access-key', secret, lens_addr)
+        self.send_poke('set-current-bucket', bucket, lens_addr)
+
+    def get_code(self, lens_addr):
+        f_data = dict()
+        source = dict()
+        sink = dict()
+
+        source['dojo'] = "+code"
+        sink['stdout'] = None
+
+        f_data['source'] = source
+        f_data['sink'] = sink
+
+        with open(f'{self._volume_directory}/{self.pier_name}/_data/code.json','w') as f :
+            json.dump(f_data, f)
+
+        x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}').output.decode('utf-8').strip().split('\\')[0][1:]
+
+        return x
+
+
+    #def reset_code(self):
+    #    return self.container.exec_run('/bin/reset-urbit-code').output.strip()
 
     def start(self):
         self.container.start()
@@ -154,17 +195,3 @@ class UrbitDocker:
     
     def isRunning(self):
         return self.running
-
-
-
-
-if __name__ == '__main__':
-    filename = "settings/pier/walzod-fogsed-mopfel-winrux.json"
-    f = open(filename)
-    data = json.load(f)
-    urdock = UrbitDocker(data)
-    urdock.start()
-    import time
-    time.sleep(2)
-    print(urdock.logs().decode('utf-8'))
-    urdock.stop()

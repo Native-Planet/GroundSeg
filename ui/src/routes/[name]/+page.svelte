@@ -9,6 +9,7 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import UpdateInstructions from '$lib/UpdateInstructions.svelte'
   import Clipboard from 'clipboard'
+  import PierOptions from '$lib/PierOptions.svelte'
 
   const cur = $page.url;
   const path = cur.pathname.replace("/", "")
@@ -24,7 +25,6 @@
     clickedPatp = false,
     fresh = true
   
-  let showUpdateMinIO = false
   let copyPatp
 
   onMount(() => {
@@ -38,9 +38,11 @@
   })
   onDestroy(() => shown = false)
   
+  const toggleLogs = () => showLogs = !showLogs
+
   const getPierData = () => {
     if (shown) {
-      const u = api + "/urbit/pier?pier=" + path
+      const u = $api + "/urbit/pier?pier=" + path
       fetch(u).then(r => r.json()).then(d => handleData(d))
       setTimeout(getPierData, 1000)
     }
@@ -48,7 +50,7 @@
 
   const getPierCode = () => {
     if (shown) {
-      const u = api + "/urbit/code?pier=" + path
+      const u = $api + "/urbit/code?pier=" + path
       fetch(u).then(r => r.json()).then(d => {
         code = d
         if (d.length == 27) {setTimeout(getPierCode, 1800000)}
@@ -58,28 +60,10 @@
     if (d == 400) { window.location.href = "/" }
     if (d.pier.name == path) { data = d }}
 
-  const toggleLogs = () => showLogs = !showLogs
-
-  const ejectPier = () => {
-    ejecting = true
-    let u = api + "/urbit/eject"
-    const f = new FormData()
-    f.append(data.pier.name, 'eject')
-
-    fetch(u, {method: 'POST',body: f})
-    .then(res => { return res.blob(); })
-    .then(d => {
-      ejecting = false
-      var a = document.createElement("a")
-      a.href = window.URL.createObjectURL(d)
-      a.download = data.pier.name
-      a.click()
-    })}
-
 
   const togglePier = () => {
     loading = true
-    let u = api + "/urbit/"
+    let u = $api + "/urbit/"
     const f = new FormData()
     if (data.pier.running) {
       f.append(data.pier.name, 'stop')
@@ -100,7 +84,7 @@
   }
 
   const deletePier = () => {
-    let u = api + "/urbit/delete"
+    let u = $api + "/urbit/delete"
     const f = new FormData()
     f.append(data.pier.name, 'delete')
 
@@ -109,22 +93,6 @@
       .then(d => { if (d == 200) {
         window.location.href = "/"
    }})}
-
-  const updateMinIO = () => {
-    /*
-    let u = api + "/urbit/minio_endpoint"
-    const f = new FormData()
-    f.append('pier', data.pier.name)
-
-    fetch(u, {method: 'POST',body: f})
-      .then(r => r.json())
-      .then(d => { if (d == 200) {
-        console.log('updated minio endpoints in ship')}
-        else {
-        console.log('failed to update minio endpoints')}})}
-    */
-    showUpdateMinIO = !showUpdateMinIO
-  }
 
 </script>
 
@@ -155,13 +123,6 @@
 
       <PrimaryButton standard="Back to profile" status="standard" left={false} on:click={toggleLogs} />
     </div>
-
-  {:else if showUpdateMinIO}
-    <UpdateInstructions
-      on:click={updateMinIO}
-      endpoint={data.pier.s3_url}
-      accessKey={data.pier.name}
-    />
 
   {:else}
     
@@ -231,29 +192,14 @@
           </div>
 
           {#if advanced}
-            <div class="cmd-wrapper">
-              <button
-                on:click={toggleLogs} 
-                class="cmd logs">
-                View Logs
-              </button>
-
-            {#if data.pier.minio_registered && (data.nw_label == 'Remote')}
-              <button
-                on:click={updateMinIO} 
-                class="cmd minio">
-                Update minIO
-              </button>
-            {/if}
-
-              <button 
-                on:click={ejectPier}
-                class="cmd eject">
-                Eject{ejecting ? "ing" : " Pier"}
-              </button>
-
-              <button on:click={()=> deleteCheck = true} class="cmd delete">Delete Pier</button>
-            </div>
+						<PierOptions 
+							nw_label={data.nw_label}
+					 		minio_registered={data.pier.minio_registered}
+							patp={data.pier.name}
+							hasBucket={data.hasBucket}
+					 		on:toggleLogs={toggleLogs}
+							on:exportLogs={()=>console.log("export")}
+							on:deletePier={()=>deleteCheck=!deleteCheck}/>
           {/if}
         </div>
       {/if}
@@ -352,24 +298,6 @@
   .commands {
     padding-top: 6px;
   }
-  .cmd-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .cmd {
-    appearance: none;
-    background: none;
-    color: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    border: none;
-    border-radius: 8px;
-    padding: 8px;
-    width: 120px;
-    cursor: pointer;
-  }
-
   .advanced {
     font-size: 14px;
     padding-top: 6px;
@@ -379,19 +307,6 @@
   }
   .advanced:hover {
     opacity: .6;
-  }
-  .logs {
-    background: var(--action-color);
-  }
-  .minio {
-    background: orange;
-  }
-  .eject {
-    background: #FFFFFF4D;
-  }
-
-  .delete {
-    background: #f48399;
   }
   .block {
     background: #ffffff4d;

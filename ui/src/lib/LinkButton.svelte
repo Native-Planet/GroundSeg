@@ -1,5 +1,5 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher } from 'svelte';
 
   export let text=null, src=null, top=0, left=true, disabled=true
 

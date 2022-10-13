@@ -1,40 +1,56 @@
 # Native Planet GroundSeg
 This is the Control Software for the NP System. 
 
-It expects a Linux Box with `systemd` and `apt` available.
-
-## Building
-To build please run the `build.sh` script in the root directory.
-
-This will create a build folder which will contain the complete webapp
+Groundseg requires `docker` and `docker-compose` 
 
 ## Installation
-To install build the software first and run the `install.sh` script in the root directory.
 
-This will copy the build directory to `/opt/nativeplanet/groundseg/` and the service file to the correct directory
+**Disclaimer:** This software is installed with `sudo` priveleges as this is required for Groundseg to work properly.
 
-## Development Running
-To run this for development use the `startup.sh` script. This will run the python flask app and the UI app as seperate systems.
+### Standard Installation (Recommended)
+This installs `docker`, `docker-compose` and the required images for GroundSeg to work.
 
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/standard_install.sh \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_install.sh && \
+sudo chmod +x /tmp/nativeplanet/standard_install.sh && \
+sudo /tmp/nativeplanet/standard_install.sh
+```
+
+### Groundseg Only
+
+This downloads and runs the compose file. Only use this if you already have `docker` and `docker-compose` installed.
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/groundseg_install.sh \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_install.sh && \
+sudo chmod +x /tmp/nativeplanet/groundseg_install.sh && \
+sudo /tmp/nativeplanet/groundseg_install.sh
+```
+
+## Updating from Beta-1.0.0 (Assembly 2022 Demo Version)
+In order to prevent conflicting configs we will have to copy the config files to the new location.
+```
+sudo mkdir -p /var/lib/docker/volumes/groundseg_settings/_data && \
+sudo cp -r /opt/nativeplanet/groundseg/settings/* /var/lib/docker/volumes/groundseg_settings/_data/
+```
+
+**Optional but recommended:** Delete the old files.
+```
+sudo rm -r /opt/nativeplanet/groundseg/*
+```
+
+Lastly, run either one of the install commands.
+
+
+## Development and Building From Source
+1. Clone this repository
+2. `export HOST_HOSTNAME=$(hostname)` 
+3. Run `sudo -E docker-compose up --build` in the root directory of the repository.
 
 ## TODO 
 
-1. Ability to change the Anchor endpoint. if a user wants to host thier own anchor endpoint and not subscribe we need to let them change the endpoint
-2. Refactor the code to be a bit cleaner
-3. Add bitcoin node support
-4. While Urbit is booting or uploading allow the user to begin setting up MinIO through the UI
-5. After Urbit is booted allow user (with the press of a single button) to add S3 support and Bitcoin node support (if installed)
-6. Add functionality to check for and update system with the click of a button
-7. Add ability to completely turn on/off wifi from settings
-8. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container
-
-
-## Notes
-### How to add s3 endpoints through dojo
-```
-~sampel-palnet:dojo> :s3-store|set-endpoint 'ams3.digitaloceanspaces.com'
-~sampel-palnet:dojo> :s3-store|set-access-key-id 'ACCESSKEY'
-~sampel-palnet:dojo> :s3-store|set-secret-access-key '5eCrEtK3Y/8L4H8L4H'
-~sampel-palnet:dojo> :s3-store|set-current-bucket 'bucketname'
-```
-
+1. Refactor the code to be a bit cleaner
+2. Add bitcoin node support
+3. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container

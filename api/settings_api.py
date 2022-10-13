@@ -12,8 +12,6 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 
 import urbit_docker
-from wifi import Cell, Scheme
-from wifi_finder import Finder
 from pprint import pprint
 
 
@@ -30,9 +28,16 @@ def settings():
     temp = psutil.sensors_temperatures()['coretemp'][0].current
     disk = shutil.disk_usage("/")
     net = psutil.net_if_stats()
+    connected = ''
 
-    check_connected = subprocess.Popen(['iwgetid','-r'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-    connected, stderr = check_connected.communicate()
+    check_connected = subprocess.Popen(['nmcli', '-t', 'con', 'show'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    connections, stderr = check_connected.communicate()
+    connections_arr = connections.decode('utf-8').split('\n')
+    substr = 'wireless'
+
+    for ln in connections_arr:
+        if substr in ln:
+            connected = ln.split(':')[0]
 
     wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
     ws, stderr = wifi_status.communicate()
@@ -42,47 +47,46 @@ def settings():
     else:
         eth_only = True
 
-    for k,v in net.items():
-        if 'wl' in k:
-            wifi = k
-            if(v.isup):
-                eth = False
-                break
-            
-
     return jsonify({
         "ram": ram.percent,
         "disk" : disk,
         "temp" : temp,
         "anchor" : orchestrator.wireguard.isRunning(),
         "ethOnly" : eth_only,
-        "connected" : connected.decode("utf-8"),
+        "connected" : connected,
         "minio" : orchestrator.minIO_on,
-        "wg_reg" : orchestrator.wireguard_reg
+        "wg_reg" : orchestrator.wireguard_reg,
+        "gsVersion" : orchestrator.config['gsVersion'],
+        "updateMode" : orchestrator.update_mode()
     })
-    
+
+
+@app.route('/settings/update', methods=['GET','POST'])
+def has_update():
+    orchestrator = current_app.config['ORCHESTRATOR']
+
+    if request.method == 'GET':
+        x = True
+        return jsonify(x)
+
+    if request.method == 'POST':
+        mode = request.form['updateMode']
+        orchestrator.set_update_mode(mode)
+        return jsonify(mode)
+
 @app.route('/settings/networks', methods=['GET'])
 def list_networks():
-    wifi = 'wl'
-    net = psutil.net_if_stats()
 
-    for k,v in net.items():
-        if 'wl' in k:
-            wifi = k
+    available = subprocess.Popen(['nmcli', '-t', 'dev', 'wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    ssids, stderr = available.communicate()
+    ssids_cleaned = ssids.decode('utf-8').split('\n')
 
-    global glob_network
     networks = []
 
-    try:
-        n = list(Cell.all(wifi))
-        for c in n:
-            if((c.ssid !='') and ('\\x00\\x00' not in c.ssid )):
-                if(c.ssid not in networks):
-                    networks.append(c.ssid)
-        glob_network = networks
-    except Exception as e:
-        networks = glob_network
-        pass
+    for ln in ssids_cleaned[1:]:
+        info = ln.split(':')
+        if len(info) > 1:
+            networks.append(info[1])
 
     return jsonify(networks)
 
@@ -122,6 +126,8 @@ def anchor_endpoint():
         endpoint = request.form['new']
         x = orchestrator.changeWireguardUrl(endpoint)
         if x == 0:
+            orchestrator.first_boot()
+            orchestrator.save_config()
             return jsonify(200)
     return jsonify(400)
 
@@ -190,10 +196,10 @@ def settings_logs():
 
 @app.route('/settings/shutdown',methods=['POST'])
 def shutdown():
-    os.system('shutdown now')
+    os.system("echo 'shutdown' > /commands")
     return jsonify(200)
 
 @app.route('/settings/restart',methods=['POST'])
 def restart():
-    os.system('reboot')
+    os.system("echo 'reboot' > /commands")
     return jsonify(200)

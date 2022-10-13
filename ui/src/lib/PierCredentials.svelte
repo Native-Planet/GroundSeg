@@ -34,7 +34,7 @@
 
   // Submit MinIO pasword
   const submitPassword = () => {
-    let u = api + "/urbit/minio/register"
+    let u = $api + "/urbit/minio/register"
     const f = new FormData()
     f.append('patp', name)
     f.append('password', confirmPassword)
@@ -70,7 +70,7 @@
 
   const toggleNetwork = () => { 
     isSwitching = true
-    let u = api + "/urbit/network"
+    let u = $api + "/urbit/network"
     const f = new FormData()
     f.append(name,'network')
 
@@ -162,68 +162,73 @@
         </div>
       {/if}
 
-      <!-- Confirm Password -->
-      {#if (minioPassword.length > 7) && !minIO_reg}
-        <div class="info">
-          <div class="title-smaller">Confirm Password</div>
   
-          <div class="login-key-wrapper">
-            <input
-              id="minio-password-1"
-              bind:value={confirmPassword}
-              class="minio-password"
-              type="password"
-              placeholder="Enter the password again" />
-            <button on:click={toggleViewConfirm}>
-              <img class="eye" src={viewConfirm ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
-            </button>
-          </div>
-        </div>
-      {/if}
-
-      <!-- Password Submit Button -->
-      {#if (confirmPassword.length > 0) && showButton}
-        <PrimaryButton
-          on:click={submitPassword}
-          top={24}
-          bottom={24}
-          standard="Create MinIO"
-          success="Setup complete! Toggle Remote Access to view your MinIO Console!"
-          failure={submitted ? "An error occured, refresh the page and try again" : "Passwords do not match"}
-          loading="Setting up MinIO for you..."
-          status={!submitted && (minioPassword == confirmPassword) ? 'standard' : buttonStatus}
-        />
-      {/if}
-
-      <!-- Show MinIO Console URL -->
-      {#if minIO_reg && (nw_label == 'Remote')}
-        <div class="info">
-          <div class="title">MinIO Console</div>
-
-          <div class="login-key-wrapper">
-            <div on:click={copyMinIO} id="minio" data-clipboard-text={minIO} class="login-key">
-              {
-                clickedMinIO ? "copied!" 
-                : viewMinIO ? minIO
-                : "click to copy"
-              }
+        <!-- Confirm Password -->
+        {#if (minioPassword.length > 7) && !minIO_reg}
+          <div class="info">
+            <div class="title-smaller">Confirm Password</div>
+  
+            <div class="login-key-wrapper">
+              <input
+                id="minio-password-1"
+                bind:value={confirmPassword}
+                class="minio-password"
+                type="password"
+                placeholder="Enter the password again" />
+              <button on:click={toggleViewConfirm}>
+                <img class="eye" src={viewConfirm ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
+              </button>
             </div>
-            <a class="newtab" href={minIO} target="_blank">
-              <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
-            </a>
-            <button on:click={()=> viewMinIO = !viewMinIO}>
-              <img class="eye" src={viewMinIO ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
-            </button>
           </div>
-        </div>
+        {/if}
+
+  
+        <!-- Password Submit Button -->
+        {#if (confirmPassword.length > 0) && showButton}
+          <PrimaryButton
+            on:click={submitPassword}
+            top={24}
+            bottom={24}
+            standard="Create MinIO"
+            success="Setup complete! Toggle Remote Access to view your MinIO Console!"
+            failure={submitted ? "An error occured, refresh the page and try again" : "Passwords do not match"}
+            loading="Setting up MinIO for you..."
+            status={!submitted && (minioPassword == confirmPassword) ? 'standard' : buttonStatus}
+          />
+        {/if}
+  
+      {#if nw_label == 'Remote'}
+
+        <!-- Show MinIO Console URL -->
+        {#if minIO_reg}
+          <div class="info">
+            <div class="title">MinIO Console</div>
+
+            <div class="login-key-wrapper">
+              <div on:click={copyMinIO} id="minio" data-clipboard-text={minIO} class="login-key">
+                {
+                  clickedMinIO ? "copied!" 
+                  : viewMinIO ? minIO
+                  : "click to copy"
+                }
+              </div>
+              <a class="newtab" href={minIO} target="_blank">
+                <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
+              </a>
+              <button on:click={()=> viewMinIO = !viewMinIO}>
+                <img class="eye" src={viewMinIO ? "/eye-closed.svg" : "/eye-open.svg"} alt="eye" />
+              </button>
+            </div>
+          </div>
+        {/if}
       {/if}
     {/if}
 
     <!-- Toggle Network -->
     {#if wg_reg && wg_running}
-    <div class="info"class:switching={isSwitching} on:click={toggleNetwork}>
+    <div class="info"class:switching={isSwitching}>
       <div class="title">Access</div>
-      <div class="access-options">
+      <div class="access-options" on:click={toggleNetwork}>
         <button class="option" class:access-active={nw_label === 'Local'} >Local</button>
         <button class="option" class:access-active={nw_label === 'Remote'} >Remote</button>
       </div>
@@ -317,14 +322,14 @@
   }
   .access-options {
     display: flex;
-    width: 240px;
+    width: 180px;
     border-radius: 8px;
     background: #ffffff4d;
     gap: 2px;
   }
   .option {
     color: inherit;
-    font-size: 14px;
+    font-size: 12px;
     flex: 1;
     padding: 8px 0 8px 0;
     background: none;

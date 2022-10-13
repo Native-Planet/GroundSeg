@@ -8,15 +8,16 @@
   let opened = true
 
   const update = () => {
-    fetch(api).then(r => r.json()).then(d => piers.set(d))
+    if (opened) {
+    fetch($api).then(r => r.json()).then(d => piers.set(d))
     setTimeout(update, 1000)}
-
+  }
   const checkStatus = (n,r) => {
     if (!r) {return 'Stopped'}
     if ((n in $codes) && ($codes[n].length == 27)) {
       return 'Running'}
 
-    const u = api + "/urbit/code?pier=" + n
+    const u = $api + "/urbit/code?pier=" + n
     fetch(u).then(x => x.json()).then(d => {
       codes.update(c => {c[n] = d; return c})})
 

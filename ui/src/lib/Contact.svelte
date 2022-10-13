@@ -1,7 +1,6 @@
 <script>
   import Fa from 'svelte-fa'
   import { onMount } from 'svelte'
-  import {power, api} from '$lib/api'
   import { faGithub } from '@fortawesome/free-brands-svg-icons/index.es'
   import Clipboard from 'clipboard'
 

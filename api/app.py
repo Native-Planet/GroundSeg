@@ -17,7 +17,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-orchestrator = Orchestrator("settings/system.json")
+orchestrator = Orchestrator("/settings/system.json")
 
 
 app = Flask(__name__)
@@ -36,5 +36,11 @@ def mainscreen():
     piers = orchestrator.getUrbits()
     return jsonify(piers)
 
+@app.route("/updater", methods=['GET'])
+def heartbeat():
+    status = orchestrator.app_status
+    return jsonify(status)
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=27016)
+    debug_mode = False
+    app.run(host='0.0.0.0', port=27016, debug=debug_mode, use_reloader=debug_mode)
