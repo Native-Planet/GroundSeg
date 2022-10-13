@@ -252,7 +252,7 @@ class Orchestrator:
         self.registerUrbit(patp)
 
         self.save_config()
-        urbit.start()
+        urbit.run()
         
 
     def removeUrbit(self, patp):

@@ -24,15 +24,14 @@ class UrbitDocker:
 
     def __init__(self,pier_config):
         self.config = pier_config
-
-
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
+
         self.buildUrbit()
-        self.running = (self.container.attrs['State']['Status'] == 'running' )
-        if(self.isRunning()):
-            self.stop()
-            self.start()
+        #self.running = (self.container.attrs['State']['Status'] == 'running' )
+        #if(self.isRunning()):
+        #    self.stop()
+        #    self.remove()
         
 
     def buildVolume(self):
@@ -40,20 +39,40 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
-                shutil.copy('/app/start_urbit.sh', 
-                        f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+         #       shutil.copy('/app/start_urbit.sh', 
+         #               f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
+
+        self.volume = client.volumes.create(name=self.minio_name)
+        #shutil.copy('/app/start_urbit.sh',
+        #        f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
         for c in containers:
             if(self.pier_name == c.name):
-                self.container = c
-                return
+                c.stop()
+                c.remove()
+                #self.container = c
+                #break
+
+        self.run()
+
+        return 0
+
+    def run(self):
+
+        os.system(f'mkdir -p {self._volume_directory}/{self.pier_name}/_data/')
+        shutil.copy('/app/start_urbit.sh',
+                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+
+
+
         if(self.config["network"] != "none"):
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
-            self.container = client.containers.create(
+            self.container = client.containers.run(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     command = command, 
                                     name = self.pier_name,
@@ -63,8 +82,9 @@ class UrbitDocker:
         else:
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]}'
-            self.container = client.containers.create(
+            self.container = client.containers.run(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    command = command, 
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
