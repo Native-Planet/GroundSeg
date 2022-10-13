@@ -44,6 +44,10 @@ class UrbitDocker:
                         f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
                 return
 
+        self.volume = client.volumes.create(name=self.pier_name)
+        shutil.copy('/app/start_urbit.sh',
+                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+
     def buildContainer(self):
         containers = client.containers.list(all=True)
         for c in containers:
