@@ -16,7 +16,7 @@ class Orchestrator:
     minIO_on = False
     wireguard_reg = False
     app_status = 'live'
-    gs_version = 'Beta-2.0.0'
+    gs_version = 'Beta-2.0.1'
 
 
     def __init__(self, config_file):
@@ -252,7 +252,7 @@ class Orchestrator:
         self.registerUrbit(patp)
 
         self.save_config()
-        urbit.run()
+        urbit.start()
         
 
     def removeUrbit(self, patp):
