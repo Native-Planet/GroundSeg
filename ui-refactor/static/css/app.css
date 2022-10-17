@@ -1,0 +1,25 @@
+/* default */
+a {text-decoration: none}
+
+/* card is the main container on every page */
+
+.card::-webkit-scrollbar {display: none;}
+.card {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+
+    background: rgba(109, 109, 109, 0.5);
+    backdrop-filter: blur(60px);
+    -moz-backdrop-filter: blur(60px);
+    -o-backdrop-filter: blur(60px);
+    -webkit-backdrop-filter: blur(60px);
+
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

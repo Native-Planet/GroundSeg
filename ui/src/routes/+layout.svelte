@@ -33,7 +33,7 @@
   }
 
   //onMount(()=>{api.set('http://nativeplanet.local:27016') console.log($page)})
-  onMount(()=>api.set('http://' + $page.url.origin.split('/')[2] + ':27016'))
+  onMount(()=>api.set($page.url.protocol + '//' + $page.url.hostname + ':27016'))
 
 </script>
 <div class="container" class:frozen={($page.url.pathname === "/settings") && (($power === 'shutdown') || ($power === 'restart'))}>

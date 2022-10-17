@@ -8,8 +8,6 @@
 		pierExport = 'standard',
 		bucketExport = 'standard'
 
-	// temporary
-
 	const dispatch = createEventDispatcher();
 
   const updateMinIO = () => {
@@ -124,6 +122,28 @@
 	</div>
 {/if}
 
+<!-- Pack & Meld -->
+<div class="info">
+  <div class="title">Pack & Meld</div>
+  <div class="button-wrapper">
+		<div class="select-wrapper">
+			<div class="select">Once a month</div>
+			<div class="option-wrapper">
+				<div class="option">Every two weeks</div>
+				<div class="option">Once a week</div>
+				<div class="option">Off</div>
+			</div>
+		</div>
+		<PrimaryButton
+			noMargin={true}
+			background="#FFFFFF4D"
+			standard="|pack & |meld now"
+   		loading="melding..."
+			status={'standard'}
+		 on:click={()=>console.log('peqenmeld')} />
+	</div>
+</div>
+
 <!-- Pier Management -->
 <div class="info">
   <div class="title">Pier Management</div>
@@ -156,6 +176,19 @@
 	.button-wrapper {
 		display: flex;
 		gap: 12px;
+	}
+
+	.select-wrapper {
+		font-size: 12px;
+		min-width: 140px;
+		text-align: center;
+	}
+
+	.select {
+		background: var(--action-color); 
+		border-radius: 6px;
+		padding-top: 7px;
+		padding-bottom: 7px;
 	}
 	
 </style>

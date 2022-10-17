@@ -3,9 +3,11 @@ from flask import Flask, flash, request, redirect, url_for, send_from_directory,
 from flask import render_template, make_response, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from graphene import Schema
 
 from orchestrator import Orchestrator
 import urbit_docker
+from schema import Query
 import upload_api, urbit_api, settings_api
 
 
@@ -31,10 +33,13 @@ app.register_blueprint(urbit_api.app)
 app.register_blueprint(upload_api.app)
 app.register_blueprint(settings_api.app)
 
-@app.route("/", methods=['GET'])
-def mainscreen():
-    piers = orchestrator.getUrbits()
-    return jsonify(piers)
+@app.route("/graphql", methods=['POST'])
+def graphql_endpoint():
+    schema = Schema(query=Query)
+
+    query_string = request.get_json()
+    result = schema.execute(query_string['data'])
+    return jsonify(result.data)
 
 @app.route("/updater", methods=['GET'])
 def heartbeat():

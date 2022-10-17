@@ -4,3 +4,4 @@ docker
 psutil
 flask-dropzone
 flask-cors
+graphene>=3.0
