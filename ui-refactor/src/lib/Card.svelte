@@ -2,7 +2,7 @@
   import { fade } from 'svelte/transition'
   import { fadeIn, fadeOut } from '$lib/api'
 
-	export let width, maxHeight = "80vh"
+	export let width, maxHeight = "80vh", padding = true
 
 	let innerWidth = 0
   let innerHeight = 0
@@ -19,7 +19,8 @@
 <div in:fade={fadeIn}
 		 out:fade={fadeOut} 
 		 class="card" 
-	 	 style="max-height:{maxHeight}; width: { vert(innerHeight, innerWidth)
+	 	 style="padding:{padding ? '20px' : '0'};
+		 	max-height:{maxHeight}; width: { vert(innerHeight, innerWidth)
 			 ? 'calc(100vw - 40px)'
 			 : width
 			 };">
@@ -48,7 +49,6 @@
     -ms-overflow-style: none;
 		scrollbar-width: none;
 
-		padding: 20px;
 	}
 
 </style>

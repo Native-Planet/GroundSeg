@@ -1,4 +1,4 @@
-/** @type {import('./$types').LayoutServerLoad} */
+/** @type {import('./$types').PageServerLoad} */
 import { env } from '$env/dynamic/private'
 import { homepageQuery } from '$lib/api'
 

@@ -1,22 +1,24 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
-	import { updateState, piers, api } from '$lib/api'
+
+	import { updateState, homepageQuery, piers, api } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
+	import PierList from '$lib/PierList.svelte'
   import SettingsButton from '$lib/SettingsButton.svelte'
+	import BootButtons from '$lib/BootButtons.svelte'
 
 	// load data into store
 	export let data
-	//updateState(data)
-	console.log(data)
+	updateState(data)
 
-	// is page in view
-	let inView = true
+	// init
+	let inView = false
 
 	// updateState loop
   const update = () => {
     if (inView) {
-			const query = { "data": "query { piers }"}
+			const query = { "data": homepageQuery()}
 			let d = fetch($api, {
 				method: 'POST',
 				headers: {'Content-Type': 'application/json'},
@@ -25,12 +27,15 @@
 			.then(raw => raw.json())
     	.then(res => updateState(res))
 
-			setTimeout(update, 1000)
+			setTimeout(update, 3000)
 		}
 	}
 
 	// Start the update loop
-	//onMount(()=> update())
+	onMount(()=> {
+		inView = !inView
+		update()
+	})
 
 	// end the update loop
 	onDestroy(()=> inView = !inView)
@@ -38,10 +43,12 @@
 </script>
 
 <SettingsButton />
-<Card width="460px">
-  <Logo />
-	<a href="nallux-dozryl">Legit</a>
-	<a href="tsar0s">should redirect</a>
-	<a href="boot/existing">Existing</a>
-	<a href="boot/new">New</a>
-</Card>
+{#if inView}
+	<Card width="460px" padding={false}>
+		<div style="margin: 20px 0 0 20px;">
+  		<Logo />
+		</div>
+		<PierList />
+		<BootButtons />
+	</Card>
+{/if}

@@ -10,7 +10,7 @@ class Pier(ObjectType):
     urbit_url = String()
     minio_url = String()
     minio_reg = Boolean()
-    remote = String()
+    remote = Boolean()
 
     # Advanced options
     pier_logs = String()
@@ -22,18 +22,57 @@ class Query(ObjectType):
     system = String()
 
     def resolve_piers(root, info):
-        return [{
-            "name":"nallux-dozryl",
-            "running":True,
-            "code": "nidpel-ripnus-niswex-bicted",
-            "urbit_url":"https://darmud-hasnep-nallux-dozryl.startram.io",
-            "minio_url":"https://console.s3.darmud-hasnep-nallux-dozryl.startram.io",
-            "minio_reg":True,
-            "remote":True,
-            "pier_logs":"sum logssssss",
-            "minio_adv": "linked/exported bucket",
-            "pier_admin": "restarted/down has been shut"
-            }]
+
+        return [
+                {
+                    "name":"nallux-dozryl",
+                    "running":True,
+                    "code": "nidpel-ripnus-niswex-bicted",
+                    "urbit_url":"https://darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_url":"https://console.s3.darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_reg":True,
+                    "remote":True,
+                    "pier_logs":"sum logssssss",
+                    "minio_adv": "linked/exported bucket",
+                    "pier_admin": "restarted/down has been shut"
+                    },
+                {
+                    "name":"donpub-dozryl",
+                    "running":True,
+                    "code": "nidpzl-ripnus-niswex-bicted",
+                    "urbit_url":"https://darmuz-hasnep-nallux-dozryl.startram.io",
+                    "minio_url":"https://consoze.s3.darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_reg":True,
+                    "remote":True,
+                    "pier_logs":"sum logsssssz",
+                    "minio_adv": "linked/expozted bucket",
+                    "pier_admin": "restarted/zown has been shut"
+                    },
+                {
+                    "name":"nallux-dozryl",
+                    "running":True,
+                    "code": "nidpel-ripnus-niswex-bicted",
+                    "urbit_url":"https://darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_url":"https://console.s3.darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_reg":True,
+                    "remote":True,
+                    "pier_logs":"sum logssssss",
+                    "minio_adv": "linked/exported bucket",
+                    "pier_admin": "restarted/down has been shut"
+                    },
+                {
+                    "name":"donpub-dozryl",
+                    "running":True,
+                    "code": "nidpzl-ripnus-niswex-bicted",
+                    "urbit_url":"https://darmuz-hasnep-nallux-dozryl.startram.io",
+                    "minio_url":"https://consoze.s3.darmud-hasnep-nallux-dozryl.startram.io",
+                    "minio_reg":True,
+                    "remote":True,
+                    "pier_logs":"sum logsssssz",
+                    "minio_adv": "linked/expozted bucket",
+                    "pier_admin": "restarted/zown has been shut"
+                    }
+                ]
 
     def resolve_system(root, info):
         return 'settings dump'

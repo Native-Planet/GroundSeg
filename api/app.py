@@ -6,10 +6,7 @@ from werkzeug.utils import secure_filename
 from graphene import Schema
 
 from orchestrator import Orchestrator
-import urbit_docker
 from schema import Query
-import upload_api, urbit_api, settings_api
-
 
 def signal_handler(sig, frame):
     print("Exiting gracefully")
@@ -18,20 +15,13 @@ def signal_handler(sig, frame):
     p = subprocess.Popen(cmds,shell=True)
     sys.exit(0)
 
-
 orchestrator = Orchestrator("/settings/system.json")
-
 
 app = Flask(__name__)
 CORS(app)
 
 app.config['ORCHESTRATOR'] = orchestrator
 app.config['TEMP_FOLDER'] = './tmp/'
-
-
-app.register_blueprint(urbit_api.app)
-app.register_blueprint(upload_api.app)
-app.register_blueprint(settings_api.app)
 
 @app.route("/graphql", methods=['POST'])
 def graphql_endpoint():
@@ -40,11 +30,6 @@ def graphql_endpoint():
     query_string = request.get_json()
     result = schema.execute(query_string['data'])
     return jsonify(result.data)
-
-@app.route("/updater", methods=['GET'])
-def heartbeat():
-    status = orchestrator.app_status
-    return jsonify(status)
 
 if __name__ == '__main__':
     debug_mode = False

@@ -17,5 +17,6 @@
     background-color: #040404;
     height: 100vh;
     width: 100vw;
+    --action-color: #008eff;
   }
 </style>
