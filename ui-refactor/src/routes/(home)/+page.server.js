@@ -1,13 +1,12 @@
 /** @type {import('./$types').PageServerLoad} */
 import { env } from '$env/dynamic/private'
-import { homepageQuery } from '$lib/api'
 
 export const prerender = true;
 
 export function load() {				
-  const url =	"http://" + env.HOST_HOSTNAME + ".local:27016/graphql"
-	const query = { "data": homepageQuery()}
-	let d = fetch(url, {
+  const url =	"http://" + env.HOST_HOSTNAME + ".local:27016"
+	const query = ['name', 'running', 'code', 'urbitUrl']
+	let d = fetch(url + '/piers', {
 					method: 'POST',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify(query)

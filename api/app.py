@@ -3,10 +3,9 @@ from flask import Flask, flash, request, redirect, url_for, send_from_directory,
 from flask import render_template, make_response, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from graphene import Schema
 
 from orchestrator import Orchestrator
-from schema import Query
+
 
 def signal_handler(sig, frame):
     print("Exiting gracefully")
@@ -23,13 +22,17 @@ CORS(app)
 app.config['ORCHESTRATOR'] = orchestrator
 app.config['TEMP_FOLDER'] = './tmp/'
 
-@app.route("/graphql", methods=['POST'])
-def graphql_endpoint():
-    schema = Schema(query=Query)
+@app.route("/piers", methods=['POST'])
+def list_piers():
+    data = request.get_json()
+    piers = orchestrator.get_piers(data)
+    return jsonify(piers)
 
-    query_string = request.get_json()
-    result = schema.execute(query_string['data'])
-    return jsonify(result.data)
+@app.route("/submit", methods=['POST'])
+def submit_request():
+    data = request.get_json()
+    status_code = orchestrator.submit_request(data)
+    return jsonify(status_code)
 
 if __name__ == '__main__':
     debug_mode = False

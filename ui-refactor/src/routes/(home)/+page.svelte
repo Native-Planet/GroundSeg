@@ -1,7 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
 
-	import { updateState, homepageQuery, piers, api } from '$lib/api'
+	import { updateState, piers, api } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 	import PierList from '$lib/PierList.svelte'
@@ -18,11 +18,11 @@
 	// updateState loop
   const update = () => {
     if (inView) {
-			const query = { "data": homepageQuery()}
-			let d = fetch($api, {
-				method: 'POST',
-				headers: {'Content-Type': 'application/json'},
-				body: JSON.stringify(query)
+			const query = ['name', 'running', 'code', 'urbitUrl']
+			let d = fetch($api + '/piers', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify(query)
 			})
 			.then(raw => raw.json())
     	.then(res => updateState(res))

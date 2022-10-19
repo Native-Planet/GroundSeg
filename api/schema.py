@@ -2,7 +2,7 @@ from graphene import ObjectType, Field, String, Boolean, List
 
 class Pier(ObjectType):
     # General (requested on home page)
-    name = String()
+    name = String(patp=String(default_value="all"))
     running = Boolean() #urbit.isRunning();
     code = String()
 
@@ -17,8 +17,10 @@ class Pier(ObjectType):
     minio_adv = String()
     pier_admin = String()
 
+
 class Query(ObjectType):
-    piers = List(Pier)
+    all_piers = List(Pier)
+    pier = Field(Pier)
     system = String()
 
     def resolve_piers(root, info):

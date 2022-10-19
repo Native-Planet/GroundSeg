@@ -1,7 +1,6 @@
 <script>
 	import { onMount } from 'svelte'
-  import { fade } from 'svelte/transition'
-	import { quintOut } from 'svelte/easing'
+  import { blur } from 'svelte/transition'
 
 	let inView = false
 
@@ -11,17 +10,11 @@
 </script>
 
 {#if inView}
-	<div class="boot">
-		<a
-			class="existing"
-			href="/boot/existing"
-			in:fade={{delay: 400, duration: 300, easing: quintOut }}>
+	<div class="boot" transition:blur={{duration: 600, amount: 10}}>
+		<a class="existing"	href="/boot/existing">
     	Boot an existing Urbit ID
 	  </a>
-		<a
-			class="new"
-		 	href="/boot/new"
-			in:fade={{delay: 460, duration: 300, easing: quintOut }}>
+		<a class="new" href="/boot/new">
     	Boot a new Urbit ID
 	  </a>
 	</div>

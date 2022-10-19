@@ -14,7 +14,6 @@
 		inView = !inView
 	})
 
-
 </script>
 	<div class="wrapper">
  		{#each $piers as p, i}
@@ -22,7 +21,7 @@
 		 		<div class="pier" in:scale={{duration:160, delay: 360 + (50 * i)}}>
 			   	<Sigil patp={p.name} size="60px" rad="8px" />
 					<a class="info"
-    	  		href={p.running ? p.url : ""}
+    	  		href={p.running ? p.urbitUrl : ""}
 		      	target={p.running ? "_blank" : ""}>
 	  		    <div class="patp">{p.name}</div>
   	    		<div class="status">{p.running ? 'Running' : 'Stopped'}</div>

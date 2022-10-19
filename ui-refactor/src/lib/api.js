@@ -7,13 +7,6 @@ export const fadeIn = {duration:200, delay: 160}
 export const fadeOut = {duration:200}
 
 //
-// graphql queries
-//
-export const homepageQuery = () => {
-	return "query { piers {name,running,code, urbitUrl} }"
-}
-
-//
 // writable stores
 //
 export const piers = writable([])
@@ -58,4 +51,31 @@ const mergeByProperty = (target, source, prop) => {
     })
     targetElement ? Object.assign(targetElement, sourceElement) : target.push(sourceElement);
   })
+}
+
+export const isPatp = p => {
+  
+  // prefixes and suffixes into arrays
+  let pre = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+  let suf = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+  pre = pre.match(/.{1,3}/g)
+  suf = suf.match(/.{1,3}/g)
+
+  // patp into array
+  p = p.replace(/~/g,'').split('-')
+
+  // check every syllable
+  let checked = []
+  for (let i = 0; i < p.length; i++) {
+
+    if (p[i].length == 3) {
+      checked.push(suf.includes(p[i]))
+    } else if (p[i].length == 6) {
+      let s = p[i].match(/.{1,3}/g)
+      checked.push(pre.includes(s[0]) && (suf.includes(s[1])))
+    } else {return false}
+  }
+
+  // returns true if no falses in checked
+  return !checked.includes(false)
 }

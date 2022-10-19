@@ -1,6 +1,6 @@
-import json, subprocess, requests
+import json, subprocess, requests, copy
 from wireguard import Wireguard
-from urbit_docker import UrbitDocker
+from urbit_docker import UrbitDocker, default_pier_config 
 from minio_docker import MinIODocker
 from updater_docker import WatchtowerDocker
 import socket
@@ -15,7 +15,6 @@ class Orchestrator:
     _watchtower = {}
     minIO_on = False
     wireguard_reg = False
-    app_status = 'live'
     gs_version = 'Beta-2.0.1'
 
 
@@ -125,6 +124,59 @@ class Orchestrator:
 
         return 0
         
+#
+#   Flask endpoint functions
+#
+
+    # '/piers'
+    def get_piers(self, data):
+
+        payload = []
+        for urbit in self._urbits.values():
+            pier = dict()
+            #u['network'] = urbit.config['network']
+            #u['minio_registered'] = True
+
+            if 'name' in data:
+                pier['name'] = urbit.pier_name
+
+            if 'running' in data:
+                pier['running'] = urbit.isRunning()
+
+            payload.append(pier)
+        
+        #'code'
+        #'urbitUrl'
+        result = {'piers': payload}
+        return result
+
+    # '/submit'
+    def submit_request(self, data):
+        if data.get('boot') == 'new':
+            patp = data.get('patp')
+            key = data.get('key')
+
+            http_port, ames_port = self.getOpenUrbitPort()
+            urbit = self.make_urbit(patp, http_port, ames_port)
+            urbit.addKey(key)
+            self.addUrbit(patp, urbit)
+
+        return 200
+ 
+
+    # make urbit ship docker
+    def make_urbit(self, patp, http_port, ames_port):
+        data = copy.deepcopy(default_pier_config)
+        data['pier_name'] = patp
+        data['http_port'] = http_port
+        data['ames_port'] = ames_port
+    
+        with open(f'settings/pier/{patp}.json', 'w') as f:
+            json.dump(data, f, indent = 4)
+    
+        urbit = UrbitDocker(data)
+        return urbit
+
 
     def load_urbits(self):
         for p in self.config['piers']:
