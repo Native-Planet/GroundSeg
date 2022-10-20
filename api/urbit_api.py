@@ -5,53 +5,51 @@ from flask import current_app
 
 
 import os,time
-import zipfile, tarfile
-import glob
+import zipfile, tarfile, zipfile, glob
 from io import BytesIO
-import zipfile
 from werkzeug.utils import secure_filename
-import socket
 
 from orchestrator import Orchestrator
 
 import urbit_docker
 
-
 app = Blueprint('urbit', __name__, template_folder='templates')
 
-@app.route('/urbit/pier', methods=['GET'])
-def pier_info():
-    pier = request.args.get('pier')
+# Get all urbits
+@app.route("/urbits", methods=['GET'])
+def all_urbits():
     orchestrator = current_app.config['ORCHESTRATOR']
-    urbits = orchestrator.getUrbits()
+    urbs = orchestrator.get_urbits()
+    return jsonify(urbs)
+
+# Get details of urbit ID
+@app.route('/urbit', methods=['GET','POST'])
+def urbit_info():
+    urbit_id = request.args.get('urbit_id')
+    orchestrator = current_app.config['ORCHESTRATOR']
     
-    urbit=None
-    for u in urbits:
-        if(pier == u['name']):
-            urbit = u
+    if request.method == 'GET':
+        urb = orchestrator.get_urbit(urbit_id)
+    
+        return jsonify(urb)
 
-    if(urbit == None):
-        return jsonify(400)
+    if request.method == 'POST':
+        res = orchestrator.handle_urbit_post(urbit_id, request.get_json())
+        return jsonify(res)
 
-    nw_label = "Local"
-    if(urbit['network'] == 'wireguard'):
-        nw_label = "Remote"
-
-    p = dict()
-    p['nw_label'] = nw_label
-    p['pier'] = urbit
-    p['wg_reg'] = orchestrator.wireguard_reg
-    p['wg_running'] = orchestrator.wireguard.isRunning()
-    p['hasBucket'] = orchestrator.has_bucket(pier)
-
-    return(jsonify(p))
-
+# Get +code
 @app.route('/urbit/code', methods=['GET'])
 def pier_code():
     pier = request.args.get('pier')
     orchestrator = current_app.config['ORCHESTRATOR']
     code = orchestrator.getCode(pier)
     return jsonify(code)
+
+
+
+
+#####################################################################################
+
 
 @app.route('/urbit/minio/register', methods=['POST'])
 def register_minio():

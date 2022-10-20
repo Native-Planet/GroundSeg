@@ -36,7 +36,7 @@ class Wireguard:
 
         # Load wireguard docker
         self.wg_docker = WireguardDocker(data)
-        if(self.wg_docker.isRunning()):
+        if(self.wg_docker.is_running()):
             self.wg_docker.stop()
 
 
@@ -141,6 +141,6 @@ class Wireguard:
         # Setup and start the local wg client
         self.wg_docker.addConfig(self.wg_config)
 
-    def isRunning(self):
-        return self.wg_docker.isRunning()
+    def is_running(self):
+        return self.wg_docker.is_running()
 

@@ -1,25 +1,21 @@
 /* default */
 a {text-decoration: none}
 
-/* card is the main container on every page */
+/* standard design for pier info */
 
-.card::-webkit-scrollbar {display: none;}
-.card {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #fff;
-    
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-
-    background: rgba(109, 109, 109, 0.5);
-    backdrop-filter: blur(60px);
-    -moz-backdrop-filter: blur(60px);
-    -o-backdrop-filter: blur(60px);
-    -webkit-backdrop-filter: blur(60px);
-
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+.pier-info {margin-bottom: 12px}
+.pier-title {
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.pier-cred-wrapper {display: flex;}
+.pier-cred {
+  font-style: italic;
+  font-size: 12px;
+  padding: 8px;
+  background: #ffffff4d;
+  border-radius: 6px;
+  flex: 1;
+  cursor: pointer;
 }

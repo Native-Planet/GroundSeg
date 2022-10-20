@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
 
-	import { piers } from '$lib/api'
+	import { urbits } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
 
   import Fa from 'svelte-fa'
@@ -16,17 +16,17 @@
 
 </script>
 	<div class="wrapper">
- 		{#each $piers as p, i}
+ 		{#each $urbits as u, i}
 			{#if inView}
-		 		<div class="pier" in:scale={{duration:160, delay: 360 + (50 * i)}}>
-			   	<Sigil patp={p.name} size="60px" rad="8px" />
+		 		<div class="pier" in:scale={{duration:120, delay: 300}}>
+			   	<Sigil patp={u.name} size="60px" rad="8px" />
 					<a class="info"
-    	  		href={p.running ? p.urbitUrl : ""}
-		      	target={p.running ? "_blank" : ""}>
-	  		    <div class="patp">{p.name}</div>
-  	    		<div class="status">{p.running ? 'Running' : 'Stopped'}</div>
+    	  		href={u.running ? u.urbitUrl : ""}
+		      	target={u.running ? "_blank" : ""}>
+	  		    <div class="patp">{u.name}</div>
+  	    		<div class="status">{u.running ? 'Running' : 'Stopped'}</div>
 		    	</a>
-	  		  <a href={p.name}>
+	  		  <a href={u.name}>
   	    		<Fa icon={faGear} size="1.2x" />
   	    	</a>
 			  </div>

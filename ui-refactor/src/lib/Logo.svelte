@@ -7,7 +7,7 @@
   export let t = ""
 </script>
 
-<div class="logo" transition:blur={{duration: 1000, amount: 100}} >
+<div class="logo" transition:blur={{duration: 400, amount: 100}} >
   <a href="/"><img src="/nplogo.svg" alt="Native Planet Logo" /></a>
 	{#if t.length > 0}
 		<div class="wrapper"> 

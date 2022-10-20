@@ -1,6 +1,6 @@
-import json, subprocess, requests, copy
+import json, subprocess, requests
 from wireguard import Wireguard
-from urbit_docker import UrbitDocker, default_pier_config 
+from urbit_docker import UrbitDocker
 from minio_docker import MinIODocker
 from updater_docker import WatchtowerDocker
 import socket
@@ -10,14 +10,150 @@ import os
 
 class Orchestrator:
     
+#
+#   variables
+#
     _urbits = {}
     _minios = {}
     _watchtower = {}
     minIO_on = False
     wireguard_reg = False
-    gs_version = 'Beta-2.0.1'
+    gs_version = 'Beta-2.0.2'
+
+#
+#   pier information
+#
+    # Get all piers for home page
+    def get_urbits(self):
+        urbits= []
+
+        for urbit in self._urbits.values():
+            u = dict()
+            u['name'] = urbit.pier_name
+            u['running'] = urbit.is_running()
+            if(urbit.config['network']=='wireguard'):
+                u['url'] = f"https://{urbit.config['wg_url']}"
+            else:
+                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
+
+            urbits.append(u)
+
+        return {'urbits': urbits}
+
+    # Get +code of Urbit Pier
+    def get_code(self,pier):
+        code = ''
+        addr = self.getLoopbackAddr(pier)
+        try:
+            code = self._urbits[pier].get_code(addr)
+        except Exception as e:
+            print(e)
+
+        return code
+
+    # Get all details of Urbit ID
+    def get_urbit(self, urbit_id):
+        urb = self._urbits.get(urbit_id)
+        
+        if(urb == None):
+            return 400
+
+        u = dict()
+        u['name'] = urb.pier_name
+        u['running'] = urb.is_running()
+
+        u['wgReg'] = self.wireguard_reg
+        u['wgRunning'] = self.wireguard.is_running()
+
+        u['remote'] = False
+        u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
+
+        if(urb.config['network'] == 'wireguard'):
+            u['remote'] = True
+            u['urbitUrl'] = f"https://{urb.config['wg_url']}"
+
+        return u
+
+    # Handle POST request relating to Urbit ID
+    def handle_urbit_post(self ,urbit_id, data):
+        urb = self._urbits.get(urbit_id)
+
+        if urb == None:
+            return 400
+
+        if data['app'] == 'pier':
+            if data['data'] == 'toggle':
+                x = self.toggle_pier_power(urb)
+                return x
+
+        if data['app'] == 'wireguard':
+            if data['data'] == 'toggle':
+                x = self.toggle_pier_network(urb)
+                return x
+
+        return 400
+
+    # Toggle Pier on or off
+    def toggle_pier_power(self, urb):
+
+        if urb.is_running() == True:
+            x = urb.stop()
+            if x == 0:
+                return 200
+            return 400
+        else:
+            x = urb.start()
+            if x == 0:
+                return 200
+            return 400
+        
+        return 400
+
+    # Toggle Pier Wireguard connection on or off
+    def toggle_pier_network(self, urb):
+
+        wg_reg = self.wireguard_reg
+        wg_is_running = self.wireguard.wg_docker.is_running()
+        cfg = urb.config
+
+        network = 'none'
+        if cfg['network'] == 'none' and wg_reg and wg_is_running:
+            network = 'wireguard'
+
+        x = urb.set_network(network)
+        if x == 0:
+            return 200
+
+        return 400
+            
+ 
 
 
+
+
+
+#####################################################################################
+
+    #p['hasBucket'] = orchestrator.has_bucket(pier)
+
+ 
+#            u['minio_registered'] = True
+
+#            if urbit.config['minio_password'] == '':
+#                u['minio_registered'] = False
+
+#            if self.wireguard_reg:
+#                u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
+#            else:
+#               u['s3_url'] = ""
+#            if(urbit.config['network']=='wireguard'):
+#                u['url'] = f"https://{urbit.config['wg_url']}"
+#            else:
+#                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
+
+#
+#   init
+#
     def __init__(self, config_file):
         # store config file location
         self.config_file = config_file
@@ -124,59 +260,6 @@ class Orchestrator:
 
         return 0
         
-#
-#   Flask endpoint functions
-#
-
-    # '/piers'
-    def get_piers(self, data):
-
-        payload = []
-        for urbit in self._urbits.values():
-            pier = dict()
-            #u['network'] = urbit.config['network']
-            #u['minio_registered'] = True
-
-            if 'name' in data:
-                pier['name'] = urbit.pier_name
-
-            if 'running' in data:
-                pier['running'] = urbit.isRunning()
-
-            payload.append(pier)
-        
-        #'code'
-        #'urbitUrl'
-        result = {'piers': payload}
-        return result
-
-    # '/submit'
-    def submit_request(self, data):
-        if data.get('boot') == 'new':
-            patp = data.get('patp')
-            key = data.get('key')
-
-            http_port, ames_port = self.getOpenUrbitPort()
-            urbit = self.make_urbit(patp, http_port, ames_port)
-            urbit.addKey(key)
-            self.addUrbit(patp, urbit)
-
-        return 200
- 
-
-    # make urbit ship docker
-    def make_urbit(self, patp, http_port, ames_port):
-        data = copy.deepcopy(default_pier_config)
-        data['pier_name'] = patp
-        data['http_port'] = http_port
-        data['ames_port'] = ames_port
-    
-        with open(f'settings/pier/{patp}.json', 'w') as f:
-            json.dump(data, f, indent = 4)
-    
-        urbit = UrbitDocker(data)
-        return urbit
-
 
     def load_urbits(self):
         for p in self.config['piers']:
@@ -323,32 +406,6 @@ class Orchestrator:
         self.save_config()
 
 
-    def getUrbits(self):
-        urbits= []
-
-        for urbit in self._urbits.values():
-            u = dict()
-            u['name'] = urbit.pier_name
-            u['running'] = urbit.isRunning();
-            u['network'] = urbit.config['network']
-            u['minio_registered'] = True
-
-            if urbit.config['minio_password'] == '':
-                u['minio_registered'] = False
-
-            if self.wireguard_reg:
-                u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
-            else:
-               u['s3_url'] = ""
-
-            if(urbit.config['network']=='wireguard'):
-                u['url'] = f"https://{urbit.config['wg_url']}"
-            else:
-                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
-
-            urbits.append(u)
-
-        return urbits
 
     def getCode(self,pier):
         code = ''
@@ -376,21 +433,6 @@ class Orchestrator:
         print(containers)
         return containers
 
-    def switchUrbitNetwork(self, urbit_name):
-        urbit = self._urbits[urbit_name]
-        network = 'none'
-        url = f"{socket.gethostname()}.local:{urbit.config['http_port']}"
-
-        if((urbit.config['network'] == 'none') 
-           and (self.wireguard_reg) 
-           and (self.wireguard.wg_docker.isRunning())):
-            network = 'wireguard'
-            url = urbit.config['wg_url']
-
-        urbit.setNetwork(network);
-        time.sleep(2)
-        
-
     def getOpenUrbitPort(self):
         http_port = 8080
         ames_port = 34343
@@ -411,7 +453,6 @@ class Orchestrator:
         if container in self._urbits.keys():
             return self._urbits[container].logs()
         return ""
-
 
     def first_boot(self):
         subprocess.run("wg genkey > privkey", shell=True)

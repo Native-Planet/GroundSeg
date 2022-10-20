@@ -9,7 +9,7 @@ export const fadeOut = {duration:200}
 //
 // writable stores
 //
-export const piers = writable([])
+export const urbits = writable([])
 export const system = writable({})
 export const api = writable('')
 
@@ -17,19 +17,13 @@ export const api = writable('')
 // state update main functions
 //
 export const updateState = update => {
-	updatePiers(update['piers'])
+	updateUrbits(update['urbits'])
 	updateApi(update['api'])
 }
 
 export const updateApi = a => {if(a){api.set(a)}}
+export const updateUrbits = p => {if (p) {urbits.set(p)}}
 
-export const updatePiers = p => {
-	//piers.update(state => {
-	//})
-	if (p) {
-	piers.set(p)	
-	}
-}
 /*
 export const updateSystem = update => {
 	if (update['system']) {
@@ -44,14 +38,6 @@ export const updateSystem = update => {
 //
 // misc
 //
-const mergeByProperty = (target, source, prop) => {
-  source.forEach(sourceElement => {
-    let targetElement = target.find(targetElement => {
-      return sourceElement[prop] === targetElement[prop];
-    })
-    targetElement ? Object.assign(targetElement, sourceElement) : target.push(sourceElement);
-  })
-}
 
 export const isPatp = p => {
   

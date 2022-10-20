@@ -25,15 +25,13 @@ class UrbitDocker:
     def __init__(self,pier_config):
         self.config = pier_config
 
-
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
         self.buildUrbit()
         self.running = (self.container.attrs['State']['Status'] == 'running' )
-        if(self.isRunning()):
+        if(self.is_running()):
             self.stop()
             self.start()
-        
 
     def buildVolume(self):
         volumes = client.volumes.list()
@@ -89,7 +87,7 @@ class UrbitDocker:
 
         running = False
         
-        if(self.isRunning()):
+        if(self.is_running()):
             self.stop()
             running = True
 
@@ -99,12 +97,12 @@ class UrbitDocker:
         if(running):
             self.start()
 
-    def setNetwork(self, network):
+    def set_network(self, network):
         if(self.config['network'] == network):
-            return
+            return 0
 
         running = False
-        if(self.isRunning()):
+        if(self.is_running()):
             self.stop()
             running = True
         
@@ -116,6 +114,8 @@ class UrbitDocker:
 
         if(running):
             self.start()
+
+        return 0
 
     def save_config(self):
         with open(f'settings/pier/{self.pier_name}.json', 'w') as f:
@@ -189,13 +189,15 @@ class UrbitDocker:
     def start(self):
         self.container.start()
         self.running=True
+        return 0
 
     def stop(self):
         self.container.stop()
         self.running=False
+        return 0
 
     def logs(self):
         return self.container.logs()
     
-    def isRunning(self):
+    def is_running(self):
         return self.running

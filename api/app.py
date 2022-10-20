@@ -5,6 +5,8 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 from orchestrator import Orchestrator
+import urbit_docker
+import upload_api, urbit_api, settings_api
 
 
 def signal_handler(sig, frame):
@@ -14,7 +16,9 @@ def signal_handler(sig, frame):
     p = subprocess.Popen(cmds,shell=True)
     sys.exit(0)
 
+
 orchestrator = Orchestrator("/settings/system.json")
+
 
 app = Flask(__name__)
 CORS(app)
@@ -22,17 +26,9 @@ CORS(app)
 app.config['ORCHESTRATOR'] = orchestrator
 app.config['TEMP_FOLDER'] = './tmp/'
 
-@app.route("/piers", methods=['POST'])
-def list_piers():
-    data = request.get_json()
-    piers = orchestrator.get_piers(data)
-    return jsonify(piers)
-
-@app.route("/submit", methods=['POST'])
-def submit_request():
-    data = request.get_json()
-    status_code = orchestrator.submit_request(data)
-    return jsonify(status_code)
+app.register_blueprint(urbit_api.app)
+app.register_blueprint(upload_api.app)
+app.register_blueprint(settings_api.app)
 
 if __name__ == '__main__':
     debug_mode = False
