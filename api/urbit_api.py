@@ -34,7 +34,7 @@ def urbit_info():
         return jsonify(urb)
 
     if request.method == 'POST':
-        res = orchestrator.handle_urbit_post(urbit_id, request.get_json())
+        res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
         return jsonify(res)
 
 # Get +code

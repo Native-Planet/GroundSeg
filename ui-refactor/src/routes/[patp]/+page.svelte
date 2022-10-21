@@ -1,28 +1,35 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
+  import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
 	import { api, updateState } from '$lib/api'
 
-	import Card from '$lib/Card.svelte'
   import SettingsButton from '$lib/SettingsButton.svelte'
+	import Card from '$lib/Card.svelte'
   import Logo from '$lib/Logo.svelte'
 
 	import PierHeader from '$lib/PierHeader.svelte'
 	import PierProfile from '$lib/PierProfile.svelte'
-	import PierCredentials from '$lib/PierCredentials.svelte'
+	import PierCode from '$lib/PierCode.svelte'
+	import PierUrl from '$lib/PierUrl.svelte'
+  import PierMinIOSetup from '$lib/PierMinIOSetup.svelte'
+  import PierMinIO from '$lib/PierMinIO.svelte'
+	import PierNetwork from '$lib/PierNetwork.svelte'
 
 	// load data into store
 	export let data
 	updateState(data)
 
 	// default values
-	let inView = false, loaded = false, urbit
+	let inView = false, loaded = false, urbit, code = ''
 
 	// start api loop
 	onMount(()=> {
 		inView = !inView
-		update()
-	})
+    update()
+    getUrbitCode()
+  })
+
 	// stop api loop
 	onDestroy(()=> inView = !inView)
 
@@ -31,14 +38,35 @@
     if (inView) {
 			fetch($api + '/urbit?urbit_id=' + $page.params.patp)
 			.then(raw => raw.json())
-			.then(res => { urbit = res; loaded = true})
+        .then(res => { handleData(res); loaded = true })
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)
 	}}
 
-	// temp
-	let code = 'aaaaaa-aaaaaa-aaaaaa-aaaaaa'
+  const handleData = d => {
+    if (d == 400) { window.location.href = "/" }
+    if (d.name == $page.params.patp) { urbit = d }
+  }
+
+  const getUrbitCode = () => {
+    if (inView) {
+			fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
+			  method: 'POST',
+			  headers: {'Content-Type': 'application/json'},
+			  body: JSON.stringify({'app':'pier','data':'+code'})
+	    })
+      .then(r => r.json())
+      .then(d => {
+        code = d
+        if (d.length == 27) {
+          setTimeout(getUrbitCode, 1800000)
+        } else {
+          setTimeout(getUrbitCode, 1000)
+        }
+      })
+  }}
+
 </script>
 
 <SettingsButton />
@@ -54,19 +82,35 @@
 		<!-- Pier Profile (public information) -->
 		<PierProfile name={urbit.name} running={urbit.running}/>
 
-	  <!-- Pier Credentials -->
+	  <!-- Pier Credentials-->
+
 	  {#if (code.length == 27) && urbit.running}
-			<PierCredentials
-      	name={urbit.name}
-			  remote={urbit.remote}
-				code={code}
-				urbitUrl={urbit.urbitUrl}
-			  wgReg={urbit.wgReg}
-				wgRunning={urbit.wgRunning} />
-		{/if}
-		<!--
-    		minIO={urbit.s3Url}
-	      minIO_reg={data.pier.minio_registered}
+
+    	<!-- Landscape +code 
+        placeholder code -->
+      <div transition:scale={{duration:120, delay: 200}}>
+    	  <PierCode code={code} />
+      </div>
+
+    	<!-- Urbit Landscape URL -->
+      <div transition:scale={{duration:120, delay: 200}}>
+    	  <PierUrl urbitUrl={urbit.urbitUrl} />
+      </div>
+
+    	<!-- MinIO Console -->
+      {#if urbit.wgReg && urbit.wgRunning}
+        <div transition:scale={{duration:120, delay: 200}}>
+          <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
+          <PierMinIO minIOReg={urbit.minIOReg} remote={urbit.remote} minIOUrl={urbit.minIOUrl} />
+        </div>
+      {/if}
+
+      <!-- Toggle Urbit Network -->
+      <div transition:scale={{duration:120, delay: 200}}>
+		    <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
+      </div>
+
+   {/if}
 
 		<!-- Advanced Options -->
 		<!--

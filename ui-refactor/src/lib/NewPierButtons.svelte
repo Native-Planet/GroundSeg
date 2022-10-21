@@ -25,8 +25,8 @@
     const k = key.trim()
 
     if (isPatp(n)) {
-			const query = {"boot":"new","patp":n.replace(/~/g,''),"key":k}
-			fetch($api + '/submit', {
+      const query = {"app":"boot-new", "data": k }
+			fetch($api + '/urbit?urbit_id=' + n.replace(/~/g,''), {
 					method: 'POST',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify(query)
@@ -37,6 +37,7 @@
             buttonStatus = 'success'
             setTimeout(window.location.href = "/" + name, 2000)
           } else {
+            console.log(res)
             buttonStatus = 'failure'
             setTimeout(()=>buttonStatus = 'standard', 4000)
     }})} else {

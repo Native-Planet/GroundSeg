@@ -63,7 +63,7 @@ class Wireguard:
 
         return(response['lease'])
 
-    def registerService(self, subdomain, service_type, url):
+    def register_service(self, subdomain, service_type, url):
         # /v1/create
         update_data = {
             "subdomain" : f"{subdomain}",
@@ -93,7 +93,7 @@ class Wireguard:
 
         return response['status']
         
-    def getStatus(self,url):
+    def get_status(self,url):
         headers = {"Content-Type": "application/json"}
         response = None
 

@@ -10,7 +10,7 @@
 
   let copy = new Clipboard('#code');
  	copy.on("success", ()=> {
-    clicked = true; setTimeout(()=> clickedExt = false, 1000)})
+    clicked = true; setTimeout(()=> clicked = false, 1000)})
 </script>
 
     <div class="pier-info">

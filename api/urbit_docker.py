@@ -74,17 +74,14 @@ class UrbitDocker:
                                     detach = True)
 
 
-    def setWireguardNetwork(self, url, http_port, ames_port, s3_port, console_port):
+    def set_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
         self.config['wg_url'] = url
         self.config['wg_http_port'] = http_port
         self.config['wg_ames_port'] = ames_port
         self.config['wg_s3_port'] = s3_port
         self.config['wg_console_port'] = console_port
 
-        print(self.config)
-        #self.config['network'] = 'wireguard'
         self.save_config()
-
         running = False
         
         if(self.is_running()):
@@ -131,7 +128,7 @@ class UrbitDocker:
         self.container.remove()
         self.volume.remove()
 
-    def addKey(self, key_value):
+    def add_key(self, key_value):
         with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
             f.write(key_value)
 
