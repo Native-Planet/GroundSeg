@@ -214,6 +214,7 @@ class Orchestrator:
         x = urbit.start()
         return x
  
+    # Register Wireguard for Urbit
     def register_urbit(self, patp):
        endpoint = self.config['endpointUrl']
        api_version = self.config['apiVersion']

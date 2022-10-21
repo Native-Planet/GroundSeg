@@ -83,7 +83,6 @@
 		<PierProfile name={urbit.name} running={urbit.running}/>
 
 	  <!-- Pier Credentials-->
-
 	  {#if (code.length == 27) && urbit.running}
 
     	<!-- Landscape +code 
