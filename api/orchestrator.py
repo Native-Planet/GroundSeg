@@ -1,4 +1,6 @@
-import json, subprocess, requests, copy, socket, time, sys, os
+import json, os, time, shutil  #subprocess, requests, copy, socket, time, sys
+from flask import jsonify, send_file
+
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker, default_pier_config
 from minio_docker import MinIODocker
@@ -7,14 +9,14 @@ from updater_docker import WatchtowerDocker
 class Orchestrator:
     
 #
-#   Initial Variables
+#   Variables
 #
     _urbits = {}
     _minios = {}
     _watchtower = {}
     minIO_on = False
     wireguard_reg = False
-    gs_version = 'Beta-2.0.2'
+    gs_version = 'Beta-2.0.2' # no longer required
 
 #
 #   Urbit Pier
@@ -56,6 +58,7 @@ class Orchestrator:
         u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
         u['minIOUrl'] = ""
         u['minIOReg'] = True
+        u['hasBucket'] = False
 
         if(urb.config['network'] == 'wireguard'):
             u['remote'] = True
@@ -66,6 +69,9 @@ class Orchestrator:
 
         if urb.config['minio_password'] == '':
              u['minIOReg'] = False
+
+        if urbit_id in self._minios:
+            u['hasBucket'] = True
 
         return u
 
@@ -93,6 +99,10 @@ class Orchestrator:
                 x = self.get_urbit_code(urbit_id, urb)
                 return x
 
+            if data['data'] == 's3-update':
+                x = self.set_minio_endpoint(urbit_id)
+                return x
+
         # Wireguard requests
         if data['app'] == 'wireguard':
             if data['data'] == 'toggle':
@@ -104,6 +114,10 @@ class Orchestrator:
             pwd = data.get('password')
             if pwd != None:
                 x = self.create_minio_admin_account(urbit_id, pwd)
+                return x
+
+            if data['data'] == 'export':
+                x = self.export_minio_bucket(urbit_id)
                 return x
 
         return 400
@@ -216,46 +230,139 @@ class Orchestrator:
  
     # Register Wireguard for Urbit
     def register_urbit(self, patp):
-       endpoint = self.config['endpointUrl']
-       api_version = self.config['apiVersion']
-       url = f'https://{endpoint}/{api_version}'
+        
+        # Todo: clean up
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f'https://{endpoint}/{api_version}'
 
-       if self.wireguard_reg:
-           self.anchor_config = self.wireguard.get_status(url)
-           patp_reg = False
+        if self.wireguard_reg:
+            self.anchor_config = self.wireguard.get_status(url)
+            patp_reg = False
 
-           if self.anchor_config != None:
-              for ep in self.anchor_config['subdomains']:
-                 if(patp in ep['url']):
-                     print(f"{patp} already exists")
-                     patp_reg = True
+            if self.anchor_config != None:
+                for ep in self.anchor_config['subdomains']:
+                    if(patp in ep['url']):
+                        print(f"{patp} already exists")
+                        patp_reg = True
 
-           if patp_reg == False:
-              self.wireguard.register_service(f'{patp}','urbit',url)
-              self.wireguard.register_service(f's3.{patp}','minio',url)
+            if patp_reg == False:
+                self.wireguard.register_service(f'{patp}','urbit',url)
+                self.wireguard.register_service(f's3.{patp}','minio',url)
 
-           self.anchor_config = self.wireguard.get_status(url)
-           url = None
-           http_port = None
-           ames_port = None
-           s3_port = None
-           console_port = None
+            self.anchor_config = self.wireguard.get_status(url)
+            url = None
+            http_port = None
+            ames_port = None
+            s3_port = None
+            console_port = None
 
-           print(self.anchor_config['subdomains'])
-           pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
-           for ep in self.anchor_config['subdomains']:
-               if(f'{patp}.{pub_url}' == ep['url']):
-                   url = ep['url']
-                   http_port = ep['port']
-               elif(f'ames.{patp}.{pub_url}' == ep['url']):
-                   ames_port = ep['port']
-               elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
-                   s3_port = ep['port']
-               elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
-                   console_port = ep['port']
+            print(self.anchor_config['subdomains'])
+            pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+            for ep in self.anchor_config['subdomains']:
+                if(f'{patp}.{pub_url}' == ep['url']):
+                    url = ep['url']
+                    http_port = ep['port']
+                elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                    ames_port = ep['port']
+                elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                    s3_port = ep['port']
+                elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                    console_port = ep['port']
 
-           self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
+            self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
+            self.wireguard.start()
+
+    # Update/Set Urbit S3 Endpoint
+    def set_minio_endpoint(self, patp):
+        ak, sk = self._minios[patp].make_service_account().split('\n')
+        u = self._urbits[patp]
+
+        endpoint = f"s3.{u.config['wg_url']}"
+        bucket = 'bucket'
+        lens_port = self.get_urbit_loopback_addr(patp)
+        access_key = ak.split(' ')[-1]
+        secret = sk.split(' ')[-1]
+
+        try:
+            x = u.set_minio_endpoint(endpoint,access_key,secret,bucket,lens_port)
+            return 200
+
+        except Exception as e:
+            print(e)
+        
+        return 400
+
+    # Export contents of minIO bucket
+    def export_minio_bucket(self, patp):
+        m = self._minios[patp]
+    
+        if(m==None):
+            return 400
+        
+        file_name = f'bucket_{patp}.zip'
+        bucket_path=f'/var/lib/docker/volumes/minio_{patp}/_data/bucket'
+        shutil.make_archive(f'/app/tmp/bucket_{patp}', 'zip', bucket_path)
+
+        return send_file(f'/app/tmp/{file_name}', download_name=file_name, as_attachment=True)
+
+
+#
+#   System Settings
+#
+    # Get all system information
+    def get_system_settings(self):
+        settings = dict()
+        settings['wgReg'] = self.wireguard_reg
+        settings['wgRunning'] = self.wireguard.is_running()
+        # todo: add more
+
+        return {'system': settings}
+
+    # Modify system settings
+    def handle_module_post_request(self, module, data):
+        if module == 'anchor':
+            if data['action'] == 'register':
+                x = self.register_device(data['key']) 
+                return x
+                
+        return module
+
+    # Register device to an Anchor service using a key
+    def register_device(self, reg_key):
+
+        # Todo: do we need to save the key?
+        # Todo: clean this function
+        self.config['reg_key'] = reg_key
+
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f'https://{endpoint}/{api_version}'
+
+        x = self.wireguard.register_device(reg_key, url) 
+
+        if x == None:
+            return 400
+
+        time.sleep(2)
+        self.anchor_config = self.wireguard.get_status(url)
+
+        if(self.anchor_config != None):
+           print("starting wg")
            self.wireguard.start()
+           self.wireguard_reg = True
+           time.sleep(2)
+           
+           print("reg urbits")
+           for p in self.config['piers']:
+              self.register_urbit(p)
+
+           print("starting minIOs")
+           self.startMinIOs()
+           self.save_config()
+
+           return 200
+        return 400
 
 
 #
@@ -271,28 +378,18 @@ class Orchestrator:
             return self._urbits[container].logs()
         return ""
 
+    # Custom jsonify
+    def custom_jsonify(self, val):
+        if type(val) is int:
+            return jsonify(val)
+        if type(val) is str:
+            return jsonify(val)
+        return val
 
 
 
 
 #####################################################################################
-
-    #p['hasBucket'] = orchestrator.has_bucket(pier)
-
- 
-#            u['minio_registered'] = True
-
-#            if urbit.config['minio_password'] == '':
-#                u['minio_registered'] = False
-
-#            if self.wireguard_reg:
-#                u['s3_url'] = f"https://console.s3.{urbit.config['wg_url']}"
-#            else:
-#               u['s3_url'] = ""
-#            if(urbit.config['network']=='wireguard'):
-#                u['url'] = f"https://{urbit.config['wg_url']}"
-#            else:
-#                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
 
 #
 #   init
@@ -362,33 +459,6 @@ class Orchestrator:
            self.stopMinIOs()
            self.wireguard.stop()
 
-
-    def registerDevice(self, reg_key):
-        self.config['reg_key'] = reg_key
-        endpoint = self.config['endpointUrl']
-        api_version = self.config['apiVersion']
-        url = f'https://{endpoint}/{api_version}'
-        x = self.wireguard.registerDevice(self.config['reg_key'], url) 
-        time.sleep(2)
-        self.anchor_config = self.wireguard.getStatus(url)
-        print(self.anchor_config)
-        if(self.anchor_config != None):
-           print("starting wg")
-           self.wireguard.start()
-           self.wireguard_reg = True
-           time.sleep(2)
-           
-           print("reg urbits")
-           for p in self.config['piers']:
-              self.registerUrbit(p)
-
-           print("starting minIOs")
-           self.startMinIOs()
-           self.save_config()
-
-           return 0
-        return 1
-
     def getWireguardUrl(self):
         endpoint = self.config['endpointUrl']
         return endpoint
@@ -435,40 +505,9 @@ class Orchestrator:
 
         return 0
 
-    def registerMinIO(self, patp, password):
-        self._urbits[patp].config['minio_password'] = password
-        self._minios[patp] = MinIODocker(self._urbits[patp].config)
-        self.minIO_on = True
-
-        return 0
-
-    def setMinIOEndpoint(self, patp):
-        ak, sk = self._minios[patp].makeServiceAcc().split('\n')
-        u = self._urbits[patp]
-
-        endpoint = f"s3.{u.config['wg_url']}"
-        bucket = 'bucket'
-        lens_port = self.getLoopbackAddr(patp)
-        access_key = ak.split(' ')[-1]
-        secret = sk.split(' ')[-1]
-
-        try:
-            u.set_minio_endpoint(endpoint,access_key,secret,bucket,lens_port)
-        except Exception as e:
-            print(e)
-
-    def getLoopbackAddr(self, patp):
-        log = self.getLogs(patp).decode('utf-8').split('\n')[::-1]
-        substr = 'http: loopback live on'
-
-        for ln in log:
-            if substr in ln:
-                return str(ln.split(' ')[-1])
-
     def getMinIOSecret(self, patp):
         x = self._urbits[patp].config['minio_password']
         return(x)
-
 
     def startMinIOs(self):
       for m in self._minios.values():
@@ -479,59 +518,6 @@ class Orchestrator:
       for m in self._minios.values():
          m.stop()
       self.minIO_on = False
-
-    def registerUrbit(self, patp):
-       endpoint = self.config['endpointUrl']
-       api_version = self.config['apiVersion']
-       url = f'https://{endpoint}/{api_version}'
-
-       if self.wireguard_reg:
-           self.anchor_config = self.wireguard.getStatus(url)
-           patp_reg = False
-           if(self.anchor_config != None):
-              for ep in self.anchor_config['subdomains']:
-                 if(patp in ep['url']):
-                     print(f"{patp} already exists")
-                     patp_reg = True
-
-           if(patp_reg == False):
-
-              self.wireguard.registerService(f'{patp}','urbit',url)
-              self.wireguard.registerService(f's3.{patp}','minio',url)
-
-           self.anchor_config = self.wireguard.getStatus(url)
-           url = None
-           http_port = None
-           ames_port = None
-           s3_port = None
-           console_port = None
-
-
-           print(self.anchor_config['subdomains'])
-           pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
-           for ep in self.anchor_config['subdomains']:
-               if(f'{patp}.{pub_url}' == ep['url']):
-                   url = ep['url']
-                   http_port = ep['port']
-               elif(f'ames.{patp}.{pub_url}' == ep['url']):
-                   ames_port = ep['port']
-               elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
-                   s3_port = ep['port']
-               elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
-                   console_port = ep['port']
-
-           self._urbits[patp].setWireguardNetwork(url, http_port, ames_port, s3_port, console_port)
-           self.wireguard.start()
-
-    def addUrbit(self, patp, urbit):
-        self.config['piers'].append(patp)
-        self._urbits[patp] = urbit
-
-        self.registerUrbit(patp)
-
-        self.save_config()
-        urbit.start()
-        
 
     def removeUrbit(self, patp):
         urb = self._urbits[patp]
@@ -548,25 +534,6 @@ class Orchestrator:
         self.config['piers'].remove(patp)
         self.save_config()
 
-
-
-    def getCode(self,pier):
-        code = ''
-        addr = self.getLoopbackAddr(pier)
-        try:
-            code = self._urbits[pier].get_code(addr)
-        except Exception as e:
-            print(e)
-
-        return code
-    
-    def has_bucket(self, patp):
-        minio = list(self._minios.keys())
-        for m in minio:
-            if m == patp:
-                return True
-        return False
-
     def getContainers(self):
         minio = list(self._minios.keys())
         containers = list(self._urbits.keys())
@@ -575,18 +542,6 @@ class Orchestrator:
             containers.append(f"minio_{m}")
         print(containers)
         return containers
-
-    def getOpenUrbitPort(self):
-        http_port = 8080
-        ames_port = 34343
-
-        for u in self._urbits.values():
-            if(u.config['http_port'] >= http_port):
-                http_port = u.config['http_port']
-            if(u.config['ames_port'] >= ames_port):
-                ames_port = u.config['ames_port']
-
-        return http_port+1, ames_port+1
 
     def getLogs(self, container):
         if container == 'wireguard':
@@ -609,7 +564,6 @@ class Orchestrator:
         #clean up files
         subprocess.run("rm privkey pubkey", shell =True)
    
-
     def save_config(self):
         with open(self.config_file, 'w') as f:
             json.dump(self.config, f, indent = 4)

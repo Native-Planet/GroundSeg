@@ -7,6 +7,7 @@
   import SettingsButton from '$lib/SettingsButton.svelte'
 	import Card from '$lib/Card.svelte'
   import Logo from '$lib/Logo.svelte'
+  import ToggleAdvancedButton from '$lib/ToggleAdvancedButton.svelte'
 
 	import PierHeader from '$lib/PierHeader.svelte'
 	import PierProfile from '$lib/PierProfile.svelte'
@@ -15,13 +16,17 @@
   import PierMinIOSetup from '$lib/PierMinIOSetup.svelte'
   import PierMinIO from '$lib/PierMinIO.svelte'
 	import PierNetwork from '$lib/PierNetwork.svelte'
+  import PierOptions from '$lib/PierOptions.svelte'
 
 	// load data into store
 	export let data
 	updateState(data)
 
 	// default values
-	let inView = false, loaded = false, urbit, code = ''
+  let inView = false,
+    loaded = false,
+    urbit, code = '',
+    advanced = false
 
 	// start api loop
 	onMount(()=> {
@@ -80,7 +85,7 @@
 		</PierHeader>
 
 		<!-- Pier Profile (public information) -->
-		<PierProfile name={urbit.name} running={urbit.running}/>
+    <PierProfile name={urbit.name} running={urbit.running} {code} />
 
 	  <!-- Pier Credentials-->
 	  {#if (code.length == 27) && urbit.running}
@@ -100,6 +105,8 @@
       {#if urbit.wgReg && urbit.wgRunning}
         <div transition:scale={{duration:120, delay: 200}}>
           <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
+        </div>
+        <div transition:scale={{duration:120, delay: 200}}>
           <PierMinIO minIOReg={urbit.minIOReg} remote={urbit.remote} minIOUrl={urbit.minIOUrl} />
         </div>
       {/if}
@@ -109,28 +116,19 @@
 		    <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
       </div>
 
-   {/if}
+    {/if}
 
-		<!-- Advanced Options -->
-		<!--
-	  <div class="commands">
-		  <div class="advanced" on:click={()=> advanced = !advanced}>
-    		Advanced Options
-      	<Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
-			</div>
+    <!-- Advanced Options -->
+    <ToggleAdvancedButton {advanced} on:click={()=> advanced = !advanced} />
 
-			{#if advanced}
-				<PierOptions 
-					nw_label={data.nw_label}
-					minio_registered={data.pier.minio_registered}
-					patp={data.pier.name}
-					hasBucket={data.hasBucket}
-					on:toggleLogs={toggleLogs}
-					on:exportLogs={()=>console.log("export")}
-					on:deletePier={()=>deleteCheck=!deleteCheck}/>
-			{/if}
-		</div>
-		-->
+		{#if advanced}
+      <PierOptions
+        remote={urbit.remote}
+        minIOReg={urbit.minIOReg}
+        hasBucket={urbit.hasBucket}
+        name={urbit.name}
+        />
+		{/if}
 
 	</Card>
 {/if}

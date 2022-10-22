@@ -46,7 +46,7 @@ class Wireguard:
         self.wg_docker.stop()
 
 
-    def registerDevice(self, reg_code, url):
+    def register_device(self, reg_code, url):
         # /v1/register
         update_data = {
             "reg_code" : f"{reg_code}",

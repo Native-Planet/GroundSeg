@@ -1,0 +1,92 @@
+<script>
+  /*
+  const ejectPier = () => {
+    pierExport = 'loading'
+    let u = $api + "/urbit/eject"
+    const f = new FormData()
+					f.append(patp, 'eject')
+
+    fetch(u, {method: 'POST',body: f})
+    .then(res => { return res.blob(); })
+    .then(d => {
+      pierExport = 'standard'
+      var a = document.createElement("a")
+      a.href = window.URL.createObjectURL(d)
+      a.download = patp
+      a.click()
+    })}
+    */
+</script>
+
+todo
+<!-- Pack & Meld --
+<div class="info">
+  <div class="title">Pack & Meld</div>
+  <div class="button-wrapper">
+		<div class="select-wrapper">
+			<div class="select">Once a month</div>
+			<div class="option-wrapper">
+				<div class="option">Every two weeks</div>
+				<div class="option">Once a week</div>
+				<div class="option">Off</div>
+			</div>
+		</div>
+		<PrimaryButton
+			noMargin={true}
+			background="#FFFFFF4D"
+			standard="|pack & |meld now"
+   		loading="melding..."
+			status={'standard'}
+		 on:click={()=>console.log('peqenmeld')} />
+	</div>
+</div>
+
+<!-- Pier Management --
+<div class="info">
+  <div class="title">Pier Management</div>
+  <div class="button-wrapper">
+		<PrimaryButton
+			noMargin={true}
+			background="orange"
+			standard="Export Urbit Pier"
+   		loading="Compressing your pier.."
+			status={pierExport}
+			on:click={ejectPier} />
+
+		<PrimaryButton
+			noMargin={true}
+			background="red"
+			standard="Delete Urbit Pier"
+	 on:click={()=>dispatch('deletePier')} />
+	</div>
+</div>
+
+<style>
+  .info {
+    margin-bottom: 12px;
+  }
+  .title {
+    font-weight: 700;
+    margin-bottom: 12px;
+    text-align: left;
+  }
+	.button-wrapper {
+		display: flex;
+		gap: 12px;
+	}
+
+	.select-wrapper {
+		font-size: 12px;
+		min-width: 140px;
+		text-align: center;
+	}
+
+	.select {
+		background: var(--action-color); 
+		border-radius: 6px;
+		padding-top: 7px;
+		padding-bottom: 7px;
+	}
+	
+</style>
+-->

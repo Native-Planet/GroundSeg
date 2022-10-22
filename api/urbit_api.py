@@ -1,17 +1,10 @@
-import requests, copy, json, shutil
-from flask import Flask, flash, request, redirect, url_for, send_from_directory, Response, Blueprint
-from flask import render_template, make_response, send_file, jsonify
-from flask import current_app
+from flask import Blueprint, current_app, request, jsonify
 
-
-import os,time
-import zipfile, tarfile, zipfile, glob
-from io import BytesIO
-from werkzeug.utils import secure_filename
+#import zipfile, tarfile, zipfile, glob
+#from io import BytesIO
+#from werkzeug.utils import secure_filename
 
 from orchestrator import Orchestrator
-
-import urbit_docker
 
 app = Blueprint('urbit', __name__, template_folder='templates')
 
@@ -22,7 +15,7 @@ def all_urbits():
     urbs = orchestrator.get_urbits()
     return jsonify(urbs)
 
-# Get details of urbit ID
+# Handle urbit ID related requests
 @app.route('/urbit', methods=['GET','POST'])
 def urbit_info():
     urbit_id = request.args.get('urbit_id')
@@ -36,15 +29,6 @@ def urbit_info():
     if request.method == 'POST':
         res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
         return jsonify(res)
-
-# Get +code
-@app.route('/urbit/code', methods=['GET'])
-def pier_code():
-    pier = request.args.get('pier')
-    orchestrator = current_app.config['ORCHESTRATOR']
-    code = orchestrator.getCode(pier)
-    return jsonify(code)
-
 
 
 

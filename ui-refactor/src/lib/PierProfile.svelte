@@ -6,9 +6,7 @@
 	import Sigil from '$lib/Sigil.svelte'
 	import Clipboard from 'clipboard'
 
-	export let name, running,
-					// temp
-					code = 'aaaaaa-aaaaaa-aaaaaa-aaaaaa'
+	export let name, running, code
 
 	let copyPatp, clickedPatp = false
 
@@ -48,7 +46,6 @@
     display: flex;
     gap: 20px;
     align-items: center;
-    margin-bottom: 14px;
 		padding: 20px 0 20px 0;
   }
   .status {

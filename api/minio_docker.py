@@ -15,7 +15,6 @@ class MinIODocker:
         self.buildMinIO()
 
 
-
     def buildVolume(self):
         volumes = client.volumes.list()
         for v in volumes:
@@ -85,7 +84,7 @@ class MinIODocker:
         self.container.remove()
         self.volume.remove()
 
-    def makeServiceAcc(self):
+    def make_service_account(self):
+        x = None
         x = self.container.exec_run(f"/data/mc admin user svcacct add myminio {self.config['pier_name']}").output.decode('utf-8').strip()
-        print(x)
         return x
