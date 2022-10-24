@@ -7,7 +7,7 @@
   import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
   import PierOptionsUrbit from '$lib/PierOptionsUrbit.svelte'
 
-  export let remote, minIOReg, hasBucket, name
+  export let remote, minIOReg, hasBucket, name, running
 
   // Available tabs
   let tabs = ['Logs','MinIO', 'Urbit'],
@@ -17,7 +17,11 @@
   // Switch tabs
   // Todo: add transition
   const switchTab = (tab,i) => {
+    if (activeTab == tab) {
+      activeTab = null
+    } else {
     activeTab = tab
+    }
   }
 
 </script>
@@ -59,7 +63,7 @@
   <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
 {/if}
 {#if activeTab == 'Urbit'}
-  <PierOptionsUrbit />
+  <PierOptionsUrbit {name} {running} />
 {/if}
 
 <style>

@@ -49,6 +49,7 @@
     -ms-overflow-style: none;
 		scrollbar-width: none;
 
+    overflow: scroll;
 	}
 
 </style>

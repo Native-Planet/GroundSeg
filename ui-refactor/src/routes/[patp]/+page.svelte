@@ -127,6 +127,7 @@
         minIOReg={urbit.minIOReg}
         hasBucket={urbit.hasBucket}
         name={urbit.name}
+        running={urbit.running}
         />
 		{/if}
 
