@@ -1,4 +1,5 @@
 <script>
+  import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
@@ -51,19 +52,22 @@
 
 </script>
 <div class="reg-key-wrapper">
-  <div class="advanced" on:click={toggleAdvanced}>
+  <div class="advanced" on:click={toggleAdvanced} transition:scale={{duration:120, delay: 200}}>
     Advanced Options
     <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
   </div>
 
   {#if advanced}
-    <div class="ep-title">Set Endpoint</div>
-    <div class="ep-key">
+    <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
+      Set Endpoint
+    </div>
+    <div class="ep-key"transition:scale={{duration:120, delay: 200}}>
       <input type="text" bind:value={epKey} />
       <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
     </div>
 
     {#if currentEpKey != epKey}
+      <div transition:scale={{duration:120, delay: 200}}>
       <PrimaryButton
         on:click={connectEndpoint}
         standard="Set to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
@@ -73,6 +77,7 @@
         status={epButtonStatus}
         top="12"
       />
+      </div>
     {/if}
   {/if}
 </div>

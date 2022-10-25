@@ -1,4 +1,5 @@
 <script>
+  import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
@@ -38,7 +39,7 @@
 
 </script>
 
-<div class="reg-key-wrapper">
+<div class="reg-key-wrapper" transition:scale={{duration:120, delay: 200}}>
 
   <!-- If not registered -->
   {#if !wgReg}
@@ -102,9 +103,4 @@
     opacity: .8;
     cursor: pointer;
   }
-  .disabled {
-    opacity: .6;
-    pointer-events: none;
-  }
-
 </style>
