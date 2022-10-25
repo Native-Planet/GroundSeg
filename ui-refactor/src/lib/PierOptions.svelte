@@ -1,13 +1,16 @@
 <script>
-  import { scale } from 'svelte/transition'
+  import { scale, fly } from 'svelte/transition'
+	import { quintOut } from 'svelte/easing'
+
 	import { api } from '$lib/api'
 	import PrimaryButton from '$lib/PrimaryButton.svelte'
   
   import PierOptionsLogs from '$lib/PierOptionsLogs.svelte'
   import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
-  import PierOptionsUrbit from '$lib/PierOptionsUrbit.svelte'
+  import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
+  import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
-  export let remote, minIOReg, hasBucket, name, running
+  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency
 
   // Available tabs
   let tabs = ['Logs','MinIO', 'Urbit'],
@@ -57,13 +60,26 @@
 
 <!-- Tab Contents -->
 {#if activeTab == 'Logs'}
-  <PierOptionsLogs />
+  <div in:scale={{duration:120, delay: 200}}>
+    <PierOptionsLogs />
+  </div>
 {/if}
+
 {#if activeTab == 'MinIO'}
-  <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+  <div in:scale={{duration:120, delay: 200}}>
+    <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+  </div>
 {/if}
+
 {#if activeTab == 'Urbit'}
-  <PierOptionsUrbit {name} {running} />
+  <div class="main-wrapper" in:scale={{duration:120, delay: 200}}>
+   <div class="admin-wrapper">
+     <PierOptionsAdmin {name} {running} />
+   </div>
+   <div class="meld-wrapper">
+     <PierOptionsMeld  {frequency} {timeNow} />
+   </div>
+  </div>
 {/if}
 
 <style>
@@ -90,4 +106,24 @@
     background: var(--action-color);
     opacity: .8;
   }
+  .main-wrapper {
+    display: flex;
+    text-align: center;
+    padding-top: 20px;
+    align-items: start;
+  }
+  .admin-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .meld-wrapper {
+    flex:2;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
 </style>

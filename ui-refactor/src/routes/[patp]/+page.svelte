@@ -4,7 +4,6 @@
 	import { page } from '$app/stores'
 	import { api, updateState } from '$lib/api'
 
-  import SettingsButton from '$lib/SettingsButton.svelte'
 	import Card from '$lib/Card.svelte'
   import Logo from '$lib/Logo.svelte'
   import ToggleAdvancedButton from '$lib/ToggleAdvancedButton.svelte'
@@ -74,8 +73,6 @@
 
 </script>
 
-<SettingsButton />
-
 {#if inView && loaded}
 <Card width="480px">
 
@@ -128,6 +125,8 @@
         hasBucket={urbit.hasBucket}
         name={urbit.name}
         running={urbit.running}
+        timeNow={urbit.timeNow}
+        frequency={urbit.frequency}
         />
 		{/if}
 

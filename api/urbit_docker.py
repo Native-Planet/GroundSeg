@@ -16,8 +16,11 @@ default_pier_config = {
         "wg_http_port": None,
         "wg_ames_port": None,
         "wg_s3_port": None,
-        "wg_console_port": None
+        "wg_console_port": None,
+        "meld_frequency": 7
         }
+
+# important: add check for missing fields in config -- add the fields
 
 class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'

@@ -1,4 +1,6 @@
-import json, os, time, shutil  #subprocess, requests, copy, socket, time, sys
+import json, os, time, shutil  
+import subprocess#, requests, copy, socket, time, sys
+from datetime import datetime
 from flask import jsonify, send_file
 
 from wireguard import Wireguard
@@ -53,6 +55,8 @@ class Orchestrator:
 
         u['wgReg'] = self.wireguard_reg
         u['wgRunning'] = self.wireguard.is_running()
+        u['timeNow'] = datetime.utcnow()
+        u['frequency'] = urb.config['meld_frequency']
 
         u['remote'] = False
         u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
@@ -325,8 +329,47 @@ class Orchestrator:
             if data['action'] == 'register':
                 x = self.register_device(data['key']) 
                 return x
+
+            if data['action'] == 'toggle':
+                running = self.wireguard.is_running()
+                if running:
+                    return self.toggle_anchor_off()
+                return self.toggle_anchor_on()
+
+            if data['action'] == 'get-url':
+                return self.config['endpointUrl']
+            if data['action'] == 'change-url':
+                return self.change_wireguard_url(data['url'])
                 
         return module
+
+    # Starts Wireguard and all MinIO containers
+    def toggle_anchor_on(self):
+           self.wireguard.start()
+           self.toggle_minios_on() 
+           return 200
+
+    # Stops Wireguard and all MinIO containers
+    def toggle_anchor_off(self):
+        for p in self._urbits.keys():
+            if(self._urbits[p].config['network'] == 'wireguard'):
+                 self.toggle_pier_network(self._urbits[p])
+
+        self.toggle_minios_off()
+        self.wireguard.stop()
+        return 200
+
+    # Toggle MinIO on
+    def toggle_minios_on(self):
+      for m in self._minios.values():
+         m.start()
+      self.minIO_on = True
+
+    # Toggl MinIO off
+    def toggle_minios_off(self):
+      for m in self._minios.values():
+         m.stop()
+      self.minIO_on = False
 
     # Register device to an Anchor service using a key
     def register_device(self, reg_key):
@@ -358,16 +401,39 @@ class Orchestrator:
               self.register_urbit(p)
 
            print("starting minIOs")
-           self.startMinIOs()
+           self.toggle_minios_on()
            self.save_config()
 
            return 200
         return 400
 
+    def change_wireguard_url(self, url):
+        self.config['endpointUrl'] = url
+        self.wireguard_reg = False
+        self.toggle_anchor_off()
+        self.first_boot()
+        self.save_config()
+        if self.config['endpointUrl'] == url:
+            return 200
+        return 400
 
 #
 #   General
 #
+
+    # First boot
+    def first_boot(self):
+        subprocess.run("wg genkey > privkey", shell=True)
+        subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
+
+        # Load priv and pub key
+        with open('pubkey') as f:
+           self.config['pubkey'] = f.read().strip()
+        with open('privkey') as f:
+           self.config['privkey'] = f.read().strip()
+        #clean up files
+        subprocess.run("rm privkey pubkey", shell =True)
+ 
     # Get logs from docker container
     def get_logs(self, container):
         if container == 'wireguard':
@@ -446,34 +512,6 @@ class Orchestrator:
 
             return system_json
             
-    def wireguardStart(self):
-        if(self.wireguard.wg_docker.isRunning()==False):
-           self.wireguard.start()
-           self.startMinIOs() 
-
-    def wireguardStop(self):
-        if(self.wireguard.wg_docker.isRunning() == True):
-           for p in self._urbits.keys():
-              if(self._urbits[p].config['network'] == 'wireguard'):
-                 self.switchUrbitNetwork(p)
-           self.stopMinIOs()
-           self.wireguard.stop()
-
-    def getWireguardUrl(self):
-        endpoint = self.config['endpointUrl']
-        return endpoint
-
-    def changeWireguardUrl(self, url):
-        self.config['endpointUrl'] = url
-        self.config['reg_key'] = ''
-        self.wireguard_reg = False
-        self.save_config()
-
-        self.wireguardStop()
-
-        return 0
-        
-
     def load_urbits(self):
         for p in self.config['piers']:
             data = None
@@ -509,16 +547,6 @@ class Orchestrator:
         x = self._urbits[patp].config['minio_password']
         return(x)
 
-    def startMinIOs(self):
-      for m in self._minios.values():
-         m.start()
-      self.minIO_on = True
-
-    def stopMinIOs(self):
-      for m in self._minios.values():
-         m.stop()
-      self.minIO_on = False
-
     def removeUrbit(self, patp):
         urb = self._urbits[patp]
         urb.removeUrbit()
@@ -543,27 +571,6 @@ class Orchestrator:
         print(containers)
         return containers
 
-    def getLogs(self, container):
-        if container == 'wireguard':
-            return self.wireguard.wg_docker.logs()
-        if 'minio_' in container:
-            return self._minios[container[6:]].logs()
-        if container in self._urbits.keys():
-            return self._urbits[container].logs()
-        return ""
-
-    def first_boot(self):
-        subprocess.run("wg genkey > privkey", shell=True)
-        subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
-
-        # Load priv and pub key
-        with open('pubkey') as f:
-           self.config['pubkey'] = f.read().strip()
-        with open('privkey') as f:
-           self.config['privkey'] = f.read().strip()
-        #clean up files
-        subprocess.run("rm privkey pubkey", shell =True)
-   
     def save_config(self):
         with open(self.config_file, 'w') as f:
             json.dump(self.config, f, indent = 4)

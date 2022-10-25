@@ -1,8 +1,16 @@
+<script>
+  import { page } from '$app/stores'
+</script>
+
 <a href='/settings'>
-  <img src="/settings.svg" alt="Settings Icon" />
+  <img src="/settings.svg" alt="Settings Icon" class:inverted={$page.routeId == 'settings'}/>
 </a>
 
 <style>
+  .inverted {
+    filter: invert(1);
+    pointer-events: none;
+  }
 	a {
 		position:absolute;
 		top: 0;

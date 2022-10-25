@@ -1,5 +1,12 @@
+<script>
+  import SettingsButton from '$lib/SettingsButton.svelte'
+  import AnchorButton from '$lib/AnchorButton.svelte'
+</script>
+
 <div>
-	<slot />
+<SettingsButton />
+<AnchorButton />
+  <slot/>
 </div>
 
 <style>

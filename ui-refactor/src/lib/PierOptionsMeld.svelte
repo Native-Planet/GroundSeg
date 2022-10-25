@@ -1,6 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte'
-
+  import { onMount } from 'svelte'
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faCaretLeft, faCaretRight } from '@fortawesome/free-solid-svg-icons'
@@ -9,22 +8,17 @@
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let name, running
+  export let timeNow, frequency
 
   let exportButtonText = 'Export Urbit Pier',
-    deleteButtonText = 'Delete Urbit Pier',
-    frequency = 7, now, inView = true,
-    meldTime = '00:00'
+    deleteButtonText = 'Delete Urbit Pier', 
+    inView = true,
+    meldTime = '00:00',
+    cloneFreq
+
+  onMount(()=> cloneFreq = frequency)
 
   //const dispatch = createEventDispatcher()
-
-  const exportUrbitPier = () => {
-    console.log("exported pier")
-  }
- 
-  const deleteUrbitPier = () => {
-    console.log("deleted pier") 
-  }
 
   const sendMeldPoke = () => {
     console.log("meldd")
@@ -34,71 +28,80 @@
     console.log("meld settings saved")
   }
 
-  const currentTime = () => {
-    if (inView) {
-      let time = Date.now()
-      let dateObj = new Date(time)
-      now = dateObj.toUTCString().slice(17, -4)
-      setTimeout(currentTime, 1000)
-    }
-  }
-
-  onMount(()=> currentTime())
-  onDestroy(()=> inView = !inView)
-
 </script>
 
-<div class="main-wrapper">
+  <div class="option-title">Schedule Meld</div>
 
-  <!-- Admin options -->
-  <div class="admin-wrapper">
-    <div class="option-title">Admin Actions</div>
-    <button class="export-pier" on:click={exportUrbitPier}>{exportButtonText}</button>
-    <button class="delete-pier" on:click={deleteUrbitPier}>{deleteButtonText}</button>
+  <!-- frequency selector -->
+  <div class="day">
+    <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
+      <Fa icon={faCaretLeft} size="1x" />
+    </button>
+
+    <div class="day-text">Every</div>
+    <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
+    <div class="day-text">days</div>
+
+    <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
+      <Fa icon={faCaretRight} size="1x" />
+    </button>
+
   </div>
 
-  <!-- Meld scheduling -->
-  <div class="meld-wrapper">
-    <div class="meld-schedule">
-      <div class="option-title">Schedule Meld</div>
+  <div class="day">
+    <div class="day-text">at</div>
 
-      <!-- current time -->
-      <div class="current-time">Current time: {now} UTC</div>
+    <!-- temp -->
 
-      <!-- frequency selector -->
+    <input id="hour" type="number" />
+  </div>
+
+
+  <!-- Current time on host device -->
+  <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+
+
+<!--
+  <div class="meld-schedule">
+    <!-- current time --
+
+      <!-- frequency selector --
       <div class="day">
-        <button disabled={frequency <= 1} class="day-button" on:click={()=>frequency = --frequency }>
+        <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
           <Fa icon={faCaretLeft} size="1x" />
         </button>
-        <div class="day-text">Frequency (days):</div>
-        <input type="number" class="day-input" bind:value={frequency} min=1 max=365 />
-        <button class="day-button" on:click={()=>frequency = ++frequency}>
+        <div class="day-text">Every</div>
+        <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
+        <div class="day-text">days</div>
+        <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
           <Fa icon={faCaretRight} size="1x" />
         </button>
       </div>
 
-      <!-- set meld time -->
+      <div class="current-time">at</div>
+
+      <!-- set meld time 
+        using this package is temporary solution. Need to write our own.
+      --
       <div style="color:#fff;width:60px;margin:auto;overflow:hidden;border-radius:8px;">
         <SveltyPicker inputClasses="form-control" theme="clock-colors" format="hh:ii" bind:value={meldTime}></SveltyPicker>
       </div>
     </div>
 
-  </div>
-
-  <!-- Meld Actions -->
+  <!-- Meld Actions --
   <div class="admin-wrapper">
     <div class="option-title">Meld Actions</div>
 
-    <!-- Save new meld schedule -->
+    <!-- Save new meld schedule --
     <PrimaryButton
       noMargin={true}
-      standard="Save changes"
+      standard="{frequency == cloneFreq ? "No" : "Save"} changes"
       success="changes saved!"
-      status="disabled"
+      status={frequency == cloneFreq ? 'disabled' : 'standard'}
       on:click={saveMeldChanges}
       />
 
-    <!-- Meld now -->
+    <!-- Meld now --
     {#if running}
       <PrimaryButton
         background="#FFFFFF4D"
@@ -113,6 +116,7 @@
 
 </div>
 
+    -->
 <style>
   :global(.clock-colors) {
     --sdt-primary: #008eff;
@@ -124,20 +128,6 @@
     --sdt-clock-bg: #eeeded;
     --sdt-clock-bg-minute: rgb(238, 237, 237, 0.25);
   }
-  .main-wrapper {
-    display: flex;
-    text-align: center;
-    padding: 20px;
-    align-items: start;
-  }
-
-  .meld-wrapper {
-    flex:1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
   .meld-schedule {
     display: flex;
     flex-direction: column;
@@ -147,7 +137,6 @@
   .option-title {
     font-size: 14px;
     color: inherit;
-    margin-bottom: 12px;
   }
 
   .current-time {
@@ -182,6 +171,7 @@
   input[type=number] {-moz-appearance: textfield;}
 
   .admin-wrapper {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 12px;

@@ -5,7 +5,6 @@
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 	import PierList from '$lib/PierList.svelte'
-  import SettingsButton from '$lib/SettingsButton.svelte'
 	import BootButtons from '$lib/BootButtons.svelte'
 
 	// load data into store
@@ -37,7 +36,6 @@
 	
 </script>
 
-<SettingsButton />
 {#if inView}
 	<Card width="460px" padding={false}>
 		<div style="margin: 20px 0 0 20px;">
