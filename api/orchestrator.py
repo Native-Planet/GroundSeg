@@ -1,5 +1,4 @@
-import json, os, time, shutil  
-import subprocess#, requests, copy, socket, time, sys
+import json, os, time, shutil, copy, subprocess #, requests, socket, sys
 from datetime import datetime
 from flask import jsonify, send_file
 
@@ -13,12 +12,87 @@ class Orchestrator:
 #
 #   Variables
 #
+    config = {}
     _urbits = {}
     _minios = {}
     _watchtower = {}
     minIO_on = False
-    wireguard_reg = False
-    gs_version = 'Beta-2.0.2' # no longer required
+    gs_version = 'Beta-2.0.2'
+
+#
+#   init
+#
+    def __init__(self, config_file):
+        # store config file location
+        self.config_file = config_file
+
+        # load existing or create new system.json
+        self.config = self.load_config(config_file)
+
+        # if first boot, set up keys
+        if self.config['firstBoot']:
+            self.reset_pubkey()
+            self.config['firstBoot'] = False
+        
+        # save the latest config to file
+        self.save_config()
+
+        # start wireguard if anchor is registered
+        self.wireguard = Wireguard(self.config)
+        if self.config['wgRegistered']:
+            self.wireguard.stop()
+            self.wireguard.start()
+
+        # load urbit ships
+        self.load_urbits()
+
+        # start auto updater
+        self._watchtower = WatchtowerDocker(self.config['updateMode'])
+
+    # Checks if system.json and all its fields exists, adds field if incomplete
+    def load_config(self, config_file):
+        cfg = {}
+        try:
+            with open(config_file) as f:
+                cfg = json.load(f)
+        except Exception as e:
+            print(e)
+
+        cfg = self.check_config_field(cfg,'firstBoot',True)
+        cfg = self.check_config_field(cfg,'piers',[])
+        cfg = self.check_config_field(cfg,'endpointUrl', 'api.startram.io')
+        cfg = self.check_config_field(cfg,'apiVersion', 'v1')
+        cfg = self.check_config_field(cfg,'wgRegistered', False)
+        cfg = self.check_config_field(cfg,'updateMode','auto')
+
+        cfg['gsVersion'] = self.gs_version
+
+        # Remove reg_key from old configs
+        if 'reg_key' in cfg:
+            if cfg['reg_key'] != None:
+                cfg['wgRegistered'] = True
+                cfg['reg_key'] = None
+        
+        return cfg
+
+    # Adds missing field to config
+    def check_config_field(self, cfg, field, default):
+        if not field in cfg:
+            cfg[field] = default
+        return cfg
+
+    # Load urbit ships
+    def load_urbits(self):
+        for p in self.config['piers']:
+            data = None
+            with open(f'settings/pier/{p}.json') as f:
+                data = json.load(f)
+
+            self._urbits[p] = UrbitDocker(data)
+
+            if data['minio_password'] != '':
+                self._minios[p] = MinIODocker(data)
+                self.toggle_minios_on()
 
 #
 #   Urbit Pier
@@ -53,7 +127,7 @@ class Orchestrator:
         u['name'] = urb.pier_name
         u['running'] = urb.is_running()
 
-        u['wgReg'] = self.wireguard_reg
+        u['wgReg'] = self.config['wgRegistered']
         u['wgRunning'] = self.wireguard.is_running()
         u['timeNow'] = datetime.utcnow()
         u['frequency'] = urb.config['meld_frequency']
@@ -68,7 +142,7 @@ class Orchestrator:
             u['remote'] = True
             u['urbitUrl'] = f"https://{urb.config['wg_url']}"
 
-        if self.wireguard_reg:
+        if self.config['wgRegistered']:
             u['minIOUrl'] = f"https://console.s3.{urb.config['wg_url']}"
 
         if urb.config['minio_password'] == '':
@@ -145,7 +219,7 @@ class Orchestrator:
     # Toggle Pier Wireguard connection on or off
     def toggle_pier_network(self, urb):
 
-        wg_reg = self.wireguard_reg
+        wg_reg = self.config['wgRegistered']
         wg_is_running = self.wireguard.wg_docker.is_running()
         cfg = urb.config
 
@@ -240,7 +314,7 @@ class Orchestrator:
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
 
-        if self.wireguard_reg:
+        if self.config['wgRegistered']:
             self.anchor_config = self.wireguard.get_status(url)
             patp_reg = False
 
@@ -317,7 +391,7 @@ class Orchestrator:
     # Get all system information
     def get_system_settings(self):
         settings = dict()
-        settings['wgReg'] = self.wireguard_reg
+        settings['wgReg'] = self.config['wgRegistered']
         settings['wgRunning'] = self.wireguard.is_running()
         # todo: add more
 
@@ -338,6 +412,7 @@ class Orchestrator:
 
             if data['action'] == 'get-url':
                 return self.config['endpointUrl']
+
             if data['action'] == 'change-url':
                 return self.change_wireguard_url(data['url'])
                 
@@ -374,10 +449,6 @@ class Orchestrator:
     # Register device to an Anchor service using a key
     def register_device(self, reg_key):
 
-        # Todo: do we need to save the key?
-        # Todo: clean this function
-        self.config['reg_key'] = reg_key
-
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
@@ -393,7 +464,7 @@ class Orchestrator:
         if(self.anchor_config != None):
            print("starting wg")
            self.wireguard.start()
-           self.wireguard_reg = True
+           self.config['wgRegistered'] = True
            time.sleep(2)
            
            print("reg urbits")
@@ -409,9 +480,9 @@ class Orchestrator:
 
     def change_wireguard_url(self, url):
         self.config['endpointUrl'] = url
-        self.wireguard_reg = False
+        self.config['wgRegistered'] = False
         self.toggle_anchor_off()
-        self.first_boot()
+        self.reset_pubkey()
         self.save_config()
         if self.config['endpointUrl'] == url:
             return 200
@@ -421,8 +492,12 @@ class Orchestrator:
 #   General
 #
 
-    # First boot
-    def first_boot(self):
+    def save_config(self):
+        with open(self.config_file, 'w') as f:
+            json.dump(self.config, f, indent = 4)
+
+    # Reset Public and Private Keys
+    def reset_pubkey(self):
         subprocess.run("wg genkey > privkey", shell=True)
         subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
 
@@ -456,73 +531,6 @@ class Orchestrator:
 
 
 #####################################################################################
-
-#
-#   init
-#
-    def __init__(self, config_file):
-        # store config file location
-        self.config_file = config_file
-
-        # load existing or create new system.json
-        self.config = self.load_config(config_file)
-
-        # First boot setup
-        if(self.config['firstBoot']):
-            self.first_boot()
-            self.config['firstBoot'] = False
-            self.save_config()
-
-        # get wireguard networking information
-        # Load urbits with wg info
-        # start wireguard
-        self.wireguard = Wireguard(self.config)
-        if('reg_key' in self.config.keys()):
-           if(self.config['reg_key']!= None):
-              self.wireguard_reg = True
-              self.wireguard.stop()
-              self.wireguard.start()
-
-        self.load_urbits()
-
-        # Start auto updater
-        if not 'updateMode' in self.config:
-           self.set_update_mode('auto')
-
-        self._watchtower = WatchtowerDocker(self.config['updateMode'])
-
-    def load_config(self, config_file):
-        try:
-            with open(config_file) as f:
-                system_json = json.load(f)
-                system_json['gsVersion'] = self.gs_version
-                return system_json
-        except Exception as e:
-            print("creating new config file...")
-            system_json = dict()
-            system_json['firstBoot'] = True
-            system_json['piers'] = []
-            system_json['endpointUrl'] = "api.startram.io"
-            system_json['apiVersion'] = "v1"
-            system_json['gsVersion'] = self.gs_version
-            system_json['updateMode'] = "auto"
-
-            with open(config_file,'w') as f :
-                json.dump(system_json, f)
-
-            return system_json
-            
-    def load_urbits(self):
-        for p in self.config['piers']:
-            data = None
-            with open(f'settings/pier/{p}.json') as f:
-                data = json.load(f)
-
-            self._urbits[p] = UrbitDocker(data)
-
-            if data['minio_password'] != '':
-                self._minios[p] = MinIODocker(data)
-                self.startMinIOs()
 
     def update_mode(self):
         if "updateMode" in self.config:
@@ -570,7 +578,3 @@ class Orchestrator:
             containers.append(f"minio_{m}")
         print(containers)
         return containers
-
-    def save_config(self):
-        with open(self.config_file, 'w') as f:
-            json.dump(self.config, f, indent = 4)

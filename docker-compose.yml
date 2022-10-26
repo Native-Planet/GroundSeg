@@ -18,16 +18,5 @@ services:
       - /opt/nativeplanet/groundseg/commands:/commands
       - settings:/settings
 
-  webui:
-    build: ./ui-refactor
-    container_name: groundseg_webui
-    privileged: true
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports: 
-      - 80:3000
-
 volumes:
   settings:

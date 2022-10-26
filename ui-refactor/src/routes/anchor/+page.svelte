@@ -50,6 +50,6 @@
     <AnchorRegisterKey wgReg={$system.wgReg} />
 
     <!-- Advanced Options -->
-    <AnchorAdvanced wgUrl={$system.wgUrl}/>
+    <AnchorAdvanced />
   </Card>
 {/if}
