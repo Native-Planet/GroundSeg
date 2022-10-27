@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>Label</key>
+		<string>io.nativeplanet.groundseg</string>
+    <key>ProgramArguments</key>
+    <array>
+    	<string>/bin/bash</string>
+    	<string>-c</string>
+     	<string>--compress-level=9</string>
+    	<string>'HOST_HOSTNAME=$(hostname) exec docker compose up'</string>
+    </array>
+    <key>WorkingDirectory</key>
+		<string>/opt/nativeplanet/groundseg</string>
+    <key>KeepAlive</key>
+		<true/>
+	</dict>
+</plist>

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Add mdns to firewalld in PureOS
+sudo firewall-cmd --permanent --add-service=mdns # permanent
+sudo firewall-cmd --reload
+
 # Location of scripts
 ACC=Native-Planet
 REPO=GroundSeg
@@ -21,15 +25,32 @@ chmod +x $SAVE_DIR/opencmd.sh
 # Create pipe file
 sudo mkfifo $SAVE_DIR/commands
 
-# systemd unit
-sudo wget -O /etc/systemd/system/groundseg.service \
-	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
-sudo wget -O /etc/systemd/system/gs-pipefile.service \
-	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/gs-pipefile.service
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
-# Load and start
-sudo systemctl enable groundseg
-sudo systemctl enable gs-pipefile
-sudo systemctl daemon-reload 
-sudo systemctl restart groundseg
-sudo systemctl restart gs-pipefile
+  # systemd units
+  sudo wget -O /etc/systemd/system/groundseg.service \
+	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
+  sudo wget -O /etc/systemd/system/gs-pipefile.service \
+	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/gs-pipefile.service
+
+  # Load and start
+  sudo systemctl enable groundseg
+  sudo systemctl enable gs-pipefile
+  sudo systemctl daemon-reload 
+  sudo systemctl restart groundseg
+  sudo systemctl restart gs-pipefile
+
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  # launchd daemons
+  sudo wget -O /Library/LaunchDaemons/io.nativeplanet.groundseg.plist \
+	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.groundseg.plist
+  sudo wget -O /Library/LaunchDaemons/io.nativeplanet.gs-pipefile.plist \
+	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.gs-pipefile.plist
+
+  # Load and start
+  sudo launchctl load ~/Library/LaunchDaemons/io.nativeplanet.groundseg.plist
+  sudo launchctl load ~/Library/LaunchDaemons/io.nativeplanet.gs-pipefile.plist
+
+else
+  echo "Unsupported Operating System. Please reach out to ~raldeg/nativeplanet for further assistance"
+fi
