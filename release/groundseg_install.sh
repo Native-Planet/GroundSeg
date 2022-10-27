@@ -41,6 +41,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   sudo systemctl restart gs-pipefile
 
 elif [[ "$OSTYPE" == "darwin"* ]]; then
+
   # launchd daemons
   sudo wget -O /Library/LaunchDaemons/io.nativeplanet.groundseg.plist \
 	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.groundseg.plist
@@ -48,8 +49,8 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.gs-pipefile.plist
 
   # Load and start
-  sudo launchctl load ~/Library/LaunchDaemons/io.nativeplanet.groundseg.plist
-  sudo launchctl load ~/Library/LaunchDaemons/io.nativeplanet.gs-pipefile.plist
+  sudo launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist
+  sudo launchctl load /Library/LaunchDaemons/io.nativeplanet.gs-pipefile.plist
 
 else
   echo "Unsupported Operating System. Please reach out to ~raldeg/nativeplanet for further assistance"
