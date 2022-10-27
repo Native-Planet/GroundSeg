@@ -1,6 +1,6 @@
 <script>
   import { fade } from 'svelte/transition'
-  import { fadeIn, fadeOut } from '$lib/api'
+  import { fadeIn, fadeOut, isPortrait } from '$lib/api'
 
 	export let width, maxHeight = "80vh", padding = true
 
@@ -14,16 +14,15 @@
 	}
 </script>
 
-<svelte:window bind:innerWidth bind:innerHeight />
-
 <div in:fade={fadeIn}
 		 out:fade={fadeOut} 
 		 class="card" 
 	 	 style="padding:{padding ? '20px' : '0'};
-		 	max-height:{maxHeight}; width: { vert(innerHeight, innerWidth)
-			 ? 'calc(100vw - 40px)'
-			 : width
-			 };">
+      max-height:{maxHeight}; width: {
+      $isPortrait
+			  ? 'calc(100vw - 40px)'
+			  : width
+    };">
 	<slot/>
 </div>
 

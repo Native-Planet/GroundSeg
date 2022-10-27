@@ -39,38 +39,40 @@
 
 </script>
 
-<div class="reg-key-wrapper" transition:scale={{duration:120, delay: 200}}>
+<div class="reg-key-wrapper">
 
   <!-- If not registered -->
   {#if !wgReg}
-    <div class="reg-title">Key Registration</div>
-    <div class="reg-key">
+    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Key Registration</div>
+    <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
   <!-- if registered -->
   {:else if !reRegCheck}
-    <div class="reg-title">Key Registration</div>
-    <div class="reg-key">
+    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Key Registration</div>
+    <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
   {/if}
 
   <!-- Submit button -->
-  <PrimaryButton
-    on:click={wgReg && reRegCheck ? ()=>reRegCheck = false : registerKey }
-    standard="Register{wgReg && reRegCheck ? " A New Key" : ""}"
-    success="Key registered"
-    failure="Registration failed"
-    loading="Processing..."
-    status={
-      wgReg && reRegCheck ? buttonStatus :
-      key == '' ? "disabled" : buttonStatus
-    }
-    top="{wgReg && reRegCheck ? "26" : "12"}"
-  />
+  <div transition:scale={{duration:120, delay: 200}}>
+    <PrimaryButton
+      on:click={wgReg && reRegCheck ? ()=>reRegCheck = false : registerKey }
+      standard="Register{wgReg && reRegCheck ? " A New Key" : ""}"
+      success="Key registered"
+      failure="Registration failed"
+      loading="Processing..."
+      status={
+        wgReg && reRegCheck ? buttonStatus :
+        key == '' ? "disabled" : buttonStatus
+      }
+      top="{wgReg && reRegCheck ? "26" : "12"}"
+      />
+  </div>
 </div>
 
 <style>

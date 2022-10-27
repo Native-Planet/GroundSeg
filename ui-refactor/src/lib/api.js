@@ -12,6 +12,7 @@ export const fadeOut = {duration:200}
 export const urbits = writable([])
 export const system = writable({})
 export const api = writable('')
+export const isPortrait = writable(false)
 
 //
 // state update

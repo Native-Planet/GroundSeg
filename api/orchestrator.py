@@ -1,4 +1,4 @@
-import json, os, time, shutil, copy, subprocess #, requests, socket, sys
+import json, os, time, psutil, shutil, copy, subprocess #, requests, socket, sys
 from datetime import datetime
 from flask import jsonify, send_file
 
@@ -17,7 +17,7 @@ class Orchestrator:
     _minios = {}
     _watchtower = {}
     minIO_on = False
-    gs_version = 'Beta-2.0.2'
+    gs_version = 'Beta-3.0.0'
 
 #
 #   init
@@ -42,6 +42,8 @@ class Orchestrator:
         if self.config['wgRegistered']:
             self.wireguard.stop()
             self.wireguard.start()
+            self.toggle_minios_off()
+            self.toggle_minios_on()
 
         # load urbit ships
         self.load_urbits()
@@ -105,10 +107,10 @@ class Orchestrator:
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.is_running()
+            u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
+
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"https://{urbit.config['wg_url']}"
-            else:
-                u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
 
             urbits.append(u)
 
@@ -393,16 +395,24 @@ class Orchestrator:
         settings = dict()
         settings['wgReg'] = self.config['wgRegistered']
         settings['wgRunning'] = self.wireguard.is_running()
-        # todo: add more
+        settings['ram'] = psutil.virtual_memory().percent
+        settings['cpu'] = psutil.cpu_percent(1)
+        settings['temp'] = psutil.sensors_temperatures()['coretemp'][0].current
+        settings['disk'] = shutil.disk_usage("/")
+        settings['gsVersion'] = self.gs_version
+        settings['updateMode'] = self.config['updateMode']
+        settings['ethOnly'] = self.get_ethernet_status()
+        settings['minio'] = self.minIO_on
 
         return {'system': settings}
 
     # Modify system settings
     def handle_module_post_request(self, module, data):
+
+        # anchor module
         if module == 'anchor':
             if data['action'] == 'register':
-                x = self.register_device(data['key']) 
-                return x
+                return self.register_device(data['key']) 
 
             if data['action'] == 'toggle':
                 running = self.wireguard.is_running()
@@ -415,8 +425,30 @@ class Orchestrator:
 
             if data['action'] == 'change-url':
                 return self.change_wireguard_url(data['url'])
-                
+
+        # watchtower module
+        if module == 'watchtower':
+            if data['action'] == 'toggle':
+                return self.set_update_mode()
+
+        # minIO module
+        if module == 'minio':
+            if data['action'] == 'reload':
+                self.toggle_minios_off()
+                self.toggle_minios_on()
+                time.sleep(1)
+                return 200
+
         return module
+
+    # Check if wifi is disabled
+    def get_ethernet_status(self):
+        wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        ws, stderr = wifi_status.communicate()
+
+        if ws == b'enabled\n':
+            return False
+        return True
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):
@@ -478,6 +510,7 @@ class Orchestrator:
            return 200
         return 400
 
+    # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
@@ -487,6 +520,20 @@ class Orchestrator:
         if self.config['endpointUrl'] == url:
             return 200
         return 400
+
+    # Toggle update mode
+    def set_update_mode(self):
+        if self.config['updateMode'] == 'auto':
+            self.config['updateMode'] = 'off'
+        else:
+            self.config['updateMode'] = 'auto'
+
+        self.save_config()
+        self._watchtower.remove()
+        self._watchtower = WatchtowerDocker(self.config['updateMode'])
+
+        return 200
+
 
 #
 #   General
@@ -532,25 +579,6 @@ class Orchestrator:
 
 #####################################################################################
 
-    def update_mode(self):
-        if "updateMode" in self.config:
-            return self.config['updateMode']
-        
-        res = self.set_update_mode('install')
-        
-        if res == 0:
-            return 'install'
-        return ''
-
-    def set_update_mode(self, mode):
-        self.config['updateMode'] = mode
-        self.save_config()
-
-        self._watchtower.remove()
-        self._watchtower = WatchtowerDocker(mode)
-
-        return 0
-
     def getMinIOSecret(self, patp):
         x = self._urbits[patp].config['minio_password']
         return(x)
@@ -569,12 +597,3 @@ class Orchestrator:
 
         self.config['piers'].remove(patp)
         self.save_config()
-
-    def getContainers(self):
-        minio = list(self._minios.keys())
-        containers = list(self._urbits.keys())
-        containers.append('wireguard')
-        for m in minio:
-            containers.append(f"minio_{m}")
-        print(containers)
-        return containers

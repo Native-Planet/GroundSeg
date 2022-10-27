@@ -22,27 +22,26 @@
 	updateState(data)
 
 	// default values
-  let inView = false,
+  let inView = true,
     loaded = false,
     urbit, code = '',
     advanced = false
 
 	// start api loop
 	onMount(()=> {
-		inView = !inView
     update()
     getUrbitCode()
   })
 
 	// stop api loop
-	onDestroy(()=> inView = !inView)
+	onDestroy(()=> inView = false)
 
 	// api call
   const update = () => {
     if (inView) {
 			fetch($api + '/urbit?urbit_id=' + $page.params.patp)
 			.then(raw => raw.json())
-        .then(res => { handleData(res); loaded = true })
+      .then(res => { handleData(res); loaded = true })
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)

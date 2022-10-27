@@ -1,8 +1,24 @@
 <script>
+  import { afterUpdate } from 'svelte'
+
+  import { isPortrait } from '$lib/api'
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
+
+	let innerWidth = 0
+  let innerHeight = 0
+
+	const vert = (h,w) => {
+	  let r = h / w
+    let d = false
+		if ( r > 1) { d = true }
+		isPortrait.set(d)	
+	}
+
+  afterUpdate(()=>vert(innerHeight, innerWidth))
 </script>
 
+<svelte:window bind:innerWidth bind:innerHeight />
 <div>
 <SettingsButton />
 <AnchorButton />

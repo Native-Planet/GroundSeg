@@ -14,7 +14,7 @@
 	updateState(data)
 
 	// init
-	let inView = false
+	let inView = true
 
 	// updateState loop
   const update = () => {
@@ -24,17 +24,17 @@
     	.then(res => updateState(res))
 			.catch(err => console.log(err))
 
+      console.log("anchor query")
 			setTimeout(update, 1000)
 	}}
 
 	// Start the update loop
 	onMount(()=> {
-		inView = !inView
 		update()
 	})
 
 	// end the update loop
-	onDestroy(()=> inView = !inView)
+  onDestroy(()=> {console.log("anchor destroy");inView = false})
 	
 </script>
 
