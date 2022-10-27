@@ -1,11 +1,11 @@
 # Native Planet GroundSeg
 This is the Control Software for the NP System. 
 
-Groundseg requires `docker` and `docker-compose` 
+GroundSeg requires `docker` and `docker-compose` to work.
 
 ## Installation
 
-**Disclaimer:** This software is installed with `sudo` priveleges as this is required for Groundseg to work properly.
+**Disclaimer:** This software runs as `root` on your device. This is required for controlling various aspects of the device.
 
 ### Standard Installation (Recommended)
 This installs `docker`, `docker-compose` and the required images for GroundSeg to work.
@@ -48,6 +48,43 @@ Lastly, run either one of the install commands.
 1. Clone this repository
 2. `export HOST_HOSTNAME=$(hostname)` 
 3. Run `sudo -E docker-compose up --build` in the root directory of the repository.
+
+## Removing GroundSeg (Uninstall)
+
+### Standard Removal (Recommended)
+This removes `docker`, `docker-compose`, GroundSeg related docker containers and images, and the GroundSeg system files.
+This **DOES NOT** remove the docker volumes on the device.
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/standard_uninstall.sh \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_uninstall.sh && \
+sudo chmod +x /tmp/nativeplanet/standard_uninstall.sh && \
+sudo /tmp/nativeplanet/standard_uninstall.sh
+```
+
+### Groundseg Only
+
+This removes GroundSeg related docker containers and images, and the GroundSeg system files.
+
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/groundseg_uninstall.sh \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_uninstall.sh && \
+sudo chmod +x /tmp/nativeplanet/groundseg_uninstall.sh && \
+sudo /tmp/nativeplanet/groundseg_uninstall.sh
+```
+
+### Uninstall and clear data
+This removes `docker`, `docker-compose`, **ALL** docker images, containers and volumes, and the GroundSeg system files.
+This wipes all docker and GroundSeg data. Make sure you have exported the data you want saved.
+
+```
+mkdir -p /tmp/nativeplanet && \
+sudo wget -O /tmp/nativeplanet/complete_uninstall.sh \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/complete_uninstall.sh && \
+sudo chmod +x /tmp/nativeplanet/complete_uninstall.sh && \
+sudo /tmp/nativeplanet/complete_uninstall.sh
+```
 
 ## TODO 
 
