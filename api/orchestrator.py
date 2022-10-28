@@ -311,7 +311,6 @@ class Orchestrator:
     # Register Wireguard for Urbit
     def register_urbit(self, patp):
         
-        # Todo: clean up
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
@@ -388,15 +387,25 @@ class Orchestrator:
 
 
 #
+#   Anchor Settings
+#
+    # Get anchor registration information
+    def get_anchor_settings(self):
+        settings = dict()
+        settings['wgReg'] = self.config['wgRegistered']
+        settings['wgRunning'] = self.wireguard.is_running()
+
+        return {'anchor': settings}
+
+
+#
 #   System Settings
 #
     # Get all system information
     def get_system_settings(self):
         settings = dict()
-        settings['wgReg'] = self.config['wgRegistered']
-        settings['wgRunning'] = self.wireguard.is_running()
         settings['ram'] = psutil.virtual_memory().percent
-        settings['cpu'] = psutil.cpu_percent(1)
+        settings['cpu'] = psutil.cpu_percent(0.05)
         settings['temp'] = psutil.sensors_temperatures()['coretemp'][0].current
         settings['disk'] = shutil.disk_usage("/")
         settings['gsVersion'] = self.gs_version
@@ -438,6 +447,10 @@ class Orchestrator:
                 self.toggle_minios_on()
                 time.sleep(1)
                 return 200
+        
+        if module == 'ethernet':
+            if data['action'] == 'toggle':
+                return self.toggle_ethernet()
 
         return module
 
@@ -446,9 +459,21 @@ class Orchestrator:
         wifi_status = subprocess.Popen(['nmcli','radio','wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
         ws, stderr = wifi_status.communicate()
 
+        eth = True
         if ws == b'enabled\n':
-            return False
-        return True
+            eth = False
+        
+        self.eth_only = eth
+        return eth
+    
+    # Enables and disables wifi on the host device
+    def toggle_ethernet(self):
+        if self.eth_only:
+            os.system('nmcli radio wifi off')
+        else:
+            os.system('nmcli radio wifi on')
+
+        return 200
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):

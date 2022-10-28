@@ -11,7 +11,7 @@
 
 	// load data into store
 	export let data
-	updateState(data)
+  updateState(data)
 
 	// init
 	let inView = true
@@ -19,12 +19,11 @@
 	// updateState loop
   const update = () => {
     if (inView) {
-			fetch($api + '/system')
+			fetch($api + '/anchor')
 			.then(raw => raw.json())
-    	.then(res => updateState(res))
+    	.then(res => data = res)
 			.catch(err => console.log(err))
 
-      console.log("anchor query")
 			setTimeout(update, 1000)
 	}}
 
@@ -34,20 +33,19 @@
 	})
 
 	// end the update loop
-  onDestroy(()=> {console.log("anchor destroy");inView = false})
+  onDestroy(()=> inView = false)
 	
 </script>
 
 {#if inView}
   <Card width="460px">
-
     <!-- Header -->
-    <AnchorHeader wgReg={$system.wgReg} wgRunning={$system.wgRunning}>
+    <AnchorHeader wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning}>
       <Logo t='Anchor'/>
     </AnchorHeader>
 
     <!-- Register Key -->
-    <AnchorRegisterKey wgReg={$system.wgReg} />
+    <AnchorRegisterKey wgReg={data.anchor.wgReg} />
 
     <!-- Advanced Options -->
     <AnchorAdvanced />

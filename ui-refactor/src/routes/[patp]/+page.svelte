@@ -81,7 +81,9 @@
 		</PierHeader>
 
 		<!-- Pier Profile (public information) -->
-    <PierProfile name={urbit.name} running={urbit.running} {code} />
+    <div transition:scale={{duration:120, delay: 200}}>
+      <PierProfile name={urbit.name} running={urbit.running} {code} />
+    </div>
 
 	  <!-- Pier Credentials-->
 	  {#if (code.length == 27) && urbit.running}

@@ -14,9 +14,6 @@
 <style>
   a {
     color: var(--text-color);
-    background: var(--block-background);
-    border: none;
-    border-radius: 6px;
     padding: 8px 12px 8px 12px;
     min-width: 50px;
     line-height: 14px;

@@ -1,5 +1,6 @@
 <script>
 	import { api } from '$lib/api'
+  import { scale } from 'svelte/transition'
 
   export let ram, temp, disk, cpu, gsVersion, updateMode
 
@@ -26,7 +27,8 @@
 		</div>
 
 		<!-- CPU info -->
-    <div class="hw">
+    <div class="hw" in:scale={{duration:120}}>
+
       <div class="word">CPU Temperature</div>
       <div class="data">{temp} &deg C</div>
 		</div>

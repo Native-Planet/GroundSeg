@@ -36,10 +36,9 @@
     transform: translate(-50%, -50%);
     color: #fff;
     
-    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
 
-    background: rgba(109, 109, 109, 0.5);
+    background: #6d6d6d33;
     backdrop-filter: blur(60px);
     -moz-backdrop-filter: blur(60px);
     -o-backdrop-filter: blur(60px);

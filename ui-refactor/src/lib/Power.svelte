@@ -25,7 +25,7 @@
     padding: 10px 40px 10px 40px;
     border-radius: 15px;
     font-size: 18px;
-    gap: 12px;
+    gap: 16px;
     align-items: center;
   }
   .control-title {

@@ -1,6 +1,5 @@
 <script>
 	import { onMount } from 'svelte'
-	import { scale } from 'svelte/transition'
 
 	import { api } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
@@ -18,7 +17,7 @@
 
 </script>
 
-<div class="wrapper" in:scale={{duration:120, delay: 200}}>
+<div class="wrapper">
 	<Sigil patp={name} size="72px" rad="12px" />
 
 	<div class="info">

@@ -24,6 +24,10 @@
 </div>
 
 <style>
+  .ethernet {
+    display: flex;
+    padding-top: 12px;
+  }
   .ethernet-text {
     font-size: 14px;
     flex: 1;

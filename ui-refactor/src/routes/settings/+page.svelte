@@ -18,7 +18,7 @@
 	export let data
 	updateState(data)
 
-	let inViewSettings = true, tabs = ['Settings','Logs'], activeTab = 'Settings'
+	let inViewSettings = false, tabs = ['Settings','Logs'], activeTab = 'Settings'
 
 	// updateState loop
   const update = () => {
@@ -28,15 +28,17 @@
     	.then(res => updateState(res))
 			.catch(err => console.log(err))
 
-      console.log("settings query")
 			setTimeout(update, 1000)
 	}}
 
 	// Start the update loop
-	onMount(()=>update())
+  onMount(()=> {
+    update();
+    inViewSettings = true
+  })
 
 	// end the update loop
-  onDestroy(()=> {console.log("settings destroy");inViewSettings = false})
+  onDestroy(()=> inViewSettings = false)
 	
 </script>
 
@@ -60,7 +62,8 @@
 
     {#if activeTab == 'Settings'}
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
-        <div class="panel">
+
+        <div class="panel" transition:scale={{duration:120, delay: 200}}>
           <SysInfo
             ram={$system.ram} 
             temp={$system.temp}
@@ -71,20 +74,21 @@
             />
         </div>
 
-        <div class="panel">
+        <div class="panel" transition:scale={{duration:120, delay: 200}}>
           <Network ethOnly={$system.ethOnly}/>
           <MinIO minio={$system.minio} />
         </div>
       </div>
+
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
-        <div class="panel">
+        <div class="panel" transition:scale={{duration:120, delay: 200}}>
           <Power />
         </div>
-        <div class="panel">
+        <div class="panel" transition:scale={{duration:120, delay: 200}}>
           <Contact />
         </div>
-      </div>
 
+      </div>
     {/if}
   </Card>
 {/if}

@@ -1,7 +1,5 @@
 <script>
   import { api } from '$lib/api'
-  import { onMount, onDestroy } from 'svelte'
-  //import Select from 'svelte-select'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   import NetworkEth from '$lib/NetworkEth.svelte'
@@ -15,10 +13,6 @@
     ethSwapping = false,
     nw = '', pw = '',
     view = false
-
-  //onMount(()=> getNetworks())
-  onDestroy(()=> opened = false)
-
 
   const toggleEth = () =>  {
 
@@ -65,21 +59,15 @@
     document.querySelector('#pass').type = view ? 'text' : 'password'
   }
 
-  const getNetworks = () => {
-    if (opened) {
-      fetch($api + "/settings/networks").then(r => r.json()).then(d => networks = d)
-      setTimeout(getNetworks, 10000)
-   }}
-
 </script>
 
   <div class="network">
     <div class="network-title">Connectivity</div>
     <NetworkEth {ethOnly} />
 
-    <!--
     {#if !ethOnly}
-    
+      show wifi
+    <!--
       <div class="wifi">
         <div class="select">
           <Select
@@ -109,18 +97,8 @@
           </div>
         {/if}
       </div>
-    {/if}
-  </div>
-{:else}
-  <div class="network">
-    <div class="network-title">Connectivity</div>
-    <div class="ethernet">
-      <div class="ethernet-text" class:disabled={true}>Ethernet Only</div>
-      <div class="switch-wrapper-blurred"></div>
-    </div>
-    <div class="blurred"></div>
     -->
-
+    {/if}
 
   </div>
 
@@ -135,55 +113,6 @@
   .network-title {
     font-size: 18px;
     padding-bottom: 8px;
-  }
-  .ethernet {
-    display: flex;
-    padding-top: 12px;
-  }
-  .ethernet-text {
-    font-size: 14px;
-    flex: 1;
-  }
-  .switch-wrapper {
-    border-radius: 8px;
-    width: 32px;
-    height: 12px;
-    background: #ffffff4d;
-    padding: 2px;
-    cursor: pointer;
-  }
-  .switch-wrapper-blurred {
-    border-radius: 8px;
-    width: 32px;
-    height: 12px;
-    background: #ffffff4d;
-    padding: 2px;
-    filter: blur(10px);
-    animation: breathe 2s infinite;
-  }
-  .blurred {
-    height: 32px;
-    width: 100%;
-    background: #ffffff4d;
-    border-radius: 8px;
-    margin-top: 20px;
-    filter: blur(10px);
-    animation: breathe 2s infinite;
-  }
-  .switch {
-    height: 100%;
-    width: 19px;
-    border-radius: 6px;
-    margin-top: auto;
-  }
-  .on {
-    background: #008eff;
-    float: right;
-  }
-  .off {
-    background: #000;
-    float: left;
-    opacity: .2;
   }
   .wifi {
     margin-top: 20px;

@@ -5,7 +5,7 @@ export const prerender = true;
 
 export function load() {				
   const url =	"http://" + env.HOST_HOSTNAME + ".local:27016"
-	let d = fetch(url + '/system')
+	let d = fetch(url + '/anchor')
 		.then(raw => raw.json())
     .then(res => {
 		res['api'] = url

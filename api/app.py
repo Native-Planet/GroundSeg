@@ -55,6 +55,13 @@ def system_settings():
         res = orchestrator.handle_module_post_request(module, request.get_json())
         return jsonify(res)
 
+# Handle anchor registration related information
+@app.route("/anchor", methods=['GET'])
+def anchor_settings():
+    if request.method == 'GET':
+        settings = orchestrator.get_anchor_settings()
+        return jsonify(settings)
+
 
 if __name__ == '__main__':
     debug_mode = False
