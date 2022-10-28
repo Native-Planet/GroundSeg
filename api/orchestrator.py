@@ -412,6 +412,7 @@ class Orchestrator:
         settings['updateMode'] = self.config['updateMode']
         settings['ethOnly'] = self.get_ethernet_status()
         settings['minio'] = self.minIO_on
+        settings['connected'] = self.get_connection_status()
 
         return {'system': settings}
 
@@ -448,9 +449,16 @@ class Orchestrator:
                 time.sleep(1)
                 return 200
         
-        if module == 'ethernet':
+        # network connectivity module
+        if module == 'network':
             if data['action'] == 'toggle':
                 return self.toggle_ethernet()
+
+            if data['action'] == 'networks':
+                return self.get_wifi_list()
+
+            if data['action'] == 'connect':
+                return self.change_wifi_network(data['network'], data['password'])
 
         return module
 
@@ -466,6 +474,36 @@ class Orchestrator:
         self.eth_only = eth
         return eth
     
+    # Check if wifi is connected
+    def get_connection_status(self):
+        check_connected = subprocess.Popen(['nmcli', '-t', 'con', 'show'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        connections, stderr = check_connected.communicate()
+        connections_arr = connections.decode('utf-8').split('\n')
+        substr = 'wireless'
+
+        for ln in connections_arr:
+            if substr in ln:
+                conn = ln.split(':')
+                if len(conn[-1]) > 0:
+                    return conn[0]
+        return ''
+
+    # Returns list of available SSIDs
+    def get_wifi_list(self):
+        available = subprocess.Popen(['nmcli', '-t', 'dev', 'wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        ssids, stderr = available.communicate()
+        ssids_cleaned = ssids.decode('utf-8').split('\n')
+
+        networks = []
+
+        for ln in ssids_cleaned[1:]:
+            info = ln.split(':')
+            if len(info) > 1:
+                networks.append(info[1])
+
+        return networks
+
+
     # Enables and disables wifi on the host device
     def toggle_ethernet(self):
         if self.eth_only:
@@ -474,6 +512,28 @@ class Orchestrator:
             os.system('nmcli radio wifi on')
 
         return 200
+
+    def change_wifi_network(self, network, password):
+        connect_attempt = subprocess.Popen(['nmcli','dev','wifi','connect',network,'password',password],
+                stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+
+        did_connect, stderr = connect_attempt.communicate()
+        did_connect = did_connect.decode("utf-8")[0:5]
+
+        if did_connect == 'Error':
+            return 400
+        else:
+            # for some reason deleting doesn't work
+            #if connected != '':
+                #del_connection = subprocess.Popen(['nmcli','con','del',connected],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+
+                #did_delete, delerr = del_connection.communicate()
+                #did_delete = did_delete.decode("utf-8")
+                #print(did_delete)
+
+            return 200
+
+
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):

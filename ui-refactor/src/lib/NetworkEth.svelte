@@ -4,7 +4,7 @@
   export let ethOnly
 
   const toggleEth = () =>  {
-    let module = 'ethernet'
+    let module = 'network'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},

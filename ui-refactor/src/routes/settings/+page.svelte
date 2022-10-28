@@ -75,7 +75,7 @@
         </div>
 
         <div class="panel" transition:scale={{duration:120, delay: 200}}>
-          <Network ethOnly={$system.ethOnly}/>
+          <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           <MinIO minio={$system.minio} />
         </div>
       </div>
