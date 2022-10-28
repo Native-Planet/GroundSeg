@@ -4,23 +4,28 @@
   import Fa from 'svelte-fa'
   import { faCaretLeft, faCaretRight } from '@fortawesome/free-solid-svg-icons'
   import SveltyPicker from 'svelty-picker'
+  import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
+
   //import { createEventDispatcher } from 'svelte'
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let timeNow, frequency
+  export let timeNow, frequency, running, name,  meldHour = 0, meldMinute = 0
+    
+  let selectedHour = meldHour, selectedMinute = meldMinute
 
-  let exportButtonText = 'Export Urbit Pier',
-    deleteButtonText = 'Delete Urbit Pier', 
-    inView = true,
-    meldTime = '00:00',
-    cloneFreq
+  let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
+  let inView = true
+  let cloneFreq
+  let minutes = Array.from(Array(60).keys()) 
+  let hours = Array.from(Array(24).keys())
 
   onMount(()=> cloneFreq = frequency)
 
   //const dispatch = createEventDispatcher()
 
   const sendMeldPoke = () => {
+    console.log(name)
     console.log("meldd")
   }
 
@@ -30,8 +35,9 @@
 
 </script>
 
-  <div class="option-title">Schedule Meld</div>
+<div class="option-title">Schedule Meld</div>
 
+<div class="panel">
   <!-- frequency selector -->
   <div class="day">
     <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
@@ -49,104 +55,111 @@
   </div>
 
   <div class="day">
+
     <div class="day-text">at</div>
 
-    <!-- temp -->
+    <!-- hour selector -->
+    <Listbox class="time-box" value={selectedHour} on:change={(e) => (selectedHour = e.detail)}>
+      <ListboxButton class="time-selector">{selectedHour < 10 ? "0" : ""}{selectedHour}</ListboxButton>
+      <ListboxOptions class="time-list">
+        {#each hours as hour}
+          <ListboxOption class="time-option" value={hour}>
+            {hour < 10 ? "0" : ""}{hour}
+          </ListboxOption>
+        {/each}
+      </ListboxOptions>
+    </Listbox>
 
-    <input id="hour" type="number" />
+    <div class="day-text">:</div>
+
+    <!-- minute selector -->
+    <Listbox value={selectedMinute} on:change={(e) => (selectedMinute = e.detail)}>
+      <ListboxButton class="time-selector">{selectedMinute < 10 ? "0" : ""}{selectedMinute}</ListboxButton>
+      <ListboxOptions class="time-list">
+        {#each minutes as minute}
+          <ListboxOption value={minute}>
+            {minute < 10 ? "0" : ""}{minute}
+          </ListboxOption>
+        {/each}
+      </ListboxOptions>
+    </Listbox>
+
   </div>
 
-
   <!-- Current time on host device -->
-  <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+  <div class="day">
+    <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+  </div>
 
+  <div class="day-action">
+  <!-- Save new meld schedule -->
+  <PrimaryButton
+    noMargin={true}
+    standard="{frequency == cloneFreq ? "No" : "Save"} changes"
+    success="changes saved!"
+    status={frequency == cloneFreq ? 'disabled' : 'standard'}
+    on:click={saveMeldChanges}
+    />
 
-<!--
-  <div class="meld-schedule">
-    <!-- current time --
-
-      <!-- frequency selector --
-      <div class="day">
-        <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
-          <Fa icon={faCaretLeft} size="1x" />
-        </button>
-        <div class="day-text">Every</div>
-        <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
-        <div class="day-text">days</div>
-        <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
-          <Fa icon={faCaretRight} size="1x" />
-        </button>
-      </div>
-
-      <div class="current-time">at</div>
-
-      <!-- set meld time 
-        using this package is temporary solution. Need to write our own.
-      --
-      <div style="color:#fff;width:60px;margin:auto;overflow:hidden;border-radius:8px;">
-        <SveltyPicker inputClasses="form-control" theme="clock-colors" format="hh:ii" bind:value={meldTime}></SveltyPicker>
-      </div>
-    </div>
-
-  <!-- Meld Actions --
-  <div class="admin-wrapper">
-    <div class="option-title">Meld Actions</div>
-
-    <!-- Save new meld schedule --
+  <!-- Meld now -->
+  {#if running}
     <PrimaryButton
+      background="#FFFFFF4D"
       noMargin={true}
-      standard="{frequency == cloneFreq ? "No" : "Save"} changes"
-      success="changes saved!"
-      status={frequency == cloneFreq ? 'disabled' : 'standard'}
-      on:click={saveMeldChanges}
+      standard="Meld now"
+      success="Meld poke successful. Please give it a moment"
+      on:click={sendMeldPoke}
       />
-
-    <!-- Meld now --
-    {#if running}
-      <PrimaryButton
-        background="#FFFFFF4D"
-        noMargin={true}
-        standard="Meld now"
-        success="Meld poke successful. Please give it a moment"
-        on:click={sendMeldPoke}
-        />
-    {/if}
-
+  {/if}
   </div>
 
 </div>
 
-    -->
 <style>
-  :global(.clock-colors) {
-    --sdt-primary: #008eff;
-    --sdt-color: #fff;
-    --sdt-bg-main: #040404BF;
-    --sdt-bg-today: var(--sdt-primary);
-    --sdt-btn-bg-hover: red;
-    --sdt-btn-header-bg-hover: #dfdfdf;
-    --sdt-clock-bg: #eeeded;
-    --sdt-clock-bg-minute: rgb(238, 237, 237, 0.25);
+	:global(.time-list::-webkit-scrollbar) {display: none;}
+  :global(.time-selector) {
+    padding: none;
+    font-size: 12px;
+    font-family: inherit;
+    color: inherit;
+    background: #FFFFFF4D;
+    border-radius: 4px;
+    position: relative;
   }
-  .meld-schedule {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  :global(.time-list) {
+    font-size: 12px;
+    text-align: center;
+    background: #040404;
+    position: absolute;
+    padding: 0 6px 0 6px;
+    max-height: 64px;
+    -ms-overflow-style: none;
+		scrollbar-width: none;
+    overflow: scroll;
+    list-style-type: none;
   }
-
   .option-title {
     font-size: 14px;
     color: inherit;
   }
-
   .current-time {
     font-size:12px;
   }
   .day {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     justify-content: center;
+    align-items: center;
+    padding: 4px;
   }
+  .day-action {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+    padding: 4px;
+  }
+
   .day-text {
     font-size: 12px;
     color: inherit;
@@ -169,20 +182,4 @@
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {-webkit-appearance: none;margin: 0;}
   input[type=number] {-moz-appearance: textfield;}
-
-  .admin-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .export-pier {
-    color: orange;
-    cursor: pointer;
-  }
-
-  .delete-pier {
-    color: red;
-    cursor: pointer;
-  }
 </style>

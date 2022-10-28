@@ -77,7 +77,7 @@
      <PierOptionsAdmin {name} {running} />
    </div>
    <div class="meld-wrapper">
-     <PierOptionsMeld  {frequency} {timeNow} />
+     <PierOptionsMeld  {frequency} {timeNow} {running} {name} />
    </div>
   </div>
 {/if}

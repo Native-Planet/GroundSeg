@@ -62,8 +62,8 @@
 </script>
 <div class="wifi">
   <Listbox value={selectedConnection} on:change={(e) => (selectedConnection = e.detail)}>
-    <ListboxButton on:click={getNetworks} >{selectedConnection.length > 0 ? selectedConnection : "Select a wifi network"}</ListboxButton>
-    <ListboxOptions>
+    <ListboxButton class="connection-selector" on:click={getNetworks} >{selectedConnection.length > 0 ? selectedConnection : "Select a wifi network"}</ListboxButton>
+    <ListboxOptions class="connection-list">
       {#each networks as network}
         <ListboxOption value={network}>
           {network}
@@ -93,6 +93,34 @@
 </div>
  
 <style>
+	:global(.connection-list::-webkit-scrollbar) {display: none;}
+  :global(.connection-selector) {
+    padding: 8px 0 8px 0;
+    font-size: 12px;
+    font-family: inherit;
+    color: inherit;
+    background: #FFFFFF4D;
+    border-radius: 6px;
+    position: relative;
+    width: 100%;
+  }
+  :global(.connection-list) {
+    font-size: 12px;
+    line-height: 24px;
+    margin: auto;
+    width: 300px;
+    text-align: center;
+    border-radius: 6px;
+    background: #040404;
+    position: absolute;
+    padding: 0 6px 0 6px;
+    max-height: 240px;
+    -ms-overflow-style: none;
+		scrollbar-width: none;
+    overflow: scroll;
+    list-style-type: none;
+  }
+
   .wifi {
     margin-top: 20px;
   }
