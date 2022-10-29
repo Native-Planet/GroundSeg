@@ -17,17 +17,15 @@ default_pier_config = {
         "wg_ames_port": None,
         "wg_s3_port": None,
         "wg_console_port": None,
-        "meld_frequency": 7
+        "meld_frequency": 7,
+        "meld_time": "0000"
         }
-
-# important: add check for missing fields in config -- add the fields
 
 class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'
 
     def __init__(self,pier_config):
         self.config = pier_config
-
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
         self.buildUrbit()
@@ -35,6 +33,8 @@ class UrbitDocker:
         if(self.is_running()):
             self.stop()
             self.start()
+
+        self.save_config()
 
     def buildVolume(self):
         volumes = client.volumes.list()
@@ -182,6 +182,22 @@ class UrbitDocker:
 
         return x
 
+    def set_meld_schedule(self, freq, hour, minute):
+        if hour < 10:
+            hour = '0' + str(hour)
+        else:
+            hour = str(hour)
+
+        if minute < 10:
+            minute = '0' + str(minute)
+        else:
+            minute = str(minute)
+
+        self.config['meld_time'] = hour + minute
+        self.config['meld_frequency'] = int(freq)
+        self.save_config()
+
+        return 200
 
     #def reset_code(self):
     #    return self.container.exec_run('/bin/reset-urbit-code').output.strip()

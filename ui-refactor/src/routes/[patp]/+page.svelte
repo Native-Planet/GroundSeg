@@ -25,7 +25,8 @@
   let inView = true,
     loaded = false,
     urbit, code = '',
-    advanced = false
+    advanced = false,
+    expanded = false
 
 	// start api loop
 	onMount(()=> {
@@ -73,7 +74,7 @@
 </script>
 
 {#if inView && loaded}
-<Card width="480px">
+<Card width="600px">
 
 		<!-- Pier Header -->
 		<PierHeader running={urbit.running} name={urbit.name}>
@@ -86,7 +87,7 @@
     </div>
 
 	  <!-- Pier Credentials-->
-	  {#if (code.length == 27) && urbit.running}
+	  {#if (code.length == 27) && urbit.running && !expanded }
 
     	<!-- Landscape +code 
         placeholder code -->
@@ -117,7 +118,8 @@
     {/if}
 
     <!-- Advanced Options -->
-    <ToggleAdvancedButton {advanced} on:click={()=> advanced = !advanced} />
+
+    <ToggleAdvancedButton {advanced} on:click={()=> {advanced = !advanced;expanded = false}} />
 
 		{#if advanced}
       <PierOptions
@@ -128,6 +130,11 @@
         running={urbit.running}
         timeNow={urbit.timeNow}
         frequency={urbit.frequency}
+        meldHour={urbit.meldHour}
+        meldMinute={urbit.meldMinute}
+        containers={urbit.containers}
+        {expanded}
+        on:toggleExpand={()=> expanded = !expanded}
         />
 		{/if}
 

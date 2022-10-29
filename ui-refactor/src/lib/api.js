@@ -13,6 +13,7 @@ export const urbits = writable([])
 export const system = writable({})
 export const api = writable('')
 export const isPortrait = writable(false)
+export const currentLog = writable({'container': '', 'log': []})
 
 //
 // state update

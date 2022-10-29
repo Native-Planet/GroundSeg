@@ -2,11 +2,14 @@
 	import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
   import { page } from '$app/stores'
+  import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
 
 	import { updateState, api, system, isPortrait } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
+  import Logs from '$lib/Logs.svelte'
   import SysInfo from '$lib/SysInfo.svelte'
   import Power from '$lib/Power.svelte'
 
@@ -18,11 +21,11 @@
 	export let data
 	updateState(data)
 
-	let inViewSettings = false, tabs = ['Settings','Logs'], activeTab = 'Settings'
+	let inViewSettings = false, tabs = ['Settings','Logs'], activeTab = 'Settings', selectedContainer
 
 	// updateState loop
   const update = () => {
-    if ($page.routeId == 'settings') {
+    if (($page.routeId == 'settings') && (activeTab == 'Settings')) {
 			fetch($api + '/system')
 			.then(raw => raw.json())
     	.then(res => updateState(res))
@@ -31,10 +34,30 @@
 			setTimeout(update, 1000)
 	}}
 
+  const exportLogs = () => {
+    let module = 'logs'
+    fetch($api + '/system?module=' + module, {
+		  method: 'POST',
+		  headers: {'Content-Type': 'application/json'},
+  	  body: JSON.stringify({'action':'export','container':selectedContainer})
+	  })
+      .then(r => r.json())
+      .then(d => {
+          var element = document.createElement('a')
+          element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(d))
+          element.setAttribute('download', selectedContainer)
+          element.style.display = 'none'
+          document.body.appendChild(element)
+          element.click()
+          document.body.removeChild(element)
+      })
+  }
+
 	// Start the update loop
   onMount(()=> {
-    update();
+    update()
     inViewSettings = true
+    selectedContainer = $system.containers[0]
   })
 
 	// end the update loop
@@ -63,7 +86,7 @@
     {#if activeTab == 'Settings'}
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
-        <div class="panel" transition:scale={{duration:120, delay: 200}}>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <SysInfo
             ram={$system.ram} 
             temp={$system.temp}
@@ -74,26 +97,72 @@
             />
         </div>
 
-        <div class="panel" transition:scale={{duration:120, delay: 200}}>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           <MinIO minio={$system.minio} />
         </div>
       </div>
 
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
-        <div class="panel" transition:scale={{duration:120, delay: 200}}>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Power />
         </div>
-        <div class="panel" transition:scale={{duration:120, delay: 200}}>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Contact />
         </div>
 
       </div>
     {/if}
+
+    {#if activeTab == 'Logs'}
+      <div in:scale={{duration:120, delay: 200}}>
+        <Logs container={selectedContainer} maxHeight="60vh" />
+      </div>
+      <div class="bottom-panel">
+        <Listbox value={selectedContainer} on:change={(e) => (selectedContainer = e.detail)}>
+          <ListboxOptions as="div" class="containers-list">
+            {#each $system.containers as c}
+              <ListboxOption as="p" value={c}>
+                {c}
+              </ListboxOption>
+            {/each}
+          </ListboxOptions>
+          <ListboxButton class="containers-selector">{selectedContainer}</ListboxButton>
+        </Listbox>
+        <PrimaryButton on:click={exportLogs} standard="Export" status="standard" />
+      </div>
+    {/if}
+
   </Card>
 {/if}
 
 <style>
+  .bottom-panel {
+    padding-top: 24px;
+    display: flex;
+    align-items: end;
+    gap: 12px;
+  }
+  :global(.containers-selector) {
+    background: #FFFFFF4D;
+    color: white;
+    padding: 8px;
+    width: 360px;
+    border-radius: 6px;
+    font-size: 12px;
+    position: relative;
+  }
+  :global(.containers-list) {
+    position: absolute;
+    bottom: 48px;
+    font-size: 12px;
+    background: #040404;
+    color: white;
+    padding: 6px 12px 6px 12px;
+    width: calc(360px - 24px);
+    border-radius: 6px;
+  }
+
   .navbar {
     display: flex;
     margin: auto;

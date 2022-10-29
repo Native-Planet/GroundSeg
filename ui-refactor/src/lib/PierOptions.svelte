@@ -1,6 +1,9 @@
 <script>
   import { scale, fly } from 'svelte/transition'
 	import { quintOut } from 'svelte/easing'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher()
 
 	import { api } from '$lib/api'
 	import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -10,7 +13,9 @@
   import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
   import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
-  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency
+  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency, meldHour, meldMinute, containers, expanded
+
+  let selectedContainer = name
 
   // Available tabs
   let tabs = ['Logs','MinIO', 'Urbit'],
@@ -20,12 +25,17 @@
   // Switch tabs
   // Todo: add transition
   const switchTab = (tab,i) => {
+    if (expanded && (tab != 'Logs')) {toggleExpand()}
+
     if (activeTab == tab) {
       activeTab = null
     } else {
     activeTab = tab
     }
+
   }
+
+  const toggleExpand = () => dispatch('toggleExpand')
 
 </script>
 
@@ -61,7 +71,7 @@
 <!-- Tab Contents -->
 {#if activeTab == 'Logs'}
   <div in:scale={{duration:120, delay: 200}}>
-    <PierOptionsLogs />
+    <PierOptionsLogs on:toggleExpand={toggleExpand} {name} {containers} {expanded} />
   </div>
 {/if}
 
@@ -77,7 +87,7 @@
      <PierOptionsAdmin {name} {running} />
    </div>
    <div class="meld-wrapper">
-     <PierOptionsMeld  {frequency} {timeNow} {running} {name} />
+     <PierOptionsMeld  {frequency} {timeNow} {running} {name} {meldHour} {meldMinute} />
    </div>
   </div>
 {/if}

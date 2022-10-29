@@ -90,6 +90,12 @@ class Orchestrator:
             with open(f'settings/pier/{p}.json') as f:
                 data = json.load(f)
 
+            if not 'meld_time' in data:
+                data['meld_time'] = default_pier_config['meld_time']
+        
+            if not 'meld_frequency' in data:
+                data['meld_frequency'] = default_pier_config['meld_frequency']
+
             self._urbits[p] = UrbitDocker(data)
 
             if data['minio_password'] != '':
@@ -134,6 +140,11 @@ class Orchestrator:
         u['timeNow'] = datetime.utcnow()
         u['frequency'] = urb.config['meld_frequency']
 
+        hour, minute = urb.config['meld_time'][0:2], urb.config['meld_time'][2:]
+
+        u['containers'] = self.get_pier_containers(urbit_id)
+        u['meldHour'] = int(hour)
+        u['meldMinute'] = int(minute)
         u['remote'] = False
         u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
         u['minIOUrl'] = ""
@@ -172,35 +183,40 @@ class Orchestrator:
         # Urbit Pier requests
         if data['app'] == 'pier':
             if data['data'] == 'toggle':
-                x = self.toggle_pier_power(urb)
-                return x
+                return self.toggle_pier_power(urb)
 
             if data['data'] == '+code':
-                x = self.get_urbit_code(urbit_id, urb)
-                return x
+                return self.get_urbit_code(urbit_id, urb)
 
             if data['data'] == 's3-update':
-                x = self.set_minio_endpoint(urbit_id)
-                return x
+                return self.set_minio_endpoint(urbit_id)
+
+            if data['data'] == 'schedule-meld':
+                return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
 
         # Wireguard requests
         if data['app'] == 'wireguard':
             if data['data'] == 'toggle':
-                x = self.toggle_pier_network(urb)
-                return x
+                return self.toggle_pier_network(urb)
 
         # MinIO requests
         if data['app'] == 'minio':
             pwd = data.get('password')
             if pwd != None:
-                x = self.create_minio_admin_account(urbit_id, pwd)
-                return x
+                return self.create_minio_admin_account(urbit_id, pwd)
 
             if data['data'] == 'export':
-                x = self.export_minio_bucket(urbit_id)
-                return x
+                return self.export_minio_bucket(urbit_id)
 
         return 400
+
+    # Get list of containers related to this patp
+    def get_pier_containers(self, patp):
+        containers = [patp]
+        if patp in list(self._minios.keys()):
+            containers.append(f'minio_{patp}')
+
+        return containers
 
     # Toggle Pier on or off
     def toggle_pier_power(self, urb):
@@ -256,7 +272,7 @@ class Orchestrator:
  
     # Get looback address of Urbit Pier
     def get_urbit_loopback_addr(self, patp):
-        log = self.get_logs(patp).decode('utf-8').split('\n')[::-1]
+        log = self.get_log_lines(patp,0)[::-1]
         substr = 'http: loopback live on'
 
         for ln in log:
@@ -413,6 +429,7 @@ class Orchestrator:
         settings['ethOnly'] = self.get_ethernet_status()
         settings['minio'] = self.minIO_on
         settings['connected'] = self.get_connection_status()
+        settings['containers'] = self.get_containers()
 
         return {'system': settings}
 
@@ -460,7 +477,25 @@ class Orchestrator:
             if data['action'] == 'connect':
                 return self.change_wifi_network(data['network'], data['password'])
 
+        # logs module
+        if module == 'logs':
+            if data['action'] == 'view':
+                return self.get_log_lines(data['container'], data['haveLine'])
+
+            if data['action'] == 'export':
+                return '\n'.join(self.get_log_lines(data['container'], 0))
+
         return module
+
+    # Get list of available docker containers
+    def get_containers(self):
+        minio = list(self._minios.keys())
+        containers = list(self._urbits.keys())
+        containers.append('wireguard')
+        for m in minio:
+            containers.append(f"minio_{m}")
+
+        return containers
 
     # Check if wifi is disabled
     def get_ethernet_status(self):
@@ -532,8 +567,6 @@ class Orchestrator:
                 #print(did_delete)
 
             return 200
-
-
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):
@@ -642,14 +675,20 @@ class Orchestrator:
         subprocess.run("rm privkey pubkey", shell =True)
  
     # Get logs from docker container
-    def get_logs(self, container):
+    def get_log_lines(self, container, line):
+
+        blob = ''
+
         if container == 'wireguard':
-            return self.wireguard.wg_docker.logs()
+            blob = self.wireguard.wg_docker.logs()
+
         if 'minio_' in container:
-            return self._minios[container[6:]].logs()
+            blob = self._minios[container[6:]].logs()
+
         if container in self._urbits.keys():
-            return self._urbits[container].logs()
-        return ""
+            blob = self._urbits[container].logs()
+
+        return blob.decode('utf-8').split('\n')[line:]
 
     # Custom jsonify
     def custom_jsonify(self, val):

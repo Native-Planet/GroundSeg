@@ -10,9 +10,9 @@
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let timeNow, frequency, running, name,  meldHour = 0, meldMinute = 0
+  export let timeNow, frequency, running, name, meldHour, meldMinute
     
-  let selectedHour = meldHour, selectedMinute = meldMinute
+  let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard'
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let inView = true
@@ -25,13 +25,29 @@
   //const dispatch = createEventDispatcher()
 
   const sendMeldPoke = () => {
-    console.log(name)
     console.log("meldd")
   }
 
   const saveMeldChanges = () => {
-    console.log("meld settings saved")
-  }
+		fetch($api + '/urbit?urbit_id=' + name, {
+		method: 'POST',
+		headers: {'Content-Type': 'application/json'},
+		body: JSON.stringify({'app':'pier','data':'schedule-meld','frequency':cloneFreq,'hour':selectedHour,'minute':selectedMinute})
+		})
+      .then(d=>d.json())
+      .then(r=>{
+        if (r === 200) {
+          console.log(r)
+          meldSetStatus = 'success'
+          setTimeout(()=>{
+            meldSetStatus = 'standard'
+          }, 3000)}
+        if (r === 400) {
+          meldSetStatus = 'failure'
+          setTimeout(()=>meldSetStatus = 'standard', 3000)
+      }})
+		  .catch(err => console.log(err))
+    }
 
 </script>
 
@@ -95,9 +111,20 @@
   <!-- Save new meld schedule -->
   <PrimaryButton
     noMargin={true}
-    standard="{frequency == cloneFreq ? "No" : "Save"} changes"
+    standard="{
+      frequency != cloneFreq 
+      || selectedHour != meldHour 
+      || selectedMinute != meldMinute
+      ? "Save" : "No"
+    } changes"
     success="changes saved!"
-    status={frequency == cloneFreq ? 'disabled' : 'standard'}
+    failure="failed to set meld schedule"
+    status={
+      frequency != cloneFreq 
+      || selectedHour != meldHour 
+      || selectedMinute != meldMinute
+      ? meldSetStatus : 'disabled'
+    }
     on:click={saveMeldChanges}
     />
 
