@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess #, requests, socket, sys
+import json, os, time, psutil, shutil, copy, subprocess, threading #,requests, socket, sys
 from datetime import datetime
 from flask import jsonify, send_file
 
@@ -96,12 +96,20 @@ class Orchestrator:
             if not 'meld_frequency' in data:
                 data['meld_frequency'] = default_pier_config['meld_frequency']
 
+            if not 'meld_schedule' in data:
+                data['meld_schedule'] = default_pier_config['meld_schedule']
+
+            if not 'meld_last' in data:
+                data['meld_last'] = default_pier_config['meld_last']
+
+            if not 'meld_next' in data:
+                data['meld_next'] = default_pier_config['meld_next']
+
             self._urbits[p] = UrbitDocker(data)
 
             if data['minio_password'] != '':
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
-
 #
 #   Urbit Pier
 #
@@ -137,8 +145,11 @@ class Orchestrator:
 
         u['wgReg'] = self.config['wgRegistered']
         u['wgRunning'] = self.wireguard.is_running()
+        u['meldOn'] = urb.config['meld_schedule']
         u['timeNow'] = datetime.utcnow()
         u['frequency'] = urb.config['meld_frequency']
+        u['meldLast'] = datetime.fromtimestamp(int(urb.config['meld_last']))
+        u['meldNext'] = datetime.fromtimestamp(int(urb.config['meld_next']))
 
         hour, minute = urb.config['meld_time'][0:2], urb.config['meld_time'][2:]
 
@@ -193,6 +204,14 @@ class Orchestrator:
 
             if data['data'] == 'schedule-meld':
                 return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
+
+            if data['data'] == 'toggle-meld':
+                x = self.get_urbit_loopback_addr(urb.config['pier_name'])
+                return urb.toggle_meld_status()
+
+            if data['data'] == 'do-meld':
+                lens_addr = self.get_urbit_loopback_addr(urbit_id)
+                return urb.send_meld(lens_addr)
 
         # Wireguard requests
         if data['app'] == 'wireguard':

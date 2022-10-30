@@ -133,6 +133,9 @@
         meldHour={urbit.meldHour}
         meldMinute={urbit.meldMinute}
         containers={urbit.containers}
+        meldOn={urbit.meldOn}
+        meldLast={urbit.meldLast}
+        meldNext={urbit.meldNext}
         {expanded}
         on:toggleExpand={()=> expanded = !expanded}
         />

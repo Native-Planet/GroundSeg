@@ -13,7 +13,7 @@
   import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
   import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
-  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency, meldHour, meldMinute, containers, expanded
+  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency, meldHour, meldMinute, meldOn, meldLast, meldNext, containers, expanded
 
   let selectedContainer = name
 
@@ -87,7 +87,7 @@
      <PierOptionsAdmin {name} {running} />
    </div>
    <div class="meld-wrapper">
-     <PierOptionsMeld  {frequency} {timeNow} {running} {name} {meldHour} {meldMinute} />
+     <PierOptionsMeld  {frequency} {timeNow} {running} {name} {meldHour} {meldMinute} {meldOn} {meldLast} {meldNext} />
    </div>
   </div>
 {/if}

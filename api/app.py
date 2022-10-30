@@ -1,4 +1,6 @@
-from flask import Flask, jsonify, request
+import threading, time
+from datetime import datetime
+from flask import Flask, jsonify, request 
 from flask_cors import CORS
 from orchestrator import Orchestrator
 
@@ -14,12 +16,22 @@ def signal_handler(sig, frame):
 orchestrator = Orchestrator("/settings/system.json")
 
 app = Flask(__name__)
-#app.config['ORCHESTRATOR'] = orchestrator
 app.config['TEMP_FOLDER'] = './tmp/'
 
 # Todo: Look into what this actually does
 CORS(app)
 
+def meld_loop():
+    while True:
+        for p in orchestrator._urbits.values():
+            now = int(datetime.utcnow().timestamp())
+
+            if p.config['meld_schedule']:
+                if int(p.config['meld_next']) < now:
+                    x = orchestrator.get_urbit_loopback_addr(p.config['pier_name'])
+                    p.send_meld(x)
+
+threading.Thread(target=meld_loop).start()
 
 # Get all urbits
 @app.route("/urbits", methods=['GET'])
@@ -65,4 +77,4 @@ def anchor_settings():
 
 if __name__ == '__main__':
     debug_mode = False
-    app.run(host='0.0.0.0', port=27016, debug=debug_mode, use_reloader=debug_mode)
+    app.run(host='0.0.0.0', port=27016, debug=True, use_reloader=debug_mode)
