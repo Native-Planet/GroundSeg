@@ -213,6 +213,22 @@ class Orchestrator:
                 lens_addr = self.get_urbit_loopback_addr(urbit_id)
                 return urb.send_meld(lens_addr)
 
+        # Wireguard requests
+        if data['app'] == 'wireguard':
+            if data['data'] == 'toggle':
+                return self.toggle_pier_network(urb)
+
+        # MinIO requests
+        if data['app'] == 'minio':
+            pwd = data.get('password')
+            if pwd != None:
+                return self.create_minio_admin_account(urbit_id, pwd)
+
+            if data['data'] == 'export':
+                return self.export_minio_bucket(urbit_id)
+
+        return 400
+
     # Delete Urbit Pier and MiniO
     def delete_urbit(self, patp):
         urb = self._urbits[patp]
@@ -230,22 +246,6 @@ class Orchestrator:
         self.save_config()
 
         return 200
-
-        # Wireguard requests
-        if data['app'] == 'wireguard':
-            if data['data'] == 'toggle':
-                return self.toggle_pier_network(urb)
-
-        # MinIO requests
-        if data['app'] == 'minio':
-            pwd = data.get('password')
-            if pwd != None:
-                return self.create_minio_admin_account(urbit_id, pwd)
-
-            if data['data'] == 'export':
-                return self.export_minio_bucket(urbit_id)
-
-        return 400
 
     # Get list of containers related to this patp
     def get_pier_containers(self, patp):

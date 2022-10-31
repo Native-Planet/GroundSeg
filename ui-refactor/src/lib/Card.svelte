@@ -2,7 +2,7 @@
   import { fade } from 'svelte/transition'
   import { fadeIn, fadeOut, isPortrait } from '$lib/api'
 
-	export let width, maxHeight = "80vh", padding = true
+	export let width, maxHeight = "80vh", padding = true, home = false
 
 	let innerWidth = 0
   let innerHeight = 0
@@ -20,7 +20,7 @@
 	 	 style="padding:{padding ? '20px' : '0'};
       max-height:{maxHeight}; width: {
       $isPortrait
-			  ? 'calc(100vw - 40px)'
+      ? home ? '100vw' : 'calc(100vw - 40px)'
 			  : width
     };">
 	<slot/>

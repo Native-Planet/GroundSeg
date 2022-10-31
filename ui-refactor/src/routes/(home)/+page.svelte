@@ -37,7 +37,7 @@
 </script>
 
 {#if inView}
-	<Card width="460px" padding={false}>
+  <Card width="460px" padding={false} home={true}>
 		<div style="margin: 20px 0 0 20px;">
   		<Logo />
 		</div>

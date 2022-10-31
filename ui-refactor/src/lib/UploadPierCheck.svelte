@@ -31,6 +31,7 @@
   .warning-title {
     font-size: 12px;
     font-weight: 700;
+    margin-top: 12px;
     padding-bottom: 12px;
     text-align: left;
   }

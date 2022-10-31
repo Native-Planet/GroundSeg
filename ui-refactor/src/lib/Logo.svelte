@@ -14,7 +14,7 @@
 			<div class="text">{t}</div>
 			<a class="home" href="/">
 				<Fa icon={faIgloo} />
-				home
+        <span>home</span>
 			</a>
 		</div>
 	{/if}
@@ -36,9 +36,11 @@
 
 	}
 	.home {
+    display: flex;
 		font-size: 12px;
 		margin-left: 18px;
-		margin-top: 2px;
+		margin-top: 5px;
 		color: inherit;
+    gap: 4px;
 	}
 </style>

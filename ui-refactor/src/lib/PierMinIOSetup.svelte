@@ -49,7 +49,10 @@
       .then(d => { 
         if (d == 200) {buttonStatus = 'success'}
         else {buttonStatus = 'failure'}
-        setTimeout(()=>buttonStatus = 'standard', 10000)
+        setTimeout(()=> {
+          buttonStatus = 'standard', 10000
+          showButton = false
+        })
     })}
 
 </script>
