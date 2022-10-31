@@ -53,11 +53,6 @@
 </Card>
 
 <style>
-
-  strong {
-    opacity: 1;
-  }
-
   .subtitle {
     font-weight: 700;
     font-size: .9em;
@@ -75,6 +70,6 @@
   }
   .buttons {
     display: flex;
-    margin-top: 24px;
+    margin-top: 48px;
   }
 </style>

@@ -23,8 +23,6 @@
      <span>Neglecting to do so will cause technical and networking issues with your Urbit ID.</span>
    </div>
 
-  <a class="learn" href="/boot/existing">Learn more</a>
-
 </div>
 
 <style>
@@ -50,10 +48,5 @@
   .warning-content > span {
     font-size: 13px;
     opacity: .8;
-  }
-  .learn {
-    font-size: 12px;
-    color: inherit;
-    text-decoration-line: underline;
   }
 </style>
