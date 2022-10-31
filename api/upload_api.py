@@ -12,8 +12,6 @@ from orchestrator import Orchestrator
 
 import urbit_docker
 
-#import system_info as sys_info
-
 
 app = Blueprint('upload', __name__, template_folder='templates')
 
@@ -48,8 +46,9 @@ def uploadKey():
 
 @app.route('/upload/pier', methods=['POST'])
 def uploadPier():
-    if request.method == 'POST':
 
+
+'''    
         file = request.files['file']
 
         filename = secure_filename(file.filename)
@@ -97,7 +96,24 @@ def uploadPier():
                 os.remove(os.path.join(current_app.config['TEMP_FOLDER'], filename))
                 timeout = 10000
                 
-                patp = filename[:-4]
+                patp = filename.split('.')[0]
+
+                http_port, ames_port = current)app.config['ORCHESTRATOR'].get_open_urbit_ports()
+                urb = copy.deepcopy(default_pier_config)
+
+                urb['pier_name'] = patp
+                urb['http_port'] = http_port
+                urb['ames_port'] = ames_port
+
+        with open(f'settings/pier/{patp}.json', 'w') as f:
+            json.dump(urb, f, indent = 4)
+    
+        urbit = UrbitDocker(urb)
+        urbit.add_key(key)
+
+        x = self.add_urbit(patp, urbit)
+        return x
+
                 http_port, ames_port = current_app.config['ORCHESTRATOR'].getOpenUrbitPort()
                 urbit = make_urbit(patp, http_port, ames_port)
                 urbit.copyFolder(current_app.config['TEMP_FOLDER'])
@@ -110,4 +126,4 @@ def uploadPier():
             print(f'Chunk {current_chunk + 1} of {total_chunks} '
                       f'for file {file.filename} complete')
         return make_response(("Chunk upload successful", 200))
-
+'''

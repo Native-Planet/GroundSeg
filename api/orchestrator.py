@@ -213,6 +213,24 @@ class Orchestrator:
                 lens_addr = self.get_urbit_loopback_addr(urbit_id)
                 return urb.send_meld(lens_addr)
 
+    # Delete Urbit Pier and MiniO
+    def delete_urbit(self, patp):
+        urb = self._urbits[patp]
+        urb.remove_urbit()
+        urb = self._urbits.pop(patp)
+        
+        time.sleep(2)
+
+        if(patp in self._minios.keys()):
+           minio = self._minios[patp]
+           minio.remove_minio()
+           minio = self._minios.pop(patp)
+
+        self.config['piers'].remove(patp)
+        self.save_config()
+
+        return 200
+
         # Wireguard requests
         if data['app'] == 'wireguard':
             if data['data'] == 'toggle':
@@ -315,8 +333,28 @@ class Orchestrator:
     
         urbit = UrbitDocker(urb)
         urbit.add_key(key)
-
         x = self.add_urbit(patp, urbit)
+
+        return x
+
+    def boot_existing_urbit(self, patp):
+        if patp == None:
+            return 400
+
+        http_port, ames_port = self.get_open_urbit_ports()
+        data = copy.deepcopy(default_pier_config)
+        data['pier_name'] = patp
+        data['http_port'] = http_port
+        data['ames_port'] = ames_port
+        with open(f'settings/pier/{patp}.json', 'w') as f:
+            json.dump(data, f, indent = 4)
+    
+        urbit = UrbitDocker(data)
+
+        urbit.copy_folder('/tmp')
+        shutil.rmtree(f'/tmp/{patp}')
+        x = self.add_urbit(patp, urbit)
+
         return x
 
     # Get unused ports for Urbit
@@ -716,27 +754,3 @@ class Orchestrator:
         if type(val) is str:
             return jsonify(val)
         return val
-
-
-
-
-#####################################################################################
-
-    def getMinIOSecret(self, patp):
-        x = self._urbits[patp].config['minio_password']
-        return(x)
-
-    def removeUrbit(self, patp):
-        urb = self._urbits[patp]
-        urb.removeUrbit()
-        urb = self._urbits.pop(patp)
-        
-        time.sleep(2)
-
-        if(patp in self._minios.keys()):
-           minio = self._minios[patp]
-           minio.removeMinIO()
-           minio = self._minios.pop(patp)
-
-        self.config['piers'].remove(patp)
-        self.save_config()

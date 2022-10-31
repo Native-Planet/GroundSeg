@@ -135,7 +135,7 @@ class UrbitDocker:
         self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
         self.buildContainer()
     
-    def removeUrbit(self):
+    def remove_urbit(self):
         self.stop()
         self.container.remove()
         self.volume.remove()
@@ -144,9 +144,10 @@ class UrbitDocker:
         with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
             f.write(key_value)
 
-    def copyFolder(self,folder_loc):
+    def copy_folder(self,folder_loc):
         from distutils.dir_util import copy_tree
         copy_tree(folder_loc,f'{self._volume_directory}/{self.pier_name}/_data/')
+
 
     def send_meld(self, lens_addr):
         pack_data = dict()
