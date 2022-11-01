@@ -13,7 +13,9 @@
   import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
   import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
-  export let remote, minIOReg, hasBucket, name, running, timeNow, frequency, meldHour, meldMinute, meldOn, meldLast, meldNext, containers, expanded
+  export let remote, minIOReg, hasBucket, name, running, timeNow,
+    frequency, meldHour, meldMinute, meldOn, meldLast, meldNext,
+    containers, expanded, isPierDeletion
 
   let selectedContainer = name
 
@@ -26,6 +28,7 @@
   // Todo: add transition
   const switchTab = (tab,i) => {
     if (expanded && (tab != 'Logs')) {toggleExpand()}
+    if (isPierDeletion && (tab != 'Urbit')) {toggleDeletePier()}
 
     if (activeTab == tab) {
       activeTab = null
@@ -36,6 +39,7 @@
   }
 
   const toggleExpand = () => dispatch('toggleExpand')
+  const toggleDeletePier = () => dispatch('toggleDeletePier')
 
 </script>
 
@@ -84,11 +88,24 @@
 {#if activeTab == 'Urbit'}
   <div class="main-wrapper" in:scale={{duration:120, delay: 200}}>
    <div class="admin-wrapper">
-     <PierOptionsAdmin {name} {running} />
+     <PierOptionsAdmin {name} {isPierDeletion} {hasBucket} on:delete={toggleDeletePier}/>
    </div>
-   <div class="meld-wrapper">
-     <PierOptionsMeld  {frequency} {timeNow} {running} {name} {meldHour} {meldMinute} {meldOn} {meldLast} {meldNext} />
-   </div>
+
+   {#if !isPierDeletion}
+     <div class="meld-wrapper">
+       <PierOptionsMeld 
+         {frequency}
+         {timeNow}
+         {running}
+         {name}
+         {meldHour}
+         {meldMinute}
+         {meldOn}
+         {meldLast}
+         {meldNext}
+         />
+      </div>
+   {/if}
   </div>
 {/if}
 

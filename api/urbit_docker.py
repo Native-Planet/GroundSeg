@@ -1,4 +1,4 @@
-import docker, json, shutil, threading, time
+import docker, json, shutil, threading, time, os
 from datetime import datetime
 from minio_docker import MinIODocker
 
@@ -90,14 +90,14 @@ class UrbitDocker:
         self.save_config()
         running = False
         
-        if(self.is_running()):
+        if self.is_running():
             self.stop()
             running = True
 
         self.container.remove()
         
         self.buildContainer()
-        if(running):
+        if running:
             self.start()
 
     def set_network(self, network):
@@ -190,6 +190,9 @@ class UrbitDocker:
                 self.config['meld_next'] = str(meld_next + day)
                 self.save_config()
 
+                os.remove(f'{self._volume_directory}/{self.pier_name}/_data/pack.json')
+                os.remove(f'{self._volume_directory}/{self.pier_name}/_data/meld.json')
+
                 return y
 
     def send_poke(self, command, data, lens_addr):
@@ -208,6 +211,7 @@ class UrbitDocker:
 
         x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}').output.strip()
         print(f"{command} {x.decode('utf-8')}")
+        os.remove(f'{self._volume_directory}/{self.pier_name}/_data/{command}.json')
 
         return x
 
@@ -232,6 +236,7 @@ class UrbitDocker:
             json.dump(f_data, f)
 
         x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}').output.decode('utf-8').strip().split('\\')[0][1:]
+        os.remove(f'{self._volume_directory}/{self.pier_name}/_data/code.json')
 
         return x
 

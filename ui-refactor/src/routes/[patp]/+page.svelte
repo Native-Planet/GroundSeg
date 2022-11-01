@@ -26,7 +26,9 @@
     loaded = false,
     urbit, code = '',
     advanced = false,
-    expanded = false
+    expanded = false,
+    isPierDeletion = false
+
 
 	// start api loop
 	onMount(()=> {
@@ -87,10 +89,9 @@
     </div>
 
 	  <!-- Pier Credentials-->
-	  {#if (code.length == 27) && urbit.running && !expanded }
+	  {#if (code.length == 27) && urbit.running && !expanded && !isPierDeletion}
 
-    	<!-- Landscape +code 
-        placeholder code -->
+      <!-- Landscape +code -->
       <div transition:scale={{duration:120, delay: 200}}>
     	  <PierCode code={code} />
       </div>
@@ -137,7 +138,9 @@
         meldLast={urbit.meldLast}
         meldNext={urbit.meldNext}
         {expanded}
+        {isPierDeletion}
         on:toggleExpand={()=> expanded = !expanded}
+        on:toggleDeletePier={()=> isPierDeletion = !isPierDeletion}
         />
 		{/if}
 

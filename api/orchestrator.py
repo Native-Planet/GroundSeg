@@ -1,6 +1,7 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading #,requests, socket, sys
-from datetime import datetime
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys
 from flask import jsonify, send_file
+from datetime import datetime
+from io import BytesIO
 
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker, default_pier_config
@@ -213,6 +214,12 @@ class Orchestrator:
                 lens_addr = self.get_urbit_loopback_addr(urbit_id)
                 return urb.send_meld(lens_addr)
 
+            if data['data'] == 'export':
+                return self.export_urbit(urb)
+
+            if data['data'] == 'delete':
+                return self.delete_urbit(urbit_id)
+
         # Wireguard requests
         if data['app'] == 'wireguard':
             if data['data'] == 'toggle':
@@ -246,6 +253,28 @@ class Orchestrator:
         self.save_config()
 
         return 200
+
+    # Export Urbit Pier
+    def export_urbit(self, urb):
+        if urb.is_running():
+            print(f'stopping {urb.pier_name}', file=sys.stderr)
+            urb.stop()
+
+        file_name = f'{urb.pier_name}.zip'
+        memory_file = BytesIO()
+        file_path=f'{urb._volume_directory}/{urb.pier_name}/_data/'
+
+        print('compressing',file=sys.stderr)
+
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(file_path):
+                arc_dir = root[root.find('_data/')+6:]
+                for file in files:
+                    zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
+
+        memory_file.seek(0)
+
+        return send_file(memory_file, download_name=file_name, as_attachment=True)
 
     # Get list of containers related to this patp
     def get_pier_containers(self, patp):
