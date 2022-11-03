@@ -1,18 +1,9 @@
-#import requests, json
-import threading, time, os, zipfile, tarfile, copy, shutil, psutil
+import threading, time, os, zipfile, tarfile, copy, shutil, psutil, sys, requests
 from datetime import datetime
 from flask import Flask, jsonify, request 
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
-
-# Todo: is this even used?
-def signal_handler(sig, frame):
-    print("Exiting gracefully")
-    cmds = shlex.split("./kill_urbit.sh")
-    print(cmds)
-    p = subprocess.Popen(cmds,shell=True)
-    sys.exit(0)
 
 # Load GroundSeg
 orchestrator = Orchestrator("/settings/system.json")
@@ -20,11 +11,33 @@ orchestrator = Orchestrator("/settings/system.json")
 app = Flask(__name__)
 app.config['TEMP_FOLDER'] = '/tmp/'
 
-# Todo: Look into what this actually does
 CORS(app)
+
+# Get updated Anchor information every 12 hours
+def anchor_information():
+    print("Anchor information thread started", file=sys.stderr)
+    while True:
+        response = None
+        if orchestrator.config['wgRegistered']:
+            try:
+                url = orchestrator.config['endpointUrl']
+                pubkey = orchestrator.config['pubkey']
+                headers = {"Content-Type": "application/json"}
+
+                response = requests.get(
+                        f'https://{url}/v1/retrieve?pubkey={pubkey}',
+                        headers=headers).json()
+            
+                orchestrator._lease = response['lease']
+                time.sleep(60 * 60 * 12)
+
+            except Exception as e:
+                print(e, file=sys.stderr)
+                time.sleep(60)
 
 # Constantly update system information
 def sys_monitor():
+    print("System monitor thread started", file=sys.stderr)
     while True:
         orchestrator._ram = psutil.virtual_memory().percent
         orchestrator._cpu = psutil.cpu_percent(1)
@@ -33,7 +46,7 @@ def sys_monitor():
 
 # Checks if a meld is due, runs meld
 def meld_loop():
-
+    print("Meld thread started", file=sys.stderr)
     while True:
         copied = orchestrator._urbits
         for p in list(copied):
@@ -53,6 +66,8 @@ threading.Thread(target=sys_monitor).start()
 # Start meld loop on a new thread
 threading.Thread(target=meld_loop).start()
 
+# Start anchor information loop on a new thread
+threading.Thread(target=anchor_information).start()
 #
 #   Endpoints
 #

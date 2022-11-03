@@ -1,4 +1,5 @@
 <script>
+
 	import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
 
@@ -10,7 +11,7 @@
 
 	let inView = false
 
-  const checkStatus = n => {
+  const checkStatus = (n,r) => {
 	  fetch($api + '/urbit?urbit_id=' + n, {
 		  method: 'POST',
 		  headers: {'Content-Type': 'application/json'},
@@ -25,7 +26,7 @@
         return d
       })
       .then(v => {
-        if (v.length != 27) {
+        if ((v.length != 27) && inView && r) {
           checkStatus(n)
         }
       })
@@ -34,12 +35,25 @@
 	onMount(()=> {
 		inView = !inView
     for (let i = 0; i < $urbits.length; i++) {
-      checkStatus($urbits[i].name)
+      checkStatus($urbits[i].name, $urbits[i].running)
     }
 	})
 
 </script>
 	<div class="wrapper">
+
+    {#if $urbits.length == 0}
+      <div class="welcome">
+        Welcome to GroundSeg.
+      </div>
+      <div class="welcome">
+        From here you can boot and manage multiple Urbit IDs.
+      </div>
+      <div class="welcome">
+        Select one of the options below to get started.
+      </div>
+    {:else} 
+
  		{#each $urbits as u, i}
 			{#if inView}
 		 		<div class="pier" in:scale={{duration:120, delay: 300}}>
@@ -64,9 +78,18 @@
 			  </div>
 			{/if}
 		 {/each}
+
+    {/if}
+
 	</div>
 <style>
 	a { color: inherit; }
+
+  .welcome {
+    padding: 0 24px 0 24px;
+    line-height: 24px;
+    font-size: 14px;
+  }
 
   .wrapper {
     margin-bottom: 28px;

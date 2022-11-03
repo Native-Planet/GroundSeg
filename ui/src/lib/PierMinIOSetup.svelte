@@ -1,4 +1,5 @@
 <script>
+  import { afterUpdate } from 'svelte'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
   import { faCircleQuestion } from '@fortawesome/free-regular-svg-icons'
@@ -54,6 +55,12 @@
           showButton = false
         })
     })}
+
+  afterUpdate(() => {
+    if (minIOPassword.length < 8) {
+      confirmPassword = ''
+    }
+  })
 
 </script>
 

@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -23,6 +23,7 @@ class Orchestrator:
     _core_temp = None
     _disk = None
     gs_version = 'Beta-3.0.0'
+    _lease = None
 
 #
 #   init
@@ -33,6 +34,7 @@ class Orchestrator:
 
         # load existing or create new system.json
         self.config = self.load_config(config_file)
+        print(f'Loaded system JSON', file=sys.stderr)
 
         # if first boot, set up keys
         if self.config['firstBoot']:
@@ -49,12 +51,14 @@ class Orchestrator:
             self.wireguard.start()
             self.toggle_minios_off()
             self.toggle_minios_on()
+            print(f'Wireguard connection started', file=sys.stderr)
 
         # load urbit ships
         self.load_urbits()
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
+        print(f'Initializing completed', file=sys.stderr)
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
@@ -63,7 +67,7 @@ class Orchestrator:
             with open(config_file) as f:
                 cfg = json.load(f)
         except Exception as e:
-            print(e)
+            print(e, file=sys.stderr)
 
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
@@ -95,26 +99,17 @@ class Orchestrator:
             with open(f'settings/pier/{p}.json') as f:
                 data = json.load(f)
 
-            if not 'meld_time' in data:
-                data['meld_time'] = default_pier_config['meld_time']
-        
-            if not 'meld_frequency' in data:
-                data['meld_frequency'] = default_pier_config['meld_frequency']
-
-            if not 'meld_schedule' in data:
-                data['meld_schedule'] = default_pier_config['meld_schedule']
-
-            if not 'meld_last' in data:
-                data['meld_last'] = default_pier_config['meld_last']
-
-            if not 'meld_next' in data:
-                data['meld_next'] = default_pier_config['meld_next']
+            # Add all missing fields
+            data = {**default_pier_config, **data}
 
             self._urbits[p] = UrbitDocker(data)
 
             if data['minio_password'] != '':
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
+
+        print(f'Urbit Piers loaded', file=sys.stderr)
+
 #
 #   Urbit Pier
 #
@@ -323,6 +318,7 @@ class Orchestrator:
             
     # Create minIO admin acccount
     def create_minio_admin_account(self, patp, password):
+
         self._urbits[patp].config['minio_password'] = password
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
         self.minIO_on = True
@@ -460,22 +456,26 @@ class Orchestrator:
 
     # Update/Set Urbit S3 Endpoint
     def set_minio_endpoint(self, patp):
-        ak, sk = self._minios[patp].make_service_account().split('\n')
+        acc = 'urbit_minio'
+        secret = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(40))
+
+        res = self._minios[patp].make_service_account(acc, secret)
         u = self._urbits[patp]
 
         endpoint = f"s3.{u.config['wg_url']}"
         bucket = 'bucket'
         lens_port = self.get_urbit_loopback_addr(patp)
-        access_key = ak.split(' ')[-1]
-        secret = sk.split(' ')[-1]
-
-        try:
-            x = u.set_minio_endpoint(endpoint,access_key,secret,bucket,lens_port)
-            return 200
-
-        except Exception as e:
-            print(e)
         
+        if res == 200:
+            try:
+                return u.set_minio_endpoint(endpoint,acc,secret,bucket,lens_port)
+
+            except Exception as e:
+                print(e, file=sys.stderr)
+
         return 400
 
     # Export contents of minIO bucket
@@ -497,11 +497,19 @@ class Orchestrator:
 #
     # Get anchor registration information
     def get_anchor_settings(self):
-        settings = dict()
-        settings['wgReg'] = self.config['wgRegistered']
-        settings['wgRunning'] = self.wireguard.is_running()
 
-        return {'anchor': settings}
+        lease_end = None
+
+        if self._lease != None:
+            x = list(map(int,self._lease.split('-')))
+            lease_end = datetime(x[0], x[1], x[2], 0, 0)
+
+        anchor = dict()
+        anchor['wgReg'] = self.config['wgRegistered']
+        anchor['wgRunning'] = self.wireguard.is_running()
+        anchor['lease'] = lease_end
+
+        return {'anchor': anchor}
 
 
 #
@@ -543,6 +551,14 @@ class Orchestrator:
             if data['action'] == 'change-url':
                 return self.change_wireguard_url(data['url'])
 
+        # power module
+        if module == 'power':
+            if data['action'] == 'restart':
+                return self.shutdown()
+
+            if data['action'] == 'shutdown':
+                return self.restart()
+
         # watchtower module
         if module == 'watchtower':
             if data['action'] == 'toggle':
@@ -576,6 +592,16 @@ class Orchestrator:
                 return '\n'.join(self.get_log_lines(data['container'], 0))
 
         return module
+
+    # Shutdown
+    def shutdown(self):
+        os.system("echo 'shutdown' > /commands")
+        return 200
+
+    # Restart
+    def restart(self):
+        os.system("echo 'restart' > /commands")
+        return 200
 
     # Get list of available docker containers
     def get_containers(self):
@@ -632,9 +658,9 @@ class Orchestrator:
     # Enables and disables wifi on the host device
     def toggle_ethernet(self):
         if self.eth_only:
-            os.system('nmcli radio wifi off')
-        else:
             os.system('nmcli radio wifi on')
+        else:
+            os.system('nmcli radio wifi off')
 
         return 200
 

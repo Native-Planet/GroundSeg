@@ -9,8 +9,9 @@
     currentEpKey = '',
     epKey = '',
     defaultEpKey = 'api.startram.io',
-    epButtonStatus = 'standard'
-
+    epButtonStatus = 'standard',
+    cancelButtonStatus = 'standard',
+    confirmCancel = false
 
   const insertNP = () => epKey = defaultEpKey
 
@@ -50,6 +51,16 @@
           setTimeout(()=>epButtonStatus = 'standard', 3000)
    }})}
 
+  const cancelSubscription = () => {
+    if (confirmCancel) {
+      cancelButtonStatus = 'loading'
+      setTimeout(()=> cancelButtonStatus = 'success', 3000)
+      setTimeout(()=> cancelButtonStatus = 'failure', 6000)
+      setTimeout(()=> cancelButtonStatus = 'standard', 9000)
+      confirmCancel = !confirmCancel
+      console.log('pls nu T_T')
+    } else {confirmCancel = !confirmCancel }
+  }
 </script>
 <div class="reg-key-wrapper">
   <div class="advanced" on:click={toggleAdvanced} transition:scale={{duration:120, delay: 200}}>
@@ -79,6 +90,29 @@
       />
       </div>
     {/if}
+
+    <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
+      Cancelation
+    </div>
+
+    <div transition:scale={{duration:120, delay: 200}}>
+      <PrimaryButton
+        on:click={cancelSubscription}
+        background="#bb3f3f"
+        standard="
+          {
+            confirmCancel ? "Click again to cancel your" : "Cancel my"
+          } {
+            defaultEpKey == currentEpKey ? "StarTram" : "Anchor"
+          } subscription"
+        success="Subscription successfully canceled!"
+        failure="Something went wrong, please try again"
+        loading="Canceling your subscription"
+        status={cancelButtonStatus}
+        top="12"
+      />
+    </div>
+
   {/if}
 </div>
 

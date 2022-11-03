@@ -81,7 +81,6 @@
 
 <div class="panel">
 
-  {#if meldOn}
   <!-- frequency selector -->
   <div class="day">
     <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
@@ -124,8 +123,6 @@
   <div class="day">
     <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
   </div>
-
-  {/if}
 
   <div class="day">
     <div class="current-time">Last meld: {meldLast.slice(12,-13) == "1970" ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>

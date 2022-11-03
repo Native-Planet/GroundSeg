@@ -1,50 +1,50 @@
 <script>
+  import { onDestroy } from 'svelte'
   import { page } from '$app/stores'
   import { power, api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons'
 
-  const shutdown = () => {
-    console.log("shutdown")
+  let confirmed = false
+
+  const handlePower = () => {
+    let module = 'power'
+	  fetch($api + '/system?module=' + module, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({'action':$power})
+	  })
+      .then(d => d.json())
+      .then(res => {
+        if (res == 200) {confirmed = true }
+      })
   }
-    /*
-    let u = $api + "/settings/shutdown"
-    const f = new FormData()
-
-    setTimeout(()=> window.location.href = "/", 3000)
-
-    fetch(u, {method: 'POST',body: f})
-      .then(r => r.json())
-      .then(d => { if (d == 200) {
-        window.location.href = "/"
-   }})}
-    */
-  const restart = () => {
-    console.log("restart")
-  }
-    /*
-    let u = $api + "/settings/restart"
-    const f = new FormData()
-
-    fetch(u, {method: 'POST',body: f})
-      .then(r => r.json())
-      .then(d => { if (d == 200) {
-        window.location.href = "/"
-   }})}
-  */
 
   const cancel  = () => {
     power.set(null)
   }
+
 </script>
 
-{#if $page.url.pathname === "/settings"}
+{#if confirmed}
+
+  <div class="power">
+    {#if $power == 'shutdown'}
+      <div class="text">The shutdown command has been sent. Please be patient while the system powers off.</div>
+    {/if}
+    {#if $power == 'restart'}
+      <div class="text">The restart command has been sent. Please be patient while the system restarts.</div>
+    {/if}
+  </div>
+
+{:else if $page.url.pathname === "/settings"}
+
   {#if $power === 'shutdown'}
     <div class="power">
       <div class="text">Are you sure you want to shut down the device?</div>
       <div class="buttons">
         <button class="cancel" on:click={cancel}>Cancel</button>
-        <button class="shutdown" on:click={shutdown}>
+        <button class="shutdown" on:click={handlePower}>
           <Fa icon={faPowerOff} size="0.85x" />
           <span>Shutdown</span>
         </button>
@@ -55,14 +55,16 @@
       <div class="text">Are you sure you want to restart the device?</div>
       <div class="buttons">
         <button class="cancel" on:click={cancel}>Cancel</button>
-        <button class="restart" on:click={restart}>
+        <button class="restart" on:click={handlePower}>
           <Fa icon={faRotateRight} size="0.85x" />
           <span>Restart</span>
         </button>
       </div>
     </div>
   {/if}
+
 {/if}
+
 <style>
   @font-face {
     font-family: Inter;

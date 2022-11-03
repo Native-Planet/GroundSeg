@@ -222,6 +222,8 @@ class UrbitDocker:
         self.send_poke('set-secret-access-key', secret, lens_addr)
         self.send_poke('set-current-bucket', bucket, lens_addr)
 
+        return 200
+
     def get_code(self, lens_addr):
 
         f_data = dict()

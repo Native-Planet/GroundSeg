@@ -1,5 +1,6 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
+  import { scale } from 'svelte/transition'
 
 	import { updateState, api, system } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
@@ -14,7 +15,7 @@
   updateState(data)
 
 	// init
-	let inView = true
+	let inView = false
 
 	// updateState loop
   const update = () => {
@@ -29,6 +30,7 @@
 
 	// Start the update loop
 	onMount(()=> {
+    inView = true
 		update()
 	})
 
@@ -44,6 +46,12 @@
       <Logo t='Anchor'/>
     </AnchorHeader>
 
+    {#if data.anchor.lease != null}
+      <div class="lease" transition:scale={{duration:120, delay: 200}}>
+        Your subscription expires on {data.anchor.lease.slice(5,-12)}
+      </div>
+    {/if}
+
     <!-- Register Key -->
     <AnchorRegisterKey wgReg={data.anchor.wgReg} />
 
@@ -51,3 +59,10 @@
     <AnchorAdvanced />
   </Card>
 {/if}
+
+<style>
+  .lease {
+    padding-top: 20px;
+    font-size: 12px;
+  }
+</style>

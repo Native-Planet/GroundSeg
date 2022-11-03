@@ -16,7 +16,12 @@
 		isPortrait.set(d)	
 	}
 
-  afterUpdate(()=>vert(innerHeight, innerWidth))
+  afterUpdate(()=> {
+    vert(innerHeight, innerWidth)
+    if ($page.url.pathname != '/settings') {
+      power.set(null)
+    }
+  })
 
 </script>
 
