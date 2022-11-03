@@ -9,11 +9,13 @@ export const fadeOut = {duration:200}
 //
 // writable stores
 //
+export const codes = writable({})
 export const urbits = writable([])
 export const system = writable({})
 export const api = writable('')
 export const isPortrait = writable(false)
 export const currentLog = writable({'container': '', 'log': []})
+export const power = writable('')
 
 //
 // state update

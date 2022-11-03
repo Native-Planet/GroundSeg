@@ -25,8 +25,9 @@
     const k = key.trim()
 
     if (isPatp(n)) {
+      let nr = n.replace(/~/g,'')
       const query = {"app":"boot-new", "data": k }
-			fetch($api + '/urbit?urbit_id=' + n.replace(/~/g,''), {
+			fetch($api + '/urbit?urbit_id=' + nr, {
 					method: 'POST',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify(query)
@@ -34,8 +35,7 @@
         .then(d => d.json())
         .then(res => {
           if (res === 200) {
-            buttonStatus = 'success'
-            setTimeout(window.location.href = "/" + name, 2000)
+            handleSuccess(nr)
           } else {
             console.log(res)
             buttonStatus = 'failure'
@@ -44,6 +44,19 @@
       buttonStatus = 'failure'
       setTimeout(()=>buttonStatus = 'standard', 4000)
     }}
+
+  const handleSuccess = n => {
+			fetch($api + '/urbit?urbit_id=' + n)
+			.then(raw => raw.json())
+      .then(res => {
+        if (res.name == n) {
+          window.location.href = '/' + n
+        } else {
+          setTimeout(()=> handleSuccess(n), 1000)
+        }
+      })
+			.catch(err => console.log(err))
+  }
 
 </script>
 

@@ -1,5 +1,5 @@
 #import requests, json
-import threading, time, os, zipfile, tarfile, copy, shutil
+import threading, time, os, zipfile, tarfile, copy, shutil, psutil
 from datetime import datetime
 from flask import Flask, jsonify, request 
 from flask_cors import CORS
@@ -23,17 +23,34 @@ app.config['TEMP_FOLDER'] = '/tmp/'
 # Todo: Look into what this actually does
 CORS(app)
 
+# Constantly update system information
+def sys_monitor():
+    while True:
+        orchestrator._ram = psutil.virtual_memory().percent
+        orchestrator._cpu = psutil.cpu_percent(1)
+        orchestrator._core_temp = psutil.sensors_temperatures()['coretemp'][0].current
+        orchestrator._disk = shutil.disk_usage("/")
+
 # Checks if a meld is due, runs meld
 def meld_loop():
+
     while True:
-        for p in orchestrator._urbits.values():
-            now = int(datetime.utcnow().timestamp())
+        copied = orchestrator._urbits
+        for p in list(copied):
+            try:
+                now = int(datetime.utcnow().timestamp())
 
-            if p.config['meld_schedule']:
-                if int(p.config['meld_next']) < now:
-                    x = orchestrator.get_urbit_loopback_addr(p.config['pier_name'])
-                    p.send_meld(x)
+                if copied[p].config['meld_schedule']:
+                    if int(copied[p].config['meld_next']) <= now:
+                        x = orchestrator.get_urbit_loopback_addr(copied[p].config['pier_name'])
+                        copied[p].send_meld(x)
+            except:
+                break
 
+# Start system monitoring on a new thread
+threading.Thread(target=sys_monitor).start()
+
+# Start meld loop on a new thread
 threading.Thread(target=meld_loop).start()
 
 #

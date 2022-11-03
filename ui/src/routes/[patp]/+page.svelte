@@ -24,10 +24,11 @@
 	// default values
   let inView = true,
     loaded = false,
-    urbit, code = '',
+    urbit, code = null,
     advanced = false,
     expanded = false,
-    isPierDeletion = false
+    isPierDeletion = false,
+    failureCount = 0
 
 
 	// start api loop
@@ -44,15 +45,25 @@
     if (inView) {
 			fetch($api + '/urbit?urbit_id=' + $page.params.patp)
 			.then(raw => raw.json())
-      .then(res => { handleData(res); loaded = true })
+      .then(res => handleData(res))
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)
 	}}
 
   const handleData = d => {
-    if (d == 400) { window.location.href = "/" }
-    if (d.name == $page.params.patp) { urbit = d }
+    if (d == 400) { 
+      failureCount = ++failureCount
+
+      if (failureCount > 3) {
+        window.location.href = "/" }
+    }
+
+    if (d.name == $page.params.patp) { 
+      loaded = true
+      failureCount = 0
+      urbit = d 
+    }
   }
 
   const getUrbitCode = () => {
@@ -89,7 +100,7 @@
     </div>
 
 	  <!-- Pier Credentials-->
-	  {#if (code.length == 27) && urbit.running && !expanded && !isPierDeletion}
+	  {#if (code != null) && (code.length == 27) && urbit.running && !expanded && !isPierDeletion}
 
       <!-- Landscape +code -->
       <div transition:scale={{duration:120, delay: 200}}>

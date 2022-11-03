@@ -21,12 +21,14 @@
 	<Sigil patp={name} size="72px" rad="12px" />
 
 	<div class="info">
-    {#if (code.length != 27 && running)}
-    	<div class="status booting">Booting</div>
-    {:else if running}
-       <div class="status running">Running</div>
+    {#if !running}
+      <div class="status">Stopped</div>
+    {:else if code == null}
+      <div class="status loading">Loading...</div>
+    {:else if code.length != 27}
+      <div class="status booting">Booting</div>
     {:else}
-       <div class="status">Stopped</div>
+       <div class="status running">Running</div>
     {/if}
 
     <div
@@ -53,6 +55,9 @@
     font-size: .8em;
     padding-bottom: 6px;
     color: red;
+  }
+  .loading {
+    color: white;
   }
   .booting {
     color: orange;

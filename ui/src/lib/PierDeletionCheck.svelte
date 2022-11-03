@@ -92,7 +92,7 @@
   {/if}
 </div>
 
-<div class="final-check">
+<div class="final-check" on:click={()=> finalCheck = !finalCheck}>
   <input type="checkbox" bind:checked={finalCheck} />
   I understand that this action cannot be undone.
 </div>
@@ -128,6 +128,8 @@
   .final-check {
     font-size: 14px;
     padding: 0 20px 18px 20px;
+    cursor: pointer;
+    user-select: none;
   }
   .buttons {
     display: flex;

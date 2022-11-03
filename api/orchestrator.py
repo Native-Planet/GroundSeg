@@ -18,6 +18,10 @@ class Orchestrator:
     _minios = {}
     _watchtower = {}
     minIO_on = False
+    _ram = None
+    _cpu = None
+    _core_temp = None
+    _disk = None
     gs_version = 'Beta-3.0.0'
 
 #
@@ -506,10 +510,10 @@ class Orchestrator:
     # Get all system information
     def get_system_settings(self):
         settings = dict()
-        settings['ram'] = psutil.virtual_memory().percent
-        settings['cpu'] = psutil.cpu_percent(0.05)
-        settings['temp'] = psutil.sensors_temperatures()['coretemp'][0].current
-        settings['disk'] = shutil.disk_usage("/")
+        settings['ram'] = self._ram
+        settings['cpu'] = self._cpu
+        settings['temp'] = self._core_temp
+        settings['disk'] = self._disk
         settings['gsVersion'] = self.gs_version
         settings['updateMode'] = self.config['updateMode']
         settings['ethOnly'] = self.get_ethernet_status()

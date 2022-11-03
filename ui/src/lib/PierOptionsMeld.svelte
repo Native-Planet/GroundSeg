@@ -4,9 +4,9 @@
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faCaretLeft, faCaretRight } from '@fortawesome/free-solid-svg-icons'
-  import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import TimeSelector from '$lib/TimeSelector.svelte'
 
   export let timeNow, frequency, running, name, meldHour, meldMinute, meldOn, meldLast, meldNext
     
@@ -90,7 +90,7 @@
 
     <div class="day-text">Every</div>
     <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
-    <div class="day-text">days</div>
+    <div class="day-text">day{cloneFreq > 1 ? "s" : ""}</div>
 
     <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
       <Fa icon={faCaretRight} size="1x" />
@@ -103,30 +103,20 @@
     <div class="day-text">at</div>
 
     <!-- hour selector -->
-    <Listbox value={selectedHour} on:change={e => {selectedHour = e.detail; console.log(selectedHour)}}>
-      <ListboxOptions class="time-list">
-        {#each hours as hour}
-          <ListboxOption class="time-option" value={hour}>
-            {hour < 10 ? "0" : ""}{hour}
-          </ListboxOption>
-        {/each}
-      </ListboxOptions>
-      <ListboxButton class="time-selector">{selectedHour < 10 ? "0" : ""}{selectedHour}</ListboxButton>
-    </Listbox>
+    <TimeSelector
+      value={selectedHour}
+      listOptions={hours}
+      on:change={e => selectedHour = e.detail} 
+    />
 
     <div class="day-text">:</div>
 
     <!-- minute selector -->
-    <Listbox value={selectedMinute} on:change={(e) => (selectedMinute = e.detail)}>
-      <ListboxOptions class="time-list">
-        {#each minutes as minute}
-          <ListboxOption value={minute}>
-            {minute < 10 ? "0" : ""}{minute}
-          </ListboxOption>
-        {/each}
-      </ListboxOptions>
-      <ListboxButton class="time-selector">{selectedMinute < 10 ? "0" : ""}{selectedMinute}</ListboxButton>
-    </Listbox>
+    <TimeSelector
+      value={selectedMinute}
+      listOptions={minutes}
+      on:change={e => selectedMinute = e.detail} 
+    />
 
   </div>
 
@@ -186,28 +176,6 @@
 </div>
 
 <style>
-	:global(.time-list::-webkit-scrollbar) {display: none;}
-  :global(.time-selector) {
-    padding: none;
-    font-size: 12px;
-    font-family: inherit;
-    color: inherit;
-    background: #FFFFFF4D;
-    border-radius: 4px;
-    position: relative;
-  }
-  :global(.time-list) {
-    font-size: 12px;
-    text-align: center;
-    background: #040404;
-    position: absolute;
-    padding: 0 6px 0 6px;
-    max-height: 64px;
-    -ms-overflow-style: none;
-		scrollbar-width: none;
-    overflow: scroll;
-    list-style-type: none;
-  }
   .option-title {
     text-align: right;
     float: left;

@@ -37,7 +37,7 @@
 </script> 
 
 {#if isPierDeletion}
-  <div in:scale={{duration:120, delay: 600}}>
+  <div in:scale={{duration:120, delay: 300}}>
     <PierDeletionCheck {name} {hasBucket} on:cancel={()=>dispatch('delete')} /> 
   </div>
 {:else}

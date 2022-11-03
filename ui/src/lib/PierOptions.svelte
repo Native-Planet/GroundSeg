@@ -48,7 +48,7 @@
   {#each tabs as tab, i}
     <!-- Check if tab is MinIO -->
     {#if tab == 'MinIO'}
-      {#if !hasBucket || (minIOReg && remote)}
+      {#if hasBucket || (minIOReg && remote)}
         <div 
           class="tab" 
           on:click={()=>switchTab(tab,i)}

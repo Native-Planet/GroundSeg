@@ -1,9 +1,10 @@
 <script>
   import { afterUpdate } from 'svelte'
-
-  import { isPortrait } from '$lib/api'
+  import { page } from '$app/stores'
+  import { power, api, isPortrait } from '$lib/api'
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
+  import PowerScreen from '$lib/PowerScreen.svelte'
 
 	let innerWidth = 0
   let innerHeight = 0
@@ -16,13 +17,20 @@
 	}
 
   afterUpdate(()=>vert(innerHeight, innerWidth))
+
 </script>
 
 <svelte:window bind:innerWidth bind:innerHeight />
-<div>
-<SettingsButton />
-<AnchorButton />
-  <slot/>
+
+<PowerScreen />
+
+<div class="bg">
+  <div class:frozen={($page.url.pathname === "/settings") 
+    && (($power === 'shutdown') || ($power === 'restart'))}>
+    <SettingsButton />
+    <AnchorButton />
+    <slot/>
+  </div>
 </div>
 
 <style>
@@ -41,5 +49,9 @@
     height: 100vh;
     width: 100vw;
     --action-color: #008eff;
+  }
+  .frozen {
+    opacity: 0;
+    pointer-events: none;
   }
 </style>

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
 
-	import { urbits } from '$lib/api'
+	import { urbits, codes, api } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
 
   import Fa from 'svelte-fa'
@@ -10,8 +10,32 @@
 
 	let inView = false
 
+  const checkStatus = n => {
+	  fetch($api + '/urbit?urbit_id=' + n, {
+		  method: 'POST',
+		  headers: {'Content-Type': 'application/json'},
+		  body: JSON.stringify({'app':'pier','data':'+code'})
+	  })
+      .then(r => r.json())
+      .then(d => {
+        codes.update(c => {
+          c[n] = d
+          return c
+        })
+        return d
+      })
+      .then(v => {
+        if (v.length != 27) {
+          checkStatus(n)
+        }
+      })
+  }
+
 	onMount(()=> {
 		inView = !inView
+    for (let i = 0; i < $urbits.length; i++) {
+      checkStatus($urbits[i].name)
+    }
 	})
 
 </script>
@@ -24,7 +48,15 @@
     	  		href={u.running ? u.urbitUrl : ""}
 		      	target={u.running ? "_blank" : ""}>
 	  		    <div class="patp">{u.name}</div>
-  	    		<div class="status">{u.running ? 'Running' : 'Stopped'}</div>
+            <div class="status">
+              {
+              !u.running ? 'Stopped'
+              : !(u.name in $codes) ? 'Loading...'
+              : ($codes[u.name].length != 27) ? 'Booting'
+              : $codes[u.name].length == 27 ? 'Running'
+              : 'Loading...'
+              }
+            </div>
 		    	</a>
 	  		  <a href={u.name}>
   	    		<Fa icon={faGear} size="1.2x" />

@@ -1,9 +1,10 @@
 <script>
+  import { power } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons'
 
-  const restart = () => console.log("re") //power.set('restart')
-  const shutdown = () => console.log("shut") //power.set('shutdown')
+  const restart = () => power.set('restart')
+  const shutdown = () => power.set('shutdown')
 
 </script>
 <div class="control">
