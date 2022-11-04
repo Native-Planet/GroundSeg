@@ -51,7 +51,6 @@
     gap: 24px;
     color: inherit;
     padding: 20px;
-    width: 440px;
     max-width: calc(100vw - 40px);
   }
   .info {

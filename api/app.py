@@ -60,6 +60,8 @@ def meld_loop():
             except:
                 break
 
+        time.sleep(30)
+
 # Start system monitoring on a new thread
 threading.Thread(target=sys_monitor).start()
 
@@ -68,6 +70,7 @@ threading.Thread(target=meld_loop).start()
 
 # Start anchor information loop on a new thread
 threading.Thread(target=anchor_information).start()
+
 #
 #   Endpoints
 #
@@ -119,6 +122,7 @@ def pier_upload():
     # Uploaded pier
     file = request.files['file']
     filename = secure_filename(file.filename)
+
     fn = save_path = f'/tmp/{filename}'
     current_chunk = int(request.form['dzchunkindex'])
         
@@ -177,4 +181,4 @@ def pier_upload():
 
 if __name__ == '__main__':
     debug_mode = False
-    app.run(host='0.0.0.0', port=27016, debug=debug_mode, use_reloader=debug_mode)
+    app.run(host='0.0.0.0', port=27016, threaded=True, debug=debug_mode, use_reloader=debug_mode)

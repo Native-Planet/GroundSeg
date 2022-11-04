@@ -3,9 +3,12 @@
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import LinkButton from '$lib/LinkButton.svelte'
-
+	import { updateState } from '$lib/api'
   import UploadPierCheck from '$lib/UploadPierCheck.svelte'
   import Dropzone from '$lib/Dropzone.svelte'
+
+	export let data
+	updateState(data)
 
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
@@ -46,7 +49,10 @@
 
     <div class="buttons">
       <LinkButton text="Back" src="/" disabled={false} />
-      <PrimaryButton on:click={()=>warningCheck = !warningCheck} standard="I understand" left={false} />
+      <PrimaryButton
+        on:click={()=>warningCheck = !warningCheck}
+        standard="I understand"
+        left={false} />
     </div>
 
   {/if}

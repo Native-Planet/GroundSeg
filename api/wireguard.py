@@ -1,4 +1,4 @@
-import requests, subprocess, base64, time, json
+import requests, subprocess, base64, time, json, sys
 
 from wireguard_docker import WireguardDocker
 
@@ -92,6 +92,24 @@ class Wireguard:
                 time.sleep(60)
 
         return response['status']
+        
+    def delete_service(self, subdomain, service_type, url):
+        # /v1/delete
+        update_data = {
+            "subdomain" : f"{subdomain}",
+            "pubkey":self.config['pubkey'],
+            "svc_type": service_type
+        }
+        headers = {"Content-Type": "application/json"}
+
+        response = None
+        try:
+            response = requests.post(f'{url}/delete',json=update_data,headers=headers).json()
+        except Exception as e:
+            print(e)
+            return None
+
+        print(response, file=sys.stderr)
         
     def get_status(self,url):
         headers = {"Content-Type": "application/json"}

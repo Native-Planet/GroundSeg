@@ -1,4 +1,4 @@
-import docker, json, shutil, threading, time, os, sys
+import docker, json, shutil, threading, time, os, sys, subprocess
 from datetime import datetime
 from minio_docker import MinIODocker
 
@@ -144,11 +144,6 @@ class UrbitDocker:
         with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
             f.write(key_value)
 
-    def copy_folder(self,folder_loc):
-        from distutils.dir_util import copy_tree
-        copy_tree(folder_loc,f'{self._volume_directory}/{self.pier_name}/_data/')
-
-
     def send_meld(self, lens_addr):
         pack_data = dict()
         meld_data = dict()
@@ -211,7 +206,6 @@ class UrbitDocker:
             json.dump(f_data, f)
 
         x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}').output.strip()
-        print(f"{command} {x.decode('utf-8')}")
         os.remove(f'{self._volume_directory}/{self.pier_name}/_data/{command}.json')
 
         return x

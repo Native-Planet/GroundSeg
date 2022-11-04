@@ -249,7 +249,16 @@ class Orchestrator:
            minio = self._minios.pop(patp)
 
         self.config['piers'].remove(patp)
+        os.remove(f"settings/pier/{patp}.json")
         self.save_config()
+
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f'https://{endpoint}/{api_version}'
+
+        if self.config['wgRegistered']:
+            self.wireguard.delete_service(f'{patp}','urbit',url)
+            self.wireguard.delete_service(f's3.{patp}','minio',url)
 
         return 200
 
@@ -332,7 +341,7 @@ class Orchestrator:
         try:
             code = urb.get_code(addr)
         except Exception as e:
-            print(e)
+            print(e, file=sys.stderr)
 
         return code
  
@@ -378,13 +387,16 @@ class Orchestrator:
         with open(f'settings/pier/{patp}.json', 'w') as f:
             json.dump(data, f, indent = 4)
     
+        vol_dir = f'/var/lib/docker/volumes/{patp}'
+        os.system(f'rm -r {vol_dir}')
+        os.system(f'mkdir -p {vol_dir}')
+        os.system(f'cp -R /tmp {vol_dir}/_data') 
+
         urbit = UrbitDocker(data)
 
-        urbit.copy_folder('/tmp')
         shutil.rmtree(f'/tmp/{patp}')
-        x = self.add_urbit(patp, urbit)
 
-        return x
+        return self.add_urbit(patp, urbit)
 
     # Get unused ports for Urbit
     def get_open_urbit_ports(self):
@@ -673,16 +685,8 @@ class Orchestrator:
 
         if did_connect == 'Error':
             return 400
-        else:
-            # for some reason deleting doesn't work
-            #if connected != '':
-                #del_connection = subprocess.Popen(['nmcli','con','del',connected],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
 
-                #did_delete, delerr = del_connection.communicate()
-                #did_delete = did_delete.decode("utf-8")
-                #print(did_delete)
-
-            return 200
+        return 200
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):
