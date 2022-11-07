@@ -17,8 +17,6 @@
   import MinIO from '$lib/MinIO.svelte'
   import Contact from '$lib/Contact.svelte'
 
-  import AutoPierStart from '$lib/AutoPierStart.svelte'
-
 	// load data into store
 	export let data
 	updateState(data)
