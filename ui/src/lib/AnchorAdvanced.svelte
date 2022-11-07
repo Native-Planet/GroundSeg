@@ -5,13 +5,17 @@
   import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
+  export let wgReg
+
   let advanced = false,
     currentEpKey = '',
     epKey = '',
     defaultEpKey = 'api.startram.io',
     epButtonStatus = 'standard',
     cancelButtonStatus = 'standard',
-    confirmCancel = false
+    confirmCancel = false,
+    regKey = '', view = false
+
 
   const insertNP = () => epKey = defaultEpKey
 
@@ -54,14 +58,35 @@
   const cancelSubscription = () => {
     if (confirmCancel) {
       cancelButtonStatus = 'loading'
-      setTimeout(()=> cancelButtonStatus = 'success', 3000)
-      setTimeout(()=> cancelButtonStatus = 'failure', 6000)
-      setTimeout(()=> cancelButtonStatus = 'standard', 9000)
+      let module = 'anchor'
+
+  	  fetch($api + '/system?module=' + module, {
+	  		method: 'POST',
+		  	headers: {'Content-Type': 'application/json'},
+			  body: JSON.stringify({'action':'unsubscribe','key':regKey.trim()})
+  	  })
+       .then(d=>d.json())
+        .then(r=>{
+          if (r == 200) {
+            cancelButtonStatus = 'success'
+            regKey = ''
+          } else {
+            cancelButtonStatus = 'failure'
+          }
+          setTimeout(()=> cancelButtonStatus = 'standard', 3000)
+          confirmCancel = !confirmCancel
+       })
+    } else {
       confirmCancel = !confirmCancel
-      console.log('pls nu T_T')
-    } else {confirmCancel = !confirmCancel }
+  }}
+
+  const toggleView = () => {
+    view = !view
+    document.querySelector('#input').type = view ? 'text' : 'password'
   }
+
 </script>
+
 <div class="reg-key-wrapper">
   <div class="advanced" on:click={toggleAdvanced} transition:scale={{duration:120, delay: 200}}>
     Advanced Options
@@ -91,8 +116,14 @@
       </div>
     {/if}
 
+    {#if wgReg}
     <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
       Cancelation
+    </div>
+
+    <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
+      <input placeholder="Registration Key" id='input' type="password" bind:value={regKey} />
+      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
     <div transition:scale={{duration:120, delay: 200}}>
@@ -108,10 +139,11 @@
         success="Subscription successfully canceled!"
         failure="Something went wrong, please try again"
         loading="Canceling your subscription"
-        status={cancelButtonStatus}
+        status={regKey.length < 1 ? 'disabled' : cancelButtonStatus}
         top="12"
       />
     </div>
+    {/if}
 
   {/if}
 </div>
@@ -157,6 +189,25 @@
     opacity: .8;
     cursor: pointer;
   }
-
-
+  .reg-key {
+    display: flex;
+  }
+  .reg-key > input {
+    font-family: inherit;
+    background: #ffffff4d;
+    color: inherit;
+    border-radius: 6px;
+    font-size: 12px;
+    padding: 8px;
+    border: none;
+    flex: 1;
+  }
+  input:focus {
+    outline: none;
+  }
+  .reg-key > img {
+    padding-left: 12px;
+    opacity: .8;
+    cursor: pointer;
+  }
 </style>

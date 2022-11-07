@@ -42,9 +42,9 @@ class Wireguard:
 
     def start(self):
         self.wg_docker.start()
+
     def stop(self):
         self.wg_docker.stop()
-
 
     def register_device(self, reg_code, url):
         # /v1/register
@@ -111,6 +111,23 @@ class Wireguard:
 
         print(response, file=sys.stderr)
         
+    def cancel_subscription(self, reg_key, url):
+        # /v1/stripe/cancel
+        headers = {"Content-Type": "application/json"}
+        data = {'reg_code': reg_key}
+        response = None
+
+        try:
+            response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
+            if response['error'] == 0:
+                return 200
+            print(response, file=sys.stderr)
+            return 400
+
+        except Exception as e:
+            print(f'err: {e}', file=sys.stderr)
+            return 400
+
     def get_status(self,url):
         headers = {"Content-Type": "application/json"}
         response = None

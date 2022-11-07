@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
+  import { page } from '$app/stores'
 
 	import { updateState, api, system } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
@@ -19,7 +20,7 @@
 
 	// updateState loop
   const update = () => {
-    if (inView) {
+    if ($page.routeId == 'anchor') {
 			fetch($api + '/anchor')
 			.then(raw => raw.json())
     	.then(res => data = res)
@@ -34,7 +35,6 @@
 		update()
 	})
 
-	// end the update loop
   onDestroy(()=> inView = false)
 	
 </script>
@@ -56,7 +56,7 @@
     <AnchorRegisterKey wgReg={data.anchor.wgReg} />
 
     <!-- Advanced Options -->
-    <AnchorAdvanced />
+    <AnchorAdvanced wgReg={data.anchor.wgReg} />
   </Card>
 {/if}
 

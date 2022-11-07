@@ -43,15 +43,17 @@
 	<div class="wrapper">
 
     {#if $urbits.length == 0}
-      <div class="welcome">
+
+      <div class="welcome" in:scale={{duration:120, delay: 300}}>
         Welcome to GroundSeg.
       </div>
-      <div class="welcome">
+      <div class="welcome" in:scale={{duration:120, delay: 300}}>
         From here you can boot and manage multiple Urbit IDs.
       </div>
-      <div class="welcome">
+      <div class="welcome" in:scale={{duration:120, delay: 300}}>
         Select one of the options below to get started.
       </div>
+
     {:else} 
 
  		{#each $urbits as u, i}

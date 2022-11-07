@@ -27,12 +27,12 @@
 
 	// Start the update loop
 	onMount(()=> {
-		inView = !inView
+		inView = true
 		update()
 	})
 
 	// end the update loop
-	onDestroy(()=> inView = !inView)
+	onDestroy(()=> inView = false)
 	
 </script>
 

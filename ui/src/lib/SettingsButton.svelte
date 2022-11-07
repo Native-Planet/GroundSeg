@@ -8,7 +8,8 @@
 
 <style>
   .inverted {
-    filter: invert(1);
+    /* filter: invert(1); */
+    opacity: .2;
     pointer-events: none;
   }
 	a {

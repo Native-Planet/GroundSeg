@@ -136,7 +136,6 @@
 
   <div class="day-action">
   <!-- Save new meld schedule -->
-  {#if meldOn}
   <PrimaryButton
     noMargin={true}
     standard="{
@@ -155,7 +154,6 @@
     }
     on:click={saveMeldChanges}
     />
-  {/if}
 
   <!-- Meld now -->
   {#if running}

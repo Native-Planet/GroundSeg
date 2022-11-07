@@ -563,6 +563,12 @@ class Orchestrator:
             if data['action'] == 'change-url':
                 return self.change_wireguard_url(data['url'])
 
+            if data['action'] == 'unsubscribe':
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f'https://{endpoint}/{api_version}'
+                return self.wireguard.cancel_subscription(data['key'],url)
+
         # power module
         if module == 'power':
             if data['action'] == 'restart':
