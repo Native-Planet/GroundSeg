@@ -148,6 +148,7 @@
         meldOn={urbit.meldOn}
         meldLast={urbit.meldLast}
         meldNext={urbit.meldNext}
+        autostart={urbit.autostart}
         {expanded}
         {isPierDeletion}
         on:toggleExpand={()=> expanded = !expanded}

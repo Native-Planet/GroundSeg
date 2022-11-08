@@ -71,6 +71,7 @@ class Orchestrator:
 
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
+        cfg = self.check_config_field(cfg,'autostart',[])
         cfg = self.check_config_field(cfg,'endpointUrl', 'api.startram.io')
         cfg = self.check_config_field(cfg,'apiVersion', 'v1')
         cfg = self.check_config_field(cfg,'wgRegistered', False)
@@ -107,6 +108,9 @@ class Orchestrator:
             if data['minio_password'] != '':
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
+
+            if p in self.config['autostart']:
+                self._urbits[p].start()
 
         print(f'Urbit Piers loaded', file=sys.stderr)
 
@@ -145,6 +149,8 @@ class Orchestrator:
 
         u['wgReg'] = self.config['wgRegistered']
         u['wgRunning'] = self.wireguard.is_running()
+        u['autostart'] = urbit_id in self.config['autostart']
+
         u['meldOn'] = urb.config['meld_schedule']
         u['timeNow'] = datetime.utcnow()
         u['frequency'] = urb.config['meld_frequency']
@@ -219,6 +225,9 @@ class Orchestrator:
             if data['data'] == 'delete':
                 return self.delete_urbit(urbit_id)
 
+            if data['data'] == 'toggle-autostart':
+                return self.toggle_autostart(urbit_id)
+
         # Wireguard requests
         if data['app'] == 'wireguard':
             if data['data'] == 'toggle':
@@ -234,6 +243,17 @@ class Orchestrator:
                 return self.export_minio_bucket(urbit_id)
 
         return 400
+
+    # Toggle Autostart
+    def toggle_autostart(self, patp):
+        if patp in self.config['autostart']:
+            self.config['autostart'].remove(patp)
+        else:
+            self.config['autostart'].append(patp)
+
+        self.save_config()
+
+        return 200
 
     # Delete Urbit Pier and MiniO
     def delete_urbit(self, patp):
@@ -414,6 +434,7 @@ class Orchestrator:
     # Add Urbit to list of Urbit
     def add_urbit(self, patp, urbit):
         self.config['piers'].append(patp)
+        self.config['autostart'].append(patp)
         self._urbits[patp] = urbit
 
         self.register_urbit(patp)

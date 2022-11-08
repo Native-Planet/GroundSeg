@@ -15,7 +15,7 @@
 
   export let remote, minIOReg, hasBucket, name, running, timeNow,
     frequency, meldHour, meldMinute, meldOn, meldLast, meldNext,
-    containers, expanded, isPierDeletion
+    containers, expanded, isPierDeletion, autostart
 
   let selectedContainer = name
 
@@ -88,7 +88,13 @@
 {#if activeTab == 'Urbit'}
   <div class="main-wrapper" in:scale={{duration:120, delay: 200}}>
    <div class="admin-wrapper">
-     <PierOptionsAdmin {name} {isPierDeletion} {hasBucket} on:delete={toggleDeletePier}/>
+     <PierOptionsAdmin
+       {name}
+       {isPierDeletion}
+       {hasBucket}
+       {autostart}
+       on:delete={toggleDeletePier}
+     />
    </div>
 
    {#if !isPierDeletion}
@@ -140,14 +146,14 @@
     align-items: start;
   }
   .admin-wrapper {
-    flex: 1;
+    flex: 2;
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
 
   .meld-wrapper {
-    flex:2;
+    flex:3;
     display: flex;
     flex-direction: column;
     gap: 12px;
