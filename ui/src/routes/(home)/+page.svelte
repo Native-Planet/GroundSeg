@@ -33,12 +33,11 @@
 
 	// end the update loop
 	onDestroy(()=> inView = false)
-	
+
 </script>
 
 {#if inView}
   <Card width="520px" padding={false} home={true}>
-    {JSON.stringify($api)}
 		<div style="margin: 20px 0 0 20px;">
   		<Logo />
 		</div>

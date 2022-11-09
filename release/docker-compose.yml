@@ -3,6 +3,7 @@ version: "3.9"
 services:
   api:
     image: nativeplanet/groundseg_api:latest
+    container_name: groundseg_api
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true
@@ -15,10 +16,13 @@ services:
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
       - /var/lib/docker/volumes:/var/lib/docker/volumes
       - /opt/nativeplanet/groundseg/commands:/commands
+      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
+      - /etc/systemd/system:/opt/systemd/system
       - settings:/settings
 
   webui:
     image: nativeplanet/groundseg_webui:latest
+    container_name: groundseg_webui
     privileged: true
     labels:
       com.centurylinklabs.watchtower.enable: true

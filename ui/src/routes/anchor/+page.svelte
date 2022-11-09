@@ -23,7 +23,7 @@
     if ($page.routeId == 'anchor') {
 			fetch($api + '/anchor')
 			.then(raw => raw.json())
-    	.then(res => data = res)
+      .then(res => data = res)
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)
@@ -31,8 +31,8 @@
 
 	// Start the update loop
 	onMount(()=> {
-    inView = true
 		update()
+    inView = true
 	})
 
   onDestroy(()=> inView = false)
@@ -41,6 +41,7 @@
 
 {#if inView}
   <Card width="460px">
+
     <!-- Header -->
     <AnchorHeader wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning}>
       <Logo t='Anchor'/>
