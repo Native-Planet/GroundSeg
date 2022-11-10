@@ -115,6 +115,15 @@ class Orchestrator:
         print(f'Urbit Piers loaded', file=sys.stderr)
 
 #
+#   Login
+#
+
+    def handle_login_request(self, data):
+        if 'password' in data:
+            print(data['password'], file=sys.stderr)
+            return 200
+        return 400
+#
 #   Urbit Pier
 #
     # Get all piers for home page
@@ -759,26 +768,33 @@ class Orchestrator:
         self.anchor_config = self.wireguard.get_status(url)
 
         if(self.anchor_config != None):
-           print("starting wg")
+           print("Starting Wireguard", file=sys.stderr)
            self.wireguard.start()
            self.config['wgRegistered'] = True
            time.sleep(2)
            
-           print("reg urbits")
+           print("Registering Urbits", file=sys.stderr)
            for p in self.config['piers']:
               self.register_urbit(p)
 
-           print("starting minIOs")
+           print("Starting minIOs", file=sys.stderr)
            self.toggle_minios_on()
            self.save_config()
 
            return 200
+
         return 400
 
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
+        old_url = self.config['endpointUrl']
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
+
+        for patp in self.config['piers']:
+            self.wireguard.delete_service(f'{patp}','urbit',old_url)
+            self.wireguard.delete_service(f's3.{patp}','minio',old_url)
+
         self.toggle_anchor_off()
         self.reset_pubkey()
         self.save_config()

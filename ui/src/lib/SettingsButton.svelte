@@ -1,16 +1,20 @@
 <script>
   import { page } from '$app/stores'
+
+  const hide = () => {
+    return (($page.routeId == 'settings') || ($page.routeId == 'login'))
+  }
 </script>
 
 <a href='/settings'>
-  <img src="/settings.svg" alt="Settings Icon" class:inverted={$page.routeId == 'settings'}/>
+  <img src="/settings.svg" alt="Settings Icon" class:inverted={hide}/>
 </a>
 
 <style>
   .inverted {
-    /* filter: invert(1); */
     opacity: .2;
     pointer-events: none;
+    filter: blur(2px);
   }
 	a {
 		position:absolute;

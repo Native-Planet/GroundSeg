@@ -178,6 +178,11 @@ def pier_upload():
     else:
         return jsonify(501)
 
+# Login
+@app.route("/login", methods=['POST'])
+def login():
+    res = orchestrator.handle_login_request(request.get_json())
+    return jsonify(res)
 
 if __name__ == '__main__':
     debug_mode = False

@@ -4,7 +4,7 @@
   import Fa from 'svelte-fa'
   import { faIgloo } from '@fortawesome/free-solid-svg-icons'
 
-  export let t = ""
+  export let t = "", login = false
 </script>
 
 <div class="logo" transition:blur={{duration: 400, amount: 100}} >
@@ -12,10 +12,12 @@
 	{#if t.length > 0}
 		<div class="wrapper"> 
 			<div class="text">{t}</div>
+      {#if !login}
 			<a class="home" href="/">
 				<Fa icon={faIgloo} />
         <span>home</span>
 			</a>
+      {/if}
 		</div>
 	{/if}
 </div>

@@ -4,10 +4,14 @@
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
+  const hide = () => {
+    return (($page.routeId == 'anchor') || ($page.routeId == 'login'))
+  }
+
 </script>
 
 <a href='/anchor'>
-  <div class="img" class:inverted={$page.routeId == 'anchor'}>
+  <div class="img" class:inverted={hide}>
     <Fa icon={faSatelliteDish} size="1.2x" />
   </div>
   <!--
@@ -19,6 +23,7 @@
   .inverted {
     opacity: 0.2;
     pointer-events: none;
+    filter: blur(2px);
   }
 	a {
 		position:absolute;
