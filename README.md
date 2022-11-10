@@ -3,6 +3,9 @@ This is the Control Software for the NP System.
 
 GroundSeg requires `docker` and `docker-compose` to work.
 
+## Updating to Beta-3.0.0 -- Important!
+Due to a major refactor in GroundSeg, you will have to run the [GroundSeg Installation command](#groundseg-only) for the software to run properly.
+
 ## Installation
 
 **Disclaimer:** This software runs as `root` on your device. This is required for controlling various aspects of the device.
@@ -88,6 +91,6 @@ sudo /tmp/nativeplanet/complete_uninstall.sh
 
 ## TODO 
 
-1. Refactor the code to be a bit cleaner
-2. Add bitcoin node support
-3. Setup a cronjob during the install script that run a `|pack` and `|meld` perioidically on each urbit container
+1. Add bitcoin node support
+2. Login and authentication
+3. Onboarding screen
