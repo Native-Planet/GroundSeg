@@ -1,4 +1,4 @@
-import requests, subprocess, base64, time, json
+import requests, subprocess, base64, time, json, sys
 
 from wireguard_docker import WireguardDocker
 
@@ -36,17 +36,17 @@ class Wireguard:
 
         # Load wireguard docker
         self.wg_docker = WireguardDocker(data)
-        if(self.wg_docker.isRunning()):
+        if(self.wg_docker.is_running()):
             self.wg_docker.stop()
 
 
     def start(self):
         self.wg_docker.start()
+
     def stop(self):
         self.wg_docker.stop()
 
-
-    def registerDevice(self, reg_code, url):
+    def register_device(self, reg_code, url):
         # /v1/register
         update_data = {
             "reg_code" : f"{reg_code}",
@@ -63,7 +63,7 @@ class Wireguard:
 
         return(response['lease'])
 
-    def registerService(self, subdomain, service_type, url):
+    def register_service(self, subdomain, service_type, url):
         # /v1/create
         update_data = {
             "subdomain" : f"{subdomain}",
@@ -93,7 +93,42 @@ class Wireguard:
 
         return response['status']
         
-    def getStatus(self,url):
+    def delete_service(self, subdomain, service_type, url):
+        # /v1/delete
+        update_data = {
+            "subdomain" : f"{subdomain}",
+            "pubkey":self.config['pubkey'],
+            "svc_type": service_type
+        }
+        headers = {"Content-Type": "application/json"}
+
+        response = None
+        try:
+            response = requests.post(f'{url}/delete',json=update_data,headers=headers).json()
+        except Exception as e:
+            print(e)
+            return None
+
+        print(response, file=sys.stderr)
+        
+    def cancel_subscription(self, reg_key, url):
+        # /v1/stripe/cancel
+        headers = {"Content-Type": "application/json"}
+        data = {'reg_code': reg_key}
+        response = None
+
+        try:
+            response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
+            if response['error'] == 0:
+                return 200
+            print(response, file=sys.stderr)
+            return 400
+
+        except Exception as e:
+            print(f'err: {e}', file=sys.stderr)
+            return 400
+
+    def get_status(self,url):
         headers = {"Content-Type": "application/json"}
         response = None
 
@@ -141,6 +176,6 @@ class Wireguard:
         # Setup and start the local wg client
         self.wg_docker.addConfig(self.wg_config)
 
-    def isRunning(self):
-        return self.wg_docker.isRunning()
+    def is_running(self):
+        return self.wg_docker.is_running()
 

@@ -1,7 +1,7 @@
 <script>
+  import { power } from '$lib/api'
   import Fa from 'svelte-fa'
-  import {power} from '$lib/api'
-  import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
+  import { faPowerOff, faRotateRight } from '@fortawesome/free-solid-svg-icons'
 
   const restart = () => power.set('restart')
   const shutdown = () => power.set('shutdown')
@@ -22,12 +22,11 @@
 <style>
   .control {
     display: flex;
-    background: #0000006d;
-    width: 300px;
+    background: #0404044d;
     padding: 10px 40px 10px 40px;
     border-radius: 15px;
     font-size: 18px;
-    gap: 12px;
+    gap: 16px;
     align-items: center;
   }
   .control-title {

@@ -16,6 +16,8 @@ services:
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
       - /var/lib/docker/volumes:/var/lib/docker/volumes
       - /opt/nativeplanet/groundseg/commands:/commands
+      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
+      - /etc/systemd/system:/opt/systemd/system
       - settings:/settings
 
   webui:

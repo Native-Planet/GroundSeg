@@ -1,7 +1,7 @@
 <script>
   import Fa from 'svelte-fa'
   import { onMount } from 'svelte'
-  import { faGithub } from '@fortawesome/free-brands-svg-icons/index.es'
+  import { faGithub } from '@fortawesome/free-brands-svg-icons'
   import Clipboard from 'clipboard'
 
 
@@ -20,7 +20,7 @@
 <div class="contact">
   <div class="contact-title">Support</div>
   <a href='https://nativeplanet.io' target='_blank' class="site">
-    <img src='/nplogo-new.svg' style="width:20px" alt='Native Planet Logo' />
+    <img src='/nplogo.svg' style="width:20px" alt='Native Planet Logo' />
   </a>
   <a href='https://github.com/Native-Planet' target='_blank' class="site">
     <Fa icon={faGithub} size="1x" />
@@ -29,10 +29,10 @@
 </div>
 
 <style>
+  a { color: inherit; }
   .contact {
     display: flex;
-    background: #0000006d;
-    width: 300px;
+    background: #0404044d;
     padding: 10px 40px 10px 40px;
     border-radius: 15px;
     font-size: 18px;

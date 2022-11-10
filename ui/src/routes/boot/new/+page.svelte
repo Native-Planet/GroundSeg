@@ -1,35 +1,49 @@
 <script>
-  import { newID } from '$lib/components'
-  let name = '',
-    key = '',
-    minio = '',
-    viewKey = false
+  import { scale } from 'svelte/transition'
+	import { onMount } from 'svelte'
+	import { updateState } from '$lib/api'
+  import Logo from '$lib/Logo.svelte'
+	import Card from '$lib/Card.svelte'
+	import NewPierButtons from '$lib/NewPierButtons.svelte'
+
+	export let data
+	updateState(data)
+
+  let name = '', key = '', viewKey = false, inView = false
 
   const toggleViewKey = () => {
     viewKey = !viewKey
     document.querySelector('#key').type = viewKey ? 'text' : 'password'
   }
 
+	onMount(()=> inView = !inView)
+
 </script>
 
-<svelte:component this={newID.logo} />
-<div class="key">
-  <div class="info">
-    <div class="title">Pier Name</div>
-    <input spellcheck="false" placeholder="sampel-palnet" bind:value={name}/>
-  </div>
+{#if inView}
+<Card width="480px">
+  <Logo t="Boot a new Urbit ID"/>
+	<div class="key" in:scale={{duration:160, delay: 360}}>
+  	<div class="info">
+    	<div class="title">Urbit ID</div>
+	    <input spellcheck="false" placeholder="sampel-palnet" bind:value={name}/>
+  	</div>
 
-  <div class="info">
-    <div class="title">Pier Key</div>
-    <div class="pass-wrapper">
-      <input spellcheck="false" id="key" type="password" bind:value={key}/>
-      <img on:click={toggleViewKey} src="/eye-{viewKey ? "closed" : "open"}.svg" alt="eye" />
-    </div>
-  </div>
+	  <div class="info">
+  	  <div class="title">Arvo Key</div>
+    	<div class="pass-wrapper">
+	      <input spellcheck="false" id="key" type="password" bind:value={key}/>
+  	    <img on:click={toggleViewKey} src="/eye-{viewKey ? "closed" : "open"}.svg" alt="eye" />
+    	</div>
+	  </div>
 
-  <svelte:component this={newID.newPier} {name} {key} />
+	</div>
 
-</div>
+	<NewPierButtons {name} {key}/>
+
+</Card>
+{/if}
+
 <style>
   .key {
     display: flex;
@@ -37,7 +51,6 @@
     gap: 24px;
     color: inherit;
     padding: 20px;
-    width: 460px;
     max-width: calc(100vw - 40px);
   }
   .info {

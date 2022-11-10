@@ -1,161 +1,162 @@
 <script>
+  import { scale, fly } from 'svelte/transition'
+	import { quintOut } from 'svelte/easing'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher()
+
 	import { api } from '$lib/api'
 	import PrimaryButton from '$lib/PrimaryButton.svelte'
-	import { createEventDispatcher } from 'svelte'
+  
+  import PierOptionsLogs from '$lib/PierOptionsLogs.svelte'
+  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
+  import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
+  import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
-	export let nw_label, minio_registered, patp, hasBucket
-	let minIOLink = 'standard',
-		pierExport = 'standard',
-		bucketExport = 'standard'
+  export let remote, minIOReg, hasBucket, name, running, timeNow,
+    frequency, meldHour, meldMinute, meldOn, meldLast, meldNext,
+    containers, expanded, isPierDeletion, autostart
 
-	// temporary
+  let selectedContainer = name
 
-	const dispatch = createEventDispatcher();
+  // Available tabs
+  let tabs = ['Logs','MinIO', 'Urbit'],
+    activeTab = null,
+    cur = null
 
-  const updateMinIO = () => {
-		minIOLink = 'loading'
-    let u = $api + "/urbit/minio_endpoint"
-    const f = new FormData()
-    f.append('pier', patp)
+  // Switch tabs
+  // Todo: add transition
+  const switchTab = (tab,i) => {
+    if (expanded && (tab != 'Logs')) {toggleExpand()}
+    if (isPierDeletion && (tab != 'Urbit')) {toggleDeletePier()}
 
-    fetch(u, {method: 'POST',body: f})
-      .then(r => r.json())
-			.then(d => { if (d == 200) {
-				minIOLink = 'success'
-				setTimeout(()=>minIOLink='standard', 3000)
-			} else {
-				minIOLink = 'failure'
-				setTimeout(()=>minIOLink='standard', 3000)
-        }})}
+    if (activeTab == tab) {
+      activeTab = null
+    } else {
+    activeTab = tab
+    }
 
-  const ejectPier = () => {
-    pierExport = 'loading'
-    let u = $api + "/urbit/eject"
-    const f = new FormData()
-					f.append(patp, 'eject')
+  }
 
-    fetch(u, {method: 'POST',body: f})
-    .then(res => { return res.blob(); })
-    .then(d => {
-      pierExport = 'standard'
-      var a = document.createElement("a")
-      a.href = window.URL.createObjectURL(d)
-      a.download = patp
-      a.click()
-    })}
-
-  const ejectBucket = () => {
-    bucketExport = 'loading'
-    let u = $api + "/urbit/minio/eject"
-    const f = new FormData()
-					f.append('pier', patp)
-
-    fetch(u, {method: 'POST',body: f})
-    .then(res => { return res.blob(); })
-    .then(d => {
-      bucketExport = 'standard'
-      var a = document.createElement("a")
-      a.href = window.URL.createObjectURL(d)
-      a.download = 'bucket_' + patp
-      a.click()
-    })}
-
-
-  const exportLog = c => {
-    const u = $api + "/settings/logs"
-    const f = new FormData()
-    f.append('logs', patp)
-    fetch(u, {method: 'POST', body: f})
-      .then(r => r.json()).then(d => {
-          var element = document.createElement('a')
-          element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(d))
-          element.setAttribute('download', 'logs_' + patp)
-          element.style.display = 'none'
-          document.body.appendChild(element)
-          element.click()
-          document.body.removeChild(element)
-    })}
+  const toggleExpand = () => dispatch('toggleExpand')
+  const toggleDeletePier = () => dispatch('toggleDeletePier')
 
 </script>
 
-<!-- Logs -->
-<div class="info">
-	<div class="title">Logs</div>
-  <div class="button-wrapper">
-		<PrimaryButton
-			standard="View Urbit Pier Logs"
-			noMargin={true}
-			on:click={()=>dispatch('toggleLogs')} />
-		<PrimaryButton
-			standard="Export Urbit Pier Logs" 
-	 		noMargin={true}
-			background='#FFFFFF4D'
-		 	on:click={exportLog} />
-  </div>
+<!-- Advanced Options Navigation -->
+<div class="navbar">
+  {#each tabs as tab, i}
+    <!-- Check if tab is MinIO -->
+    {#if tab == 'MinIO'}
+      {#if hasBucket || (minIOReg && remote)}
+        <div 
+          class="tab" 
+          on:click={()=>switchTab(tab,i)}
+          class:active={tab == activeTab}
+          transition:scale={{duration:120, delay: 200}}
+          >
+          {tab}
+        </div>
+      {/if}
+    <!-- Default Tab -->
+    {:else}
+      <div 
+        class="tab" 
+        on:click={()=>switchTab(tab,i)}
+        class:active={tab == activeTab}
+        transition:scale={{duration:120, delay: 200}}
+        >
+        {tab}
+      </div>
+    {/if}
+  {/each}
 </div>
 
-<!-- MinIO -->
-{#if hasBucket || (minio_registered && (nw_label == 'Remote'))}
-	<div class="info">
-		<div class="title">MinIO</div>
-  	<div class="button-wrapper">
-
-    	{#if minio_registered && (nw_label == 'Remote')}
-				<PrimaryButton
-					noMargin={true}
-					standard="Link to Urbit"
-  	     	success="MinIO linked!"
-    	  	failure="Something went wrong"
-    			loading="Linking..."
-					status={minIOLink}
-	 				on:click={updateMinIO} />
-			{/if}
-
-			{#if hasBucket}
-				<PrimaryButton
-					noMargin={true}
-					background="#FFFFFF4D"
-					standard="Export Bucket"
-    			loading="Compressing your files.."
-			 		status={bucketExport}
-					on:click={ejectBucket} />
-			{/if}
-	  </div>
-	</div>
+<!-- Tab Contents -->
+{#if activeTab == 'Logs'}
+  <div in:scale={{duration:120, delay: 200}}>
+    <PierOptionsLogs on:toggleExpand={toggleExpand} {name} {containers} {expanded} />
+  </div>
 {/if}
 
-<!-- Pier Management -->
-<div class="info">
-  <div class="title">Pier Management</div>
-  <div class="button-wrapper">
-		<PrimaryButton
-			noMargin={true}
-			background="orange"
-			standard="Export Urbit Pier"
-   		loading="Compressing your pier.."
-			status={pierExport}
-			on:click={ejectPier} />
+{#if activeTab == 'MinIO'}
+  <div in:scale={{duration:120, delay: 200}}>
+    <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+  </div>
+{/if}
 
-		<PrimaryButton
-			noMargin={true}
-			background="red"
-			standard="Delete Urbit Pier"
-	 on:click={()=>dispatch('deletePier')} />
-	</div>
-</div>
+{#if activeTab == 'Urbit'}
+  <div class="main-wrapper" in:scale={{duration:120, delay: 200}}>
+   <div class="admin-wrapper">
+     <PierOptionsAdmin
+       {name}
+       {isPierDeletion}
+       {hasBucket}
+       {autostart}
+       on:delete={toggleDeletePier}
+     />
+   </div>
+
+   {#if !isPierDeletion}
+     <div class="meld-wrapper">
+       <PierOptionsMeld 
+         {frequency}
+         {timeNow}
+         {running}
+         {name}
+         {meldHour}
+         {meldMinute}
+         {meldOn}
+         {meldLast}
+         {meldNext}
+         />
+      </div>
+   {/if}
+  </div>
+{/if}
 
 <style>
-  .info {
-    margin-bottom: 12px;
+  .navbar {
+    display: flex;
+    margin-top: 12px;
+    gap: 6px;
   }
-  .title {
-    font-weight: 700;
-    margin-bottom: 12px;
-    text-align: left;
+  .tab {
+    flex: 1;
+    font-size: 14px;
+    padding: 6px;
+    text-align: center;
+    border-radius: 8px;
+    border: solid 1px #FFFFFF4D;
+    cursor: pointer;
   }
-	.button-wrapper {
-		display: flex;
-		gap: 12px;
-	}
-	
+  .tab:hover {background: #FFFFFF4D;}
+  .active {
+    background: var(--action-color);
+    border-color: var(--action-color);
+  }
+  .active:hover {
+    background: var(--action-color);
+    opacity: .8;
+  }
+  .main-wrapper {
+    display: flex;
+    text-align: center;
+    padding-top: 20px;
+    align-items: start;
+  }
+  .admin-wrapper {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .meld-wrapper {
+    flex:3;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
 </style>

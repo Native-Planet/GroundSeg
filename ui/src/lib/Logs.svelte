@@ -1,54 +1,110 @@
 <script>
-  import { api, scrollDown } from '$lib/api'
-  import { logs } from '$lib/components'
-  import { onMount, onDestroy } from 'svelte'
+  import { api, currentLog } from '$lib/api'
+  import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
 
-  export let log, maxHeightOffset = 0
+  export let container, maxHeight
+  let div
+	let autoscroll
+  let shown = false
 
-  let stream = null, shown = false
+	beforeUpdate(() => {
+		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 20);
+	})
 
-  onMount(() => {shown=true;getLog();})
-  onDestroy(() => {shown=false;scrollDown.set(true);})
+	afterUpdate(() => {
+		if (autoscroll) div.scrollTo(0, div.scrollHeight);
+	})
+  onMount(() => {
+    shown = true
+    getLog()
+  })
+  onDestroy(() => {
+    shown = false
+    currentLog.set({'container':'','log':[]})
+  })
 
-  const handleScroll = e => {
-    if ((e.deltaY < 0) && (Array.isArray(stream))) {
-      scrollDown.set(false)
-    }
-  }
-
+  const toLatest = () => div.scrollTo(0, div.scrollHeight)
   const getLog = () => {
-    if (shown) {
-      const u = $api + "/settings/logs"
-      const f = new FormData()
-      f.append('logs', log)
-      fetch(u, {method: 'POST', body: f})
-        .then(r => r.json()).then(d => {
-          stream = d.split("\n")
+    if (container == '') {
+      setTimeout(getLog, 1000) 
+    } else {
+      let module = 'logs'
+      if (shown) {
+        if ($currentLog.container != container) {
+          currentLog.set({'container':'','log':[]})        
+        }
+  	    fetch($api + '/system?module=' + module, {
+			    method: 'POST',
+			    headers: {'Content-Type': 'application/json'},
+  			  body: JSON.stringify({'action':'view','container':container,'haveLine':$currentLog.log.length})
+	      })
+        .then(r => r.json())
+        .then(d => {
+          currentLog.update( s => {
+            s['container'] = container
+            s['log'] = s['log'].concat(d)
+            return s
+          })
+          setTimeout(getLog, 1000)
         })
-      if ($scrollDown) {
-        window.location.href="#jump"
-      }
-      setTimeout(getLog, 1000)
-    }
+    }}
   }
+
 </script>
 
+{#if shown}
+  <div class="logs-wrapper" bind:this={div} style="max-height:{maxHeight}">
+  <!-- Print log array -->
+  {#each $currentLog.log as ln}
+    {#if ln.length > 0}
+      <code>{ln}</code><br>
+    {/if}
+  {/each}
+
+  <!-- Jump to latest -->
+  {#if !autoscroll}<button on:click={toLatest} class="latest">Show Latest</button>{/if}
+</div>
+{/if}
+
+<style>
+	.logs-wrapper::-webkit-scrollbar {display: none;}
+  .logs-wrapper {
+    margin-top: 12px;
+    overflow: auto;
+  }
+  code {
+    font-size: 12px;
+    font-weight: 300;
+  }
+  .latest {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    background: #0404048D;
+    padding: 12px;
+    backdrop-filter: blur(20px);
+    color: inherit;
+    border: none;
+    border-radius: 15px;
+  }
+</style>
+<!--
 <svelte:window on:wheel={handleScroll} />
 
 {#if Array.isArray(stream)}
-  <!-- detect mousewheel event -->
+  <!-- detect mousewheel event --
 
   <div class="wrapper">
 
     <svelte:component this={logs.logo} />
 
-    <!-- stream of selected log -->
+    <!-- stream of selected log --
     <div class="logs" style="max-height: calc(80vh - 92px - {maxHeightOffset}px;">
       {#each stream as s}<div class="content">{s}</div>{/each}
       <div id="jump"></div>
     </div>
 
-    <!-- send to bottom of screen -->
+    <!-- send to bottom of screen --
     {#if !$scrollDown}
       <button class="latest" on:click={()=>{window.location.href="#jump";scrollDown.set(true)}}>Show Latest</button>
     {/if}
@@ -113,3 +169,4 @@
     border-radius: 15px;
   }
 </style>
+-->

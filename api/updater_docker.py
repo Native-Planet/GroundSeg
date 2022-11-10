@@ -37,7 +37,7 @@ class WatchtowerDocker:
 
         if mode == 'off':
             self.stop()
-        else:
+        if mode == 'auto':
             self.start()
 
     def start(self):

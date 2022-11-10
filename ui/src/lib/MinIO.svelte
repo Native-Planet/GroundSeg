@@ -1,41 +1,39 @@
 <script>
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
-  import { faRotateRight } from '@fortawesome/free-solid-svg-icons/index.es'
+  import { faRotateRight } from '@fortawesome/free-solid-svg-icons'
 
-  export let info
+  export let minio
   let loading = false
 
   const restartMinIO = () => {
     loading = true
-    const f = new FormData()
-    const u = $api + "/settings/minio"
-    f.append('refresh', 'refresh')
-    fetch(u, {method: 'POST',body: f})
+    let module = 'minio'
+	  fetch($api + '/system?module=' + module, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({'action':'reload'})
+	  })
       .then(d => d.json())
       .then(res => {
         if (res === 200) {
           loading = false
           console.log("minio refreshed")
-    }})}
+        }})
+  }
 
 </script>
 
 <div class="minio">
   <div class="title-wrapper">
-    {#if info}
-      <div class="title" class:disabled={!info.minio}>MinIO</div>
-      <div
-        on:click={restartMinIO}
-        class:disabled={!info.minio}
-        class:loading={loading}
-        class="switch">
-        <Fa icon={faRotateRight} size="1x" />
-      </div>
-    {:else}
-      <div class="title">MinIO</div>
-      <div class="blurred"></div>
-    {/if}
+    <div class="title" class:disabled={!minio}>MinIO</div>
+    <div
+      on:click={restartMinIO}
+      class:disabled={!minio}
+      class:loading={loading}
+      class="switch">
+      <Fa icon={faRotateRight} size="1x" />
+    </div>
   </div>
 </div>
 
@@ -44,14 +42,8 @@
     from {transform: rotate(0deg);} 
     to {transform: rotate(360deg);}
   }
-  @keyframes breathe {
-    0% {opacity: .6}
-    50% {opacity: 0}
-    100% {opacity: .6}
-  }
   .minio {
-    background: #0000006d;
-    width: 300px;
+    background: #0404044d;
     padding: 20px 40px 20px 40px;
     border-radius: 15px;
     font-size: 18px;
@@ -81,14 +73,5 @@
     color: #ffffff;
     opacity: .2;
     pointer-events: none;
-  }
-  .blurred {
-    height: 25px;
-    background: red;
-    width: 25px;
-    animation: breathe 2s infinite;
-    background: #ffffff4d;
-    filter: blur(6px);
-    border-radius: 8px;
   }
 </style>

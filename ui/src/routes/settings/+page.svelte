@@ -1,84 +1,208 @@
 <script>
-  import { onMount, onDestroy } from 'svelte'
-  import { settings } from '$lib/components'
-  import { power, api } from '$lib/api'
+	import { onMount, onDestroy } from 'svelte'
+  import { scale } from 'svelte/transition'
   import { page } from '$app/stores'
+  import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
 
-  let info, opened, hasUpdate = false
+	import { updateState, api, system, isPortrait } from '$lib/api'
+  import Logo from '$lib/Logo.svelte'
+	import Card from '$lib/Card.svelte'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
+  import Logs from '$lib/Logs.svelte'
+  import SysInfo from '$lib/SysInfo.svelte'
+  import Power from '$lib/Power.svelte'
+
+  import Network from '$lib/Network.svelte'
+  import MinIO from '$lib/MinIO.svelte'
+  import Contact from '$lib/Contact.svelte'
+
+	// load data into store
+	export let data
+	updateState(data)
+
+  let inViewSettings = false, 
+    tabs = ['Settings','Logs'],
+    activeTab = 'Settings',
+    selectedContainer
+
+	// updateState loop
   const update = () => {
-    if (opened) {
-      fetch($api + "/settings").then(r => r.json()).then(d => info = d)
-      setTimeout(update, 1000)
-  }}
+    if (($page.routeId == 'settings') && (activeTab == 'Settings')) {
+			fetch($api + '/system')
+			.then(raw => raw.json())
+    	.then(res => updateState(res))
+			.catch(err => console.log(err))
 
-  const updateGS = () => {
-    if (opened) {
-      let u = $api + "/settings/update"
-      fetch(u).then(r => r.json()).then(d => hasUpdate = d)
-      setTimeout(updateGS, (15 * 60 * 1000))}}
+			setTimeout(update, 1000)
+	}}
 
-  const downloadUpdate = () => {
-    let u = $api + "/settings/update"
-    const f = new FormData()
-    fetch(u, {method: 'POST',body: f})
-      .then(window.location.href = "/updater")}
+  const exportLogs = () => {
+    let module = 'logs'
+    fetch($api + '/system?module=' + module, {
+		  method: 'POST',
+		  headers: {'Content-Type': 'application/json'},
+  	  body: JSON.stringify({'action':'export','container':selectedContainer})
+	  })
+      .then(r => r.json())
+      .then(d => {
+          var element = document.createElement('a')
+          element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(d))
+          element.setAttribute('download', selectedContainer)
+          element.style.display = 'none'
+          document.body.appendChild(element)
+          element.click()
+          document.body.removeChild(element)
+      })
+  }
 
-  onMount( ()=> {opened = true; updateGS(); update()})
-  onDestroy(() => opened = false)
+	// Start the update loop
+  onMount(()=> {
+    update()
+    inViewSettings = true
+    selectedContainer = $system.containers[0]
+  })
 
-  power.set(null)
-
+	// end the update loop
+  onDestroy(()=> inViewSettings = false)
+	
 </script>
 
-<svelte:component this={settings.logo} t="System settings" />
+{#if inViewSettings}
+  <Card width="800px">
+    <Logo t='System Settings'/>
 
-<div class="wrapper">
-<div class="content">
+    <!-- Settings Navigation -->
+    <div class="navbar">
+      {#each tabs as tab,i}
+      <div 
+        class="tab" 
+        on:click={()=>activeTab = tab}
+        class:active={tab == activeTab}
+        transition:scale={{duration:120, delay: 200}}
+        >
+        {tab}
+      </div>
+      {/each}
+    </div>
 
-  <div class="panel">
-    <svelte:component this={settings.sysInfo} {info}/>
-    <svelte:component this={settings.network} {info} />
-    <svelte:component this={settings.power} />
-  </div>
+    {#if activeTab == 'Settings'}
+      <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
-  <div class="panel">
-    <svelte:component this={settings.anchor} {info} />
-    <svelte:component this={settings.minIO} {info} />
-    <svelte:component this={settings.exportLogs} />
-    <svelte:component this={settings.contact} />
-  </div>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
+          <SysInfo
+            ram={$system.ram} 
+            temp={$system.temp}
+            disk={$system.disk}
+            cpu={$system.cpu}
+            gsVersion={$system.gsVersion}
+            updateMode={$system.updateMode}
+            />
+        </div>
 
-</div>
-</div>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
+          <Network ethOnly={$system.ethOnly} connected={$system.connected} />
+          <MinIO minio={$system.minio} />
+        </div>
+      </div>
+
+      <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
+          <Power />
+        </div>
+        <div class="panel" in:scale={{duration:120, delay: 200}}>
+          <Contact />
+        </div>
+
+      </div>
+    {/if}
+
+    {#if activeTab == 'Logs'}
+      <div in:scale={{duration:120, delay: 200}}>
+        <Logs container={selectedContainer} maxHeight="60vh" />
+      </div>
+      <div class="bottom-panel">
+        <Listbox value={selectedContainer} on:change={(e) => (selectedContainer = e.detail)}>
+          <ListboxOptions as="div" class="containers-list">
+            {#each $system.containers as c}
+              <ListboxOption as="p" value={c}>
+                {c}
+              </ListboxOption>
+            {/each}
+          </ListboxOptions>
+          <ListboxButton class="containers-selector">{selectedContainer}</ListboxButton>
+        </Listbox>
+        <PrimaryButton on:click={exportLogs} standard="Export" status="standard" />
+      </div>
+    {/if}
+
+  </Card>
+{/if}
+
 <style>
-  .content {
-    padding: 20px;
-    width: 772px;
-    overflow: auto;
-    max-width: calc(100vw - 40px);
-    max-height: 70vh;
+  .bottom-panel {
+    padding-top: 24px;
     display: flex;
-    flex-wrap: wrap;
+    align-items: end;
     gap: 12px;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
-  .content::-webkit-scrollbar {
-    display: none;
+  :global(.containers-selector) {
+    background: #FFFFFF4D;
+    color: white;
+    padding: 8px;
+    width: 360px;
+    border-radius: 6px;
+    font-size: 12px;
+    position: relative;
   }
+  :global(.containers-list) {
+    position: absolute;
+    bottom: 48px;
+    font-size: 12px;
+    background: #040404;
+    color: white;
+    padding: 6px 12px 6px 12px;
+    width: calc(360px - 24px);
+    border-radius: 6px;
+  }
+
+  .navbar {
+    display: flex;
+    margin: auto;
+    margin-top: 12px;
+    max-width: 360px;
+    gap: 6px;
+  }
+  .tab {
+    flex: 1;
+    font-size: 14px;
+    padding: 6px;
+    text-align: center;
+    border-radius: 8px;
+    border: solid 1px #FFFFFF4D;
+    cursor: pointer;
+  }
+  .tab:hover {background: #FFFFFF4D;}
+  .active {
+    background: var(--action-color);
+    border-color: var(--action-color);
+  }
+  .active:hover {
+    background: var(--action-color);
+    opacity: .8;
+  }
+  .main-panel {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+  }
+  .portrait { flex-direction: column;}
+  .landscape { flex-direction: row;}
   .panel {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    width: 380px;
   }
+
 </style>
-
-
-
-
-
-
-
-

@@ -1,0 +1,31 @@
+/* Defaults */
+
+a { text-decoration: none }
+button { appearance: none; border: none; background: none }
+
+/* Standard animation for stuff */
+
+@keyframes breathe {
+  0% {opacity: .6}
+  50% {opacity: 0}
+  100% {opacity: .6}
+}
+
+/* Standard design for pier info */
+
+.pier-info { margin-bottom: 12px }
+.pier-title {
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.pier-cred-wrapper { display: flex; }
+.pier-cred {
+  font-style: italic;
+  font-size: 12px;
+  padding: 8px;
+  background: #ffffff4d;
+  border-radius: 6px;
+  flex: 1;
+  cursor: pointer;
+}

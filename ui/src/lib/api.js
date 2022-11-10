@@ -1,16 +1,39 @@
-import { writable } from 'svelte/store';
-import cfg from '/src/config.json' assert {type: 'json'}
+import { writable } from 'svelte/store'
 
-// api url
+//
+// fade transition params
+//
+export const fadeIn = {duration:200, delay: 160}
+export const fadeOut = {duration:200}
 
-// stores
-export const api = writable(null)
-export const piers = writable(null)
-export const scrollDown = writable(true)
-export const power = writable(null)
+//
+// writable stores
+//
 export const codes = writable({})
+export const urbits = writable([])
+export const system = writable({})
+export const api = writable('')
+export const isPortrait = writable(false)
+export const currentLog = writable({'container': '', 'log': []})
+export const power = writable('')
 
-// Check if valid Patp - Supports galaxy to moon only
+//
+// state update
+//
+export const updateState = update => {
+	updateUrbits(update['urbits'])
+  updateSystemInformation(update['system'])
+	updateApi(update['api'])
+}
+
+const updateApi = a => {if(a){api.set(a)}}
+const updateUrbits = p => {if (p) {urbits.set(p)}}
+const updateSystemInformation = s => {if (s) {system.set(s)}}
+
+//
+// misc
+//
+// Todo: clean this up
 
 export const isPatp = p => {
   

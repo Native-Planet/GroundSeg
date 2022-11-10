@@ -8,11 +8,6 @@
   const dispatch = createEventDispatcher();
 
   let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = '', failed = false
-  let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
-  let suffix = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
-
-  prefix = prefix.match(/.{1,3}/g)
-  suffix = suffix.match(/.{1,3}/g)
 
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
@@ -20,7 +15,7 @@
       acceptedFiles: '.zip, .tar, .tgz, .gz',
       chunking: true,
       forceChunking: true,
-      url: $api + '/upload/pier',
+      url: $api + '/upload',
       disablePreviews: true,
       uploadprogress: checkUpdate,
       success: onSuccess,
@@ -54,12 +49,14 @@
   }
 
   const onSuccess = (file,res) => {
+    console.log(res)
     if (res == 200) {
       let name = file.name.split(".")[0]
       window.location.href="/" + name
   }}
 
-  const onError = () => {
+  const onError = (e) => {
+    console.log(e)
     isUploading = false
     failed = true
     setTimeout(()=>{failed = false}, 2400)

@@ -69,7 +69,7 @@ class WireguardDocker:
     def logs(self):
         return self.container.logs()
 
-    def isRunning(self):
+    def is_running(self):
         return self.running
      
 

@@ -1,6 +1,4 @@
-import docker
-import json
-import time, shutil
+import docker, sys, json, time, shutil
 
 client = docker.from_env()
 
@@ -13,7 +11,6 @@ class MinIODocker:
         self.minio_name = f"minio_{self.config['pier_name']}"
 
         self.buildMinIO()
-
 
 
     def buildVolume(self):
@@ -80,12 +77,27 @@ class MinIODocker:
     def logs(self):
         return self.container.logs()
 
-    def removeMinIO(self):
+    def remove_minio(self):
         self.stop()
         self.container.remove()
         self.volume.remove()
 
-    def makeServiceAcc(self):
-        x = self.container.exec_run(f"/data/mc admin user svcacct add myminio {self.config['pier_name']}").output.decode('utf-8').strip()
-        print(x)
-        return x
+    def make_service_account(self, acc, pwd):
+        x = None
+
+        print('Updating service account credentials', file=sys.stderr)
+        x = self.container.exec_run(f"/data/mc admin user svcacct edit \
+                --secret-key '{pwd}' \
+                myminio {acc}").output.decode('utf-8').strip()
+
+        if 'ERROR' in x:
+            print('Service account does not exist. Creating new account...', file=sys.stderr)
+            x = self.container.exec_run(f"/data/mc admin user svcacct add \
+                    --access-key '{acc}' \
+                    --secret-key '{pwd}' \
+                    myminio {self.config['pier_name']}").output.decode('utf-8').strip()
+
+            if 'ERROR' in x:
+                return 400
+
+        return 200
