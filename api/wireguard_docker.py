@@ -16,7 +16,6 @@ class WireguardDocker:
         self.running = (self.container.attrs['State']['Status'] == 'running' )
 
 
-
     def buildVolume(self):
         volumes = client.volumes.list()
         print('building wg volume')
@@ -54,7 +53,7 @@ class WireguardDocker:
         self.container.remove()
         self.volume.remove()
 
-    def addConfig(self, config):
+    def add_config(self, config):
         with open(f'{self._volume_directory}/{self.wireguard_name}/_data/wg0.conf', 'w') as f:
             f.write(config)
 
@@ -71,12 +70,3 @@ class WireguardDocker:
 
     def is_running(self):
         return self.running
-     
-
-
-
-if __name__ == '__main__':
-    filename = "settings/wireguard.json"
-    f = open(filename)
-    data = json.load(f)
-    wg = WireguardDocker(data)

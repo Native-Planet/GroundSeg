@@ -105,11 +105,11 @@ class Orchestrator:
 
             self._urbits[p] = UrbitDocker(data)
 
-            if data['minio_password'] != '':
+            if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
 
-            if p in self.config['autostart']:
+            if p in self.config['autostart'] and not self._urbits[p].running:
                 self._urbits[p].start()
 
         print(f'Urbit Piers loaded', file=sys.stderr)
@@ -480,7 +480,7 @@ class Orchestrator:
             s3_port = None
             console_port = None
 
-            print(self.anchor_config['subdomains'])
+            print(self.anchor_config['subdomains'], file=sys.stderr)
             pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
             for ep in self.anchor_config['subdomains']:
                 if(f'{patp}.{pub_url}' == ep['url']):
@@ -764,7 +764,11 @@ class Orchestrator:
         if x == None:
             return 400
 
-        time.sleep(2)
+        print(f'/register response: {x}',file=sys.stderr)
+
+        if x['error'] != 0:
+            return 400
+
         self.anchor_config = self.wireguard.get_status(url)
 
         if(self.anchor_config != None):

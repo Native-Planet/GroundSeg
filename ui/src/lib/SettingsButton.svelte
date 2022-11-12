@@ -7,7 +7,7 @@
 </script>
 
 <a href='/settings'>
-  <img src="/settings.svg" alt="Settings Icon" class:inverted={hide}/>
+  <img src="/settings.svg" alt="Settings Icon" class:inverted={hide()}/>
 </a>
 
 <style>

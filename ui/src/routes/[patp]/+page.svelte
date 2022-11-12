@@ -79,7 +79,7 @@
         if (d.length == 27) {
           setTimeout(getUrbitCode, 1800000)
         } else {
-          setTimeout(getUrbitCode, 1000)
+          setTimeout(getUrbitCode, 1000000)
         }
       })
   }}

@@ -34,6 +34,8 @@ def anchor_information():
             except Exception as e:
                 print(e, file=sys.stderr)
                 time.sleep(60)
+        else:
+            time.sleep(60)
 
 # Constantly update system information
 def sys_monitor():
