@@ -149,7 +149,7 @@ def system_settings():
 
         if request.method == 'POST':
             module = request.args.get('module')
-            res = orchestrator.handle_module_post_request(module, request.get_json())
+            res = orchestrator.handle_module_post_request(module, request.get_json(), sessionid)
             return jsonify(res)
 
     return jsonify(404)
@@ -157,9 +157,19 @@ def system_settings():
 # Handle anchor registration related information
 @app.route("/anchor", methods=['GET'])
 def anchor_settings():
-    if request.method == 'GET':
-        settings = orchestrator.get_anchor_settings()
-        return jsonify(settings)
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            settings = orchestrator.get_anchor_settings()
+            return jsonify(settings)
 
 
 # Pier upload

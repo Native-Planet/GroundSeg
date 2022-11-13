@@ -21,7 +21,7 @@
 	// updateState loop
   const update = () => {
     if ($page.routeId == 'anchor') {
-			fetch($api + '/anchor')
+      fetch($api + '/anchor', {credentials: "include"})
 			.then(raw => raw.json())
       .then(res => data = res)
 			.catch(err => console.log(err))
@@ -31,6 +31,9 @@
 
 	// Start the update loop
 	onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
 		update()
     inView = true
 	})

@@ -89,6 +89,7 @@ class Wireguard:
             self.wg_docker.add_config(self.wg_config)
 
         except Exception as e:
+            print(f"wg_config err: {e}", file=sys.stderr)
             return None
 
         return response

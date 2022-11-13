@@ -21,14 +21,19 @@
     let module = 'anchor'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
+      credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'register','key':key.trim()})
 	  })
       .then(d => d.json())
       .then(res => {
         if (res === 200) {
+          console.log(res)
           buttonStatus = 'success'
-          setTimeout(()=>{buttonStatus = 'standard'; key = ''}, 3000)
+          setTimeout(()=>{
+            buttonStatus = 'standard'
+            reRegCheck = true
+            key = ''}, 3000)
         } else {
           console.log(res)
           buttonStatus = 'failure'

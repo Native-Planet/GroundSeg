@@ -619,11 +619,25 @@ class Orchestrator:
         settings['minio'] = self.minIO_on
         settings['connected'] = self.get_connection_status()
         settings['containers'] = self.get_containers()
+        settings['sessions'] = len(self.config['sessions'])
 
         return {'system': settings}
 
     # Modify system settings
-    def handle_module_post_request(self, module, data):
+    def handle_module_post_request(self, module, data, sessionid):
+
+        # sessions module
+        if module == 'session':
+            if data['action'] == 'logout':
+                self.config['sessions'] = [i for i in self.config['sessions'] if i != sessionid]
+                self.save_config()
+                return 200
+
+            if data['action'] == 'logout-all':
+                self.config['sessions'] = []
+                self.save_config()
+                return 200
+
 
         # anchor module
         if module == 'anchor':

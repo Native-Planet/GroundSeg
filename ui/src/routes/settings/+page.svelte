@@ -15,6 +15,7 @@
 
   import Network from '$lib/Network.svelte'
   import MinIO from '$lib/MinIO.svelte'
+  import Sessions from '$lib/Sessions.svelte'
   import Contact from '$lib/Contact.svelte'
 
 	// load data into store
@@ -113,6 +114,7 @@
         <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           <MinIO minio={$system.minio} />
+          <Sessions sessions={$system.sessions} />
         </div>
       </div>
 
