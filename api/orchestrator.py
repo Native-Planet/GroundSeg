@@ -23,7 +23,7 @@ class Orchestrator:
     _core_temp = None
     _disk = None
     gs_version = 'Beta-3.0.0'
-    _lease = None
+    anchor_config = {'lease': None}
 
 #
 #   init
@@ -590,15 +590,21 @@ class Orchestrator:
     def get_anchor_settings(self):
 
         lease_end = None
+        ongoing = False
+        lease = self.anchor_config['lease']
 
-        if self._lease != None:
-            x = list(map(int,self._lease.split('-')))
+        if self.anchor_config['ongoing'] == 1:
+            ongoing = True
+
+        if lease != None:
+            x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
 
         anchor = dict()
         anchor['wgReg'] = self.config['wgRegistered']
         anchor['wgRunning'] = self.wireguard.is_running()
         anchor['lease'] = lease_end
+        anchor['ongoing'] = ongoing
 
         return {'anchor': anchor}
 
@@ -660,7 +666,11 @@ class Orchestrator:
                 endpoint = self.config['endpointUrl']
                 api_version = self.config['apiVersion']
                 url = f'https://{endpoint}/{api_version}'
-                return self.wireguard.cancel_subscription(data['key'],url)
+                x = self.wireguard.cancel_subscription(data['key'],url)
+                if x != 400:
+                    self.anchor_config = x
+                    return 200
+
 
         # power module
         if module == 'power':

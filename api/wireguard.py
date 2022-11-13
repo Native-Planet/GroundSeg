@@ -151,7 +151,8 @@ class Wireguard:
         try:
             response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
             if response['error'] == 0:
-                return 200
+                return self.get_status(url)
+
             print(response, file=sys.stderr)
             return 400
 

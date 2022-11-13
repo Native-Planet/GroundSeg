@@ -28,7 +28,8 @@ def anchor_information():
                         f'https://{url}/v1/retrieve?pubkey={pubkey}',
                         headers=headers).json()
             
-                orchestrator._lease = response['lease']
+                orchestrator.anchor_config = response
+                print(response, file=sys.stderr)
                 time.sleep(60 * 60 * 12)
 
             except Exception as e:
