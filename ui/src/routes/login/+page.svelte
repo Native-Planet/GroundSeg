@@ -1,7 +1,7 @@
 <script>
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
-  import { api, updateState } from '$lib/api'
+  import { api, updateState, secret } from '$lib/api'
 
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -13,10 +13,18 @@
   let inView = false,
     showLogin = false,
     pwdView = false,
-    loginPassword = ''
+    loginPassword = '',
+    loginUsername = '',
+    buttonStatus = 'standard'
 
 
-	onMount(()=> inView = true)
+  onMount(()=> {
+    if (data['status'] == 200) {
+      console.log("logged in")
+      //window.location.href = "/"
+    }
+    inView = true
+  })
 	onDestroy(()=> inView = false)
 
   const openLogin = () => showLogin = !showLogin
@@ -27,71 +35,72 @@
   }
 
   const handleLogin = () => {
+    buttonStatus = 'loading'
     fetch($api + '/login', {
 			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'password':loginPassword})
+      headers: {"Content-Type" : "application/json"},
+      credentials : "include",
+			body: JSON.stringify({'username':loginUsername.trim(), 'password':loginPassword.trim()})
 	  })
       .then(r => r.json())
       .then(d => { 
-        console.log(d)
-        /*
-        if (d == 200) {buttonStatus = 'success'}
-        else {buttonStatus = 'failure'}
-        setTimeout(()=> {
-          buttonStatus = 'standard', 10000
-          showButton = false
-        })
-        */
-    })}
+        if (d == 200) {
+          buttonStatus = 'success'
+          setTimeout(()=> window.location.href = '/', 1000)
+        } else {
+          console.log(d)
+          buttonStatus = 'failure'
+          setTimeout(()=> {
+            buttonStatus = 'standard'
+            loginPassword = ''
+          }, 2000)
+        }
+  })
+  }
 
 </script>
 
 {#if inView}
 <Card width="640px">
   <div class="main-wrapper">
-
-    {#if !showLogin}
-
       <div class="opened-wrapper" in:scale={{delay:400, duration: 120}}>
 
+        <img src="/npfull.svg" alt="Native Planet Logo" />
+
         <div class="login-wrapper">
+          <input
+            id="login-username"
+            bind:value={loginUsername}
+            class="login-password"
+            type="text"
+            placeholder='Username'
+            disabled={buttonStatus != 'standard'}
+          />
           <input
             id="login-password"
             bind:value={loginPassword}
             class="login-password"
             type="password"
+            placeholder='Password'
+            disabled={buttonStatus != 'standard'}
           />
         </div>
 
-        <div class="buttons">
-          <PrimaryButton
-            top=24
-            left={false}
-            standard="Submit Password"
-            on:click={handleLogin}
-          />
-          <PrimaryButton
-            top=12
-            standard="Cancel"
-            background="none"
-            on:click={openLogin}
-          />
-        </div>
+        <PrimaryButton
+          top=24
+          left={false}
+          standard="Login"
+          success="Login successful!"
+          failure="Login failed"
+          loading="Logging you in.."
+          status={
+            (loginPassword.length > 0) && (loginUsername.length > 0)
+            ? buttonStatus : 'disabled'
+          }
+          on:click={handleLogin}
+        />
 
       </div>
-
-    {:else}
-      <div class="closed-wrapper" in:scale={{delay:400, duration: 120}}>
-        <img src="/npfull.svg" alt="Native Planet Logo" />
-        <div>
-          <PrimaryButton
-            standard="Login"
-            on:click={openLogin}
-          />
-        </div>
-      </div>
-    {/if}
   </div>
 </Card>
 {/if}
@@ -99,16 +108,13 @@
 <style>
   .main-wrapper {
     text-align: center;
-    margin: 120px;
-  }
-  .closed-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    align-items: center;
+    margin: 40px 80px;
   }
   .login-wrapper {
+    margin-top: 24px;
     display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .login-password {
     font-size: 12px;
@@ -120,7 +126,17 @@
     font-family: inherit;
     color: inherit;
   }
+  input {
+    text-align: center;
+  }
   input:focus {
     outline: none;
+  }
+  input:disabled {
+    opacity: 0.4;
+  }
+  input::placeholder {
+    color: inherit;
+    opacity: .6;
   }
 </style>

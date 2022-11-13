@@ -11,6 +11,7 @@ export const fadeOut = {duration:200}
 //
 // writable stores
 //
+export const secret = writable('')
 export const codes = writable({})
 export const urbits = writable([])
 export const system = writable({})

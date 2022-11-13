@@ -23,6 +23,7 @@
   const sendMeldPoke = () => {
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
+        credentials: "include",
 		headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({'app':'pier','data':'do-meld'})
 		})
@@ -38,6 +39,7 @@
   const toggleMeldSchedule = () => {
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
+        credentials: "include",
 		headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({'app':'pier','data':'toggle-meld'})
 		})
@@ -49,6 +51,7 @@
   const saveMeldChanges = () => {
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
+        credentials: "include",
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify({'app':'pier','data':'schedule-meld','frequency':cloneFreq,'hour':selectedHour,'minute':selectedMinute})
 		})

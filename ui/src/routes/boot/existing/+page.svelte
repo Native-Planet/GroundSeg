@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -15,6 +16,12 @@
   let allowCancel = true
 
   const hideCancel = () => allowCancel = false
+
+  onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
+  })
 
 </script>
 

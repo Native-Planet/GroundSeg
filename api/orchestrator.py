@@ -76,6 +76,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'apiVersion', 'v1')
         cfg = self.check_config_field(cfg,'wgRegistered', False)
         cfg = self.check_config_field(cfg,'updateMode','auto')
+        cfg = self.check_config_field(cfg, 'sessions', [])
 
         cfg['gsVersion'] = self.gs_version
 
@@ -119,10 +120,58 @@ class Orchestrator:
 #
 
     def handle_login_request(self, data):
-        if 'password' in data:
-            print(data['password'], file=sys.stderr)
-            return 200
+        if ('password' in data) and ('username' in data):
+            import crypt # Interface to crypt(3), to encrypt passwords.
+            import getpass # To get a password from user input.
+            import spwd # Shadow password database (to read /etc/shadow).
+
+            user = data['username']
+            password = data['password']
+
+            try:
+                enc_pwd = spwd.getspnam(user)[1]
+
+                if enc_pwd in ["NP", "!", "", None]:
+                    print(f'User: {user} has no password set', file=sys.stderr)
+                    return 400
+
+                if enc_pwd in ["LK", "*"]:
+                    print(f'User: {user} account is locked', file=sys.stderr)
+                    return 400
+
+                if enc_pwd == "!!":
+                    print(f'User: {user} password has expired', file=sys.stderr)
+                    return 400
+
+                # Encryption happens here, the hash is stripped from the
+                # enc_pwd and the algorithm id and salt are used to encrypt
+                # the password.
+                if crypt.crypt(password, enc_pwd) == enc_pwd:
+                    return 200
+                else:
+                    print(f'User: {user} incorrect password', file=sys.stderr)
+                    return 400
+
+            except KeyError:
+                print(f'User {user} does not exist!', file=sys.stderr)
+                return 400
+
+            print('Login unknown error')
+            return 400
+
         return 400
+
+    def make_cookie(self):
+        secret = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(64))
+
+        self.config['sessions'].append(secret)
+        self.save_config()
+
+        return secret
+
 #
 #   Urbit Pier
 #

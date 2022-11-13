@@ -33,6 +33,9 @@
 
 	// start api loop
 	onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
     update()
     getUrbitCode()
   })
@@ -43,9 +46,16 @@
 	// api call
   const update = () => {
     if (inView) {
-			fetch($api + '/urbit?urbit_id=' + $page.params.patp)
+      fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
+        credentials: "include"
+      })
 			.then(raw => raw.json())
-      .then(res => handleData(res))
+        .then(res => {
+          if (res == 404) {
+            window.location.href = "/login"
+          }
+          handleData(res)
+        })
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)
@@ -70,6 +80,7 @@
     if (inView) {
 			fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
 			  method: 'POST',
+        credentials: "include",
 			  headers: {'Content-Type': 'application/json'},
 			  body: JSON.stringify({'app':'pier','data':'+code'})
 	    })
@@ -79,7 +90,7 @@
         if (d.length == 27) {
           setTimeout(getUrbitCode, 1800000)
         } else {
-          setTimeout(getUrbitCode, 1000000)
+          setTimeout(getUrbitCode, 1000)
         }
       })
   }}

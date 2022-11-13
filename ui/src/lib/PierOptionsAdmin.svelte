@@ -21,8 +21,9 @@
 		fetch($api + '/urbit?urbit_id=' + name, {
   		method: 'POST',
 	  	headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'app':'pier','data':'export'})
-		  })
+      body: JSON.stringify({'app':'pier','data':'export'}),
+      credentials: "include",
+    })
       .then(res => { return res.blob(); })
       .then(d => {
         isLoading = false
@@ -40,6 +41,7 @@
     autostart = !autostart
 		fetch($api + '/urbit?urbit_id=' + name, {
   		method: 'POST',
+        credentials: "include",
 	  	headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({'app':'pier','data':'toggle-autostart'})
 		  })

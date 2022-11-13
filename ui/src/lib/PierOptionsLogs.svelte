@@ -20,6 +20,7 @@
     let module = 'logs'
     fetch($api + '/system?module=' + module, {
 		  method: 'POST',
+        credentials: "include",
 		  headers: {'Content-Type': 'application/json'},
   	  body: JSON.stringify({'action':'export','container':selectedContainer})
 	  })

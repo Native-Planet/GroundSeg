@@ -35,17 +35,22 @@
         }
   	    fetch($api + '/system?module=' + module, {
 			    method: 'POST',
+          credentials: "include",
 			    headers: {'Content-Type': 'application/json'},
   			  body: JSON.stringify({'action':'view','container':container,'haveLine':$currentLog.log.length})
 	      })
         .then(r => r.json())
         .then(d => {
+          if (d == 404) {
+            window.location.href = '/login'
+          } else {
           currentLog.update( s => {
             s['container'] = container
             s['log'] = s['log'].concat(d)
             return s
           })
           setTimeout(getLog, 1000)
+          }
         })
     }}
   }

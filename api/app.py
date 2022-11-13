@@ -1,6 +1,6 @@
 import threading, time, os, zipfile, tarfile, copy, shutil, psutil, sys, requests
 from datetime import datetime
-from flask import Flask, jsonify, request 
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
@@ -11,7 +11,7 @@ orchestrator = Orchestrator("/settings/system.json")
 app = Flask(__name__)
 app.config['TEMP_FOLDER'] = '/tmp/'
 
-CORS(app)
+CORS(app, supports_credentials=True)
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
@@ -78,36 +78,81 @@ threading.Thread(target=anchor_information).start()
 #
 
 # Get all urbits
+
+@app.route("/cookies", methods=['GET'])
+def check_cookies():
+    sessionid = request.args.get('sessionid')
+
+    if sessionid in orchestrator.config['sessions']:
+        return jsonify(200)
+
+    return jsonify(404)
+
 @app.route("/urbits", methods=['GET'])
 def all_urbits():
-    urbs = orchestrator.get_urbits()
-    return jsonify(urbs)
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        urbs = orchestrator.get_urbits()
+        res = make_response(jsonify(urbs))
+        return res
+
+    return jsonify(404)
 
 # Handle urbit ID related requests
 @app.route('/urbit', methods=['GET','POST'])
 def urbit_info():
     urbit_id = request.args.get('urbit_id')
-    
-    if request.method == 'GET':
-        urb = orchestrator.get_urbit(urbit_id)
-    
-        return jsonify(urb)
+    sessionid = request.args.get('sessionid')
 
-    if request.method == 'POST':
-        res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
-        return orchestrator.custom_jsonify(res)
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            urb = orchestrator.get_urbit(urbit_id)
+            return jsonify(urb)
+
+        if request.method == 'POST':
+            res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
+            return orchestrator.custom_jsonify(res)
+
+    return jsonify(404)
 
 # Handle device's system settings
 @app.route("/system", methods=['GET','POST'])
 def system_settings():
-    if request.method == 'GET':
-        settings = orchestrator.get_system_settings()
-        return jsonify(settings)
+    sessionid = request.args.get('sessionid')
 
-    if request.method == 'POST':
-        module = request.args.get('module')
-        res = orchestrator.handle_module_post_request(module, request.get_json())
-        return jsonify(res)
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            settings = orchestrator.get_system_settings()
+            return jsonify(settings)
+
+        if request.method == 'POST':
+            module = request.args.get('module')
+            res = orchestrator.handle_module_post_request(module, request.get_json())
+            return jsonify(res)
+
+    return jsonify(404)
 
 # Handle anchor registration related information
 @app.route("/anchor", methods=['GET'])
@@ -184,7 +229,13 @@ def pier_upload():
 @app.route("/login", methods=['POST'])
 def login():
     res = orchestrator.handle_login_request(request.get_json())
-    return jsonify(res)
+    if res == 200:
+        res = make_response(jsonify(res))
+        res.set_cookie('sessionid', orchestrator.make_cookie())
+    else:
+        res = make_response(jsonify(res))
+
+    return res
 
 if __name__ == '__main__':
     debug_mode = False

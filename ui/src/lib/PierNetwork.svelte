@@ -10,6 +10,7 @@
 		isSwitching = true
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
+        credentials: "include",
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify({'app':'wireguard','data':'toggle'})
 		})

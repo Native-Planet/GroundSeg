@@ -15,10 +15,14 @@
 	  fetch($api + '/urbit?urbit_id=' + n, {
 		  method: 'POST',
 		  headers: {'Content-Type': 'application/json'},
+      credentials: "include",
 		  body: JSON.stringify({'app':'pier','data':'+code'})
 	  })
       .then(r => r.json())
       .then(d => {
+        if (d == 404) {
+          window.location.href = "/login"
+        }
         codes.update(c => {
           c[n] = d
           return c
