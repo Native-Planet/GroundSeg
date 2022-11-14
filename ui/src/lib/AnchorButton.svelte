@@ -1,34 +1,38 @@
 <script>
+  import { afterUpdate } from 'svelte'
   import { page } from '$app/stores'
-
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
-  const hide = () => {
-    return (($page.routeId == 'anchor') || ($page.routeId == 'login'))
-  }
+  let hide = false
+  let blur = false
+  afterUpdate(()=> {
+    hide = ($page.routeId == 'login')
+    blur = ($page.routeId == 'anchor')
+  })
 
 </script>
 
-<a href='/anchor'>
-  <div class="img" class:inverted={hide}>
+<a href='/anchor' class:hide={hide} class:blur={blur}>
+  <div class="img">
     <Fa icon={faSatelliteDish} size="1.2x" />
   </div>
-  <!--
-  <img src="/settings.svg" alt="Settings Icon" />
-  -->
 </a>
 
 <style>
-  .inverted {
-    opacity: 0.2;
+  .blur {
+    opacity: .2;
     pointer-events: none;
     filter: blur(2px);
+  }
+  .hide {
+    opacity: 0;
+    pointer-events: none;
   }
 	a {
 		position:absolute;
 		left: 44px;
     top: 3px;
 	}
-  .img {height: 24px; margin: 20px; color: white;}
+  .img {height: 24px; margin: 20px; color: white}
 </style>

@@ -21,7 +21,7 @@
   onMount(()=> {
     if (data['status'] == 200) {
       console.log("logged in")
-      //window.location.href = "/"
+      window.location.href = "/"
     }
     inView = true
   })

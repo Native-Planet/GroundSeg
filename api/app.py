@@ -176,65 +176,80 @@ def anchor_settings():
 # Pier upload
 @app.route("/upload", methods=['POST'])
 def pier_upload():
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
     
-    # Uploaded pier
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-
-    fn = save_path = f'/tmp/{filename}'
-    current_chunk = int(request.form['dzchunkindex'])
+        # Uploaded pier
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        patp = filename.split('.')[0]
         
-    if os.path.exists(save_path) and current_chunk == 0:
-        # 400 and 500s will tell dropzone that an error occurred and show an error
-        os.remove(os.path.join(app.config['TEMP_FOLDER'], filename))
-        # File already exists
-        return jsonify(200)
+        # Create subfolder
+        file_subfolder = f"{app.config['TEMP_FOLDER']}{patp}"
+        os.system(f"mkdir -p {file_subfolder}")
 
-    try:
-        with open(save_path, 'ab') as f:
-            f.seek(int(request.form['dzchunkbyteoffset']))
-            f.write(file.stream.read())
-    except OSError:
-        # log.exception will include the traceback so we can see what's wrong
-        # Could not write to file
-        return jsonify(500)
-
-    total_chunks = int(request.form['dztotalchunkcount'])
-
-    if current_chunk + 1 == total_chunks:
-        # This was the last chunk, the file should be complete and the size we expect
-        if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
-            # size mismatch
-            return jsonify(501)
-        else:
-
-            # Extract pier
-            try:
-                if filename.endswith("zip"):
-                    with zipfile.ZipFile(fn) as zip_ref:
-                        zip_ref.extractall('/tmp/')
-
-                elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                    tar = tarfile.open(fn,"r:gz")
-                    tar.extractall(app.config['TEMP_FOLDER'])
-                    tar.close()
-
-            except Exception as e:
-                return jsonify(e)
+        fn = save_path = f"{app.config['TEMP_FOLDER']}{patp}/{filename}"
+        current_chunk = int(request.form['dzchunkindex'])
             
-            os.remove(os.path.join(app.config['TEMP_FOLDER'], filename))
-            
-            patp = filename.split('.')[0]
-            res = orchestrator.boot_existing_urbit(patp)
-            if res == 0:
-                return jsonify(200)
-            else:
-                return jsonify(400)
-
+        if os.path.exists(save_path) and current_chunk == 0:
+            # 400 and 500s will tell dropzone that an error occurred and show an error
+            os.remove(save_path)
+            # File already exists
             return jsonify(200)
 
-    else:
-        return jsonify(501)
+        try:
+            with open(save_path, 'ab') as f:
+                f.seek(int(request.form['dzchunkbyteoffset']))
+                f.write(file.stream.read())
+        except OSError:
+            # log.exception will include the traceback so we can see what's wrong
+            # Could not write to file
+            return jsonify(500)
+
+        total_chunks = int(request.form['dztotalchunkcount'])
+
+        if current_chunk + 1 == total_chunks:
+            # This was the last chunk, the file should be complete and the size we expect
+            if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
+                # size mismatch
+                return jsonify(501)
+            else:
+
+                # Extract pier
+                try:
+                    if filename.endswith("zip"):
+                        with zipfile.ZipFile(fn) as zip_ref:
+                            zip_ref.extractall(file_subfolder)
+
+                    elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
+                        tar = tarfile.open(fn,"r:gz")
+                        tar.extractall(file_subfolder)
+                        tar.close()
+
+                except Exception as e:
+                    return jsonify(e)
+                
+                os.remove(save_path)
+                
+                res = orchestrator.boot_existing_urbit(patp)
+                if res == 0:
+                    return jsonify(200)
+                else:
+                    return jsonify(400)
+
+                return jsonify(200)
+
+        else:
+            return jsonify(501)
+
+    return jsonify(404)
 
 # Login
 @app.route("/login", methods=['POST'])

@@ -23,7 +23,7 @@ class Orchestrator:
     _core_temp = None
     _disk = None
     gs_version = 'Beta-3.0.0'
-    anchor_config = {'lease': None}
+    anchor_config = {'lease': None,'ongoing': None}
 
 #
 #   init
@@ -468,7 +468,7 @@ class Orchestrator:
         vol_dir = f'/var/lib/docker/volumes/{patp}'
         os.system(f'rm -r {vol_dir}')
         os.system(f'mkdir -p {vol_dir}')
-        os.system(f'cp -R /tmp {vol_dir}/_data') 
+        os.system(f'cp -R /tmp/{patp} {vol_dir}/_data') 
 
         urbit = UrbitDocker(data)
 
@@ -515,7 +515,7 @@ class Orchestrator:
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
                     if(patp in ep['url']):
-                        print(f"{patp} already exists")
+                        print(f"{patp} already exists", file=sys.stderr)
                         patp_reg = True
 
             if patp_reg == False:
