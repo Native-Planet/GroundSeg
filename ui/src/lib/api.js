@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store'
 
-export const dev = true
+export const dev = false
 
 //
 // fade transition params

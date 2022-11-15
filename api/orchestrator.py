@@ -13,6 +13,7 @@ class Orchestrator:
 #
 #   Variables
 #
+    service_restart = False
     config = {}
     _urbits = {}
     _minios = {}
@@ -22,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.0.0'
+    gs_version = 'Beta-3.1.0'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -35,6 +36,10 @@ class Orchestrator:
         # load existing or create new system.json
         self.config = self.load_config(config_file)
         print(f'Loaded system JSON', file=sys.stderr)
+
+        if self.service_restart == True:
+            self.service_restart = False
+            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
 
         # if first boot, set up keys
         if self.config['firstBoot']:
@@ -77,6 +82,75 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'wgRegistered', False)
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
+
+        # update files outside of of docker
+        if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
+            print("Updating system files...", file=sys.stderr)
+            with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
+                docker_text = """---
+version: "3.9"
+services:
+  api:
+    image: nativeplanet/groundseg_api:latest
+    container_name: groundseg_api
+    privileged: true
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    ports:
+      - 27016:27016
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
+      - /etc/shadow:/etc/shadow
+      - /etc/systemd/:/etc/systemd
+      - settings:/settings
+
+  webui:
+    image: nativeplanet/groundseg_webui:latest
+    container_name: groundseg_webui
+    privileged: true
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    ports:
+      - 80:3000
+
+    volumes:
+      settings:
+"""
+
+                f.write(docker_text)
+                f.close()
+
+            with open('/etc/systemd/system/groundseg.service', 'w') as f:
+                service_text = """[Unit]
+Description=NativePlanet GroundSeg Controller
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+User=root
+WorkingDirectory=/opt/nativeplanet/groundseg/
+ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
+ExecStop=docker compose down
+[Install]
+WantedBy=multi-user.target
+"""
+
+                f.write(service_text)
+                f.close()
+
+            with open('/opt/nativeplanet/groundseg/opencmd.sh', 'w') as f:
+                cmd_text = '#!/bin/bash\nwhile true; do eval "$(cat commands)"; done'
+                f.write(cmd_text)
+                f.close()
+
+            self.service_restart = True
 
         cfg['gsVersion'] = self.gs_version
 
@@ -716,12 +790,12 @@ class Orchestrator:
 
     # Shutdown
     def shutdown(self):
-        os.system("echo 'shutdown' > /commands")
+        os.system("echo 'shutdown -h now' > /opt/nativeplanet/groundseg/commands")
         return 200
 
     # Restart
     def restart(self):
-        os.system("echo 'restart' > /commands")
+        os.system("echo 'reboot' > /opt/nativeplanet/groundseg/commands")
         return 200
 
     # Get list of available docker containers
