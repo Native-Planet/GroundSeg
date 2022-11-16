@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.1.0'
+    gs_version = 'Beta-3.1.1'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -519,13 +519,18 @@ WantedBy=multi-user.target
             json.dump(data, f, indent = 4)
     
         vol_dir = f'/var/lib/docker/volumes/{patp}'
-        os.system(f'rm -r {vol_dir}')
+
+        print(f"Removing existing volume for {patp}",file=sys.stderr)
+        os.system(f'rm -rf {vol_dir}')
+
+        print(f"Creating volume directory for {patp}",file=sys.stderr)
         os.system(f'mkdir -p {vol_dir}')
-        os.system(f'cp -R /tmp/{patp} {vol_dir}/_data') 
 
+        print(f"Moving {patp} pier from /tmp/{patp} to volume directory",file=sys.stderr)
+        os.system(f'mv /tmp/{patp} {vol_dir}/_data') 
+
+        print(f"Building docker container",file=sys.stderr)
         urbit = UrbitDocker(data)
-
-        shutil.rmtree(f'/tmp/{patp}')
 
         return self.add_urbit(patp, urbit)
 
