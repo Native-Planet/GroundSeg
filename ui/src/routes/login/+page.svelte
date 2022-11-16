@@ -14,7 +14,6 @@
     showLogin = false,
     pwdView = false,
     loginPassword = '',
-    loginUsername = '',
     buttonStatus = 'standard'
 
 
@@ -27,8 +26,6 @@
   })
 	onDestroy(()=> inView = false)
 
-  const openLogin = () => showLogin = !showLogin
-
   const togglePwdView = () => {
     pwdView = !pwdView
     document.querySelector('#login-password').type = pwdView ? 'text' : 'password'
@@ -40,7 +37,7 @@
 			method: 'POST',
       headers: {"Content-Type" : "application/json"},
       credentials : "include",
-			body: JSON.stringify({'username':loginUsername.trim(), 'password':loginPassword.trim()})
+			body: JSON.stringify({'password':loginPassword.trim()})
 	  })
       .then(r => r.json())
       .then(d => { 
@@ -69,14 +66,6 @@
 
         <div class="login-wrapper">
           <input
-            id="login-username"
-            bind:value={loginUsername}
-            class="login-password"
-            type="text"
-            placeholder='Username'
-            disabled={buttonStatus != 'standard'}
-          />
-          <input
             id="login-password"
             bind:value={loginPassword}
             class="login-password"
@@ -93,10 +82,7 @@
           success="Login successful!"
           failure="Login failed"
           loading="Logging you in.."
-          status={
-            (loginPassword.length > 0) && (loginUsername.length > 0)
-            ? buttonStatus : 'disabled'
-          }
+          status={loginPassword.length > 0 ? buttonStatus : 'disabled'}
           on:click={handleLogin}
         />
 

@@ -1,11 +1,13 @@
 <script>
   import { api } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
+  import ModifyPassword from '$lib/ModifyPassword.svelte'
 
   export let sessions
 
   let loading = false
   let loadingAll = false
+  let modPass = false
 
   const logoutSessions = () => {
     loading = true
@@ -51,25 +53,35 @@
   <div class="title-wrapper">
     <div class="title">Security</div>
   </div>
-    <div class="button-wrapper">
-      <PrimaryButton 
-        background="black"
-        standard="Logout"
-        loading="Logging out..."
-        status={loading ? "loading" : "standard"}
-        on:click={logoutSessions}
-      />
-    {#if sessions > 1}
-      <PrimaryButton 
-        left={false}
-        background="#ffffff4d"
-        standard="Logout everywhere"
-        loading="Logging out of all sessions"
-        status={loadingAll ? "loading" : "standard"}
-        on:click={logoutAll}
-      />
+    {#if modPass}
+      <ModifyPassword on:cancel={()=>modPass = false} />
+    {:else}
+
+      <div class="button-wrapper">
+        <PrimaryButton 
+          standard="Modify Password"
+          on:click={()=>modPass = true}
+        />
+        <PrimaryButton 
+          background="black"
+          noMargin={true}
+          standard="Logout"
+          loading="Logging out..."
+          status={loading ? "loading" : "standard"}
+          on:click={logoutSessions}
+        />
+        {#if sessions > 1}
+        <PrimaryButton 
+          noMargin={true}
+          background="#ffffff4d"
+          standard="Logout All"
+          loading="Logging out of all sessions"
+          status={loadingAll ? "loading" : "standard"}
+          on:click={logoutAll}
+        />
+        {/if}
+      </div>
     {/if}
-    </div>
 </div>
 
 <style>

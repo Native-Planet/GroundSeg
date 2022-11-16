@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string, hashlib
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -37,10 +37,6 @@ class Orchestrator:
         self.config = self.load_config(config_file)
         print(f'Loaded system JSON', file=sys.stderr)
 
-        if self.service_restart == True:
-            self.service_restart = False
-            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
-
         # if first boot, set up keys
         if self.config['firstBoot']:
             self.reset_pubkey()
@@ -48,6 +44,16 @@ class Orchestrator:
         
         # save the latest config to file
         self.save_config()
+
+        # Service restart
+        if self.service_restart == True and self.config != None:
+            print("Service restarting...", file=sys.stderr)
+
+            self.service_restart = False
+            os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
+            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
+            os.system("echo 'systemctl daemon-reload' > /commands")
+            os.system("echo 'systemctl restart groundseg' > /commands")
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
@@ -60,6 +66,10 @@ class Orchestrator:
 
         # load urbit ships
         self.load_urbits()
+
+        # Create password if doesn't exist
+        if len(self.config['pwHash']) < 1:
+            self.create_password('nativeplanet')
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
@@ -82,6 +92,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'wgRegistered', False)
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
+        cfg = self.check_config_field(cfg, 'pwHash', '')
 
         # update files outside of of docker
         if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
@@ -120,8 +131,8 @@ services:
     ports:
       - 80:3000
 
-    volumes:
-      settings:
+volumes:
+  settings:
 """
 
                 f.write(docker_text)
@@ -194,44 +205,12 @@ WantedBy=multi-user.target
 #
 
     def handle_login_request(self, data):
-        if ('password' in data) and ('username' in data):
-            import crypt # Interface to crypt(3), to encrypt passwords.
-            import getpass # To get a password from user input.
-            import spwd # Shadow password database (to read /etc/shadow).
+        if 'password' in data:
+            encoded_str = (self.config['salt'] + data['password']).encode('utf-8')
+            this_hash = hashlib.sha512(encoded_str).hexdigest()
 
-            user = data['username']
-            password = data['password']
-
-            try:
-                enc_pwd = spwd.getspnam(user)[1]
-
-                if enc_pwd in ["NP", "!", "", None]:
-                    print(f'User: {user} has no password set', file=sys.stderr)
-                    return 400
-
-                if enc_pwd in ["LK", "*"]:
-                    print(f'User: {user} account is locked', file=sys.stderr)
-                    return 400
-
-                if enc_pwd == "!!":
-                    print(f'User: {user} password has expired', file=sys.stderr)
-                    return 400
-
-                # Encryption happens here, the hash is stripped from the
-                # enc_pwd and the algorithm id and salt are used to encrypt
-                # the password.
-                if crypt.crypt(password, enc_pwd) == enc_pwd:
-                    return 200
-                else:
-                    print(f'User: {user} incorrect password', file=sys.stderr)
-                    return 400
-
-            except KeyError:
-                print(f'User {user} does not exist!', file=sys.stderr)
-                return 400
-
-            print('Login unknown error')
-            return 400
+            if this_hash == self.config['pwHash']:
+                return 200
 
         return 400
 
@@ -718,6 +697,13 @@ WantedBy=multi-user.target
                 self.save_config()
                 return 200
 
+            if data['action'] == 'change-pass':
+                encoded_str = (self.config['salt'] + data['old-pass']).encode('utf-8')
+                this_hash = hashlib.sha512(encoded_str).hexdigest()
+
+                if this_hash == self.config['pwHash']:
+                    self.create_password(data['new-pass'])
+                    return 200
 
         # anchor module
         if module == 'anchor':
@@ -1003,6 +989,23 @@ WantedBy=multi-user.target
             blob = self._urbits[container].logs()
 
         return blob.decode('utf-8').split('\n')[line:]
+
+    # Create new password
+    def create_password(self, pwd):
+        # create salt
+        salt = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(16))
+
+        # make hash
+        encoded_str = (salt + pwd).encode('utf-8')
+        hashed = hashlib.sha512(encoded_str).hexdigest()
+
+        # add to config
+        self.config['salt'] = salt
+        self.config['pwHash'] = hashed
+        self.save_config()
 
     # Custom jsonify
     def custom_jsonify(self, val):
