@@ -6,7 +6,6 @@ class Wireguard:
 
     _headers = {"Content-Type": "application/json"}
 
-
     def __init__(self, config):
         self.config = config
         data = None
@@ -39,32 +38,64 @@ class Wireguard:
         if(self.wg_docker.is_running()):
             self.wg_docker.stop()
 
+#
+#   Wireguard Docker commands
+#
 
+    # Start container
     def start(self):
         self.wg_docker.start()
 
+    # Stop container
     def stop(self):
         self.wg_docker.stop()
 
-    def register_device(self, reg_code, url):
-        # /v1/register
-        update_data = {
-            "reg_code" : f"{reg_code}",
-            "pubkey":self.config['pubkey']
-        }
-        headers = {"Content-Type": "application/json"}
+#
+#   StarTram endpoints
+#
 
+    # /v1/register
+    def register_device(self, reg_code, url):
+        update_data = {"reg_code" : f"{reg_code}","pubkey":self.config['pubkey']}
         response = None
+
         try:
-            response = requests.post(f'{url}/register',json=update_data,headers=headers).json()
+            return requests.post(f'{url}/register',json=update_data,headers=self._headers).json()
+
         except Exception as e:
-            print(f"register device {e}")
+            print(f"/register failed: {e}", file=sys.stderr)
             return None
 
-        return(response['lease'])
+    # /v1/retrieve
+    def get_status(self,url):
+        response = None
+        full_url = f'{url}/retrieve?pubkey={self.config["pubkey"]}'
 
+        err_count = 0
+
+        while err_count < 6:
+            try:
+                response = requests.get(full_url,headers=self._headers).json()
+                break
+
+            except Exception as e:
+                print(f"/retrieve failed: {e}",file=sys.stderr)
+                err_count = err_count + 1
+
+        try:
+            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
+            self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
+            # Setup and start the local wg client
+            self.wg_docker.add_config(self.wg_config)
+
+        except Exception as e:
+            print(f"wg_config err: {e}", file=sys.stderr)
+            return None
+
+        return response
+
+    # /v1/create
     def register_service(self, subdomain, service_type, url):
-        # /v1/create
         update_data = {
             "subdomain" : f"{subdomain}",
             "pubkey":self.config['pubkey'],
@@ -120,7 +151,8 @@ class Wireguard:
         try:
             response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
             if response['error'] == 0:
-                return 200
+                return self.get_status(url)
+
             print(response, file=sys.stderr)
             return 400
 
@@ -128,54 +160,5 @@ class Wireguard:
             print(f'err: {e}', file=sys.stderr)
             return 400
 
-    def get_status(self,url):
-        headers = {"Content-Type": "application/json"}
-        response = None
-
-        try:
-            response = requests.get(
-                    f'{url}/retrieve?pubkey={self.config["pubkey"]}',
-                    headers=headers).json()
-        except Exception as e:
-            print(e)
-
-        count =0
-        while ((response['conf'] == None) and (count > 6)):
-            try:
-                response = requests.get(
-                        f'{url}/retrieve?pubkey={self.config["pubkey"]}',
-                        headers=headers).json()
-            except Exception as e:
-                print(e)
-            count = count +1
-
-        try:
-            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
-
-            self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
-            # Setup and start the local wg client
-            self.wg_docker.addConfig(self.wg_config)
-        except Exception as e:
-            print(response)
-            print(f"get Status {e}")
-            return None
-
-        return response
- 
-
-    def setupWireguard(self, patp):
-        # Setup the wireguard server
-        response = self.check_wireguard();
-        if response['error']==1:
-            self.wg_config = self.create_wireguard(patp).decode('utf-8')
-        else:
-            print(response)
-            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
-
-        self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
-        # Setup and start the local wg client
-        self.wg_docker.addConfig(self.wg_config)
-
     def is_running(self):
         return self.wg_docker.is_running()
-

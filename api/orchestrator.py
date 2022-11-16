@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string, hashlib
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -13,6 +13,7 @@ class Orchestrator:
 #
 #   Variables
 #
+    service_restart = False
     config = {}
     _urbits = {}
     _minios = {}
@@ -22,8 +23,8 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.0.0'
-    _lease = None
+    gs_version = 'Beta-3.1.0'
+    anchor_config = {'lease': None,'ongoing': None}
 
 #
 #   init
@@ -44,6 +45,16 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
+        # Service restart
+        if self.service_restart == True and self.config != None:
+            print("Service restarting...", file=sys.stderr)
+
+            self.service_restart = False
+            os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
+            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
+            os.system("echo 'systemctl daemon-reload' > /commands")
+            os.system("echo 'systemctl restart groundseg' > /commands")
+
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         if self.config['wgRegistered']:
@@ -55,6 +66,10 @@ class Orchestrator:
 
         # load urbit ships
         self.load_urbits()
+
+        # Create password if doesn't exist
+        if len(self.config['pwHash']) < 1:
+            self.create_password('nativeplanet')
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
@@ -76,6 +91,77 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'apiVersion', 'v1')
         cfg = self.check_config_field(cfg,'wgRegistered', False)
         cfg = self.check_config_field(cfg,'updateMode','auto')
+        cfg = self.check_config_field(cfg, 'sessions', [])
+        cfg = self.check_config_field(cfg, 'pwHash', '')
+
+        # update files outside of of docker
+        if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
+            print("Updating system files...", file=sys.stderr)
+            with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
+                docker_text = """---
+version: "3.9"
+services:
+  api:
+    image: nativeplanet/groundseg_api:latest
+    container_name: groundseg_api
+    privileged: true
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    ports:
+      - 27016:27016
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
+      - /etc/shadow:/etc/shadow
+      - /etc/systemd/:/etc/systemd
+      - settings:/settings
+
+  webui:
+    image: nativeplanet/groundseg_webui:latest
+    container_name: groundseg_webui
+    privileged: true
+    environment:
+      - HOST_HOSTNAME=${HOST_HOSTNAME}
+    labels:
+      com.centurylinklabs.watchtower.enable: true
+    ports:
+      - 80:3000
+
+volumes:
+  settings:
+"""
+
+                f.write(docker_text)
+                f.close()
+
+            with open('/etc/systemd/system/groundseg.service', 'w') as f:
+                service_text = """[Unit]
+Description=NativePlanet GroundSeg Controller
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+User=root
+WorkingDirectory=/opt/nativeplanet/groundseg/
+ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
+ExecStop=docker compose down
+[Install]
+WantedBy=multi-user.target
+"""
+
+                f.write(service_text)
+                f.close()
+
+            with open('/opt/nativeplanet/groundseg/opencmd.sh', 'w') as f:
+                cmd_text = '#!/bin/bash\nwhile true; do eval "$(cat commands)"; done'
+                f.write(cmd_text)
+                f.close()
+
+            self.service_restart = True
 
         cfg['gsVersion'] = self.gs_version
 
@@ -105,14 +191,39 @@ class Orchestrator:
 
             self._urbits[p] = UrbitDocker(data)
 
-            if data['minio_password'] != '':
+            if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
 
-            if p in self.config['autostart']:
+            if p in self.config['autostart'] and not self._urbits[p].running:
                 self._urbits[p].start()
 
         print(f'Urbit Piers loaded', file=sys.stderr)
+
+#
+#   Login
+#
+
+    def handle_login_request(self, data):
+        if 'password' in data:
+            encoded_str = (self.config['salt'] + data['password']).encode('utf-8')
+            this_hash = hashlib.sha512(encoded_str).hexdigest()
+
+            if this_hash == self.config['pwHash']:
+                return 200
+
+        return 400
+
+    def make_cookie(self):
+        secret = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(64))
+
+        self.config['sessions'].append(secret)
+        self.save_config()
+
+        return secret
 
 #
 #   Urbit Pier
@@ -410,7 +521,7 @@ class Orchestrator:
         vol_dir = f'/var/lib/docker/volumes/{patp}'
         os.system(f'rm -r {vol_dir}')
         os.system(f'mkdir -p {vol_dir}')
-        os.system(f'cp -R /tmp {vol_dir}/_data') 
+        os.system(f'cp -R /tmp/{patp} {vol_dir}/_data') 
 
         urbit = UrbitDocker(data)
 
@@ -457,7 +568,7 @@ class Orchestrator:
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
                     if(patp in ep['url']):
-                        print(f"{patp} already exists")
+                        print(f"{patp} already exists", file=sys.stderr)
                         patp_reg = True
 
             if patp_reg == False:
@@ -471,7 +582,7 @@ class Orchestrator:
             s3_port = None
             console_port = None
 
-            print(self.anchor_config['subdomains'])
+            print(self.anchor_config['subdomains'], file=sys.stderr)
             pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
             for ep in self.anchor_config['subdomains']:
                 if(f'{patp}.{pub_url}' == ep['url']):
@@ -532,15 +643,21 @@ class Orchestrator:
     def get_anchor_settings(self):
 
         lease_end = None
+        ongoing = False
+        lease = self.anchor_config['lease']
 
-        if self._lease != None:
-            x = list(map(int,self._lease.split('-')))
+        if self.anchor_config['ongoing'] == 1:
+            ongoing = True
+
+        if lease != None:
+            x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
 
         anchor = dict()
         anchor['wgReg'] = self.config['wgRegistered']
         anchor['wgRunning'] = self.wireguard.is_running()
         anchor['lease'] = lease_end
+        anchor['ongoing'] = ongoing
 
         return {'anchor': anchor}
 
@@ -561,11 +678,32 @@ class Orchestrator:
         settings['minio'] = self.minIO_on
         settings['connected'] = self.get_connection_status()
         settings['containers'] = self.get_containers()
+        settings['sessions'] = len(self.config['sessions'])
 
         return {'system': settings}
 
     # Modify system settings
-    def handle_module_post_request(self, module, data):
+    def handle_module_post_request(self, module, data, sessionid):
+
+        # sessions module
+        if module == 'session':
+            if data['action'] == 'logout':
+                self.config['sessions'] = [i for i in self.config['sessions'] if i != sessionid]
+                self.save_config()
+                return 200
+
+            if data['action'] == 'logout-all':
+                self.config['sessions'] = []
+                self.save_config()
+                return 200
+
+            if data['action'] == 'change-pass':
+                encoded_str = (self.config['salt'] + data['old-pass']).encode('utf-8')
+                this_hash = hashlib.sha512(encoded_str).hexdigest()
+
+                if this_hash == self.config['pwHash']:
+                    self.create_password(data['new-pass'])
+                    return 200
 
         # anchor module
         if module == 'anchor':
@@ -588,7 +726,11 @@ class Orchestrator:
                 endpoint = self.config['endpointUrl']
                 api_version = self.config['apiVersion']
                 url = f'https://{endpoint}/{api_version}'
-                return self.wireguard.cancel_subscription(data['key'],url)
+                x = self.wireguard.cancel_subscription(data['key'],url)
+                if x != 400:
+                    self.anchor_config = x
+                    return 200
+
 
         # power module
         if module == 'power':
@@ -634,12 +776,12 @@ class Orchestrator:
 
     # Shutdown
     def shutdown(self):
-        os.system("echo 'shutdown' > /commands")
+        os.system("echo 'shutdown -h now' > /opt/nativeplanet/groundseg/commands")
         return 200
 
     # Restart
     def restart(self):
-        os.system("echo 'restart' > /commands")
+        os.system("echo 'reboot' > /opt/nativeplanet/groundseg/commands")
         return 200
 
     # Get list of available docker containers
@@ -755,30 +897,41 @@ class Orchestrator:
         if x == None:
             return 400
 
-        time.sleep(2)
+        print(f'/register response: {x}',file=sys.stderr)
+
+        if x['error'] != 0:
+            return 400
+
         self.anchor_config = self.wireguard.get_status(url)
 
         if(self.anchor_config != None):
-           print("starting wg")
+           print("Starting Wireguard", file=sys.stderr)
            self.wireguard.start()
            self.config['wgRegistered'] = True
            time.sleep(2)
            
-           print("reg urbits")
+           print("Registering Urbits", file=sys.stderr)
            for p in self.config['piers']:
               self.register_urbit(p)
 
-           print("starting minIOs")
+           print("Starting minIOs", file=sys.stderr)
            self.toggle_minios_on()
            self.save_config()
 
            return 200
+
         return 400
 
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
+        old_url = self.config['endpointUrl']
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
+
+        for patp in self.config['piers']:
+            self.wireguard.delete_service(f'{patp}','urbit',old_url)
+            self.wireguard.delete_service(f's3.{patp}','minio',old_url)
+
         self.toggle_anchor_off()
         self.reset_pubkey()
         self.save_config()
@@ -836,6 +989,23 @@ class Orchestrator:
             blob = self._urbits[container].logs()
 
         return blob.decode('utf-8').split('\n')[line:]
+
+    # Create new password
+    def create_password(self, pwd):
+        # create salt
+        salt = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(16))
+
+        # make hash
+        encoded_str = (salt + pwd).encode('utf-8')
+        hashed = hashlib.sha512(encoded_str).hexdigest()
+
+        # add to config
+        self.config['salt'] = salt
+        self.config['pwHash'] = hashed
+        self.save_config()
 
     # Custom jsonify
     def custom_jsonify(self, val):

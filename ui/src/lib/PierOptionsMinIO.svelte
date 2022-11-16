@@ -13,6 +13,7 @@
       linkButtonStatus = 'loading'
 			fetch($api + '/urbit?urbit_id=' + name, {
 			method: 'POST',
+        credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'app':'pier','data':'s3-update'})
 	  })
@@ -31,6 +32,7 @@
     exportBucketStatus = 'loading'
 		fetch($api + '/urbit?urbit_id=' + name, {
 			method: 'POST',
+        credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'app':'minio','data':'export'})
 	  })

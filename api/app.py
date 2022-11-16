@@ -1,6 +1,6 @@
 import threading, time, os, zipfile, tarfile, copy, shutil, psutil, sys, requests
 from datetime import datetime
-from flask import Flask, jsonify, request 
+from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
@@ -11,7 +11,7 @@ orchestrator = Orchestrator("/settings/system.json")
 app = Flask(__name__)
 app.config['TEMP_FOLDER'] = '/tmp/'
 
-CORS(app)
+CORS(app, supports_credentials=True)
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
@@ -28,12 +28,15 @@ def anchor_information():
                         f'https://{url}/v1/retrieve?pubkey={pubkey}',
                         headers=headers).json()
             
-                orchestrator._lease = response['lease']
+                orchestrator.anchor_config = response
+                print(response, file=sys.stderr)
                 time.sleep(60 * 60 * 12)
 
             except Exception as e:
                 print(e, file=sys.stderr)
                 time.sleep(60)
+        else:
+            time.sleep(60)
 
 # Constantly update system information
 def sys_monitor():
@@ -76,108 +79,189 @@ threading.Thread(target=anchor_information).start()
 #
 
 # Get all urbits
+
+@app.route("/cookies", methods=['GET'])
+def check_cookies():
+    sessionid = request.args.get('sessionid')
+
+    if sessionid in orchestrator.config['sessions']:
+        return jsonify(200)
+
+    return jsonify(404)
+
 @app.route("/urbits", methods=['GET'])
 def all_urbits():
-    urbs = orchestrator.get_urbits()
-    return jsonify(urbs)
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        urbs = orchestrator.get_urbits()
+        res = make_response(jsonify(urbs))
+        return res
+
+    return jsonify(404)
 
 # Handle urbit ID related requests
 @app.route('/urbit', methods=['GET','POST'])
 def urbit_info():
     urbit_id = request.args.get('urbit_id')
-    
-    if request.method == 'GET':
-        urb = orchestrator.get_urbit(urbit_id)
-    
-        return jsonify(urb)
+    sessionid = request.args.get('sessionid')
 
-    if request.method == 'POST':
-        res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
-        return orchestrator.custom_jsonify(res)
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            urb = orchestrator.get_urbit(urbit_id)
+            return jsonify(urb)
+
+        if request.method == 'POST':
+            res = orchestrator.handle_urbit_post_request(urbit_id, request.get_json())
+            return orchestrator.custom_jsonify(res)
+
+    return jsonify(404)
 
 # Handle device's system settings
 @app.route("/system", methods=['GET','POST'])
 def system_settings():
-    if request.method == 'GET':
-        settings = orchestrator.get_system_settings()
-        return jsonify(settings)
+    sessionid = request.args.get('sessionid')
 
-    if request.method == 'POST':
-        module = request.args.get('module')
-        res = orchestrator.handle_module_post_request(module, request.get_json())
-        return jsonify(res)
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            settings = orchestrator.get_system_settings()
+            return jsonify(settings)
+
+        if request.method == 'POST':
+            module = request.args.get('module')
+            res = orchestrator.handle_module_post_request(module, request.get_json(), sessionid)
+            return jsonify(res)
+
+    return jsonify(404)
 
 # Handle anchor registration related information
 @app.route("/anchor", methods=['GET'])
 def anchor_settings():
-    if request.method == 'GET':
-        settings = orchestrator.get_anchor_settings()
-        return jsonify(settings)
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+
+        if request.method == 'GET':
+            settings = orchestrator.get_anchor_settings()
+            return jsonify(settings)
 
 
 # Pier upload
 @app.route("/upload", methods=['POST'])
 def pier_upload():
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
     
-    # Uploaded pier
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-
-    fn = save_path = f'/tmp/{filename}'
-    current_chunk = int(request.form['dzchunkindex'])
+        # Uploaded pier
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        patp = filename.split('.')[0]
         
-    if os.path.exists(save_path) and current_chunk == 0:
-        # 400 and 500s will tell dropzone that an error occurred and show an error
-        os.remove(os.path.join(app.config['TEMP_FOLDER'], filename))
-        # File already exists
-        return jsonify(200)
+        # Create subfolder
+        file_subfolder = f"{app.config['TEMP_FOLDER']}{patp}"
+        os.system(f"mkdir -p {file_subfolder}")
 
-    try:
-        with open(save_path, 'ab') as f:
-            f.seek(int(request.form['dzchunkbyteoffset']))
-            f.write(file.stream.read())
-    except OSError:
-        # log.exception will include the traceback so we can see what's wrong
-        # Could not write to file
-        return jsonify(500)
-
-    total_chunks = int(request.form['dztotalchunkcount'])
-
-    if current_chunk + 1 == total_chunks:
-        # This was the last chunk, the file should be complete and the size we expect
-        if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
-            # size mismatch
-            return jsonify(501)
-        else:
-
-            # Extract pier
-            try:
-                if filename.endswith("zip"):
-                    with zipfile.ZipFile(fn) as zip_ref:
-                        zip_ref.extractall('/tmp/')
-
-                elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                    tar = tarfile.open(fn,"r:gz")
-                    tar.extractall(app.config['TEMP_FOLDER'])
-                    tar.close()
-
-            except Exception as e:
-                return jsonify(e)
+        fn = save_path = f"{app.config['TEMP_FOLDER']}{patp}/{filename}"
+        current_chunk = int(request.form['dzchunkindex'])
             
-            os.remove(os.path.join(app.config['TEMP_FOLDER'], filename))
-            
-            patp = filename.split('.')[0]
-            res = orchestrator.boot_existing_urbit(patp)
-            if res == 0:
-                return jsonify(200)
-            else:
-                return jsonify(400)
-
+        if os.path.exists(save_path) and current_chunk == 0:
+            # 400 and 500s will tell dropzone that an error occurred and show an error
+            os.remove(save_path)
+            # File already exists
             return jsonify(200)
 
-    else:
-        return jsonify(501)
+        try:
+            with open(save_path, 'ab') as f:
+                f.seek(int(request.form['dzchunkbyteoffset']))
+                f.write(file.stream.read())
+        except OSError:
+            # log.exception will include the traceback so we can see what's wrong
+            # Could not write to file
+            return jsonify(500)
 
+        total_chunks = int(request.form['dztotalchunkcount'])
+
+        if current_chunk + 1 == total_chunks:
+            # This was the last chunk, the file should be complete and the size we expect
+            if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
+                # size mismatch
+                return jsonify(501)
+            else:
+
+                # Extract pier
+                try:
+                    if filename.endswith("zip"):
+                        with zipfile.ZipFile(fn) as zip_ref:
+                            zip_ref.extractall(file_subfolder)
+
+                    elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
+                        tar = tarfile.open(fn,"r:gz")
+                        tar.extractall(file_subfolder)
+                        tar.close()
+
+                except Exception as e:
+                    return jsonify(e)
+                
+                os.remove(save_path)
+                
+                res = orchestrator.boot_existing_urbit(patp)
+                if res == 0:
+                    return jsonify(200)
+                else:
+                    return jsonify(400)
+
+                return jsonify(200)
+
+        else:
+            return jsonify(501)
+
+    return jsonify(404)
+
+# Login
+@app.route("/login", methods=['POST'])
+def login():
+    res = orchestrator.handle_login_request(request.get_json())
+    if res == 200:
+        res = make_response(jsonify(res))
+        res.set_cookie('sessionid', orchestrator.make_cookie())
+    else:
+        res = make_response(jsonify(res))
+
+    return res
 
 if __name__ == '__main__':
     debug_mode = False

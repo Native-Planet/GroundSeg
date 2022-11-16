@@ -17,7 +17,7 @@
 	// updateState loop
   const update = () => {
     if (inView) {
-			fetch($api + '/urbits')
+      fetch($api + '/urbits', {credentials:"include"})
 			.then(raw => raw.json())
     	.then(res => updateState(res))
 			.catch(err => console.log(err))
@@ -27,6 +27,9 @@
 
 	// Start the update loop
 	onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
 		inView = true
 		update()
 	})

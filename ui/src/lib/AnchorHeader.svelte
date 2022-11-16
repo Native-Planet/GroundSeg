@@ -4,29 +4,46 @@
 
 	export let wgRunning, wgReg
 
+  let loading = false
+
 	// toggle anchor on or off
 	const toggleAnchor = () => {
+    loading = true
     let module = 'anchor'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
+      credentials:"include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'toggle'})
 	  })
       .then(d => d.json())
-      .then(res => console.log(res))
-  }
+      .then(res => {
+        if (res == 200) {
+          loading = false
+        }
+        console.log(res)
+      })
+    }
 
 </script>
 <div class="wrapper">
 	<div class="slot"><slot/></div>
   {#if wgReg}
-	  <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleAnchor} class="switch-wrapper">
+    <div 
+      in:scale={{duration:100,delay:300, amount:10}}
+      on:click={toggleAnchor}
+      class:loading={loading}
+      class="switch-wrapper">
       <div class="switch {wgRunning ? "on" : "off"}" />
 	  </div>
   {/if}
 </div>
 
 <style>
+  .loading {
+    opacity: .4;
+    pointer-events: none;
+  }
 	.wrapper {display: flex;}
 	.slot {flex:1}
   .switch-wrapper {

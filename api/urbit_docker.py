@@ -66,6 +66,7 @@ class UrbitDocker:
                                     command = command, 
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
+                                    labels = {"com.centurylinklabs.watchtower.enable":"true"},
                                     mounts = [self.mount],
                                     detach=True)
         else:

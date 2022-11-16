@@ -13,6 +13,7 @@
     let myDropzone = new Dropzone("#dropper", {
       paramName: "file", // The name that will be used to transfer the file
       acceptedFiles: '.zip, .tar, .tgz, .gz',
+      withCredentials: true,
       chunking: true,
       forceChunking: true,
       url: $api + '/upload',

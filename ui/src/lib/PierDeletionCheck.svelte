@@ -15,6 +15,7 @@
   const exportBucket = () => {
     exportBucketStatus = 'loading'
 		fetch($api + '/urbit?urbit_id=' + name, {
+      credentials: "include",
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'app':'minio','data':'export'})
@@ -33,6 +34,7 @@
 
 		fetch($api + '/urbit?urbit_id=' + name, {
   		method: 'POST',
+      credentials: "include",
 	  	headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({'app':'pier','data':'export'})
 		  })
@@ -51,6 +53,7 @@
 
 		fetch($api + '/urbit?urbit_id=' + name, {
   		method: 'POST',
+      credentials: "include",
 	  	headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({'app':'pier','data':'delete'})
 		  })

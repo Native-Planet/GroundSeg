@@ -1,15 +1,28 @@
 <script>
+  import { afterUpdate } from 'svelte'
   import { page } from '$app/stores'
+
+  let hide = false
+  let blur = false
+  afterUpdate(()=> {
+    hide = ($page.routeId == 'login')
+    blur = ($page.routeId == 'settings')
+  })
+
 </script>
 
-<a href='/settings'>
-  <img src="/settings.svg" alt="Settings Icon" class:inverted={$page.routeId == 'settings'}/>
+<a href='/settings' class:hide={hide} class:blur={blur}>
+  <img src="/settings.svg" alt="Settings Icon"/>
 </a>
 
 <style>
-  .inverted {
-    /* filter: invert(1); */
+  .blur {
     opacity: .2;
+    pointer-events: none;
+    filter: blur(2px);
+  }
+  .hide {
+    opacity: 0;
     pointer-events: none;
   }
 	a {

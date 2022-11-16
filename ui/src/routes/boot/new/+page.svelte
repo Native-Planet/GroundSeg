@@ -16,7 +16,12 @@
     document.querySelector('#key').type = viewKey ? 'text' : 'password'
   }
 
-	onMount(()=> inView = !inView)
+  onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
+    inView = !inView
+  })
 
 </script>
 

@@ -15,6 +15,7 @@
 
   import Network from '$lib/Network.svelte'
   import MinIO from '$lib/MinIO.svelte'
+  import Sessions from '$lib/Sessions.svelte'
   import Contact from '$lib/Contact.svelte'
 
 	// load data into store
@@ -29,7 +30,9 @@
 	// updateState loop
   const update = () => {
     if (($page.routeId == 'settings') && (activeTab == 'Settings')) {
-			fetch($api + '/system')
+      fetch($api + '/system', {
+        credentials: "include"
+      })
 			.then(raw => raw.json())
     	.then(res => updateState(res))
 			.catch(err => console.log(err))
@@ -41,11 +44,15 @@
     let module = 'logs'
     fetch($api + '/system?module=' + module, {
 		  method: 'POST',
+      credentials: "include",
 		  headers: {'Content-Type': 'application/json'},
   	  body: JSON.stringify({'action':'export','container':selectedContainer})
 	  })
       .then(r => r.json())
       .then(d => {
+          if (d == 404) {
+            window.location.href = "/login"
+          } else {
           var element = document.createElement('a')
           element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(d))
           element.setAttribute('download', selectedContainer)
@@ -53,11 +60,15 @@
           document.body.appendChild(element)
           element.click()
           document.body.removeChild(element)
+          }
       })
   }
 
 	// Start the update loop
   onMount(()=> {
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
     update()
     inViewSettings = true
     selectedContainer = $system.containers[0]
@@ -103,6 +114,7 @@
         <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           <MinIO minio={$system.minio} />
+          <Sessions sessions={$system.sessions} />
         </div>
       </div>
 

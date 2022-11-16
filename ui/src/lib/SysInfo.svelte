@@ -8,6 +8,7 @@
     let module = 'watchtower'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
+      credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'toggle'})
 	  })
@@ -61,7 +62,7 @@
     <!-- groundseg_webui version -->
     <div class="hw-version">
       <div class="word">Web UI Version</div>
-      <span>Beta-3.0.0</span>
+      <span>Beta-3.1.0</span>
     </div>
 
     <!-- App update modes -->

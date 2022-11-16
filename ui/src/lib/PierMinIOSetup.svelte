@@ -43,6 +43,7 @@
 
     fetch($api + '/urbit?urbit_id=' + name, {
 			method: 'POST',
+        credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'app':'minio','password':confirmPassword})
 	  })

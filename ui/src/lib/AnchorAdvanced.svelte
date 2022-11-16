@@ -28,6 +28,7 @@
     let module = 'anchor'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
+      credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'get-url'})
 	  })
@@ -40,6 +41,7 @@
     let module = 'anchor'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
+      credentials: "include",
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'change-url','url':epKey})
 	  })
@@ -62,6 +64,7 @@
 
   	  fetch($api + '/system?module=' + module, {
 	  		method: 'POST',
+        credentials: "include",
 		  	headers: {'Content-Type': 'application/json'},
 			  body: JSON.stringify({'action':'unsubscribe','key':regKey.trim()})
   	  })

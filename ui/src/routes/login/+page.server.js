@@ -13,8 +13,12 @@ export function load({ cookies }) {
 	let d = fetch(url + '/cookies?sessionid=' + sessionid, {
     credentials:"include"
   })
-  .then(r => r.json())
-  .then(d => { return d })
-
-  return {"status":d,"api":"http://" + env.HOST_HOSTNAME + ".local:27016"}
+    .then(r => r.json())
+    .then(d => {
+      return d
+      })
+  return {
+    "status":d,
+    "api":"http://" + env.HOST_HOSTNAME + ".local:27016"
+  }
 }
