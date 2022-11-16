@@ -34,7 +34,7 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" == "nobuild" ) {
-                        currentBuild.getRawBuild().getExecutor().interrupt(Result.NOT_BUILT)
+                        currentBuild.getRawBuild().getExecutor().interrupt(Result.ABORTED)
                         print("Ignoring branch ${tag}")
                         sleep(1)
                     }
