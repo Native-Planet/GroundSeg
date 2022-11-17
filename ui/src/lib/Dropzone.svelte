@@ -74,7 +74,7 @@
         <div class="uploaded" class:processing={curProgress == 100}>
           {#if totalSize > (1000 * 1000 * 1000)}
             {#if curProgress == 100}
-              {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB}
+              {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
             {:else}
               {parseFloat((uploadedAmount / (1000 * 1000 * 1000)).toFixed(2))} GB / {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
             {/if}

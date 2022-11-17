@@ -1,5 +1,5 @@
 <script>
-	import { api } from '$lib/api'
+	import { api, webuiVersion } from '$lib/api'
   import { scale } from 'svelte/transition'
 
   export let ram, temp, disk, cpu, gsVersion, updateMode
@@ -62,7 +62,7 @@
     <!-- groundseg_webui version -->
     <div class="hw-version">
       <div class="word">Web UI Version</div>
-      <span>Beta-3.1.0</span>
+      <span>{webuiVersion}</span>
     </div>
 
     <!-- App update modes -->
