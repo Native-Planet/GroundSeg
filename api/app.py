@@ -224,6 +224,7 @@ def pier_upload():
 
                 # Extract pier
                 try:
+                    print("Extracting pier",file=sys.stderr)
                     if filename.endswith("zip"):
                         with zipfile.ZipFile(fn) as zip_ref:
                             zip_ref.extractall(file_subfolder)

@@ -29,6 +29,7 @@
       const query = {"app":"boot-new", "data": k }
 			fetch($api + '/urbit?urbit_id=' + nr, {
 					method: 'POST',
+          credentials: 'include',
 					headers: {'Content-Type': 'application/json'},
 					body: JSON.stringify(query)
 			})
@@ -46,7 +47,7 @@
     }}
 
   const handleSuccess = n => {
-			fetch($api + '/urbit?urbit_id=' + n)
+    fetch($api + '/urbit?urbit_id=' + n, {credentials:'include'})
 			.then(raw => raw.json())
       .then(res => {
         if (res.name == n) {

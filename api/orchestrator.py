@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.1.1'
+    gs_version = 'Beta-3.1.2'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -739,10 +739,10 @@ WantedBy=multi-user.target
 
         # power module
         if module == 'power':
-            if data['action'] == 'restart':
+            if data['action'] == 'shutdown':
                 return self.shutdown()
 
-            if data['action'] == 'shutdown':
+            if data['action'] == 'restart':
                 return self.restart()
 
         # watchtower module
