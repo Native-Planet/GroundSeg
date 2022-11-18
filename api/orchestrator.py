@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.2.0'
+    gs_version = 'Beta-3.2.1'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -569,6 +569,7 @@ WantedBy=multi-user.target
 
             x = self.add_urbit(patp, urbit)
             if x == 0:
+                self._watchtower = WatchtowerDocker(self.config['updateMode'])
                 return 200
 
         except Exception as e:
