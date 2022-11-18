@@ -40,13 +40,14 @@
     <Dropzone on:full={hideCancel} />
 
     {#if allowCancel}
-      <LinkButton
-        top=24
-        left={false}
-        text="Cancel"
-        src="/"
-        disabled={false}
-      />
+      <div style="margin: 24px 0 12px 12px;">
+        <LinkButton
+          left={false}
+          text="Cancel"
+          src="/"
+          disabled={false}
+        />
+      </div>
     {/if}
 
   {:else}

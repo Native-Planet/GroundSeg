@@ -7,7 +7,13 @@
 
   const dispatch = createEventDispatcher();
 
-  let isUploading = false, curProgress = 0, totalSize = 0, uploadedAmount = 0, fileName = '', failed = false
+  let isUploading = false,
+    curProgress = 0,
+    totalSize = 0,
+    uploadedAmount = 0,
+    fileName = '',
+    failed = false,
+    failedText = "File is invalid"
 
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
@@ -53,13 +59,20 @@
     console.log(res)
     if (res == 200) {
       let name = file.name.split(".")[0]
-      window.location.href="/" + name
-  }}
+      window.location.href = "/" + name
+    } else if (res == 404) {
+      window.location.href = "/login"
+    } else {
+      failed = true
+      failedText = res
+    }
+  }
 
   const onError = (e) => {
     console.log(e)
     isUploading = false
     failed = true
+    failedText = e
     setTimeout(()=>{failed = false}, 2400)
   }
 
@@ -91,7 +104,7 @@
     </div>
   {:else}
     {#if failed}
-      <span style="color: red;">File is invalid</span>
+      <span style="color: red;">{failedText}</span>
     {:else}
       Drop pier here to upload
     {/if}
