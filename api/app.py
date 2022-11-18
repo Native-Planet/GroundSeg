@@ -1,9 +1,10 @@
-import threading, time, os, zipfile, tarfile, copy, shutil, psutil, sys, requests
+import threading, time, os, copy, shutil, psutil, sys, requests
 from datetime import datetime
 from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
+from updater_docker import WatchtowerDocker
 
 # Load GroundSeg
 orchestrator = Orchestrator("/settings/system.json")
@@ -186,6 +187,11 @@ def pier_upload():
 
     if sessionid in orchestrator.config['sessions']:
     
+        try:
+            orchestrator._watchtower.remove()
+        except Exception as e:
+            print("Watchtower not running!", file=sys.stderr)
+
         # Uploaded pier
         file = request.files['file']
         filename = secure_filename(file.filename)
@@ -199,19 +205,18 @@ def pier_upload():
         current_chunk = int(request.form['dzchunkindex'])
             
         if os.path.exists(save_path) and current_chunk == 0:
-            # 400 and 500s will tell dropzone that an error occurred and show an error
             os.remove(save_path)
-            # File already exists
-            return jsonify(200)
+            orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+            return jsonify("File exists, try again")
 
         try:
             with open(save_path, 'ab') as f:
                 f.seek(int(request.form['dzchunkbyteoffset']))
                 f.write(file.stream.read())
-        except OSError:
-            # log.exception will include the traceback so we can see what's wrong
-            # Could not write to file
-            return jsonify(500)
+        except Exception as e:
+            print(e,file=sys.stderr)
+            orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+            return jsonify("Can't write file")
 
         total_chunks = int(request.form['dztotalchunkcount'])
 
@@ -219,37 +224,16 @@ def pier_upload():
             # This was the last chunk, the file should be complete and the size we expect
             if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
                 # size mismatch
-                return jsonify(501)
+                orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+                return jsonify("File size mismatched")
             else:
-
-                # Extract pier
-                try:
-                    print("Extracting pier",file=sys.stderr)
-                    if filename.endswith("zip"):
-                        with zipfile.ZipFile(fn) as zip_ref:
-                            zip_ref.extractall(file_subfolder)
-
-                    elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                        tar = tarfile.open(fn,"r:gz")
-                        tar.extractall(file_subfolder)
-                        tar.close()
-
-                except Exception as e:
-                    return jsonify(e)
-                
-                os.remove(save_path)
-                
-                res = orchestrator.boot_existing_urbit(patp)
-                if res == 0:
-                    return jsonify(200)
-                else:
-                    return jsonify(400)
-
-                return jsonify(200)
-
+                orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+                return jsonify(orchestrator.boot_existing_urbit(filename))
         else:
-            return jsonify(501)
+            # Not final chunk yet
+            return jsonify(200)
 
+    orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
     return jsonify(404)
 
 # Login

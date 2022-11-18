@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, sys, secrets, string, hashlib
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, tarfile, sys, secrets, string, hashlib
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.1.2'
+    gs_version = 'Beta-3.2.0'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -98,7 +98,8 @@ class Orchestrator:
         if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
             print("Updating system files...", file=sys.stderr)
             with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
-                docker_text = """---
+                docker_text = """\
+---
 version: "3.9"
 services:
   api:
@@ -506,33 +507,74 @@ WantedBy=multi-user.target
 
         return x
 
-    def boot_existing_urbit(self, patp):
-        if patp == None:
-            return 400
+    def boot_existing_urbit(self, filename):
+        patp = filename.split('.')[0]
 
-        http_port, ames_port = self.get_open_urbit_ports()
-        data = copy.deepcopy(default_pier_config)
-        data['pier_name'] = patp
-        data['http_port'] = http_port
-        data['ames_port'] = ames_port
-        with open(f'settings/pier/{patp}.json', 'w') as f:
-            json.dump(data, f, indent = 4)
-    
+        if patp == None:
+            return "File is invalid"
+
+        return self.extract_pier(filename)
+
+    def extract_pier(self, filename):
+        patp = filename.split('.')[0]
         vol_dir = f'/var/lib/docker/volumes/{patp}'
 
-        print(f"Removing existing volume for {patp}",file=sys.stderr)
-        os.system(f'rm -rf {vol_dir}')
+        try:
+            print(f"Removing existing volume for {patp}",file=sys.stderr)
+            os.system(f'rm -rf {vol_dir}')
 
-        print(f"Creating volume directory for {patp}",file=sys.stderr)
-        os.system(f'mkdir -p {vol_dir}')
+            print(f"Creating volume directory for {patp}",file=sys.stderr)
+            os.system(f'mkdir -p {vol_dir}/_data')
 
-        print(f"Moving {patp} pier from /tmp/{patp} to volume directory",file=sys.stderr)
-        os.system(f'mv /tmp/{patp} {vol_dir}/_data') 
+            print(f"Extracting {filename}",file=sys.stderr)
+            if filename.endswith("zip"):
+                with zipfile.ZipFile(f"/tmp/{patp}/{filename}") as zip_ref:
+                    zip_ref.extractall(f"{vol_dir}/_data")
 
-        print(f"Building docker container",file=sys.stderr)
-        urbit = UrbitDocker(data)
+            elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
+                tar = tarfile.open(f"/tmp/{patp}/{filename}","r:gz")
+                tar.extractall(f"{vol_dir}/_data")
+                tar.close()
 
-        return self.add_urbit(patp, urbit)
+        except Exception as e:
+            print(e, file=sys.stderr)
+            return "File extraction failed"
+
+        try:
+            print(f"Deleting {filename}", file=sys.stderr)
+            os.remove(f"/tmp/{patp}/{filename}")
+
+        except Exception as e:
+            print(e, file=sys.stderr)
+            return f"Failed to remove {filename}"
+
+        return self.build_urbit_container_existing(patp)
+
+    def build_urbit_container_existing(self, patp):
+
+        try:
+            print(f"Building docker container",file=sys.stderr)
+
+            http_port, ames_port = self.get_open_urbit_ports()
+            data = copy.deepcopy(default_pier_config)
+
+            data['pier_name'] = patp
+            data['http_port'] = http_port
+            data['ames_port'] = ames_port
+
+            urbit = UrbitDocker(data)
+
+            with open(f'settings/pier/{patp}.json', 'w') as f:
+                json.dump(data, f, indent = 4)
+
+            x = self.add_urbit(patp, urbit)
+            if x == 0:
+                return 200
+
+        except Exception as e:
+            print(e, file=sys.stderr)
+
+        return "Failed to create Urbit pier"
 
     # Get unused ports for Urbit
     def get_open_urbit_ports(self):
@@ -952,7 +994,12 @@ WantedBy=multi-user.target
             self.config['updateMode'] = 'auto'
 
         self.save_config()
-        self._watchtower.remove()
+
+        try:
+            self._watchtower.remove()
+        except Exception as e:
+            print("Watchtower not running!", file=sys.stderr)
+        
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
 
         return 200
