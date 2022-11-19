@@ -189,8 +189,8 @@ def pier_upload():
     
         try:
             orchestrator._watchtower.remove()
-        except Exception as e:
-            print("Watchtower not running!", file=sys.stderr)
+        except:
+            pass
 
         # Uploaded pier
         file = request.files['file']
@@ -203,6 +203,14 @@ def pier_upload():
 
         fn = save_path = f"{app.config['TEMP_FOLDER']}{patp}/{filename}"
         current_chunk = int(request.form['dzchunkindex'])
+
+        if current_chunk == 0:
+            try:
+                os.remove(save_path)
+                print("Cleaning up old files", file=sys.stderr)
+            except:
+                print("Directory is clear", file=sys.stderr)
+                pass
             
         if os.path.exists(save_path) and current_chunk == 0:
             os.remove(save_path)
@@ -227,7 +235,6 @@ def pier_upload():
                 orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
                 return jsonify("File size mismatched")
             else:
-                orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
                 return jsonify(orchestrator.boot_existing_urbit(filename))
         else:
             # Not final chunk yet
