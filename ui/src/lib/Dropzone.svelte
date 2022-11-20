@@ -3,18 +3,86 @@
   import { api, isPatp } from '$lib/api'
   import Dropzone from "dropzone"
   import { sigil, stringRenderer } from '@tlon/sigil-js'
-  import { createEventDispatcher } from 'svelte';
+  import LinkButton from '$lib/LinkButton.svelte'
 
-  const dispatch = createEventDispatcher();
-
-  let isUploading = false,
+  let dzStatus = "free",
     curProgress = 0,
     totalSize = 0,
     uploadedAmount = 0,
     fileName = '',
     failed = false,
-    failedText = "File is invalid"
+    failedText = "File is invalid",
+    allowCancel = true
 
+  const checkPatp = (f,done) => {
+    let patp = f.name.split('.')[0]
+
+    if (isPatp(patp)) {
+      return done()
+    } else { 
+      failed = true
+      setTimeout(()=>failed = false, 2400) 
+  }}
+
+  const checkUpdate = (file,prog,sent) => {
+    if (file.status === 'uploading') {
+      dzStatus = 'uploading'
+    }
+    if (prog == 100) {
+      dzStatus = 'processing'
+      allowCancel = false
+    }
+    curProgress = prog
+    totalSize = file.size
+    fileName = file.name 
+    uploadedAmount = sent
+  }
+
+  const onSuccess = (file,res) => {
+    console.log("success:" + res)
+    if (res == 200) {
+      let name = file.name.split(".")[0]
+      handleSuccess(name)
+    } else if (res == 404) {
+      window.location.href = "/login"
+    } else {
+      dzStatus = 'free'
+      failed = true
+      failedText = res
+      setTimeout(()=>{
+        failed = false
+        failedText = "File is invalid"
+        allowCancel = true 
+      }, 2400)
+    }
+  }
+
+  const handleSuccess = n => {
+    fetch($api + '/urbit?urbit_id=' + n, {credentials:'include'})
+			.then(raw => raw.json())
+      .then(res => {
+        if (res.name == n) {
+          window.location.href = '/' + n
+        } else {
+          setTimeout(()=> handleSuccess(n), 1000)
+        }
+      })
+			.catch(err => console.log(err))
+  }
+
+  const onError = (e) => {
+    console.log("error:" + e)
+    dzStatus = 'free'
+    failed = true
+    failedText = e
+    setTimeout(()=>{
+      failed = false
+      failedText = "File is invalid"
+      allowCancel = true 
+    }, 2400)
+  }
+
+  // Dropzone params
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
       paramName: "file", // The name that will be used to transfer the file
@@ -32,84 +100,71 @@
       chunkSize: 50000000 // bytes
   })})
 
-  const checkPatp = (f,done) => {
-    let patp = f.name.split('.')[0]
-
-    if (isPatp(patp)) {
-      return done()
-    } else { 
-      failed = true
-      setTimeout(()=>failed = false, 2400) 
-  }}
-
-  const checkUpdate = (file,prog,sent) => {
-    if (file.status === 'uploading') {
-      isUploading = true
-    }
-    if (prog == 100) {
-      dispatch('full')
-    }
-    curProgress = prog
-    totalSize = file.size
-    fileName = file.name 
-    uploadedAmount = sent
-  }
-
-  const onSuccess = (file,res) => {
-    console.log(res)
-    if (res == 200) {
-      let name = file.name.split(".")[0]
-      window.location.href = "/" + name
-    } else if (res == 404) {
-      window.location.href = "/login"
-    } else {
-      failed = true
-      failedText = res
-    }
-  }
-
-  const onError = (e) => {
-    console.log(e)
-    isUploading = false
-    failed = true
-    failedText = e
-    setTimeout(()=>{failed = false}, 2400)
-  }
-
 </script>
+<div id="dropper" class={dzStatus == "free" ? "drop" : "disabled"}>
 
-<div id="dropper" class={isUploading ? "disabled" : "drop"}>
-  {#if isUploading}
-    <div class="content">
-      <div class="filename" class:processing={curProgress == 100}>{curProgress < 100 ? "Uploading" : "Processing"} {fileName}</div>
-      <div class="bar-wrapper">
-        <div class="bar" style="width:{curProgress}%"></div>
-        <div class="uploaded" class:processing={curProgress == 100}>
-          {#if totalSize > (1000 * 1000 * 1000)}
-            {#if curProgress == 100}
-              {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
-            {:else}
-              {parseFloat((uploadedAmount / (1000 * 1000 * 1000)).toFixed(2))} GB / {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
-            {/if}
-          {:else}
-            {#if curProgress == 100}
-              {(totalSize / (1000 * 1000)).toFixed(2)} MB
-            {:else}
-              {parseFloat((uploadedAmount / (1000 * 1000)).toFixed(2))} MB / {parseFloat((totalSize / (1000 * 1000)).toFixed(2))} MB
-            {/if}
-          {/if}
-        </div>
-        <div class="percent" class:processing={curProgress == 100}>{curProgress.toFixed(0)}%</div>
-      </div>
-    </div>
-  {:else}
+  {#if dzStatus == 'free'}
     {#if failed}
       <span style="color: red;">{failedText}</span>
     {:else}
       Drop pier here to upload
     {/if}
   {/if}
+
+  {#if dzStatus == 'uploading'}
+
+    <div class="content">
+      <div class="filename">Uploading {fileName}</div>
+      <div class="bar-wrapper">
+        <div class="bar" style="width:{curProgress}%"></div>
+
+        <div class="uploaded">
+          {#if totalSize > (1000 * 1000 * 1000)}
+            {parseFloat((uploadedAmount / (1000 * 1000 * 1000)).toFixed(2))} GB / {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
+          {:else}
+            {parseFloat((uploadedAmount / (1000 * 1000)).toFixed(2))} MB / {parseFloat((totalSize / (1000 * 1000)).toFixed(2))} MB
+          {/if}
+        </div>
+
+        <div class="percent">{curProgress.toFixed(0)}%</div>
+      </div>
+    </div>
+
+  {/if}
+
+  {#if dzStatus == 'processing'}
+
+    <div class="content">
+      <div class="filename processing">Processing {fileName}</div>
+      <div class="bar-wrapper">
+        <div class="bar" style="width:{curProgress}%"></div>
+
+        <div class="uploaded processing">
+          {#if totalSize > (1000 * 1000 * 1000)}
+            {(totalSize / (1000 * 1000 * 1000)).toFixed(2)} GB
+          {:else}
+            {(totalSize / (1000 * 1000)).toFixed(2)} MB
+          {/if}
+        </div>
+
+        <div class="percent processing">{curProgress.toFixed(0)}%</div>
+      </div>
+    </div>
+
+  {/if}
+
 </div>
+
+{#if allowCancel}
+  <div style="text-align:center;margin: 24px 0 12px 0">
+    <LinkButton
+      left={false}
+      text="Cancel"
+      src="/"
+      disabled={false}
+    />
+  </div>
+{/if}
 
 <style>
   #dropper {

@@ -20,7 +20,8 @@ default_pier_config = {
         "meld_frequency": 7,
         "meld_time": "0000",
         "meld_last": "0",
-        "meld_next": "0"
+        "meld_next": "0",
+        "boot_status": "boot"
         }
 
 
@@ -121,9 +122,16 @@ class UrbitDocker:
 
         return 0
 
-    def toggle_meld_status(self):
+    def toggle_meld_status(self, loopbackAddr):
         self.config['meld_schedule'] = not self.config['meld_schedule']
         self.save_config()
+        try:
+            now = int(datetime.utcnow().timestamp())
+            if self.config['meld_schedule']:
+                if int(self.config['meld_next']) <= now:
+                    self.send_meld(loopbackAddr)
+        except:
+            pass
         
         return 200
 

@@ -65,7 +65,7 @@
 		 		<div class="pier" in:scale={{duration:120, delay: 300}}>
 			   	<Sigil patp={u.name} size="60px" rad="8px" />
 					<a class="info"
-    	  		href={u.running ? u.urbitUrl : ""}
+    	  		href={u.running ? u.url : ""}
 		      	target={u.running ? "_blank" : ""}>
 	  		    <div class="patp">{u.name}</div>
             <div class="status">

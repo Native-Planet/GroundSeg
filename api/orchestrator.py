@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.2.1'
+    gs_version = 'Beta-3.2.2'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -52,13 +52,14 @@ class Orchestrator:
             self.service_restart = False
             os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
             os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
+            # Legacy directory
             os.system("echo 'systemctl daemon-reload' > /commands")
             os.system("echo 'systemctl restart groundseg' > /commands")
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
-        if self.config['wgRegistered']:
-            self.wireguard.stop()
+        self.wireguard.stop()
+        if self.config['wgRegistered'] and self.config['wgOn']:
             self.wireguard.start()
             self.toggle_minios_off()
             self.toggle_minios_on()
@@ -86,10 +87,10 @@ class Orchestrator:
 
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
-        cfg = self.check_config_field(cfg,'autostart',[])
         cfg = self.check_config_field(cfg,'endpointUrl', 'api.startram.io')
         cfg = self.check_config_field(cfg,'apiVersion', 'v1')
         cfg = self.check_config_field(cfg,'wgRegistered', False)
+        cfg = self.check_config_field(cfg, 'wgOn', False)
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
@@ -171,6 +172,9 @@ WantedBy=multi-user.target
             if cfg['reg_key'] != None:
                 cfg['wgRegistered'] = True
                 cfg['reg_key'] = None
+
+        if 'autostart' in cfg:
+            cfg.pop('autostart')
         
         return cfg
 
@@ -196,7 +200,7 @@ WantedBy=multi-user.target
                 self._minios[p] = MinIODocker(data)
                 self.toggle_minios_on()
 
-            if p in self.config['autostart'] and not self._urbits[p].running:
+            if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
                 self._urbits[p].start()
 
         print(f'Urbit Piers loaded', file=sys.stderr)
@@ -261,7 +265,7 @@ WantedBy=multi-user.target
 
         u['wgReg'] = self.config['wgRegistered']
         u['wgRunning'] = self.wireguard.is_running()
-        u['autostart'] = urbit_id in self.config['autostart']
+        u['autostart'] = urb.config['boot_status'] != 'off'
 
         u['meldOn'] = urb.config['meld_schedule']
         u['timeNow'] = datetime.utcnow()
@@ -325,7 +329,7 @@ WantedBy=multi-user.target
 
             if data['data'] == 'toggle-meld':
                 x = self.get_urbit_loopback_addr(urb.config['pier_name'])
-                return urb.toggle_meld_status()
+                return urb.toggle_meld_status(x)
 
             if data['data'] == 'do-meld':
                 lens_addr = self.get_urbit_loopback_addr(urbit_id)
@@ -358,12 +362,15 @@ WantedBy=multi-user.target
 
     # Toggle Autostart
     def toggle_autostart(self, patp):
-        if patp in self.config['autostart']:
-            self.config['autostart'].remove(patp)
+        if self._urbits[patp].config['boot_status'] == 'off':
+            if self._urbits[patp].is_running():
+                self._urbits[patp].config['boot_status'] = 'boot'
+            else:
+                self._urbits[patp].config['boot_status'] = 'noboot'
         else:
-            self.config['autostart'].append(patp)
+            self._urbits[patp].config['boot_status'] = 'off'
 
-        self.save_config()
+        self._urbits[patp].save_config()
 
         return 200
 
@@ -430,11 +437,17 @@ WantedBy=multi-user.target
         if urb.is_running() == True:
             x = urb.stop()
             if x == 0:
+                if urb.config['boot_status'] != 'off':
+                    urb.config['boot_status'] = 'noboot'
+                    urb.save_config()
                 return 200
             return 400
         else:
             x = urb.start()
             if x == 0:
+                if urb.config['boot_status'] != 'off':
+                    urb.config['boot_status'] = 'boot'
+                    urb.save_config()
                 return 200
             return 400
         
@@ -593,7 +606,7 @@ WantedBy=multi-user.target
     # Add Urbit to list of Urbit
     def add_urbit(self, patp, urbit):
         self.config['piers'].append(patp)
-        self.config['autostart'].append(patp)
+        urbit.config['boot_status'] = 'boot'
         self._urbits[patp] = urbit
 
         self.register_urbit(patp)
@@ -907,9 +920,11 @@ WantedBy=multi-user.target
 
     # Starts Wireguard and all MinIO containers
     def toggle_anchor_on(self):
-           self.wireguard.start()
-           self.toggle_minios_on() 
-           return 200
+        self.wireguard.start()
+        self.toggle_minios_on() 
+        self.config['wgOn'] = True
+        self.save_config()
+        return 200
 
     # Stops Wireguard and all MinIO containers
     def toggle_anchor_off(self):
@@ -919,6 +934,8 @@ WantedBy=multi-user.target
 
         self.toggle_minios_off()
         self.wireguard.stop()
+        self.config['wgOn'] = False
+        self.save_config()
         return 200
 
     # Toggle MinIO on
