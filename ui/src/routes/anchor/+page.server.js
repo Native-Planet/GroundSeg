@@ -19,6 +19,9 @@ export function load({ cookies }) {
 		res['api'] = "http://" + env.HOST_HOSTNAME + ".local:27016"
 		return res
  	})
-		.catch(err => console.log(err))
+		.catch(err => {
+      console.log(err)
+      return {"api": "http://" + env.HOST_HOSTNAME + ".local:27016"}
+    })
 	return d
 }
