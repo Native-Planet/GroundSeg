@@ -3,19 +3,16 @@
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
-  import LinkButton from '$lib/LinkButton.svelte'
 	import { updateState } from '$lib/api'
   import UploadPierCheck from '$lib/UploadPierCheck.svelte'
   import Dropzone from '$lib/Dropzone.svelte'
+  import LinkButton from '$lib/LinkButton.svelte'
 
 	export let data
 	updateState(data)
 
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
-  let allowCancel = true
-
-  const hideCancel = () => allowCancel = false
 
   onMount(()=> {
     if (data['status'] == 404) {
@@ -37,18 +34,7 @@
       {/each}
     </div>
 
-    <Dropzone on:full={hideCancel} />
-
-    {#if allowCancel}
-      <div style="margin: 24px 0 12px 12px;">
-        <LinkButton
-          left={false}
-          text="Cancel"
-          src="/"
-          disabled={false}
-        />
-      </div>
-    {/if}
+    <Dropzone />
 
   {:else}
 
