@@ -9,7 +9,7 @@ class Wireguard:
     def __init__(self, config):
         self.config = config
         data = None
-        filename = "/settings/wireguard.json"
+        filename = "settings/wireguard.json"
         
         # Load existing or create new wireguard.json 
         try:

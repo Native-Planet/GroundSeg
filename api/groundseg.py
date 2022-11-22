@@ -7,7 +7,7 @@ from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
 
 # Load GroundSeg
-orchestrator = Orchestrator("/settings/system.json")
+orchestrator = Orchestrator("settings/system.json")
 
 app = Flask(__name__)
 app.config['TEMP_FOLDER'] = '/tmp/'
@@ -198,10 +198,10 @@ def pier_upload():
         patp = filename.split('.')[0]
         
         # Create subfolder
-        file_subfolder = f"{app.config['TEMP_FOLDER']}{patp}"
-        os.system(f"mkdir -p {file_subfolder}")
+        file_subfolder = f"uploaded/{patp}"
+        os.makedirs(file_subfolder, exist_ok=True)
 
-        fn = save_path = f"{app.config['TEMP_FOLDER']}{patp}/{filename}"
+        fn = save_path = f"{file_subfolder}/{filename}"
         current_chunk = int(request.form['dzchunkindex'])
 
         if current_chunk == 0:

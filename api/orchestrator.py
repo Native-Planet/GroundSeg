@@ -1,4 +1,19 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, tarfile, sys, secrets, string, hashlib
+import json
+import os
+import time
+import psutil
+import shutil
+import copy
+import subprocess
+import threading
+import zipfile
+import tarfile
+import sys
+import secrets
+import string
+import hashlib
+import socket
+
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -45,17 +60,6 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # Service restart
-        if self.service_restart == True and self.config != None:
-            print("Service restarting...", file=sys.stderr)
-
-            self.service_restart = False
-            os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
-            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
-            # Legacy directory
-            os.system("echo 'systemctl daemon-reload' > /commands")
-            os.system("echo 'systemctl restart groundseg' > /commands")
-
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         self.wireguard.stop()
@@ -78,6 +82,11 @@ class Orchestrator:
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
+        # Make config directories
+        cfg_path = "settings/pier"
+        os.makedirs(cfg_path, exist_ok=True)
+
+        # Populate config
         cfg = {}
         try:
             with open(config_file) as f:
@@ -94,76 +103,6 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
-
-        # update files outside of of docker
-        if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
-            print("Updating system files...", file=sys.stderr)
-            with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
-                docker_text = """\
----
-version: "3.9"
-services:
-  api:
-    image: nativeplanet/groundseg_api:latest
-    container_name: groundseg_api
-    privileged: true
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 27016:27016
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
-      - /etc/shadow:/etc/shadow
-      - /etc/systemd/:/etc/systemd
-      - settings:/settings
-
-  webui:
-    image: nativeplanet/groundseg_webui:latest
-    container_name: groundseg_webui
-    privileged: true
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 80:3000
-
-volumes:
-  settings:
-"""
-
-                f.write(docker_text)
-                f.close()
-
-            with open('/etc/systemd/system/groundseg.service', 'w') as f:
-                service_text = """[Unit]
-Description=NativePlanet GroundSeg Controller
-After=multi-user.target
-[Service]
-Type=simple
-Restart=always
-User=root
-WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
-ExecStop=docker compose down
-[Install]
-WantedBy=multi-user.target
-"""
-
-                f.write(service_text)
-                f.close()
-
-            with open('/opt/nativeplanet/groundseg/opencmd.sh', 'w') as f:
-                cmd_text = '#!/bin/bash\nwhile true; do eval "$(cat commands)"; done'
-                f.write(cmd_text)
-                f.close()
-
-            self.service_restart = True
 
         cfg['gsVersion'] = self.gs_version
 
@@ -241,7 +180,7 @@ WantedBy=multi-user.target
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.is_running()
-            u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
+            u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
 
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"https://{urbit.config['wg_url']}"
@@ -279,7 +218,7 @@ WantedBy=multi-user.target
         u['meldHour'] = int(hour)
         u['meldMinute'] = int(minute)
         u['remote'] = False
-        u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
+        u['urbitUrl'] = f'http://{socket.gethostname()}.local:{urb.config["http_port"]}'
         u['minIOUrl'] = ""
         u['minIOReg'] = True
         u['hasBucket'] = False
@@ -541,11 +480,11 @@ WantedBy=multi-user.target
 
             print(f"Extracting {filename}",file=sys.stderr)
             if filename.endswith("zip"):
-                with zipfile.ZipFile(f"/tmp/{patp}/{filename}") as zip_ref:
+                with zipfile.ZipFile(f"uploaded/{patp}/{filename}") as zip_ref:
                     zip_ref.extractall(f"{vol_dir}/_data")
 
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                tar = tarfile.open(f"/tmp/{patp}/{filename}","r:gz")
+                tar = tarfile.open(f"uploaded/{patp}/{filename}","r:gz")
                 tar.extractall(f"{vol_dir}/_data")
                 tar.close()
 
@@ -555,7 +494,7 @@ WantedBy=multi-user.target
 
         try:
             print(f"Deleting {filename}", file=sys.stderr)
-            os.remove(f"/tmp/{patp}/{filename}")
+            os.remove(f"uploaded/{patp}/{filename}")
 
         except Exception as e:
             print(e, file=sys.stderr)
@@ -1028,7 +967,7 @@ WantedBy=multi-user.target
 #
 
     def save_config(self):
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, 'w+') as f:
             json.dump(self.config, f, indent = 4)
 
     # Reset Public and Private Keys
