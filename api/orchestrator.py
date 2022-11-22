@@ -13,10 +13,12 @@ import secrets
 import string
 import hashlib
 import socket
+import base64
 
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
+from pywgkey.key import WgKey
 
 from wireguard import Wireguard
 from urbit_docker import UrbitDocker, default_pier_config
@@ -892,6 +894,9 @@ class Orchestrator:
     # Register device to an Anchor service using a key
     def register_device(self, reg_key):
 
+        #self.reset_pubkey()
+        #self.save_config()
+
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
@@ -972,17 +977,16 @@ class Orchestrator:
 
     # Reset Public and Private Keys
     def reset_pubkey(self):
-        subprocess.run("wg genkey > privkey", shell=True)
-        subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
+        x = WgKey()
+
+        b64pub = x.pubkey + '\n' 
+        b64pub = b64pub.encode('utf-8')
+        b64pub = base64.b64encode(b64pub).decode('utf-8')
 
         # Load priv and pub key
-        with open('pubkey') as f:
-           self.config['pubkey'] = f.read().strip()
-        with open('privkey') as f:
-           self.config['privkey'] = f.read().strip()
-        #clean up files
-        subprocess.run("rm privkey pubkey", shell =True)
- 
+        self.config['pubkey'] = b64pub
+        self.config['privkey'] = x.privkey
+
     # Get logs from docker container
     def get_log_lines(self, container, line):
 

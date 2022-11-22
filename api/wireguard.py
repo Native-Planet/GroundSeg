@@ -1,5 +1,9 @@
-import requests, subprocess, base64, time, json, sys
-
+import requests
+import subprocess
+import base64
+import time
+import json
+import sys
 from wireguard_docker import WireguardDocker
 
 class Wireguard:
