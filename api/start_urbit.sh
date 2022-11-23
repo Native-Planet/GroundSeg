@@ -4,6 +4,7 @@ set -eu
 # set defaults
 amesPort="34343"
 httpPort="80"
+loom="31"
 
 # check args
 for i in "$@"
@@ -15,6 +16,10 @@ case $i in
       ;;
    --http-port=*)
       httpPort="${i#*=}"
+      shift
+      ;;
+   --loom=*)
+      loom="${i#*=}"
       shift
       ;;
 esac
@@ -39,7 +44,7 @@ keyname=''${keys[0]}
 mv $keyname /tmp
 
 # Boot urbit with the key, exit when done booting
-urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort
+urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
 
 # Remove the keyfile for security
 rm /tmp/$keyname
@@ -50,7 +55,7 @@ comets=( $cometnames )
 cometname=''${comets[0]}
 rm *.comet
 
-urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort
+urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
 fi
 
 # Find the first directory and start urbit with the ship therein
@@ -58,4 +63,4 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-exec urbit $ttyflag -p $amesPort --http-port $httpPort $dirname 
+exec urbit $ttyflag -p $amesPort --http-port $httpPort  --loom $loom $dirname
