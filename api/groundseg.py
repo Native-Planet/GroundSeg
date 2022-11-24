@@ -15,10 +15,9 @@ from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
 
 # Load GroundSeg
-orchestrator = Orchestrator("settings/system.json")
+orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
 app = Flask(__name__)
-app.config['TEMP_FOLDER'] = '/tmp/'
 
 CORS(app, supports_credentials=True)
 
@@ -206,7 +205,7 @@ def pier_upload():
         patp = filename.split('.')[0]
         
         # Create subfolder
-        file_subfolder = f"uploaded/{patp}"
+        file_subfolder = f"{orchestrator.config['CFG_DIR']}/uploaded/{patp}"
         os.makedirs(file_subfolder, exist_ok=True)
 
         fn = save_path = f"{file_subfolder}/{filename}"

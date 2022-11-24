@@ -1,20 +1,21 @@
 /** @type {import('./$types').PageServerLoad} */
 import { env } from '$env/dynamic/private'
-import { dev } from '$lib/api'
 
 export const prerender = false;
 
 export function load({ cookies }) {				
   const sessionid = cookies.get('sessionid');
 
-  let url =	"http://groundseg_api:27016"
-  if (dev) {url = "http://" + env.HOST_HOSTNAME + ".local:27016" }
+  let url = "http://" + env.HOST_HOSTNAME + ".local:27016"
+  let query = 'http://localhost/cookies?sessionid=' + sessionid 
 
-	let d = fetch(url + '/cookies?sessionid=' + sessionid, {
-    credentials:"include"
+	let d = fetch(query, {credentials:"include"})
+	.then(j => j.json())
+  .then(r => {
+    if (r == 404) {return {api:url,status:r}}
+    else {return {api:url}}
   })
-  .then(r => r.json())
-  .then(d => { return d })
+  .catch(err => {console.log(err); return {api:url}})
 
-  return {"status":d,"api":"http://" + env.HOST_HOSTNAME + ".local:27016"}
+	return d
 }

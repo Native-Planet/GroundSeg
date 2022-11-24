@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 import psutil
 import shutil
@@ -8,19 +9,20 @@ import subprocess
 import threading
 import zipfile
 import tarfile
-import sys
 import secrets
 import string
 import hashlib
 import socket
 import base64
+import urllib.request
 
-from flask import jsonify, send_file
+from flask import jsonify, send_file, current_app
 from datetime import datetime
 from io import BytesIO
 from pywgkey.key import WgKey
 
 from wireguard import Wireguard
+from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
 from minio_docker import MinIODocker
 from updater_docker import WatchtowerDocker
@@ -30,18 +32,23 @@ class Orchestrator:
 #
 #   Variables
 #
-    service_restart = False
-    config = {}
-    _urbits = {}
-    _minios = {}
-    _watchtower = {}
-    minIO_on = False
+    # System
     _ram = None
     _cpu = None
     _core_temp = None
     _disk = None
+
+    # GroundSeg
     gs_version = 'Beta-3.2.2'
     anchor_config = {'lease': None,'ongoing': None}
+    minIO_on = False
+    config = {}
+
+    # Docker
+    _urbits = {}
+    _minios = {}
+    _watchtower = {}
+    _webui = {}
 
 #
 #   init
@@ -62,6 +69,10 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
+        # Start WebUI
+        self._webui = WebUIDocker(self.config['webuiPort'])
+        print('WebUI started', file=sys.stderr)
+
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         self.wireguard.stop()
@@ -80,13 +91,23 @@ class Orchestrator:
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
-        print(f'Initializing completed', file=sys.stderr)
+
+        # MC Binaries
+        if not os.path.isfile("{self.config['CFG_DIR']}/mc"):
+            urllib.request.urlretrieve(
+                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
+                    "/opt/nativeplanet/groundseg/mc"
+                    )
+            print("Downloaded MC binary", file=sys.stderr)
+
+        # End of Init
+        print(f'Initialization completed', file=sys.stderr)
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
         # Make config directories
-        cfg_path = "settings/pier"
-        os.makedirs(cfg_path, exist_ok=True)
+        cfg_path = '/opt/nativeplanet/groundseg'
+        os.makedirs(f"{cfg_path}/settings/pier", exist_ok=True)
 
         # Populate config
         cfg = {}
@@ -105,14 +126,16 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
+        cfg = self.check_config_field(cfg, 'webuiPort', '80')
 
         cfg['gsVersion'] = self.gs_version
+        cfg['CFG_DIR'] = cfg_path
 
         # Remove reg_key from old configs
         if 'reg_key' in cfg:
             if cfg['reg_key'] != None:
                 cfg['wgRegistered'] = True
-                cfg['reg_key'] = None
+            cfg.pop('reg_key')
 
         if 'autostart' in cfg:
             cfg.pop('autostart')
@@ -129,7 +152,7 @@ class Orchestrator:
     def load_urbits(self):
         for p in self.config['piers']:
             data = None
-            with open(f'settings/pier/{p}.json') as f:
+            with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
                 data = json.load(f)
 
             # Add all missing fields
@@ -329,7 +352,7 @@ class Orchestrator:
            minio = self._minios.pop(patp)
 
         self.config['piers'].remove(patp)
-        os.remove(f"settings/pier/{patp}.json")
+        os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
         self.save_config()
 
         endpoint = self.config['endpointUrl']
@@ -452,7 +475,7 @@ class Orchestrator:
         urb['http_port'] = http_port
         urb['ames_port'] = ames_port
 
-        with open(f'settings/pier/{patp}.json', 'w') as f:
+        with open(f'/opt/nativeplanet/groundseg/settings/pier/{patp}.json', 'w') as f:
             json.dump(urb, f, indent = 4)
     
         urbit = UrbitDocker(urb)
@@ -472,6 +495,7 @@ class Orchestrator:
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
         vol_dir = f'/var/lib/docker/volumes/{patp}'
+        compressed_dir = f"{self.config['CFG_DIR']}/uploaded/{patp}/{filename}"
 
         try:
             print(f"Removing existing volume for {patp}",file=sys.stderr)
@@ -482,11 +506,11 @@ class Orchestrator:
 
             print(f"Extracting {filename}",file=sys.stderr)
             if filename.endswith("zip"):
-                with zipfile.ZipFile(f"uploaded/{patp}/{filename}") as zip_ref:
+                with zipfile.ZipFile(compressed_dir) as zip_ref:
                     zip_ref.extractall(f"{vol_dir}/_data")
 
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                tar = tarfile.open(f"uploaded/{patp}/{filename}","r:gz")
+                tar = tarfile.open(compressed_dir,"r:gz")
                 tar.extractall(f"{vol_dir}/_data")
                 tar.close()
 
@@ -495,8 +519,8 @@ class Orchestrator:
             return "File extraction failed"
 
         try:
-            print(f"Deleting {filename}", file=sys.stderr)
-            os.remove(f"uploaded/{patp}/{filename}")
+            shutil.rmtree(f"{self.config['CFG_DIR']}/uploaded/{patp}", ignore_errors=True)
+            print(f"Deleted {patp}/{filename}", file=sys.stderr)
 
         except Exception as e:
             print(e, file=sys.stderr)
@@ -518,7 +542,7 @@ class Orchestrator:
 
             urbit = UrbitDocker(data)
 
-            with open(f'settings/pier/{patp}.json', 'w') as f:
+            with open(f'/opt/nativeplanet/groundseg/settings/pier/{patp}.json', 'w') as f:
                 json.dump(data, f, indent = 4)
 
             x = self.add_urbit(patp, urbit)
@@ -574,6 +598,7 @@ class Orchestrator:
                         patp_reg = True
 
             if patp_reg == False:
+                print(f"Registering services for {patp}", file=sys.stderr)
                 self.wireguard.register_service(f'{patp}','urbit',url)
                 self.wireguard.register_service(f's3.{patp}','minio',url)
 
@@ -778,12 +803,18 @@ class Orchestrator:
 
     # Shutdown
     def shutdown(self):
-        os.system("echo 'shutdown -h now' > /opt/nativeplanet/groundseg/commands")
+        if sys.platform == "win32":
+            os.system("shutdown /s /t 0")
+        else:
+            os.system("shutdown -h now")
         return 200
 
     # Restart
     def restart(self):
-        os.system("echo 'reboot' > /opt/nativeplanet/groundseg/commands")
+        if sys.platform == "win32":
+            os.system("shutdown /s /t 0")
+        else:
+            os.system("shutdown /r")
         return 200
 
     # Get list of available docker containers
@@ -917,6 +948,7 @@ class Orchestrator:
            print("Starting Wireguard", file=sys.stderr)
            self.wireguard.start()
            self.config['wgRegistered'] = True
+           self.config['wgOn'] = True
            time.sleep(2)
            
            print("Registering Urbits", file=sys.stderr)
@@ -936,6 +968,7 @@ class Orchestrator:
         old_url = self.config['endpointUrl']
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
+        self.config['wgOn'] = False
 
         for patp in self.config['piers']:
             self.wireguard.delete_service(f'{patp}','urbit',old_url)

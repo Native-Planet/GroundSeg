@@ -136,7 +136,7 @@ class UrbitDocker:
         return 200
 
     def save_config(self):
-        with open(f'settings/pier/{self.pier_name}.json', 'w') as f:
+        with open(f'/opt/nativeplanet/groundseg/settings/pier/{self.pier_name}.json', 'w') as f:
             json.dump(self.config, f, indent = 4)
 
     def buildUrbit(self):

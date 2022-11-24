@@ -3,4 +3,4 @@ requests
 docker
 psutil
 flask-cors
-cryptography
+pywgkey
