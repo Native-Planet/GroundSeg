@@ -7,7 +7,7 @@ export function load({ cookies }) {
   const sessionid = cookies.get('sessionid');
 
   let url = "http://" + env.HOST_HOSTNAME + ".local:27016"
-  let query = 'http://localhost/anchor?sessionid=' + sessionid 
+  let query = 'http://127.0.0.1:27016/anchor?sessionid=' + sessionid 
 
 	let d = fetch(query, {credentials:"include"})
 	.then(j => j.json())
