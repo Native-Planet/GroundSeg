@@ -69,10 +69,6 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # Start WebUI
-        self._webui = WebUIDocker(self.config['webuiPort'])
-        print('WebUI started', file=sys.stderr)
-
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         self.wireguard.stop()
@@ -99,6 +95,10 @@ class Orchestrator:
                     "/opt/nativeplanet/groundseg/mc"
                     )
             print("Downloaded MC binary", file=sys.stderr)
+
+        # Start WebUI
+        self._webui = WebUIDocker(self.config['webuiPort'])
+        print('WebUI started', file=sys.stderr)
 
         # End of Init
         print(f'Initialization completed', file=sys.stderr)
