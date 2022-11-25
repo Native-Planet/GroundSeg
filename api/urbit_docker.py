@@ -11,6 +11,7 @@ default_pier_config = {
         "minio_version":"latest",
         "minio_password": "",
         "network":"none",
+        "loom": 31,
         "wg_url": "nan",
         "wg_http_port": None,
         "wg_ames_port": None,
@@ -61,7 +62,8 @@ class UrbitDocker:
                 return
         if(self.config["network"] != "none"):
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
-                                          --port={self.config["wg_ames_port"]}'
+                                          --port={self.config["wg_ames_port"]}\
+                                          --loom={self.config["loom"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     command = command, 
@@ -71,15 +73,34 @@ class UrbitDocker:
                                     mounts = [self.mount],
                                     detach=True)
         else:
-            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
-                                          --port={self.config["wg_ames_port"]}'
+            command = f'bash /urbit/start_urbit.sh --http-port=80 \
+                                          --port=34343 \
+                                          --loom={self.config["loom"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
+                                    command = command, 
                                     name = self.pier_name,
                                     mounts = [self.mount],
                                     detach = True)
+
+    def set_loom(self, loom):
+        self.config['loom'] = loom
+        self.save_config()
+
+        self.save_config()
+        running = False
+        
+        if self.is_running():
+            self.stop()
+            running = True
+
+        self.container.remove()
+        
+        self.buildContainer()
+        if running:
+            self.start()
 
 
     def set_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
