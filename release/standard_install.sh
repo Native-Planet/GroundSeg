@@ -10,11 +10,6 @@ wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/
 chmod +x /tmp/nativeplanet/docker_install.sh
 sudo /tmp/nativeplanet/docker_install.sh
 
-sudo mkdir -p /usr/local/lib/docker/cli-plugins
-sudo wget -O /usr/local/lib/docker/cli-plugins/docker-compose \
-	https://github.com/docker/compose/releases/download/v2.11.2/docker-compose-linux-x86_64
-sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-
 systemctl enable docker
 systemctl start docker
 

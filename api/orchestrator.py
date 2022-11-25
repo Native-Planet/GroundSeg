@@ -39,7 +39,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.2.2'
+    gs_version = 'Beta-3.3.0'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -92,7 +92,7 @@ class Orchestrator:
         if not os.path.isfile("{self.config['CFG_DIR']}/mc"):
             urllib.request.urlretrieve(
                     "https://dl.min.io/client/mc/release/linux-amd64/mc",
-                    "/opt/nativeplanet/groundseg/mc"
+                    f"{self.config['CFG_DIR']}/mc"
                     )
             print("Downloaded MC binary", file=sys.stderr)
 

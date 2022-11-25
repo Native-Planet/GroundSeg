@@ -29,6 +29,7 @@ class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'
 
     def __init__(self,pier_config):
+        self.start_script()
         self.config = pier_config
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
@@ -45,13 +46,15 @@ class UrbitDocker:
         for v in volumes:
             if self.pier_name == v.name:
                 self.volume = v
-                shutil.copy('start_urbit.sh', 
-                        f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+                with open(f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh', 'w') as f:
+                    f.write(self.start_script)
+                    f.close()
                 return
 
         self.volume = client.volumes.create(name=self.pier_name)
-        shutil.copy('start_urbit.sh',
-                f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh')
+        with open(f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh', 'w') as f:
+            f.write(self.start_script)
+            f.close()
 
     def buildContainer(self):
         containers = client.containers.list(all=True)
@@ -291,3 +294,68 @@ class UrbitDocker:
     
     def is_running(self):
         return self.running
+
+    def start_script(self):
+        self.start_script = """\
+#!/bin/bash
+
+set -eu
+# set defaults
+amesPort="34343"
+httpPort="80"
+
+# check args
+for i in "$@"
+do
+case $i in
+  -p=*|--port=*)
+      amesPort="${i#*=}"
+      shift
+      ;;
+   --http-port=*)
+      httpPort="${i#*=}"
+      shift
+      ;;
+esac
+done
+
+
+# If the container is not started with the `-i` flag
+# then STDIN will be closed and we need to start
+# Urbit/vere with the `-t` flag.
+ttyflag=""
+if [ ! -t 0 ]; then
+echo "Running with no STDIN"
+ttyflag="-t"
+fi
+
+# Check if there is a keyfile, if so boot a ship with its name, and then remove the key
+if [ -e *.key ]; then
+# Get the name of the key
+keynames="*.key"
+keys=( $keynames )
+keyname=''${keys[0]}
+mv $keyname /tmp
+
+# Boot urbit with the key, exit when done booting
+urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort
+
+# Remove the keyfile for security
+rm /tmp/$keyname
+rm *.key || true
+elif [ -e *.comet ]; then
+cometnames="*.comet"
+comets=( $cometnames )
+cometname=''${comets[0]}
+rm *.comet
+
+urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort
+fi
+
+# Find the first directory and start urbit with the ship therein
+dirnames="*/"
+dirs=( $dirnames )
+dirname=''${dirnames[0]}
+
+exec urbit $ttyflag -p $amesPort --http-port $httpPort $dirname 
+"""
