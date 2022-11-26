@@ -39,10 +39,10 @@
 	  })
       .then(r => r.json())
 			.then(d => { if (d == 200) {
-				linkButtonStatus = 'success'
+				unlinkButtonStatus = 'success'
 				setTimeout(()=>unlinkButtonStatus='standard', 3000)
 			} else {
-				linkButtonStatus = 'failure'
+				unlinkButtonStatus = 'failure'
 				setTimeout(()=>unlinkButtonStatus='standard', 3000)
         }})
       .catch(err => console.log(err))
