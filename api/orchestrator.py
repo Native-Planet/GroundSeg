@@ -89,12 +89,14 @@ class Orchestrator:
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
 
         # MC Binaries
-        if not os.path.isfile("{self.config['CFG_DIR']}/mc"):
+        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
             urllib.request.urlretrieve(
                     "https://dl.min.io/client/mc/release/linux-amd64/mc",
                     f"{self.config['CFG_DIR']}/mc"
                     )
             print("Downloaded MC binary", file=sys.stderr)
+        else:
+            print("MC binary already exists!", file=sys.stderr)
 
         # Start WebUI
         self._webui = WebUIDocker(self.config['webuiPort'])
@@ -127,9 +129,12 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
+        cfg = self.check_config_field(cfg, 'updateUrl', 'version.infra.native.computer')
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
+        cfg['binHash'] = self.make_hash("/opt/nativeplanet/groundseg/groundseg")
+        print(f"Binary hash: {cfg['binHash']}", file=sys.stderr)
 
         # Remove reg_key from old configs
         if 'reg_key' in cfg:
@@ -141,6 +146,15 @@ class Orchestrator:
             cfg.pop('autostart')
         
         return cfg
+
+    def make_hash(self, file):
+        h  = hashlib.sha256()
+        b  = bytearray(128*1024)
+        mv = memoryview(b)
+        with open(file, 'rb', buffering=0) as f:
+            while n := f.readinto(mv):
+                h.update(mv[:n])
+        return h.hexdigest()
 
     # Adds missing field to config
     def check_config_field(self, cfg, field, default):
@@ -288,6 +302,14 @@ class Orchestrator:
             if data['data'] == 's3-update':
                 return self.set_minio_endpoint(urbit_id)
 
+            if data['data'] == 's3-unlink':
+                lens_port = self.get_urbit_loopback_addr(urbit_id)
+                try:
+                    return urb.unlink_minio_endpoint(lens_port)
+
+                except Exception as e:
+                    print(e, file=sys.stderr)
+
             if data['data'] == 'schedule-meld':
                 return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
 
@@ -351,7 +373,7 @@ class Orchestrator:
            minio.remove_minio()
            minio = self._minios.pop(patp)
 
-        self.config['piers'].remove(patp)
+        self.config['piers'] = [i for i in self.config['piers'] if i != patp]
         os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
         self.save_config()
 
@@ -570,6 +592,7 @@ class Orchestrator:
 
     # Add Urbit to list of Urbit
     def add_urbit(self, patp, urbit):
+        self.config['piers'] = [i for i in self.config['piers'] if i != patp]
         self.config['piers'].append(patp)
         urbit.config['boot_status'] = 'boot'
         self._urbits[patp] = urbit

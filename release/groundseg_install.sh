@@ -20,7 +20,7 @@ sudo wget -O $SAVE_DIR/groundseg \
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
-  # systemd units
+  # systemd unit
   sudo wget -O /etc/systemd/system/groundseg.service \
 	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
 
@@ -31,7 +31,7 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
 elif [[ "$OSTYPE" == "darwin"* ]]; then
 
-  # launchd daemons
+  # launchd daemon
   sudo wget -O /Library/LaunchDaemons/io.nativeplanet.groundseg.plist \
 	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.groundseg.plist
 

@@ -6,6 +6,7 @@ import shutil
 import psutil
 import sys
 import requests
+import urllib.request
 
 from datetime import datetime
 from flask import Flask, jsonify, request, make_response
@@ -20,6 +21,30 @@ orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 app = Flask(__name__)
 
 CORS(app, supports_credentials=True)
+
+# Binary Updater
+def check_bin_updates():
+    print("Binary updater thread started", file=sys.stderr)
+
+    cur_hash = orchestrator.config['binHash']
+    # latest_entry = get latest entry from orchestrator.config['updateUrl']
+    # new_name, new_hash, dl_url = latest_entry
+
+    new_hash = cur_hash # placeholder
+
+    while True:
+        if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
+            print("Updating your groundseg binary", file=sys.stderr)
+            #urllib.request.urlretrieve(dl_url,
+            print(f"{orchestrator.config['CFG_DIR']}/groundseg", file=sys.stderr)
+        
+            print("Restarting groundseg...", file=sys.stderr)
+            if sys.platform == "darwin":
+                os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
+            else:
+                os.system("systemctl restart groundseg")
+
+        time.sleep(90)
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
@@ -72,6 +97,9 @@ def meld_loop():
                 break
 
         time.sleep(30)
+
+# Start binary updater thread
+threading.Thread(target=check_bin_updates).start()
 
 # Start system monitoring on a new thread
 threading.Thread(target=sys_monitor).start()

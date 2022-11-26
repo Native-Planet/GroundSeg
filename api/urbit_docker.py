@@ -1,4 +1,12 @@
-import docker, json, shutil, threading, time, os, sys, subprocess
+import docker
+import json
+import shutil
+import threading
+import time
+import os
+import sys
+import subprocess
+
 from datetime import datetime
 from minio_docker import MinIODocker
 
@@ -227,6 +235,14 @@ class UrbitDocker:
         self.send_poke('set-access-key-id', access_key, lens_addr)
         self.send_poke('set-secret-access-key', secret, lens_addr)
         self.send_poke('set-current-bucket', bucket, lens_addr)
+
+        return 200
+
+    def unlink_minio_endpoint(self, lens_addr):
+        self.send_poke('set-endpoint', '', lens_addr)
+        self.send_poke('set-access-key-id', '', lens_addr)
+        self.send_poke('set-secret-access-key', '', lens_addr)
+        self.send_poke('set-current-bucket', '', lens_addr)
 
         return 200
 
