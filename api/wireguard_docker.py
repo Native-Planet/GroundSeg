@@ -60,6 +60,7 @@ class WireguardDocker:
     def start(self):
         self.container.start()
         self.running=True
+        return 0
 
     def stop(self):
         self.container.stop()

@@ -48,7 +48,7 @@ class Wireguard:
 
     # Start container
     def start(self):
-        self.wg_docker.start()
+        return self.wg_docker.start()
 
     # Stop container
     def stop(self):

@@ -133,7 +133,15 @@ class Orchestrator:
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
-        cfg['binHash'] = self.make_hash("/opt/nativeplanet/groundseg/groundseg")
+
+        bin_hash = 'no-binary-detected'
+        try:
+            bin_hash = self.make_hash("/opt/nativeplanet/groundseg/groundseg")
+        except:
+            print("No binary detected!", file=sys.stderr)
+
+        cfg['binHash'] = bin_hash
+
         print(f"Binary hash: {cfg['binHash']}", file=sys.stderr)
 
         # Remove reg_key from old configs
@@ -598,10 +606,15 @@ class Orchestrator:
         self._urbits[patp] = urbit
 
         self.register_urbit(patp)
-        self.save_config()
+        
+        if self.wireguard.is_running() and len(self.config['piers']) < 2:
+            print("Restarting anchor",file=sys.stderr)
+            x = self.toggle_anchor_off()
+            if x == 200:
+                self.toggle_anchor_on()
 
-        x = urbit.start()
-        return x
+        self.save_config()
+        return urbit.start()
  
     # Register Wireguard for Urbit
     def register_urbit(self, patp):
@@ -646,7 +659,7 @@ class Orchestrator:
                     console_port = ep['port']
 
             self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
-            self.wireguard.start()
+            return self.wireguard.start()
 
     # Update/Set Urbit S3 Endpoint
     def set_minio_endpoint(self, patp):
