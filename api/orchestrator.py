@@ -1,4 +1,4 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, tarfile, sys, secrets, string, hashlib
+import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, tarfile, sys, secrets, string, hashlib, requests, urllib.request
 from flask import jsonify, send_file
 from datetime import datetime
 from io import BytesIO
@@ -23,7 +23,7 @@ class Orchestrator:
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.2.2'
+    gs_version = 'Beta-3.2.3'
     anchor_config = {'lease': None,'ongoing': None}
 
 #
@@ -45,25 +45,34 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # Service restart
-        if self.service_restart == True and self.config != None:
-            print("Service restarting...", file=sys.stderr)
+        # Update to binary
+        print("Copying configs to /opt", file=sys.stderr)
+        os.system("rm -r /opt/nativeplanet/groundseg/settings")
+        time.sleep(2)
+        os.system("cp -r /var/lib/docker/volumes/groundseg_settings/_data /opt/nativeplanet/groundseg/settings")
 
-            self.service_restart = False
-            os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
-            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
-            # Legacy directory
-            os.system("echo 'systemctl daemon-reload' > /commands")
-            os.system("echo 'systemctl restart groundseg' > /commands")
+        time.sleep(3)
 
-        # start wireguard if anchor is registered
-        self.wireguard = Wireguard(self.config)
-        self.wireguard.stop()
-        if self.config['wgRegistered'] and self.config['wgOn']:
-            self.wireguard.start()
-            self.toggle_minios_off()
-            self.toggle_minios_on()
-            print(f'Wireguard connection started', file=sys.stderr)
+        new_name, new_hash, dl_url = requests.get("https://version.infra.native.computer/version.csv").text.split('\n')[0].split(',')[0:3]
+
+        print(f"Latest version: {new_name}", file=sys.stderr)
+        print("Downloading new groundseg binary", file=sys.stderr)
+        urllib.request.urlretrieve(dl_url, f"/opt/nativeplanet/groundseg/groundseg")
+
+        time.sleep(3)
+
+        print("Setting launch permissions for new binary", file=sys.stderr)
+        os.system(f"chmod +x /opt/nativeplanet/groundseg/groundseg")
+
+        time.sleep(1)
+
+        print("Restarting groundseg...", file=sys.stderr)
+
+        os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
+        os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
+        # Legacy directory
+        os.system("echo 'systemctl daemon-reload' > /commands")
+        os.system("echo 'systemctl restart groundseg' > /commands")
 
         # load urbit ships
         self.load_urbits()
@@ -95,75 +104,23 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
 
-        # update files outside of of docker
-        if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
-            print("Updating system files...", file=sys.stderr)
-            with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
-                docker_text = """\
----
-version: "3.9"
-services:
-  api:
-    image: nativeplanet/groundseg_api:latest
-    container_name: groundseg_api
-    privileged: true
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 27016:27016
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
-      - /etc/shadow:/etc/shadow
-      - /etc/systemd/:/etc/systemd
-      - settings:/settings
 
-  webui:
-    image: nativeplanet/groundseg_webui:latest
-    container_name: groundseg_webui
-    privileged: true
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 80:3000
-
-volumes:
-  settings:
-"""
-
-                f.write(docker_text)
-                f.close()
-
-            with open('/etc/systemd/system/groundseg.service', 'w') as f:
-                service_text = """[Unit]
+        with open('/etc/systemd/system/groundseg.service', 'w') as f:
+            service_text = """\
+[Unit]
 Description=NativePlanet GroundSeg Controller
 After=multi-user.target
 [Service]
 Type=simple
 Restart=always
 User=root
-WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
-ExecStop=docker compose down
+ExecStart=/opt/nativeplanet/groundseg/groundseg
 [Install]
 WantedBy=multi-user.target
 """
 
-                f.write(service_text)
-                f.close()
-
-            with open('/opt/nativeplanet/groundseg/opencmd.sh', 'w') as f:
-                cmd_text = '#!/bin/bash\nwhile true; do eval "$(cat commands)"; done'
-                f.write(cmd_text)
-                f.close()
-
-            self.service_restart = True
+            f.write(service_text)
+            f.close()
 
         cfg['gsVersion'] = self.gs_version
 
