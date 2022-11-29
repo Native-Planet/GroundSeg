@@ -27,24 +27,43 @@ def check_bin_updates():
     print("Binary updater thread started", file=sys.stderr)
 
     cur_hash = orchestrator.config['binHash']
-    # latest_entry = get latest entry from orchestrator.config['updateUrl']
-    # new_name, new_hash, dl_url = latest_entry
-
-    new_hash = cur_hash # placeholder
 
     while True:
-        if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
-            print("Updating your groundseg binary", file=sys.stderr)
-            #urllib.request.urlretrieve(dl_url,
-            print(f"{orchestrator.config['CFG_DIR']}/groundseg", file=sys.stderr)
-        
-            print("Restarting groundseg...", file=sys.stderr)
-            if sys.platform == "darwin":
-                os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
-            else:
-                os.system("systemctl restart groundseg")
+
+        try:
+            new_name, new_hash, dl_url = requests.get(orchestrator.config['updateUrl']).text.split('\n')[0].split(',')[0:3]
+
+            if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
+                print(f"Latest version: {new_name}", file=sys.stderr)
+                print("Downloading new groundseg binary", file=sys.stderr)
+                urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
+
+                print("Removing old groundseg binary", file=sys.stderr)
+                os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(3)
+
+                print("Renaming new groundseg binary", file=sys.stderr)
+                os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
+                        f"{orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(2)
+                print("Setting launch permissions for new binary", file=sys.stderr)
+                os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(1)
+
+                print("Restarting groundseg...", file=sys.stderr)
+                if sys.platform == "darwin":
+                    os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
+                else:
+                    os.system("systemctl restart groundseg")
+
+        except Exception as e:
+            print(e, file=sys.stderr)
 
         time.sleep(90)
+
 
 # Get updated Anchor information every 12 hours
 def anchor_information():

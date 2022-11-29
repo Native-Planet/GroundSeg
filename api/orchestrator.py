@@ -129,7 +129,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
-        cfg = self.check_config_field(cfg, 'updateUrl', 'version.infra.native.computer')
+        cfg = self.check_config_field(cfg, 'updateUrl', 'https://version.infra.native.computer/version.csv')
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
