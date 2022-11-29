@@ -6,6 +6,7 @@
 
   // Button status
   let linkButtonStatus = 'standard',
+    unlinkButtonStatus = 'standard',
     exportBucketStatus = 'standard'
 
 	// Update Urbit S3 endpoint
@@ -24,6 +25,25 @@
 			} else {
 				linkButtonStatus = 'failure'
 				setTimeout(()=>linkButtonStatus='standard', 3000)
+        }})
+      .catch(err => console.log(err))
+  }
+
+	const unlinkMinIO = () => {
+      unlinkButtonStatus = 'loading'
+			fetch($api + '/urbit?urbit_id=' + name, {
+			method: 'POST',
+        credentials: "include",
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({'app':'pier','data':'s3-unlink'})
+	  })
+      .then(r => r.json())
+			.then(d => { if (d == 200) {
+				unlinkButtonStatus = 'success'
+				setTimeout(()=>unlinkButtonStatus='standard', 3000)
+			} else {
+				unlinkButtonStatus = 'failure'
+				setTimeout(()=>unlinkButtonStatus='standard', 3000)
         }})
       .catch(err => console.log(err))
   }
@@ -57,6 +77,15 @@
       loading="Linking..."
 	  	status={linkButtonStatus}
 	 	  on:click={updateMinIO} />
+    <PrimaryButton
+	    noMargin={true}
+      background="orange"
+  		standard="Unlink MinIO"
+    	success="MinIO unlinked from Urbit!"
+      failure="Something went wrong"
+      loading="Removing link..."
+	  	status={unlinkButtonStatus}
+	 	  on:click={unlinkMinIO} />
   {/if}
 
 {#if hasBucket}

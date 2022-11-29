@@ -5,8 +5,6 @@ After=multi-user.target
 Type=simple
 Restart=always
 User=root
-WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
-ExecStop=docker compose down
+ExecStart=/opt/nativeplanet/groundseg/groundseg
 [Install]
 WantedBy=multi-user.target

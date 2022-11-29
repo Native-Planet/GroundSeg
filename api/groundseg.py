@@ -1,4 +1,13 @@
-import threading, time, os, copy, shutil, psutil, sys, requests
+import threading
+import time
+import os
+import copy
+import shutil
+import psutil
+import sys
+import requests
+import urllib.request
+
 from datetime import datetime
 from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
@@ -6,13 +15,59 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
 
+# Stop and remove legacy containers
+os.system('docker rm -f groundseg_api')
+os.system('docker rm -f groundseg_webui')
+
 # Load GroundSeg
-orchestrator = Orchestrator("/settings/system.json")
+orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
 app = Flask(__name__)
-app.config['TEMP_FOLDER'] = '/tmp/'
 
 CORS(app, supports_credentials=True)
+
+# Binary Updater
+def check_bin_updates():
+    print("Binary updater thread started", file=sys.stderr)
+
+    cur_hash = orchestrator.config['binHash']
+
+    while True:
+
+        try:
+            new_name, new_hash, dl_url = requests.get(orchestrator.config['updateUrl']).text.split('\n')[0].split(',')[0:3]
+
+            if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
+                print(f"Latest version: {new_name}", file=sys.stderr)
+                print("Downloading new groundseg binary", file=sys.stderr)
+                urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
+
+                print("Removing old groundseg binary", file=sys.stderr)
+                os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(3)
+
+                print("Renaming new groundseg binary", file=sys.stderr)
+                os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
+                        f"{orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(2)
+                print("Setting launch permissions for new binary", file=sys.stderr)
+                os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(1)
+
+                print("Restarting groundseg...", file=sys.stderr)
+                if sys.platform == "darwin":
+                    os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
+                else:
+                    os.system("systemctl restart groundseg")
+
+        except Exception as e:
+            print(e, file=sys.stderr)
+
+        time.sleep(90)
+
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
@@ -65,6 +120,9 @@ def meld_loop():
                 break
 
         time.sleep(30)
+
+# Start binary updater thread
+threading.Thread(target=check_bin_updates).start()
 
 # Start system monitoring on a new thread
 threading.Thread(target=sys_monitor).start()
@@ -198,10 +256,10 @@ def pier_upload():
         patp = filename.split('.')[0]
         
         # Create subfolder
-        file_subfolder = f"{app.config['TEMP_FOLDER']}{patp}"
-        os.system(f"mkdir -p {file_subfolder}")
+        file_subfolder = f"{orchestrator.config['CFG_DIR']}/uploaded/{patp}"
+        os.makedirs(file_subfolder, exist_ok=True)
 
-        fn = save_path = f"{app.config['TEMP_FOLDER']}{patp}/{filename}"
+        fn = save_path = f"{file_subfolder}/{filename}"
         current_chunk = int(request.form['dzchunkindex'])
 
         if current_chunk == 0:

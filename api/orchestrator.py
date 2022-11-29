@@ -1,9 +1,28 @@
-import json, os, time, psutil, shutil, copy, subprocess, threading, zipfile, tarfile, sys, secrets, string, hashlib
-from flask import jsonify, send_file
+import json
+import os
+import sys
+import time
+import psutil
+import shutil
+import copy
+import subprocess
+import threading
+import zipfile
+import tarfile
+import secrets
+import string
+import hashlib
+import socket
+import base64
+import urllib.request
+
+from flask import jsonify, send_file, current_app
 from datetime import datetime
 from io import BytesIO
+from pywgkey.key import WgKey
 
 from wireguard import Wireguard
+from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
 from minio_docker import MinIODocker
 from updater_docker import WatchtowerDocker
@@ -13,18 +32,23 @@ class Orchestrator:
 #
 #   Variables
 #
-    service_restart = False
-    config = {}
-    _urbits = {}
-    _minios = {}
-    _watchtower = {}
-    minIO_on = False
+    # System
     _ram = None
     _cpu = None
     _core_temp = None
     _disk = None
-    gs_version = 'Beta-3.2.2'
+
+    # GroundSeg
+    gs_version = 'Beta-3.3.0'
     anchor_config = {'lease': None,'ongoing': None}
+    minIO_on = False
+    config = {}
+
+    # Docker
+    _urbits = {}
+    _minios = {}
+    _watchtower = {}
+    _webui = {}
 
 #
 #   init
@@ -45,17 +69,6 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # Service restart
-        if self.service_restart == True and self.config != None:
-            print("Service restarting...", file=sys.stderr)
-
-            self.service_restart = False
-            os.system("echo 'systemctl daemon-reload' > /opt/nativeplanet/groundseg/commands")
-            os.system("echo 'systemctl restart groundseg' > /opt/nativeplanet/groundseg/commands")
-            # Legacy directory
-            os.system("echo 'systemctl daemon-reload' > /commands")
-            os.system("echo 'systemctl restart groundseg' > /commands")
-
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         self.wireguard.stop()
@@ -74,10 +87,31 @@ class Orchestrator:
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
-        print(f'Initializing completed', file=sys.stderr)
+
+        # MC Binaries
+        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
+            urllib.request.urlretrieve(
+                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
+                    f"{self.config['CFG_DIR']}/mc"
+                    )
+            print("Downloaded MC binary", file=sys.stderr)
+        else:
+            print("MC binary already exists!", file=sys.stderr)
+
+        # Start WebUI
+        self._webui = WebUIDocker(self.config['webuiPort'])
+        print('WebUI started', file=sys.stderr)
+
+        # End of Init
+        print(f'Initialization completed', file=sys.stderr)
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
+        # Make config directories
+        cfg_path = '/opt/nativeplanet/groundseg'
+        os.makedirs(f"{cfg_path}/settings/pier", exist_ok=True)
+
+        # Populate config
         cfg = {}
         try:
             with open(config_file) as f:
@@ -94,89 +128,41 @@ class Orchestrator:
         cfg = self.check_config_field(cfg,'updateMode','auto')
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
-
-        # update files outside of of docker
-        if ('gsVersion' not in cfg) or (cfg['gsVersion'] != self.gs_version and cfg['updateMode'] == 'auto'):
-            print("Updating system files...", file=sys.stderr)
-            with open('/opt/nativeplanet/groundseg/docker-compose.yml', 'w') as f:
-                docker_text = """\
----
-version: "3.9"
-services:
-  api:
-    image: nativeplanet/groundseg_api:latest
-    container_name: groundseg_api
-    privileged: true
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 27016:27016
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
-      - /var/lib/docker/volumes:/var/lib/docker/volumes
-      - /opt/nativeplanet/groundseg:/opt/nativeplanet/groundseg
-      - /etc/shadow:/etc/shadow
-      - /etc/systemd/:/etc/systemd
-      - settings:/settings
-
-  webui:
-    image: nativeplanet/groundseg_webui:latest
-    container_name: groundseg_webui
-    privileged: true
-    environment:
-      - HOST_HOSTNAME=${HOST_HOSTNAME}
-    labels:
-      com.centurylinklabs.watchtower.enable: true
-    ports:
-      - 80:3000
-
-volumes:
-  settings:
-"""
-
-                f.write(docker_text)
-                f.close()
-
-            with open('/etc/systemd/system/groundseg.service', 'w') as f:
-                service_text = """[Unit]
-Description=NativePlanet GroundSeg Controller
-After=multi-user.target
-[Service]
-Type=simple
-Restart=always
-User=root
-WorkingDirectory=/opt/nativeplanet/groundseg/
-ExecStart=/bin/bash -c 'HOST_HOSTNAME=$(hostname) exec docker compose up'
-ExecStop=docker compose down
-[Install]
-WantedBy=multi-user.target
-"""
-
-                f.write(service_text)
-                f.close()
-
-            with open('/opt/nativeplanet/groundseg/opencmd.sh', 'w') as f:
-                cmd_text = '#!/bin/bash\nwhile true; do eval "$(cat commands)"; done'
-                f.write(cmd_text)
-                f.close()
-
-            self.service_restart = True
+        cfg = self.check_config_field(cfg, 'webuiPort', '80')
+        cfg = self.check_config_field(cfg, 'updateUrl', 'https://version.infra.native.computer/version.csv')
 
         cfg['gsVersion'] = self.gs_version
+        cfg['CFG_DIR'] = cfg_path
+
+        bin_hash = 'no-binary-detected'
+        try:
+            bin_hash = self.make_hash("/opt/nativeplanet/groundseg/groundseg")
+        except:
+            print("No binary detected!", file=sys.stderr)
+
+        cfg['binHash'] = bin_hash
+
+        print(f"Binary hash: {cfg['binHash']}", file=sys.stderr)
 
         # Remove reg_key from old configs
         if 'reg_key' in cfg:
             if cfg['reg_key'] != None:
                 cfg['wgRegistered'] = True
-                cfg['reg_key'] = None
+            cfg.pop('reg_key')
 
         if 'autostart' in cfg:
             cfg.pop('autostart')
         
         return cfg
+
+    def make_hash(self, file):
+        h  = hashlib.sha256()
+        b  = bytearray(128*1024)
+        mv = memoryview(b)
+        with open(file, 'rb', buffering=0) as f:
+            while n := f.readinto(mv):
+                h.update(mv[:n])
+        return h.hexdigest()
 
     # Adds missing field to config
     def check_config_field(self, cfg, field, default):
@@ -188,7 +174,7 @@ WantedBy=multi-user.target
     def load_urbits(self):
         for p in self.config['piers']:
             data = None
-            with open(f'settings/pier/{p}.json') as f:
+            with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
                 data = json.load(f)
 
             # Add all missing fields
@@ -241,7 +227,7 @@ WantedBy=multi-user.target
             u = dict()
             u['name'] = urbit.pier_name
             u['running'] = urbit.is_running()
-            u['url'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urbit.config["http_port"]}'
+            u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
 
             if(urbit.config['network']=='wireguard'):
                 u['url'] = f"https://{urbit.config['wg_url']}"
@@ -279,7 +265,7 @@ WantedBy=multi-user.target
         u['meldHour'] = int(hour)
         u['meldMinute'] = int(minute)
         u['remote'] = False
-        u['urbitUrl'] = f'http://{os.environ["HOST_HOSTNAME"]}.local:{urb.config["http_port"]}'
+        u['urbitUrl'] = f'http://{socket.gethostname()}.local:{urb.config["http_port"]}'
         u['minIOUrl'] = ""
         u['minIOReg'] = True
         u['hasBucket'] = False
@@ -323,6 +309,14 @@ WantedBy=multi-user.target
 
             if data['data'] == 's3-update':
                 return self.set_minio_endpoint(urbit_id)
+
+            if data['data'] == 's3-unlink':
+                lens_port = self.get_urbit_loopback_addr(urbit_id)
+                try:
+                    return urb.unlink_minio_endpoint(lens_port)
+
+                except Exception as e:
+                    print(e, file=sys.stderr)
 
             if data['data'] == 'schedule-meld':
                 return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
@@ -387,8 +381,8 @@ WantedBy=multi-user.target
            minio.remove_minio()
            minio = self._minios.pop(patp)
 
-        self.config['piers'].remove(patp)
-        os.remove(f"settings/pier/{patp}.json")
+        self.config['piers'] = [i for i in self.config['piers'] if i != patp]
+        os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
         self.save_config()
 
         endpoint = self.config['endpointUrl']
@@ -511,7 +505,7 @@ WantedBy=multi-user.target
         urb['http_port'] = http_port
         urb['ames_port'] = ames_port
 
-        with open(f'settings/pier/{patp}.json', 'w') as f:
+        with open(f'/opt/nativeplanet/groundseg/settings/pier/{patp}.json', 'w') as f:
             json.dump(urb, f, indent = 4)
     
         urbit = UrbitDocker(urb)
@@ -531,6 +525,7 @@ WantedBy=multi-user.target
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
         vol_dir = f'/var/lib/docker/volumes/{patp}'
+        compressed_dir = f"{self.config['CFG_DIR']}/uploaded/{patp}/{filename}"
 
         try:
             print(f"Removing existing volume for {patp}",file=sys.stderr)
@@ -541,11 +536,11 @@ WantedBy=multi-user.target
 
             print(f"Extracting {filename}",file=sys.stderr)
             if filename.endswith("zip"):
-                with zipfile.ZipFile(f"/tmp/{patp}/{filename}") as zip_ref:
+                with zipfile.ZipFile(compressed_dir) as zip_ref:
                     zip_ref.extractall(f"{vol_dir}/_data")
 
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                tar = tarfile.open(f"/tmp/{patp}/{filename}","r:gz")
+                tar = tarfile.open(compressed_dir,"r:gz")
                 tar.extractall(f"{vol_dir}/_data")
                 tar.close()
 
@@ -554,8 +549,8 @@ WantedBy=multi-user.target
             return "File extraction failed"
 
         try:
-            print(f"Deleting {filename}", file=sys.stderr)
-            os.remove(f"/tmp/{patp}/{filename}")
+            shutil.rmtree(f"{self.config['CFG_DIR']}/uploaded/{patp}", ignore_errors=True)
+            print(f"Deleted {patp}/{filename}", file=sys.stderr)
 
         except Exception as e:
             print(e, file=sys.stderr)
@@ -577,7 +572,7 @@ WantedBy=multi-user.target
 
             urbit = UrbitDocker(data)
 
-            with open(f'settings/pier/{patp}.json', 'w') as f:
+            with open(f'/opt/nativeplanet/groundseg/settings/pier/{patp}.json', 'w') as f:
                 json.dump(data, f, indent = 4)
 
             x = self.add_urbit(patp, urbit)
@@ -605,15 +600,21 @@ WantedBy=multi-user.target
 
     # Add Urbit to list of Urbit
     def add_urbit(self, patp, urbit):
+        self.config['piers'] = [i for i in self.config['piers'] if i != patp]
         self.config['piers'].append(patp)
         urbit.config['boot_status'] = 'boot'
         self._urbits[patp] = urbit
 
         self.register_urbit(patp)
-        self.save_config()
+        
+        if self.wireguard.is_running() and len(self.config['piers']) < 2:
+            print("Restarting anchor",file=sys.stderr)
+            x = self.toggle_anchor_off()
+            if x == 200:
+                self.toggle_anchor_on()
 
-        x = urbit.start()
-        return x
+        self.save_config()
+        return urbit.start()
  
     # Register Wireguard for Urbit
     def register_urbit(self, patp):
@@ -633,6 +634,7 @@ WantedBy=multi-user.target
                         patp_reg = True
 
             if patp_reg == False:
+                print(f"Registering services for {patp}", file=sys.stderr)
                 self.wireguard.register_service(f'{patp}','urbit',url)
                 self.wireguard.register_service(f's3.{patp}','minio',url)
 
@@ -657,7 +659,7 @@ WantedBy=multi-user.target
                     console_port = ep['port']
 
             self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
-            self.wireguard.start()
+            return self.wireguard.start()
 
     # Update/Set Urbit S3 Endpoint
     def set_minio_endpoint(self, patp):
@@ -837,12 +839,18 @@ WantedBy=multi-user.target
 
     # Shutdown
     def shutdown(self):
-        os.system("echo 'shutdown -h now' > /opt/nativeplanet/groundseg/commands")
+        if sys.platform == "win32":
+            os.system("shutdown /s /t 0")
+        else:
+            os.system("shutdown -h now")
         return 200
 
     # Restart
     def restart(self):
-        os.system("echo 'reboot' > /opt/nativeplanet/groundseg/commands")
+        if sys.platform == "win32":
+            os.system("shutdown /s /t 0")
+        else:
+            os.system("shutdown /r")
         return 200
 
     # Get list of available docker containers
@@ -953,6 +961,9 @@ WantedBy=multi-user.target
     # Register device to an Anchor service using a key
     def register_device(self, reg_key):
 
+        #self.reset_pubkey()
+        #self.save_config()
+
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
@@ -973,6 +984,7 @@ WantedBy=multi-user.target
            print("Starting Wireguard", file=sys.stderr)
            self.wireguard.start()
            self.config['wgRegistered'] = True
+           self.config['wgOn'] = True
            time.sleep(2)
            
            print("Registering Urbits", file=sys.stderr)
@@ -992,6 +1004,7 @@ WantedBy=multi-user.target
         old_url = self.config['endpointUrl']
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
+        self.config['wgOn'] = False
 
         for patp in self.config['piers']:
             self.wireguard.delete_service(f'{patp}','urbit',old_url)
@@ -1028,22 +1041,21 @@ WantedBy=multi-user.target
 #
 
     def save_config(self):
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, 'w+') as f:
             json.dump(self.config, f, indent = 4)
 
     # Reset Public and Private Keys
     def reset_pubkey(self):
-        subprocess.run("wg genkey > privkey", shell=True)
-        subprocess.run("cat privkey| wg pubkey | base64 -w 0 > pubkey", shell=True)
+        x = WgKey()
+
+        b64pub = x.pubkey + '\n' 
+        b64pub = b64pub.encode('utf-8')
+        b64pub = base64.b64encode(b64pub).decode('utf-8')
 
         # Load priv and pub key
-        with open('pubkey') as f:
-           self.config['pubkey'] = f.read().strip()
-        with open('privkey') as f:
-           self.config['privkey'] = f.read().strip()
-        #clean up files
-        subprocess.run("rm privkey pubkey", shell =True)
- 
+        self.config['pubkey'] = b64pub
+        self.config['privkey'] = x.privkey
+
     # Get logs from docker container
     def get_log_lines(self, container, line):
 
