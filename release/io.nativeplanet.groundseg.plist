@@ -6,13 +6,8 @@
 		<string>io.nativeplanet.groundseg</string>
     <key>ProgramArguments</key>
     <array>
-    	<string>/bin/bash</string>
-    	<string>-c</string>
-     	<string>--compress-level=9</string>
-    	<string>'HOST_HOSTNAME=$(hostname) exec docker compose up'</string>
+      <string>/opt/nativeplanet/groundseg/groundseg</string>
     </array>
-    <key>WorkingDirectory</key>
-		<string>/opt/nativeplanet/groundseg</string>
     <key>KeepAlive</key>
 		<true/>
 	</dict>

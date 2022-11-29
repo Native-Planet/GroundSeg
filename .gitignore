@@ -9,6 +9,16 @@ __pycache__/
 # C extensions
 *.so
 
+# Nuitka
+*.bin
+groundseg.dist/
+groundseg.build/
+groundseg.onefile-build/
+
+# GroundSeg
+settings/
+uploaded/
+
 # Distribution / packaging
 .Python
 build/

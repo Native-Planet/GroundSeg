@@ -1,5 +1,9 @@
-import requests, subprocess, base64, time, json, sys
-
+import requests
+import subprocess
+import base64
+import time
+import json
+import sys
 from wireguard_docker import WireguardDocker
 
 class Wireguard:
@@ -9,7 +13,7 @@ class Wireguard:
     def __init__(self, config):
         self.config = config
         data = None
-        filename = "/settings/wireguard.json"
+        filename = "/opt/nativeplanet/groundseg/settings/wireguard.json"
         
         # Load existing or create new wireguard.json 
         try:
@@ -44,7 +48,7 @@ class Wireguard:
 
     # Start container
     def start(self):
-        self.wg_docker.start()
+        return self.wg_docker.start()
 
     # Stop container
     def stop(self):
@@ -106,6 +110,7 @@ class Wireguard:
         response = None
         try:
             response = requests.post(f'{url}/create',json=update_data,headers=headers).json()
+            print(f"Sent creation request for {service_type}", file=sys.stderr)
         except Exception as e:
             print(e)
             return None
@@ -116,6 +121,7 @@ class Wireguard:
                 response = requests.get(
                         f'{url}/retrieve?pubkey={update_data["pubkey"]}',
                         headers=headers).json()
+                print(f"Retrieving response for {service_type}", file=sys.stderr)
             except Exception as e:
                 print(e)
             print("Waiting for endpoint to be created")
