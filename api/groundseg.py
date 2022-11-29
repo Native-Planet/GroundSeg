@@ -15,6 +15,10 @@ from werkzeug.utils import secure_filename
 from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
 
+# Stop and remove legacy containers
+os.system('docker rm -f groundseg_api')
+os.system('docker rm -f groundseg_webui')
+
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
