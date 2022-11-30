@@ -14,6 +14,7 @@ __pycache__/
 groundseg.dist/
 groundseg.build/
 groundseg.onefile-build/
+groundseg
 
 # GroundSeg
 settings/
