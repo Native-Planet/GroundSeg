@@ -39,7 +39,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.0'
+    gs_version = 'Beta-3.3.1-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -69,6 +69,16 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
+        # MC Binaries
+        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
+            urllib.request.urlretrieve(
+                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
+                    f"{self.config['CFG_DIR']}/mc"
+                    )
+            print("Downloaded MC binary", file=sys.stderr)
+        else:
+            print("MC binary already exists!", file=sys.stderr)
+
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
         self.wireguard.stop()
@@ -87,16 +97,6 @@ class Orchestrator:
 
         # start auto updater
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
-
-        # MC Binaries
-        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
-            urllib.request.urlretrieve(
-                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
-                    f"{self.config['CFG_DIR']}/mc"
-                    )
-            print("Downloaded MC binary", file=sys.stderr)
-        else:
-            print("MC binary already exists!", file=sys.stderr)
 
         # Start WebUI
         self._webui = WebUIDocker(self.config['webuiPort'])
@@ -624,7 +624,11 @@ class Orchestrator:
         url = f'https://{endpoint}/{api_version}'
 
         if self.config['wgRegistered']:
-            self.anchor_config = self.wireguard.get_status(url)
+            x = self.wireguard.get_status(url)
+            if x != None:
+                self.anchor_config = x 
+                self.wireguard.set_wg_config(x['conf'])
+
             patp_reg = False
 
             if self.anchor_config != None:
@@ -638,7 +642,10 @@ class Orchestrator:
                 self.wireguard.register_service(f'{patp}','urbit',url)
                 self.wireguard.register_service(f's3.{patp}','minio',url)
 
-            self.anchor_config = self.wireguard.get_status(url)
+            x = self.wireguard.get_status(url)
+            if x != None:
+                self.anchor_config = x 
+                self.wireguard.set_wg_config(x['conf'])
             url = None
             http_port = None
             ames_port = None
@@ -961,9 +968,6 @@ class Orchestrator:
     # Register device to an Anchor service using a key
     def register_device(self, reg_key):
 
-        #self.reset_pubkey()
-        #self.save_config()
-
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']
         url = f'https://{endpoint}/{api_version}'
@@ -978,9 +982,12 @@ class Orchestrator:
         if x['error'] != 0:
             return 400
 
-        self.anchor_config = self.wireguard.get_status(url)
+        x = self.wireguard.get_status(url)
+        if x != None:
+            self.anchor_config = x 
+            self.wireguard.set_wg_config(x['conf'])
 
-        if(self.anchor_config != None):
+        if self.anchor_config != None:
            print("Starting Wireguard", file=sys.stderr)
            self.wireguard.start()
            self.config['wgRegistered'] = True

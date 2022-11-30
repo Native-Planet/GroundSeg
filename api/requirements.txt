@@ -4,3 +4,6 @@ docker
 psutil
 flask-cors
 pywgkey
+nuitka
+zstandard
+orderedset

@@ -86,17 +86,16 @@ class Wireguard:
                 print(f"/retrieve failed: {e}",file=sys.stderr)
                 err_count = err_count + 1
 
+        return response
+
+    def update_wg_config(self, conf):
         try:
-            self.wg_config = base64.b64decode(response['conf']).decode('utf-8')
+            self.wg_config = base64.b64decode(conf).decode('utf-8')
             self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
-            # Setup and start the local wg client
             self.wg_docker.add_config(self.wg_config)
 
         except Exception as e:
             print(f"wg_config err: {e}", file=sys.stderr)
-            return None
-
-        return response
 
     # /v1/create
     def register_service(self, subdomain, service_type, url):
@@ -112,7 +111,7 @@ class Wireguard:
             response = requests.post(f'{url}/create',json=update_data,headers=headers).json()
             print(f"Sent creation request for {service_type}", file=sys.stderr)
         except Exception as e:
-            print(e)
+            print(e, file=sys.stderr)
             return None
         
         # wait for it to be created
