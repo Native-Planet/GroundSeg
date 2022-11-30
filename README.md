@@ -35,7 +35,7 @@ sudo /tmp/nativeplanet/groundseg_install.sh
 
 ## Edge Branch Installation (Unstable)
 1. Modify `"updateUrl"` in `/opt/nativeplanet/groundseg/settings/system.json` to `https://version.infra.native.computer/version_edge.csv`
-
+2. `sudo systemctl restart groundseg`
 
 
 ## Development and Building From Source
