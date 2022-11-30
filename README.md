@@ -10,8 +10,8 @@ Due to a major refactor in GroundSeg, you will have to run the [GroundSeg Instal
 
 **Disclaimer:** This software runs as `root` on your device. This is required for controlling various aspects of the device.
 
-### Standard Installation (Recommended)
-This installs `docker`, `docker-compose` and the required images for GroundSeg to work.
+### Docker + GroundSeg (Recommended)
+This installs `docker` and the GroundSeg binary.
 
 ```
 mkdir -p /tmp/nativeplanet && \
@@ -24,6 +24,7 @@ sudo /tmp/nativeplanet/standard_install.sh
 ### Groundseg Only
 
 This downloads and runs the compose file. Only use this if you already have `docker` and `docker-compose` installed.
+
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/groundseg_install.sh \
@@ -32,19 +33,9 @@ sudo chmod +x /tmp/nativeplanet/groundseg_install.sh && \
 sudo /tmp/nativeplanet/groundseg_install.sh
 ```
 
-## Updating from Beta-1.0.0 (Assembly 2022 Demo Version)
-In order to prevent conflicting configs we will have to copy the config files to the new location.
-```
-sudo mkdir -p /var/lib/docker/volumes/groundseg_settings/_data && \
-sudo cp -r /opt/nativeplanet/groundseg/settings/* /var/lib/docker/volumes/groundseg_settings/_data/
-```
+## Edge Branch Installation (Unstable)
+1. Modify `"updateUrl"` in `/opt/nativeplanet/groundseg/settings/system.json` to `https://version.infra.native.computer/version_edge.csv`
 
-**Optional but recommended:** Delete the old files.
-```
-sudo rm -r /opt/nativeplanet/groundseg/*
-```
-
-Lastly, run either one of the install commands.
 
 
 ## Development and Building From Source
@@ -92,5 +83,4 @@ sudo /tmp/nativeplanet/complete_uninstall.sh
 ## TODO 
 
 1. Add bitcoin node support
-2. Login and authentication
-3. Onboarding screen
+2. Onboarding screen
