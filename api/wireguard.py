@@ -39,7 +39,7 @@ class Wireguard:
 
         # Load wireguard docker
         self.wg_docker = WireguardDocker(data)
-        if(self.wg_docker.is_running()):
+        if self.wg_docker.is_running():
             self.wg_docker.stop()
 
 #

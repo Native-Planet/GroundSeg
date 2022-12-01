@@ -39,7 +39,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.1-edge'
+    gs_version = 'Beta-3.3.2-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -627,7 +627,7 @@ class Orchestrator:
             x = self.wireguard.get_status(url)
             if x != None:
                 self.anchor_config = x 
-                self.wireguard.set_wg_config(x['conf'])
+                self.wireguard.update_wg_config(x['conf'])
 
             patp_reg = False
 
@@ -645,7 +645,7 @@ class Orchestrator:
             x = self.wireguard.get_status(url)
             if x != None:
                 self.anchor_config = x 
-                self.wireguard.set_wg_config(x['conf'])
+                self.wireguard.update_wg_config(x['conf'])
             url = None
             http_port = None
             ames_port = None
@@ -985,7 +985,7 @@ class Orchestrator:
         x = self.wireguard.get_status(url)
         if x != None:
             self.anchor_config = x 
-            self.wireguard.set_wg_config(x['conf'])
+            self.wireguard.update_wg_config(x['conf'])
 
         if self.anchor_config != None:
            print("Starting Wireguard", file=sys.stderr)
