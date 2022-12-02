@@ -660,7 +660,7 @@ class Orchestrator:
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
                     if(patp in ep['url']):
-                        self.log_groundseg(f"{patp}: Services already exists", file=sys.stderr)
+                        self.log_groundseg(f"{patp}: Services already exists")
                         patp_reg = True
 
             if patp_reg == False:
