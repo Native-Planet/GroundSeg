@@ -1,7 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
-
 	import { updateState, api } from '$lib/api'
+
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 	import PierList from '$lib/PierList.svelte'
@@ -29,6 +29,8 @@
 	onMount(()=> {
     if (data['status'] == 404) {
       window.location.href = "/login"
+    } else {
+      console.log(data['status'])
     }
 		inView = true
 		update()
