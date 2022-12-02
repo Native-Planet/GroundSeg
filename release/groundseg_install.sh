@@ -18,7 +18,7 @@ sudo mkdir -p $SAVE_DIR
 sudo wget -O $SAVE_DIR/groundseg \
   https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
 
-sudo chmod +x /opt/nativeplanet
+sudo chmod +x $SAVE_DIR/groundseg
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
