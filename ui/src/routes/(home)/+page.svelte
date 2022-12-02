@@ -1,5 +1,6 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
+  import { page } from '$app/stores'
 	import { updateState, api } from '$lib/api'
 
   import Logo from '$lib/Logo.svelte'
@@ -27,6 +28,7 @@
 
 	// Start the update loop
 	onMount(()=> {
+    api.set("http://" + $page.url.hostname + ":27016")
     if (data['status'] == 404) {
       window.location.href = "/login"
     }
