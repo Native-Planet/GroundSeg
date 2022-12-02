@@ -14,9 +14,11 @@ TAG=beta-3.3.0
 SAVE_DIR=/opt/nativeplanet/groundseg
 sudo mkdir -p $SAVE_DIR
 
-# 
+# Download GroundSeg binary
 sudo wget -O $SAVE_DIR/groundseg \
   https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
+
+sudo chmod +x /opt/nativeplanet
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
