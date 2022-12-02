@@ -29,8 +29,6 @@
 	onMount(()=> {
     if (data['status'] == 404) {
       window.location.href = "/login"
-    } else {
-      console.log(data['status'])
     }
 		inView = true
 		update()
