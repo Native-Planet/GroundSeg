@@ -1,5 +1,5 @@
 <script>
-  import { afterUpdate } from 'svelte'
+  import { onMount, afterUpdate } from 'svelte'
   import { page } from '$app/stores'
   import { power, api, isPortrait } from '$lib/api'
   import SettingsButton from '$lib/SettingsButton.svelte'
@@ -22,6 +22,8 @@
       power.set(null)
     }
   })
+
+  onMount(()=> api.set("http://" + $page.url.hostname + ":27016"))
 
 </script>
 

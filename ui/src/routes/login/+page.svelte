@@ -2,6 +2,7 @@
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
   import { api, updateState, secret } from '$lib/api'
+  import { page } from '$app/stores'
 
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -16,15 +17,16 @@
     loginPassword = '',
     buttonStatus = 'standard'
 
-
+	onDestroy(()=> inView = false)
   onMount(()=> {
     if (data['status'] == 200) {
       console.log("logged in")
       window.location.href = "/"
+    } else {
+      console.log(data['status'])
     }
     inView = true
   })
-	onDestroy(()=> inView = false)
 
   const togglePwdView = () => {
     pwdView = !pwdView
@@ -52,7 +54,7 @@
             loginPassword = ''
           }, 2000)
         }
-  })
+    })
   }
 
 </script>

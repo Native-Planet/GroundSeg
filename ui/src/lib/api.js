@@ -26,10 +26,8 @@ export const power = writable('')
 export const updateState = update => {
 	updateUrbits(update['urbits'])
   updateSystemInformation(update['system'])
-	updateApi(update['api'])
 }
 
-const updateApi = a => {if(a){api.set(a)}}
 const updateUrbits = p => {if (p) {urbits.set(p)}}
 const updateSystemInformation = s => {if (s) {system.set(s)}}
 
