@@ -16,8 +16,7 @@ from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
 
 # Stop and remove legacy containers
-os.system('docker rm -f groundseg_api')
-os.system('docker rm -f groundseg_webui')
+os.system('docker rm -f groundseg_api groundseg_webui')
 
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
@@ -231,6 +230,7 @@ def anchor_settings():
             settings = orchestrator.get_anchor_settings()
             return jsonify(settings)
 
+    return jsonify(404)
 
 # Pier upload
 @app.route("/upload", methods=['POST'])
@@ -312,6 +312,7 @@ def login():
         res = make_response(jsonify(res))
 
     return res
+
 
 if __name__ == '__main__':
     debug_mode = False

@@ -9,7 +9,7 @@ sudo rm -r /opt/nativeplanet/groundseg/*
 python -m nuitka --clang --onefile api/groundseg.py -o groundseg
 
 # move binary
-sudo mv groundseg /opt/nativeplanet/groundseg/groundseg
+sudo cp groundseg /opt/nativeplanet/groundseg/groundseg
 
 # restart service
 sudo chmod +x /opt/nativeplanet/groundseg/groundseg

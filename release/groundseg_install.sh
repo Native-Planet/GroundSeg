@@ -8,21 +8,23 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=main
-TAG="beta-3.3.0"
+TAG=beta-3.3.0
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg
 sudo mkdir -p $SAVE_DIR
 
-# 
+# Download GroundSeg binary
 sudo wget -O $SAVE_DIR/groundseg \
   https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
+
+sudo chmod +x $SAVE_DIR/groundseg
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
   # systemd unit
   sudo wget -O /etc/systemd/system/groundseg.service \
-	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
+    https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
 
   # Load and start
   sudo systemctl enable groundseg

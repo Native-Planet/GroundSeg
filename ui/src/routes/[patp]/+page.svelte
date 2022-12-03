@@ -33,6 +33,7 @@
 
 	// start api loop
 	onMount(()=> {
+    api.set("http://" + $page.url.hostname + ":27016")
     if (data['status'] == 404) {
       window.location.href = "/login"
     }
