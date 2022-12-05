@@ -24,7 +24,6 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
   # systemd unit
   sudo wget -O /etc/systemd/system/groundseg.service \
-    https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
 	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg.service
 
   # Load and start
