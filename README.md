@@ -1,7 +1,7 @@
 # Native Planet GroundSeg
 This is the Control Software for the NP System. 
 
-GroundSeg requires `docker` and `docker-compose` to work.
+GroundSeg requires `docker` and `glibc ^2.34` to work.
 
 ## Updating to Beta-3.0.0 -- Important!
 Due to a major refactor in GroundSeg, you will have to run the [GroundSeg Installation command](#groundseg-only) for the software to run properly.
@@ -23,7 +23,7 @@ sudo /tmp/nativeplanet/standard_install.sh
 
 ### Groundseg Only
 
-This downloads and runs the compose file. Only use this if you already have `docker` and `docker-compose` installed.
+This downloads the `systemd` or `launchd` service file and the groundseg binary.
 
 ```
 mkdir -p /tmp/nativeplanet && \
