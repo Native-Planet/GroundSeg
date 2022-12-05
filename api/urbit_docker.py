@@ -15,6 +15,7 @@ default_pier_config = {
         "pier_name":"",
         "http_port":8080,
         "ames_port":34343,
+        "loom_size":31,
         "urbit_version":"latest",
         "minio_version":"latest",
         "minio_password": "",
@@ -41,15 +42,15 @@ class UrbitDocker:
         self.config = pier_config
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
-        self.buildUrbit()
+        self.build_urbit()
         self.running = (self.container.attrs['State']['Status'] == 'running' )
-        if(self.is_running()):
+        if self.running:
             self.stop()
             self.start()
 
         self.save_config()
 
-    def buildVolume(self):
+    def build_volume(self):
         volumes = client.volumes.list()
         for v in volumes:
             if self.pier_name == v.name:
@@ -64,15 +65,17 @@ class UrbitDocker:
             f.write(self.start_script)
             f.close()
 
-    def buildContainer(self):
+    def build_container(self):
         containers = client.containers.list(all=True)
         for c in containers:
             if(self.pier_name == c.name):
                 self.container = c
                 return
-        if(self.config["network"] != "none"):
+        if self.config["network"] != "none":
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
-                                          --port={self.config["wg_ames_port"]}'
+                                          --port={self.config["wg_ames_port"]} \
+                                          --loom={self.config["loom_size"]}'
+
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
                                     command = command, 
@@ -81,11 +84,12 @@ class UrbitDocker:
                                     labels = {"com.centurylinklabs.watchtower.enable":"true"},
                                     mounts = [self.mount],
                                     detach=True)
+
         else:
-            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
-                                          --port={self.config["wg_ames_port"]}'
+            command = f'bash /urbit/start_urbit.sh --loom={self.config["loom_size"]}'
             self.container = client.containers.create(
                                     f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    command = command, 
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
                                     name = self.pier_name,
@@ -114,11 +118,11 @@ class UrbitDocker:
             self.start()
 
     def set_network(self, network):
-        if(self.config['network'] == network):
+        if self.config['network'] == network:
             return 0
 
         running = False
-        if(self.is_running()):
+        if self.running:
             self.stop()
             running = True
         
@@ -126,12 +130,30 @@ class UrbitDocker:
         self.config['network'] = network
         self.save_config()
 
-        self.buildContainer()
+        self.build_container()
 
-        if(running):
+        if running:
             self.start()
 
         return 0
+
+    def set_loom_size(self, size):
+        running = False
+
+        if self.running:
+            self.stop()
+            running = True
+        
+        self.container.remove()
+        self.config['loom_size'] = size
+        self.save_config()
+
+        self.build_container()
+
+        if running:
+            self.start()
+
+        return 200
 
     def toggle_meld_status(self, loopbackAddr):
         self.config['meld_schedule'] = not self.config['meld_schedule']
@@ -150,10 +172,10 @@ class UrbitDocker:
         with open(f'/opt/nativeplanet/groundseg/settings/pier/{self.pier_name}.json', 'w') as f:
             json.dump(self.config, f, indent = 4)
 
-    def buildUrbit(self):
-        self.buildVolume()
+    def build_urbit(self):
+        self.build_volume()
         self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
-        self.buildContainer()
+        self.build_container()
     
     def remove_urbit(self):
         self.stop()
@@ -319,6 +341,7 @@ set -eu
 # set defaults
 amesPort="34343"
 httpPort="80"
+loom="31"
 
 # check args
 for i in "$@"
@@ -330,6 +353,10 @@ case $i in
       ;;
    --http-port=*)
       httpPort="${i#*=}"
+      shift
+      ;;
+   --loom=*)
+      loom="${i#*=}"
       shift
       ;;
 esac
@@ -354,7 +381,7 @@ keyname=''${keys[0]}
 mv $keyname /tmp
 
 # Boot urbit with the key, exit when done booting
-urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort
+urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
 
 # Remove the keyfile for security
 rm /tmp/$keyname
@@ -365,7 +392,7 @@ comets=( $cometnames )
 cometname=''${comets[0]}
 rm *.comet
 
-urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort
+urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
 fi
 
 # Find the first directory and start urbit with the ship therein
@@ -373,5 +400,5 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-exec urbit $ttyflag -p $amesPort --http-port $httpPort $dirname 
+exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
 """

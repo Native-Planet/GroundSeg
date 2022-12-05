@@ -1,5 +1,6 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
+
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
 	import { api, updateState } from '$lib/api'
@@ -161,6 +162,7 @@
         meldLast={urbit.meldLast}
         meldNext={urbit.meldNext}
         autostart={urbit.autostart}
+        loomSize={urbit.loomSize}
         {expanded}
         {isPierDeletion}
         on:toggleExpand={()=> expanded = !expanded}
