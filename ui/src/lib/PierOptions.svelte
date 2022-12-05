@@ -15,7 +15,7 @@
 
   export let remote, minIOReg, hasBucket, name, running, timeNow,
     frequency, meldHour, meldMinute, meldOn, meldLast, meldNext,
-    containers, expanded, isPierDeletion, autostart
+    containers, expanded, isPierDeletion, autostart, loomSize
 
   let selectedContainer = name
 
@@ -93,6 +93,7 @@
        {isPierDeletion}
        {hasBucket}
        {autostart}
+       {loomSize}
        on:delete={toggleDeletePier}
      />
    </div>

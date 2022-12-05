@@ -39,7 +39,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.4'
+    gs_version = 'Beta-3.3.5-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -178,6 +178,9 @@ class Orchestrator:
     # Load urbit ships
     def load_urbits(self):
         for p in self.config['piers']:
+
+            self.log_groundseg(f"{p}: Loading Pier")
+
             data = None
             with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
                 data = json.load(f)
@@ -193,8 +196,6 @@ class Orchestrator:
 
             if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
                 self._urbits[p].start()
-
-            self.log_groundseg(f"{p}: Loading Pier")
 
         self.log_groundseg("Urbit Piers loaded")
 
@@ -279,6 +280,7 @@ class Orchestrator:
         u['minIOUrl'] = ""
         u['minIOReg'] = True
         u['hasBucket'] = False
+        u['loomSize'] = urb.config['loom_size']
 
         if(urb.config['network'] == 'wireguard'):
             u['remote'] = True
@@ -323,11 +325,7 @@ class Orchestrator:
 
                 if data['data'] == 's3-unlink':
                     lens_port = self.get_urbit_loopback_addr(urbit_id)
-                    try:
-                        return urb.unlink_minio_endpoint(lens_port)
-
-                    except Exception as e:
-                        self.log_groundseg(f"{urbit_id}: {e}")
+                    return urb.unlink_minio_endpoint(lens_port)
 
                 if data['data'] == 'schedule-meld':
                     return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
@@ -348,6 +346,9 @@ class Orchestrator:
 
                 if data['data'] == 'toggle-autostart':
                     return self.toggle_autostart(urbit_id)
+
+                if data['data'] == 'loom':
+                    return urb.set_loom_size(data['size'])
 
             # Wireguard requests
             if data['app'] == 'wireguard':
@@ -383,6 +384,7 @@ class Orchestrator:
         self.log_groundseg(f"{patp}: Boot status set to {self._urbits[patp].config['boot_status']}")
 
         return 200
+
 
     # Delete Urbit Pier and MiniO
     def delete_urbit(self, patp):
