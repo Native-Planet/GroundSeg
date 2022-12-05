@@ -15,6 +15,7 @@ default_pier_config = {
         "pier_name":"",
         "http_port":8080,
         "ames_port":34343,
+        "loom_size":31,
         "urbit_version":"latest",
         "minio_version":"latest",
         "minio_password": "",

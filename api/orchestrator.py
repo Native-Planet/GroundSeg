@@ -279,6 +279,7 @@ class Orchestrator:
         u['minIOUrl'] = ""
         u['minIOReg'] = True
         u['hasBucket'] = False
+        u['loomSize'] = urb.config['loom_size']
 
         if(urb.config['network'] == 'wireguard'):
             u['remote'] = True
@@ -323,11 +324,7 @@ class Orchestrator:
 
                 if data['data'] == 's3-unlink':
                     lens_port = self.get_urbit_loopback_addr(urbit_id)
-                    try:
-                        return urb.unlink_minio_endpoint(lens_port)
-
-                    except Exception as e:
-                        self.log_groundseg(f"{urbit_id}: {e}")
+                    return urb.unlink_minio_endpoint(lens_port)
 
                 if data['data'] == 'schedule-meld':
                     return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
@@ -348,6 +345,9 @@ class Orchestrator:
 
                 if data['data'] == 'toggle-autostart':
                     return self.toggle_autostart(urbit_id)
+
+                if data['data'] == 'loom':
+                    return self.change_loom_size(urbit_id, data['size'])
 
             # Wireguard requests
             if data['app'] == 'wireguard':
@@ -383,6 +383,19 @@ class Orchestrator:
         self.log_groundseg(f"{patp}: Boot status set to {self._urbits[patp].config['boot_status']}")
 
         return 200
+
+    # Modify loom and restart ship if required
+    def change_loom_size(self, patp, size):
+        self._urbits[patp].config['loom_size'] = size
+        self._urbits[patp].save_config()
+        if self._urbits[patp].running == False:
+            return 200
+        if 0 == self._urbits[patp].stop():
+            if 0 == self._urbits[patp].start():
+                return 200
+
+        return 400
+
 
     # Delete Urbit Pier and MiniO
     def delete_urbit(self, patp):
