@@ -39,7 +39,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.4'
+    gs_version = 'Beta-3.3.5-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -178,6 +178,9 @@ class Orchestrator:
     # Load urbit ships
     def load_urbits(self):
         for p in self.config['piers']:
+
+            self.log_groundseg(f"{p}: Loading Pier")
+
             data = None
             with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
                 data = json.load(f)
@@ -193,8 +196,6 @@ class Orchestrator:
 
             if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
                 self._urbits[p].start()
-
-            self.log_groundseg(f"{p}: Loading Pier")
 
         self.log_groundseg("Urbit Piers loaded")
 
@@ -347,7 +348,7 @@ class Orchestrator:
                     return self.toggle_autostart(urbit_id)
 
                 if data['data'] == 'loom':
-                    return self.change_loom_size(urbit_id, data['size'])
+                    return urb.set_loom_size(data['size'])
 
             # Wireguard requests
             if data['app'] == 'wireguard':
@@ -383,18 +384,6 @@ class Orchestrator:
         self.log_groundseg(f"{patp}: Boot status set to {self._urbits[patp].config['boot_status']}")
 
         return 200
-
-    # Modify loom and restart ship if required
-    def change_loom_size(self, patp, size):
-        self._urbits[patp].config['loom_size'] = size
-        self._urbits[patp].save_config()
-        if self._urbits[patp].running == False:
-            return 200
-        if 0 == self._urbits[patp].stop():
-            if 0 == self._urbits[patp].start():
-                return 200
-
-        return 400
 
 
     # Delete Urbit Pier and MiniO
