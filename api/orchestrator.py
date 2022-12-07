@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.6-edge'
+    gs_version = 'Beta-3.3.7-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -496,8 +496,9 @@ class Orchestrator:
     def create_minio_admin_account(self, patp, password):
 
         self._urbits[patp].config['minio_password'] = password
+        self._urbits[patp].save_config()
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
-        self._mc.mc_setup(p,self._minios[p].config['wg_s3_port'],self._minios[p].config['minio_password'])
+        self._mc.mc_setup(patp, self._minios[patp].config['wg_s3_port'], self._minios[patp].config['minio_password'])
         self.minIO_on = True
 
         self.log_groundseg(f"{patp}: Created MinIO admin account")
