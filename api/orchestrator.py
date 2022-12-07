@@ -25,6 +25,7 @@ from wireguard import Wireguard
 from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
 from minio_docker import MinIODocker
+from mc_docker import MCDocker
 from updater_docker import WatchtowerDocker
 
 class Orchestrator:
@@ -39,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.5'
+    gs_version = 'Beta-3.3.6-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -47,6 +48,7 @@ class Orchestrator:
     # Docker
     _urbits = {}
     _minios = {}
+    _mc = {}
     _watchtower = {}
     _webui = {}
 
@@ -72,16 +74,11 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # MC Binaries
-        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
-            self.log_groundseg("MC Binaries not found. Downloading..")
-            urllib.request.urlretrieve(
-                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
-                    f"{self.config['CFG_DIR']}/mc"
-                    )
-            self.log_groundseg("Downloaded MC binary")
-        else:
-            self.log_groundseg("MC binary already exists!")
+        # Remove MC Binary
+        if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
+            self.log_groundseg("Old MC binary found. Deleting...")
+            os.system(f"rm {self.config['CFG_DIR']}/mc")
+            self.log_groundseg("Old MC binary deleted")
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
@@ -177,6 +174,11 @@ class Orchestrator:
 
     # Load urbit ships
     def load_urbits(self):
+        if self.wireguard.wg_docker.is_running():
+            self.log_groundseg("Starting MC")
+            self._mc = MCDocker()
+            time.sleep(3)
+
         for p in self.config['piers']:
 
             self.log_groundseg(f"{p}: Loading Pier")
@@ -192,7 +194,8 @@ class Orchestrator:
 
             if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
                 self._minios[p] = MinIODocker(data)
-                self.toggle_minios_on()
+                if self.toggle_minios_on():
+                    x = self._mc.mc_setup(p, self._minios[p].config['wg_s3_port'], self._minios[p].config['minio_password'])
 
             if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
                 self._urbits[p].start()
@@ -494,6 +497,7 @@ class Orchestrator:
 
         self._urbits[patp].config['minio_password'] = password
         self._minios[patp] = MinIODocker(self._urbits[patp].config)
+        self._mc.mc_setup(p,self._minios[p].config['wg_s3_port'],self._minios[p].config['minio_password'])
         self.minIO_on = True
 
         self.log_groundseg(f"{patp}: Created MinIO admin account")
@@ -704,7 +708,7 @@ class Orchestrator:
             string.ascii_lowercase + 
             string.digits) for i in range(40))
 
-        res = self._minios[patp].make_service_account(acc, secret)
+        res = self._mc.make_service_account(patp, acc, secret)
         u = self._urbits[patp]
 
         endpoint = f"s3.{u.config['wg_url']}"
@@ -985,7 +989,9 @@ class Orchestrator:
     def toggle_minios_on(self):
       for m in self._minios.values():
          m.start()
+      time.sleep(2)
       self.minIO_on = True
+      return self.minIO_on
 
     # Toggl MinIO off
     def toggle_minios_off(self):
@@ -1036,7 +1042,8 @@ class Orchestrator:
 
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
-        old_url = self.config['endpointUrl']
+        endpoint = self.config['endpointUrl']
+        old_url = f'https://{endpoint}/{api_version}'
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
         self.config['wgOn'] = False
