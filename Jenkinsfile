@@ -27,10 +27,10 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" == "latest" ) {
-                        sh 'mv ./release/version.csv /opt/groundseg/version/version.csv'
+                        sh 'mv ./release/version.csv /opt/groundseg/version/'
                     }
                     if( "${tag}" == "edge" ) {
-                        sh 'mv ./release/version_edge.csv /opt/groundseg/version/version_edge.csv'
+                        sh 'mv ./release/version_edge.csv /opt/groundseg/version/'
                     }
                 }
             }
