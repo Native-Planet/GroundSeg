@@ -30,10 +30,8 @@ class MCDocker:
                     )
 
     def mc_setup(self, patp, port, pwd):
-        x = self.container.exec_run(f"mc alias set patp_{patp} http://localhost:{port} {patp} {pwd}")
-        print(x, file=sys.stderr)
-        y = self.container.exec_run(f"mc anonymous set public patp_{patp}/bucket")
-        print(y, file=sys.stderr)
+        self.container.exec_run(f"mc alias set patp_{patp} http://localhost:{port} {patp} {pwd}")
+        self.container.exec_run(f"mc anonymous set public patp_{patp}/bucket")
         return 200
 
     def make_service_account(self, patp, acc, pwd):
@@ -44,8 +42,6 @@ class MCDocker:
                 --secret-key '{pwd}' \
                 patp_{patp} {acc}", tty=True).output.decode('utf-8').strip()
 
-        print(f"mk svc acc {x}", file=sys.stderr)
-
         if 'ERROR' in x:
             print('Service account does not exist. Creating new account...', file=sys.stderr)
             x = self.container.exec_run(f"mc admin user svcacct add \
@@ -53,8 +49,6 @@ class MCDocker:
                     --secret-key '{pwd}' \
                     patp_{patp} {patp}").output.decode('utf-8').strip()
         
-            print(f"mk svc acc 2 {x}", file=sys.stderr)
-
             if 'ERROR' in x:
                 return 400
 

@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.5'
+    gs_version = 'Beta-3.3.6-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -74,16 +74,11 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        # MC Binaries
-        if not os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
-            self.log_groundseg("MC Binaries not found. Downloading..")
-            urllib.request.urlretrieve(
-                    "https://dl.min.io/client/mc/release/linux-amd64/mc",
-                    f"{self.config['CFG_DIR']}/mc"
-                    )
-            self.log_groundseg("Downloaded MC binary")
-        else:
-            self.log_groundseg("MC binary already exists!")
+        # Remove MC Binary
+        if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
+            self.log_groundseg("Old MC binary found. Deleting...")
+            os.system(f"rm {self.config['CFG_DIR']}/mc")
+            self.log_groundseg("Old MC binary deleted")
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
@@ -1047,7 +1042,8 @@ class Orchestrator:
 
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
-        old_url = self.config['endpointUrl']
+        endpoint = self.config['endpointUrl']
+        old_url = f'https://{endpoint}/{api_version}'
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False
         self.config['wgOn'] = False
