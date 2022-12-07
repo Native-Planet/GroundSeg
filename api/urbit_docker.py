@@ -113,7 +113,7 @@ class UrbitDocker:
 
         self.container.remove()
         
-        self.buildContainer()
+        self.build_container()
         if running:
             self.start()
 

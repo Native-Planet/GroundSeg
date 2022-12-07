@@ -59,17 +59,12 @@ class MinIODocker:
                 command=command, 
                 name = self.minio_name,
                 environment = environment,
+                labels = {"com.centurylinklabs.watchtower.enable":"true"},
                 network = f'container:wireguard',
                 mounts = [self.mount],
                 detach=True)
 
-        self.container.exec_run('mkdir /data/bucket')
-
-        shutil.copy('/opt/nativeplanet/groundseg/mc', f'/var/lib/docker/volumes/{self.minio_name}/_data/mc')
-
-        self.container.exec_run("chmod +x /data/mc")
-        self.container.exec_run(f"/data/mc alias set myminio http://localhost:{s3_port} {self.config['pier_name']} {self.config['minio_password']}")
-        self.container.exec_run("/data/mc anonymous set public myminio/bucket")
+        self.container.exec_run('mkdir -p /data/bucket')
 
     def stop(self):
         self.container.stop()
@@ -81,23 +76,3 @@ class MinIODocker:
         self.stop()
         self.container.remove()
         self.volume.remove()
-
-    def make_service_account(self, acc, pwd):
-        x = None
-
-        print('Updating service account credentials', file=sys.stderr)
-        x = self.container.exec_run(f"/data/mc admin user svcacct edit \
-                --secret-key '{pwd}' \
-                myminio {acc}").output.decode('utf-8').strip()
-
-        if 'ERROR' in x:
-            print('Service account does not exist. Creating new account...', file=sys.stderr)
-            x = self.container.exec_run(f"/data/mc admin user svcacct add \
-                    --access-key '{acc}' \
-                    --secret-key '{pwd}' \
-                    myminio {self.config['pier_name']}").output.decode('utf-8').strip()
-
-            if 'ERROR' in x:
-                return 400
-
-        return 200
