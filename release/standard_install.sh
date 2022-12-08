@@ -7,7 +7,9 @@ BRANCH=main
 
 DIST="$(. /etc/os-release && echo "$ID")"
 
-mkdir -p /tmp/nativeplanet
+echo $DIST
+
+sudo mkdir -p /tmp/nativeplanet
 
 if [[ "$DIST" == "linuxmint" ]]
 then
@@ -19,18 +21,18 @@ then
     sudo apt update
     sudo apt install docker-ce docker-ce-cli containerd.io
 else
-    wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/
-    chmod +x /tmp/nativeplanet/docker_install.sh
+    sudo wget -O /tmp/nativeplanet/docker_install.sh https://get.docker.com/
+    sudo chmod +x /tmp/nativeplanet/docker_install.sh
     sudo /tmp/nativeplanet/docker_install.sh
 fi
 
-systemctl enable docker
-systemctl start docker
+sudo systemctl enable docker
+sudo systemctl start docker
 
-wget -O /tmp/nativeplanet/groundseg_install.sh \
+sudo wget -O /tmp/nativeplanet/groundseg_install.sh \
 	https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/groundseg_install.sh
 
-chmod +x /tmp/nativeplanet/groundseg_install.sh
+sudo chmod +x /tmp/nativeplanet/groundseg_install.sh
 sudo /tmp/nativeplanet/groundseg_install.sh
 
-rm -r /tmp/nativeplanet
+sudo rm -r /tmp/nativeplanet
