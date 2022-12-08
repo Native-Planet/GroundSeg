@@ -14,6 +14,9 @@ TAG=beta-3.3.7
 SAVE_DIR=/opt/nativeplanet/groundseg
 sudo mkdir -p $SAVE_DIR
 
+# Stop GroundSeg if running
+sudo systemctl stop groundseg
+
 # Download GroundSeg binary
 sudo wget -O $SAVE_DIR/groundseg \
   https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
