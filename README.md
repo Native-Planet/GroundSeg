@@ -3,42 +3,31 @@ This is the Control Software for the NP System.
 
 GroundSeg requires `docker` and `glibc ^2.34` to work.
 
-## Updating to Beta-3.0.0 -- Important!
-Due to a major refactor in GroundSeg, you will have to run the [GroundSeg Installation command](#groundseg-only) for the software to run properly.
-
 ## Installation
 
 **Disclaimer:** This software runs as `root` on your device. This is required for controlling various aspects of the device.
 
 ### Docker + GroundSeg (Recommended)
-This installs `docker` and the GroundSeg binary.
+This installs `docker` and the GroundSeg binary. Use this if you do not know what you're doing.
 
 ```
-mkdir -p /tmp/nativeplanet && \
-sudo wget -O /tmp/nativeplanet/standard_install.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_install.sh && \
-sudo chmod +x /tmp/nativeplanet/standard_install.sh && \
-sudo /tmp/nativeplanet/standard_install.sh
+sudo wget -O - get.groundseg.app | bash
 ```
 
 ### Groundseg Only
 
-This downloads the `systemd` or `launchd` service file and the groundseg binary.
+This downloads the appropriate service file for you init system and the groundseg binary. Docker has to already be installed.
 
 ```
-mkdir -p /tmp/nativeplanet && \
-sudo wget -O /tmp/nativeplanet/groundseg_install.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_install.sh && \
-sudo chmod +x /tmp/nativeplanet/groundseg_install.sh && \
-sudo /tmp/nativeplanet/groundseg_install.sh
+sudo wget -O - only.groundseg.app | bash
 ```
 
 ## Edge Branch Installation (Unstable)
 1. Modify `"updateUrl"` in `/opt/nativeplanet/groundseg/settings/system.json` to `https://version.infra.native.computer/version_edge.csv`
 2. `sudo systemctl restart groundseg`
 
-
 ## Development and Building From Source
+(Outdated -- New instructions coming soon)
 1. Clone this repository
 2. `export HOST_HOSTNAME=$(hostname)` 
 3. Run `sudo -E docker-compose up --build` in the root directory of the repository.
@@ -48,6 +37,7 @@ sudo /tmp/nativeplanet/groundseg_install.sh
 ### Standard Removal (Recommended)
 This removes `docker`, `docker-compose`, GroundSeg related docker containers and images, and the GroundSeg system files.
 This **DOES NOT** remove the docker volumes on the device.
+
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/standard_uninstall.sh \
