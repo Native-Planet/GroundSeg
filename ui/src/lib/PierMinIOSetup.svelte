@@ -71,7 +71,7 @@
 
     <div class="pier-title">
       <!-- Password prompt title -->
-      <span>Setup MinIO Password</span>
+      <span>Setup MinIO Local Storage Password</span>
 
       <!-- Info button -->
       <button class="question-mark" on:click={()=>handleTextToggle('info')} >

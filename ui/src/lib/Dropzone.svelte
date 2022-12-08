@@ -66,8 +66,8 @@
         } else {
           setTimeout(()=> handleSuccess(n), 1000)
         }
-      })
-			.catch(err => console.log(err))
+    })
+    .catch(err => console.log(err))
   }
 
   const onError = (e) => {
@@ -107,7 +107,7 @@
     {#if failed}
       <span style="color: red;">{failedText}</span>
     {:else}
-      Drop pier here to upload
+      Drop Pier File here to Upload
     {/if}
   {/if}
 

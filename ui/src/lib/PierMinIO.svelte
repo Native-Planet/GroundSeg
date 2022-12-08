@@ -16,7 +16,7 @@
 
 {#if minIOReg && remote}
   <div class="pier-info">
-    <div class="pier-title">MinIO Console</div>
+    <div class="pier-title">MinIO Local Storage Console</div>
     <div class="pier-cred-wrapper">
       <div on:click={copy} id="minIOUrl" data-clipboard-text={minIOUrl} class="pier-cred">
 		  	{

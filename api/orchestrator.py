@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.7'
+    gs_version = 'Beta-3.3.8-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -666,8 +666,8 @@ class Orchestrator:
 
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
-                    if(patp in ep['url']):
-                        self.log_groundseg(f"{patp}: Services already exists")
+                    if patp in ep['url'] :
+                        self.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
                         patp_reg = True
 
             if patp_reg == False:

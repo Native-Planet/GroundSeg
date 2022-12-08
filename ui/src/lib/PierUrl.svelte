@@ -15,7 +15,7 @@
 </script>
 
 <div class="pier-info">
-  <div class="pier-title">Urbit Link</div>
+  <div class="pier-title">Ship Access URL</div>
   <div class="pier-cred-wrapper">
     <div on:click={copy} id="urbitUrl" data-clipboard-text={urbitUrl} class="pier-cred">
 			{

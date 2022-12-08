@@ -23,7 +23,7 @@
 
 	// updateState loop
   const update = () => {
-    if ($page.routeId == 'anchor') {
+    if ($page.routeId == 'startram') {
       fetch($api + '/anchor', {credentials: "include"})
 			.then(raw => raw.json())
       .then(res => data = res)
@@ -51,7 +51,7 @@
 
     <!-- Header -->
     <AnchorHeader wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning}>
-      <Logo t='Anchor'/>
+      <Logo t='StarTram'/>
     </AnchorHeader>
 
     {#if data.anchor.lease != null}

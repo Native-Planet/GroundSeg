@@ -48,7 +48,7 @@
 
   <!-- If not registered -->
   {#if !wgReg}
-    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Key Registration</div>
+    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
@@ -56,7 +56,7 @@
 
   <!-- if registered -->
   {:else if !reRegCheck}
-    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Key Registration</div>
+    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
@@ -66,8 +66,9 @@
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
     <PrimaryButton
+      left={true}
       on:click={wgReg && reRegCheck ? ()=>reRegCheck = false : registerKey }
-      standard="Register{wgReg && reRegCheck ? " A New Key" : ""}"
+      standard="Register{wgReg && reRegCheck ? " A New StarTram Key" : ""}"
       success="Key registered"
       failure="Registration failed"
       loading="Processing..."
@@ -76,7 +77,7 @@
         key == '' ? "disabled" : buttonStatus
       }
       top="{wgReg && reRegCheck ? "26" : "12"}"
-      />
+    />
   </div>
 </div>
 

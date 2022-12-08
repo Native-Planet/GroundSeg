@@ -1,26 +1,24 @@
 <script>
   import { scale } from 'svelte/transition'
-	import { onMount } from 'svelte'
+  import { onMount } from 'svelte'
 	import { updateState } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
-	import Card from '$lib/Card.svelte'
 	import NewPierButtons from '$lib/NewPierButtons.svelte'
+
+	import Card from '$lib/Card.svelte'
+  import KeyDropper from '$lib/KeyDropper.svelte'
 
 	export let data
 	updateState(data)
 
-  let name = '', key = '', viewKey = false, inView = false
-
-  const toggleViewKey = () => {
-    viewKey = !viewKey
-    document.querySelector('#key').type = viewKey ? 'text' : 'password'
-  }
+  let name = '', key = '', inView = false
 
   onMount(()=> {
     if (data['status'] == 404) {
       window.location.href = "/login"
     }
     inView = !inView
+
   })
 
 </script>
@@ -35,11 +33,8 @@
   	</div>
 
 	  <div class="info">
-  	  <div class="title">Arvo Key</div>
-    	<div class="pass-wrapper">
-	      <input spellcheck="false" id="key" type="password" bind:value={key}/>
-  	    <img on:click={toggleViewKey} src="/eye-{viewKey ? "closed" : "open"}.svg" alt="eye" />
-    	</div>
+  	  <div class="title">Keyfile</div>
+      <KeyDropper on:change={e=> key = e.detail } />
 	  </div>
 
 	</div>
@@ -50,6 +45,23 @@
 {/if}
 
 <style>
+  input {
+    flex: 1;
+    padding: 8px;
+    font-size: 12px;
+    color: inherit;
+    font-weight: 700;
+    background: #ffffff4d;
+    outline: none;
+    border: none;
+    border-radius: 6px;
+  }
+  ::-moz-placeholder {
+    color: white;
+  }
+  ::-webkit-input-placeholder {
+    color: white;
+  }
   .key {
     display: flex;
     flex-direction: column;
@@ -69,22 +81,4 @@
     margin-bottom: 8px;
     text-align: left;
   }
-  .pass-wrapper {
-    display: flex;
-  }
-  input {
-    flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    color: inherit;
-    font-weight: 700;
-    background: #ffffff4d;
-    outline: none;
-    border: none;
-    border-radius: 6px;
-  }
-  .pass-wrapper > img {
-    padding-left: 12px;
-  }
-
 </style>
