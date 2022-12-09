@@ -1037,6 +1037,14 @@ class Orchestrator:
             self.toggle_minios_on()
             self.save_config()
 
+            time.sleep(2)
+
+            if self.wireguard.is_running() and len(self.config['piers']) > 0:
+                self.log_groundseg(f"Restarting Anchor")
+                x = self.toggle_anchor_off()
+                if x == 200:
+                    self.toggle_anchor_on()
+
             return 200
 
         return 400
