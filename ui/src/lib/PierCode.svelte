@@ -14,7 +14,7 @@
 </script>
 
     <div class="pier-info">
-      <div class="pier-title">Urbit Login Code</div>
+      <div class="pier-title">Access Key</div>
       <div class="pier-cred-wrapper">
         <div on:click={copy} id="code" data-clipboard-text={code} class="pier-cred">
 					{

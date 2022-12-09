@@ -8,11 +8,14 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=main
-TAG=beta-3.3.4
+TAG=beta-3.3.7
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg
 sudo mkdir -p $SAVE_DIR
+
+# Stop GroundSeg if running
+sudo systemctl stop groundseg
 
 # Download GroundSeg binary
 sudo wget -O $SAVE_DIR/groundseg \

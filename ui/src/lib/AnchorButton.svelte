@@ -1,20 +1,43 @@
 <script>
-  import { afterUpdate } from 'svelte'
+  import { onMount, afterUpdate } from 'svelte'
+	import { updateState, api, system } from '$lib/api'
   import { page } from '$app/stores'
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
   let hide = false
   let blur = false
+  let data = {anchor: {wgReg:false, wgRunning: false}}
+
   afterUpdate(()=> {
     hide = ($page.routeId == 'login')
-    blur = ($page.routeId == 'anchor')
+    blur = ($page.routeId == 'startram')
   })
+
+	// updateState loop
+  const update = () => {
+    fetch($api + '/anchor', {credentials: "include"})
+    .then(raw => raw.json())
+    .then(res => data = res)
+    .catch(err => console.log(err))
+
+    setTimeout(update, 10000)
+	}
+
+	// Start the update loop
+	onMount(()=> {
+    api.set("http://" + $page.url.hostname + ":27016")
+		update()
+	})
 
 </script>
 
-<a href='/anchor' class:hide={hide} class:blur={blur}>
-  <div class="img">
+<a href='/startram' class:hide={hide} class:blur={blur}>
+  <div 
+    class="img" 
+    class:connected={data.anchor.wgReg && data.anchor.wgRunning}
+    class:not-connected={data.anchor.wgReg && !data.anchor.wgRunning}
+  >
     <Fa icon={faSatelliteDish} size="1.2x" />
   </div>
 </a>
@@ -35,4 +58,10 @@
     top: 3px;
 	}
   .img {height: 24px; margin: 20px; color: white}
+  .connected {
+    color: lime;
+  }
+  .not-connected {
+    color: red;
+  }
 </style>
