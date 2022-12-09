@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.8-edge'
+    gs_version = 'Beta-3.3.9-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -1044,6 +1044,7 @@ class Orchestrator:
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
         endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
         old_url = f'https://{endpoint}/{api_version}'
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False

@@ -1,11 +1,11 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-	import { updateState, api, system } from '$lib/api'
+	import { updateState, api, system, noconn } from '$lib/api'
   import { page } from '$app/stores'
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
-  let hide = false
+  let hide = true
   let blur = false
   let data = {anchor: {wgReg:false, wgRunning: false}}
 
@@ -16,11 +16,16 @@
 
 	// updateState loop
   const update = () => {
-    fetch($api + '/anchor', {credentials: "include"})
-    .then(raw => raw.json())
-    .then(res => data = res)
-    .catch(err => console.log(err))
-
+    if (!$noconn) {
+      fetch($api + '/anchor', {credentials: "include"})
+      .then(raw => raw.json())
+      .then(res => data = res)
+      .catch(err => {
+        if ((typeof err) == 'object') {
+          updateState({status:'noconn'})
+        }
+      })
+    }
     setTimeout(update, 10000)
 	}
 
@@ -32,15 +37,17 @@
 
 </script>
 
-<a href='/startram' class:hide={hide} class:blur={blur}>
-  <div 
-    class="img" 
-    class:connected={data.anchor.wgReg && data.anchor.wgRunning}
-    class:not-connected={data.anchor.wgReg && !data.anchor.wgRunning}
-  >
-    <Fa icon={faSatelliteDish} size="1.2x" />
-  </div>
-</a>
+{#if !hide}
+  <a href='/startram' class:hide={hide} class:blur={blur}>
+    <div 
+      class="img" 
+      class:connected={data.anchor.wgReg && data.anchor.wgRunning}
+      class:not-connected={data.anchor.wgReg && !data.anchor.wgRunning}
+    >
+      <Fa icon={faSatelliteDish} size="1.2x" />
+    </div>
+  </a>
+{/if}
 
 <style>
   .blur {

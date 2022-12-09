@@ -12,7 +12,13 @@ export function load({ cookies }) {
 	let d = fetch(query, {credentials:"include"})
 	.then(j => j.json())
   .then(r => {return {api:url,status:r}})
-  .catch(err => {console.log(err); return {api:url}})
+  .catch(err => {
+    console.log(err)
+    if ((typeof err) == 'object') {
+      err = 'noconn'
+    }
+    return {status:err}
+  })
 
 	return d
 }

@@ -14,7 +14,13 @@ export function load({ cookies }) {
     if (r == 404) {return {status:r}}
     else {return r}
   })
-  .catch(err => {return {status:err}})
+  .catch(err => {
+    console.log(err)
+    if ((typeof err) == 'object') {
+      err = 'noconn'
+    }
+    return {status:err}
+  })
 
 	return d
 }
