@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.4.0-edge'
+    gs_version = 'Beta-3.4.0'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -890,7 +890,7 @@ class Orchestrator:
         if sys.platform == "win32":
             os.system("shutdown /s /t 0")
         else:
-            os.system("shutdown /r")
+            os.system("reboot")
         return 200
 
     # Get list of available docker containers
