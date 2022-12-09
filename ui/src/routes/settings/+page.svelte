@@ -4,7 +4,7 @@
   import { page } from '$app/stores'
   import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
 
-	import { updateState, api, system, isPortrait } from '$lib/api'
+	import { updateState, api, system, isPortrait, noconn } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -29,7 +29,7 @@
 
 	// updateState loop
   const update = () => {
-    if (($page.routeId == 'settings') && (activeTab == 'Settings')) {
+    if (($page.routeId == 'settings') && (activeTab == 'Settings') && !$noconn) {
       fetch($api + '/system', {
         credentials: "include"
       })

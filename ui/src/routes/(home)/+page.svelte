@@ -1,7 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
   import { page } from '$app/stores'
-	import { updateState, api } from '$lib/api'
+	import { updateState, api, noconn } from '$lib/api'
 
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
@@ -17,12 +17,16 @@
 
 	// updateState loop
   const update = () => {
-    if (inView) {
+    if (inView && !$noconn) {
       fetch($api + '/urbits', {credentials:"include"})
 			.then(raw => raw.json())
     	.then(res => updateState(res))
-			.catch(err => console.log(err))
-
+      .catch(err => {
+        console.log(err)
+        if ((typeof err) == 'object') {
+          updateState({status:'noconn'})
+        }
+      })
 			setTimeout(update, 3000)
 	}}
 

@@ -15,7 +15,13 @@ export function load({ cookies }) {
     if (r == 404) {return {api:url,status:r}}
     else {return {api:url}}
   })
-  .catch(err => {console.log(err); return {api:url}})
+  .catch(err => {
+    console.log(err)
+    if ((typeof err) == 'object') {
+      err = 'noconn'
+    }
+    return {status:err}
+  })
 
 	return d
 }
