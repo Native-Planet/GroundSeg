@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store'
 
-export const webuiVersion = 'Beta-3.3.7'
+export const webuiVersion = 'Beta-3.4.0'
 
 //
 // fade transition params
@@ -11,6 +11,7 @@ export const fadeOut = {duration:200}
 //
 // writable stores
 //
+export const noconn = writable(false)
 export const secret = writable('')
 export const codes = writable({})
 export const urbits = writable([])
@@ -24,10 +25,12 @@ export const power = writable('')
 // state update
 //
 export const updateState = update => {
+  updateConnStatus(update['status'])
 	updateUrbits(update['urbits'])
   updateSystemInformation(update['system'])
 }
 
+const updateConnStatus = c => noconn.set(c == 'noconn')
 const updateUrbits = p => {if (p) {urbits.set(p)}}
 const updateSystemInformation = s => {if (s) {system.set(s)}}
 

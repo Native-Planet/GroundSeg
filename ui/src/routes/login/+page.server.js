@@ -11,7 +11,13 @@ export function load({ cookies }) {
 	let d = fetch(query)
     .then(j => j.json())
     .then(r => {return {status:r}})
-    .catch(err => {return {status:err}})
+    .catch(err => {
+      console.log(err)
+      if ((typeof err) == 'object') {
+        err = 'noconn'
+      }
+      return {status:err}
+    })
 
 	return d
 }

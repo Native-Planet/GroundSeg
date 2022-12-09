@@ -1,5 +1,5 @@
 <script>
-  import { api, currentLog } from '$lib/api'
+  import { api, currentLog, noconn } from '$lib/api'
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
 
   export let container, maxHeight
@@ -29,7 +29,7 @@
       setTimeout(getLog, 1000) 
     } else {
       let module = 'logs'
-      if (shown) {
+      if (shown && !$noconn) {
         if ($currentLog.container != container) {
           currentLog.set({'container':'','log':[]})        
         }

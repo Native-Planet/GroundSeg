@@ -3,7 +3,7 @@
 
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
-	import { api, updateState } from '$lib/api'
+	import { api, updateState, noconn } from '$lib/api'
 
 	import Card from '$lib/Card.svelte'
   import Logo from '$lib/Logo.svelte'
@@ -47,7 +47,7 @@
 
 	// api call
   const update = () => {
-    if (inView) {
+    if (inView && !$noconn) {
       fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
         credentials: "include"
       })

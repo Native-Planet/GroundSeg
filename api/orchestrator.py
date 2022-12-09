@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.7'
+    gs_version = 'Beta-3.4.0'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -666,8 +666,8 @@ class Orchestrator:
 
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
-                    if(patp in ep['url']):
-                        self.log_groundseg(f"{patp}: Services already exists")
+                    if patp in ep['url'] :
+                        self.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
                         patp_reg = True
 
             if patp_reg == False:
@@ -890,7 +890,7 @@ class Orchestrator:
         if sys.platform == "win32":
             os.system("shutdown /s /t 0")
         else:
-            os.system("shutdown /r")
+            os.system("reboot")
         return 200
 
     # Get list of available docker containers
@@ -1037,6 +1037,14 @@ class Orchestrator:
             self.toggle_minios_on()
             self.save_config()
 
+            time.sleep(2)
+
+            if self.wireguard.is_running() and len(self.config['piers']) > 0:
+                self.log_groundseg(f"Restarting Anchor")
+                x = self.toggle_anchor_off()
+                if x == 200:
+                    self.toggle_anchor_on()
+
             return 200
 
         return 400
@@ -1044,6 +1052,7 @@ class Orchestrator:
     # Change Anchor endpoint URL
     def change_wireguard_url(self, url):
         endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
         old_url = f'https://{endpoint}/{api_version}'
         self.config['endpointUrl'] = url
         self.config['wgRegistered'] = False

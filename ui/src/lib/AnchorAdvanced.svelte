@@ -2,7 +2,7 @@
   import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
-  import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
+  import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let wgReg
@@ -14,7 +14,8 @@
     epButtonStatus = 'standard',
     cancelButtonStatus = 'standard',
     confirmCancel = false,
-    regKey = '', view = false
+    regKey = '', view = false,
+    showEpInfo = false
 
 
   const insertNP = () => epKey = defaultEpKey
@@ -99,7 +100,19 @@
   {#if advanced}
     <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
       Set Endpoint
+      {#if wgReg}
+        <button class="alert-mark" on:click={()=>showEpInfo = !showEpInfo} >
+          <Fa icon={faTriangleExclamation} size="1.2x" />
+        </button>
+      {/if}
     </div>
+
+    {#if showEpInfo}
+      <div class="ep-info">
+        Modifying your endpoint will result in removing all StarTram related services attached to this device.
+      </div>
+    {/if}
+
     <div class="ep-key"transition:scale={{duration:120, delay: 200}}>
       <input type="text" bind:value={epKey} />
       <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
@@ -212,5 +225,14 @@
     padding-left: 12px;
     opacity: .8;
     cursor: pointer;
+  }
+  .ep-info {
+    font-size: 11px;
+    padding-bottom: 12px;
+    color: orange;
+  }
+  .alert-mark {
+    cursor: pointer;
+    color: orange;
   }
 </style>

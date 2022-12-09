@@ -1,10 +1,12 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
+  import { get } from 'svelte/store'
   import { page } from '$app/stores'
-  import { power, api, isPortrait } from '$lib/api'
+  import { power, api, isPortrait, noconn } from '$lib/api'
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
   import PowerScreen from '$lib/PowerScreen.svelte'
+  import NoConnection from '$lib/NoConnection.svelte'
 
 	let innerWidth = 0
   let innerHeight = 0
@@ -16,6 +18,21 @@
 		isPortrait.set(d)	
 	}
 
+  const checkStatus = () => {
+    if ($noconn) {
+      fetch($api + "/cookies",{credentials:"include"})
+        .then(() => {
+          noconn.set(false)
+          setTimeout(checkStatus, 15000)
+        })
+        .catch(err => {
+          setTimeout(checkStatus, 2000)
+        })
+    } else {
+      setTimeout(checkStatus, 15000)
+    }
+  }
+
   afterUpdate(()=> {
     vert(innerHeight, innerWidth)
     if ($page.url.pathname != '/settings') {
@@ -23,7 +40,10 @@
     }
   })
 
-  onMount(()=> api.set("http://" + $page.url.hostname + ":27016"))
+  onMount(()=> {
+    api.set("http://" + $page.url.hostname + ":27016")
+    checkStatus()
+  })
 
 </script>
 
@@ -32,12 +52,16 @@
 <PowerScreen />
 
 <div class="bg">
-  <div class:frozen={($page.url.pathname === "/settings") 
-    && (($power === 'shutdown') || ($power === 'restart'))}>
-    <SettingsButton />
-    <AnchorButton />
-    <slot/>
-  </div>
+  {#if $noconn}
+    <NoConnection />
+  {:else}
+    <div class:frozen={($page.url.pathname === "/settings") 
+      && (($power === 'shutdown') || ($power === 'restart'))}>
+      <SettingsButton />
+      <AnchorButton />
+      <slot/>
+    </div>
+  {/if}
 </div>
 
 <style>

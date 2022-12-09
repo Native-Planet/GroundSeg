@@ -6,7 +6,7 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-	import { updateState, api, system } from '$lib/api'
+	import { updateState, api, system, noconn } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 
@@ -23,11 +23,16 @@
 
 	// updateState loop
   const update = () => {
-    if ($page.routeId == 'anchor') {
+    if (($page.routeId == 'startram') && !$noconn) {
       fetch($api + '/anchor', {credentials: "include"})
 			.then(raw => raw.json())
       .then(res => data = res)
-			.catch(err => console.log(err))
+      .catch(err => {
+        console.log(err)
+        if ((typeof err) == 'object') {
+          updateState({status:'noconn'})
+        }
+      })
 
 			setTimeout(update, 1000)
 	}}
@@ -51,7 +56,7 @@
 
     <!-- Header -->
     <AnchorHeader wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning}>
-      <Logo t='Anchor'/>
+      <Logo t='StarTram'/>
     </AnchorHeader>
 
     {#if data.anchor.lease != null}
