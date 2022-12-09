@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.3.9-edge'
+    gs_version = 'Beta-3.4.0-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -1036,6 +1036,14 @@ class Orchestrator:
             self.log_groundseg(f"Starting MinIOs")
             self.toggle_minios_on()
             self.save_config()
+
+            time.sleep(2)
+
+            if self.wireguard.is_running() and len(self.config['piers']) > 0:
+                self.log_groundseg(f"Restarting Anchor")
+                x = self.toggle_anchor_off()
+                if x == 200:
+                    self.toggle_anchor_on()
 
             return 200
 
