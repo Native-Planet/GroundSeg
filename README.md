@@ -22,15 +22,32 @@ This downloads the appropriate service file for you init system and the groundse
 sudo wget -O - only.groundseg.app | bash
 ```
 
+### For Windows
+
+- Make sure you are running Windows 10 version 2004 or higher.
+
+- Open the Command Prompt App from the Start Menu.
+
+- Run the `wsl.exe --install` command.
+
+- Reboot your machine.
+
+- You will be prompted for a user name and password from the Command Prompt.
+
+- Open the Ubuntu app from the Start Menu.
+
+- Run the `sudo apt-get update && sudo apt-get upgrade -y` command.
+
+- Once the installation is complete, run `sudo wget -O - get.groundseg.app | bash`.
+
 ## Edge Branch Installation (Unstable)
+
 1. Modify `"updateUrl"` in `/opt/nativeplanet/groundseg/settings/system.json` to `https://version.infra.native.computer/version_edge.csv`
 2. `sudo systemctl restart groundseg`
 
 ## Development and Building From Source
-(Outdated -- New instructions coming soon)
-1. Clone this repository
-2. `export HOST_HOSTNAME=$(hostname)` 
-3. Run `sudo -E docker-compose up --build` in the root directory of the repository.
+
+Coming Soon
 
 ## Removing GroundSeg (Uninstall)
 
