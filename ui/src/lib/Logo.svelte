@@ -1,10 +1,7 @@
 <script>
   import { blur } from 'svelte/transition'
 
-  import Fa from 'svelte-fa'
-  import { faIgloo } from '@fortawesome/free-solid-svg-icons'
-
-  export let t = "", login = false
+  export let t = ""
 </script>
 
 <div class="logo" transition:blur={{duration: 400, amount: 100}} >
@@ -12,12 +9,6 @@
 	{#if t.length > 0}
 		<div class="wrapper"> 
 			<div class="text">{t}</div>
-      {#if !login}
-			<a class="home" href="/">
-				<Fa icon={faIgloo} />
-        <span>home</span>
-			</a>
-      {/if}
 		</div>
 	{/if}
 </div>
@@ -35,6 +26,7 @@
   .text {
     font-size: 14px;
     padding-left: 18px;
+    padding-bottom: 10px;
 
 	}
 	.home {
