@@ -6,7 +6,7 @@ import socket
 client = docker.from_env()
 
 class WebUIDocker:
-    _webui_img = "nativeplanet/groundseg-webui:latest"
+    _webui_img = "nativeplanet/groundseg-webui:edge"
 
     def __init__(self,port):
         client.images.pull(self._webui_img)
