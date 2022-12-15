@@ -47,12 +47,21 @@ class Installer:
             try:
                 subprocess.run(['rm', 'docker_install.sh'])
                 subprocess.run('docker')
-                subprocess.run(['systemctl', 'enable', 'docker'])
-                subprocess.run(['systemctl', 'start', 'docker'])
-                return True
 
             except:
                 Log.log_groundseg("Docker failed to install. Please try installing it manually")
+                pass
+
+            try:
+                res = subprocess.run(['systemctl', 'enable', 'docker'])
+                if res.returncode == 0:
+                    Log.log_groundseg("Docker enabled")
+                    res = subprocess.run(['systemctl', 'start', 'docker'])
+                    if res.returncode == 0:
+                        Log.log_groundseg("Docker started")
+                        return True
+
+            except:
                 pass
 
         return False
