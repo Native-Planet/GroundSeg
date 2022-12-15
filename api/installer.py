@@ -47,6 +47,8 @@ class Installer:
             try:
                 subprocess.run(['rm', 'docker_install.sh'])
                 subprocess.run('docker')
+                subprocess.run(['systemctl', 'enable', 'docker'])
+                subprocess.run(['systemctl', 'start', 'docker'])
                 return True
 
             except:
