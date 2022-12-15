@@ -1,3 +1,4 @@
+import time
 import sys
 import subprocess
 import platform
@@ -56,9 +57,11 @@ class Installer:
                 res = subprocess.run(['systemctl', 'enable', 'docker'])
                 if res.returncode == 0:
                     Log.log_groundseg("Docker enabled")
-                    res = subprocess.run(['systemctl', 'start', 'docker'])
+                    time.sleep(3)
+                    res = subprocess.run(['systemctl', 'restart', 'docker'])
                     if res.returncode == 0:
                         Log.log_groundseg("Docker started")
+                        time.sleep(3)
                         return True
 
             except:
