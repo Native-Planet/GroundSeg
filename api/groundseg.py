@@ -12,23 +12,35 @@ from datetime import datetime
 from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+
+from utils import Log
+from installer import Installer
+
+# Create flask app
+app = Flask(__name__)
+CORS(app, supports_credentials=True)
+
+# Announce
+Log.log_groundseg("---------- Starting GroundSeg ----------")
+Log.log_groundseg("----------- Urbit is love <3 -----------")
+
+# Check if dependencies are installed
+installer = Installer()
+
+if not installer.env_ready:
+    Log.log_groundseg("Exiting")
+    quit()
+
+# Orchestrator import
 from orchestrator import Orchestrator
 from updater_docker import WatchtowerDocker
-
-# Stop and remove legacy containers
-os.system('docker rm -f groundseg_api groundseg_webui')
 
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
-app = Flask(__name__)
-
-CORS(app, supports_credentials=True)
-
 # Binary Updater
 def check_bin_updates():
-    print("Binary updater thread started", file=sys.stderr)
-
+    Log.log_groundseg("Binary updater thread started")
     cur_hash = orchestrator.config['binHash']
 
     while True:
@@ -37,40 +49,43 @@ def check_bin_updates():
             new_name, new_hash, dl_url = requests.get(orchestrator.config['updateUrl']).text.split('\n')[0].split(',')[0:3]
 
             if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
-                print(f"Latest version: {new_name}", file=sys.stderr)
-                print("Downloading new groundseg binary", file=sys.stderr)
+                Log.log_groundseg(f"Latest version: {new_name}")
+                Log.log_groundseg("Downloading new groundseg binary")
                 urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
 
-                print("Removing old groundseg binary", file=sys.stderr)
-                os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+                Log.log_groundseg("Removing old groundseg binary")
+                try:
+                    os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+                except:
+                    pass
 
                 time.sleep(3)
 
-                print("Renaming new groundseg binary", file=sys.stderr)
+                Log.log_groundseg("Renaming new groundseg binary")
                 os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
                         f"{orchestrator.config['CFG_DIR']}/groundseg")
 
                 time.sleep(2)
-                print("Setting launch permissions for new binary", file=sys.stderr)
+                Log.log_groundseg("Setting launch permissions for new binary")
                 os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
 
                 time.sleep(1)
 
-                print("Restarting groundseg...", file=sys.stderr)
+                Log.log_groundseg("Restarting groundseg...")
                 if sys.platform == "darwin":
                     os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
                 else:
                     os.system("systemctl restart groundseg")
 
         except Exception as e:
-            print(e, file=sys.stderr)
+            Log.log_groundseg(e)
 
         time.sleep(90)
 
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
-    print("Anchor information thread started", file=sys.stderr)
+    Log.log_groundseg("Anchor information thread started")
     while True:
         response = None
         if orchestrator.config['wgRegistered']:
@@ -84,18 +99,18 @@ def anchor_information():
                         headers=headers).json()
             
                 orchestrator.anchor_config = response
-                print(response, file=sys.stderr)
+                Log.log_groundseg(response)
                 time.sleep(60 * 60 * 12)
 
             except Exception as e:
-                print(e, file=sys.stderr)
+                Log.log_groundseg(e)
                 time.sleep(60)
         else:
             time.sleep(60)
 
 # Constantly update system information
 def sys_monitor():
-    print("System monitor thread started", file=sys.stderr)
+    Log.log_groundseg("System monitor thread started")
     while True:
         orchestrator._ram = psutil.virtual_memory().percent
         orchestrator._cpu = psutil.cpu_percent(1)
@@ -104,7 +119,7 @@ def sys_monitor():
 
 # Checks if a meld is due, runs meld
 def meld_loop():
-    print("Meld thread started", file=sys.stderr)
+    Log.log_groundseg("Meld thread started")
     while True:
         copied = orchestrator._urbits
         for p in list(copied):
@@ -120,24 +135,16 @@ def meld_loop():
 
         time.sleep(30)
 
-# Start binary updater thread
-threading.Thread(target=check_bin_updates).start()
-
-# Start system monitoring on a new thread
-threading.Thread(target=sys_monitor).start()
-
-# Start meld loop on a new thread
-threading.Thread(target=meld_loop).start()
-
-# Start anchor information loop on a new thread
-threading.Thread(target=anchor_information).start()
+threading.Thread(target=check_bin_updates).start() # Start binary updater thread
+threading.Thread(target=sys_monitor).start() # Start system monitoring on a new thread
+threading.Thread(target=meld_loop).start() # Start meld loop on a new thread
+threading.Thread(target=anchor_information).start() # Start anchor information loop on a new thread
 
 #
 #   Endpoints
 #
 
-# Get all urbits
-
+# Check if cookie is valid
 @app.route("/cookies", methods=['GET'])
 def check_cookies():
     sessionid = request.args.get('sessionid')
@@ -147,6 +154,7 @@ def check_cookies():
 
     return jsonify(404)
 
+# Get all urbits
 @app.route("/urbits", methods=['GET'])
 def all_urbits():
     sessionid = request.args.get('sessionid')
@@ -265,9 +273,9 @@ def pier_upload():
         if current_chunk == 0:
             try:
                 os.remove(save_path)
-                print("Cleaning up old files", file=sys.stderr)
+                Log.log_groundseg("Cleaning up old files")
             except:
-                print("Directory is clear", file=sys.stderr)
+                Log.log_groundseg("Directory is clear")
                 pass
             
         if os.path.exists(save_path) and current_chunk == 0:
@@ -280,7 +288,7 @@ def pier_upload():
                 f.seek(int(request.form['dzchunkbyteoffset']))
                 f.write(file.stream.read())
         except Exception as e:
-            print(e,file=sys.stderr)
+            Log.log_groundseg(e,file=sys.stderr)
             orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
             return jsonify("Can't write file")
 

@@ -21,6 +21,7 @@ from datetime import datetime
 from io import BytesIO
 from pywgkey.key import WgKey
 
+from utils import Log
 from wireguard import Wireguard
 from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
@@ -57,14 +58,12 @@ class Orchestrator:
 #   init
 #
     def __init__(self, config_file):
-        self.log_groundseg("---------- Starting GroundSeg ----------")
-        self.log_groundseg("----------- Urbit is love <3 -----------")
         # store config file location
         self.config_file = config_file
 
         # load existing or create new system.json
         self.config = self.load_config(config_file)
-        self.log_groundseg("Loaded system JSON")
+        Log.log_groundseg("Loaded system JSON")
 
         # if first boot, set up keys
         if self.config['firstBoot']:
@@ -76,9 +75,9 @@ class Orchestrator:
 
         # Remove MC Binary
         if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
-            self.log_groundseg("Old MC binary found. Deleting...")
+            Log.log_groundseg("Old MC binary found. Deleting...")
             os.system(f"rm {self.config['CFG_DIR']}/mc")
-            self.log_groundseg("Old MC binary deleted")
+            Log.log_groundseg("Old MC binary deleted")
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
@@ -87,7 +86,7 @@ class Orchestrator:
             self.wireguard.start()
             self.toggle_minios_off()
             self.toggle_minios_on()
-            self.log_groundseg("Wireguard connection started")
+            Log.log_groundseg("Wireguard connection started")
 
         # load urbit ships
         self.load_urbits()
@@ -101,10 +100,10 @@ class Orchestrator:
 
         # Start WebUI
         self._webui = WebUIDocker(self.config['webuiPort'])
-        self.log_groundseg("WebUI started")
+        Log.log_groundseg("WebUI started")
 
         # End of Init
-        self.log_groundseg("Initialization completed")
+        Log.log_groundseg("Initialization completed")
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
@@ -118,7 +117,7 @@ class Orchestrator:
             with open(config_file) as f:
                 cfg = json.load(f)
         except Exception as e:
-            self.log_groundseg(e)
+            Log.log_groundseg(e)
 
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
@@ -139,9 +138,9 @@ class Orchestrator:
 
         try:
             bin_hash = self.make_hash("/opt/nativeplanet/groundseg/groundseg")
-            self.log_groundseg(f"Binary hash: {bin_hash}")
+            Log.log_groundseg(f"Binary hash: {bin_hash}")
         except:
-            self.log_groundseg("No binary detected!")
+            Log.log_groundseg("No binary detected!")
 
         cfg['binHash'] = bin_hash
 
@@ -169,19 +168,19 @@ class Orchestrator:
     def check_config_field(self, cfg, field, default):
         if not field in cfg:
             cfg[field] = default
-            self.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+            Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
         return cfg
 
     # Load urbit ships
     def load_urbits(self):
         if self.wireguard.wg_docker.is_running():
-            self.log_groundseg("Starting MC")
+            Log.log_groundseg("Starting MC")
             self._mc = MCDocker()
             time.sleep(3)
 
         for p in self.config['piers']:
 
-            self.log_groundseg(f"{p}: Loading Pier")
+            Log.log_groundseg(f"{p}: Loading Pier")
 
             data = None
             with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
@@ -200,7 +199,7 @@ class Orchestrator:
             if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
                 self._urbits[p].start()
 
-        self.log_groundseg("Urbit Piers loaded")
+        Log.log_groundseg("Urbit Piers loaded")
 
 #
 #   Login
@@ -212,7 +211,7 @@ class Orchestrator:
             this_hash = hashlib.sha512(encoded_str).hexdigest()
 
             if this_hash == self.config['pwHash']:
-                self.log_groundseg("Login: Password is correct!")
+                Log.log_groundseg("Login: Password is correct!")
                 return 200
 
         return 400
@@ -225,8 +224,8 @@ class Orchestrator:
 
         self.config['sessions'].append(secret)
         self.save_config()
-        self.log_groundseg("Created new Session ID")
-        self.log_groundseg(f"Active Sessions {len(self.config['sessions'])}")
+        Log.log_groundseg("Created new Session ID")
+        Log.log_groundseg(f"Active Sessions {len(self.config['sessions'])}")
 
         return secret
 
@@ -370,7 +369,7 @@ class Orchestrator:
             return 400
 
         except Exception as e:
-            self.log_groundseg(e)
+            Log.log_groundseg(e)
             return 400
 
     # Toggle Autostart
@@ -384,7 +383,7 @@ class Orchestrator:
             self._urbits[patp].config['boot_status'] = 'off'
 
         self._urbits[patp].save_config()
-        self.log_groundseg(f"{patp}: Boot status set to {self._urbits[patp].config['boot_status']}")
+        Log.log_groundseg(f"{patp}: Boot status set to {self._urbits[patp].config['boot_status']}")
 
         return 200
 
@@ -414,21 +413,21 @@ class Orchestrator:
             self.wireguard.delete_service(f'{patp}','urbit',url)
             self.wireguard.delete_service(f's3.{patp}','minio',url)
 
-        self.log_groundseg(f"{patp}: Pier and services deleted")
+        Log.log_groundseg(f"{patp}: Pier and services deleted")
         return 200
 
     # Export Urbit Pier
     def export_urbit(self, urb):
         if urb.is_running():
-            self.log_groundseg(f"{urb.pier_name}: Pier export requested")
-            self.log_groundseg(f"{urb.pier_name}: Stopping!")
+            Log.log_groundseg(f"{urb.pier_name}: Pier export requested")
+            Log.log_groundseg(f"{urb.pier_name}: Stopping!")
             urb.stop()
 
         file_name = f'{urb.pier_name}.zip'
         memory_file = BytesIO()
         file_path=f'{urb._volume_directory}/{urb.pier_name}/_data/'
 
-        self.log_groundseg(f"{urb.pier_name}: Compressing pier..")
+        Log.log_groundseg(f"{urb.pier_name}: Compressing pier..")
 
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(file_path):
@@ -438,7 +437,7 @@ class Orchestrator:
 
         memory_file.seek(0)
 
-        self.log_groundseg(f"{urb.pier_name}: Exported!")
+        Log.log_groundseg(f"{urb.pier_name}: Exported!")
         return send_file(memory_file, download_name=file_name, as_attachment=True)
 
     # Get list of containers related to this patp
@@ -458,7 +457,7 @@ class Orchestrator:
                 if urb.config['boot_status'] != 'off':
                     urb.config['boot_status'] = 'noboot'
                     urb.save_config()
-                self.log_groundseg(f"{urb.pier_name}: Stopping!")
+                Log.log_groundseg(f"{urb.pier_name}: Stopping!")
                 return 200
             return 400
         else:
@@ -467,7 +466,7 @@ class Orchestrator:
                 if urb.config['boot_status'] != 'off':
                     urb.config['boot_status'] = 'boot'
                     urb.save_config()
-                self.log_groundseg(f"{urb.pier_name}: Starting!")
+                Log.log_groundseg(f"{urb.pier_name}: Starting!")
                 return 200
             return 400
         
@@ -487,7 +486,7 @@ class Orchestrator:
 
         x = urb.set_network(network)
         if x == 0:
-            self.log_groundseg(f"{urb.pier_name}: Setting network to {network}")
+            Log.log_groundseg(f"{urb.pier_name}: Setting network to {network}")
             return 200
 
         return 400
@@ -501,7 +500,7 @@ class Orchestrator:
         self._mc.mc_setup(patp, self._minios[patp].config['wg_s3_port'], self._minios[patp].config['minio_password'])
         self.minIO_on = True
 
-        self.log_groundseg(f"{patp}: Created MinIO admin account")
+        Log.log_groundseg(f"{patp}: Created MinIO admin account")
         return 200
     
     # Get +code from Urbit
@@ -511,7 +510,7 @@ class Orchestrator:
         try:
             code = urb.get_code(addr)
         except Exception as e:
-            self.log_groundseg(e)
+            Log.log_groundseg(e)
 
         return code
  
@@ -543,7 +542,7 @@ class Orchestrator:
         urbit.add_key(key)
         x = self.add_urbit(patp, urbit)
 
-        self.log_groundseg(f"{patp}: Booting new pier")
+        Log.log_groundseg(f"{patp}: Booting new pier")
         return x
 
     def boot_existing_urbit(self, filename):
@@ -552,7 +551,7 @@ class Orchestrator:
         if patp == None:
             return "File is invalid"
 
-        self.log_groundseg(f"{patp}: Booting existing pier")
+        Log.log_groundseg(f"{patp}: Booting existing pier")
         return self.extract_pier(filename)
 
     def extract_pier(self, filename):
@@ -561,13 +560,13 @@ class Orchestrator:
         compressed_dir = f"{self.config['CFG_DIR']}/uploaded/{patp}/{filename}"
 
         try:
-            self.log_groundseg(f"{patp}: Removing existing volume")
+            Log.log_groundseg(f"{patp}: Removing existing volume")
             os.system(f'rm -rf {vol_dir}')
 
-            self.log_groundseg(f"{patp}: Creating volume directory")
+            Log.log_groundseg(f"{patp}: Creating volume directory")
             os.system(f'mkdir -p {vol_dir}/_data')
 
-            self.log_groundseg(f"{patp}: Extracting {filename}")
+            Log.log_groundseg(f"{patp}: Extracting {filename}")
             if filename.endswith("zip"):
                 with zipfile.ZipFile(compressed_dir) as zip_ref:
                     zip_ref.extractall(f"{vol_dir}/_data")
@@ -578,15 +577,15 @@ class Orchestrator:
                 tar.close()
 
         except Exception as e:
-            self.log_groundseg(e)
+            Log.log_groundseg(e)
             return "File extraction failed"
 
         try:
             shutil.rmtree(f"{self.config['CFG_DIR']}/uploaded/{patp}", ignore_errors=True)
-            self.log_groundseg(f"{patp}: Deleted {filename}")
+            Log.log_groundseg(f"{patp}: Deleted {filename}")
 
         except Exception as e:
-            self.log_groundseg(e)
+            Log.log_groundseg(e)
             return f"Failed to remove {filename}"
 
         return self.build_urbit_container_existing(patp)
@@ -594,7 +593,7 @@ class Orchestrator:
     def build_urbit_container_existing(self, patp):
 
         try:
-            self.log_groundseg(f"{patp}: Building docker container")
+            Log.log_groundseg(f"{patp}: Building docker container")
 
             http_port, ames_port = self.get_open_urbit_ports()
             data = copy.deepcopy(default_pier_config)
@@ -614,7 +613,7 @@ class Orchestrator:
                 return 200
 
         except Exception as e:
-            self.log_groundseg(f"{patp}: {e}")
+            Log.log_groundseg(f"{patp}: {e}")
 
         return "Failed to create Urbit pier"
 
@@ -641,7 +640,7 @@ class Orchestrator:
         self.register_urbit(patp)
         
         if self.wireguard.is_running() and len(self.config['piers']) < 2:
-            self.log_groundseg(f"Restarting Anchor")
+            Log.log_groundseg(f"Restarting Anchor")
             x = self.toggle_anchor_off()
             if x == 200:
                 self.toggle_anchor_on()
@@ -667,11 +666,11 @@ class Orchestrator:
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
                     if patp in ep['url'] :
-                        self.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
+                        Log.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
                         patp_reg = True
 
             if patp_reg == False:
-                self.log_groundseg(f"{patp}: Registering services")
+                Log.log_groundseg(f"{patp}: Registering services")
                 self.wireguard.register_service(f'{patp}','urbit',url)
                 self.wireguard.register_service(f's3.{patp}','minio',url)
 
@@ -685,7 +684,7 @@ class Orchestrator:
             s3_port = None
             console_port = None
 
-            self.log_groundseg(self.anchor_config['subdomains'])
+            Log.log_groundseg(self.anchor_config['subdomains'])
             pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
             for ep in self.anchor_config['subdomains']:
                 if(f'{patp}.{pub_url}' == ep['url']):
@@ -721,7 +720,7 @@ class Orchestrator:
                 return u.set_minio_endpoint(endpoint,acc,secret,bucket,lens_port)
 
             except Exception as e:
-                self.log_groundseg(e)
+                Log.log_groundseg(e)
 
         return 400
 
@@ -1012,7 +1011,7 @@ class Orchestrator:
         if x == None:
             return 400
 
-        self.log_groundseg(f"/register response: {x}")
+        Log.log_groundseg(f"/register response: {x}")
 
         if x['error'] != 0:
             return 400
@@ -1023,24 +1022,24 @@ class Orchestrator:
             self.wireguard.update_wg_config(x['conf'])
 
         if self.anchor_config != None:
-            self.log_groundseg(f"Starting Wireguard")
+            Log.log_groundseg(f"Starting Wireguard")
             self.wireguard.start()
             self.config['wgRegistered'] = True
             self.config['wgOn'] = True
             time.sleep(2)
            
-            self.log_groundseg(f"Registering Urbits")
+            Log.log_groundseg(f"Registering Urbits")
             for p in self.config['piers']:
                 self.register_urbit(p)
 
-            self.log_groundseg(f"Starting MinIOs")
+            Log.log_groundseg(f"Starting MinIOs")
             self.toggle_minios_on()
             self.save_config()
 
             time.sleep(2)
 
             if self.wireguard.is_running() and len(self.config['piers']) > 0:
-                self.log_groundseg(f"Restarting Anchor")
+                Log.log_groundseg(f"Restarting Anchor")
                 x = self.toggle_anchor_off()
                 if x == 200:
                     self.toggle_anchor_on()
@@ -1081,11 +1080,11 @@ class Orchestrator:
         try:
             self._watchtower.remove()
         except:
-            self.log_groundseg(f"Watchtower is not running!")
+            Log.log_groundseg(f"Watchtower is not running!")
         
         self._watchtower = WatchtowerDocker(self.config['updateMode'])
 
-        self.log_groundseg(f"Update mode: {self.config['updateMode']}")
+        Log.log_groundseg(f"Update mode: {self.config['updateMode']}")
 
         return 200
 
@@ -1151,12 +1150,3 @@ class Orchestrator:
             return jsonify(val)
         return val
 
-    # Log to file
-    def log_groundseg(self, text):
-        print(text, file=sys.stderr)
-        try:
-            with open("/opt/nativeplanet/groundseg/groundseg.log", "a") as log:
-                log.write(f"{datetime.now()} {text}\n")
-                log.close()
-        except:
-            pass
