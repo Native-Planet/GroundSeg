@@ -3,8 +3,11 @@
   import { get } from 'svelte/store'
   import { page } from '$app/stores'
   import { power, api, isPortrait, noconn } from '$lib/api'
+
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
+  import HomeButton from '$lib/HomeButton.svelte'
+
   import PowerScreen from '$lib/PowerScreen.svelte'
   import NoConnection from '$lib/NoConnection.svelte'
 
@@ -59,6 +62,7 @@
       && (($power === 'shutdown') || ($power === 'restart'))}>
       <SettingsButton />
       <AnchorButton />
+      <HomeButton />
       <slot/>
     </div>
   {/if}
