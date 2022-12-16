@@ -14,7 +14,8 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 from utils import Log
-from installer import Installer
+from orchestrator import Orchestrator
+from updater_docker import WatchtowerDocker
 
 # Create flask app
 app = Flask(__name__)
@@ -23,17 +24,6 @@ CORS(app, supports_credentials=True)
 # Announce
 Log.log_groundseg("---------- Starting GroundSeg ----------")
 Log.log_groundseg("----------- Urbit is love <3 -----------")
-
-# Check if dependencies are installed
-installer = Installer()
-
-if not installer.env_ready:
-    Log.log_groundseg("Exiting")
-    quit()
-
-# Orchestrator import
-from orchestrator import Orchestrator
-from updater_docker import WatchtowerDocker
 
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
@@ -46,7 +36,9 @@ def check_bin_updates():
     while True:
 
         try:
-            new_name, new_hash, dl_url = requests.get(orchestrator.config['updateUrl']).text.split('\n')[0].split(',')[0:3]
+            new_name, new_hash, dl_url = requests.get(
+                    orchestrator.config['updateUrl']
+                    ).text.split('\n')[0].split(',')[0:3]
 
             if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
                 Log.log_groundseg(f"Latest version: {new_name}")
@@ -111,11 +103,45 @@ def anchor_information():
 # Constantly update system information
 def sys_monitor():
     Log.log_groundseg("System monitor thread started")
+    error = False
     while True:
-        orchestrator._ram = psutil.virtual_memory().percent
-        orchestrator._cpu = psutil.cpu_percent(1)
-        orchestrator._core_temp = psutil.sensors_temperatures()['coretemp'][0].current
-        orchestrator._disk = shutil.disk_usage("/")
+        if error:
+            Log.log_groundseg("System monitor error, 5 second timeout")
+            time.sleep(5)
+            error = False
+
+        # RAM info
+        try:
+            orchestrator._ram = psutil.virtual_memory().percent
+        except Exception as e:
+            orchestrator._ram = 0.0
+            Log.log_groundseg(e)
+            error = True
+
+        # CPU info
+        try:
+            orchestrator._cpu = psutil.cpu_percent(1)
+        except Exception as e:
+            orchestrator._cpu = 0.0
+            Log.log_groundseg(e)
+            error = True
+
+        # CPU Temp info
+        try:
+            orchestrator._core_temp = psutil.sensors_temperatures()['coretemp'][0].current
+        except Exception as e:
+            orchestrator._core_temp = 0.0
+            Log.log_groundseg(e)
+            error = True
+
+        # Disk info
+        try:
+            orchestrator._disk = shutil.disk_usage("/")
+        except Exception as e:
+            orchestrator._disk = [0,0,0]
+            Log.log_groundseg(e)
+            error = True
+
 
 # Checks if a meld is due, runs meld
 def meld_loop():
