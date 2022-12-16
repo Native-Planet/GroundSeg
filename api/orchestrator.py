@@ -41,7 +41,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.0'
+    gs_version = 'Beta-3.5.0-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
