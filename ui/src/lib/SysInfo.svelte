@@ -1,6 +1,7 @@
 <script>
 	import { api, webuiVersion } from '$lib/api'
   import { scale } from 'svelte/transition'
+  import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let ram, temp, disk, cpu, gsVersion, updateMode
 
@@ -11,6 +12,18 @@
       credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
 			body: JSON.stringify({'action':'toggle'})
+	  })
+      .then(d => d.json())
+      .then(res => console.log(res))
+  }
+
+  const restartGroundSeg = () => {
+    let module = 'binary'
+	  fetch($api + '/system?module=' + module, {
+			method: 'POST',
+      credentials: 'include',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({'action':'restart'})
 	  })
       .then(d => d.json())
       .then(res => console.log(res))
@@ -71,6 +84,16 @@
       <div on:click={toggleUpdate} class="switch-wrapper">
         <div class="switch {updateMode == 'auto' ? "on" : "off"}"></div>
       </div>
+    </div>
+
+    <!-- Restart groundseg -->
+    <div class="hw-version">
+      <div class="word">Restart GroundSeg</div>
+      <PrimaryButton 
+        on:click={restartGroundSeg}
+        standard="Restart"
+        background="black"
+        />
     </div>
 </div>
 

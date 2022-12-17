@@ -41,7 +41,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.0'
+    gs_version = 'Beta-3.5.1-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -873,6 +873,23 @@ class Orchestrator:
 
             if data['action'] == 'export':
                 return '\n'.join(self.get_log_lines(data['container'], 0))
+
+        # binary module
+        if module == 'binary':
+            if data['action'] == 'restart':
+
+                Log.log_groundseg("Restarting groundseg...")
+
+                if sys.platform == "darwin":
+                    os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
+                    return 200
+
+                elif sys.platform == "linux":
+                    os.system("systemctl restart groundseg")
+                    return 200
+
+                else:
+                    Log.log_groundseg("Windows not supported yet")
 
         return module
 
