@@ -64,6 +64,7 @@ def check_bin_updates():
                 time.sleep(1)
 
                 Log.log_groundseg("Restarting groundseg...")
+
                 if sys.platform == "darwin":
                     os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
                 else:
