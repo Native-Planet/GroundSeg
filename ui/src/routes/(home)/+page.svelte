@@ -32,10 +32,16 @@
 
 	// Start the update loop
 	onMount(()=> {
+    console.log(data)
     api.set("http://" + $page.url.hostname + ":27016")
     if (data['status'] == 404) {
       window.location.href = "/login"
     }
+
+    if (data['status'] == 'setup') {
+      window.location.href = "/setup"
+    }
+
 		inView = true
 		update()
 	})
