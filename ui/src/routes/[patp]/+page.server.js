@@ -12,7 +12,7 @@ export function load({ cookies }) {
 	let d = fetch(query, {credentials:"include"})
 	.then(j => j.json())
   .then(r => {
-    if (r == 404) {return {api:url,status:r}}
+    if ((r == 404) || (r == 'setup')) {return {status:r}}
     else {return {api:url}}
   })
   .catch(err => {

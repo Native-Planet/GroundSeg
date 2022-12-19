@@ -41,7 +41,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.1-edge'
+    gs_version = 'Beta-3.5.2-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -67,8 +67,9 @@ class Orchestrator:
 
         # if first boot, set up keys
         if self.config['firstBoot']:
+            Log.log_groundseg("GroundSeg is in setup mode")
             self.reset_pubkey()
-            self.config['firstBoot'] = False
+            #self.config['firstBoot'] = False
         
         # save the latest config to file
         self.save_config()
@@ -200,6 +201,38 @@ class Orchestrator:
                 self._urbits[p].start()
 
         Log.log_groundseg("Urbit Piers loaded")
+
+#
+#   Setup
+#
+
+    def handle_setup(self, page, data):
+        try:
+            if page == "anchor":
+                # set endpoint
+                changed = self.change_wireguard_url(data['endpoint'])
+
+                # register key
+                if changed == 200:
+                    registered = self.register_device(data['key'])
+                    
+                    if registered == 400:
+                        return 401
+
+                    return registered
+
+
+            if page == "password":
+                self.create_password(data['password'])
+                self.config['firstBoot'] = False
+                return 200
+
+        except Exception as e:
+            Log.log_groundseg(e)
+            pass
+
+        return 401
+
 
 #
 #   Login

@@ -43,6 +43,11 @@
     if (data['status'] == 404) {
       window.location.href = "/login"
     }
+
+    if (data['status'] == 'setup') {
+      window.location.href = "/setup"
+    }
+
 		update()
     inView = true
 	})

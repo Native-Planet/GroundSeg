@@ -162,10 +162,11 @@ def meld_loop():
 
         time.sleep(30)
 
-threading.Thread(target=check_bin_updates).start() # Start binary updater thread
-threading.Thread(target=sys_monitor).start() # Start system monitoring on a new thread
-threading.Thread(target=meld_loop).start() # Start meld loop on a new thread
-threading.Thread(target=anchor_information).start() # Start anchor information loop on a new thread
+# Threads
+threading.Thread(target=check_bin_updates).start() # Binary updater
+threading.Thread(target=sys_monitor).start() # System monitoring
+threading.Thread(target=meld_loop).start() # Meld loop
+threading.Thread(target=anchor_information).start() # Anchor information
 
 #
 #   Endpoints
@@ -174,6 +175,9 @@ threading.Thread(target=anchor_information).start() # Start anchor information l
 # Check if cookie is valid
 @app.route("/cookies", methods=['GET'])
 def check_cookies():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     sessionid = request.args.get('sessionid')
 
     if sessionid in orchestrator.config['sessions']:
@@ -184,6 +188,9 @@ def check_cookies():
 # Get all urbits
 @app.route("/urbits", methods=['GET'])
 def all_urbits():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     sessionid = request.args.get('sessionid')
 
     if len(str(sessionid)) != 64:
@@ -203,6 +210,9 @@ def all_urbits():
 # Handle urbit ID related requests
 @app.route('/urbit', methods=['GET','POST'])
 def urbit_info():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     urbit_id = request.args.get('urbit_id')
     sessionid = request.args.get('sessionid')
 
@@ -227,6 +237,9 @@ def urbit_info():
 # Handle device's system settings
 @app.route("/system", methods=['GET','POST'])
 def system_settings():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     sessionid = request.args.get('sessionid')
 
     if len(str(sessionid)) != 64:
@@ -251,6 +264,9 @@ def system_settings():
 # Handle anchor registration related information
 @app.route("/anchor", methods=['GET'])
 def anchor_settings():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     sessionid = request.args.get('sessionid')
 
     if len(str(sessionid)) != 64:
@@ -270,6 +286,9 @@ def anchor_settings():
 # Pier upload
 @app.route("/upload", methods=['POST'])
 def pier_upload():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     sessionid = request.args.get('sessionid')
 
     if len(str(sessionid)) != 64:
@@ -339,6 +358,9 @@ def pier_upload():
 # Login
 @app.route("/login", methods=['POST'])
 def login():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
     res = orchestrator.handle_login_request(request.get_json())
     if res == 200:
         res = make_response(jsonify(res))
@@ -348,6 +370,17 @@ def login():
 
     return res
 
+# Setup
+@app.route("/setup", methods=['POST'])
+def setup():
+    if not orchestrator.config['firstBoot']:
+        return jsonify(400)
+
+    page = request.args.get('page')
+
+    res = orchestrator.handle_setup(page, request.get_json())
+
+    return jsonify(res)
 
 if __name__ == '__main__':
     debug_mode = False
