@@ -17,9 +17,8 @@
 
 <style>
   .blur {
-    opacity: .2;
+    opacity: .3;
     pointer-events: none;
-    filter: blur(2px);
   }
   .hide {
     opacity: 0;
