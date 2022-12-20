@@ -27,7 +27,6 @@ from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
 from minio_docker import MinIODocker
 from mc_docker import MCDocker
-from updater_docker import WatchtowerDocker
 
 class Orchestrator:
     
@@ -41,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.2'
+    gs_version = 'Beta-3.5.3-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -50,7 +49,6 @@ class Orchestrator:
     _urbits = {}
     _minios = {}
     _mc = {}
-    _watchtower = {}
     _webui = {}
 
 
@@ -96,12 +94,8 @@ class Orchestrator:
         if len(self.config['pwHash']) < 1:
             self.create_password('nativeplanet')
 
-        # start auto updater
-        self._watchtower = WatchtowerDocker(self.config['updateMode'])
-
         # Start WebUI
-        self._webui = WebUIDocker(self.config['webuiPort'])
-        Log.log_groundseg("WebUI started")
+        self.start_webui()
 
         # End of Init
         Log.log_groundseg("Initialization completed")
@@ -120,6 +114,7 @@ class Orchestrator:
         except Exception as e:
             Log.log_groundseg(e)
 
+
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
         cfg = self.check_config_field(cfg,'endpointUrl', 'api.startram.io')
@@ -130,7 +125,8 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
-        cfg = self.check_config_field(cfg, 'updateUrl', 'https://version.infra.native.computer/version.csv')
+        cfg = self.check_config_field(cfg, 'updateBranch', 'latest')
+        cfg = self.check_config_field(cfg, 'updateInterval', 90)
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
@@ -154,7 +150,15 @@ class Orchestrator:
         if 'autostart' in cfg:
             cfg.pop('autostart')
         
+        if 'updateUrl' in cfg:
+            cfg.pop('updateUrl')
+
         return cfg
+
+    def start_webui(self):
+        self._webui = WebUIDocker(self.config['webuiPort'], self.config['updateBranch'])
+        Log.log_groundseg("WebUI started")
+
 
     def make_hash(self, file):
         h  = hashlib.sha256()
@@ -201,6 +205,26 @@ class Orchestrator:
                 self._urbits[p].start()
 
         Log.log_groundseg("Urbit Piers loaded")
+
+    # Reload minios
+    def reload_minios(self):
+        if self.wireguard.wg_docker.is_running():
+            Log.log_groundseg("Starting MC")
+            self._mc = MCDocker()
+            time.sleep(3)
+
+        for p in self.config['piers']:
+
+            data = None
+            with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
+                data = json.load(f)
+
+            if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
+                self._minios[p] = MinIODocker(data)
+                if self.toggle_minios_on():
+                    x = self._mc.mc_setup(p, self._minios[p].config['wg_s3_port'], self._minios[p].config['minio_password'])
+
+            Log.log_groundseg(f"{p}: MinIO reloaded")
 
 #
 #   Setup
@@ -641,8 +665,10 @@ class Orchestrator:
                 json.dump(data, f, indent = 4)
 
             x = self.add_urbit(patp, urbit)
+            if self.config['updateMode'] == 'temp':
+                self.config['updateMode'] = 'auto'
+
             if x == 0:
-                self._watchtower = WatchtowerDocker(self.config['updateMode'])
                 return 200
 
         except Exception as e:
@@ -1126,15 +1152,6 @@ class Orchestrator:
             self.config['updateMode'] = 'auto'
 
         self.save_config()
-
-        try:
-            self._watchtower.remove()
-        except:
-            Log.log_groundseg(f"Watchtower is not running!")
-        
-        self._watchtower = WatchtowerDocker(self.config['updateMode'])
-
-        Log.log_groundseg(f"Update mode: {self.config['updateMode']}")
 
         return 200
 

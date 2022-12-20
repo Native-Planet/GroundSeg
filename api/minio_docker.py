@@ -59,7 +59,6 @@ class MinIODocker:
                 command=command, 
                 name = self.minio_name,
                 environment = environment,
-                labels = {"com.centurylinklabs.watchtower.enable":"true"},
                 network = f'container:wireguard',
                 mounts = [self.mount],
                 detach=True)
