@@ -114,6 +114,12 @@ class Orchestrator:
         except Exception as e:
             Log.log_groundseg(e)
 
+        update_mode = 'latest'
+        try:
+            if cfg['updateUrl'] == 'https://version.infra.native.computer/version_edge.csv':
+                update_mode = 'edge'
+        except:
+            pass
 
         cfg = self.check_config_field(cfg,'firstBoot',True)
         cfg = self.check_config_field(cfg,'piers',[])
@@ -125,7 +131,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'sessions', [])
         cfg = self.check_config_field(cfg, 'pwHash', '')
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
-        cfg = self.check_config_field(cfg, 'updateBranch', 'latest')
+        cfg = self.check_config_field(cfg, 'updateBranch', update_mode)
         cfg = self.check_config_field(cfg, 'updateInterval', 90)
 
         cfg['gsVersion'] = self.gs_version

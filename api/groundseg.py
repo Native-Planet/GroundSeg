@@ -48,7 +48,7 @@ def check_docker_updates():
                     img = i.tags[0]
                     if img in update_list:
                         old_hash = i.id
-                        new_hash = client.images.pull(img, tag='latest').id
+                        new_hash = client.images.pull(img).id
 
                         if not old_hash == new_hash:
                             if img == webui:
