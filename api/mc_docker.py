@@ -21,7 +21,6 @@ class MCDocker:
 
         self.container = client.containers.run(
                     image= f'{self._mc_img}',
-                    labels = {"com.centurylinklabs.watchtower.enable":"true"},
                     network='container:wireguard',
                     entrypoint='/bin/bash',
                     stdin_open=True,
