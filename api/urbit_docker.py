@@ -43,12 +43,19 @@ class UrbitDocker:
         client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
         self.build_urbit()
-        self.running = (self.container.attrs['State']['Status'] == 'running' )
-        if self.running:
-            self.stop()
-            self.start()
+        self.running = (self.container.attrs['State']['Status'] == 'running')
 
         self.save_config()
+
+    def build_urbit(self):
+        self.build_volume()
+        self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
+        self.build_container()
+    
+    def remove_urbit(self):
+        self.stop()
+        self.container.remove()
+        self.volume.remove()
 
     def build_volume(self):
         volumes = client.volumes.list()
@@ -67,10 +74,18 @@ class UrbitDocker:
 
     def build_container(self):
         containers = client.containers.list(all=True)
+        running = False
+
         for c in containers:
-            if(self.pier_name == c.name):
+            if self.pier_name == c.name:
                 self.container = c
-                return
+                self.running = (c.attrs['State']['Status'] == 'running')
+                c.stop()
+                c.remove()
+        
+                if self.running:
+                    running = True
+
         if self.config["network"] != "none":
             command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
                                           --port={self.config["wg_ames_port"]} \
@@ -94,6 +109,9 @@ class UrbitDocker:
                                     name = self.pier_name,
                                     mounts = [self.mount],
                                     detach = True)
+
+        if running:
+            self.start()
 
 
     def set_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
@@ -170,16 +188,6 @@ class UrbitDocker:
     def save_config(self):
         with open(f'/opt/nativeplanet/groundseg/settings/pier/{self.pier_name}.json', 'w') as f:
             json.dump(self.config, f, indent = 4)
-
-    def build_urbit(self):
-        self.build_volume()
-        self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
-        self.build_container()
-    
-    def remove_urbit(self):
-        self.stop()
-        self.container.remove()
-        self.volume.remove()
 
     def add_key(self, key_value):
         with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
