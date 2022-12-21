@@ -18,7 +18,6 @@ class WireguardDocker:
 
     def buildVolume(self):
         volumes = client.volumes.list()
-        print('building wg volume')
         for v in volumes:
             if self.wireguard_name == v.name:
                 self.volume = v

@@ -6,10 +6,11 @@ import socket
 client = docker.from_env()
 
 class WebUIDocker:
-    _webui_img = "nativeplanet/groundseg-webui:latest"
+    def __init__(self, port, update_branch):
 
-    def __init__(self,port):
-        client.images.pull(self._webui_img)
+        webui_img = f"nativeplanet/groundseg-webui:{update_branch}"
+
+        client.images.pull(webui_img)
 
         containers = client.containers.list(all=True)
 
@@ -22,9 +23,8 @@ class WebUIDocker:
                     print(f"Webui removal error: {e}", file=sys.stderr)
 
         self.container = client.containers.run(
-                    image= f'{self._webui_img}',
+                    image= webui_img,
                     environment = [f"HOST_HOSTNAME={socket.gethostname()}",f"PORT={port}"],
-                    labels = {"com.centurylinklabs.watchtower.enable":"true"},
                     network='host',
                     name = 'groundseg-webui',
                     detach=True

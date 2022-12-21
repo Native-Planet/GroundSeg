@@ -1,3 +1,4 @@
+import docker
 import threading
 import time
 import os
@@ -15,7 +16,6 @@ from werkzeug.utils import secure_filename
 
 from utils import Log
 from orchestrator import Orchestrator
-from updater_docker import WatchtowerDocker
 
 # Create flask app
 app = Flask(__name__)
@@ -28,24 +28,71 @@ Log.log_groundseg("----------- Urbit is love <3 -----------")
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
+# Docker Updater
+def check_docker_updates():
+    Log.log_groundseg("Docker updater thread started")
+
+    while True:
+        if orchestrator.config['updateMode'] == 'auto':
+            webui = f"nativeplanet/groundseg-webui:{orchestrator.config['updateBranch']}"
+            urbit = "tloncorp/urbit:latest"
+            minio = "quay/minio/minio"
+
+            update_list = [ webui, urbit, minio]
+
+            client = docker.from_env()
+            images = client.images.list()
+
+            for i in list(images):
+                try:
+                    img = i.tags[0]
+                    if img in update_list:
+                        old_hash = i.id
+                        new_hash = client.images.pull(img).id
+
+                        if not old_hash == new_hash:
+                            if img == webui:
+                                Log.log_groundseg("Updating WebUI")
+                                orchestrator.start_webui()
+
+                            if img == urbit:
+                                Log.log_groundseg("Updating Urbit")
+                                orchestrator.load_urbits()
+
+                            if img == minio:
+                                Log.log_groundseg("Updating MinIOs")
+                                orchestrator.reload_minios()
+
+                except:
+                    pass
+
+        time.sleep(orchestrator.config['updateInterval'])
+
+
 # Binary Updater
 def check_bin_updates():
     Log.log_groundseg("Binary updater thread started")
     cur_hash = orchestrator.config['binHash']
 
     while True:
+        update_branch = orchestrator.config['updateBranch']
+        if update_branch == 'latest':
+            update_url = 'https://version.infra.native.computer/version.csv'
+
+        if update_branch == 'edge':
+            update_url = 'https://version.infra.native.computer/version_edge.csv'
 
         try:
-            new_name, new_hash, dl_url = requests.get(
-                    orchestrator.config['updateUrl']
-                    ).text.split('\n')[0].split(',')[0:3]
+            new_name, new_hash, dl_url = requests.get(update_url).text.split('\n')[0].split(',')[0:3]
 
             if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
                 Log.log_groundseg(f"Latest version: {new_name}")
                 Log.log_groundseg("Downloading new groundseg binary")
+
                 urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
 
                 Log.log_groundseg("Removing old groundseg binary")
+
                 try:
                     os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
                 except:
@@ -73,7 +120,7 @@ def check_bin_updates():
         except Exception as e:
             Log.log_groundseg(e)
 
-        time.sleep(90)
+        time.sleep(orchestrator.config['updateInterval'])
 
 
 # Get updated Anchor information every 12 hours
@@ -107,8 +154,8 @@ def sys_monitor():
     error = False
     while True:
         if error:
-            Log.log_groundseg("System monitor error, 5 second timeout")
-            time.sleep(5)
+            Log.log_groundseg("System monitor error, 15 second timeout")
+            time.sleep(15)
             error = False
 
         # RAM info
@@ -163,6 +210,7 @@ def meld_loop():
         time.sleep(30)
 
 # Threads
+threading.Thread(target=check_docker_updates).start() # Docker updater
 threading.Thread(target=check_bin_updates).start() # Binary updater
 threading.Thread(target=sys_monitor).start() # System monitoring
 threading.Thread(target=meld_loop).start() # Meld loop
@@ -299,10 +347,9 @@ def pier_upload():
 
     if sessionid in orchestrator.config['sessions']:
     
-        try:
-            orchestrator._watchtower.remove()
-        except:
-            pass
+        if orchestrator.config['updateMode'] == 'auto':
+            # change to temp mode (DO NOT SAVE CONFIG)
+            orchestrator.config['updateMode'] = 'temp'
 
         # Uploaded pier
         file = request.files['file']
@@ -326,7 +373,10 @@ def pier_upload():
             
         if os.path.exists(save_path) and current_chunk == 0:
             os.remove(save_path)
-            orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+
+            if orchestrator.config['updateMode'] == 'temp':
+                orchestrator.config['updateMode'] = 'auto'
+
             return jsonify("File exists, try again")
 
         try:
@@ -335,7 +385,10 @@ def pier_upload():
                 f.write(file.stream.read())
         except Exception as e:
             Log.log_groundseg(e,file=sys.stderr)
-            orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+
+            if orchestrator.config['updateMode'] == 'temp':
+                orchestrator.config['updateMode'] = 'auto'
+
             return jsonify("Can't write file")
 
         total_chunks = int(request.form['dztotalchunkcount'])
@@ -343,8 +396,11 @@ def pier_upload():
         if current_chunk + 1 == total_chunks:
             # This was the last chunk, the file should be complete and the size we expect
             if os.path.getsize(save_path) != int(request.form['dztotalfilesize']):
+
+                if orchestrator.config['updateMode'] == 'temp':
+                    orchestrator.config['updateMode'] = 'auto'
+
                 # size mismatch
-                orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
                 return jsonify("File size mismatched")
             else:
                 return jsonify(orchestrator.boot_existing_urbit(filename))
@@ -352,7 +408,9 @@ def pier_upload():
             # Not final chunk yet
             return jsonify(200)
 
-    orchestrator._watchtower = WatchtowerDocker(orchestrator.config['updateMode'])
+    if orchestrator.config['updateMode'] == 'temp':
+        orchestrator.config['updateMode'] = 'auto'
+
     return jsonify(404)
 
 # Login
