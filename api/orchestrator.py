@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.3-edge'
+    gs_version = 'Beta-3.5.4-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -67,7 +67,6 @@ class Orchestrator:
         if self.config['firstBoot']:
             Log.log_groundseg("GroundSeg is in setup mode")
             self.reset_pubkey()
-            #self.config['firstBoot'] = False
         
         # save the latest config to file
         self.save_config()
@@ -77,6 +76,13 @@ class Orchestrator:
             Log.log_groundseg("Old MC binary found. Deleting...")
             os.system(f"rm {self.config['CFG_DIR']}/mc")
             Log.log_groundseg("Old MC binary deleted")
+
+        # Check for internet access
+        internet = self.check_internet_access()
+        while not internet:
+            Log.log_groundseg("No internet access, checking again in 15 seconds")
+            time.sleep(15)
+            internet = self.check_internet_access()
 
         # start wireguard if anchor is registered
         self.wireguard = Wireguard(self.config)
@@ -99,6 +105,15 @@ class Orchestrator:
 
         # End of Init
         Log.log_groundseg("Initialization completed")
+
+
+    # Check if device has internet access
+    def check_internet_access(self):
+        try:
+            urllib.request.urlopen('https://nativeplanet.io', timeout=1)
+            return True
+        except:
+            return False
 
     # Checks if system.json and all its fields exists, adds field if incomplete
     def load_config(self, config_file):
