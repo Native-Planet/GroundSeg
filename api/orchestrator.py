@@ -40,7 +40,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.4-edge'
+    gs_version = 'Beta-3.5.5-edge'
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -1068,6 +1068,14 @@ class Orchestrator:
         self.toggle_minios_on() 
         self.config['wgOn'] = True
         self.save_config()
+
+        Log.log_groundseg("Getting updated wireguard config")
+
+        x = self.wireguard.get_status(url)
+        if x != None:
+            self.anchor_config = x 
+            self.wireguard.update_wg_config(x['conf'])
+
         return 200
 
     # Stops Wireguard and all MinIO containers
