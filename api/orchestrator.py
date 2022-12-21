@@ -1071,6 +1071,10 @@ class Orchestrator:
 
         Log.log_groundseg("Getting updated wireguard config")
 
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f'https://{endpoint}/{api_version}'
+
         x = self.wireguard.get_status(url)
         if x != None:
             self.anchor_config = x 
