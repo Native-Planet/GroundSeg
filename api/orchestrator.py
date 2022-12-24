@@ -15,6 +15,7 @@ import hashlib
 import socket
 import base64
 import urllib.request
+import ssl
 
 from flask import jsonify, send_file, current_app
 from datetime import datetime
@@ -110,9 +111,11 @@ class Orchestrator:
     # Check if device has internet access
     def check_internet_access(self):
         try:
-            urllib.request.urlopen('https://nativeplanet.io', timeout=1)
+            context = ssl._create_unverified_context()
+            urllib.request.urlopen('https://nativeplanet.io', timeout=1, context=context)
             return True
-        except:
+        except Exception as e:
+            Log.log_groundseg(e)
             return False
 
     # Checks if system.json and all its fields exists, adds field if incomplete
