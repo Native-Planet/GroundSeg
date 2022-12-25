@@ -3,7 +3,7 @@
 GS_PATH=$(echo $(realpath "$(dirname "$0")"))
 builder() {
   mkdir -p $GS_PATH/binary
-  sudo docker run --rm -v $GS_PATH/api:/api -v $GS_PATH/binary:/binary groundseg-builder:0.1.0
+  sudo docker run --rm -v $GS_PATH/api:/api -v $GS_PATH/binary:/binary nativeplanet/groundseg-builder:3.10.9
 }
 
 standard_build() {
