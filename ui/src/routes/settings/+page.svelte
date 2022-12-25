@@ -22,6 +22,7 @@
 	export let data
 	updateState(data)
 
+
   let inViewSettings = false, 
     tabs = ['Settings','Logs'],
     activeTab = 'Settings',
@@ -107,18 +108,24 @@
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <SysInfo
-            ram={$system.ram} 
-            temp={$system.temp}
-            disk={$system.disk}
-            cpu={$system.cpu}
-            gsVersion={$system.gsVersion}
-            updateMode={$system.updateMode}
-            />
+          {#if $system.vm}
+            VM mode SysInfo
+          {:else}
+            <SysInfo
+              ram={$system.ram} 
+              temp={$system.temp}
+              disk={$system.disk}
+              cpu={$system.cpu}
+              gsVersion={$system.gsVersion}
+              updateMode={$system.updateMode}
+              />
+          {/if}
         </div>
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <Network ethOnly={$system.ethOnly} connected={$system.connected} />
+          {#if !$system.vm}
+            <Network ethOnly={$system.ethOnly} connected={$system.connected} />
+          {/if}
           <MinIO minio={$system.minio} />
           <Sessions sessions={$system.sessions} />
         </div>

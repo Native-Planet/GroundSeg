@@ -42,6 +42,7 @@ class Orchestrator:
 
     # GroundSeg
     gs_version = 'Beta-3.5.5'
+    _vm = False
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -57,6 +58,7 @@ class Orchestrator:
 #   init
 #
     def __init__(self, config_file):
+
         # store config file location
         self.config_file = config_file
 
@@ -72,6 +74,10 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
+        if os.path.isfile(f"{self.config['CFG_DIR']}/vm"):
+            Log.log_groundseg("VM mode detected. Enabling limited features")
+            self._vm = True
+            
         # Remove MC Binary
         if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
             Log.log_groundseg("Old MC binary found. Deleting...")
@@ -340,6 +346,7 @@ class Orchestrator:
 
         # Create query result
         u = dict()
+
         u['name'] = urb.pier_name
         u['running'] = urb.is_running()
 
@@ -853,17 +860,20 @@ class Orchestrator:
     # Get all system information
     def get_system_settings(self):
         settings = dict()
-        settings['ram'] = self._ram
-        settings['cpu'] = self._cpu
-        settings['temp'] = self._core_temp
-        settings['disk'] = self._disk
+        settings['vm'] = self._vm
         settings['gsVersion'] = self.gs_version
         settings['updateMode'] = self.config['updateMode']
-        settings['ethOnly'] = self.get_ethernet_status()
         settings['minio'] = self.minIO_on
-        settings['connected'] = self.get_connection_status()
         settings['containers'] = self.get_containers()
         settings['sessions'] = len(self.config['sessions'])
+
+        if not self._vm:
+            settings['ram'] = self._ram
+            settings['cpu'] = self._cpu
+            settings['temp'] = self._core_temp
+            settings['disk'] = self._disk
+            settings['connected'] = self.get_connection_status()
+            settings['ethOnly'] = self.get_ethernet_status()
 
         return {'system': settings}
 
