@@ -6,4 +6,4 @@ flask-cors
 pywgkey
 nuitka
 zstandard
-orderedset
+ordered-set

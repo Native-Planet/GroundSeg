@@ -152,7 +152,7 @@ def anchor_information():
 def sys_monitor():
     Log.log_groundseg("System monitor thread started")
     error = False
-    while True:
+    while not orchestrator._vm:
         if error:
             Log.log_groundseg("System monitor error, 15 second timeout")
             time.sleep(15)

@@ -11,6 +11,7 @@
 
   import Logs from '$lib/Logs.svelte'
   import SysInfo from '$lib/SysInfo.svelte'
+  import SysInfoLite from '$lib/SysInfoLite.svelte'
   import Power from '$lib/Power.svelte'
 
   import Network from '$lib/Network.svelte'
@@ -21,6 +22,7 @@
 	// load data into store
 	export let data
 	updateState(data)
+
 
   let inViewSettings = false, 
     tabs = ['Settings','Logs'],
@@ -107,32 +109,43 @@
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <SysInfo
-            ram={$system.ram} 
-            temp={$system.temp}
-            disk={$system.disk}
-            cpu={$system.cpu}
-            gsVersion={$system.gsVersion}
-            updateMode={$system.updateMode}
-            />
+          {#if $system.vm}
+            <SysInfoLite
+              gsVersion={$system.gsVersion}
+              updateMode={$system.updateMode}
+              />
+          {:else}
+            <SysInfo
+              ram={$system.ram} 
+              temp={$system.temp}
+              disk={$system.disk}
+              cpu={$system.cpu}
+              gsVersion={$system.gsVersion}
+              updateMode={$system.updateMode}
+              />
+          {/if}
         </div>
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <Network ethOnly={$system.ethOnly} connected={$system.connected} />
+          {#if !$system.vm}
+            <Network ethOnly={$system.ethOnly} connected={$system.connected} />
+          {/if}
           <MinIO minio={$system.minio} />
           <Sessions sessions={$system.sessions} />
-        </div>
-      </div>
-
-      <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
-        <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <Power />
-        </div>
-        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Contact />
         </div>
-
       </div>
+
+      {#if !$system.vm}
+        <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
+          <div class="panel" in:scale={{duration:120, delay: 200}}>
+            <Power />
+          </div>
+          <div class="panel" in:scale={{duration:120, delay: 200}}>
+            <Contact />
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if activeTab == 'Logs'}
