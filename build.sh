@@ -58,15 +58,3 @@ do
       ;;
   esac
 done
-
-# clear everything
-
-# build binary
-#python -m nuitka --clang --onefile api/groundseg.py -o groundseg
-
-# move binary
-#sudo cp groundseg /opt/nativeplanet/groundseg/groundseg
-
-# restart service
-#sudo chmod +x /opt/nativeplanet/groundseg/groundseg
-#sudo systemctl restart groundseg

@@ -74,7 +74,7 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
-        if os.path.isfile(f"{self.config['CFG_DIR']}/vm"):
+        if os.path.isfile(f"{self.config['CFG_DIR']}/vm") or 'WSL_DISTRO_NAME' in os.environ:
             Log.log_groundseg("VM mode detected. Enabling limited features")
             self._vm = True
             
