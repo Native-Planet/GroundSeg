@@ -11,6 +11,7 @@
 
   import Logs from '$lib/Logs.svelte'
   import SysInfo from '$lib/SysInfo.svelte'
+  import SysInfoLite from '$lib/SysInfoLite.svelte'
   import Power from '$lib/Power.svelte'
 
   import Network from '$lib/Network.svelte'
@@ -109,7 +110,10 @@
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
           {#if $system.vm}
-            VM mode SysInfo
+            <SysInfoLite
+              gsVersion={$system.gsVersion}
+              updateMode={$system.updateMode}
+              />
           {:else}
             <SysInfo
               ram={$system.ram} 
@@ -128,18 +132,20 @@
           {/if}
           <MinIO minio={$system.minio} />
           <Sessions sessions={$system.sessions} />
-        </div>
-      </div>
-
-      <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
-        <div class="panel" in:scale={{duration:120, delay: 200}}>
-          <Power />
-        </div>
-        <div class="panel" in:scale={{duration:120, delay: 200}}>
           <Contact />
         </div>
-
       </div>
+
+      {#if !$system.vm}
+        <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
+          <div class="panel" in:scale={{duration:120, delay: 200}}>
+            <Power />
+          </div>
+          <div class="panel" in:scale={{duration:120, delay: 200}}>
+            <Contact />
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if activeTab == 'Logs'}
