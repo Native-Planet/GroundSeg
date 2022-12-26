@@ -15,10 +15,7 @@ groundseg.dist/
 groundseg.build/
 groundseg.onefile-build/
 groundseg
-
-# GroundSeg
-settings/
-uploaded/
+binary/
 
 # Distribution / packaging
 .Python
