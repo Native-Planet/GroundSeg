@@ -757,7 +757,9 @@ class Orchestrator:
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
 
-                    if patp in ep['url'] :
+                    ep_patp = ep['url'].split('.')[-3]
+
+                    if patp == ep_patp :
                         Log.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
                     else:
                         Log.log_groundseg(f"{patp}: Registering services")
