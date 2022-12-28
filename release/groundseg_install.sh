@@ -8,7 +8,7 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=main
-TAG=beta-3.5.5
+TAG=v1.0.0
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg

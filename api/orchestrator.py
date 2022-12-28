@@ -15,6 +15,7 @@ import hashlib
 import socket
 import base64
 import urllib.request
+import ssl
 
 from flask import jsonify, send_file, current_app
 from datetime import datetime
@@ -40,7 +41,8 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.5'
+    gs_version = 'v1.0.0'
+    _vm = False
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -56,6 +58,7 @@ class Orchestrator:
 #   init
 #
     def __init__(self, config_file):
+
         # store config file location
         self.config_file = config_file
 
@@ -71,6 +74,10 @@ class Orchestrator:
         # save the latest config to file
         self.save_config()
 
+        if os.path.isfile(f"{self.config['CFG_DIR']}/vm") or 'WSL_DISTRO_NAME' in os.environ:
+            Log.log_groundseg("VM mode detected. Enabling limited features")
+            self._vm = True
+            
         # Remove MC Binary
         if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
             Log.log_groundseg("Old MC binary found. Deleting...")
@@ -110,9 +117,13 @@ class Orchestrator:
     # Check if device has internet access
     def check_internet_access(self):
         try:
-            urllib.request.urlopen('https://nativeplanet.io', timeout=1)
+            context = ssl._create_unverified_context()
+            urllib.request.urlopen('https://nativeplanet.io',
+                                   timeout=1, context=context
+                                   )
             return True
-        except:
+        except Exception as e:
+            Log.log_groundseg(e)
             return False
 
     # Checks if system.json and all its fields exists, adds field if incomplete
@@ -337,6 +348,7 @@ class Orchestrator:
 
         # Create query result
         u = dict()
+
         u['name'] = urb.pier_name
         u['running'] = urb.is_running()
 
@@ -850,17 +862,20 @@ class Orchestrator:
     # Get all system information
     def get_system_settings(self):
         settings = dict()
-        settings['ram'] = self._ram
-        settings['cpu'] = self._cpu
-        settings['temp'] = self._core_temp
-        settings['disk'] = self._disk
+        settings['vm'] = self._vm
         settings['gsVersion'] = self.gs_version
         settings['updateMode'] = self.config['updateMode']
-        settings['ethOnly'] = self.get_ethernet_status()
         settings['minio'] = self.minIO_on
-        settings['connected'] = self.get_connection_status()
         settings['containers'] = self.get_containers()
         settings['sessions'] = len(self.config['sessions'])
+
+        if not self._vm:
+            settings['ram'] = self._ram
+            settings['cpu'] = self._cpu
+            settings['temp'] = self._core_temp
+            settings['disk'] = self._disk
+            settings['connected'] = self.get_connection_status()
+            settings['ethOnly'] = self.get_ethernet_status()
 
         return {'system': settings}
 
