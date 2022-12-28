@@ -132,7 +132,9 @@
           {/if}
           <MinIO minio={$system.minio} />
           <Sessions sessions={$system.sessions} />
-          <Contact />
+          {#if $system.vm}
+            <Contact />
+          {/if}
         </div>
       </div>
 
