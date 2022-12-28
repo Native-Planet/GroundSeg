@@ -753,18 +753,18 @@ class Orchestrator:
                 self.anchor_config = x 
                 self.wireguard.update_wg_config(x['conf'])
 
-            patp_reg = False
 
             if self.anchor_config != None:
                 for ep in self.anchor_config['subdomains']:
-                    if patp in ep['url'] :
-                        Log.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
-                        patp_reg = True
 
-            if patp_reg == False:
-                Log.log_groundseg(f"{patp}: Registering services")
-                self.wireguard.register_service(f'{patp}','urbit',url)
-                self.wireguard.register_service(f's3.{patp}','minio',url)
+                    ep_patp = ep['url'].split('.')[-3]
+
+                    if patp == ep_patp :
+                        Log.log_groundseg(f"{patp}: {ep['svc_type']} already exists")
+                    else:
+                        Log.log_groundseg(f"{patp}: Registering services")
+                        self.wireguard.register_service(f'{patp}','urbit',url)
+                        self.wireguard.register_service(f's3.{patp}','minio',url)
 
             x = self.wireguard.get_status(url)
             if x != None:
