@@ -1,11 +1,13 @@
 # Native Planet GroundSeg
 This is the Control Software for the NP System. 
 
-GroundSeg requires `docker` and `glibc ^2.34` to work.
+GroundSeg requires `docker` and `glibc ^2.31` to work.
+
+GroundSeg works better with StarTram. Read more about [StarTram](https://www.nativeplanet.io/startram)
 
 ## Installation
 
-**Disclaimer:** This software runs as `root` on your device. This is required for controlling various aspects of the device.
+**Disclaimer:** GroundSeg runs with `sudo` privileges on your device. This is required for controlling various aspects of the device.
 
 ### Docker + GroundSeg (Recommended)
 This installs `docker` and the GroundSeg binary. Use this if you do not know what you're doing.
@@ -24,30 +26,22 @@ sudo wget -O - only.groundseg.app | bash
 
 ### For Windows
 
-- Make sure you are running Windows 10 version 2004 or higher.
+Coming soon
 
-- Open the Command Prompt App from the Start Menu.
+### For MacOS
 
-- Run the `wsl.exe --install` command.
-
-- Reboot your machine.
-
-- You will be prompted for a user name and password from the Command Prompt.
-
-- Open the Ubuntu app from the Start Menu.
-
-- Run the `sudo apt-get update && sudo apt-get upgrade -y` command.
-
-- Once the installation is complete, run `sudo wget -O - get.groundseg.app | bash`.
+Coming soon
 
 ## Edge Branch Installation (Unstable)
 
-1. Modify `"updateUrl"` in `/opt/nativeplanet/groundseg/settings/system.json` to `https://version.infra.native.computer/version_edge.csv`
-2. `sudo systemctl restart groundseg`
+1. Go to `/opt/nativeplanet/groundseg/settings/system.json`
+2. Set `"updateBranch" to "edge"
+3. `sudo systemctl restart groundseg`
 
-## Development and Building From Source
+## Building From Source
 
-Coming Soon
+1. Have docker installed
+2. run `build.sh`
 
 ## Removing GroundSeg (Uninstall)
 
@@ -86,8 +80,3 @@ https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/complete_
 sudo chmod +x /tmp/nativeplanet/complete_uninstall.sh && \
 sudo /tmp/nativeplanet/complete_uninstall.sh
 ```
-
-## TODO 
-
-1. Add bitcoin node support
-2. Onboarding screen

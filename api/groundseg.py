@@ -89,7 +89,13 @@ def check_bin_updates():
                 Log.log_groundseg(f"Latest version: {new_name}")
                 Log.log_groundseg("Downloading new groundseg binary")
 
-                urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
+                #urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
+                r = requests.get(dl_url)
+                f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
+                for chunk in r.iter_content(chunk_size=512 * 1024):
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)
+                f.close()
 
                 Log.log_groundseg("Removing old groundseg binary")
 
