@@ -41,7 +41,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'Beta-3.5.6-edge'
+    gs_version = 'v1.0.0'
     _vm = False
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
@@ -118,7 +118,9 @@ class Orchestrator:
     def check_internet_access(self):
         try:
             context = ssl._create_unverified_context()
-            urllib.request.urlopen('https://nativeplanet.io', timeout=1, context=context)
+            urllib.request.urlopen('https://nativeplanet.io',
+                                   timeout=1, context=context
+                                   )
             return True
         except Exception as e:
             Log.log_groundseg(e)
