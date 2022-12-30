@@ -7,6 +7,7 @@
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
   import HomeButton from '$lib/HomeButton.svelte'
+  import BugButton from '$lib/BugButton.svelte'
 
   import PowerScreen from '$lib/PowerScreen.svelte'
   import NoConnection from '$lib/NoConnection.svelte'
@@ -64,6 +65,7 @@
       <AnchorButton />
       <HomeButton />
       <slot/>
+      <BugButton />
     </div>
   {/if}
 </div>

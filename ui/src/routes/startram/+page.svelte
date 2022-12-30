@@ -79,6 +79,12 @@
     <!-- Register Key -->
     <AnchorRegisterKey wgReg={data.anchor.wgReg} />
 
+    <div class="sign-up">
+      <a href="https://www.nativeplanet.io/startram" target="_blank">
+        Need a startram registration key? Get one here!
+      </a>
+    </div>
+
     <!-- Advanced Options -->
     <AnchorAdvanced wgReg={data.anchor.wgReg} />
   </Card>
@@ -94,5 +100,15 @@
     background: green;
     padding: 2px 8px;
     border-radius: 8px;
+  }
+  .sign-up {
+    margin-top: 12px;
+    margin-left: 2px;
+  }
+  a {
+    color: inherit;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>
