@@ -337,6 +337,24 @@ def anchor_settings():
 
     return jsonify(404)
 
+@app.route("/bug", methods=['POST'])
+def bug_report():
+    if orchestrator.config['firstBoot']:
+        return jsonify('setup')
+
+    sessionid = request.args.get('sessionid')
+
+    if len(str(sessionid)) != 64:
+        sessionid = request.cookies.get('sessionid')
+
+    if sessionid == None:
+        return jsonify(404)
+
+    if sessionid in orchestrator.config['sessions']:
+        return jsonify(orchestrator.handle_bug_report(request.get_json()))
+
+    return jsonify(404)
+
 # Pier upload
 @app.route("/upload", methods=['POST'])
 def pier_upload():

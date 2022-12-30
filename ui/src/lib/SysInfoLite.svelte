@@ -79,10 +79,6 @@
     font-size: 18px;
     padding-bottom: 8px;
   }
-  .hw {
-    display: flex;
-    font-size: 14px;
-  }
   .hw-version {
     display: flex;
     font-size: 14px;

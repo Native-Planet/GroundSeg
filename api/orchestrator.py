@@ -1,4 +1,5 @@
 import json
+import requests
 import os
 import sys
 import time
@@ -41,7 +42,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.0'
+    gs_version = 'v1.0.1'
     _vm = False
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
@@ -318,6 +319,64 @@ class Orchestrator:
 
         return secret
 
+#
+#   Bug Report
+#
+
+    def handle_bug_report(self, data):
+        try:
+            # Prep
+            report = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+            os.system(f"mkdir -p {self.config['CFG_DIR']}/bug-reports/{report}")
+            current_logfile = f"{datetime.now().strftime('%Y-%m')}.log"
+
+            with open(f"{self.config['CFG_DIR']}/bug-reports/{report}/details.txt", "w") as f:
+                f.write(f"Contact:\n{data['person']}\nDetails:\n{data['message']}")
+                f.close()
+
+            # Create zipfile
+            bug_file = zipfile.ZipFile(
+                    f"{self.config['CFG_DIR']}/bug-reports/{report}/{report}.zip", 'w', zipfile.ZIP_DEFLATED
+                    )
+
+            # wireguard config
+            if self.config['wgRegistered']:
+                try:
+                    bug_file.writestr('wireguard.log', subprocess.check_output(['docker', 'logs', 'wireguard']))
+                    bug_file.writestr('wg_show.txt', subprocess.check_output(
+                        ['docker', 'exec', 'wireguard', 'wg', 'show']
+                        ))
+                except:
+                    pass
+
+            # docker ps -a
+            bug_file.writestr('docker.txt', subprocess.check_output(['docker', 'ps', '-a']).decode('utf-8'))
+
+            # current log
+            bug_file.write(f"{self.config['CFG_DIR']}/logs/{current_logfile}", arcname=current_logfile)
+
+            # save zipfile
+            bug_file.close()
+
+            # send to endpoint
+            bug_endpoint = "https://bugs.groundseg.app"
+
+
+            uploaded_file = open(f"{self.config['CFG_DIR']}/bug-reports/{report}/{report}.zip", 'rb')
+
+            form_data = {"contact": data['person'], "string": data['message']}
+            form_file = {"zip_file": (f"{report}.zip", uploaded_file)}
+
+            r = requests.post(bug_endpoint, data=form_data, files=form_file)
+            Log.log_groundseg(f"Bug report sent on {report}")
+
+            return r.status_code
+
+        except Exception as e:
+            Log.log_groundseg(e)
+            pass
+
+        return 400
 #
 #   Urbit Pier
 #
