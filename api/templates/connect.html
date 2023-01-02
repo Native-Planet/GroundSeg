@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroundSeg Connect</title>
+    <style>
+      body {
+        margin: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #040404;
+      }
+      .card::-webkit-scrollbar {display: none;}
+      .card {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        
+        border-radius: 20px;
+
+        background: #ffffff4d;
+        backdrop-filter: blur(60px);
+        -moz-backdrop-filter: blur(60px);
+        -o-backdrop-filter: blur(60px);
+        -webkit-backdrop-filter: blur(60px);
+
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+
+        overflow: scroll;
+        padding: 20px;
+      }
+      a {
+        width: 400px;
+        -webkit-appearance: button;
+        -moz-appearance: button;
+        appearance: button;
+        text-decoration: none;
+        text-align: center;
+        width: 100%;
+        border: none;
+        background: none;
+        color: white;
+        padding: 12px 0 12px 0;
+      }
+      a:hover {
+        background: #0404044d;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      {% for ssid in ssids %}
+      <a href="/connect/{{ ssid }}">{{ ssid }}</a>
+      {% endfor %}
+    </div>
+  </body>
+</html>

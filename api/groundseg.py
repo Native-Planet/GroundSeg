@@ -8,13 +8,15 @@ import psutil
 import sys
 import requests
 import urllib.request
+import nmcli
 
 from datetime import datetime
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request, make_response, render_template
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from PyAccessPoint import pyaccesspoint
 
-from utils import Log
+from utils import Log, Network
 from orchestrator import Orchestrator
 
 # Create flask app
@@ -27,6 +29,19 @@ Log.log_groundseg("----------- Urbit is love <3 -----------")
 
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
+
+ssids = None
+ap = pyaccesspoint.AccessPoint(wlan=orchestrator._wifi_device, ssid='NativePlanet_c2c', password='nativeplanet')
+
+if orchestrator._c2c_mode:
+    nmcli.radio.wifi_on()
+    time.sleep(1)
+    if nmcli.radio.wifi():
+        ssids = Network.list_wifi_ssids()
+        print(ssids, file=sys.stderr)
+        time.sleep(3)
+        if ap.stop():
+         print(ap.start(), file=sys.stderr)
 
 # Docker Updater
 def check_docker_updates():
@@ -62,7 +77,6 @@ def check_docker_updates():
                             if img == minio:
                                 Log.log_groundseg("Updating MinIOs")
                                 orchestrator.reload_minios()
-
                 except:
                     pass
 
@@ -216,11 +230,12 @@ def meld_loop():
         time.sleep(30)
 
 # Threads
-threading.Thread(target=check_docker_updates).start() # Docker updater
-threading.Thread(target=check_bin_updates).start() # Binary updater
-threading.Thread(target=sys_monitor).start() # System monitoring
-threading.Thread(target=meld_loop).start() # Meld loop
-threading.Thread(target=anchor_information).start() # Anchor information
+if not orchestrator._c2c_mode:
+    threading.Thread(target=check_docker_updates).start() # Docker updater
+    threading.Thread(target=check_bin_updates).start() # Binary updater
+    threading.Thread(target=sys_monitor).start() # System monitoring
+    threading.Thread(target=meld_loop).start() # Meld loop
+    threading.Thread(target=anchor_information).start() # Anchor information
 
 #
 #   Endpoints
@@ -464,6 +479,34 @@ def setup():
 
     return jsonify(res)
 
+# c2c
+@app.route("/", methods=['GET'])
+def c2c():
+    if orchestrator._c2c_mode:
+        return render_template('connect.html', ssids=ssids)
+    return jsonify(404)
+
+@app.route("/connect/<ssid>", methods=['GET','POST'])
+def c2ssid(ssid=None):
+    if orchestrator._c2c_mode:
+        if request.method == 'GET':
+            return render_template('ssid.html', ssid=ssid)
+        if request.method == 'POST':
+            # turn off ap
+            if ap.stop():
+                nmcli.radio.wifi_on()
+                time.sleep(2)
+                if nmcli.radio.wifi():
+                    print(Network.list_wifi_ssids(), file=sys.stderr)
+                    completed = Network.wifi_connect(ssid, request.form['password'])
+                    Log.log_groundseg(f"Connection to wifi network {completed}")
+                    os.system("systemctl restart groundseg.service")
+            return jsonify(200)
+    return jsonify(404)
+
 if __name__ == '__main__':
+    port = 27016
+    if orchestrator._c2c_mode:
+        port = 80
     debug_mode = False
-    app.run(host='0.0.0.0', port=27016, threaded=True, debug=debug_mode, use_reloader=debug_mode)
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=debug_mode, use_reloader=debug_mode)
