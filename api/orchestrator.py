@@ -838,40 +838,6 @@ class Orchestrator:
                 self.wireguard.update_wg_config(x['conf'])
 
             if self.anchor_config != None:
-<<<<<<< Updated upstream
-             if self.anchor_config != None:
-                 # Define services
-                 urbit_web = False
-                 urbit_ames = False
-                 minio_svc = False
-                 minio_console = False
-                 minio_bucket = False
-                 # Check if service exists for patp
-                 for ep in self.anchor_config['subdomains']:
-                     ep_patp = ep['url'].split('.')[-3]
-                     ep_svc = ep['svc_type']
-                     if ep_patp == patp:
-                         if ep_svc == 'urbit-web':
-                             urbit_web = True
-                         if ep_svc == 'urbit-ames':
-                             urbit_ames = True
-                         if ep_svc == 'minio':
-                             minio_svc = True
-                         if ep_svc == 'minio-console':
-                             minio_console = True
-                         if ep_svc == 'minio-bucket':
-                             minio_bucket = True
- 
-                 # One or more of the urbit services is not registered
-                 if not (urbit_web and urbit_ames):
-                     Log.log_groundseg(f"{patp}: Registering Urbit anchor services")
-                     self.wireguard.register_service(f'{patp}','urbit',url)
- 
-                 # One or more of the minio services is not registered
-                 if not (minio_svc and minio_console and minio_bucket):
-                     Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
-                     self.wireguard.register_service(f's3.{patp}','minio',url)
-=======
                 # Define services
                 urbit_web = False
                 urbit_ames = False
@@ -893,22 +859,22 @@ class Orchestrator:
                             minio_console = True
                         if ep_svc == 'minio-bucket':
                             minio_bucket = True
-
+ 
                 # One or more of the urbit services is not registered
                 if not (urbit_web and urbit_ames):
                     Log.log_groundseg(f"{patp}: Registering Urbit anchor services")
                     self.wireguard.register_service(f'{patp}','urbit',url)
-
+ 
                 # One or more of the minio services is not registered
                 if not (minio_svc and minio_console and minio_bucket):
                     Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
                     self.wireguard.register_service(f's3.{patp}','minio',url)
->>>>>>> Stashed changes
 
             x = self.wireguard.get_status(url)
             if x != None:
                 self.anchor_config = x 
                 self.wireguard.update_wg_config(x['conf'])
+
             url = None
             http_port = None
             ames_port = None
@@ -917,6 +883,7 @@ class Orchestrator:
 
             Log.log_groundseg(self.anchor_config['subdomains'])
             pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
             for ep in self.anchor_config['subdomains']:
                 if(f'{patp}.{pub_url}' == ep['url']):
                     url = ep['url']
