@@ -42,7 +42,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.1'
+    gs_version = 'v1.0.2'
     _vm = False
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
