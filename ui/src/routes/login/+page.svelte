@@ -22,6 +22,8 @@
     if (data['status'] == 200) {
       console.log("logged in")
       window.location.href = "/"
+    } else if (data['status'] == 'setup') {
+      window.location.href = "/setup"
     } else {
       console.log(data['status'])
     }

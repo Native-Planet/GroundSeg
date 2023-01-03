@@ -292,6 +292,11 @@ class Orchestrator:
         try:
             if page == "anchor":
                 # set endpoint
+                if 'skip' in data:
+                    self.config['firstBoot'] = False
+                    self.save_config()
+                    return 200
+
                 changed = self.change_wireguard_url(data['endpoint'])
 
                 # register key
@@ -301,12 +306,14 @@ class Orchestrator:
                     if registered == 400:
                         return 401
 
-                    return registered
+                    if registered == 200:
+                        self.config['firstBoot'] = False
+                        self.save_config()
 
+                    return registered
 
             if page == "password":
                 self.create_password(data['password'])
-                self.config['firstBoot'] = False
                 return 200
 
         except Exception as e:

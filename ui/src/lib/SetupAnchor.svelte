@@ -21,6 +21,25 @@
     document.querySelector('#key-input').type = keyView ? 'text' : 'password'
   }
 
+  const skipAnchor = () => {
+    let step = "anchor"
+    let query = {"skip":true}
+
+    fetch($api + '/setup?page=' + step, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(query)
+    })
+      .then(d => d.json())
+      .then(res => {
+        if (res == 200) {
+          window.location.href = "/login"
+        } else {
+          console.log("failed")
+        }
+      })
+  }
+
   const submitAnchor = () => {
     let step = "anchor"
     let query = {"key":key, "endpoint":epKey}
@@ -44,7 +63,7 @@
 
         if (res == 200) {
           buttonStatus = "success"
-          setTimeout(()=> dispatch("nextPage"), 3000)
+          window.location.href = "/login"
         }
         setTimeout(()=> buttonStatus = "standard", 3000)
       })
@@ -68,7 +87,7 @@
   <PrimaryButton
     background="#ffffff4d"
     standard="Skip"
-    on:click={()=> dispatch('nextPage')}
+    on:click={skipAnchor}
   />
 
   {#if ((epKey.length > 0) && (key.length > 0))}
