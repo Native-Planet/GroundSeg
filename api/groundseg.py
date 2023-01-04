@@ -504,6 +504,14 @@ def c2ssid(ssid=None):
             return jsonify(200)
     return jsonify(404)
 
+@app.route("/connect/reload/page", methods=['GET'])
+def c2crestart():
+    if orchestrator._c2c_mode:
+        Log.log_groundseg("Restarting Connect to Connect")
+        os.system("systemctl restart groundseg.service")
+        return jsonify(200)
+    return jsonify(404)
+
 if __name__ == '__main__':
     port = 27016
     if orchestrator._c2c_mode:

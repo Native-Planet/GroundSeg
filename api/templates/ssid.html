@@ -4,43 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GroundSeg Connect</title>
-    <style>
-      body {
-        margin: 0;
-        width: 100vw;
-        height: 100vh;
-        background: #040404;
-      }
-      .card::-webkit-scrollbar {display: none;}
-      .card {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #fff;
-        
-        border-radius: 20px;
-
-        background: #ffffff4d;
-        backdrop-filter: blur(60px);
-        -moz-backdrop-filter: blur(60px);
-        -o-backdrop-filter: blur(60px);
-        -webkit-backdrop-filter: blur(60px);
-
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-
-        overflow: scroll;
-        padding: 20px;
-      }
-    </style>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
   </head>
   <body>
     <div class="card">
+      <!-- Header -->
+      <div class="logo" >
+        <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
+        <span class="text">{{ ssid }}</span>
+        <form action="/connect/reload/page" method="get">
+          <button class="rescan" type="submit">Rescan</button>
+        </form>
+      </div>
       <form method="post">
-        <label>{{ ssid }}</label>
-        <input type="password" placeholder="password" name="password" />
-        <button type="submit">Connect to network</button>
+        <input type="password" placeholder="Password for {{ ssid }}" name="password" />
+        <a class="back" href="/">Back</a>
+        <button class="connect" type="submit">Connect</button>
       </form>
     </div>
   </body>
