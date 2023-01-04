@@ -9,6 +9,8 @@ import sys
 import requests
 import urllib.request
 import nmcli
+import subprocess
+import html_templates
 
 from datetime import datetime
 from flask import Flask, jsonify, request, make_response, render_template
@@ -33,15 +35,45 @@ orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 ssids = None
 ap = pyaccesspoint.AccessPoint(wlan=orchestrator._wifi_device, ssid='NativePlanet_c2c', password='nativeplanet')
 
+# Handle Connect to Connect
 if orchestrator._c2c_mode:
-    nmcli.radio.wifi_on()
-    time.sleep(1)
-    if nmcli.radio.wifi():
+    try:
+        Log.log_groundseg(f"Turning wireless adapter {orchestrator._wifi_device} on")
+        nmcli.radio.wifi_on()
+        wifi_on = nmcli.radio.wifi()
+        while not wifi_on:
+            Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
+            nmcli.radio.wifi.on()
+            time.sleep(1)
+            wifi_on = nmcli.radio.wifi()
+
+        time.sleep(1)
+        Log.log_gorundseg("Scanning for available SSIDs")
+        nmcli.device.wifi_rescan()
+        time.sleep(8)
         ssids = Network.list_wifi_ssids()
-        print(ssids, file=sys.stderr)
-        time.sleep(3)
-        if ap.stop():
-         print(ap.start(), file=sys.stderr)
+
+        if len(ssids) < 1:
+            Log.log_groundseg("No SSIDs available, exiting..")
+            sys.exit()
+
+        Log.log_groundseg(f"Available SSIDs: {ssids}")
+        Log.log_groundseg("Stopping systemd-resolved")
+        x = subprocess.check_output("systemctl stop systemd-resolved", shell=True)
+        if x.decode('utf-8') == '':
+            if ap.stop():
+                if ap.start():
+                    Log.log_groundseg("Access Point enabled")
+                else:
+                    Log.log_groundseg("Unable to start Access Point. Exiting..")
+                    sys.exit()
+            else:
+                Log.log_groundseg("Something went wrong. Exiting..")
+                sys.exit()
+    except Exception as e:
+        Log.log_groundseg(f"Connect to connect error: {e}")
+        Log.log_groundseg("Exiting..")
+        sys.exit()
 
 # Docker Updater
 def check_docker_updates():
@@ -483,24 +515,40 @@ def setup():
 @app.route("/", methods=['GET'])
 def c2c():
     if orchestrator._c2c_mode:
-        return render_template('connect.html', ssids=ssids)
+        return html_templates.home_page(ssids) ##render_template('connect.html', ssids=ssids)
     return jsonify(404)
 
 @app.route("/connect/<ssid>", methods=['GET','POST'])
 def c2ssid(ssid=None):
     if orchestrator._c2c_mode:
+
         if request.method == 'GET':
-            return render_template('ssid.html', ssid=ssid)
+            return html_templates.connect_page(ssid)
+
         if request.method == 'POST':
+            Log.log_groundseg(f"Requested to connect to SSID: {ssid}")
+            Log.log_groundseg(f"Turning off Access Point")
+
             # turn off ap
             if ap.stop():
-                nmcli.radio.wifi_on()
-                time.sleep(2)
-                if nmcli.radio.wifi():
-                    print(Network.list_wifi_ssids(), file=sys.stderr)
+                Log.log_groundseg("Starting systemd-resolved")
+                x = subprocess.check_output("systemctl start systemd-resolved", shell=True)
+                if x.decode('utf-8') == '':
+                    nmcli.radio.wifi_on()
+                    wifi_on = nmcli.radio.wifi()
+
+                    while not wifi_on:
+                        Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
+                        nmcli.radio.wifi.on()
+                        time.sleep(1)
+                        wifi_on = nmcli.radio.wifi()
+
+                    Log.log_groundseg(f"Available SSIDs: {Network.list_wifi_ssids()}")
+
                     completed = Network.wifi_connect(ssid, request.form['password'])
                     Log.log_groundseg(f"Connection to wifi network {completed}")
-                    os.system("systemctl restart groundseg.service")
+                    os.system("reboot")
+
             return jsonify(200)
     return jsonify(404)
 
@@ -508,7 +556,7 @@ def c2ssid(ssid=None):
 def c2crestart():
     if orchestrator._c2c_mode:
         Log.log_groundseg("Restarting Connect to Connect")
-        os.system("systemctl restart groundseg.service")
+        os.system("reboot")
         return jsonify(200)
     return jsonify(404)
 
