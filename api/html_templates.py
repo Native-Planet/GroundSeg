@@ -170,11 +170,11 @@ def home_page(ssids):
   <body>
     <div class="card">
       <!-- Header -->
-      <div class="logo" >
+      <div class="logo">
         <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
         <span class="text">Select a Wireless Network</span>
         <form action="/connect/reload/page" method="get">
-          <button class="rescan" type="submit">Rescan</button>
+          <button class="rescan" type="submit">Restart</button>
         </form>
       </div>
       <!-- List of SSIDs -->
@@ -198,7 +198,7 @@ def connect_page(ssid):
         <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
         <span class="text">{ssid}</span>
         <form action="/connect/reload/page" method="get">
-          <button class="rescan" type="submit">Rescan</button>
+          <button class="rescan" type="submit">Restart</button>
         </form>
       </div>
       <form method="post">

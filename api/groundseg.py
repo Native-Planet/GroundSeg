@@ -47,10 +47,17 @@ if orchestrator._c2c_mode:
             time.sleep(1)
             wifi_on = nmcli.radio.wifi()
 
+        #time.sleep(1)
+        #for c in nmcli.connection():
+        #    if c.conn_type == 'wifi':
+        #        Log.log_groundseg(f"Deleting {c.name}")
+        #        nmcli.connection.delete(c.name)
+
         time.sleep(1)
-        Log.log_gorundseg("Scanning for available SSIDs")
+        Log.log_groundseg("Scanning for available SSIDs")
         nmcli.device.wifi_rescan()
         time.sleep(8)
+
         ssids = Network.list_wifi_ssids()
 
         if len(ssids) < 1:
@@ -261,6 +268,15 @@ def meld_loop():
 
         time.sleep(30)
 
+def c2c_kill_switch():
+    interval = orchestrator.config['c2cInterval']
+    if interval != 0:
+        Log.log_groundseg(f"Connect to connect interval detected! Restarting device in {interval} seconds"
+        time.sleep(orchestrator.config['c2cInterval'])
+        os.system("reboot")
+    else:
+        Log.log_groundseg("Connect to connect interval not set!")
+
 # Threads
 if not orchestrator._c2c_mode:
     threading.Thread(target=check_docker_updates).start() # Docker updater
@@ -268,6 +284,8 @@ if not orchestrator._c2c_mode:
     threading.Thread(target=sys_monitor).start() # System monitoring
     threading.Thread(target=meld_loop).start() # Meld loop
     threading.Thread(target=anchor_information).start() # Anchor information
+else:
+    threading.Thread(target=c2c_kill_switch).start # Reboot device after delay
 
 #
 #   Endpoints
@@ -547,15 +565,19 @@ def c2ssid(ssid=None):
 
                     completed = Network.wifi_connect(ssid, request.form['password'])
                     Log.log_groundseg(f"Connection to wifi network {completed}")
-                    os.system("reboot")
 
-            return jsonify(200)
+                    if completed == "success" and orchestrator.config['c2cInverval'] == 0:
+                        orchestrator.config['c2cInterval'] = 600
+                        orchestrator.save_config()
+
+                    os.system("reboot")
+                    return jsonify(200)
     return jsonify(404)
 
 @app.route("/connect/reload/page", methods=['GET'])
 def c2crestart():
     if orchestrator._c2c_mode:
-        Log.log_groundseg("Restarting Connect to Connect")
+        Log.log_groundseg("Connect to Connect: Restarting device")
         os.system("reboot")
         return jsonify(200)
     return jsonify(404)

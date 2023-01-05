@@ -185,6 +185,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
         cfg = self.check_config_field(cfg, 'updateBranch', update_mode)
         cfg = self.check_config_field(cfg, 'updateInterval', 90)
+        cfg = self.check_config_field(cfg, 'c2cInterval', 0)
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
