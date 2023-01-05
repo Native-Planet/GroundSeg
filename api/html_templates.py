@@ -1,5 +1,5 @@
 head = """\n
-  <head>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GroundSeg Connect to Connect</title>
@@ -159,30 +159,30 @@ head = """\n
           border-bottom: solid 1px #ffffff4d;
         }
     </style>
-  </head>
+</head>
   """
 
 def home_page(ssids):
     formatted_ssids = ''.join(list(map(lambda z: f'<a class="ssid" href="/connect/{z}">{z}</a><div class="sep"></div>', ssids)))
 
     body = f"""\n
-  {head}
-  <body>
-    <div class="card">
-      <!-- Header -->
-      <div class="logo">
-        <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
-        <span class="text">Select a Wireless Network</span>
-        <form action="/connect/reload/page" method="get">
-          <button class="rescan" type="submit">Restart</button>
-        </form>
-      </div>
-      <!-- List of SSIDs -->
-      <div class="title">Available Networks</div>
-      <div class="sep"></div>
-      {formatted_ssids}
-    </div>
-  </body>
+{head}
+<body>
+<div class="card">
+  <!-- Header -->
+  <div class="logo">
+    <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
+    <span class="text">Select a Wireless Network</span>
+    <form action="/" method="post">
+      <button class="rescan" type="submit">Restart</button>
+    </form>
+  </div>
+  <!-- List of SSIDs -->
+  <div class="title">Available Networks</div>
+  <div class="sep"></div>
+  {formatted_ssids}
+</div>
+</body>
 """
 
     return body
@@ -190,24 +190,24 @@ def home_page(ssids):
 def connect_page(ssid):
 
     body = f"""\n
-  {head}
-  <body>
-    <div class="card">
-      <!-- Header -->
-      <div class="logo" >
-        <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
-        <span class="text">{ssid}</span>
-        <form action="/connect/reload/page" method="get">
-          <button class="rescan" type="submit">Restart</button>
-        </form>
-      </div>
-      <form method="post">
-        <input type="password" placeholder="Password for {ssid}" name="password" />
-        <a class="back" href="/">Back</a>
-        <button class="connect" type="submit">Connect</button>
-      </form>
-    </div>
-  </body>
+{head}
+<body>
+<div class="card">
+  <!-- Header -->
+  <div class="logo" >
+    <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
+    <span class="text">{ssid}</span>
+    <form action="/" method="post">
+      <button class="rescan" type="submit">Restart</button>
+    </form>
+  </div>
+  <form method="post">
+    <input type="password" placeholder="Password for {ssid}" name="password" />
+    <a class="back" href="/">Back</a>
+    <button class="connect" type="submit">Connect</button>
+  </form>
+</div>
+</body>
 """
     
     return body

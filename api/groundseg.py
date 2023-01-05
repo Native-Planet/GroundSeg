@@ -22,7 +22,7 @@ from utils import Log, Network
 from orchestrator import Orchestrator
 
 # Create flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder='/opt/nativeplanet/groundseg/static')
 CORS(app, supports_credentials=True)
 
 # Announce
@@ -46,12 +46,6 @@ if orchestrator._c2c_mode:
             nmcli.radio.wifi.on()
             time.sleep(1)
             wifi_on = nmcli.radio.wifi()
-
-        #time.sleep(1)
-        #for c in nmcli.connection():
-        #    if c.conn_type == 'wifi':
-        #        Log.log_groundseg(f"Deleting {c.name}")
-        #        nmcli.connection.delete(c.name)
 
         time.sleep(1)
         Log.log_groundseg("Scanning for available SSIDs")
@@ -271,7 +265,7 @@ def meld_loop():
 def c2c_kill_switch():
     interval = orchestrator.config['c2cInterval']
     if interval != 0:
-        Log.log_groundseg(f"Connect to connect interval detected! Restarting device in {interval} seconds"
+        Log.log_groundseg(f"Connect to connect interval detected! Restarting device in {interval} seconds")
         time.sleep(orchestrator.config['c2cInterval'])
         os.system("reboot")
     else:
@@ -530,10 +524,16 @@ def setup():
     return jsonify(res)
 
 # c2c
-@app.route("/", methods=['GET'])
+@app.route("/", methods=['GET','POST'])
 def c2c():
     if orchestrator._c2c_mode:
-        return html_templates.home_page(ssids) ##render_template('connect.html', ssids=ssids)
+        if request.method == 'GET':
+            return html_templates.home_page(ssids) ##render_template('connect.html', ssids=ssids)
+        if request.method == 'POST':
+            Log.log_groundseg("Connect to Connect: Restarting device")
+            os.system("reboot")
+            return jsonify(200)
+
     return jsonify(404)
 
 @app.route("/connect/<ssid>", methods=['GET','POST'])
@@ -548,38 +548,35 @@ def c2ssid(ssid=None):
             Log.log_groundseg(f"Turning off Access Point")
 
             # turn off ap
-            if ap.stop():
-                Log.log_groundseg("Starting systemd-resolved")
-                x = subprocess.check_output("systemctl start systemd-resolved", shell=True)
-                if x.decode('utf-8') == '':
-                    nmcli.radio.wifi_on()
-                    wifi_on = nmcli.radio.wifi()
-
-                    while not wifi_on:
-                        Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
-                        nmcli.radio.wifi.on()
-                        time.sleep(1)
+            try:
+                if ap.stop():
+                    Log.log_groundseg("Starting systemd-resolved")
+                    x = subprocess.check_output("systemctl start systemd-resolved", shell=True)
+                    if x.decode('utf-8') == '':
+                        nmcli.radio.wifi_on()
                         wifi_on = nmcli.radio.wifi()
 
-                    Log.log_groundseg(f"Available SSIDs: {Network.list_wifi_ssids()}")
+                        while not wifi_on:
+                            Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
+                            nmcli.radio.wifi.on()
+                            time.sleep(1)
+                            wifi_on = nmcli.radio.wifi()
 
-                    completed = Network.wifi_connect(ssid, request.form['password'])
-                    Log.log_groundseg(f"Connection to wifi network {completed}")
+                        Log.log_groundseg(f"Available SSIDs: {Network.list_wifi_ssids()}")
 
-                    if completed == "success" and orchestrator.config['c2cInverval'] == 0:
-                        orchestrator.config['c2cInterval'] = 600
-                        orchestrator.save_config()
+                        completed = Network.wifi_connect(ssid, request.form['password'])
+                        Log.log_groundseg(f"Connection to wifi network {completed}")
 
-                    os.system("reboot")
-                    return jsonify(200)
-    return jsonify(404)
+                        if completed == "success" and orchestrator.config['c2cInterval'] == 0:
+                            orchestrator.config['c2cInterval'] = 600
+                            orchestrator.save_config()
 
-@app.route("/connect/reload/page", methods=['GET'])
-def c2crestart():
-    if orchestrator._c2c_mode:
-        Log.log_groundseg("Connect to Connect: Restarting device")
-        os.system("reboot")
-        return jsonify(200)
+                        os.system("reboot")
+                        return jsonify(200)
+            except Exception as e:
+                Log.log_groundseg(f"An error has occurred: {e}")
+                Log.log_groundseg("Restarting device..")
+                os.system("reboot")
     return jsonify(404)
 
 if __name__ == '__main__':

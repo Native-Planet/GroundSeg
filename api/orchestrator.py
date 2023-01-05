@@ -98,7 +98,7 @@ class Orchestrator:
 
         # NP box
         if self._npbox:
-            if not internet:
+            if True::
                 Log.log_groundseg("No internet access, enabling Connect2Connect mode")
                 self._c2c_mode = True
 
