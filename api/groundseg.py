@@ -279,7 +279,7 @@ if not orchestrator._c2c_mode:
     threading.Thread(target=meld_loop).start() # Meld loop
     threading.Thread(target=anchor_information).start() # Anchor information
 else:
-    threading.Thread(target=c2c_kill_switch).start # Reboot device after delay
+    threading.Thread(target=c2c_kill_switch).start() # Reboot device after delay
 
 #
 #   Endpoints
