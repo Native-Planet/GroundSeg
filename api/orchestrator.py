@@ -18,6 +18,7 @@ import base64
 import urllib.request
 import ssl
 import nmcli
+import static_files
 
 from flask import jsonify, send_file, current_app
 from datetime import datetime
@@ -93,12 +94,37 @@ class Orchestrator:
             os.system(f"rm {self.config['CFG_DIR']}/mc")
             Log.log_groundseg("Old MC binary deleted")
 
+        # Create static files
+        static_dir =f"{self.config['CFG_DIR']}/static"
+        os.system(f"mkdir -p {static_dir}")
+        
+        # background.png
+        if not os.path.isfile(f"{static_dir}/background.png"):
+            if not static_files.make_if_valid("background.png"):
+                Log.log_groundseg("Failed to create background.png")
+            else:
+                Log.log_groundseg("Created background.png")
+
+        # nplogo.svg
+        if not os.path.isfile(f"{static_dir}/nplogo.svg"):
+            if not static_files.make_if_valid("nplogo.svg"):
+                Log.log_groundseg("Failed to create nplogo.svg")
+            else:
+                Log.log_groundseg("Created nplogo.svg")
+            
+        # Inter-SemiBold.otf
+        if not os.path.isfile(f"{static_dir}/Inter-SemiBold.otf"):
+            if not static_files.make_if_valid("Inter-SemiBold.otf"):
+                Log.log_groundseg("Failed to create Inter-SemiBold.otf")
+            else:
+                Log.log_groundseg("Created Inter-SemiBold.otf")
+
         # Check for internet access
         internet = self.check_internet_access()
 
         # NP box
         if self._npbox:
-            if True::
+            if True: #not internet:
                 Log.log_groundseg("No internet access, enabling Connect2Connect mode")
                 self._c2c_mode = True
 
