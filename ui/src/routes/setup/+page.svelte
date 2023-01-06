@@ -13,6 +13,7 @@
 	// load data into store
 	export let data
 	updateState(data)
+  console.log(data)
 
   let inViewSetup = false, setupPage = 0
 
@@ -28,11 +29,11 @@
     <Logo t='GroundSeg Setup'/>
 
     {#if setupPage == 0}
-      <SetupAnchor on:nextPage={()=> setupPage = 1}/>
+      <SetupPassword on:nextPage={()=> setupPage = 1} />
     {/if}
 
     {#if setupPage == 1}
-      <SetupPassword on:prevPage={()=> setupPage = 0} />
+      <SetupAnchor on:prevPage={()=> setupPage = 0}/>
     {/if}
 
   </Card>

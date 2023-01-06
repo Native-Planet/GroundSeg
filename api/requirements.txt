@@ -7,3 +7,5 @@ pywgkey
 nuitka
 zstandard
 ordered-set
+nmcli
+PyAccessPoint

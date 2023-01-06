@@ -8,17 +8,21 @@ import psutil
 import sys
 import requests
 import urllib.request
+import nmcli
+import subprocess
+import html_templates
 
 from datetime import datetime
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request, make_response, render_template
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from PyAccessPoint import pyaccesspoint
 
-from utils import Log
+from utils import Log, Network
 from orchestrator import Orchestrator
 
 # Create flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder='/opt/nativeplanet/groundseg/static')
 CORS(app, supports_credentials=True)
 
 # Announce
@@ -27,6 +31,50 @@ Log.log_groundseg("----------- Urbit is love <3 -----------")
 
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
+
+ssids = None
+ap = pyaccesspoint.AccessPoint(wlan=orchestrator._wifi_device, ssid='NativePlanet_c2c', password='nativeplanet')
+
+# Handle Connect to Connect
+if orchestrator._c2c_mode:
+    try:
+        Log.log_groundseg(f"Turning wireless adapter {orchestrator._wifi_device} on")
+        nmcli.radio.wifi_on()
+        wifi_on = nmcli.radio.wifi()
+        while not wifi_on:
+            Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
+            nmcli.radio.wifi.on()
+            time.sleep(1)
+            wifi_on = nmcli.radio.wifi()
+
+        time.sleep(1)
+        Log.log_groundseg("Scanning for available SSIDs")
+        nmcli.device.wifi_rescan()
+        time.sleep(8)
+
+        ssids = Network.list_wifi_ssids()
+
+        if len(ssids) < 1:
+            Log.log_groundseg("No SSIDs available, exiting..")
+            sys.exit()
+
+        Log.log_groundseg(f"Available SSIDs: {ssids}")
+        Log.log_groundseg("Stopping systemd-resolved")
+        x = subprocess.check_output("systemctl stop systemd-resolved", shell=True)
+        if x.decode('utf-8') == '':
+            if ap.stop():
+                if ap.start():
+                    Log.log_groundseg("Access Point enabled")
+                else:
+                    Log.log_groundseg("Unable to start Access Point. Exiting..")
+                    sys.exit()
+            else:
+                Log.log_groundseg("Something went wrong. Exiting..")
+                sys.exit()
+    except Exception as e:
+        Log.log_groundseg(f"Connect to connect error: {e}")
+        Log.log_groundseg("Exiting..")
+        sys.exit()
 
 # Docker Updater
 def check_docker_updates():
@@ -62,7 +110,6 @@ def check_docker_updates():
                             if img == minio:
                                 Log.log_groundseg("Updating MinIOs")
                                 orchestrator.reload_minios()
-
                 except:
                     pass
 
@@ -215,12 +262,24 @@ def meld_loop():
 
         time.sleep(30)
 
+def c2c_kill_switch():
+    interval = orchestrator.config['c2cInterval']
+    if interval != 0:
+        Log.log_groundseg(f"Connect to connect interval detected! Restarting device in {interval} seconds")
+        time.sleep(orchestrator.config['c2cInterval'])
+        os.system("reboot")
+    else:
+        Log.log_groundseg("Connect to connect interval not set!")
+
 # Threads
-threading.Thread(target=check_docker_updates).start() # Docker updater
-threading.Thread(target=check_bin_updates).start() # Binary updater
-threading.Thread(target=sys_monitor).start() # System monitoring
-threading.Thread(target=meld_loop).start() # Meld loop
-threading.Thread(target=anchor_information).start() # Anchor information
+if not orchestrator._c2c_mode:
+    threading.Thread(target=check_docker_updates).start() # Docker updater
+    threading.Thread(target=check_bin_updates).start() # Binary updater
+    threading.Thread(target=sys_monitor).start() # System monitoring
+    threading.Thread(target=meld_loop).start() # Meld loop
+    threading.Thread(target=anchor_information).start() # Anchor information
+else:
+    threading.Thread(target=c2c_kill_switch).start # Reboot device after delay
 
 #
 #   Endpoints
@@ -464,6 +523,69 @@ def setup():
 
     return jsonify(res)
 
+# c2c
+@app.route("/", methods=['GET','POST'])
+def c2c():
+    if orchestrator._c2c_mode:
+        if request.method == 'GET':
+            return html_templates.home_page(ssids) ##render_template('connect.html', ssids=ssids)
+        if request.method == 'POST':
+            Log.log_groundseg("Connect to Connect: Restarting device")
+            os.system("reboot")
+            return jsonify(200)
+
+    return jsonify(404)
+
+@app.route("/connect/<ssid>", methods=['GET','POST'])
+def c2ssid(ssid=None):
+    if orchestrator._c2c_mode:
+
+        if request.method == 'GET':
+            return html_templates.connect_page(ssid)
+
+        if request.method == 'POST':
+            Log.log_groundseg(f"Requested to connect to SSID: {ssid}")
+            Log.log_groundseg(f"Turning off Access Point")
+
+            # turn off ap
+            try:
+                if ap.stop():
+                    Log.log_groundseg("Starting systemd-resolved")
+                    x = subprocess.check_output("systemctl start systemd-resolved", shell=True)
+                    if x.decode('utf-8') == '':
+                        nmcli.radio.wifi_on()
+                        wifi_on = nmcli.radio.wifi()
+
+                        while not wifi_on:
+                            Log.log_groundseg("Wireless adapter not turned on yet. Trying again..")
+                            nmcli.radio.wifi.on()
+                            time.sleep(1)
+                            wifi_on = nmcli.radio.wifi()
+
+                        time.sleep(1)
+                        Log.log_groundseg("Scanning for available SSIDs")
+                        nmcli.device.wifi_rescan()
+                        time.sleep(8)
+                        Log.log_groundseg(f"Available SSIDs: {Network.list_wifi_ssids()}")
+
+                        completed = Network.wifi_connect(ssid, request.form['password'])
+                        Log.log_groundseg(f"Connection to wifi network {completed}")
+
+                        if completed == "success" and orchestrator.config['c2cInterval'] == 0:
+                            orchestrator.config['c2cInterval'] = 600
+                            orchestrator.save_config()
+
+                        os.system("reboot")
+                        return jsonify(200)
+            except Exception as e:
+                Log.log_groundseg(f"An error has occurred: {e}")
+                Log.log_groundseg("Restarting device..")
+                os.system("reboot")
+    return jsonify(404)
+
 if __name__ == '__main__':
+    port = 27016
+    if orchestrator._c2c_mode:
+        port = 80
     debug_mode = False
-    app.run(host='0.0.0.0', port=27016, threaded=True, debug=debug_mode, use_reloader=debug_mode)
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=debug_mode, use_reloader=debug_mode)

@@ -1,6 +1,7 @@
 from datetime import datetime
 import sys
 import os
+import nmcli
 
 class Log:
 
@@ -24,3 +25,15 @@ class Log:
                 log.close()
         except:
             pass
+
+class Network:
+
+    def list_wifi_ssids():
+        return [x.ssid for x in nmcli.device.wifi() if len(x.ssid) > 0]
+
+    def wifi_connect(ssid, pwd):
+        try:
+            nmcli.device.wifi_connect(ssid, pwd)
+            return "success"
+        except Exception as e:
+            return f"failed: {e}"
