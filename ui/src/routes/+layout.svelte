@@ -61,9 +61,11 @@
   {:else}
     <div class:frozen={($page.url.pathname === "/settings") 
       && (($power === 'shutdown') || ($power === 'restart'))}>
+      {#if !($page.routeId == 'setup')}
       <SettingsButton />
       <AnchorButton />
       <HomeButton />
+      {/if}
       <slot/>
       <BugButton />
     </div>

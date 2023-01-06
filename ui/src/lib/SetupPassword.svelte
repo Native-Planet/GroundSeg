@@ -35,6 +35,7 @@
     })
       .then(d => d.json())
       .then(res => {
+        console.log(res)
         if (res == 400) {
           window.location.href = "/login"
         }
@@ -45,7 +46,7 @@
 
         if (res == 200) {
           buttonStatus = 'success'
-          setTimeout(()=> window.location.href = "/login", 3000)
+          dispatch('nextPage')
         }
         setTimeout(()=> buttonStatus = "standard", 3000)
       })
@@ -68,12 +69,6 @@
 {/if}
 
 <div class="button">
-  <PrimaryButton
-    background="#ffffff4d"
-    standard="Back"
-    on:click={()=> dispatch('prevPage')}
-  />
-
   {#if ((confirmPassword.length > 0) && (password == confirmPassword))}
     <PrimaryButton
       left={false}

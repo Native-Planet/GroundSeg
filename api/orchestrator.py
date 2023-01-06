@@ -17,13 +17,15 @@ import socket
 import base64
 import urllib.request
 import ssl
+import nmcli
+import static_files
 
 from flask import jsonify, send_file, current_app
 from datetime import datetime
 from io import BytesIO
 from pywgkey.key import WgKey
 
-from utils import Log
+from utils import Log, Network
 from wireguard import Wireguard
 from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
@@ -42,8 +44,11 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.2'
+    gs_version = 'v1.0.3'
     _vm = False
+    _npbox = False
+    _c2c_mode = False
+    _wifi_device = None
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
@@ -79,37 +84,83 @@ class Orchestrator:
             Log.log_groundseg("VM mode detected. Enabling limited features")
             self._vm = True
             
+        if os.path.isfile(f"{self.config['CFG_DIR']}/nativeplanet"):
+            Log.log_groundseg("NP box detected. Enabling NP box features")
+            self._npbox = True
+
         # Remove MC Binary
         if os.path.isfile(f"{self.config['CFG_DIR']}/mc"):
             Log.log_groundseg("Old MC binary found. Deleting...")
             os.system(f"rm {self.config['CFG_DIR']}/mc")
             Log.log_groundseg("Old MC binary deleted")
 
+        # Create static files
+        static_dir =f"{self.config['CFG_DIR']}/static"
+        os.system(f"mkdir -p {static_dir}")
+        
+        # background.png
+        if not os.path.isfile(f"{static_dir}/background.png"):
+            if not static_files.make_if_valid("background.png"):
+                Log.log_groundseg("Failed to create background.png")
+            else:
+                Log.log_groundseg("Created background.png")
+
+        # nplogo.svg
+        if not os.path.isfile(f"{static_dir}/nplogo.svg"):
+            if not static_files.make_if_valid("nplogo.svg"):
+                Log.log_groundseg("Failed to create nplogo.svg")
+            else:
+                Log.log_groundseg("Created nplogo.svg")
+            
+        # Inter-SemiBold.otf
+        if not os.path.isfile(f"{static_dir}/Inter-SemiBold.otf"):
+            if not static_files.make_if_valid("Inter-SemiBold.otf"):
+                Log.log_groundseg("Failed to create Inter-SemiBold.otf")
+            else:
+                Log.log_groundseg("Created Inter-SemiBold.otf")
+
         # Check for internet access
         internet = self.check_internet_access()
-        while not internet:
-            Log.log_groundseg("No internet access, checking again in 15 seconds")
-            time.sleep(15)
-            internet = self.check_internet_access()
 
-        # start wireguard if anchor is registered
-        self.wireguard = Wireguard(self.config)
-        self.wireguard.stop()
-        if self.config['wgRegistered'] and self.config['wgOn']:
-            self.wireguard.start()
-            self.toggle_minios_off()
-            self.toggle_minios_on()
-            Log.log_groundseg("Wireguard connection started")
+        # NP box
+        if self._npbox:
+            if not internet:
+                Log.log_groundseg("No internet access, enabling Connect2Connect mode")
+                self._c2c_mode = True
 
-        # load urbit ships
-        self.load_urbits()
+                # Get wifi device
+                for d in nmcli.device():
+                    if d.device_type == 'wifi':
+                        self._wifi_device = d.device
+                        break
 
-        # Create password if doesn't exist
-        if len(self.config['pwHash']) < 1:
-            self.create_password('nativeplanet')
+        # Not NP box
+        else:
+            while not internet:
+                Log.log_groundseg("No internet access, checking again in 15 seconds")
+                time.sleep(15)
+                internet = self.check_internet_access()
 
-        # Start WebUI
-        self.start_webui()
+        # Skip if in c2c mode
+        if not self._c2c_mode:
+            # start wireguard if anchor is registered
+            self.wireguard = Wireguard(self.config)
+            self.wireguard.stop()
+            if self.config['wgRegistered'] and self.config['wgOn']:
+                self.wireguard.start()
+                self.toggle_minios_off()
+                self.toggle_minios_on()
+                Log.log_groundseg("Wireguard connection started")
+
+            # load urbit ships
+            self.load_urbits()
+
+            # Create password if doesn't exist
+            if len(self.config['pwHash']) < 1:
+                self.create_password('nativeplanet')
+
+            # Start WebUI
+            self.start_webui()
 
         # End of Init
         Log.log_groundseg("Initialization completed")
@@ -160,6 +211,7 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
         cfg = self.check_config_field(cfg, 'updateBranch', update_mode)
         cfg = self.check_config_field(cfg, 'updateInterval', 90)
+        cfg = self.check_config_field(cfg, 'c2cInterval', 0)
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
@@ -267,6 +319,11 @@ class Orchestrator:
         try:
             if page == "anchor":
                 # set endpoint
+                if 'skip' in data:
+                    self.config['firstBoot'] = False
+                    self.save_config()
+                    return 200
+
                 changed = self.change_wireguard_url(data['endpoint'])
 
                 # register key
@@ -276,12 +333,14 @@ class Orchestrator:
                     if registered == 400:
                         return 401
 
-                    return registered
+                    if registered == 200:
+                        self.config['firstBoot'] = False
+                        self.save_config()
 
+                    return registered
 
             if page == "password":
                 self.create_password(data['password'])
-                self.config['firstBoot'] = False
                 return 200
 
         except Exception as e:
@@ -813,43 +872,43 @@ class Orchestrator:
                 self.wireguard.update_wg_config(x['conf'])
 
             if self.anchor_config != None:
-             if self.anchor_config != None:
-                 # Define services
-                 urbit_web = False
-                 urbit_ames = False
-                 minio_svc = False
-                 minio_console = False
-                 minio_bucket = False
-                 # Check if service exists for patp
-                 for ep in self.anchor_config['subdomains']:
-                     ep_patp = ep['url'].split('.')[-3]
-                     ep_svc = ep['svc_type']
-                     if ep_patp == patp:
-                         if ep_svc == 'urbit-web':
-                             urbit_web = True
-                         if ep_svc == 'urbit-ames':
-                             urbit_ames = True
-                         if ep_svc == 'minio':
-                             minio_svc = True
-                         if ep_svc == 'minio-console':
-                             minio_console = True
-                         if ep_svc == 'minio-bucket':
-                             minio_bucket = True
+                # Define services
+                urbit_web = False
+                urbit_ames = False
+                minio_svc = False
+                minio_console = False
+                minio_bucket = False
+                # Check if service exists for patp
+                for ep in self.anchor_config['subdomains']:
+                    ep_patp = ep['url'].split('.')[-3]
+                    ep_svc = ep['svc_type']
+                    if ep_patp == patp:
+                        if ep_svc == 'urbit-web':
+                            urbit_web = True
+                        if ep_svc == 'urbit-ames':
+                            urbit_ames = True
+                        if ep_svc == 'minio':
+                            minio_svc = True
+                        if ep_svc == 'minio-console':
+                            minio_console = True
+                        if ep_svc == 'minio-bucket':
+                            minio_bucket = True
  
-                 # One or more of the urbit services is not registered
-                 if not (urbit_web and urbit_ames):
-                     Log.log_groundseg(f"{patp}: Registering Urbit anchor services")
-                     self.wireguard.register_service(f'{patp}','urbit',url)
+                # One or more of the urbit services is not registered
+                if not (urbit_web and urbit_ames):
+                    Log.log_groundseg(f"{patp}: Registering Urbit anchor services")
+                    self.wireguard.register_service(f'{patp}','urbit',url)
  
-                 # One or more of the minio services is not registered
-                 if not (minio_svc and minio_console and minio_bucket):
-                     Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
-                     self.wireguard.register_service(f's3.{patp}','minio',url)
+                # One or more of the minio services is not registered
+                if not (minio_svc and minio_console and minio_bucket):
+                    Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
+                    self.wireguard.register_service(f's3.{patp}','minio',url)
 
             x = self.wireguard.get_status(url)
             if x != None:
                 self.anchor_config = x 
                 self.wireguard.update_wg_config(x['conf'])
+
             url = None
             http_port = None
             ames_port = None
@@ -858,6 +917,7 @@ class Orchestrator:
 
             Log.log_groundseg(self.anchor_config['subdomains'])
             pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
             for ep in self.anchor_config['subdomains']:
                 if(f'{patp}.{pub_url}' == ep['url']):
                     url = ep['url']
@@ -1036,7 +1096,9 @@ class Orchestrator:
                 return self.toggle_ethernet()
 
             if data['action'] == 'networks':
-                return self.get_wifi_list()
+                if self._vm:
+                    return []
+                return Network.list_wifi_ssids()
 
             if data['action'] == 'connect':
                 return self.change_wifi_network(data['network'], data['password'])
@@ -1119,22 +1181,6 @@ class Orchestrator:
                 if len(conn[-1]) > 0:
                     return conn[0]
         return ''
-
-    # Returns list of available SSIDs
-    def get_wifi_list(self):
-        available = subprocess.Popen(['nmcli', '-t', 'dev', 'wifi'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-        ssids, stderr = available.communicate()
-        ssids_cleaned = ssids.decode('utf-8').split('\n')
-
-        networks = []
-
-        for ln in ssids_cleaned[1:]:
-            info = ln.split(':')
-            if len(info) > 1:
-                networks.append(info[1])
-
-        return networks
-
 
     # Enables and disables wifi on the host device
     def toggle_ethernet(self):
