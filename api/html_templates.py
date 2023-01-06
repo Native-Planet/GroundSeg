@@ -202,7 +202,7 @@ def connect_page(ssid):
     </form>
   </div>
   <form method="post">
-    <input type="password" placeholder="Password for {ssid}" name="password" />
+    <input type="text" placeholder="Password for {ssid}" name="password" />
     <a class="back" href="/">Back</a>
     <button class="connect" type="submit">Connect</button>
   </form>
