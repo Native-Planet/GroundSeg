@@ -562,6 +562,10 @@ def c2ssid(ssid=None):
                             time.sleep(1)
                             wifi_on = nmcli.radio.wifi()
 
+                        time.sleep(1)
+                        Log.log_groundseg("Scanning for available SSIDs")
+                        nmcli.device.wifi_rescan()
+                        time.sleep(8)
                         Log.log_groundseg(f"Available SSIDs: {Network.list_wifi_ssids()}")
 
                         completed = Network.wifi_connect(ssid, request.form['password'])
