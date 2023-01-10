@@ -5,7 +5,7 @@ It simplifies the process of getting onto the Urbit network and provides a range
 that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
 subscription, users can also access their Urbit ship remotely.
 
-# Dependencies
+## Dependencies
 
 - docker
 - glibc ^2.31
