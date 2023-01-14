@@ -10,6 +10,7 @@ DIST="$(. /etc/os-release && echo "$ID")"
 echo $DIST
 
 sudo mkdir -p /tmp/nativeplanet
+sudo apt -y install network-manager avahi-daemon
 
 if [[ "$DIST" == "linuxmint" ]]
 then
