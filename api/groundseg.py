@@ -83,7 +83,7 @@ def check_docker_updates():
     while True:
         if orchestrator.config['updateMode'] == 'auto':
             webui = f"nativeplanet/groundseg-webui:{orchestrator.config['updateBranch']}"
-            urbit = "tloncorp/urbit:latest"
+            urbit = "tloncorp/vere:latest"
             minio = "quay/minio/minio"
 
             update_list = [ webui, urbit, minio]
@@ -273,13 +273,13 @@ def c2c_kill_switch():
 
 # Threads
 if not orchestrator._c2c_mode:
-    threading.Thread(target=check_docker_updates).start() # Docker updater
-    threading.Thread(target=check_bin_updates).start() # Binary updater
-    threading.Thread(target=sys_monitor).start() # System monitoring
-    threading.Thread(target=meld_loop).start() # Meld loop
-    threading.Thread(target=anchor_information).start() # Anchor information
+    threading.Thread(target=check_docker_updates, daemon=True).start() # Docker updater
+    threading.Thread(target=check_bin_updates, daemon=True).start() # Binary updater
+    threading.Thread(target=sys_monitor, daemon=True).start() # System monitoring
+    threading.Thread(target=meld_loop, daemon=True).start() # Meld loop
+    threading.Thread(target=anchor_information, daemon=True).start() # Anchor information
 else:
-    threading.Thread(target=c2c_kill_switch).start # Reboot device after delay
+    threading.Thread(target=c2c_kill_switch, daemon=True).start() # Reboot device after delay
 
 #
 #   Endpoints

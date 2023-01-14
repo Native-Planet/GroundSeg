@@ -25,7 +25,7 @@ from datetime import datetime
 from io import BytesIO
 from pywgkey.key import WgKey
 
-from utils import Log, Network
+from utils import Log, Network, Utils
 from wireguard import Wireguard
 from webui_docker import WebUIDocker
 from urbit_docker import UrbitDocker, default_pier_config
@@ -44,7 +44,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.3-edge'
+    gs_version = 'v1.0.4'
     _vm = False
     _npbox = False
     _c2c_mode = False
@@ -268,28 +268,32 @@ class Orchestrator:
             self._mc = MCDocker()
             time.sleep(3)
 
-        for p in self.config['piers']:
+        if Utils.remove_urbit_containers():
+            for p in self.config['piers']:
+                Log.log_groundseg(f"{p}: Loading Pier")
+                data = None
+                with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
+                    data = json.load(f)
 
-            Log.log_groundseg(f"{p}: Loading Pier")
+                # Add all missing fields
+                data = {**default_pier_config, **data}
 
-            data = None
-            with open(f'/opt/nativeplanet/groundseg/settings/pier/{p}.json') as f:
-                data = json.load(f)
+                self._urbits[p] = UrbitDocker(data)
 
-            # Add all missing fields
-            data = {**default_pier_config, **data}
+                if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
+                    self._minios[p] = MinIODocker(data)
+                    if self.toggle_minios_on():
+                        x = self._mc.mc_setup(p,
+                                              self._minios[p].config['wg_s3_port'],
+                                              self._minios[p].config['minio_password']
+                                              )
 
-            self._urbits[p] = UrbitDocker(data)
+                if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
+                    self._urbits[p].start()
 
-            if data['minio_password'] != '' and self.wireguard.wg_docker.is_running():
-                self._minios[p] = MinIODocker(data)
-                if self.toggle_minios_on():
-                    x = self._mc.mc_setup(p, self._minios[p].config['wg_s3_port'], self._minios[p].config['minio_password'])
-
-            if self._urbits[p].config['boot_status'] == 'boot' and not self._urbits[p].running:
-                self._urbits[p].start()
-
-        Log.log_groundseg("Urbit Piers loaded")
+            Log.log_groundseg("Urbit Piers loaded")
+        else:
+            Log.log_groundseg("Urbit Piers not loaded. Unsafe!")
 
     # Reload minios
     def reload_minios(self):
@@ -1003,11 +1007,15 @@ class Orchestrator:
     def get_system_settings(self):
         settings = dict()
         settings['vm'] = self._vm
-        settings['gsVersion'] = self.gs_version
         settings['updateMode'] = self.config['updateMode']
         settings['minio'] = self.minIO_on
         settings['containers'] = self.get_containers()
         settings['sessions'] = len(self.config['sessions'])
+
+        if self.config['updateBranch'] == 'edge':
+            settings['gsVersion'] = str(self.gs_version) + '-edge'
+        else:
+            settings['gsVersion'] = self.gs_version
 
         if not self._vm:
             settings['ram'] = self._ram

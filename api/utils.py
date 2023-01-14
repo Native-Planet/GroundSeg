@@ -2,6 +2,27 @@ from datetime import datetime
 import sys
 import os
 import nmcli
+import docker
+
+class Utils:
+    def remove_urbit_containers():
+        client = docker.from_env()
+
+        # Force remove containers
+        containers = client.containers.list(all=True)
+        for container in containers:
+            if not container.name == 'wireguard':
+                if container.image.tags[0] == "tloncorp/urbit:latest":
+                    container.remove(force=True)
+
+        # Check if all have been removed
+        containers = client.containers.list(all=True)
+        count = 0
+        for container in containers:
+            if not container.name == 'wireguard':
+                if container.image.tags[0] == "tloncorp/urbit:latest":
+                    count = count + 1
+        return count == 0
 
 class Log:
 
