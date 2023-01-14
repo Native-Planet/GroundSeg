@@ -1,3 +1,4 @@
+chardet
 flask
 requests
 docker

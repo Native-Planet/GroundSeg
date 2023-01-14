@@ -40,7 +40,7 @@ class UrbitDocker:
     def __init__(self,pier_config):
         self.start_script()
         self.config = pier_config
-        client.images.pull(f'tloncorp/urbit:{self.config["urbit_version"]}')
+        client.images.pull(f'tloncorp/vere:{self.config["urbit_version"]}')
         self.pier_name = self.config['pier_name']
         self.build_urbit()
         self.running = (self.container.attrs['State']['Status'] == 'running')
@@ -92,7 +92,7 @@ class UrbitDocker:
                                           --loom={self.config["loom_size"]}'
 
             self.container = client.containers.create(
-                                    f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    f'tloncorp/vere:{self.config["urbit_version"]}',
                                     command = command, 
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
@@ -102,7 +102,7 @@ class UrbitDocker:
         else:
             command = f'bash /urbit/start_urbit.sh --loom={self.config["loom_size"]}'
             self.container = client.containers.create(
-                                    f'tloncorp/urbit:{self.config["urbit_version"]}',
+                                    f'tloncorp/vere:{self.config["urbit_version"]}',
                                     command = command, 
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
