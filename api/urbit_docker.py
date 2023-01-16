@@ -370,7 +370,7 @@ esac
 done
 
 # Check whether `urbit` or `vere` binary present
-type -P "vere" && urbit=vere || urbit=urbit
+type -P "vere" && URBIT=vere || URBIT=urbit
 
 # If the container is not started with the `-i` flag
 # then STDIN will be closed and we need to start
@@ -390,7 +390,7 @@ keyname=''${keys[0]}
 mv $keyname /tmp
 
 # Boot urbit with the key, exit when done booting
-$urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
+$URBIT $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
 
 # Remove the keyfile for security
 rm /tmp/$keyname
@@ -401,7 +401,7 @@ comets=( $cometnames )
 cometname=''${comets[0]}
 rm *.comet
 
-$urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
+$URBIT $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
 fi
 
 # Find the first directory and start urbit with the ship therein
@@ -409,5 +409,5 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-exec $urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
+exec $URBIT $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
 """
