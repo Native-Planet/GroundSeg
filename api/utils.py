@@ -14,6 +14,8 @@ class Utils:
             if not container.name == 'wireguard':
                 if container.image.tags[0] == "tloncorp/urbit:latest":
                     container.remove(force=True)
+                if container.image.tags[0] == "tloncorp/vere:latest":
+                    container.remove(force=True)
 
         # Check if all have been removed
         containers = client.containers.list(all=True)
@@ -21,6 +23,8 @@ class Utils:
         for container in containers:
             if not container.name == 'wireguard':
                 if container.image.tags[0] == "tloncorp/urbit:latest":
+                    count = count + 1
+                if container.image.tags[0] == "tloncorp/vere:latest":
                     count = count + 1
         return count == 0
 

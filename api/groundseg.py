@@ -83,7 +83,7 @@ def check_docker_updates():
     while True:
         if orchestrator.config['updateMode'] == 'auto':
             webui = f"nativeplanet/groundseg-webui:{orchestrator.config['updateBranch']}"
-            urbit = "tloncorp/vere:latest"
+            urbit = "nativeplanet/urbit:latest"
             minio = "quay/minio/minio"
 
             update_list = [ webui, urbit, minio]
