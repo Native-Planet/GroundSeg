@@ -44,7 +44,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.4'
+    gs_version = 'v1.0.5'
     _vm = False
     _npbox = False
     _c2c_mode = False
@@ -517,9 +517,9 @@ class Orchestrator:
         try:
             # Boot new Urbit
             if data['app'] == 'boot-new':
-               x = self.boot_new_urbit(urbit_id, data.get('data'))
-               if x == 0:
-                 return 200
+                x = self.boot_new_urbit(urbit_id, data.get('data'))
+                if x == 0:
+                    return 200
 
             # Check if Urbit Pier exists
             urb = self._urbits.get(urbit_id)
