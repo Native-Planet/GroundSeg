@@ -40,7 +40,8 @@ class UrbitDocker:
     def __init__(self,pier_config):
         self.start_script()
         self.config = pier_config
-        client.images.pull(f'tloncorp/vere:{self.config["urbit_version"]}')
+        self.docker_image = f'nativeplanet/urbit:{self.config["urbit_version"]}',
+        client.images.pull(self.docker_image)
         self.pier_name = self.config['pier_name']
         self.build_urbit()
         self.running = (self.container.attrs['State']['Status'] == 'running')
@@ -92,7 +93,7 @@ class UrbitDocker:
                                           --loom={self.config["loom_size"]}'
 
             self.container = client.containers.create(
-                                    f'tloncorp/vere:{self.config["urbit_version"]}',
+                                    self.docker_image,
                                     command = command, 
                                     name = self.pier_name,
                                     network = f'container:{self.config["network"]}',
@@ -102,7 +103,7 @@ class UrbitDocker:
         else:
             command = f'bash /urbit/start_urbit.sh --loom={self.config["loom_size"]}'
             self.container = client.containers.create(
-                                    f'tloncorp/vere:{self.config["urbit_version"]}',
+                                    self.docker_image,
                                     command = command, 
                                     ports = {'80/tcp':self.config['http_port'], 
                                              '34343/udp':self.config['ames_port']},
@@ -369,9 +370,6 @@ case $i in
 esac
 done
 
-# Check whether `urbit` or `vere` binary present
-type -P "vere" && URBIT=vere || URBIT=urbit
-
 # If the container is not started with the `-i` flag
 # then STDIN will be closed and we need to start
 # Urbit/vere with the `-t` flag.
@@ -390,7 +388,7 @@ keyname=''${keys[0]}
 mv $keyname /tmp
 
 # Boot urbit with the key, exit when done booting
-$URBIT $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
+urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
 
 # Remove the keyfile for security
 rm /tmp/$keyname
@@ -401,7 +399,7 @@ comets=( $cometnames )
 cometname=''${comets[0]}
 rm *.comet
 
-$URBIT $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
+urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
 fi
 
 # Find the first directory and start urbit with the ship therein
@@ -409,5 +407,5 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-exec $URBIT $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
+exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
 """
