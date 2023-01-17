@@ -40,7 +40,7 @@ class UrbitDocker:
     def __init__(self,pier_config):
         self.start_script()
         self.config = pier_config
-        self.docker_image = f'nativeplanet/urbit:{self.config["urbit_version"]}',
+        self.docker_image = f'nativeplanet/urbit:{self.config["urbit_version"]}'
         client.images.pull(self.docker_image)
         self.pier_name = self.config['pier_name']
         self.build_urbit()
@@ -388,7 +388,7 @@ keyname=''${keys[0]}
 mv $keyname /tmp
 
 # Boot urbit with the key, exit when done booting
-urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
+vere $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
 
 # Remove the keyfile for security
 rm /tmp/$keyname
@@ -399,7 +399,7 @@ comets=( $cometnames )
 cometname=''${comets[0]}
 rm *.comet
 
-urbit $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
+vere $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
 fi
 
 # Find the first directory and start urbit with the ship therein
@@ -407,5 +407,5 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
+exec vere $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
 """
