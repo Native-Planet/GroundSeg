@@ -11,21 +11,25 @@ class Utils:
         # Force remove containers
         containers = client.containers.list(all=True)
         for container in containers:
-            if not container.name == 'wireguard':
+            try:
                 if container.image.tags[0] == "tloncorp/urbit:latest":
                     container.remove(force=True)
                 if container.image.tags[0] == "tloncorp/vere:latest":
                     container.remove(force=True)
+            except:
+                pass
 
         # Check if all have been removed
         containers = client.containers.list(all=True)
         count = 0
         for container in containers:
-            if not container.name == 'wireguard':
+            try:
                 if container.image.tags[0] == "tloncorp/urbit:latest":
                     count = count + 1
                 if container.image.tags[0] == "tloncorp/vere:latest":
                     count = count + 1
+            except:
+                pass
         return count == 0
 
 class Log:
