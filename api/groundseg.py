@@ -191,8 +191,7 @@ def anchor_information():
                         f'https://{url}/v1/retrieve?pubkey={pubkey}',
                         headers=headers).json()
             
-                orchestrator.anchor_config = response
-                Log.log_groundseg(response)
+                orchestrator.update_anchor_config(response)
                 time.sleep(60 * 60 * 12)
 
             except Exception as e:

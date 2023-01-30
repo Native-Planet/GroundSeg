@@ -70,7 +70,6 @@ class Orchestrator:
 
         # load existing or create new system.json
         self.config = self.load_config(config_file)
-        print(self.config)
         Log.log_groundseg("Loaded system JSON")
 
     def real_init(self):
@@ -991,6 +990,37 @@ class Orchestrator:
 #
 #   Anchor Settings
 #
+
+    def update_anchor_config(self, response):
+        Log.log_groundseg("Updating Anchor Config")
+        Log.log_groundseg(response)
+        self.anchor_config = response
+
+        self.wireguard.update_wg_config(response['conf'])
+        pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
+        for patp in self._urbits:
+            svc_url = None
+            http_port = None
+            ames_port = None
+            s3_port = None
+            console_port = None
+
+            for ep in self.anchor_config['subdomains']:
+                if ep['status'] == 'ok':
+                    if(f'{patp}.{pub_url}' == ep['url']):
+                        svc_url = ep['url']
+                        http_port = ep['port']
+                    elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                        ames_port = ep['port']
+                    elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                        s3_port = ep['port']
+                    elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                        console_port = ep['port']
+
+            if not None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                self._urbits[patp].update_wireguard_network(svc_url, http_port, ames_port, s3_port, console_port)
+
     # Get anchor registration information
     def get_anchor_settings(self):
 
