@@ -44,7 +44,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.6'
+    gs_version = 'v1.0.7'
     _vm = False
     _npbox = False
     _c2c_mode = False
@@ -70,6 +70,7 @@ class Orchestrator:
 
         # load existing or create new system.json
         self.config = self.load_config(config_file)
+        print(self.config)
         Log.log_groundseg("Loaded system JSON")
 
     def real_init(self):
@@ -910,32 +911,43 @@ class Orchestrator:
                     Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
                     self.wireguard.register_service(f's3.{patp}','minio',url)
 
-            x = self.wireguard.get_status(url)
-            if x != None:
-                self.anchor_config = x 
-                self.wireguard.update_wg_config(x['conf'])
-
-            url = None
+            svc_url = None
             http_port = None
             ames_port = None
             s3_port = None
             console_port = None
+            tries = 1
 
-            Log.log_groundseg(self.anchor_config['subdomains'])
-            pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+            while None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                Log.log_groundseg("Checking config if services are ready")
+                x = self.wireguard.get_status(url)
+                if x != None:
+                    self.anchor_config = x
+                    self.wireguard.update_wg_config(x['conf'])
 
-            for ep in self.anchor_config['subdomains']:
-                if(f'{patp}.{pub_url}' == ep['url']):
-                    url = ep['url']
-                    http_port = ep['port']
-                elif(f'ames.{patp}.{pub_url}' == ep['url']):
-                    ames_port = ep['port']
-                elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
-                    s3_port = ep['port']
-                elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
-                    console_port = ep['port']
+                Log.log_groundseg(self.anchor_config['subdomains'])
+                pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
 
-            self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
+                for ep in self.anchor_config['subdomains']:
+                    if ep['status'] == 'ok':
+                        if(f'{patp}.{pub_url}' == ep['url']):
+                            svc_url = ep['url']
+                            http_port = ep['port']
+                        elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                            ames_port = ep['port']
+                        elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                            s3_port = ep['port']
+                        elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                            console_port = ep['port']
+                    else:
+                        Log.log_groundseg(f"{ep['svc_type']} not ready. Trying again in {tries * 2} seconds.")
+                        time.sleep(tries * 2)
+                        if tries <= 15:
+                            tries = tries + 1
+                        break
+
+            self._urbits[patp].set_wireguard_network(svc_url, http_port, ames_port, s3_port, console_port)
+
             return self.wireguard.start()
 
     # Update/Set Urbit S3 Endpoint
