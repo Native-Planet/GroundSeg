@@ -72,6 +72,8 @@ class Orchestrator:
         self.config = self.load_config(config_file)
         Log.log_groundseg("Loaded system JSON")
 
+    def real_init(self):
+
         # if first boot, set up keys
         if self.config['firstBoot']:
             Log.log_groundseg("GroundSeg is in setup mode")
