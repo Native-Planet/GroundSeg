@@ -52,6 +52,7 @@ class Orchestrator:
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
+    anchor_ready = True
 
     # Docker
     _urbits = {}
@@ -1021,6 +1022,26 @@ class Orchestrator:
             if not None in [svc_url,http_port,ames_port,s3_port,console_port]:
                 self._urbits[patp].update_wireguard_network(svc_url, http_port, ames_port, s3_port, console_port)
 
+    def restart_anchor(self):
+        Log.log_groundseg("Anchor refresh loop is unready")
+        self.anchor_ready = False
+        remote = []
+        for patp in self._urbits:
+            if self._urbits[patp].config['network'] != 'none':
+                remote.append(patp)
+ 
+        if self.toggle_anchor_off() == 200:
+            if self.toggle_anchor_on() == 200:
+                if len(remote) <= 0:
+                    return 200
+                for patp in remote:
+                    if self._urbits[patp].set_network('wireguard') == 0:
+                        Log.log_groundseg("Anchor refresh loop is ready")
+                        self.anchor_ready = True
+                        return 200
+        
+        return 400
+
     # Get anchor registration information
     def get_anchor_settings(self):
 
@@ -1096,6 +1117,9 @@ class Orchestrator:
 
         # anchor module
         if module == 'anchor':
+            if data['action'] == 'restart':
+                return self.restart_anchor()
+
             if data['action'] == 'register':
                 return self.register_device(data['key']) 
 

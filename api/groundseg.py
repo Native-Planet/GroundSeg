@@ -242,6 +242,24 @@ def sys_monitor():
             Log.log_groundseg(e)
             error = True
 
+# Checks if wireguard connection is functional, restarts wireguard
+def wireguard_refresher():
+    Log.log_groundseg("Wireguard refresher thread started")
+    while True:
+        try:
+            if orchestrator.config['wgOn'] and orchestrator.anchor_ready:
+                copied = orchestrator._urbits
+                for p in list(copied):
+                    if copied[p].running and copied[p].config['network'] != "none":
+                        res = requests.get(f"https://{copied[p].config['wg_url']}")
+                        if res.status_code != 200: 
+                            Log.log_groundseg("Anchor connection is broken. Restarting")
+                            orchestrator.restart_anchor()
+                            break
+        except Exception as e:
+            Log.log_groundseg(f"WG Refresher error: {e}")
+
+        time.sleep(60)
 
 # Checks if a meld is due, runs meld
 def meld_loop():
@@ -276,6 +294,7 @@ if not orchestrator._c2c_mode:
     threading.Thread(target=sys_monitor, daemon=True).start() # System monitoring
     threading.Thread(target=meld_loop, daemon=True).start() # Meld loop
     threading.Thread(target=anchor_information, daemon=True).start() # Anchor information
+    threading.Thread(target=wireguard_refresher, daemon=True).start() # Wireguard connection refresher
 else:
     threading.Thread(target=c2c_kill_switch, daemon=True).start() # Reboot device after delay
 
