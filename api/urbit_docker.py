@@ -9,6 +9,7 @@ import subprocess
 
 from datetime import datetime
 from minio_docker import MinIODocker
+from utils import Log
 
 client = docker.from_env()
 default_pier_config = {
@@ -134,6 +135,51 @@ class UrbitDocker:
         self.build_container()
         if running:
             self.start()
+
+    def update_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
+        changed = False
+        if not self.config['wg_url'] == url:
+            Log.log_groundseg(f"{self.pier_name}: Wireguard URL changed from {self.config['wg_url']} to {url}")
+            changed = True
+            self.config['wg_url'] = url
+
+        if not self.config['wg_http_port'] == http_port:
+            Log.log_groundseg(f"{self.pier_name}: Wireguard HTTP Port changed from {self.config['wg_http_port']} to {http_port}")
+            changed = True
+            self.config['wg_http_port'] = http_port
+
+        if not self.config['wg_ames_port'] == ames_port:
+            Log.log_groundseg(f"{self.pier_name}: Wireguard Ames Port changed from {self.config['wg_ames_port']} to {ames_port}")
+            changed = True
+            self.config['wg_ames_port'] = ames_port
+
+        if not self.config['wg_s3_port'] == s3_port:
+            Log.log_groundseg(f"{self.pier_name}: Wireguard S3 Port changed from {self.config['wg_s3_port']} to {s3_port}")
+            changed = True
+            self.config['wg_s3_port'] = s3_port
+
+        if not self.config['wg_console_port'] == console_port:
+            Log.log_groundseg(f"{self.pier_name}: Wireguard Console Port changed from {self.config['wg_console_port']} to {console_port}")
+            changed = True
+            self.config['wg_console_port'] = console_port
+
+        if changed:
+            self.save_config()
+            if self.config['network'] != "none":
+                Log.log_groundseg(f"{self.pier_name}: Rebuilding container")
+                running = False
+                
+                if self.is_running():
+                    self.stop()
+                    running = True
+
+                self.container.remove()
+                
+                self.build_container()
+                Log.log_groundseg(f"{self.pier_name}: Rebuilding completed")
+                if running:
+                    Log.log_groundseg(f"{self.pier_name}: Restarting container")
+                    self.start()
 
     def set_network(self, network):
         if self.config['network'] == network:

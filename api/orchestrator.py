@@ -44,7 +44,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.6'
+    gs_version = 'v1.0.7'
     _vm = False
     _npbox = False
     _c2c_mode = False
@@ -52,6 +52,7 @@ class Orchestrator:
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
+    anchor_ready = True
 
     # Docker
     _urbits = {}
@@ -71,6 +72,8 @@ class Orchestrator:
         # load existing or create new system.json
         self.config = self.load_config(config_file)
         Log.log_groundseg("Loaded system JSON")
+
+    def real_init(self):
 
         # if first boot, set up keys
         if self.config['firstBoot']:
@@ -908,32 +911,43 @@ class Orchestrator:
                     Log.log_groundseg(f"{patp}: Registering MinIO anchor services")
                     self.wireguard.register_service(f's3.{patp}','minio',url)
 
-            x = self.wireguard.get_status(url)
-            if x != None:
-                self.anchor_config = x 
-                self.wireguard.update_wg_config(x['conf'])
-
-            url = None
+            svc_url = None
             http_port = None
             ames_port = None
             s3_port = None
             console_port = None
+            tries = 1
 
-            Log.log_groundseg(self.anchor_config['subdomains'])
-            pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+            while None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                Log.log_groundseg("Checking config if services are ready")
+                x = self.wireguard.get_status(url)
+                if x != None:
+                    self.anchor_config = x
+                    self.wireguard.update_wg_config(x['conf'])
 
-            for ep in self.anchor_config['subdomains']:
-                if(f'{patp}.{pub_url}' == ep['url']):
-                    url = ep['url']
-                    http_port = ep['port']
-                elif(f'ames.{patp}.{pub_url}' == ep['url']):
-                    ames_port = ep['port']
-                elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
-                    s3_port = ep['port']
-                elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
-                    console_port = ep['port']
+                Log.log_groundseg(self.anchor_config['subdomains'])
+                pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
 
-            self._urbits[patp].set_wireguard_network(url, http_port, ames_port, s3_port, console_port)
+                for ep in self.anchor_config['subdomains']:
+                    if ep['status'] == 'ok':
+                        if(f'{patp}.{pub_url}' == ep['url']):
+                            svc_url = ep['url']
+                            http_port = ep['port']
+                        elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                            ames_port = ep['port']
+                        elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                            s3_port = ep['port']
+                        elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                            console_port = ep['port']
+                    else:
+                        Log.log_groundseg(f"{ep['svc_type']} not ready. Trying again in {tries * 2} seconds.")
+                        time.sleep(tries * 2)
+                        if tries <= 15:
+                            tries = tries + 1
+                        break
+
+            self._urbits[patp].set_wireguard_network(svc_url, http_port, ames_port, s3_port, console_port)
+
             return self.wireguard.start()
 
     # Update/Set Urbit S3 Endpoint
@@ -977,6 +991,57 @@ class Orchestrator:
 #
 #   Anchor Settings
 #
+
+    def update_anchor_config(self, response):
+        Log.log_groundseg("Updating Anchor Config")
+        Log.log_groundseg(response)
+        self.anchor_config = response
+
+        self.wireguard.update_wg_config(response['conf'])
+        pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
+        for patp in self._urbits:
+            svc_url = None
+            http_port = None
+            ames_port = None
+            s3_port = None
+            console_port = None
+
+            for ep in self.anchor_config['subdomains']:
+                if ep['status'] == 'ok':
+                    if(f'{patp}.{pub_url}' == ep['url']):
+                        svc_url = ep['url']
+                        http_port = ep['port']
+                    elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                        ames_port = ep['port']
+                    elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                        s3_port = ep['port']
+                    elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                        console_port = ep['port']
+
+            if not None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                self._urbits[patp].update_wireguard_network(svc_url, http_port, ames_port, s3_port, console_port)
+
+    def restart_anchor(self):
+        Log.log_groundseg("Anchor refresh loop is unready")
+        self.anchor_ready = False
+        remote = []
+        for patp in self._urbits:
+            if self._urbits[patp].config['network'] != 'none':
+                remote.append(patp)
+ 
+        if self.toggle_anchor_off() == 200:
+            if self.toggle_anchor_on() == 200:
+                if len(remote) <= 0:
+                    return 200
+                for patp in remote:
+                    if self._urbits[patp].set_network('wireguard') == 0:
+                        Log.log_groundseg("Anchor refresh loop is ready")
+                        self.anchor_ready = True
+                        return 200
+        
+        return 400
+
     # Get anchor registration information
     def get_anchor_settings(self):
 
@@ -1052,6 +1117,9 @@ class Orchestrator:
 
         # anchor module
         if module == 'anchor':
+            if data['action'] == 'restart':
+                return self.restart_anchor()
+
             if data['action'] == 'register':
                 return self.register_device(data['key']) 
 

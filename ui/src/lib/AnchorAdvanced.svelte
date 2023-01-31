@@ -5,7 +5,7 @@
   import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let wgReg
+  export let wgReg, wgRunning
 
   let advanced = false,
     currentEpKey = '',
@@ -13,8 +13,10 @@
     defaultEpKey = 'api.startram.io',
     epButtonStatus = 'standard',
     cancelButtonStatus = 'standard',
+    restartButtonStatus = 'standard',
     confirmCancel = false,
     regKey = '', view = false,
+    restarting = false,
     showEpInfo = false
 
 
@@ -84,6 +86,27 @@
       confirmCancel = !confirmCancel
   }}
 
+  const restartAnchor = () => {
+    restartButtonStatus = 'loading'
+    restarting = true
+    let module = 'anchor'
+
+    fetch($api + '/system?module=' + module, {
+      method: 'POST',
+      credentials: "include",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({'action':'restart'})
+    })
+      .then(d=>d.json())
+      .then(r=>{
+        if (r == 200) {restartButtonStatus = 'success'}
+        else {restartButtonStatus = 'failure'}
+        setTimeout(()=> {
+          restartButtonStatus = 'standard'
+          restarting = false
+        }, 3000)
+  })}
+
   const toggleView = () => {
     view = !view
     document.querySelector('#input').type = view ? 'text' : 'password'
@@ -98,6 +121,22 @@
   </div>
 
   {#if advanced}
+    {#if (wgRunning || restarting)}
+      <div class="ep-title" transition:scale={{duration:120, delay: 200}}>Restart StarTram</div>
+      <div transition:scale={{duration:120, delay: 200}}>
+        <PrimaryButton
+          on:click={restartAnchor}
+          background="black"
+          standard="Restart"
+          success="Successfully restarted StarTram!"
+          failure="Something went wrong, please try again"
+          loading="Restarting..."
+          status={restartButtonStatus}
+          top="12"
+        />
+      </div>
+    {/if}
+
     <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
       Set Endpoint
       {#if wgReg}

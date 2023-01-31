@@ -32,6 +32,65 @@ Log.log_groundseg("----------- Urbit is love <3 -----------")
 # Load GroundSeg
 orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 
+# Binary Updater
+def check_bin_updates():
+    Log.log_groundseg("Binary updater thread started")
+    cur_hash = orchestrator.config['binHash']
+
+    while True:
+        update_branch = orchestrator.config['updateBranch']
+        if update_branch == 'latest':
+            update_url = 'https://version.infra.native.computer/version.csv'
+
+        if update_branch == 'edge':
+            update_url = 'https://version.infra.native.computer/version_edge.csv'
+
+        try:
+            new_name, new_hash, dl_url = requests.get(update_url).text.split('\n')[0].split(',')[0:3]
+            if orchestrator.config['updateMode'] == 'auto':
+                Log.log_groundseg('Checking for binary updates')
+
+            if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
+                Log.log_groundseg(f"Latest version: {new_name}")
+                Log.log_groundseg("Downloading new groundseg binary")
+
+                r = requests.get(dl_url)
+                f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
+                for chunk in r.iter_content(chunk_size=512 * 1024):
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)
+                f.close()
+
+                Log.log_groundseg("Removing old groundseg binary")
+
+                try:
+                    os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+                except:
+                    pass
+
+                time.sleep(3)
+
+                Log.log_groundseg("Renaming new groundseg binary")
+                os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
+                        f"{orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(2)
+                Log.log_groundseg("Setting launch permissions for new binary")
+                os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
+
+                time.sleep(1)
+
+                Log.log_groundseg("Restarting groundseg...")
+                os.system("systemctl restart groundseg")
+
+        except Exception as e:
+            Log.log_groundseg(e)
+
+        time.sleep(orchestrator.config['updateInterval'])
+
+threading.Thread(target=check_bin_updates, daemon=True).start() # Binary updater
+orchestrator.real_init()
+
 ssids = None
 ap = pyaccesspoint.AccessPoint(wlan=orchestrator._wifi_device, ssid='NativePlanet_c2c', password='nativeplanet')
 
@@ -116,65 +175,6 @@ def check_docker_updates():
         time.sleep(orchestrator.config['updateInterval'])
 
 
-# Binary Updater
-def check_bin_updates():
-    Log.log_groundseg("Binary updater thread started")
-    cur_hash = orchestrator.config['binHash']
-
-    while True:
-        update_branch = orchestrator.config['updateBranch']
-        if update_branch == 'latest':
-            update_url = 'https://version.infra.native.computer/version.csv'
-
-        if update_branch == 'edge':
-            update_url = 'https://version.infra.native.computer/version_edge.csv'
-
-        try:
-            new_name, new_hash, dl_url = requests.get(update_url).text.split('\n')[0].split(',')[0:3]
-
-            if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
-                Log.log_groundseg(f"Latest version: {new_name}")
-                Log.log_groundseg("Downloading new groundseg binary")
-
-                #urllib.request.urlretrieve(dl_url, f"{orchestrator.config['CFG_DIR']}/groundseg_new")
-                r = requests.get(dl_url)
-                f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
-                for chunk in r.iter_content(chunk_size=512 * 1024):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-                f.close()
-
-                Log.log_groundseg("Removing old groundseg binary")
-
-                try:
-                    os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
-                except:
-                    pass
-
-                time.sleep(3)
-
-                Log.log_groundseg("Renaming new groundseg binary")
-                os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
-                        f"{orchestrator.config['CFG_DIR']}/groundseg")
-
-                time.sleep(2)
-                Log.log_groundseg("Setting launch permissions for new binary")
-                os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
-
-                time.sleep(1)
-
-                Log.log_groundseg("Restarting groundseg...")
-
-                if sys.platform == "darwin":
-                    os.system("launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist")
-                else:
-                    os.system("systemctl restart groundseg")
-
-        except Exception as e:
-            Log.log_groundseg(e)
-
-        time.sleep(orchestrator.config['updateInterval'])
-
 
 # Get updated Anchor information every 12 hours
 def anchor_information():
@@ -191,8 +191,7 @@ def anchor_information():
                         f'https://{url}/v1/retrieve?pubkey={pubkey}',
                         headers=headers).json()
             
-                orchestrator.anchor_config = response
-                Log.log_groundseg(response)
+                orchestrator.update_anchor_config(response)
                 time.sleep(60 * 60 * 12)
 
             except Exception as e:
@@ -243,6 +242,24 @@ def sys_monitor():
             Log.log_groundseg(e)
             error = True
 
+# Checks if wireguard connection is functional, restarts wireguard
+def wireguard_refresher():
+    Log.log_groundseg("Wireguard refresher thread started")
+    while True:
+        try:
+            if orchestrator.config['wgOn'] and orchestrator.anchor_ready:
+                copied = orchestrator._urbits
+                for p in list(copied):
+                    if copied[p].running and copied[p].config['network'] != "none":
+                        res = requests.get(f"https://{copied[p].config['wg_url']}")
+                        if res.status_code != 200: 
+                            Log.log_groundseg("Anchor connection is broken. Restarting")
+                            orchestrator.restart_anchor()
+                            break
+        except Exception as e:
+            Log.log_groundseg(f"WG Refresher error: {e}")
+
+        time.sleep(60)
 
 # Checks if a meld is due, runs meld
 def meld_loop():
@@ -274,10 +291,10 @@ def c2c_kill_switch():
 # Threads
 if not orchestrator._c2c_mode:
     threading.Thread(target=check_docker_updates, daemon=True).start() # Docker updater
-    threading.Thread(target=check_bin_updates, daemon=True).start() # Binary updater
     threading.Thread(target=sys_monitor, daemon=True).start() # System monitoring
     threading.Thread(target=meld_loop, daemon=True).start() # Meld loop
     threading.Thread(target=anchor_information, daemon=True).start() # Anchor information
+    threading.Thread(target=wireguard_refresher, daemon=True).start() # Wireguard connection refresher
 else:
     threading.Thread(target=c2c_kill_switch, daemon=True).start() # Reboot device after delay
 
