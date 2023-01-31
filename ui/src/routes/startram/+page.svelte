@@ -86,7 +86,7 @@
     </div>
 
     <!-- Advanced Options -->
-    <AnchorAdvanced wgReg={data.anchor.wgReg} />
+    <AnchorAdvanced wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning} />
   </Card>
 {/if}
 
