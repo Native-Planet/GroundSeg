@@ -41,9 +41,8 @@ pipeline {
             }
         }
     }
-    node('NP ARM server') {
-        stages {
-            stage('arm64build') {
+    stage('arm64build') {
+        agent { node { label 'arm' } }
                 steps {
                     git url: 'https://github.com/Native-Planet/GroundSeg.git'
                     script {
@@ -57,23 +56,18 @@ pipeline {
                             cd ui
                             # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
                             '''
+                            stash includes: 'binary/**', name: 'groundseg_arm64'
                         }
                     }
                 }
             }
-            stage('stash') {
-                stash includes: 'binary/**', name: 'groundseg_arm64'
-            }
         }
     }
-    stages {
-        stage('unstash') {
+        stage('postbuild') {
             String binPath = '/opt/groundseg/version/bin/'
             dir (binPath) {
                 unstash 'groundseg_arm64'
             }
-        }
-        stage('postbuild') {
             steps {
                 script {
                     if( "${tag}" == "latest" ) {
@@ -94,5 +88,4 @@ pipeline {
             cleanWs deleteDirs: true, notFailBuild: true
         }
     }
-}
 }
