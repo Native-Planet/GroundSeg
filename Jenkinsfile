@@ -31,7 +31,7 @@ pipeline {
                         cp -r api /var/jenkins_home/tmp
                         docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
                         chmod +x /var/jenkins_home/tmp/binary/groundseg
-                        mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
+                        mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}
                         '''
                     }
                 }
@@ -64,7 +64,7 @@ pipeline {
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
                         }
-                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64'
+                        sh 'sudo mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
                     }
                     if( "${tag}" == "latest" ) {
