@@ -70,7 +70,7 @@ pipeline {
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
                         }
-                        sh 'sudo mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}'
+                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
                     }
                     if( "${tag}" == "latest" ) {
