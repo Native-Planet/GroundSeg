@@ -49,7 +49,6 @@ pipeline {
         stage('arm64build') {
             agent { node { label 'arm' } }
                     steps {
-                        git url: 'https://github.com/Native-Planet/GroundSeg.git'
                         script {
                             if( "${tag}" == "arm-test" ) {
                                 sh '''
