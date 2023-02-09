@@ -9,6 +9,7 @@ ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=main
 TAG=v1.0.7
+DEVICE_ARCH=$(uname -m)
 
 # Directory to save the scrips
 SAVE_DIR=/opt/nativeplanet/groundseg
@@ -18,8 +19,13 @@ sudo mkdir -p $SAVE_DIR
 sudo systemctl stop groundseg
 
 # Download GroundSeg binary
+if [[ $DEVICE_ARCH == "aarch64" ]]; then
+sudo wget -O $SAVE_DIR/groundseg \
+  https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg_arm64
+elif [[ $DEVICE_ARCH == "x86_64" ]]; then
 sudo wget -O $SAVE_DIR/groundseg \
   https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
+fi
 
 sudo chmod +x $SAVE_DIR/groundseg
 
