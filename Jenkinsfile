@@ -20,6 +20,8 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
+                        git url: 'https://github.com/Native-Planet.git',
+                            branch: "${tag}"
                         sh '''
                         echo "debug: building amd64"
                         mkdir -p /opt/groundseg/version/bin
@@ -42,6 +44,8 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
+                        git url: 'https://github.com/Native-Planet.git',
+                            branch: "${tag}"
                         sh '''
                         echo "debug: building arm64"
                         cd build-scripts
