@@ -30,9 +30,13 @@ pipeline {
                 script {
                     if( "${tag}" == "arm-test" ) {
                         sh '''
-                        mkdir -p /opt/groundseg/version/bin && cd ./build-scripts
+                        echo "debug: building amd64"
+                        mkdir -p /opt/groundseg/version/bin
+                        cd ./build-scripts
                         docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                        cd .. && docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
+                        cd ..
+                        ls
+                        docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
                         chmod +x ./binary/groundseg
                         mv ./binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
                         '''
@@ -47,6 +51,7 @@ pipeline {
                         script {
                             if( "${tag}" == "arm-test" ) {
                                 sh '''
+                                echo "debug: building arm64"
                                 cd build-scripts
                                 docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                                 cd ..
@@ -55,7 +60,7 @@ pipeline {
                                 cd ui
                                 # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
                                 '''
-                                stash includes: 'binary/**', name: 'groundseg_arm64'
+                                stash includes: 'binary/groundseg_arm64', name: 'groundseg_arm64'
                             }
                         }
                     }
