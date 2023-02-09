@@ -40,31 +40,32 @@ pipeline {
                 }
             }
         }
-        node('NP ARM server') {
-            stages {
-                stage('arm64build') {
-                    steps {
-                        git url: 'https://github.com/Native-Planet/GroundSeg.git'
-                        script {
-                            if( "${tag}" == "arm-test" ) {
-                                sh '''
-                                cd build-scripts
-                                docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                                cd ..
-                                docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
-                                mv binary/groundseg binary/groundseg_arm64
-                                cd ui
-                                # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
-                                '''
-                            }
+    }
+    node('NP ARM server') {
+        stages {
+            stage('arm64build') {
+                steps {
+                    git url: 'https://github.com/Native-Planet/GroundSeg.git'
+                    script {
+                        if( "${tag}" == "arm-test" ) {
+                            sh '''
+                            cd build-scripts
+                            docker build --tag nativeplanet/groundseg-builder:3.10.9 .
+                            cd ..
+                            docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
+                            mv binary/groundseg binary/groundseg_arm64
+                            cd ui
+                            # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
+                            '''
                         }
                     }
                 }
-                stage('stash') {
-                    stash includes: 'binary/**', name: 'groundseg_arm64'
-                }
+            }
+            stage('stash') {
+                stash includes: 'binary/**', name: 'groundseg_arm64'
             }
         }
+    }
     stages {
         stage('unstash') {
             String binPath = '/opt/groundseg/version/bin/'
@@ -93,4 +94,5 @@ pipeline {
             cleanWs deleteDirs: true, notFailBuild: true
         }
     }
+}
 }
