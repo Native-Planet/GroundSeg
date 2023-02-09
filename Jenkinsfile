@@ -20,7 +20,7 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
-                        git url: 'https://github.com/Native-Planet.git',
+                        git url: 'https://github.com/Native-Planet/GroundSeg.git',
                             credentialsId: 'Github token',
                             branch: "${tag}"
                         sh '''
@@ -45,7 +45,7 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
-                        git url: 'https://github.com/Native-Planet.git',
+                        git url: 'https://github.com/Native-Planet/GroundSeg.git',
                             credentialsId: 'Github token',
                             branch: "${tag}"
                         sh '''
