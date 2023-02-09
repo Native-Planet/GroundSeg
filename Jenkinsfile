@@ -62,9 +62,8 @@ pipeline {
                 }
         stage('postbuild') {
             steps {
-                String binPath = '/opt/groundseg/version/bin/'
-                dir (binPath) {
-                    unstash 'groundseg_arm64'
+                dir('/opt/groundseg/version/bin/'){
+                unstash 'groundseg_arm64'
                 }
                 script {
                     if( "${tag}" == "latest" ) {
