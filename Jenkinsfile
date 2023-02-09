@@ -21,6 +21,7 @@ pipeline {
                 script {
                     if( "${tag}" != "nobuild" ) {
                         git url: 'https://github.com/Native-Planet.git',
+                            credentialsId: 'Github token',
                             branch: "${tag}"
                         sh '''
                         echo "debug: building amd64"
@@ -45,6 +46,7 @@ pipeline {
                 script {
                     if( "${tag}" != "nobuild" ) {
                         git url: 'https://github.com/Native-Planet.git',
+                            credentialsId: 'Github token',
                             branch: "${tag}"
                         sh '''
                         echo "debug: building arm64"
