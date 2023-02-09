@@ -30,11 +30,17 @@ pipeline {
                 script {
                     if( "${tag}" == "arm-test" ) {
                         sh '''
-                        mkdir -p /opt/groundseg/version/bin && cd ./build-scripts
+                        echo "debug: building amd64"
+                        mkdir -p /opt/groundseg/version/bin
+                        cd ./build-scripts
                         docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                        cd .. && docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
-                        chmod +x ./binary/groundseg
-                        mv ./binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
+                        cd ..
+                        rm -rf /var/jenkins_home/tmp
+                        mkdir -p /var/jenkins_home/tmp
+                        cp -r api /var/jenkins_home/tmp
+                        docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
+                        chmod +x /var/jenkins_home/tmp/binary/groundseg
+                        mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
                         '''
                     }
                 }
@@ -70,12 +76,28 @@ pipeline {
                         cd ui
                         # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
                         '''
-                        stash includes: 'binary/**', name: 'groundseg_arm64'
+                        stash includes: 'binary/groundseg_arm64', name: 'groundseg_arm64'
                     }
                 }
             }
                 }
         stage('postbuild') {
+            environment {
+                tag = sh ( 
+                    script: '''
+                        if [ "${environ}" = "main" ]; then
+                            echo "latest"
+                        elif [ "${environ}" = "edge" ]; then
+                            echo "edge"
+                        elif [ "${environ}" = "arm-test" ]; then
+                            echo "arm-test"
+                        else
+                            echo "nobuild"
+                        fi
+                    ''',
+                    returnStdout: true
+                ).trim()
+            }
             steps {
                 dir('/opt/groundseg/version/bin/'){
                 unstash 'groundseg_arm64'
