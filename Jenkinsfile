@@ -36,7 +36,7 @@ pipeline {
                         docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                         cd ..
                         ls api
-                        docker run -v ./binary:/binary -v ./api:/api nativeplanet/groundseg-builder:3.10.9
+                        docker run -v $(pwd)/binary:/binary -v $(pwd)/api:/api nativeplanet/groundseg-builder:3.10.9
                         chmod +x ./binary/groundseg
                         mv ./binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
                         '''
