@@ -35,10 +35,12 @@ pipeline {
                         cd ./build-scripts
                         docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                         cd ..
-                        ls api
-                        docker run -v $(pwd)/binary:/binary -v $(pwd)/api:/api nativeplanet/groundseg-builder:3.10.9
-                        chmod +x ./binary/groundseg
-                        mv ./binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
+                        rm -rf /var/jenkins_home/tmp
+                        mkdir -p /var/jenkins_home/tmp
+                        cp -r api /var/jenkins_home/tmp
+                        docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
+                        chmod +x /var/jenkins_home/tmp/binary/groundseg
+                        mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64
                         '''
                     }
                 }
@@ -51,19 +53,15 @@ pipeline {
                         script {
                             if( "${tag}" == "arm-test" ) {
                                 sh '''
-                                echo "debug: building arm64"
                                 cd build-scripts
                                 docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                                 cd ..
-                                rm -rf /var/jenkins_home/tmp
-                                mkdir -p /var/jenkins_home/tmp
-                                cp -r api /var/jenkins_home/tmp
-                                docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
+                                docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
                                 mv binary/groundseg binary/groundseg_arm64
                                 cd ui
                                 # echo docker buildx build --push --tag nativeplanet/groundseg-webui:latest --platform linux/amd64,linux/arm64 .
                                 '''
-                                stash includes: '/var/jenkins_home/tmp/binary/groundseg_arm64', name: 'groundseg_arm64'
+                                stash includes: 'binary/groundseg_arm64', name: 'groundseg_arm64'
                             }
                         }
                     }
