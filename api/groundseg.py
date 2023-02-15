@@ -9,6 +9,7 @@ import sys
 import requests
 import urllib.request
 import nmcli
+import platform
 import subprocess
 import html_templates
 
@@ -53,6 +54,11 @@ def check_bin_updates():
             if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
                 Log.log_groundseg(f"Latest version: {new_name}")
                 Log.log_groundseg("Downloading new groundseg binary")
+
+                if platform.machine() == 'x86_64':
+                    dl_url = f"{dl_url}_amd64"
+                else:
+                    dl_url = f"{dl_url}_arm64"
 
                 r = requests.get(dl_url)
                 f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
@@ -251,8 +257,8 @@ def wireguard_refresher():
                 copied = orchestrator._urbits
                 for p in list(copied):
                     if copied[p].running and copied[p].config['network'] != "none":
-                        res = requests.get(f"https://{copied[p].config['wg_url']}")
-                        if res.status_code != 200: 
+                        res = requests.get(f"https://{copied[p].config['wg_url']}/~_~/healthz")
+                        if res.status_code == 502: 
                             Log.log_groundseg("Anchor connection is broken. Restarting")
                             orchestrator.restart_anchor()
                             break

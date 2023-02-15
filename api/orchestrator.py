@@ -44,7 +44,7 @@ class Orchestrator:
     _disk = None
 
     # GroundSeg
-    gs_version = 'v1.0.7'
+    gs_version = 'v1.0.8'
     _vm = False
     _npbox = False
     _c2c_mode = False
