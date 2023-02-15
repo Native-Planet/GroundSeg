@@ -20,9 +20,6 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
-                        git url: 'https://github.com/Native-Planet/GroundSeg.git',
-                            credentialsId: 'Github token',
-                            branch: "${environ}"
                         sh '''
                         echo "debug: building amd64"
                         mkdir -p /opt/groundseg/version/bin
@@ -45,9 +42,6 @@ pipeline {
             steps {
                 script {
                     if( "${tag}" != "nobuild" ) {
-                        git url: 'https://github.com/Native-Planet/GroundSeg.git',
-                            credentialsId: 'Github token',
-                            branch: "${environ}"
                         sh '''
                         echo "debug: building arm64"
                         cd build-scripts
