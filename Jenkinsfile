@@ -15,6 +15,7 @@ pipeline {
             returnStdout: true
         ).trim()
     }
+/*
     stages {
         stage('amd64build') {
             steps {
@@ -56,6 +57,7 @@ pipeline {
                 }
             }
                 }
+*/
         stage('postbuild') {
             steps {
                 script {
