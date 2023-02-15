@@ -4,9 +4,9 @@ pipeline {
         tag = sh ( 
             script: '''
                 environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
-                if [ "${environ}" = "main" ]; then
+                if [ "${environ}" = "master" ]; then
                     echo "latest"
-                elif [ "${environ}" = "edge" ]; then
+                elif [ "${environ}" = "dev" ]; then
                     echo "edge"
                 else
                     echo "nobuild"
