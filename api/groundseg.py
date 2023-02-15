@@ -251,8 +251,8 @@ def wireguard_refresher():
                 copied = orchestrator._urbits
                 for p in list(copied):
                     if copied[p].running and copied[p].config['network'] != "none":
-                        res = requests.get(f"https://{copied[p].config['wg_url']}")
-                        if res.status_code != 200: 
+                        res = requests.get(f"https://{copied[p].config['wg_url']}/~_~/healthz")
+                        if res.status_code == 502: 
                             Log.log_groundseg("Anchor connection is broken. Restarting")
                             orchestrator.restart_anchor()
                             break
