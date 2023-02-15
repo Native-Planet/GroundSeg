@@ -58,7 +58,7 @@ pipeline {
         }*/
         stage('postbuild') {
             steps {
-                script {
+                script {/*
                     if( "${tag}" != "nobuild" ){  
                         sh 'echo "debug: post-build actions"'
                         dir('/opt/groundseg/version/bin/'){
@@ -66,7 +66,7 @@ pipeline {
                         }
                         sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
-                    }
+                    }*/
                     if( "${tag}" == "latest" ) {
                         sh '''
                         mv ./release/version.csv /opt/groundseg/version/
