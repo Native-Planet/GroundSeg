@@ -37,57 +37,60 @@ orchestrator = Orchestrator("/opt/nativeplanet/groundseg/settings/system.json")
 def check_bin_updates():
     Log.log_groundseg("Binary updater thread started")
     cur_hash = orchestrator.config['binHash']
+    branch = orchestrator.config['updateBranch']
 
     while True:
-        update_branch = orchestrator.config['updateBranch']
-        if update_branch == 'latest':
-            update_url = 'https://version.infra.native.computer/version.csv'
-
-        if update_branch == 'edge':
-            update_url = 'https://version.infra.native.computer/version_edge.csv'
+        update_url = 'https://version.groundseg.app'
+        arch = "arm64"
+        try:
+            if platform.machine() == 'x86_64':
+                arch = f"amd64"
+        except:
+            Log.log_groundseg("Unable to get architecture. Defaulting to arm64")
 
         try:
-            new_name, new_hash, dl_url = requests.get(update_url).text.split('\n')[0].split(',')[0:3]
             if orchestrator.config['updateMode'] == 'auto':
+                # Get update blob
                 Log.log_groundseg('Checking for binary updates')
+                orchestrator._update_payload = requests.get(update_url)
+                d = orchestrator._update_payload['groundseg'][branch]['groundseg']
+                # Get version
+                ver = f"v{d['major'].d['minor'].d['patch']"
+                if branch == 'edge':
+                    ver = f"{ver}-edge"
 
-            if orchestrator.config['updateMode'] == 'auto' and cur_hash != new_hash:
-                Log.log_groundseg(f"Latest version: {new_name}")
-                Log.log_groundseg("Downloading new groundseg binary")
+                if cur_hash != d[f'{arch}_sha256']:
+                    Log.log_groundseg(f"Latest version: {ver}")
+                    Log.log_groundseg("Downloading new groundseg binary")
 
-                if platform.machine() == 'x86_64':
-                    dl_url = f"{dl_url}_amd64"
-                else:
-                    dl_url = f"{dl_url}_arm64"
+                    r = requests.get(d[f'{arch}_url'])
+                    f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
+                    for chunk in r.iter_content(chunk_size=512 * 1024):
+                        if chunk: # filter out keep-alive new chunks
+                            f.write(chunk)
+                    f.close()
 
-                r = requests.get(dl_url)
-                f = open(f"{orchestrator.config['CFG_DIR']}/groundseg_new", 'wb')
-                for chunk in r.iter_content(chunk_size=512 * 1024):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-                f.close()
+                    Log.log_groundseg("Removing old groundseg binary")
 
-                Log.log_groundseg("Removing old groundseg binary")
+                    try:
+                        os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
+                    except:
+                        pass
 
-                try:
-                    os.remove(f"{orchestrator.config['CFG_DIR']}/groundseg")
-                except:
-                    pass
+                    time.sleep(3)
 
-                time.sleep(3)
+                    Log.log_groundseg("Renaming new groundseg binary")
+                    os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
+                            f"{orchestrator.config['CFG_DIR']}/groundseg")
 
-                Log.log_groundseg("Renaming new groundseg binary")
-                os.rename(f"{orchestrator.config['CFG_DIR']}/groundseg_new",
-                        f"{orchestrator.config['CFG_DIR']}/groundseg")
+                    time.sleep(2)
+                    Log.log_groundseg("Setting launch permissions for new binary")
+                    os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
 
-                time.sleep(2)
-                Log.log_groundseg("Setting launch permissions for new binary")
-                os.system(f"chmod +x {orchestrator.config['CFG_DIR']}/groundseg")
+                    time.sleep(1)
 
-                time.sleep(1)
-
-                Log.log_groundseg("Restarting groundseg...")
-                os.system("systemctl restart groundseg")
+                    Log.log_groundseg("Restarting groundseg...")
+                    os.system("systemctl restart groundseg")
 
         except Exception as e:
             Log.log_groundseg(e)
