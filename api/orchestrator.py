@@ -49,7 +49,7 @@ class Orchestrator:
     _npbox = False
     _c2c_mode = False
     _wifi_device = None
-    _updata_payload = {}
+    _update_payload = {}
     anchor_config = {'lease': None,'ongoing': None}
     minIO_on = False
     config = {}
