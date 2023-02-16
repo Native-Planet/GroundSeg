@@ -213,8 +213,8 @@ class Orchestrator:
         cfg = self.check_config_field(cfg, 'pwHash', '')
         cfg = self.check_config_field(cfg, 'webuiPort', '80')
         cfg = self.check_config_field(cfg, 'updateBranch', update_mode)
-        cfg = self.check_config_field(cfg, 'updateInterval', 90)
         cfg = self.check_config_field(cfg, 'c2cInterval', 0)
+        cfg = self.check_update_interval(cfg)
 
         cfg['gsVersion'] = self.gs_version
         cfg['CFG_DIR'] = cfg_path
@@ -262,6 +262,21 @@ class Orchestrator:
         if not field in cfg:
             cfg[field] = default
             Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+        return cfg
+
+    # Makes sure update interval setting isn't below 1 hour
+    def check_update_interval(self, cfg):
+        if cfg['updateBranch'] != 'edge':
+            min_allowed = 3600
+            if not 'updateInterval' in cfg:
+                cfg['updateInterval'] = min_allowed
+                Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+            elif cfg['updateInterval'] < min_allowed:
+                cfg['updateInterval'] = min_allowed
+                Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+        else:
+            cfg = self.check_config_field(cfg, 'updateInterval', 90)
+
         return cfg
 
     # Load urbit ships
