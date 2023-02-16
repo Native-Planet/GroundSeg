@@ -270,10 +270,10 @@ class Orchestrator:
             min_allowed = 3600
             if not 'updateInterval' in cfg:
                 cfg['updateInterval'] = min_allowed
-                Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+                Log.log_groundseg(f"updateInterval doesn't exist! Creating with default value: {min_allowed}")
             elif cfg['updateInterval'] < min_allowed:
                 cfg['updateInterval'] = min_allowed
-                Log.log_groundseg(f"{field} doesn't exist! Creating with default value: {default}")
+                Log.log_groundseg(f"updateInterval is set below allowed minimum! Setting to: {min_allowed}")
         else:
             cfg = self.check_config_field(cfg, 'updateInterval', 90)
 
