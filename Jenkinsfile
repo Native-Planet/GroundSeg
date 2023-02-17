@@ -30,7 +30,7 @@ pipeline {
                           extensions: [],
                           gitTool: 'Default',
                           submoduleCfg: [],
-                          userRemoteConfigs: [[url: 'https://github.com/jenkinsci/git-parameter-plugin.git']]
+                          userRemoteConfigs: [[url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
         }
