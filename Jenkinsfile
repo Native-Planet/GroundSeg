@@ -120,21 +120,30 @@ pipeline {
                 ).trim()
                 major = sh(
                     script: '''
-                        ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        ver=${tag}
+                        if [[ "${tag}" == *"-"* ]]; then
+                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        fi
                         major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 minor = sh(
                     script: '''
-                        ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        ver=${tag}
+                        if [[ "${tag}" == *"-"* ]]; then
+                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        fi
                         major=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 patch = sh(
                     script: '''
-                        ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        ver=${tag}
+                        if [[ "${tag}" == *"-"* ]]; then
+                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                        fi
                         major=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
@@ -213,7 +222,12 @@ pipeline {
     }
         post {
             always {
-                cleanWs deleteDirs: true, notFailBuild: true
+                cleanWs(cleanWhenNotBuilt: true,
+                    deleteDirs: true,
+                    disableDeferredWipeout: false,
+                    notFailBuild: true,
+                    patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
+                               [pattern: '.propsfile', type: 'EXCLUDE']])
             }
         }
 }
