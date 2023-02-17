@@ -80,7 +80,6 @@ pipeline {
                         '''
                         stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                     }
-                cleanWs disableDeferredWipeout: true, deleteDirs: true
                 }
             }
         }
