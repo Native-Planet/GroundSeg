@@ -114,7 +114,7 @@ pipeline {
                 dockerhash = sh(
                     script: '''
                         obj=`curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" | jq -r '.digest'`
-                        echo $obj|jq -r '.[] | select(.architecture=="arm64") | .digest'|sed 's/sha256://g'
+                        echo $obj|sed 's/sha256://g'
                     ''',
                     returnStdout: true
                 ).trim()
