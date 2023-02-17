@@ -49,7 +49,7 @@ pipeline {
                             cp -r api /var/jenkins_home/tmp
                             docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
                             chmod +x /var/jenkins_home/tmp/binary/groundseg
-                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${params.BRANCH_TAG}
+                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${params.RELEASE_TAG}
                         '''
                     }
                 }
@@ -82,7 +82,7 @@ pipeline {
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
                         }
-                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${params.BRANCH_TAG}'
+                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${params.RELEASE_TAG}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
                     }
                 }
@@ -92,13 +92,13 @@ pipeline {
             environment {
                 arm64_sha256 = sh(
                     script: '''
-                        sha256sum /opt/groundseg/version/bin/groundseg_arm64_${params.BRANCH_TAG}'|awk '{print \$1}'
+                        sha256sum /opt/groundseg/version/bin/groundseg_arm64_${params.RELEASE_TAG}'|awk '{print \$1}'
                     ''',
                     returnStdout: true
                 ).trim()
                 amd64_sha256 = sh(
                     script: '''
-                        sha256sum /opt/groundseg/version/bin/groundseg_amd64_${params.BRANCH_TAG}'|awk '{print \$1}'
+                        sha256sum /opt/groundseg/version/bin/groundseg_amd64_${params.RELEASE_TAG}'|awk '{print \$1}'
                     ''',
                     returnStdout: true
                 ).trim()
@@ -111,27 +111,27 @@ pipeline {
                 ).trim()
                 major = sh(
                     script: '''
-                        ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
+                        ver=`echo ${params.RELEASE_TAG}|awk -F '-' '{print \$2}'`
                         major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 minor = sh(
                     script: '''
-                        ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
+                        ver=`echo ${params.RELEASE_TAG}|awk -F '-' '{print \$2}'`
                         major=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 patch = sh(
                     script: '''
-                        ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
+                        ver=`echo ${params.RELEASE_TAG}|awk -F '-' '{print \$2}'`
                         major=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://bin.infra.native.computer/groundseg_arm64_${params.BRANCH_TAG}"
-                amdbin = "https://bin.infra.native.computer/groundseg_amd64_${params.BRANCH_TAG}"
+                armbin = "https://bin.infra.native.computer/groundseg_arm64_${params.RELEASE_TAG}"
+                amdbin = "https://bin.infra.native.computer/groundseg_amd64_${params.RELEASE_TAG}"
             }
             steps {
                 script {
