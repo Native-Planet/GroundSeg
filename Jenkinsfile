@@ -20,7 +20,7 @@ pipeline {
             returnStdout: true
         ).trim()
         versionauth = credentials('VersionAuth')
-        tag = ${params.RELEASE_TAG}
+        tag = "${params.RELEASE_TAG}"
     }
     stages {
         stage('checkout') {
