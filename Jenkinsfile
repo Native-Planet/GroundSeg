@@ -210,6 +210,7 @@ pipeline {
                 }
             }
         }
+    }
         post {
             always {
                 cleanWs deleteDirs: true, notFailBuild: true
