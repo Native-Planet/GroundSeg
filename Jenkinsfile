@@ -151,6 +151,12 @@ pipeline {
                                 https://version.groundseg.app/groundseg/latest/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
                                 https://version.groundseg.app/groundseg/latest/webui/sha256/${dockerhash}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/latest/groundseg/major/${major}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/latest/groundseg/minor/${minor}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/latest/groundseg/patch/${patch}
                         '''
                     }
                     if( "${channel}" == "edge" ) {
@@ -167,6 +173,12 @@ pipeline {
                                 https://version.groundseg.app/groundseg/edge/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
                                 https://version.groundseg.app/groundseg/edge/webui/sha256/${dockerhash}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/edge/groundseg/major/${major}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/edge/groundseg/minor/${minor}
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                                https://version.groundseg.app/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
             }
