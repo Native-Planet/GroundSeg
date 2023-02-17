@@ -190,8 +190,21 @@ pipeline {
                                 https://version.groundseg.app/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
+                }
             }
         }
+        stage('Merge to master') {
+            steps {
+                sh (
+                    script: '''
+                        # git checkout -b tag-${tag}
+                        # git checkout master
+                        # git merge tag-${tag}
+                        # git commit -am "merged ${tag} release"
+                        # git push origin master
+                    '''
+                )
+            }
         }
     }
         post {
