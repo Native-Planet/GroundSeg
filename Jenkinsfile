@@ -141,10 +141,10 @@ pipeline {
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/latest/groundseg/amd64_url/payload \
-                                -d "{\"payload\":\"${amdbin}\"}"
+                                -d "{\"value\":\"${amdbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/latest/groundseg/arm64_url/payload \
-                                -d "{\"payload\":\"${armbin}\"}"
+                                -d "{\"value\":\"${armbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
                                 https://version.groundseg.app/groundseg/latest/groundseg/amd64_sha256/${amdsha}
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
@@ -163,10 +163,10 @@ pipeline {
                         sh '''
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_url/payload \
-                                -d "{\"payload\":\"${amdbin}\"}"
+                                -d "{\"value\":\"${amdbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/arm64_url/payload \
-                                -d "{\"payload\":\"${armbin}\"}"
+                                -d "{\"value\":\"${armbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_sha256/${amdsha}
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
