@@ -48,8 +48,8 @@ pipeline {
                             mkdir -p /var/jenkins_home/tmp
                             cp -r api /var/jenkins_home/tmp
                             docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
-                            chmod +x /binary/groundseg
-                            mv /binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${params.BRANCH_TAG}
+                            chmod +x /var/jenkins_home/tmp/binary/groundseg
+                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${params.BRANCH_TAG}
                         '''
                     }
                 }
