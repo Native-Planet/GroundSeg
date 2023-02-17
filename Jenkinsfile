@@ -59,6 +59,14 @@ pipeline {
         stage('arm64 build') {
             agent { node { label 'arm' } }
             steps {
+                checkout([$class: 'GitSCM',
+                          branches: [[name: "${params.RELEASE_TAG}"]],
+                          doGenerateSubmoduleConfigurations: false,
+                          extensions: [],
+                          gitTool: 'Default',
+                          submoduleCfg: [],
+                          userRemoteConfigs: [[url: 'https://github.com/Native-Planet/GroundSeg.git']]
+                        ])
                 script {
                     if( "${channel}" != "nobuild" ) {
                         sh '''
