@@ -74,7 +74,7 @@ pipeline {
                 }
             }
         }
-        stage('move binaries')
+        stage('move binaries') {
             steps {
                 script {
                     if( "${channel}" != "nobuild" ){  
@@ -87,6 +87,7 @@ pipeline {
                     }
                 }
             }
+        }
         stage('postbuild') {
             environment {
                 arm64_sha256 = sh(
