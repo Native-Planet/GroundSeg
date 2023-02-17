@@ -112,21 +112,21 @@ pipeline {
                 major = sh(
                     script: '''
                         ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
-                        major=`echo ${ver}|awk -F '.' '{print \$1}'`
+                        major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 minor = sh(
                     script: '''
                         ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
-                        major=`echo ${ver}|awk -F '.' '{print \$2}'`
+                        major=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
                 patch = sh(
                     script: '''
                         ver=`echo ${params.BRANCH_TAG}|awk -F '-' '{print \$2}'`
-                        major=`echo ${ver}|awk -F '.' '{print \$3}'`
+                        major=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
                     ''',
                     returnStdout: true
                 ).trim()
@@ -142,7 +142,7 @@ pipeline {
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/latest/groundseg/amd64_url/payload \
                                 -d "{\"payload\":\"${amdbin}\"}"
-                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/latest/groundseg/arm64_url/payload \
                                 -d "{\"payload\":\"${armbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
@@ -158,7 +158,7 @@ pipeline {
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_url/payload \
                                 -d "{\"payload\":\"${amdbin}\"}"
-                            curl -X PUT -H 'X-Api-Key: ${versionauth}' \
+                            curl -X PUT -H 'X-Api-Key: ${versionauth}' -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/arm64_url/payload \
                                 -d "{\"payload\":\"${armbin}\"}"
                             curl -X PUT -H 'X-Api-Key: ${versionauth}' \
