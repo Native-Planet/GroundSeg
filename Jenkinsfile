@@ -195,18 +195,21 @@ pipeline {
         }
         stage('Merge to master') {
             steps {
-                sh (
-                    script: '''
-                        # git checkout -b tag-${tag}
-                        # git checkout master
-                        # git merge tag-${tag}
-                        # git commit -am "merged ${tag} release"
-                        # git push origin master
-                    '''
-                )
+                script {
+                    if( "${channel}" == "latest" ) {
+                        sh (
+                            script: '''
+                                git checkout -b tag-${tag}
+                                git checkout master
+                                git merge tag-${tag}
+                                git commit -am "merged ${tag} release"
+                                git push origin master
+                            '''
+                        )
+                    }
+                }
             }
         }
-    }
         post {
             always {
                 cleanWs deleteDirs: true, notFailBuild: true
