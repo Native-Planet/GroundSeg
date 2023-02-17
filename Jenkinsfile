@@ -31,7 +31,7 @@ pipeline {
                           extensions: [],
                           gitTool: 'Default',
                           submoduleCfg: [],
-                          userRemoteConfigs: [[url: 'https://github.com/Native-Planet/GroundSeg.git']]
+                          userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
         }
@@ -65,7 +65,7 @@ pipeline {
                           extensions: [],
                           gitTool: 'Default',
                           submoduleCfg: [],
-                          userRemoteConfigs: [[url: 'https://github.com/Native-Planet/GroundSeg.git']]
+                          userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
                 script {
                     if( "${channel}" != "nobuild" ) {
