@@ -40,8 +40,6 @@ pipeline {
                 script {
                     if( "${channel}" != "nobuild" ) {
                         sh '''
-                            echo $tag
-                            echo ${params.RELEASE_TAG}
                             echo "debug: building amd64"
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
