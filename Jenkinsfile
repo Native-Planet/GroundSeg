@@ -34,7 +34,7 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
-        }
+        }/*
         stage('amd64 build') {
             steps {
                 script {
@@ -101,19 +101,17 @@ pipeline {
                     }
                 }
             }
-        }
+        } */
         stage('version update') {
             environment {
                 arm64_sha256 = sh(
-                    script: '''
-                        #!/bin/bash
+                    script: '''#!/bin/bash
                         sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'
                     ''',
                     returnStdout: true
                 ).trim()
                 amd64_sha256 = sh(
-                    script: '''
-                        #!/bin/bash
+                    script: '''#!/bin/bash
                         sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'
                     ''',
                     returnStdout: true
@@ -126,8 +124,7 @@ pipeline {
                     returnStdout: true
                 ).trim()
                 major = sh(
-                    script: '''
-                        !#/bin/bash
+                    script: '''!#/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
@@ -137,8 +134,7 @@ pipeline {
                     returnStdout: true
                 ).trim()
                 minor = sh(
-                    script: '''
-                        #!/bin/bash
+                    script: '''#!/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
@@ -148,8 +144,7 @@ pipeline {
                     returnStdout: true
                 ).trim()
                 patch = sh(
-                    script: '''
-                        #!/bin/bash
+                    script: '''#!/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
@@ -188,7 +183,7 @@ pipeline {
                         '''
                     }
                     if( "${channel}" == "edge" ) {
-                        sh '''
+                        sh '''#!/bin/bash
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_url/payload \
                                 -d "{\"value\":\"${amdbin}\"}"
