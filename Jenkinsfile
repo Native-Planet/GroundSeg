@@ -104,14 +104,14 @@ pipeline {
         } */
         stage('version update') {
             environment {
-                arm64_sha256 = sh(
+                armsha = sh(
                     script: '''#!/bin/bash -x
                         val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
-                amd64_sha256 = sh(
+                amdsha = sh(
                     script: '''#!/bin/bash -x
                         val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'`
                         echo ${val}
