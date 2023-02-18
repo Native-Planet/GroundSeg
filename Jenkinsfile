@@ -104,7 +104,7 @@ pipeline {
                     }
                 }
             }
-        }
+        } /*
         stage('cleanup slave') {
             /* jenkins won't clean up slave workspace on its own for some reason*/
             agent { node { label 'arm' } }
@@ -114,7 +114,7 @@ pipeline {
                     sudo rm -rf GroundSeg_*
                 '''
             }
-        }
+        } */
         stage('version update') {
             environment {
                 /* update versions and hashes on public version server */
