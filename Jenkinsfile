@@ -106,50 +106,55 @@ pipeline {
             environment {
                 arm64_sha256 = sh(
                     script: '''#!/bin/bash -x
-                        sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'`
+                        echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 amd64_sha256 = sh(
-                    script: '''#!/bin/bash
-                        sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'
+                    script: '''#!/bin/bash -x
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'`
+                        echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 dockerhash = sh(
-                    script: '''#!/bin/bash
+                    script: '''#!/bin/bash -x
                         obj=`curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" | jq -r '.digest'`
                         echo $obj|sed 's/sha256://g'
                     ''',
                     returnStdout: true
                 ).trim()
                 major = sh(
-                    script: '''#!/bin/bash
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
                         fi
                         major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
+                        echo ${major}
                     ''',
                     returnStdout: true
                 ).trim()
                 minor = sh(
-                    script: '''#!/bin/bash
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
                         fi
-                        major=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
+                        minor=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
+                        echo ${minor}
                     ''',
                     returnStdout: true
                 ).trim()
                 patch = sh(
-                    script: '''#!/bin/bash
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
                         fi
-                        major=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
+                        patch=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
+                        echo ${patch}
                     ''',
                     returnStdout: true
                 ).trim()
@@ -159,8 +164,7 @@ pipeline {
             steps {
                 script {
                     if( "${channel}" == "latest" ) {
-                        sh '''#!/bin/bash
-                            set -x
+                        sh '''#!/bin/bash -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
@@ -184,8 +188,7 @@ pipeline {
                         '''
                     }
                     if( "${channel}" == "edge" ) {
-                        sh '''#!/bin/bash
-                            set -x
+                        sh '''#!/bin/bash -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_url/payload \
                                 -d "{\"value\":\"${amdbin}\"}"
