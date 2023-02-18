@@ -235,7 +235,7 @@ pipeline {
             /* jenkins won't clean up slave workspace on its own for some reason*/
             agent { node { label 'arm' } }
             steps {
-                sh '''#!/bin/bash -e
+                sh '''#!/bin/bash -x
                     cd ..
                     sudo rm -rf GroundSeg_*
                 '''
