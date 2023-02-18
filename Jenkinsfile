@@ -101,12 +101,14 @@ pipeline {
             environment {
                 arm64_sha256 = sh(
                     script: '''
+                        #!/bin/bash
                         sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'
                     ''',
                     returnStdout: true
                 ).trim()
                 amd64_sha256 = sh(
                     script: '''
+                        #!/bin/bash
                         sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'
                     ''',
                     returnStdout: true
@@ -120,6 +122,7 @@ pipeline {
                 ).trim()
                 major = sh(
                     script: '''
+                        !#/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
@@ -130,6 +133,7 @@ pipeline {
                 ).trim()
                 minor = sh(
                     script: '''
+                        #!/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
@@ -140,6 +144,7 @@ pipeline {
                 ).trim()
                 patch = sh(
                     script: '''
+                        #!/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
