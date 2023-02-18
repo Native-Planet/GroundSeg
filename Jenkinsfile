@@ -97,7 +97,7 @@ pipeline {
                 }
             }
         }
-        stage('postbuild') {
+        stage('version update') {
             environment {
                 arm64_sha256 = sh(
                     script: '''
@@ -207,7 +207,7 @@ pipeline {
                 }
             }
         }
-        stage('Merge to master') {
+        stage('merge to master') {
             steps {
                 script {
                     if( "${channel}" == "latest" ) {
