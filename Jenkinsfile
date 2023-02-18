@@ -6,6 +6,7 @@ pipeline {
                      defaultValue: 'master'
     }
     environment {
+        /* translate git branch to release channel */
         channel = sh ( 
             script: '''
                 environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
@@ -19,7 +20,9 @@ pipeline {
             ''',
             returnStdout: true
         ).trim()
+        /* version server auth header */
         versionauth = credentials('VersionAuth')
+        /* release tag to be built*/
         tag = "${params.RELEASE_TAG}"
     }
     stages {
@@ -37,10 +40,10 @@ pipeline {
         }
         stage('amd64 build') {
             steps {
+                /* build amd64 binary and move to web dir */
                 script {
                     if( "${channel}" != "nobuild" ) {
                         sh '''
-                            echo "debug: building amd64"
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
@@ -59,6 +62,7 @@ pipeline {
         stage('arm64 build') {
             agent { node { label 'arm' } }
             steps {
+                /* build arm64 binary and stash it, build and push crossplatform webui docker image */
                 checkout([$class: 'GitSCM',
                           branches: [[name: "${params.RELEASE_TAG}"]],
                           doGenerateSubmoduleConfigurations: false,
@@ -85,6 +89,7 @@ pipeline {
         }
         stage('move binaries') {
             steps {
+                /* unstash arm binary on master server */
                 script {
                     if( "${channel}" != "nobuild" ){  
                         sh 'echo "debug: post-build actions"'
@@ -99,6 +104,7 @@ pipeline {
         }
         stage('version update') {
             environment {
+                /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
                         val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'`
@@ -209,6 +215,7 @@ pipeline {
         }
         stage('merge to master') {
             steps {
+                /* merge tag changes into master if deploying to master */
                 script {
                     if( "${channel}" == "latest" ) {
                         sh (
@@ -225,12 +232,13 @@ pipeline {
             }
         }
         stage('cleanup slave') {
+            /* jenkins won't clean up slave workspace on its own for some reason*/
             agent { node { label 'arm' } }
             steps {
                 sh '''
                     environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
                     cd ..
-                    sudo rm -rf GroundSeg_${environ}
+                    sudo rm -rf GroundSeg_*
                 '''
             }
         }
