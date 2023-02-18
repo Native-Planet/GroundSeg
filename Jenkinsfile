@@ -106,18 +106,18 @@ pipeline {
             environment {
                 arm64_sha256 = sh(
                     script: '''#!/bin/bash
-                        sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'
+                        sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print $\1}'
                     ''',
                     returnStdout: true
                 ).trim()
                 amd64_sha256 = sh(
                     script: '''#!/bin/bash
-                        sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'
+                        sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print $\1}'
                     ''',
                     returnStdout: true
                 ).trim()
                 dockerhash = sh(
-                    script: '''
+                    script: '''#!/bin/bash
                         obj=`curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" | jq -r '.digest'`
                         echo $obj|sed 's/sha256://g'
                     ''',
