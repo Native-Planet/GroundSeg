@@ -34,7 +34,7 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
-        }/*
+        }
         stage('amd64 build') {
             steps {
                 script {
@@ -101,7 +101,7 @@ pipeline {
                     }
                 }
             }
-        } */
+        }
         stage('version update') {
             environment {
                 armsha = sh(
