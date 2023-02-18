@@ -59,16 +59,6 @@ pipeline {
                 }
             }
         }
-        stage('cleanup slave') {
-            /* jenkins won't clean up slave workspace on its own for some reason*/
-            agent { node { label 'arm' } }
-            steps {
-                sh '''#!/bin/bash -x
-                    cd ..
-                    sudo rm -rf GroundSeg_*
-                '''
-            }
-        }
         stage('arm64 build') {
             agent { node { label 'arm' } }
             steps {
@@ -113,6 +103,16 @@ pipeline {
                         '''
                     }
                 }
+            }
+        }
+        stage('cleanup slave') {
+            /* jenkins won't clean up slave workspace on its own for some reason*/
+            agent { node { label 'arm' } }
+            steps {
+                sh '''#!/bin/bash -x
+                    cd ..
+                    sudo rm -rf GroundSeg_*
+                '''
             }
         }
         stage('version update') {
