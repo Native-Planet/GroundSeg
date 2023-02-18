@@ -236,7 +236,6 @@ pipeline {
             agent { node { label 'arm' } }
             steps {
                 sh '''
-                    environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
                     cd ..
                     sudo rm -rf GroundSeg_*
                 '''
