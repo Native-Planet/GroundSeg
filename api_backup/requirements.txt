@@ -1,0 +1,12 @@
+chardet
+flask
+requests
+docker
+psutil
+flask-cors
+pywgkey
+nuitka
+zstandard
+ordered-set
+nmcli
+PyAccessPoint
