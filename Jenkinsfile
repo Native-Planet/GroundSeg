@@ -159,7 +159,7 @@ pipeline {
             steps {
                 script {
                     if( "${channel}" == "latest" ) {
-                        sh '''
+                        sh '''#!/bin/bash
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
