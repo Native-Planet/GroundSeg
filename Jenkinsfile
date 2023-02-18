@@ -82,7 +82,7 @@ pipeline {
                         sh '''
                             environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
                             cd ..
-                            rm -rf GroundSeg_${environ}
+                            sudo rm -rf GroundSeg_${environ}
                         '''
                     }
                 }
