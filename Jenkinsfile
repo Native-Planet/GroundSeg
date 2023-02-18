@@ -160,6 +160,7 @@ pipeline {
                 script {
                     if( "${channel}" == "latest" ) {
                         sh '''#!/bin/bash
+                            set -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
@@ -184,6 +185,7 @@ pipeline {
                     }
                     if( "${channel}" == "edge" ) {
                         sh '''#!/bin/bash
+                            set -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/groundseg/edge/groundseg/amd64_url/payload \
                                 -d "{\"value\":\"${amdbin}\"}"
