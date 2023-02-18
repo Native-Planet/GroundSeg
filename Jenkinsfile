@@ -79,6 +79,11 @@ pipeline {
                             docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
                         '''
                         stash includes: 'binary/groundseg', name: 'groundseg_arm64'
+                        sh '''
+                            environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
+                            cd ..
+                            rm -rf GroundSeg_${environ}
+                        '''
                     }
                 }
             }
