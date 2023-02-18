@@ -124,7 +124,7 @@ pipeline {
                     returnStdout: true
                 ).trim()
                 major = sh(
-                    script: '''!#/bin/bash
+                    script: '''#!/bin/bash
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$2}'`
