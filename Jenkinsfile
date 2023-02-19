@@ -52,7 +52,7 @@ pipeline {
             steps {
                 /* build amd64 binary and move to web dir */
                 script {
-                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {
+                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
@@ -105,7 +105,7 @@ pipeline {
             steps {
                 /* unstash arm binary on master server */
                 script {
-                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {  
+                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {  
                         sh 'echo "debug: post-build actions"'
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
