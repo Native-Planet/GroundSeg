@@ -42,7 +42,7 @@ pipeline {
             steps {
                 /* build amd64 binary and move to web dir */
                 script {
-                    if( "${channel}" != "nobuild" ) {
+                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {
                         sh '''
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
@@ -72,26 +72,30 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
                 script {
-                    if( "${channel}" != "nobuild" ) {
+                    if( "${channel}" != "nobuild" ) and ( "${channel}" != "latest" ) {
                         sh '''
                             echo "debug: building arm64"
                             cd build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                             cd ..
-                            docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
+                            docker run -v "~/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
                             cd ui
                             docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
+                            cd ../..
+                            #sudo rm -rf GroundSeg_*
                         '''
-                        stash includes: 'binary/groundseg', name: 'groundseg_arm64'
+                        stash includes: '~/binary/groundseg', name: 'groundseg_arm64'
                     }
                 }
+                /* workspace has to be cleaned or build will fail next time */
+                cleanWs()
             }
         }
         stage('move binaries') {
             steps {
                 /* unstash arm binary on master server */
                 script {
-                    if( "${channel}" != "nobuild" ){  
+                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {  
                         sh 'echo "debug: post-build actions"'
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
@@ -104,16 +108,7 @@ pipeline {
                     }
                 }
             }
-        } /*
-        stage('cleanup slave') {
-            agent { node { label 'arm' } }
-            steps {
-                sh '''#!/bin/bash -x
-                    cd ..
-                    sudo rm -rf GroundSeg_*
-                '''
-            }
-        } */
+        }
         stage('version update') {
             environment {
                 /* update versions and hashes on public version server */
