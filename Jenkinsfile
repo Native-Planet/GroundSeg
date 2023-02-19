@@ -38,6 +38,16 @@ pipeline {
                         ])
             }
         }
+        stage('SonarQube') {
+            environment {
+                scannerHome = "${tool 'SonarQubeScanner'}"
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N"
+                }
+            }
+        }
         stage('amd64 build') {
             steps {
                 /* build amd64 binary and move to web dir */
