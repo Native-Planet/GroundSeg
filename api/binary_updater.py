@@ -8,6 +8,7 @@ from log import Log
 
 class BinUpdater:
     def __init__(self, config):
+        self.config_object = config
         self.config = config.config
 
         self.branch = self.config['updateBranch']
@@ -31,8 +32,8 @@ class BinUpdater:
                     self.remove_file('groundseg_new')
 
                     # Get update blob
-                    self.payload = requests.get(self.url).json()
-                    d = self.payload['groundseg'][self.branch]['groundseg']
+                    self.config_object.update_payload = requests.get(self.url).json()
+                    d = self.config_object.update_payload['groundseg'][self.branch]['groundseg']
 
                     # Get version
                     ver = f"v{d['major']}.{d['minor']}.{d['patch']}"

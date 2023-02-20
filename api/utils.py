@@ -1,11 +1,29 @@
-from datetime import datetime
-import sys
-import os
-import nmcli
-import docker
+import ssl
+import urllib.request
 
-'''
+#import sys
+#import os
+#import nmcli
+#import docker
+
+#from datetime import datetime
+
+from log import Log
+
 class Utils:
+    def check_internet_access():
+        try:
+            context = ssl._create_unverified_context()
+            urllib.request.urlopen('https://nativeplanet.io',
+                                   timeout=1, context=context)
+            return True
+
+        except Exception as e:
+            Log.log("Check internet access error: {e}")
+            return False
+
+
+    '''
     def remove_urbit_containers():
         client = docker.from_env()
 

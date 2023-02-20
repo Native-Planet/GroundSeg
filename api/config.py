@@ -1,12 +1,30 @@
+# Python
 import os
+import ssl
 import json
+import base64
+from time import sleep
 
+# Modules
+from pywgkey.key import WgKey
+
+# GroundSeg Modules
 from log import Log
+from utils import Utils
 from hasher import Hash
 
 class Config:
+    # System
+    _ram = None
+    _cpu = None
+    _core_temp = None
+    _disk = None
+
+    # GroundSeg
     version = "v1.1.0"
     config_file = None
+    update_payload = {}
+    device_mode = "standard"
     config = None
     default_system_config = {
             "firstBoot": True,
@@ -33,7 +51,17 @@ class Config:
         # load existing or create new system.json
         self.config = self.load_config(self.config_file)
         Log.log("Loaded system JSON")
+
+        # if first boot, set up keys
+        if self.config['firstBoot']:
+            Log.log("GroundSeg is in setup mode")
+            self.reset_pubkey()
+
+        # Save latest config to system.json
         self.save_config()
+
+        # Set current mode
+        self.set_device_mode()
 
 
     # Checks if system.json and all its fields exists, adds field if incomplete
@@ -95,6 +123,43 @@ class Config:
             cfg = self.check_config_field(cfg, 'updateInterval', 90)
 
         return cfg
+
+    # Reset Public and Private Keys
+    def reset_pubkey(self):
+        x = WgKey()
+
+        b64pub = x.pubkey + '\n' 
+        b64pub = b64pub.encode('utf-8')
+        b64pub = base64.b64encode(b64pub).decode('utf-8')
+
+        # Load priv and pub key
+        self.config['pubkey'] = b64pub
+        self.config['privkey'] = x.privkey
+
+
+    def set_device_mode(self):
+        self.check_mode_file()
+        internet = Utils.check_internet_access()
+        if self.device_mode == "npbox":
+            if not internet:
+                Log.log("No internet access, starting Connect to Connect mode")
+                self.device_mode == "c2c"
+        else:
+            while not internet:
+                Log.log("No internet access, checking again in 15 seconds")
+                sleep(15)
+                internet = Utils.check_internet_access()
+
+
+    def check_mode_file(self):
+        if os.path.isfile(f"{self.base_path}/vm") or 'WSL_DISTRO_NAME' in os.environ:
+            Log.log("VM mode detected. Enabling limited features")
+            self.device_mode = "vm"
+
+        if os.path.isfile(f"{self.base_path}/nativeplanet"):
+            Log.log("NP box detected. Enabling NP box features")
+            self.device_mode = "npbox"
+
 
     def save_config(self):
         with open(self.config_file, 'w') as f:

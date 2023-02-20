@@ -4,7 +4,10 @@ import base64
 import time
 import json
 import sys
-from wireguard_docker import WireguardDocker
+
+# GroundSeg modules
+from log import Log
+#from wireguard_docker import WireguardDocker
 
 class Wireguard:
 
@@ -16,12 +19,13 @@ class Wireguard:
         filename = "/opt/nativeplanet/groundseg/settings/wireguard.json"
         
         # Load existing or create new wireguard.json 
+        Log.log("Loading up wireguard.json")
         try:
             with open(filename) as f:
                 data = json.load(f)
         except Exception as e:
-            print(e)
-            print("creating new wireguard config file...")
+            Log.log(e)
+            Log.log("creating new wireguard config file")
             wg_json = {
                     "wireguard_name":"wireguard",
                     "wireguard_version":"latest",
