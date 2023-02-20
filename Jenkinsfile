@@ -6,7 +6,7 @@ pipeline {
                      defaultValue: 'master'
     }
     tools {
-        node 'Node19'
+        nodejs 'Node19'
     }
     environment {
         /* translate git branch to release channel */
