@@ -5,9 +5,6 @@ pipeline {
                      type: 'PT_BRANCH_TAG',
                      defaultValue: 'master'
     }
-    tools {
-        nodejs 'Node19'
-    }
     environment {
         /* translate git branch to release channel */
         channel = sh ( 
