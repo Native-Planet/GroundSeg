@@ -85,7 +85,7 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
                 script {
-                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {
+                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
                             echo "debug: building arm64"
                             cd build-scripts
