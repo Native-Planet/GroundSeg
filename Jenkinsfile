@@ -5,6 +5,9 @@ pipeline {
                      type: 'PT_BRANCH_TAG',
                      defaultValue: 'master'
     }
+    tools {
+        node 'Node19'
+    }
     environment {
         /* translate git branch to release channel */
         channel = sh ( 
@@ -82,7 +85,7 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
                 script {
-                    if( "${channel}" != "nobuild" ) and ( "${channel}" != "latest" ) {
+                    if( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" ) {
                         sh '''
                             echo "debug: building arm64"
                             cd build-scripts
