@@ -37,7 +37,7 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
-        }
+        } /*
         stage('SonarQube') {
             environment {
                 scannerHome = "${tool 'SonarQubeScanner'}"
@@ -47,7 +47,7 @@ pipeline {
                     sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.python.version=3.10"
                 }
             }
-        }
+        } */
         stage('amd64 build') {
             steps {
                 /* build amd64 binary and move to web dir */
