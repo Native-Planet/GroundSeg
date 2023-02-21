@@ -1,5 +1,12 @@
+# Python
 import ssl
 import urllib.request
+import requests
+from time import sleep
+
+# GroundSeg modules
+from log import Log
+from binary_updater import BinUpdater
 
 #import sys
 #import os
@@ -8,20 +15,50 @@ import urllib.request
 
 #from datetime import datetime
 
-from log import Log
-
 class Utils:
     def check_internet_access():
         try:
             context = ssl._create_unverified_context()
             urllib.request.urlopen('https://nativeplanet.io',
-                                   timeout=1, context=context)
+                                   timeout=1,
+                                   context=context)
+
             return True
 
         except Exception as e:
             Log.log("Check internet access error: {e}")
             return False
 
+    def get_version_info(config, debug_mode):
+        Log.log("Updater thread started")
+        while True:
+            try:
+                Log.log("Checking for updates")
+                url = config.config['updateUrl']
+                r = requests.get(url)
+
+                if r.status_code == 200:
+                    config.update_avail = True
+                    config.update_payload = r.json()
+
+                    # Run binary updater
+                    b = BinUpdater()
+                    b.check_bin_update(config, debug_mode)
+
+                    if config.gs_ready:
+                        print("docker update here")
+                        # Run docker updates
+                        sleep(config.config['updateInterval'])
+                    else:
+                        sleep(60)
+
+                else:
+                    raise ValueError(f"Status code {r.status_code}")
+
+            except Exception as e:
+                config.update_avail = False
+                Log.log(f"Unable to retrieve update information: {e}")
+                sleep(60)
 
     '''
     def remove_urbit_containers():

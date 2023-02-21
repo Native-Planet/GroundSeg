@@ -14,18 +14,37 @@ from utils import Utils
 from hasher import Hash
 
 class Config:
+
+    # Default Values #
+
     # System
     _ram = None
     _cpu = None
     _core_temp = None
     _disk = None
 
-    # GroundSeg
+    # Current version
     version = "v1.1.0"
+
+    # system.json location
     config_file = None
+
+    # payload received from version server
     update_payload = {}
+
+    # if updater is working properly
+    update_avail = False
+
+    # GroundSeg has completed initialization
+    gs_ready = False
+
+    # which mode is GroundSeg running
     device_mode = "standard"
-    config = None
+
+    # system.json contents
+    config = {}
+
+    # default content of system.json
     default_system_config = {
             "firstBoot": True,
             "piers": [],
@@ -77,9 +96,6 @@ class Config:
         except Exception as e:
             Log.log(f"Failed to open system.json: {e}")
             Log.log("New system.json will be created")
-
-        except:
-            pass
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base_path

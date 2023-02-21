@@ -1,62 +1,92 @@
 import requests
 import subprocess
 import base64
-import time
 import json
 import sys
 
+from time import sleep
+
 # GroundSeg modules
 from log import Log
-#from wireguard_docker import WireguardDocker
+from wireguard_docker import WireguardDocker
 
 class Wireguard:
 
     _headers = {"Content-Type": "application/json"}
+    data = {}
+    updater_info = {}
+    default_config = { 
+                      "wireguard_name": "wireguard",
+                      "wireguard_version": "latest",
+                      "volume": "/var/lib/docker/volumes",
+                      "image": "linuxserver/wireguard",
+                      "cap_add": ["NET_ADMIN","SYS_MODULE"],
+                      "volumes": ["/lib/modules:/lib/modules"],
+                      "sysctls": { "net.ipv4.conf.all.src_valid_mark": 1 }
+                      }   
 
     def __init__(self, config):
-        self.config = config
-        data = None
-        filename = "/opt/nativeplanet/groundseg/settings/wireguard.json"
-        
-        # Load existing or create new wireguard.json 
-        Log.log("Loading up wireguard.json")
-        try:
-            with open(filename) as f:
-                data = json.load(f)
-        except Exception as e:
-            Log.log(e)
-            Log.log("creating new wireguard config file")
-            wg_json = {
-                    "wireguard_name":"wireguard",
-                    "wireguard_version":"latest",
-                    "patp":"",
-                    "cap_add":["NET_ADMIN","SYS_MODULE"],
-                    "volumes":["/lib/modules:/lib/modules"],
-                    "sysctls":
-                    {
-                        "net.ipv4.conf.all.src_valid_mark":1
-                    }
-            }   
-            with open(filename,'w') as f :
-                json.dump(wg_json, f, indent=4)
-                data = wg_json
+        self.config_object = config
+        self.config = config.config
+        self.filename = f"{self.config_object.base_path}/settings/wireguard.json"
+        self.wg_docker = WireguardDocker()
 
-        # Load wireguard docker
-        self.wg_docker = WireguardDocker(data)
-        if self.wg_docker.is_running():
-            self.wg_docker.stop()
+        # Populate config
+        try:
+            with open(self.filename) as f:
+                self.data = json.load(f)
+                Log.log("Successfully loaded wireguard.json")
+
+        except Exception as e:
+            Log.log(f"Failed to open wireguard.json: {e}")
+            Log.log("New wireguard.json will be created")
+
+        # Check if updater information is ready
+        branch = self.config['updateBranch']
+        count = 0
+        while not self.config_object.update_avail:
+            count += 1
+            if count >= 30:
+                break
+
+            Log.log("Updater information not yet ready. Checking in 3 seconds")
+            sleep(3)
+
+        # Updater Wireguard information
+        if self.config_object.update_avail:
+            self.updater_info = self.config_object.update_payload['groundseg'][branch]['wireguard']
+            self.data['image'] = self.updater_info['repo']
+            self.data['tag'] = self.updater_info['tag']
+        self.data = {**self.default_config, **self.data}
+
+        self.save_config()
+
+        # TODO: if wgOn and wgRegistered
+        if self.start():
+            Log.log("Wireguard: Successfully started container")
+        else:
+            Log.log("Wireguard: Failed to start container")
+
+    # Save wireguard.json
+    def save_config(self):
+        with open(self.filename,'w') as f :
+            json.dump(self.data, f, indent=4)
+            f.close()
+
 
 #
 #   Wireguard Docker commands
 #
 
+
     # Start container
     def start(self):
-        return self.wg_docker.start()
+        return self.wg_docker.start(self.data,self.updater_info)
 
     # Stop container
-    def stop(self):
-        self.wg_docker.stop()
+    #def stop(self):
+    #    self.wg_docker.stop()
+
 
 #
 #   StarTram endpoints
@@ -129,7 +159,7 @@ class Wireguard:
                 print(e)
             print("Waiting for endpoint to be created")
             if(response['status'] == 'creating'):
-                time.sleep(60)
+                sleep(60)
 
         return response['status']
         
