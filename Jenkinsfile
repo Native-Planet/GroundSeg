@@ -88,13 +88,13 @@ pipeline {
                             cd build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                             cd ..
-                            docker run -v /tmp/groundseg:/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
+                            docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
                             cd ui
                             docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
                             cd ../..
                             #sudo rm -rf GroundSeg_*
                         '''
-                        stash includes: '/tmp/groundseg/groundseg', name: 'groundseg_arm64'
+                        stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                     }
                 }
                 /* workspace has to be cleaned or build will fail next time */
