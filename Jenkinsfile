@@ -136,10 +136,17 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                dockerhash = sh(
+                webui_amd64_hash = sh(
                     script: '''#!/bin/bash -x
-                        obj=`curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" | jq -r '.digest'`
-                        echo $obj|sed 's/sha256://g'
+                    curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" \
+                    |jq -r '.images[]|select(.architecture=="amd64").digest'|sed 's/sha256://g'
+                    ''',
+                    returnStdout: true
+                ).trim()
+                webui_arm64_hash = sh(
+                    script: '''#!/bin/bash -x
+                    curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" \
+                    |jq -r '.images[]|select(.architecture=="arm64").digest'|sed 's/sha256://g'
                     ''',
                     returnStdout: true
                 ).trim()
@@ -196,7 +203,9 @@ pipeline {
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/webui/sha256/${dockerhash}
+                                https://version.groundseg.app/modify/groundseg/latest/webui/amd64_sha256/${webui_amd64_hash}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/latest/webui/arm64_sha256/${webui_arm64_hash}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/major/${major}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
@@ -218,7 +227,9 @@ pipeline {
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://version.groundseg.app/modify/groundseg/edge/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/webui/sha256/${dockerhash}
+                                https://version.groundseg.app/modify/groundseg/edge/webui/amd64_sha256/${webui_amd64_hash}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/edge/webui/arm64_sha256/${webui_arm64_hash}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://version.groundseg.app/modify/groundseg/edge/groundseg/major/${major}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
