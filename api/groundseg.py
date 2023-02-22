@@ -24,8 +24,7 @@ sys_config = Config(base_path, dev)
 Thread(target=Utils.get_version_info, args=(sys_config, sys_config.debug_mode), daemon=True).start()
 
 # Check C2C
-#if sys_config.device_mode == "c2c":
-if True:
+if sys_config.device_mode == "c2c":
     # start c2c kill switch
     print("c2c mode")
 
