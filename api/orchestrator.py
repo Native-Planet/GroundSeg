@@ -2,6 +2,8 @@
 # GroundSeg modules
 from log import Log
 from wireguard import Wireguard
+from urbit import Urbit
+from webui import WebUI
 
 class Orchestrator:
 
@@ -12,9 +14,13 @@ class Orchestrator:
         self.config = config.config
 
         self.wireguard = Wireguard(config)
+        self.urbit = Urbit(config)
         #self.minio
-        #self.urbit
-        #self.webui
+        self.webui = WebUI(config)
 
         self.config_object.gs_ready = True
-        Log.log("Initialization completed")
+        Log.log("GroundSeg: Initialization completed")
+
+    # List of Urbit Ships in Home Page
+    def get_urbits(self):
+        return self.urbit.list_ships()

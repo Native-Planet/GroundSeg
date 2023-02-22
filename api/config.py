@@ -3,6 +3,7 @@ import os
 import ssl
 import json
 import base64
+import platform
 from time import sleep
 
 # Modules
@@ -22,9 +23,16 @@ class Config:
     _cpu = None
     _core_temp = None
     _disk = None
+    _arch = ""
 
     # Current version
     version = "v1.1.0"
+
+    # Debug mode
+    debug_mode = False
+
+    # Base path
+    base_path = ""
 
     # system.json location
     config_file = None
@@ -55,25 +63,34 @@ class Config:
             "updateMode": "auto",
             "sessions": [],
             "pwHash": "",
-            "webuiPort": "80", #str
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
-            "c2cInterval": 0 #int
+            "c2cInterval": 0
             }
 
 
-    def __init__(self, base_path):
+    def __init__(self, base_path, debug_mode=False):
+        self.debug_mode = debug_mode
+        # Announce
+        if self.debug_mode:
+            Log.log("---------- Starting GroundSeg in debug mode ----------")
+        else:
+            Log.log("----------------- Starting GroundSeg -----------------")
+            Log.log("------------------ Urbit is love <3 ------------------")
+
+        # Get architecture
+        self._arch = self.get_arch()
+
         # store config file location
         self.base_path = base_path
         self.config_file = f"{self.base_path}/settings/system.json"
 
         # load existing or create new system.json
         self.config = self.load_config(self.config_file)
-        Log.log("Loaded system JSON")
 
         # if first boot, set up keys
         if self.config['firstBoot']:
-            Log.log("GroundSeg is in setup mode")
+            Log.log("Config: First Boot detected! GroundSeg is in setup mode")
             self.reset_pubkey()
 
         # Save latest config to system.json
@@ -94,8 +111,8 @@ class Config:
             with open(config_file) as f:
                 cfg = json.load(f)
         except Exception as e:
-            Log.log(f"Failed to open system.json: {e}")
-            Log.log("New system.json will be created")
+            Log.log(f"Config: Failed to open system.json: {e}")
+            Log.log("Config: New system.json will be created")
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base_path
@@ -106,10 +123,10 @@ class Config:
 
         try:
             bin_hash = Hash.make_hash(f"{self.base_path}/groundseg")
-            Log.log(f"Binary hash: {bin_hash}")
+            Log.log(f"Config: Binary hash: {bin_hash}")
         except Exception as e:
             print(e)
-            Log.log("No binary detected!")
+            Log.log("Config: No binary detected!")
 
         cfg['binHash'] = bin_hash
 
@@ -122,6 +139,8 @@ class Config:
         if 'autostart' in cfg:
             cfg.pop('autostart')
         
+        Log.log("Config: Loaded system.json")
+
         return cfg
 
 
@@ -131,52 +150,72 @@ class Config:
             min_allowed = 3600
             if not 'updateInterval' in cfg:
                 cfg['updateInterval'] = min_allowed
-                Log.log(f"updateInterval doesn't exist! Creating with default value: {min_allowed}")
+                Log.log(f"Config: updateInterval doesn't exist! Creating with default value: {min_allowed}")
+
             elif cfg['updateInterval'] < min_allowed:
                 cfg['updateInterval'] = min_allowed
-                Log.log(f"updateInterval is set below allowed minimum! Setting to: {min_allowed}")
+                Log.log(f"Config: updateInterval is set below allowed minimum! Setting to: {min_allowed}")
         else:
-            cfg = self.check_config_field(cfg, 'updateInterval', 90)
+            cfg['updateInterval'] = 90
 
         return cfg
 
     # Reset Public and Private Keys
     def reset_pubkey(self):
-        x = WgKey()
+        Log.log("Config: Resetting public key")
+        try:
+            x = WgKey()
 
-        b64pub = x.pubkey + '\n' 
-        b64pub = b64pub.encode('utf-8')
-        b64pub = base64.b64encode(b64pub).decode('utf-8')
+            b64pub = x.pubkey + '\n' 
+            b64pub = b64pub.encode('utf-8')
+            b64pub = base64.b64encode(b64pub).decode('utf-8')
 
-        # Load priv and pub key
-        self.config['pubkey'] = b64pub
-        self.config['privkey'] = x.privkey
+            # Load priv and pub key
+            self.config['pubkey'] = b64pub
+            self.config['privkey'] = x.privkey
+        except Exception as e:
+            Log.log(f"Config: {e}")
 
 
     def set_device_mode(self):
+        Log.log("Config: Setting device mode")
         self.check_mode_file()
         internet = Utils.check_internet_access()
         if self.device_mode == "npbox":
             if not internet:
-                Log.log("No internet access, starting Connect to Connect mode")
+                Log.log("Config: No internet access, starting Connect to Connect mode")
                 self.device_mode == "c2c"
         else:
             while not internet:
-                Log.log("No internet access, checking again in 15 seconds")
+                Log.log("Config: No internet access, checking again in 15 seconds")
                 sleep(15)
                 internet = Utils.check_internet_access()
 
 
     def check_mode_file(self):
         if os.path.isfile(f"{self.base_path}/vm") or 'WSL_DISTRO_NAME' in os.environ:
-            Log.log("VM mode detected. Enabling limited features")
+            Log.log("Config: VM mode detected. Enabling limited features")
             self.device_mode = "vm"
 
         if os.path.isfile(f"{self.base_path}/nativeplanet"):
-            Log.log("NP box detected. Enabling NP box features")
+            Log.log("Config: NP box detected. Enabling NP box features")
             self.device_mode = "npbox"
+
+
+    # Get system architecture
+    def get_arch(self):
+        arch = "arm64"
+        try:
+            if platform.machine() == 'x86_64':
+                arch = "amd64"
+        except:
+            Log.log("Updater: Unable to get architecture. Defaulting to arm64")
+
+        return arch
+
 
 
     def save_config(self):
         with open(self.config_file, 'w') as f:
+            Log.log("Config: Saving system.json")
             json.dump(self.config, f, indent = 4)

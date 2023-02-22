@@ -1,6 +1,5 @@
 import os
 import requests
-import platform
 
 from time import sleep
 
@@ -15,7 +14,6 @@ class BinUpdater:
             cur_hash = config.config['binHash']
             branch = config.config['updateBranch']
             mode = config.config['updateMode']
-            arch = self.get_arch()
 
             if mode == 'auto':
                 # Remove prior failed download
@@ -30,16 +28,16 @@ class BinUpdater:
                     ver = f"{ver}-edge"
 
                 # Show versions
-                Log.log(f"Current: {config.config['gsVersion']} | Latest: {ver}")
+                Log.log(f"Updater: Current {config.config['gsVersion']} | Latest {ver}")
 
                 # Download new version
-                if cur_hash == d[f'{arch}_sha256']:
-                    Log.log("No binary update required")
+                if cur_hash == d[f'{config._arch}_sha256']:
+                    Log.log("Updater: No binary update required")
                 else:
-                    Log.log(f"Downloading new groundseg binary")
+                    Log.log(f"Updater: Downloading new groundseg binary")
 
                     # Stream chunks and write to file
-                    dl = d[f"{arch}_url"]
+                    dl = d[f"{config._arch}_url"]
                     r = requests.get(dl)
                     f = open(f"{config.base_path}/groundseg_new", 'wb')
                     for chunk in r.iter_content(chunk_size=512 * 1024):
@@ -48,16 +46,16 @@ class BinUpdater:
                     f.close()
 
                     # Remove old binary
-                    Log.log("Removing old groundseg binary")
+                    Log.log("Updater: Removing old groundseg binary")
                     self.remove_file(f"{config.base_path}/groundseg")
 
                     # Rename new binary
-                    Log.log("Renaming new groundseg binary")
+                    Log.log("Updater: Renaming new groundseg binary")
                     self.rename_file(f"{config.base_path}/groundseg_new",
                                      f"{config.base_path}/groundseg")
 
                     # Make binary executable
-                    Log.log("Setting launch permissions for new binary")
+                    Log.log("Updater: Setting launch permissions for new binary")
                     os.system(f"chmod +x {config.base_path}/groundseg")
 
                     # Pause
@@ -65,25 +63,14 @@ class BinUpdater:
 
                     # Restart GroundSeg
                     if debug_mode:
-                        Log.log("Debug mode: Skipping restart")
+                        Log.log("Updater: Debug mode: Skipping restart")
                     else:
-                        Log.log("Restarting groundseg...")
+                        Log.log("Updater: Restarting groundseg...")
                         os.system("systemctl restart groundseg")
 
         except Exception as e:
-            Log.log(f"Binary updater failed: {e}")
+            Log.log(f"Updater: Binary updater failed: {e}")
 
-
-    # Get system architecture
-    def get_arch(self):
-        arch = "arm64"
-        try:
-            if platform.machine() == 'x86_64':
-                arch = "amd64"
-        except:
-            Log.log("Unable to get architecture. Defaulting to arm64")
-
-        return arch
 
     # Remove file
     def remove_file(self, file):

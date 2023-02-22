@@ -18,7 +18,7 @@ class Wireguard:
     default_config = { 
                       "wireguard_name": "wireguard",
                       "wireguard_version": "latest",
-                      "volume": "/var/lib/docker/volumes",
+                      "volume_dir": "/var/lib/docker/volumes",
                       "image": "linuxserver/wireguard",
                       "cap_add": ["NET_ADMIN","SYS_MODULE"],
                       "volumes": ["/lib/modules:/lib/modules"],
@@ -31,15 +31,7 @@ class Wireguard:
         self.filename = f"{self.config_object.base_path}/settings/wireguard.json"
         self.wg_docker = WireguardDocker()
 
-        # Populate config
-        try:
-            with open(self.filename) as f:
-                self.data = json.load(f)
-                Log.log("Successfully loaded wireguard.json")
-
-        except Exception as e:
-            Log.log(f"Failed to open wireguard.json: {e}")
-            Log.log("New wireguard.json will be created")
+        self.load_config()
 
         # Check if updater information is ready
         branch = self.config['updateBranch']
@@ -49,7 +41,7 @@ class Wireguard:
             if count >= 30:
                 break
 
-            Log.log("Updater information not yet ready. Checking in 3 seconds")
+            Log.log("Wireguard: Updater information not yet ready. Checking in 3 seconds")
             sleep(3)
 
         # Updater Wireguard information
@@ -63,13 +55,22 @@ class Wireguard:
 
         # TODO: if wgOn and wgRegistered
         if self.start():
-            Log.log("Wireguard: Successfully started container")
-        else:
-            Log.log("Wireguard: Failed to start container")
+            Log.log("Wireguard: Initialization Completed")
+
+    # Load wireguard.json
+    def load_config(self):
+        try:
+            with open(self.filename) as f:
+                self.data = json.load(f)
+                Log.log("Wireguard: Successfully loaded wireguard.json")
+
+        except Exception as e:
+            Log.log(f"Wireguard: Failed to open wireguard.json: {e}")
+            Log.log("Wireguard: New wireguard.json will be created")
 
     # Save wireguard.json
     def save_config(self):
-        with open(self.filename,'w') as f :
+        with open(self.filename,'w') as f:
             json.dump(self.data, f, indent=4)
             f.close()
 
@@ -81,11 +82,23 @@ class Wireguard:
 
     # Start container
     def start(self):
-        return self.wg_docker.start(self.data,self.updater_info)
+        return self.wg_docker.start(self.data, self.updater_info, self.config_object._arch)
 
     # Stop container
-    #def stop(self):
-    #    self.wg_docker.stop()
+    def stop(self):
+        return self.wg_docker.stop(self.data)
+
+    # Remove container and volume
+    def remove(self):
+        return self.wg_docker.remove_wireguard(self.data['wireguard_name'])
+
+    # Is container running
+    def is_running(self):
+        return self.wg_docker.is_running(self.data['wireguard_name'])
+
+    # Container logs
+    def logs(self):
+        return self.wg_docker.logs(self.data['wireguard_name'])
 
 
 #
@@ -126,7 +139,7 @@ class Wireguard:
         try:
             self.wg_config = base64.b64decode(conf).decode('utf-8')
             self.wg_config = self.wg_config.replace('privkey', self.config['privkey'])
-            self.wg_docker.add_config(self.wg_config)
+            self.wg_docker.add_config(self.data, self.wg_config)
 
         except Exception as e:
             print(f"wg_config err: {e}", file=sys.stderr)
@@ -199,5 +212,3 @@ class Wireguard:
             print(f'err: {e}', file=sys.stderr)
             return 400
 
-    def is_running(self):
-        return self.wg_docker.is_running()

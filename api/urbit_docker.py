@@ -1,4 +1,4 @@
-import docker
+'''
 import json
 import shutil
 import threading
@@ -10,8 +10,13 @@ import subprocess
 from datetime import datetime
 from minio_docker import MinIODocker
 from utils import Log
+'''
+import docker
+
+from utils import Utils
 
 client = docker.from_env()
+
 default_pier_config = {
         "pier_name":"",
         "http_port":8080,
@@ -38,7 +43,60 @@ default_pier_config = {
 class UrbitDocker:
     _volume_directory = '/var/lib/docker/volumes'
 
-    def __init__(self,pier_config):
+    def start(self, patp, updater_info, loc):
+        Log.log(f"{patp}: Attempting to start container")
+
+        # Check if patp is valid
+        if not Utils.check_patp(patp):
+            Log.log(f"{patp}: Invalid patp")
+            return "invalid"
+
+        # Check config
+        cfg = self._load_config(loc, patp)
+        if not cfg:
+            return "failed"
+        if cfg['boot_status'] != "boot":
+            return "ignored"
+        
+        # Get container
+        c = self.get_container(patp)
+        if not c:
+            return "failed"
+
+        # Get status
+        if c.status == "running":
+            Log.log(f"{patp}: Container already started")
+            return "succeeded"
+
+        # Start ship container
+        try:
+            c.start()
+            Log.log(f"{patp}: Successfully started container")
+            return "succeeded"
+        except:
+            Log.log(f"{patp}: Failed to start container")
+            return "failed"
+
+    def get_container(self, patp):
+        try:
+            c = client.containers.get(patp)
+            Log.log(f"{patp}: Container found")
+            return c
+        except:
+            Log.log(f"{patp}: Container not found")
+            return False
+
+    def _load_config(self, loc, patp):
+        try:
+            with open(loc) as f:
+                return json.load(f)
+        except Exception as e:
+            Log.log(f"{patp}: Failed to load config: {e}")
+            return False
+
+
+    '''
+    def __init__(self):
         self.start_script()
         self.config = pier_config
         self.docker_image = f'nativeplanet/urbit:{self.config["urbit_version"]}'
@@ -455,3 +513,4 @@ dirname=''${dirnames[0]}
 
 exec vere $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
 """
+'''
