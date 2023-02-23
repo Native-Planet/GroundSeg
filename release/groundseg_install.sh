@@ -7,7 +7,7 @@ sudo firewall-cmd --reload
 # Location of scripts
 ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=main
+BRANCH=master
 TAG=v1.0.8
 DEVICE_ARCH=$(uname -m)
 
@@ -21,10 +21,10 @@ sudo systemctl stop groundseg
 # Download GroundSeg binary
 if [[ $DEVICE_ARCH == "aarch64" ]]; then
 sudo wget -O $SAVE_DIR/groundseg \
-  https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg_arm64
+  https://bin.infra.native.computer/groundseg_arm64_${tag}
 elif [[ $DEVICE_ARCH == "x86_64" ]]; then
 sudo wget -O $SAVE_DIR/groundseg \
-  https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
+  https://bin.infra.native.computer/groundseg_amd64_${tag}
 fi
 
 sudo chmod +x $SAVE_DIR/groundseg

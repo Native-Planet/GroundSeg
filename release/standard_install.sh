@@ -3,7 +3,7 @@
 # Location of scripts
 ACC=Native-Planet
 REPO=GroundSeg
-BRANCH=main
+BRANCH=master
 
 DIST="$(. /etc/os-release && echo "$ID")"
 
