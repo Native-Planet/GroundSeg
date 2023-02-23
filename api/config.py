@@ -3,7 +3,11 @@ import os
 import ssl
 import json
 import base64
+import string
+import secrets
+import hashlib
 import platform
+
 from time import sleep
 
 # Modules
@@ -12,7 +16,6 @@ from pywgkey.key import WgKey
 # GroundSeg Modules
 from log import Log
 from utils import Utils
-from hasher import Hash
 
 class Config:
 
@@ -34,9 +37,6 @@ class Config:
     # Base path
     base_path = ""
 
-    # system.json location
-    config_file = None
-
     # payload received from version server
     update_payload = {}
 
@@ -48,6 +48,9 @@ class Config:
 
     # which mode is GroundSeg running
     device_mode = "standard"
+
+    # system.json location
+    config_file = None
 
     # system.json contents
     config = {}
@@ -122,7 +125,7 @@ class Config:
         bin_hash = '000'
 
         try:
-            bin_hash = Hash.make_hash(f"{self.base_path}/groundseg")
+            bin_hash = Utils.make_hash(f"{self.base_path}/groundseg")
             Log.log(f"Config: Binary hash: {bin_hash}")
         except Exception as e:
             print(e)
@@ -176,6 +179,41 @@ class Config:
         except Exception as e:
             Log.log(f"Config: {e}")
 
+    
+    def change_password(self, data):
+        encoded_str = (self.config['salt'] + data['old-pass']).encode('utf-8')
+        this_hash = hashlib.sha512(encoded_str).hexdigest()
+
+        Log.log("Config: Attempting to change password")
+
+        if this_hash == self.config['pwHash']:
+            if self.create_password(data['new-pass']):
+                return True
+
+    def create_password(self, pwd):
+        Log.log("Config: Attempting to create password")
+        try:
+            # create salt
+            salt = ''.join(secrets.choice(
+                string.ascii_uppercase +
+                string.ascii_lowercase +
+                string.digits) for i in range(16))
+
+            # make hash
+            encoded_str = (salt + pwd).encode('utf-8')
+            hashed = hashlib.sha512(encoded_str).hexdigest()
+
+            # add to config
+            self.config['salt'] = salt
+            self.config['pwHash'] = hashed
+            self.save_config()
+            Log.log("Config: Password set!")
+        except Exception as e:
+            Log.log("Config: Create password failed: {e}")
+            return False
+
+        return True
+
 
     def set_device_mode(self):
         Log.log("Config: Setting device mode")
@@ -214,7 +252,7 @@ class Config:
         return arch
 
 
-
+    # Save config
     def save_config(self):
         with open(self.config_file, 'w') as f:
             Log.log("Config: Saving system.json")

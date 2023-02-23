@@ -1,21 +1,27 @@
 # Python
 import ssl
-import urllib.request
+import hashlib
 import requests
+import urllib.request
 from time import sleep
+
+# Modules
+import nmcli
 
 # GroundSeg modules
 from log import Log
 from binary_updater import BinUpdater
 
-#import sys
-#import os
-#import nmcli
-#import docker
-
-#from datetime import datetime
-
 class Utils:
+    def make_hash(file):
+        h  = hashlib.sha256()
+        b  = bytearray(128*1024)
+        mv = memoryview(b)
+        with open(file, 'rb', buffering=0) as f:
+            while n := f.readinto(mv):
+                h.update(mv[:n])
+        return h.hexdigest()
+
     def check_patp(patp):
         print(f"patp ({patp})")
 
@@ -61,7 +67,7 @@ class Utils:
             return True
 
         except Exception as e:
-            Log.log("Updater: Check internet access error: {e}")
+            Log.log(f"Updater: Check internet access error: {e}")
             return False
 
     def get_version_info(config, debug_mode):
@@ -95,6 +101,17 @@ class Utils:
                 Log.log(f"Updater: Unable to retrieve update information: {e}")
                 sleep(60)
 
+    def list_wifi_ssids():
+        return [x.ssid for x in nmcli.device.wifi() if len(x.ssid) > 0]
+
+    def wifi_connect(ssid, pwd):
+        try:
+            nmcli.device.wifi_connect(ssid, pwd)
+            Log.log(f"WiFi: Connected to: {ssid}")
+            return True
+        except Exception as e:
+            Log.log(f"WiFi: Failed to connect to network: {e}")
+            return False
 
     '''
     def remove_urbit_containers():
@@ -125,15 +142,4 @@ class Utils:
         return count == 0
 
 
-class Network:
-
-    def list_wifi_ssids():
-        return [x.ssid for x in nmcli.device.wifi() if len(x.ssid) > 0]
-
-    def wifi_connect(ssid, pwd):
-        try:
-            nmcli.device.wifi_connect(ssid, pwd)
-            return "success"
-        except Exception as e:
-            return f"failed: {e}"
 '''
