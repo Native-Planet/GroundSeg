@@ -1,49 +1,15 @@
-'''
-import json
-import shutil
-import threading
-import time
-import os
-import sys
-import subprocess
-
-from datetime import datetime
-from minio_docker import MinIODocker
-from utils import Log
-'''
+# Modules
 import docker
 
+# GroundSeg modules
 from utils import Utils
+from log import Log
 
 client = docker.from_env()
 
-default_pier_config = {
-        "pier_name":"",
-        "http_port":8080,
-        "ames_port":34343,
-        "loom_size":31,
-        "urbit_version":"latest",
-        "minio_version":"latest",
-        "minio_password": "",
-        "network":"none",
-        "wg_url": "nan",
-        "wg_http_port": None,
-        "wg_ames_port": None,
-        "wg_s3_port": None,
-        "wg_console_port": None,
-        "meld_schedule": False,
-        "meld_frequency": 7,
-        "meld_time": "0000",
-        "meld_last": "0",
-        "meld_next": "0",
-        "boot_status": "boot"
-        }
-
-
 class UrbitDocker:
-    _volume_directory = '/var/lib/docker/volumes'
 
-    def start(self, patp, updater_info, loc):
+    def start(self, patp, updater_info):
         Log.log(f"{patp}: Attempting to start container")
 
         # Check if patp is valid
@@ -51,13 +17,6 @@ class UrbitDocker:
             Log.log(f"{patp}: Invalid patp")
             return "invalid"
 
-        # Check config
-        cfg = self._load_config(loc, patp)
-        if not cfg:
-            return "failed"
-        if cfg['boot_status'] != "boot":
-            return "ignored"
-        
         # Get container
         c = self.get_container(patp)
         if not c:
@@ -86,12 +45,116 @@ class UrbitDocker:
             Log.log(f"{patp}: Container not found")
             return False
 
-    def _load_config(self, loc, patp):
+    def create(self, config, updater_info, key, arch, vol_dir):
+        patp = config['pier_name']
+        tag = config['urbit_version']
+        if tag == "latest" or tag == "edge":
+            sha = f"{arch}_sha256"
+            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+        else:
+            image = f"{updater_info['repo']}:{updater_info['tag']}"
+
+        Log.log(f"{patp}: Attempting to create container")
+
+        if self._pull_image(image, patp):
+            v = self._build_volume(patp, vol_dir)
+            if v:
+                Log.log(f"{patp}: Creating Mount object")
+                mount = docker.types.Mount(target = '/urbit/', source=patp)
+                if self._build_container(patp, image, mount, config):
+                    return self.add_key(key,patp, vol_dir)
+
+    def add_key(self, key, patp, vol_dir):
+        Log.log("{patp}: Attempting to add key")
         try:
-            with open(loc) as f:
-                return json.load(f)
+            with open(f'{vol_dir}/{patp}/_data/{patp}.key', 'w') as f:
+                f.write(key)
+                f.close()
+            return True
         except Exception as e:
-            Log.log(f"{patp}: Failed to load config: {e}")
+            Log.log(f"{patp}: Failed to add key: {e}")
+
+        return False
+
+    def _pull_image(self, image, patp):
+        try:
+            Log.log(f"{patp}: Pulling {image}")
+            client.images.pull(image)
+            return True
+        except Exception as e:
+            Log.log(f"{patp}: Failed to pull {image}: {e}")
+            return False
+
+    def _get_volume(self, patp):
+        try:
+            v = client.volumes.get(patp)
+            Log.log(f"{patp}: Volume found")
+            return v
+        except:
+            Log.log(f"{patp}: Volume not found")
+            return False
+
+
+    def _build_volume(self, patp, vol_dir):
+        v = self._get_volume(patp)
+        if v:
+            return v
+        else:
+            try:
+                Log.log(f"{patp}: Attempting to create new volume")
+                v = client.volumes.create(name=patp)
+                with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
+                    script = Utils.start_script()
+                    f.write(script)
+                    f.close()
+                Log.log(f"{patp}: Volume created")
+                return v
+
+            except Exception as e:
+                Log.log(f"{patp}: Failed to create volume: {e}")
+                return False
+
+
+    def _build_container(self, patp, image, mount, config):
+        try:
+            Log.log(f"{patp}: Building container")
+            command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]}'
+
+            if config["network"] != "none":
+                Log.log("{patp}: Network is set to wireguard")
+                http = f"--http-port={config['wg_http_port']}"
+                ames = f"--port={config['wg_ames_port']}"
+                command = f"{command} {http} {ames}"
+
+                c = client.containers.create(
+                        image = image,
+                        command = command, 
+                        name = patp,
+                        network = f'container:{config["network"]}',
+                        mounts = [mount],
+                        detach=True)
+            else:
+                Log.log(f"{patp}: Network is set to local")
+
+                c = client.containers.create(
+                        image = image,
+                        command = command, 
+                        name = patp,
+                        ports = {
+                            '80/tcp':config['http_port'],
+                            '34343/udp':config['ames_port']
+                            },
+                        mounts = [mount],
+                        detach=True)
+
+            if c:
+                Log.log(f"{patp}: Successfully built container")
+                return True
+            else:
+                raise Exception("Container wasn't created")
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to build container: {e}")
             return False
 
 
@@ -107,71 +170,11 @@ class UrbitDocker:
 
         self.save_config()
 
-    def build_urbit(self):
-        self.build_volume()
-        self.mount = docker.types.Mount(target = '/urbit/', source =self.pier_name)
-        self.build_container()
     
     def remove_urbit(self):
         self.stop()
         self.container.remove()
         self.volume.remove()
-
-    def build_volume(self):
-        volumes = client.volumes.list()
-        for v in volumes:
-            if self.pier_name == v.name:
-                self.volume = v
-                with open(f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh', 'w') as f:
-                    f.write(self.start_script)
-                    f.close()
-                return
-
-        self.volume = client.volumes.create(name=self.pier_name)
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/start_urbit.sh', 'w') as f:
-            f.write(self.start_script)
-            f.close()
-
-    def build_container(self):
-        containers = client.containers.list(all=True)
-        running = False
-
-        for c in containers:
-            if self.pier_name == c.name:
-                self.container = c
-                self.running = (c.attrs['State']['Status'] == 'running')
-                c.stop()
-                c.remove()
-        
-                if self.running:
-                    running = True
-
-        if self.config["network"] != "none":
-            command = f'bash /urbit/start_urbit.sh --http-port={self.config["wg_http_port"]} \
-                                          --port={self.config["wg_ames_port"]} \
-                                          --loom={self.config["loom_size"]}'
-
-            self.container = client.containers.create(
-                                    self.docker_image,
-                                    command = command, 
-                                    name = self.pier_name,
-                                    network = f'container:{self.config["network"]}',
-                                    mounts = [self.mount],
-                                    detach=True)
-
-        else:
-            command = f'bash /urbit/start_urbit.sh --loom={self.config["loom_size"]}'
-            self.container = client.containers.create(
-                                    self.docker_image,
-                                    command = command, 
-                                    ports = {'80/tcp':self.config['http_port'], 
-                                             '34343/udp':self.config['ames_port']},
-                                    name = self.pier_name,
-                                    mounts = [self.mount],
-                                    detach = True)
-
-        if running:
-            self.start()
 
 
     def set_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
@@ -445,72 +448,4 @@ class UrbitDocker:
     def is_running(self):
         return self.running
 
-    def start_script(self):
-        self.start_script = """\
-#!/bin/bash
-
-set -eu
-# set defaults
-amesPort="34343"
-httpPort="80"
-loom="31"
-
-# check args
-for i in "$@"
-do
-case $i in
-  -p=*|--port=*)
-      amesPort="${i#*=}"
-      shift
-      ;;
-   --http-port=*)
-      httpPort="${i#*=}"
-      shift
-      ;;
-   --loom=*)
-      loom="${i#*=}"
-      shift
-      ;;
-esac
-done
-
-# If the container is not started with the `-i` flag
-# then STDIN will be closed and we need to start
-# Urbit/vere with the `-t` flag.
-ttyflag=""
-if [ ! -t 0 ]; then
-echo "Running with no STDIN"
-ttyflag="-t"
-fi
-
-# Check if there is a keyfile, if so boot a ship with its name, and then remove the key
-if [ -e *.key ]; then
-# Get the name of the key
-keynames="*.key"
-keys=( $keynames )
-keyname=''${keys[0]}
-mv $keyname /tmp
-
-# Boot urbit with the key, exit when done booting
-vere $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
-
-# Remove the keyfile for security
-rm /tmp/$keyname
-rm *.key || true
-elif [ -e *.comet ]; then
-cometnames="*.comet"
-comets=( $cometnames )
-cometname=''${comets[0]}
-rm *.comet
-
-vere $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
-fi
-
-# Find the first directory and start urbit with the ship therein
-dirnames="*/"
-dirs=( $dirnames )
-dirname=''${dirnames[0]}
-
-exec vere $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
-"""
 '''

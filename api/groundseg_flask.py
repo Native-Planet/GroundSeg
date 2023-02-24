@@ -41,7 +41,25 @@ class GroundSeg:
             return message
 
         # Handle urbit ID related requests
-        #@self.app.route('/urbit', methods=['GET','POST'])
+        @self.app.route('/urbit', methods=['GET','POST'])
+        def urbit_info():
+            approved, message = self.verify(request)
+
+            if approved:
+                urbit_id = request.args.get('urbit_id')
+                if request.method == 'GET':
+                    return jsonify(400) # temp
+                '''
+                    urb = orchestrator.get_urbit(urbit_id)
+                    return jsonify(urb)
+                '''
+
+                if request.method == 'POST':
+                    blob = request.get_json()
+                    res = self.orchestrator.urbit_post(urbit_id, blob)
+                    return self.custom_jsonify(res)
+
+            return message
 
 
         # Handle device's system settings
@@ -120,6 +138,14 @@ class GroundSeg:
 
         # No session ID provided
         return (False, jsonify(404))
+
+    # Custom jsonify
+    def custom_jsonify(self, val):
+        if type(val) is int:
+            return jsonify(val)
+        if type(val) is str:
+            return jsonify(val)
+        return val
 
     # Run Flask app
     def run(self):

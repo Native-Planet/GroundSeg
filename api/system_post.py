@@ -6,6 +6,7 @@ import nmcli
 
 # GroundSeg modules
 from utils import Utils
+from log import Log
 
 class SysPost:
     def handle_session(data, config, sid):
@@ -78,3 +79,20 @@ class SysPost:
                 return 200
 
         return 400
+
+    def handle_updater(data, config):
+        if data['action'] == 'toggle':
+            try:
+                mode = config.config['updateMode']
+                if mode == 'auto':
+                    config.config['updateMode'] = 'off'
+                else:
+                    config.config['updateMode'] = 'auto'
+                Log.log(f"Updater: Update mode changed. {mode} -> {config.config['updateMode']}")
+                config.save_config()
+                return 200
+            except Exception as e:
+                Log.log(f"Updater: Failed to change Update mode: {e}")
+
+            return 400
+
