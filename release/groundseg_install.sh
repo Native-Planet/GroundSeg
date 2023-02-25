@@ -21,10 +21,10 @@ sudo systemctl stop groundseg
 # Download GroundSeg binary
 if [[ $DEVICE_ARCH == "aarch64" ]]; then
 sudo wget -O $SAVE_DIR/groundseg \
-  https://bin.infra.native.computer/groundseg_arm64_${tag}
+  https://bin.infra.native.computer/groundseg_arm64_${TAG}
 elif [[ $DEVICE_ARCH == "x86_64" ]]; then
 sudo wget -O $SAVE_DIR/groundseg \
-  https://bin.infra.native.computer/groundseg_amd64_${tag}
+  https://bin.infra.native.computer/groundseg_amd64_${TAG}
 fi
 
 sudo chmod +x $SAVE_DIR/groundseg
