@@ -54,7 +54,7 @@ pipeline {
                 script {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
-                            git checkout ${params.RELEASE_TAG}
+                            git checkout ${tag}
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
@@ -86,7 +86,7 @@ pipeline {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
                             script:"""
-                            git checkout ${params.RELEASE_TAG}
+                            git checkout ${tag}
                             echo "debug: building arm64"
                             cd build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
