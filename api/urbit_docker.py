@@ -36,16 +36,29 @@ class UrbitDocker:
             Log.log(f"{patp}: Failed to start container")
             return "failed"
 
+    def stop(self, patp):
+        Log.log(f"{patp}: Attempting to stop container")
+        c = self.get_container(patp)
+        if c:
+            try:
+                c.stop()
+            except Exception as e:
+                Log.log(f"{patp}: Failed to stop container")
+                return False
+
+        Log.log(f"{patp}: Container stopped")
+        return True
+
     def get_container(self, patp):
         try:
             c = client.containers.get(patp)
-            Log.log(f"{patp}: Container found")
             return c
         except:
             Log.log(f"{patp}: Container not found")
             return False
 
-    def create(self, config, updater_info, key, arch, vol_dir):
+
+    def create(self, config, updater_info, arch, vol_dir, key=''):
         patp = config['pier_name']
         tag = config['urbit_version']
         if tag == "latest" or tag == "edge":
@@ -62,17 +75,68 @@ class UrbitDocker:
                 Log.log(f"{patp}: Creating Mount object")
                 mount = docker.types.Mount(target = '/urbit/', source=patp)
                 if self._build_container(patp, image, mount, config):
-                    return self.add_key(key,patp, vol_dir)
+                    return self.add_key(key, patp, vol_dir)
 
-    def add_key(self, key, patp, vol_dir):
-        Log.log("{patp}: Attempting to add key")
+    def delete(self, patp):
+        if self.delete_container(patp):
+            return self.delete_volume(patp)
+
+    def delete_container(self, patp):
+        Log.log("{patp}: Attempting to delete container")
+        c = self.get_container(patp)
+        if not c:
+            return True
         try:
-            with open(f'{vol_dir}/{patp}/_data/{patp}.key', 'w') as f:
-                f.write(key)
-                f.close()
+            c.remove(force=True)
+            Log.log("{patp}: Container deleted")
             return True
         except Exception as e:
-            Log.log(f"{patp}: Failed to add key: {e}")
+            Log.log(f"{patp}: Failed to delete container: {e}")
+
+        return False
+
+    def delete_volume(self, patp):
+        Log.log(f"{patp}: Attempting to delete volume")
+        v = self._get_volume(patp)
+        if not v:
+            return True
+        try:
+            v.remove(force=True)
+            Log.log(f"{patp}: Volume deleted")
+            return True
+        except Exception as e:
+            Log.log(f"{patp}: Error removing volume: {e}")
+
+        return False
+
+    def add_key(self, key, patp, vol_dir):
+        if len(key) > 0:
+            Log.log("{patp}: Attempting to add key")
+            try:
+                with open(f'{vol_dir}/{patp}/_data/{patp}.key', 'w') as f:
+                    f.write(key)
+                    f.close()
+                return True
+            except Exception as e:
+                Log.log(f"{patp}: Failed to add key: {e}")
+
+            return False
+        return True
+
+    def full_logs(self, patp):
+        c = self.get_container(patp)
+        if not c:
+            return False
+        return c.logs()
+
+    def exec(self, patp, command):
+        c = self.get_container(patp)
+        if c:
+            try:
+                res = c.exec_run(command)
+                return res
+            except Exception as e:
+                Log.log(f"{patp}: Unable to exec {command}: {e}")
 
         return False
 
@@ -159,18 +223,6 @@ class UrbitDocker:
 
 
     '''
-    def __init__(self):
-        self.start_script()
-        self.config = pier_config
-        self.docker_image = f'nativeplanet/urbit:{self.config["urbit_version"]}'
-        client.images.pull(self.docker_image)
-        self.pier_name = self.config['pier_name']
-        self.build_urbit()
-        self.running = (self.container.attrs['State']['Status'] == 'running')
-
-        self.save_config()
-
-    
     def remove_urbit(self):
         self.stop()
         self.container.remove()
@@ -262,23 +314,6 @@ class UrbitDocker:
 
         return 0
 
-    def set_loom_size(self, size):
-        running = False
-
-        if self.running:
-            self.stop()
-            running = True
-        
-        self.container.remove()
-        self.config['loom_size'] = size
-        self.save_config()
-
-        self.build_container()
-
-        if running:
-            self.start()
-
-        return 200
 
     def toggle_meld_status(self, loopbackAddr):
         self.config['meld_schedule'] = not self.config['meld_schedule']
@@ -293,13 +328,6 @@ class UrbitDocker:
         
         return 200
 
-    def save_config(self):
-        with open(f'/opt/nativeplanet/groundseg/settings/pier/{self.pier_name}.json', 'w') as f:
-            json.dump(self.config, f, indent = 4)
-
-    def add_key(self, key_value):
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/{self.pier_name}.key', 'w') as f:
-            f.write(key_value)
 
     def send_meld(self, lens_addr):
         pack_data = dict()
@@ -383,26 +411,6 @@ class UrbitDocker:
 
         return 200
 
-    def get_code(self, lens_addr):
-
-        f_data = dict()
-        source = dict()
-        sink = dict()
-
-        source['dojo'] = "+code"
-        sink['stdout'] = None
-
-        f_data['source'] = source
-        f_data['sink'] = sink
-
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/code.json','w') as f :
-            json.dump(f_data, f)
-
-        x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}').output.decode('utf-8').strip().split('\\')[0][1:]
-        os.remove(f'{self._volume_directory}/{self.pier_name}/_data/code.json')
-
-        return x
-
     def set_meld_schedule(self, freq, hour, minute):
 
         current_meld_next = datetime.fromtimestamp(int(self.config['meld_next']))
@@ -432,20 +440,5 @@ class UrbitDocker:
     #def reset_code(self):
     #    return self.container.exec_run('/bin/reset-urbit-code').output.strip()
 
-    def start(self):
-        self.container.start()
-        self.running=True
-        return 0
-
-    def stop(self):
-        self.container.stop()
-        self.running=False
-        return 0
-
-    def logs(self):
-        return self.container.logs()
     
-    def is_running(self):
-        return self.running
-
 '''

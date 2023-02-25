@@ -19,7 +19,7 @@ class Orchestrator:
         self.config = config.config
 
         self.wireguard = Wireguard(config)
-        self.urbit = Urbit(config)
+        self.urbit = Urbit(config, self.wireguard)
         #self.minio
         self.webui = WebUI(config)
 
@@ -69,6 +69,10 @@ class Orchestrator:
     def get_urbits(self):
         return self.urbit.list_ships()
 
+   # Get all details of Urbit ID
+    def get_urbit(self, urbit_id):
+        return self.urbit.get_info(urbit_id)
+
     # Handle POST request relating to Urbit ID
     def urbit_post(self ,urbit_id, data):
         try:
@@ -76,54 +80,47 @@ class Orchestrator:
             if data['app'] == 'boot-new':
                 return self.urbit.create(urbit_id, data.get('data'))
 
-        except Exception as e:
-            Log.log(f"Urbit: Post Request failed: {e}")
-
-        return 400
-
-        '''
             # Check if Urbit Pier exists
-            urb = self._urbits.get(urbit_id)
-            if urb == None:
+            if not self.urbit.urb_docker.get_container(urbit_id):
                 return 400
 
             # Urbit Pier requests
             if data['app'] == 'pier':
                 if data['data'] == 'toggle':
-                    return self.toggle_pier_power(urb)
+                    return self.urbit.toggle_power(urbit_id)
 
                 if data['data'] == '+code':
-                    return self.get_urbit_code(urbit_id, urb)
+                    return self.urbit.get_code(urbit_id)
 
+                if data['data'] == 'toggle-autostart':
+                    return self.urbit.toggle_autostart(urbit_id)
+
+                if data['data'] == 'loom':
+                    return self.urbit.set_loom(urbit_id,data['size'])
+
+                if data['data'] == 'schedule-meld':
+                    return self.urbit.schedule_meld(urbit_id, data['frequency'], data['hour'], data['minute'])
+
+                if data['data'] == 'toggle-meld':
+                    return self.urbit.toggle_meld(urbit_id)
+
+                if data['data'] == 'do-meld':
+                    return self.urbit.send_pack_meld(urbit_id)
+
+                if data['data'] == 'delete':
+                    return self.urbit.delete(urbit_id)
+
+                if data['data'] == 'export':
+                    return self.urbit.export(urbit_id)
+
+                #TODO:
+                '''
                 if data['data'] == 's3-update':
                     return self.set_minio_endpoint(urbit_id)
 
                 if data['data'] == 's3-unlink':
                     lens_port = self.get_urbit_loopback_addr(urbit_id)
                     return urb.unlink_minio_endpoint(lens_port)
-
-                if data['data'] == 'schedule-meld':
-                    return urb.set_meld_schedule(data['frequency'], data['hour'], data['minute'])
-
-                if data['data'] == 'toggle-meld':
-                    x = self.get_urbit_loopback_addr(urb.config['pier_name'])
-                    return urb.toggle_meld_status(x)
-
-                if data['data'] == 'do-meld':
-                    lens_addr = self.get_urbit_loopback_addr(urbit_id)
-                    return urb.send_meld(lens_addr)
-
-                if data['data'] == 'export':
-                    return self.export_urbit(urb)
-
-                if data['data'] == 'delete':
-                    return self.delete_urbit(urbit_id)
-
-                if data['data'] == 'toggle-autostart':
-                    return self.toggle_autostart(urbit_id)
-
-                if data['data'] == 'loom':
-                    return urb.set_loom_size(data['size'])
 
             # Wireguard requests
             if data['app'] == 'wireguard':
@@ -140,8 +137,12 @@ class Orchestrator:
                     return self.export_minio_bucket(urbit_id)
 
             return 400
-
         '''
+
+        except Exception as e:
+            Log.log(f"Urbit: Post Request failed: {e}")
+
+        return 400
 
 
     #
@@ -280,9 +281,7 @@ class Orchestrator:
                 if x != 400:
                     self.anchor_config = x
                     return 200
-
-
-
         '''
+
         return module
 

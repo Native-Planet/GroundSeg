@@ -83,7 +83,7 @@ class WireguardDocker:
         c = self._get_container(name)
         if not c:
             return False
-        return c.status() == "running"
+        return c.status == "running"
 
 
     def _remove_container(self, name):
@@ -113,7 +113,6 @@ class WireguardDocker:
     def _get_container(self, name):
         try:
             c = client.containers.get(name)
-            Log.log("Wireguard: Container found")
             return c
         except:
             Log.log("Wireguard: Container not found")

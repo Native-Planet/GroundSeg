@@ -48,11 +48,8 @@ class GroundSeg:
             if approved:
                 urbit_id = request.args.get('urbit_id')
                 if request.method == 'GET':
-                    return jsonify(400) # temp
-                '''
                     urb = orchestrator.get_urbit(urbit_id)
                     return jsonify(urb)
-                '''
 
                 if request.method == 'POST':
                     blob = request.get_json()

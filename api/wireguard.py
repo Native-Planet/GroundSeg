@@ -53,9 +53,10 @@ class Wireguard:
 
         self.save_config()
 
-        # TODO: if wgOn and wgRegistered
-        if self.start():
-            Log.log("Wireguard: Initialization Completed")
+        if self.config['wgOn'] and self.config['wgRegistered']:
+            self.start()
+
+        Log.log("Wireguard: Initialization Completed")
 
     # Load wireguard.json
     def load_config(self):

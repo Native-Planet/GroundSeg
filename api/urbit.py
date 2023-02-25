@@ -1,7 +1,16 @@
 # Python
+import os
 import copy
 import json
+import socket
 import shutil
+import zipfile
+
+from io import BytesIO
+from datetime import datetime
+
+# Flask
+from flask import send_file
 
 # GroundSeg Modules
 from log import Log
@@ -35,9 +44,10 @@ class Urbit:
 
     _volume_directory = '/var/lib/docker/volumes'
 
-    def __init__(self, config):
+    def __init__(self, config, wg):
         self.config_object = config
         self.config = config.config
+        self.wg = wg
         self.urb_docker = UrbitDocker()
         self._urbits = {}
 
@@ -64,6 +74,67 @@ class Urbit:
             return self.urb_docker.start(patp, self.updater_info)
         else:
             return "failed"
+
+    # Delete Urbit Pier and MiniO
+    def delete(self, patp):
+        Log.log(f"{patp}: Attempting to delete all data")
+        try:
+            if self.urb_docker.delete(patp):
+                Log.log(f"{patp}: Deleting from system.json")
+                self.config['piers'] = [i for i in self.config['piers'] if i != patp]
+                self.config_object.save_config()
+
+                Log.log(f"{patp}: Removing {patp}.json")
+                os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
+
+                self._urbits = self._urbits.pop(patp)
+                Log.log(f"{patp}: Data removed from GroundSeg")
+
+                # TODO:
+                '''
+                if(patp in self._minios.keys()):
+                   minio = self._minios[patp]
+                   minio.remove_minio()
+                   minio = self._minios.pop(patp)
+
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f'https://{endpoint}/{api_version}'
+
+                if self.config['wgRegistered']:
+                    self.wireguard.delete_service(f'{patp}','urbit',url)
+                    self.wireguard.delete_service(f's3.{patp}','minio',url)
+
+                '''
+                return 200
+        except Exception as e:
+            Log.log(f"{patp}: Failed to delete data: {e}")
+
+        return 400
+
+    def export(self, patp):
+        Log.log(f"{patp}: Attempting to export pier")
+        c = self.urb_docker.get_container(patp)
+        if c:
+            if c.status == "running":
+                self.urb_docker.stop(patp)
+
+            file_name = f"{patp}.zip"
+            memory_file = BytesIO()
+            file_path=f"{self._volume_directory}/{patp}/_data/"
+
+            Log.log(f"{patp}: Compressing pier")
+
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(file_path):
+                    arc_dir = root[root.find("_data/")+6:]
+                    for file in files:
+                        zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
+
+            memory_file.seek(0)
+
+            Log.log(f"{patp}: Pier successfully exported")
+            return send_file(memory_file, download_name=file_name, as_attachment=True)
 
     # Start all valid containers
     def start_all(self, patps):
@@ -97,17 +168,19 @@ class Urbit:
                         u = dict()
                         c = self.urb_docker.get_container(patp)
                         if c:
+                            cfg = self._urbits[patp]
                             u['name'] = patp
                             u['running'] = c.status == "running"
-                            # TODO: Urbit Config
-                            #u['url'] = f'http://{socket.gethostname()}.local:{urbit.config["http_port"]}'
+                            u['url'] = f'http://{socket.gethostname()}.local:{cfg["http_port"]}'
 
-                        #if(urbit.config['network']=='wireguard'):
-                        #    u['url'] = f"https://{urbit.config['wg_url']}"
+                            if cfg['network'] == 'wireguard':
+                                u['url'] = f"https://{cfg['wg_url']}"
 
                             urbits.append(u)
+
                     except Exception as e:
                         Log.log(f"{patp}: {e}")
+
         except Exception as e:
             Log.log(f"Urbit: Unable to list Urbit ships: {e}")
 
@@ -120,7 +193,7 @@ class Urbit:
             if not Utils.check_patp(patp):
                 raise Exception("Invalid @p")
 
-            # todo: Add check if exists, return prompt to user for further action
+            # TODO: Add check if exists, return prompt to user for further action
             
             # Get open ports
             http_port, ames_port = self.get_open_urbit_ports()
@@ -130,31 +203,67 @@ class Urbit:
             self._urbits[patp] = cfg
             self.save_config(patp)
 
-            # Delete old volume
-            try:
-                # TODO: remove with docker
-                shutil.rmtree(f"{self._volume_directory}/{patp}")
-                Log.log(f"{patp}: Removed volume")
-            except:
-                Log.log(f"{patp}: No old volume to delete")
-
+            # Delete existing ship if exists
+            if self.urb_docker.delete(patp):
                 # Create the docker container
-                if self.urb_docker.create(cfg, self.updater_info, key, self.config_object._arch, self._volume_directory):
-                    Log.log(f"{patp}: Adding to system.json")
-
-                    self.config['piers'].append(patp)
-                    self.config_object.save_config()
-
-                    # startram stuff
-                    #self.add_urbit(patp, urbit)
-
-                    if self.start(patp) == "suceeded":
-                        return 200
+                if self.urb_docker.create(cfg, self.updater_info, self.config_object._arch, self._volume_directory, key):
+                    if self.add_urbit(patp):
+                        # TODO: startram stuff
+                        if self.start(patp) == "succeeded":
+                            return 200
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
 
         return 400
+
+   # Return all details of Urbit ID
+    def get_info(self, patp):
+        # Check if Urbit Pier exists
+        c = self.urb_docker.get_container(patp)
+        if c:
+            cfg = self._urbits[patp]
+            urbit = {
+                "name": patp,
+                "running": c.status == "running",
+                "wgReg": self.config['wgRegistered'],
+                "wgRunning": self.wg.is_running(),
+                "autostart": cfg['boot_status'] != 'off',
+                "meldOn": cfg['meld_schedule'],
+                "timeNow": datetime.utcnow(),
+                "frequency": cfg['meld_frequency'],
+                "meldLast": datetime.fromtimestamp(int(cfg['meld_last'])),
+                "meldNext": datetime.fromtimestamp(int(cfg['meld_next'])),
+                "containers": [patp], #TODO: list minio container
+                "meldHour": int(cfg['meld_time'][0:2]),
+                "meldMinute": int(cfg['meld_time'][2:]),
+                "remote": False,
+                "urbitUrl": f"http://{socket.gethostname()}.local:{cfg['http_port']}",
+                "minIOUrl": "",
+                "minIOReg": True,
+                "hasBucket": False,
+                "loomSize": cfg['loom_size']
+                }
+
+
+            if(cfg['network'] == 'wireguard'):
+                urbit['remote'] = True
+                urbit['urbitUrl'] = f"https://{cfg['wg_url']}"
+
+            if self.config['wgRegistered']:
+                urbit['minIOUrl'] = f"https://console.s3.{cfg['wg_url']}"
+
+            if cfg['minio_password'] == '':
+                 urbit['minIOReg'] = False
+
+            '''
+            if patp in self._minios:
+                urbit['hasBucket'] = True
+            '''
+
+            return urbit
+        return 400
+
 
     # Get unused ports for Urbit
     def get_open_urbit_ports(self):
@@ -179,6 +288,241 @@ class Urbit:
 
         return urb
 
+    # Toggle Pier on or off
+    def toggle_power(self, patp):
+        Log.log("{patp}: Attempting to toggle container")
+        c = self.urb_docker.get_container(patp)
+        if c:
+            cfg = self._urbits[patp]
+            old_status = cfg['boot_status']
+            if c.status == "running":
+                if self.urb_docker.stop(patp):
+                    if cfg['boot_status'] != 'off':
+                        self._urbits[patp]['boot_status'] = 'noboot'
+                        Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                        self.save_config(patp)
+                        return 200
+            else:
+                if self.start(patp) == "succeeded":
+                    if cfg['boot_status'] != 'off':
+                        self._urbits[patp]['boot_status'] = 'boot'
+                        Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                        self.save_config(patp)
+                        return 200
+
+        return 400
+
+    # Get +code from Urbit
+    def get_code(self, patp):
+        code = ''
+        lens_addr = self.get_loopback_addr(patp)
+        try:
+            f_data = {"source": {"dojo": "+code"}, "sink": {"stdout": None}}
+            with open(f'{self._volume_directory}/{patp}/_data/code.json','w') as f :
+                json.dump(f_data, f)
+
+            command = f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}'
+            res = self.urb_docker.exec(patp, command)
+            if res:
+                code = res.output.decode('utf-8').strip().split('\\')[0][1:]
+
+            os.remove(f'{self._volume_directory}/{patp}/_data/code.json')
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to get +code {e}")
+
+        return code
+
+    # Toggle Autostart
+    def toggle_autostart(self, patp):
+        Log.log(f"{patp}: Attempting to toggle autostart")
+        c = self.urb_docker.get_container(patp)
+        if c:
+            try:
+                cfg = self._urbits[patp]
+                old_status = cfg['boot_status']
+                if old_status == 'off':
+                    if c.status == "running":
+                        self._urbits[patp]['boot_status'] = 'boot'
+                    else:
+                        self._urbits[patp]['boot_status'] = 'noboot'
+                else:
+                    self._urbits[patp]['boot_status'] = 'off'
+
+                self.save_config(patp)
+                Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                self.save_config(patp)
+                return 200
+
+            except Exception as e:
+                Log.log(f"{patp}: Unable to toggle autostart: {e}")
+
+        return 400
+
+    def set_loom(self, patp, size):
+        Log.log(f"{patp}: Attempting to set loom size")
+        c = self.urb_docker.get_container(patp)
+        if c:
+            try:
+                running = False
+                if c.status == "running":
+                    running = True
+                
+                old_loom = self._urbits[patp]['loom_size']
+                self.urb_docker.delete_container(patp)
+                self._urbits[patp]['loom_size'] = size
+                self.save_config(patp)
+                Log.log(f"{patp}: Loom size changed: {old_loom} -> {self._urbits[patp]['loom_size']}")
+
+                created = self.urb_docker.create(self._urbits[patp],
+                                                 self.updater_info,
+                                                 self.config_object._arch,
+                                                 self._volume_directory)
+                if created and running:
+                    self.start(patp)
+
+                return 200
+
+            except Exception as e:
+                Log.log(f"{patp}: Unable to set loom size: {e}")
+
+        return 400
+
+    def schedule_meld(self, patp, freq, hour, minute):
+        Log.log(f"{patp}: Attempting to schedule meld frequency")
+        try:
+            old_sched = self._urbits[patp]['meld_frequency']
+            current_meld_next = datetime.fromtimestamp(int(self._urbits[patp]['meld_next']))
+            time_replaced_meld_next = int(current_meld_next.replace(hour=hour, minute=minute).timestamp())
+
+            day_difference = freq - self._urbits[patp]['meld_frequency']
+            day = 60 * 60 * 24 * day_difference
+
+            self._urbits[patp]['meld_next'] = str(day + time_replaced_meld_next)
+
+            if hour < 10:
+                hour = '0' + str(hour)
+            else:
+                hour = str(hour)
+
+            if minute < 10:
+                minute = '0' + str(minute)
+            else:
+                minute = str(minute)
+
+            self._urbits[patp]['meld_time'] = hour + minute
+            self._urbits[patp]['meld_frequency'] = int(freq)
+
+            if self._urbits[patp]['meld_frequency'] > 1:
+                days = "days"
+            else:
+                days = "day"
+
+            Log.log(f"{patp}: Meld frequency changed: {old_sched} Days -> {self._urbits[patp]['meld_frequency']} {days}")
+            self.save_config(patp)
+
+            return 200
+
+        except Exception as e:
+            Log.log(f"{patp}: Unable to schedule meld: {e}")
+
+        return 400
+
+    def toggle_meld(self, patp):
+        Log.log(f"{patp}: Attempting to toggle automatic meld")
+        try:
+            self._urbits[patp]['meld_schedule'] = not self._urbits[patp]['meld_schedule']
+            Log.log(f"{patp}: Automatic meld changed: {not self._urbits[patp]['meld_schedule']} -> {self._urbits[patp]['meld_schedule']}")
+            self.save_config(patp)
+
+            try:
+                now = int(datetime.utcnow().timestamp())
+                if self._urbits[patp]['meld_schedule']:
+                    if int(self._urbits[patp]['meld_next']) <= now:
+                        self.send_pack_meld(patp)
+            except:
+                pass
+
+        except Exception as e:
+            Log.log(f"{patp}: Unable to toggle automatic meld: {e}")
+
+        return 200
+
+    def send_pack_meld(self, patp):
+        lens_addr = self.get_loopback_addr(patp)
+        if self.send_pack(patp, lens_addr):
+            if self.send_meld(patp, lens_addr):
+                return 200
+
+        return 400
+
+    def send_pack(self, patp, lens_addr):
+        Log.log(f"{patp}: Attempting to send |pack")
+        try:
+            data = {"source": {"dojo": "+hood/pack"}, "sink": {"app": "hood"}}
+            with open(f'{self._volume_directory}/{patp}/_data/pack.json','w') as f :
+                json.dump(data, f)
+
+            command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
+            res = self.urb_docker.exec(patp, command)
+            if res:
+                os.remove(f'{self._volume_directory}/{patp}/_data/pack.json')
+                Log.log(f"{patp}: |pack sent successfully")
+                return True
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to send |pack: {e}")
+
+        return False
+
+    def send_meld(self, patp, lens_addr):
+        Log.log(f"{patp}: Attempting to send |meld")
+        try:
+            data = {"source": {"dojo": "+hood/meld"}, "sink": {"app": "hood"}}
+            with open(f'{self._volume_directory}/{patp}/_data/meld.json','w') as f :
+                json.dump(data, f)
+
+            command = f'curl -s -X POST -H "Content-Type: application/json" -d @meld.json {lens_addr}'
+            res = self.urb_docker.exec(patp, command)
+            if res:
+                os.remove(f'{self._volume_directory}/{patp}/_data/meld.json')
+                Log.log(f"{patp}: |meld sent successfully")
+
+                now = datetime.utcnow()
+                self._urbits[patp]['meld_last'] = str(int(now.timestamp()))
+
+                hour, minute = self._urbits[patp]['meld_time'][0:2], self._urbits[patp]['meld_time'][2:]
+                meld_next = int(now.replace(hour=int(hour), minute=int(minute), second=0).timestamp())
+                day = 60 * 60 * 24 * self._urbits[patp]['meld_frequency']
+
+                self._urbits[patp]['meld_next'] = str(meld_next + day)
+
+                if self._urbits[patp]['meld_frequency'] > 1:
+                    days = "days"
+                else:
+                    days = "day"
+
+                Log.log(f"{patp}: Next meld in {self._urbits[patp]['meld_frequency']} {days}")
+                self.save_config(patp)
+
+                return True
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to send |meld")
+
+        return False
+
+
+    # Get looback address of Urbit Pier
+    def get_loopback_addr(self, patp):
+        log = self.urb_docker.full_logs(patp)
+        if log:
+            log_arr = log.decode("utf-8").split('\n')[::-1]
+            substr = 'http: loopback live on'
+            for ln in log_arr:
+                if substr in ln:
+                    return str(ln.split(' ')[-1])
+
     def load_config(self, patp):
         try:
             with open(f"{self.config_object.base_path}/settings/pier/{patp}.json") as f:
@@ -198,11 +542,20 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to save config: {e}")
             return False
-    '''
-    # Stop container
-    def stop(self):
-        return self.wg_docker.stop(self.data)
 
+    def add_urbit(self, patp):
+        Log.log(f"{patp}: Adding to system.json")
+        try:
+            self.config['piers'] = [i for i in self.config['piers'] if i != patp]
+            self.config['piers'].append(patp)
+            self.config_object.save_config()
+            return True
+        except Exception as e:
+            Log.log("{patp}: Failed to add @p to system.json")
+
+        return False
+
+    '''
     def remove(self):
         return self.wg_docker.remove_wireguard(self.data['wireguard_name'])
 
