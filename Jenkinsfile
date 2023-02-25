@@ -85,9 +85,7 @@ pipeline {
                 script {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
-                            script:"""
                             git checkout ${tag}
-                            echo "debug: building arm64"
                             cd build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                             cd ..
@@ -95,7 +93,6 @@ pipeline {
                             cd ui
                             docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
                             cd ../..
-                            #sudo rm -rf GroundSeg_*
                         '''
                         stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                     }
