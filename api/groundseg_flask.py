@@ -15,7 +15,6 @@ class GroundSeg:
         self.app = Flask(__name__)
         CORS(self.app, supports_credentials=True)
 
-
         #
         #   Routes
         #
@@ -93,8 +92,15 @@ class GroundSeg:
 
         
         # Pier upload
-        #@self.app.route("/upload", methods=['POST'])
+        @self.app.route("/upload", methods=['POST'])
+        def pier_upload():
+            approved, message = self.verify(request)
 
+            if approved:
+                res = self.orchestrator.handle_upload(request)
+                return jsonify(res)
+
+            return message
 
         # Login
         @self.app.route("/login", methods=['POST'])

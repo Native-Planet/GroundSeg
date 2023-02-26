@@ -82,13 +82,13 @@ class UrbitDocker:
             return self.delete_volume(patp)
 
     def delete_container(self, patp):
-        Log.log("{patp}: Attempting to delete container")
+        Log.log(f"{patp}: Attempting to delete container")
         c = self.get_container(patp)
         if not c:
             return True
         try:
             c.remove(force=True)
-            Log.log("{patp}: Container deleted")
+            Log.log(f"{patp}: Container deleted")
             return True
         except Exception as e:
             Log.log(f"{patp}: Failed to delete container: {e}")
@@ -111,7 +111,7 @@ class UrbitDocker:
 
     def add_key(self, key, patp, vol_dir):
         if len(key) > 0:
-            Log.log("{patp}: Attempting to add key")
+            Log.log(f"{patp}: Attempting to add key")
             try:
                 with open(f'{vol_dir}/{patp}/_data/{patp}.key', 'w') as f:
                     f.write(key)
@@ -185,7 +185,7 @@ class UrbitDocker:
             command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]}'
 
             if config["network"] != "none":
-                Log.log("{patp}: Network is set to wireguard")
+                Log.log(f"{patp}: Network is set to wireguard")
                 http = f"--http-port={config['wg_http_port']}"
                 ames = f"--port={config['wg_ames_port']}"
                 command = f"{command} {http} {ames}"

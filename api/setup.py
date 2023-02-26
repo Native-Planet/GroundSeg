@@ -1,27 +1,28 @@
 
 class Setup:
-    def handle_anchor(data, config):
+    def handle_anchor(data, config, wg, urbit):
         # set endpoint
         if 'skip' in data:
             config.config['firstBoot'] = False
             config.save_config()
             return 200
 
-        '''
-        changed = self.change_wireguard_url(data['endpoint'])
+        changed = wg.change_url(data['endpoint'], urbit)
 
         # register key
         if changed == 200:
-            registered = self.register_device(data['key'])
+            endpoint = config.config['endpointUrl']
+            api_version = config.config['apiVersion']
+            url = f"https://{endpoint}/{api_version}"
+            registered = wg.register_device(url, data['key'])
 
             if registered == 400:
                 return 401
 
             if registered == 200:
-                self.config['firstBoot'] = False
-                self.save_config()
+                config.config['firstBoot'] = False
+                config.save_config()
 
             return registered
-            '''
 
         return 200

@@ -95,4 +95,3 @@ class SysPost:
                 Log.log(f"Updater: Failed to change Update mode: {e}")
 
             return 400
-

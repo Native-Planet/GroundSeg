@@ -46,6 +46,9 @@ class Config:
     # GroundSeg has completed initialization
     gs_ready = False
 
+    # Anchor ready to check again
+    anchor_ready = True
+
     # which mode is GroundSeg running
     device_mode = "standard"
 

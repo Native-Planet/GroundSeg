@@ -1,6 +1,7 @@
 # Python
 import os
 import copy
+import time
 import json
 import socket
 import shutil
@@ -80,6 +81,21 @@ class Urbit:
         Log.log(f"{patp}: Attempting to delete all data")
         try:
             if self.urb_docker.delete(patp):
+
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f'https://{endpoint}/{api_version}'
+
+                if self.config['wgRegistered']:
+                    self.wg.delete_service(f'{patp}','urbit',url)
+                    self.wg.delete_service(f's3.{patp}','minio',url)
+
+                # TODO:
+                #if(patp in self._minios.keys()):
+                #   mnio = self._minios[patp]
+                #   minio.remove_minio()
+                #   minio = self._minios.pop(patp)
+
                 Log.log(f"{patp}: Deleting from system.json")
                 self.config['piers'] = [i for i in self.config['piers'] if i != patp]
                 self.config_object.save_config()
@@ -87,26 +103,11 @@ class Urbit:
                 Log.log(f"{patp}: Removing {patp}.json")
                 os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
 
-                self._urbits = self._urbits.pop(patp)
+                self._urbits.pop(patp)
                 Log.log(f"{patp}: Data removed from GroundSeg")
 
-                # TODO:
-                '''
-                if(patp in self._minios.keys()):
-                   minio = self._minios[patp]
-                   minio.remove_minio()
-                   minio = self._minios.pop(patp)
-
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f'https://{endpoint}/{api_version}'
-
-                if self.config['wgRegistered']:
-                    self.wireguard.delete_service(f'{patp}','urbit',url)
-                    self.wireguard.delete_service(f's3.{patp}','minio',url)
-
-                '''
                 return 200
+
         except Exception as e:
             Log.log(f"{patp}: Failed to delete data: {e}")
 
@@ -179,7 +180,7 @@ class Urbit:
                             urbits.append(u)
 
                     except Exception as e:
-                        Log.log(f"{patp}: {e}")
+                        Log.log(f"{patp}: Unable to get container information {e}")
 
         except Exception as e:
             Log.log(f"Urbit: Unable to list Urbit ships: {e}")
@@ -208,14 +209,91 @@ class Urbit:
                 # Create the docker container
                 if self.urb_docker.create(cfg, self.updater_info, self.config_object._arch, self._volume_directory, key):
                     if self.add_urbit(patp):
-                        # TODO: startram stuff
+                        endpoint = self.config['endpointUrl']
+                        api_version = self.config['apiVersion']
+                        url = f"https://{endpoint}/{api_version}"
+                        if self.register_urbit(patp, url):
+                            if self.start(patp) == "succeeded":
+                                return 200
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
+
+        return 400
+
+    def boot_existing(self, filename):
+        patp = filename.split('.')[0]
+
+        if patp == None:
+            return "File is invalid"
+
+        Log.log(f"{patp}: Booting existing pier")
+        return self.extract_pier(filename)
+
+    def extract_pier(self, filename):
+        patp = filename.split('.')[0]
+        vol_dir = f'/var/lib/docker/volumes/{patp}'
+        compressed_dir = f"{self.config_object.base_path}/uploaded/{patp}/{filename}"
+
+        try:
+            Log.log(f"{patp}: Removing existing volume")
+            os.system(f'rm -rf {vol_dir}')
+
+            Log.log(f"{patp}: Creating volume directory")
+            os.system(f'mkdir -p {vol_dir}/_data')
+
+            Log.log(f"{patp}: Extracting {filename}")
+            if filename.endswith("zip"):
+                with zipfile.ZipFile(compressed_dir) as zip_ref:
+                    zip_ref.extractall(f"{vol_dir}/_data")
+
+            elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
+                tar = tarfile.open(compressed_dir,"r:gz")
+                tar.extractall(f"{vol_dir}/_data")
+                tar.close()
+
+        except Exception as e:
+            Log.log(f"{patp}: Faileda to extract {filename}: {e}")
+            return "File extraction failed"
+
+        try:
+            shutil.rmtree(f"{self.config_object.base_path}/uploaded/{patp}", ignore_errors=True)
+            Log.log(f"{patp}: Deleted {filename}")
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to remove {filename}: {e}")
+            return f"Failed to remove {filename}"
+
+        return self.create_existing(patp)
+
+    def create_existing(self, patp):
+        Log.log(f"{patp}: Attempting to boot new urbit ship")
+        try:
+            if not Utils.check_patp(patp):
+                raise Exception("Invalid @p")
+
+            # Get open ports
+            http_port, ames_port = self.get_open_urbit_ports()
+
+            # Generate config file for pier
+            cfg = self.build_config(patp, http_port, ames_port)
+            self._urbits[patp] = cfg
+            self.save_config(patp)
+
+            # Create the docker container
+            if self.urb_docker.create(cfg, self.updater_info, self.config_object._arch, self._volume_directory, ""):
+                if self.add_urbit(patp):
+                    endpoint = self.config['endpointUrl']
+                    api_version = self.config['apiVersion']
+                    url = f"https://{endpoint}/{api_version}"
+                    if self.register_urbit(patp, url):
                         if self.start(patp) == "succeeded":
                             return 200
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
 
-        return 400
+        return f"Failed to boot {patp}"
 
    # Return all details of Urbit ID
     def get_info(self, patp):
@@ -290,7 +368,7 @@ class Urbit:
 
     # Toggle Pier on or off
     def toggle_power(self, patp):
-        Log.log("{patp}: Attempting to toggle container")
+        Log.log(f"{patp}: Attempting to toggle container")
         c = self.urb_docker.get_container(patp)
         if c:
             cfg = self._urbits[patp]
@@ -356,6 +434,44 @@ class Urbit:
 
             except Exception as e:
                 Log.log(f"{patp}: Unable to toggle autostart: {e}")
+
+        return 400
+
+    def toggle_network(self, patp):
+        Log.log(f"{patp}: Attempting to toggle network")
+
+        wg_reg = self.config['wgRegistered']
+        wg_is_running = self.wg.is_running()
+        c = self.urb_docker.get_container(patp)
+
+        if c:
+            try:
+                running = False
+                if c.status == "running":
+                    running = True
+                
+                old_network = self._urbits[patp]['network']
+                self.urb_docker.delete_container(patp)
+
+                if old_network == "none" and wg_reg and wg_is_running:
+                    self._urbits[patp]['network'] = "wireguard"
+                else:
+                    self._urbits[patp]['network'] = "none"
+
+                Log.log(f"{patp}: Network changed: {old_network} -> {self._urbits[patp]['network']}")
+                self.save_config(patp)
+
+                created = self.urb_docker.create(self._urbits[patp],
+                                                 self.updater_info,
+                                                 self.config_object._arch,
+                                                 self._volume_directory)
+                if created and running:
+                    self.start(patp)
+
+                return 200
+
+            except Exception as e:
+                Log.log(f"{patp}: Unable to change network: {e}")
 
         return 400
 
@@ -523,6 +639,114 @@ class Urbit:
                 if substr in ln:
                     return str(ln.split(' ')[-1])
 
+    # Add urbit ship to GroundSeg
+    def add_urbit(self, patp):
+        Log.log(f"{patp}: Adding to system.json")
+        try:
+            self.config['piers'] = [i for i in self.config['piers'] if i != patp]
+            self.config['piers'].append(patp)
+            self.config_object.save_config()
+            return True
+        except Exception as e:
+            Log.log(f"{patp}: Failed to add @p to system.json")
+
+        return False
+
+    # Register Wireguard for Urbit
+    def register_urbit(self, patp, url):
+        if self.config['wgRegistered']:
+            Log.log(f"{patp}: Attempting to register anchor services")
+            if self.wg.get_status(url):
+                self.wg.update_wg_config(self.wg.anchor_data['conf'])
+
+                # Define services
+                urbit_web = False
+                urbit_ames = False
+                minio_svc = False
+                minio_console = False
+                minio_bucket = False
+
+                # Check if service exists for patp
+                for ep in self.wg.anchor_data['subdomains']:
+                    ep_patp = ep['url'].split('.')[-3]
+                    ep_svc = ep['svc_type']
+                    if ep_patp == patp:
+                        if ep_svc == 'urbit-web':
+                            urbit_web = True
+                        if ep_svc == 'urbit-ames':
+                            urbit_ames = True
+                        if ep_svc == 'minio':
+                            minio_svc = True
+                        if ep_svc == 'minio-console':
+                            minio_console = True
+                        if ep_svc == 'minio-bucket':
+                            minio_bucket = True
+ 
+                # One or more of the urbit services is not registered
+                if not (urbit_web and urbit_ames):
+                    Log.log(f"{patp}: Registering ship")
+                    self.wg.register_service(f'{patp}', 'urbit', url)
+ 
+                # One or more of the minio services is not registered
+                if not (minio_svc and minio_console and minio_bucket):
+                    Log.log(f"{patp}: Registering MinIO")
+                    self.wg.register_service(f's3.{patp}', 'minio', url)
+
+            svc_url = None
+            http_port = None
+            ames_port = None
+            s3_port = None
+            console_port = None
+            tries = 1
+
+            while None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                Log.log(f"{patp}: Checking anchor config if services are ready")
+                if self.wg.get_status(url):
+                    self.wg.update_wg_config(self.wg.anchor_data['conf'])
+
+                Log.log(f"Anchor: {self.wg.anchor_data['subdomains']}")
+                pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
+                for ep in self.wg.anchor_data['subdomains']:
+                    if ep['status'] == 'ok':
+                        if(f'{patp}.{pub_url}' == ep['url']):
+                            svc_url = ep['url']
+                            http_port = ep['port']
+                        elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                            ames_port = ep['port']
+                        elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                            s3_port = ep['port']
+                        elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                            console_port = ep['port']
+                    else:
+                        t = tries * 2
+                        Log.log(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
+                        time.sleep(t)
+                        if tries <= 15:
+                            tries = tries + 1
+                        break
+
+            return self.set_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port)
+
+        return True
+
+    def set_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
+        Log.log(f"{patp}: Setting wireguard information")
+        try:
+            self._urbits[patp]['wg_url'] = url
+            self._urbits[patp]['wg_http_port'] = http_port
+            self._urbits[patp]['wg_ames_port'] = ames_port
+            self._urbits[patp]['wg_s3_port'] = s3_port
+            self._urbits[patp]['wg_console_port'] = console_port
+            return self.save_config(patp)
+        except Exception as e:
+            Log.log(f"{patp}: Failed to set wireguard information")
+            return False
+
+    # Container logs
+    #def logs(self):
+    #    return self.wg_docker.logs(self.data['wireguard_name'])
+
     def load_config(self, patp):
         try:
             with open(f"{self.config_object.base_path}/settings/pier/{patp}.json") as f:
@@ -542,28 +766,3 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to save config: {e}")
             return False
-
-    def add_urbit(self, patp):
-        Log.log(f"{patp}: Adding to system.json")
-        try:
-            self.config['piers'] = [i for i in self.config['piers'] if i != patp]
-            self.config['piers'].append(patp)
-            self.config_object.save_config()
-            return True
-        except Exception as e:
-            Log.log("{patp}: Failed to add @p to system.json")
-
-        return False
-
-    '''
-    def remove(self):
-        return self.wg_docker.remove_wireguard(self.data['wireguard_name'])
-
-    # Is container running
-    def is_running(self):
-        return self.wg_docker.is_running(self.data['wireguard_name'])
-
-    # Container logs
-    def logs(self):
-        return self.wg_docker.logs(self.data['wireguard_name'])
-'''

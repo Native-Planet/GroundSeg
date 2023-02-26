@@ -1,3 +1,10 @@
+# Python 
+import os
+from datetime import datetime
+
+# Flask
+from werkzeug.utils import secure_filename
+
 # GroundSeg modules
 from log import Log
 from setup import Setup
@@ -19,23 +26,21 @@ class Orchestrator:
         self.config = config.config
 
         self.wireguard = Wireguard(config)
+        #self.minio = MinIO(config, self.wireguard) TODO
         self.urbit = Urbit(config, self.wireguard)
-        #self.minio
         self.webui = WebUI(config)
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
 
-
     #
     #   Setup
     #
 
-
     def handle_setup(self, page, data):
         try:
             if page == "anchor":
-                return Setup.handle_anchor(data,self.config_object)
+                return Setup.handle_anchor(data,self.config_object, self.urbit)
 
             if page == "password":
                 if self.config_object.create_password(data['password']):
@@ -84,6 +89,11 @@ class Orchestrator:
             if not self.urbit.urb_docker.get_container(urbit_id):
                 return 400
 
+            # Wireguard requests
+            if data['app'] == 'wireguard':
+                if data['data'] == 'toggle':
+                    return self.urbit.toggle_network(urbit_id)
+
             # Urbit Pier requests
             if data['app'] == 'pier':
                 if data['data'] == 'toggle':
@@ -122,11 +132,6 @@ class Orchestrator:
                     lens_port = self.get_urbit_loopback_addr(urbit_id)
                     return urb.unlink_minio_endpoint(lens_port)
 
-            # Wireguard requests
-            if data['app'] == 'wireguard':
-                if data['data'] == 'toggle':
-                    return self.toggle_pier_network(urb)
-
             # MinIO requests
             if data['app'] == 'minio':
                 pwd = data.get('password')
@@ -154,25 +159,29 @@ class Orchestrator:
     def get_anchor_settings(self):
         lease_end = None
         ongoing = False
-        #lease = self.anchor_config['lease']
 
-        #if self.anchor_config['ongoing'] == 1:
-        #    ongoing = True
+        try:
+            lease = self.wireguard.anchor_data['lease']
+        except:
+            lease = None
 
-        '''
+        try:
+            ongoing = self.wireguard.anchor_data['ongoing'] == 1
+        except:
+            ongoing = False
+
         if lease != None:
             x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
-            '''
 
-        anchor = {
+        return { "anchor": 
+                {
                 "wgReg": self.config['wgRegistered'],
-                "wgRunning": False, #TODO:self.wireguard.is_running()
+                "wgRunning": self.wireguard.is_running(),
                 "lease": lease_end,
                 "ongoing": ongoing
                 }
-
-        return {'anchor': anchor}
+            }
 
 
     #
@@ -234,6 +243,45 @@ class Orchestrator:
         if module == 'watchtower':
             return SysPost.handle_updater(data, self.config_object)
 
+        # anchor module
+        if module == 'anchor':
+            if data['action'] == 'get-url':
+                return self.config['endpointUrl']
+
+            if data['action'] == 'toggle':
+                if self.wireguard.is_running():
+                    return self.wireguard.off(self.urbit)
+                return self.wireguard.on(self.urbit)
+
+            if data['action'] == 'restart':
+                return self.wireguard.restart(self.urbit)
+
+            if data['action'] == 'change-url':
+                return self.wireguard.change_url(data['url'], self.urbit)
+
+            if data['action'] == 'register':
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f"https://{endpoint}/{api_version}"
+
+                if self.wireguard.build_anchor(url, data['key']):
+                    self.config['wgRegistered'] = True
+                    self.config['wgOn'] = True
+
+                    for patp in self.config['piers']:
+                        self.urbit.register_urbit(patp, url)
+
+                    if self.config_object.save_config():
+                        self.wireguard.start()
+                        return 200
+
+            if data['action'] == 'unsubscribe':
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f'https://{endpoint}/{api_version}'
+                return self.wireguard.cancel_subscription(data['key'],url)
+
+        #TODO:
         '''
         # logs module
         if module == 'logs':
@@ -253,35 +301,75 @@ class Orchestrator:
                 return 200
         
 
-        # anchor module
-        if module == 'anchor':
-            if data['action'] == 'restart':
-                return self.restart_anchor()
-
-            if data['action'] == 'register':
-                return self.register_device(data['key']) 
-
-            if data['action'] == 'toggle':
-                running = self.wireguard.is_running()
-                if running:
-                    return self.toggle_anchor_off()
-                return self.toggle_anchor_on()
-
-            if data['action'] == 'get-url':
-                return self.config['endpointUrl']
-
-            if data['action'] == 'change-url':
-                return self.change_wireguard_url(data['url'])
-
-            if data['action'] == 'unsubscribe':
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f'https://{endpoint}/{api_version}'
-                x = self.wireguard.cancel_subscription(data['key'],url)
-                if x != 400:
-                    self.anchor_config = x
-                    return 200
         '''
 
         return module
 
+    def handle_upload(self, req):
+        # change to temp mode (DO NOT SAVE CONFIG)
+        if self.config['updateMode'] == 'auto':
+            self.config['updateMode'] = 'temp'
+
+        # Uploaded pier
+        file = req.files['file']
+        filename = secure_filename(file.filename)
+        patp = filename.split('.')[0]
+
+        # Create subfolder
+        file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"
+        os.makedirs(file_subfolder, exist_ok=True)
+
+        fn = save_path = f"{file_subfolder}/{filename}"
+        current_chunk = int(req.form['dzchunkindex'])
+
+        if current_chunk == 0:
+            try:
+                Log.log(f"{patp}: Starting upload")
+                os.remove(save_path)
+                Log.log(f"{patp}: Cleaning up old files")
+            except:
+                Log.log(f"{patp}: Directory is clear")
+
+        if os.path.exists(save_path) and current_chunk == 0:
+            os.remove(save_path)
+
+            if self.config['updateMode'] == 'temp':
+                self.config['updateMode'] = 'auto'
+
+            return "File exists, try uploading again"
+
+        try:
+            with open(save_path, 'ab') as f:
+                f.seek(int(req.form['dzchunkbyteoffset']))
+                f.write(file.stream.read())
+        except Exception as e:
+            Log.log(f"{patp}: Error writing to disk: {e}")
+
+            if self.config['updateMode'] == 'temp':
+                self.config['updateMode'] = 'auto'
+
+            return "Can't write to disk"
+
+        total_chunks = int(req.form['dztotalchunkcount'])
+
+        if current_chunk + 1 == total_chunks:
+            # This was the last chunk, the file should be complete and the size we expect
+            if os.path.getsize(save_path) != int(req.form['dztotalfilesize']):
+                Log.log(f"{patp}: File size mismatched")
+
+                if self.config['updateMode'] == 'temp':
+                    self.config['updateMode'] = 'auto'
+
+                # size mismatch
+                return "File size mismatched"
+            else:
+                Log.log(f"{patp}: Upload complete")
+                return self.urbit.boot_existing(filename)
+        else:
+            # Not final chunk yet
+            return 200
+
+        if self.config['updateMode'] == 'temp':
+            self.config['updateMode'] = 'auto'
+
+        return 400
