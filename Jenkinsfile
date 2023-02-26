@@ -1,9 +1,16 @@
 pipeline {
     agent any
     parameters {
-        gitParameter name: 'RELEASE_TAG',
-                     type: 'PT_BRANCH_TAG',
-                     defaultValue: 'master'
+        gitParameter(
+            name: 'RELEASE_TAG',
+            type: 'PT_BRANCH_TAG',
+            defaultValue: 'master')
+
+        choice(
+            choices: ['no' , 'yes'],
+            defaultValue: 'no'
+            description: 'Merge tag into master branch (doesn\'t do anything in dev)',
+            name: 'MERGE')
     }
     environment {
         /* translate git branch to release channel */
@@ -251,7 +258,7 @@ pipeline {
             steps {
                 /* merge tag changes into master if deploying to master */
                 script {
-                    if( "${channel}" == "latest" ) {
+                    if(( "${channel}" == "latest" ) && ( "${params.MERGE}" == "yes" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			    sh (
                                 script: '''
