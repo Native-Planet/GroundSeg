@@ -5,10 +5,9 @@ pipeline {
             name: 'RELEASE_TAG',
             type: 'PT_BRANCH_TAG',
             defaultValue: 'master')
-
         choice(
             choices: ['no' , 'yes'],
-            defaultValue: 'no'
+            defaultValue: 'no',
             description: 'Merge tag into master branch (doesn\'t do anything in dev)',
             name: 'MERGE')
     }
