@@ -1,9 +1,14 @@
 pipeline {
     agent any
     parameters {
-        gitParameter name: 'RELEASE_TAG',
-                     type: 'PT_BRANCH_TAG',
-                     defaultValue: 'master'
+        gitParameter(
+            name: 'RELEASE_TAG',
+            type: 'PT_BRANCH_TAG',
+            defaultValue: 'master')
+        choice(
+            choices: ['no' , 'yes'],
+            description: 'Merge tag into master branch (doesn\'t do anything in dev)',
+            name: 'MERGE')
     }
     environment {
         /* translate git branch to release channel */
@@ -54,6 +59,7 @@ pipeline {
                 script {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
+                            git checkout ${tag}
                             mkdir -p /opt/groundseg/version/bin
                             cd ./build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
@@ -63,7 +69,13 @@ pipeline {
                             cp -r api /var/jenkins_home/tmp
                             docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
                             chmod +x /var/jenkins_home/tmp/binary/groundseg
-                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}
+                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                        '''
+                    }
+                    if( "${channel}" == "latest" ) {
+                        sh '''
+                            cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest
+                            cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_latest
                         '''
                     }
                 }
@@ -84,7 +96,7 @@ pipeline {
                 script {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                         sh '''
-                            echo "debug: building arm64"
+                            git checkout ${tag}
                             cd build-scripts
                             docker build --tag nativeplanet/groundseg-builder:3.10.9 .
                             cd ..
@@ -92,7 +104,6 @@ pipeline {
                             cd ui
                             docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
                             cd ../..
-                            #sudo rm -rf GroundSeg_*
                         '''
                         stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                     }
@@ -110,7 +121,7 @@ pipeline {
                         dir('/opt/groundseg/version/bin/'){
                         unstash 'groundseg_arm64'
                         }
-                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}'
+                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
                         sh '''#!/bin/bash -x
                         #placeholder
@@ -124,14 +135,14 @@ pipeline {
                 /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 amdsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
@@ -183,8 +194,8 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://bin.infra.native.computer/groundseg_arm64_${tag}"
-                amdbin = "https://bin.infra.native.computer/groundseg_amd64_${tag}"
+                armbin = "https://bin.infra.native.computer/groundseg_arm64_${tag}_${channel}"
+                amdbin = "https://bin.infra.native.computer/groundseg_amd64_${tag}_${channel}"
             }
             steps {
                 script {
@@ -245,7 +256,7 @@ pipeline {
             steps {
                 /* merge tag changes into master if deploying to master */
                 script {
-                    if( "${channel}" == "latest" ) {
+                    if(( "${channel}" == "latest" ) && ( "${params.MERGE}" == "yes" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			    sh (
                                 script: '''
