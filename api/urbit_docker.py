@@ -222,33 +222,8 @@ class UrbitDocker:
             return False
 
 
+    # TODO:
     '''
-    def remove_urbit(self):
-        self.stop()
-        self.container.remove()
-        self.volume.remove()
-
-
-    def set_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
-        self.config['wg_url'] = url
-        self.config['wg_http_port'] = http_port
-        self.config['wg_ames_port'] = ames_port
-        self.config['wg_s3_port'] = s3_port
-        self.config['wg_console_port'] = console_port
-
-        self.save_config()
-        running = False
-        
-        if self.is_running():
-            self.stop()
-            running = True
-
-        self.container.remove()
-        
-        self.build_container()
-        if running:
-            self.start()
-
     def update_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
         changed = False
         if not self.config['wg_url'] == url:
@@ -294,87 +269,6 @@ class UrbitDocker:
                     Log.log_groundseg(f"{self.pier_name}: Restarting container")
                     self.start()
 
-    def set_network(self, network):
-        if self.config['network'] == network:
-            return 0
-
-        running = False
-        if self.running:
-            self.stop()
-            running = True
-        
-        self.container.remove()
-        self.config['network'] = network
-        self.save_config()
-
-        self.build_container()
-
-        if running:
-            self.start()
-
-        return 0
-
-
-    def toggle_meld_status(self, loopbackAddr):
-        self.config['meld_schedule'] = not self.config['meld_schedule']
-        self.save_config()
-        try:
-            now = int(datetime.utcnow().timestamp())
-            if self.config['meld_schedule']:
-                if int(self.config['meld_next']) <= now:
-                    self.send_meld(loopbackAddr)
-        except:
-            pass
-        
-        return 200
-
-
-    def send_meld(self, lens_addr):
-        pack_data = dict()
-        meld_data = dict()
-        pack_source = dict()
-        meld_source = dict()
-        sink = dict()
-
-        pack_source['dojo'] = "+hood/pack"
-        meld_source['dojo'] = "+hood/meld"
-
-        sink['app'] = "hood"
-
-        pack_data['source'] = pack_source
-        meld_data['source'] = meld_source
-
-        pack_data['sink'] = sink
-        meld_data['sink'] = sink
-
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/pack.json','w') as f :
-            json.dump(pack_data, f)
-
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/meld.json','w') as f :
-            json.dump(meld_data, f)
-
-        x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}').output.strip()
-
-        if x:
-            y = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @meld.json {lens_addr}').output.strip()
-
-            if y:
-                now = datetime.utcnow()
-
-                self.config['meld_last'] = str(int(now.timestamp()))
-
-                hour, minute = self.config['meld_time'][0:2], self.config['meld_time'][2:]
-                meld_next = int(now.replace(hour=int(hour), minute=int(minute), second=0).timestamp())
-                day = 60 * 60 * 24 * self.config['meld_frequency']
-                
-                self.config['meld_next'] = str(meld_next + day)
-                self.save_config()
-
-                os.remove(f'{self._volume_directory}/{self.pier_name}/_data/pack.json')
-                os.remove(f'{self._volume_directory}/{self.pier_name}/_data/meld.json')
-
-                return y
-
     def send_poke(self, command, data, lens_addr):
 
         f_data = dict()
@@ -410,35 +304,4 @@ class UrbitDocker:
         self.send_poke('set-current-bucket', '', lens_addr)
 
         return 200
-
-    def set_meld_schedule(self, freq, hour, minute):
-
-        current_meld_next = datetime.fromtimestamp(int(self.config['meld_next']))
-        time_replaced_meld_next = int(current_meld_next.replace(hour=hour, minute=minute).timestamp())
-
-        day_difference = freq - self.config['meld_frequency']
-        day = 60 * 60 * 24 * day_difference
-
-        self.config['meld_next'] = str(day + time_replaced_meld_next)
-
-        if hour < 10:
-            hour = '0' + str(hour)
-        else:
-            hour = str(hour)
-
-        if minute < 10:
-            minute = '0' + str(minute)
-        else:
-            minute = str(minute)
-
-        self.config['meld_time'] = hour + minute
-        self.config['meld_frequency'] = int(freq)
-        self.save_config()
-
-        return 200
-
-    #def reset_code(self):
-    #    return self.container.exec_run('/bin/reset-urbit-code').output.strip()
-
-    
 '''

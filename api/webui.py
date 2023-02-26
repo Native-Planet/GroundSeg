@@ -44,9 +44,12 @@ class WebUI:
 
         self.save_config()
 
-        # TODO: if wgOn and wgRegistered
         if self.start():
             Log.log("WebUI: Initialization Completed")
+
+    # Start container
+    def start(self):
+        return self.webui_docker.start(self.data,self.updater_info, self.config_object._arch)
 
     # Load webui.json
     def load_config(self):
@@ -64,13 +67,3 @@ class WebUI:
         with open(self.filename,'w') as f:
             json.dump(self.data, f, indent=4)
             f.close()
-
-
-#
-#   WebUI Docker commands
-#
-
-
-    # Start container
-    def start(self):
-        return self.webui_docker.start(self.data,self.updater_info, self.config_object._arch)
