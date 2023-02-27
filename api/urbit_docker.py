@@ -9,7 +9,7 @@ client = docker.from_env()
 
 class UrbitDocker:
 
-    def start(self, patp, updater_info):
+    def start(self, patp, updater_info, vol_dir):
         Log.log(f"{patp}: Attempting to start container")
 
         # Check if patp is valid
@@ -29,6 +29,10 @@ class UrbitDocker:
 
         # Start ship container
         try:
+            with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
+                script = Utils.start_script()
+                f.write(script)
+                f.close()
             c.start()
             Log.log(f"{patp}: Successfully started container")
             return "succeeded"
@@ -167,10 +171,6 @@ class UrbitDocker:
             try:
                 Log.log(f"{patp}: Attempting to create new volume")
                 v = client.volumes.create(name=patp)
-                with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
-                    script = Utils.start_script()
-                    f.write(script)
-                    f.close()
                 Log.log(f"{patp}: Volume created")
                 return v
 

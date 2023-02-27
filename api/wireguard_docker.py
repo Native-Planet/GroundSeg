@@ -1,6 +1,4 @@
 import docker
-import json
-
 from log import Log
 
 client = docker.from_env()

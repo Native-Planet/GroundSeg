@@ -260,3 +260,4 @@ class Config:
         with open(self.config_file, 'w') as f:
             Log.log("Config: Saving system.json")
             json.dump(self.config, f, indent = 4)
+            return True

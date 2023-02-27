@@ -14,6 +14,7 @@ from system_post import SysPost
 
 # Docker
 from wireguard import Wireguard
+from minio import MinIO
 from urbit import Urbit
 from webui import WebUI
 
@@ -26,8 +27,8 @@ class Orchestrator:
         self.config = config.config
 
         self.wireguard = Wireguard(config)
-        #self.minio = MinIO(config, self.wireguard) TODO
-        self.urbit = Urbit(config, self.wireguard)
+        self.minio = MinIO(config, self.wireguard)
+        self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
 
         self.config_object.gs_ready = True
@@ -40,7 +41,7 @@ class Orchestrator:
     def handle_setup(self, page, data):
         try:
             if page == "anchor":
-                return Setup.handle_anchor(data,self.config_object, self.urbit)
+                return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit)
 
             if page == "password":
                 if self.config_object.create_password(data['password']):
@@ -131,18 +132,20 @@ class Orchestrator:
                 if data['data'] == 's3-unlink':
                     lens_port = self.get_urbit_loopback_addr(urbit_id)
                     return urb.unlink_minio_endpoint(lens_port)
+                '''
 
             # MinIO requests
             if data['app'] == 'minio':
                 pwd = data.get('password')
                 if pwd != None:
-                    return self.create_minio_admin_account(urbit_id, pwd)
+                    return self.minio.create_minio(urbit_id, pwd, self.urbit)
 
+                '''
                 if data['data'] == 'export':
                     return self.export_minio_bucket(urbit_id)
+                '''
 
             return 400
-        '''
 
         except Exception as e:
             Log.log(f"Urbit: Post Request failed: {e}")
@@ -272,8 +275,8 @@ class Orchestrator:
                         self.urbit.register_urbit(patp, url)
 
                     if self.config_object.save_config():
-                        self.wireguard.start()
-                        return 200
+                        if self.wireguard.start():
+                            return 200
 
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']

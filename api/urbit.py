@@ -45,10 +45,11 @@ class Urbit:
 
     _volume_directory = '/var/lib/docker/volumes'
 
-    def __init__(self, config, wg):
+    def __init__(self, config, wg, minio):
         self.config_object = config
         self.config = config.config
         self.wg = wg
+        self.minio = minio
         self.urb_docker = UrbitDocker()
         self._urbits = {}
 
@@ -72,9 +73,15 @@ class Urbit:
     # Start container
     def start(self, patp):
         if self.load_config(patp):
-            return self.urb_docker.start(patp, self.updater_info)
+            if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
+                return self.urb_docker.start(patp, self.updater_info, self._volume_directory)
         else:
             return "failed"
+
+    def stop(self, patp):
+        if self.urb_docker.stop(patp):
+            return self.minio.stop_minio(f"minio_{patp}")
+                
 
     # Delete Urbit Pier and MiniO
     def delete(self, patp):
@@ -90,11 +97,7 @@ class Urbit:
                     self.wg.delete_service(f'{patp}','urbit',url)
                     self.wg.delete_service(f's3.{patp}','minio',url)
 
-                # TODO:
-                #if(patp in self._minios.keys()):
-                #   mnio = self._minios[patp]
-                #   minio.remove_minio()
-                #   minio = self._minios.pop(patp)
+                self.minio.delete(f"minio_{patp}")
 
                 Log.log(f"{patp}: Deleting from system.json")
                 self.config['piers'] = [i for i in self.config['piers'] if i != patp]
@@ -118,7 +121,7 @@ class Urbit:
         c = self.urb_docker.get_container(patp)
         if c:
             if c.status == "running":
-                self.urb_docker.stop(patp)
+                self.stop(patp)
 
             file_name = f"{patp}.zip"
             memory_file = BytesIO()
@@ -334,10 +337,9 @@ class Urbit:
             if cfg['minio_password'] == '':
                  urbit['minIOReg'] = False
 
-            '''
-            if patp in self._minios:
-                urbit['hasBucket'] = True
-            '''
+            # TODO
+            #if patp in self._minios:
+            #    urbit['hasBucket'] = True
 
             return urbit
         return 400
@@ -374,7 +376,7 @@ class Urbit:
             cfg = self._urbits[patp]
             old_status = cfg['boot_status']
             if c.status == "running":
-                if self.urb_docker.stop(patp):
+                if self.stop(patp):
                     if cfg['boot_status'] != 'off':
                         self._urbits[patp]['boot_status'] = 'noboot'
                         Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
@@ -451,6 +453,7 @@ class Urbit:
                     running = True
                 
                 old_network = self._urbits[patp]['network']
+
                 self.urb_docker.delete_container(patp)
 
                 if old_network == "none" and wg_reg and wg_is_running:

@@ -14,15 +14,16 @@ class Setup:
             endpoint = config.config['endpointUrl']
             api_version = config.config['apiVersion']
             url = f"https://{endpoint}/{api_version}"
-            registered = wg.register_device(url, data['key'])
+            if wg.build_anchor(url, data['key']):
+                config.config['wgRegistered'] = True
+                config.config['wgOn'] = True
 
-            if registered == 400:
-                return 401
+                for patp in config.config['piers']:
+                    urbit.register_urbit(patp, url)
 
-            if registered == 200:
                 config.config['firstBoot'] = False
-                config.save_config()
+                if config.save_config():
+                    if wg.start():
+                        return 200
 
-            return registered
-
-        return 200
+        return 400
