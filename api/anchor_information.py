@@ -1,0 +1,61 @@
+# Python
+import time
+
+# GroundSeg modules
+from log import Log
+
+class AnchorUpdater:
+    def __init__(self, config, orchestrator):
+        self.config_object = config
+        self.config = config.config
+        self.orchestrator = orchestrator
+
+    # Get updated Anchor information every 12 hours
+    def anchor_loop(self):
+        Log.log("Anchor: Anchor information updater thread started")
+        while True:
+            if self.config['wgRegistered']:
+                try:
+                    endpoint = self.config['endpointUrl']
+                    api_version = self.config['apiVersion']
+                    url = f"https://{endpoint}/{api_version}"
+                    if self.orchestrator.wireguard.get_status(url):
+                        wg_conf = self.orchestrator.wireguard.anchor_data['conf']
+                        if self.orchestrator.wireguard.update_wg_config(wg_conf):
+                            if self.update_urbit():
+                                time.sleep((60 * 60 * 12) - 60)
+
+                except Exception as e:
+                    Log.log("Anchor: Failed to get updated anchor information: {e}")
+
+            time.sleep(60)
+
+    def update_urbit(self):
+        try:
+            for patp in self.orchestrator.urbit._urbits:
+                svc_url = None
+                http_port = None
+                ames_port = None
+                s3_port = None
+                console_port = None
+                pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+
+                for ep in self.orchestrator.wireguard.anchor_data['subdomains']:
+                    if ep['status'] == 'ok':
+                        if f'{patp}.{pub_url}' == ep['url']:
+                            svc_url = ep['url']
+                            http_port = ep['port']
+                        elif f'ames.{patp}.{pub_url}' == ep['url']:
+                            ames_port = ep['port']
+                        elif f'bucket.s3.{patp}.{pub_url}' == ep['url']:
+                            s3_port = ep['port']
+                        elif f'console.s3.{patp}.{pub_url}' == ep['url']:
+                            console_port = ep['port']
+
+                if not None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                    if not self.orchestrator.urbit.update_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port):
+                        raise Exception("Unable to update wireguard network")
+            return True
+        except Exception as e:
+            Log.log(f"Anchor: Failed to update urbit wireguard information: {e}")
+            return False

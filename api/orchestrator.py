@@ -1,5 +1,6 @@
 # Python 
 import os
+import time
 from datetime import datetime
 
 # Flask
@@ -124,15 +125,11 @@ class Orchestrator:
                 if data['data'] == 'export':
                     return self.urbit.export(urbit_id)
 
-                #TODO:
-                '''
                 if data['data'] == 's3-update':
-                    return self.set_minio_endpoint(urbit_id)
+                    return self.urbit.set_minio(urbit_id)
 
                 if data['data'] == 's3-unlink':
-                    lens_port = self.get_urbit_loopback_addr(urbit_id)
-                    return urb.unlink_minio_endpoint(lens_port)
-                '''
+                    return self.urbit.unlink_minio(urbit_id)
 
             # MinIO requests
             if data['app'] == 'minio':
@@ -140,10 +137,8 @@ class Orchestrator:
                 if pwd != None:
                     return self.minio.create_minio(urbit_id, pwd, self.urbit)
 
-                '''
                 if data['data'] == 'export':
-                    return self.export_minio_bucket(urbit_id)
-                '''
+                    return self.minio.export(urbit_id)
 
             return 400
 
@@ -156,7 +151,6 @@ class Orchestrator:
     #
     #   Anchor Settings
     #
-
 
     # Get anchor registration information
     def get_anchor_settings(self):
@@ -203,7 +197,7 @@ class Orchestrator:
         required = {
                 "vm": is_vm,
                 "updateMode": self.config['updateMode'],
-                "minio": False, #TODO:  self.minIO_on
+                "minio": self.minio.minios_on,
                 "containers" : SysGet.get_containers(),
                 "sessions": len(self.config['sessions']),
                 "gsVersion": ver
@@ -246,6 +240,26 @@ class Orchestrator:
         if module == 'watchtower':
             return SysPost.handle_updater(data, self.config_object)
 
+        # minIO module
+        if module == 'minio':
+            if data['action'] == 'reload':
+                if self.minio.stop_all():
+                    if self.minio.start_all():
+                        time.sleep(1)
+                        return 200
+            return 400
+
+        #TODO
+        '''
+        # logs module
+        if module == 'logs':
+            if data['action'] == 'view':
+                return self.get_log_lines(data['container'], data['haveLine'])
+
+            if data['action'] == 'export':
+                return '\n'.join(self.get_log_lines(data['container'], 0))
+        '''
+
         # anchor module
         if module == 'anchor':
             if data['action'] == 'get-url':
@@ -253,11 +267,11 @@ class Orchestrator:
 
             if data['action'] == 'toggle':
                 if self.wireguard.is_running():
-                    return self.wireguard.off(self.urbit)
-                return self.wireguard.on(self.urbit)
+                    return self.wireguard.off(self.urbit, self.minio)
+                return self.wireguard.on(self.minio)
 
             if data['action'] == 'restart':
-                return self.wireguard.restart(self.urbit)
+                return self.wireguard.restart(self.urbit, self.minio)
 
             if data['action'] == 'change-url':
                 return self.wireguard.change_url(data['url'], self.urbit)
@@ -283,28 +297,6 @@ class Orchestrator:
                 api_version = self.config['apiVersion']
                 url = f'https://{endpoint}/{api_version}'
                 return self.wireguard.cancel_subscription(data['key'],url)
-
-        #TODO:
-        '''
-        # logs module
-        if module == 'logs':
-            if data['action'] == 'view':
-                return self.get_log_lines(data['container'], data['haveLine'])
-
-            if data['action'] == 'export':
-                return '\n'.join(self.get_log_lines(data['container'], 0))
-
-
-        # minIO module
-        if module == 'minio':
-            if data['action'] == 'reload':
-                self.toggle_minios_off()
-                self.toggle_minios_on()
-                time.sleep(1)
-                return 200
-        
-
-        '''
 
         return module
 

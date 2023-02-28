@@ -5,6 +5,8 @@ import time
 import json
 import socket
 import shutil
+import string
+import secrets
 import zipfile
 
 from io import BytesIO
@@ -74,13 +76,15 @@ class Urbit:
     def start(self, patp):
         if self.load_config(patp):
             if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
-                return self.urb_docker.start(patp, self.updater_info, self._volume_directory)
+                return self.urb_docker.start(self._urbits[patp],
+                                             self.updater_info,
+                                             self.config_object._arch,
+                                             self._volume_directory)
         else:
             return "failed"
 
     def stop(self, patp):
-        if self.urb_docker.stop(patp):
-            return self.minio.stop_minio(f"minio_{patp}")
+        return self.urb_docker.stop(patp)
                 
 
     # Delete Urbit Pier and MiniO
@@ -303,7 +307,15 @@ class Urbit:
         # Check if Urbit Pier exists
         c = self.urb_docker.get_container(patp)
         if c:
+            # If MinIO container exists
+            containers = [patp]
+            has_bucket = False
+            if self.minio.minio_docker.get_container(f"minio_{patp}", False):
+                containers.append("minio_{patp}")
+                has_bucket = True
+
             cfg = self._urbits[patp]
+
             urbit = {
                 "name": patp,
                 "running": c.status == "running",
@@ -315,14 +327,14 @@ class Urbit:
                 "frequency": cfg['meld_frequency'],
                 "meldLast": datetime.fromtimestamp(int(cfg['meld_last'])),
                 "meldNext": datetime.fromtimestamp(int(cfg['meld_next'])),
-                "containers": [patp], #TODO: list minio container
+                "containers": containers,
                 "meldHour": int(cfg['meld_time'][0:2]),
                 "meldMinute": int(cfg['meld_time'][2:]),
                 "remote": False,
                 "urbitUrl": f"http://{socket.gethostname()}.local:{cfg['http_port']}",
                 "minIOUrl": "",
                 "minIOReg": True,
-                "hasBucket": False,
+                "hasBucket": has_bucket,
                 "loomSize": cfg['loom_size']
                 }
 
@@ -336,10 +348,6 @@ class Urbit:
 
             if cfg['minio_password'] == '':
                  urbit['minIOReg'] = False
-
-            # TODO
-            #if patp in self._minios:
-            #    urbit['hasBucket'] = True
 
             return urbit
         return 400
@@ -745,6 +753,127 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to set wireguard information")
             return False
+
+    # Update/Set Urbit S3 Endpoint
+    def set_minio(self, patp):
+        Log.log(f"{patp}: Attempting to set MinIO endpoint")
+        acc = 'urbit_minio'
+        secret = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(40))
+
+        if self.minio.make_service_account(patp, acc, secret):
+            u = self._urbits[patp]
+            endpoint = f"s3.{u['wg_url']}"
+            bucket = 'bucket'
+            lens_port = self.get_loopback_addr(patp)
+            try:
+                return self.set_minio_endpoint(patp, endpoint, acc, secret, bucket, lens_port)
+
+            except Exception as e:
+                Log.log(f"{patp}: Failed to set MinIO endpoint: {e}")
+
+        return 400
+
+    def unlink_minio(self, patp):
+        Log.log(f"{patp}: Attempting to unlink MinIO endpoint")
+        try:
+            lens_port = self.get_loopback_addr(patp)
+            return self.unlink_minio_endpoint(patp, lens_port)
+        except Exception as e:
+            Log.log(f"{patp}: Failed to unlink MinIO endpoint: {e}")
+        return 400
+
+    def set_minio_endpoint(self, patp, endpoint, access_key, secret, bucket, lens_addr):
+        self.send_poke(patp, 'set-endpoint', endpoint, lens_addr)
+        self.send_poke(patp, 'set-access-key-id', access_key, lens_addr)
+        self.send_poke(patp, 'set-secret-access-key', secret, lens_addr)
+        self.send_poke(patp, 'set-current-bucket', bucket, lens_addr)
+
+        return 200
+
+    def unlink_minio_endpoint(self, patp, lens_addr):
+        self.send_poke(patp, 'set-endpoint', '', lens_addr)
+        self.send_poke(patp, 'set-access-key-id', '', lens_addr)
+        self.send_poke(patp, 'set-secret-access-key', '', lens_addr)
+        self.send_poke(patp, 'set-current-bucket', '', lens_addr)
+
+        return 200
+
+    def send_poke(self, patp, command, data, lens_addr):
+        Log.log(f"{patp}: Attempting to send {command} poke")
+        try:
+            data = {"source": {"dojo": f"+landscape!s3-store/{command} '{data}'"}, "sink": {"app": "s3-store"}}
+            with open(f'{self._volume_directory}/{patp}/_data/{command}.json','w') as f :
+                json.dump(data, f)
+
+            cmd = f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}'
+            res = self.urb_docker.exec(patp, cmd)
+            if res:
+                os.remove(f'{self._volume_directory}/{patp}/_data/{command}.json')
+                Log.log(f"{patp}: {command} sent successfully")
+                return True
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to send {command}: {e}")
+
+        return False
+
+    def update_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
+        Log.log(f"{patp}: Attempting to update wireguard network")
+        changed = False
+        try:
+            cfg = self._urbits[patp]
+            if not cfg['wg_url'] == url:
+                Log.log(f"{patp}: Wireguard URL changed from {cfg['wg_url']} to {url}")
+                changed = True
+                cfg['wg_url'] = url
+
+            if not cfg['wg_http_port'] == http_port:
+                Log.log(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {http_port}")
+                changed = True
+                cfg['wg_http_port'] = http_port
+
+            if not cfg['wg_ames_port'] == ames_port:
+                Log.log(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {ames_port}")
+                changed = True
+                cfg['wg_ames_port'] = ames_port
+
+            if not cfg['wg_s3_port'] == s3_port:
+                Log.log(f"{patp}: Wireguard S3 Port changed from {cfg['wg_s3_port']} to {s3_port}")
+                changed = True
+                cfg['wg_s3_port'] = s3_port
+
+            if not cfg['wg_console_port'] == console_port:
+                Log.log(f"{patp}: Wireguard Console Port changed from {cfg['wg_console_port']} to {console_port}")
+                changed = True
+                cfg['wg_console_port'] = console_port
+
+            if changed:
+                self.save_config(patp)
+
+                if cfg['network'] != "none":
+                    Log.log(f"{patp}: Rebuilding container")
+                    running = False
+                    self.minio.minio_docker.remove_container(f"minio_{patp}")
+                    c = self.urb_docker.get_container(patp)
+                    if c:
+                        running = c.status == "running"
+                        if self.urb_docker.delete_container(patp):
+                            self.urb_docker.create(self._urbits[patp],
+                                                   self.updater_info,
+                                                   self.config_object._arch,
+                                                   self._volume_directory,
+                                                   '')
+                    if running:
+                        self.start(patp)
+        except Exception as e:
+            Log.log(f"{patp}: Unable to update Wireguard network: {e}")
+            return False
+
+        Log.log(f"{patp}: Wireguard network settings updated!")
+        return True
 
     # Container logs
     #def logs(self):

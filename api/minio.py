@@ -1,3 +1,11 @@
+# Python
+import os
+import zipfile
+from io import BytesIO
+
+# Flask
+from flask import send_file
+
 # GroundSeg modules
 from log import Log
 from mc_docker import MCDocker
@@ -8,6 +16,9 @@ class MinIO:
     updater_mc = {}
     updater_minio = {}
     mc_name = "minio_client"
+    minios_on = False
+
+    _volume_directory = '/var/lib/docker/volumes'
 
     def __init__(self, config, wg):
         self.config_object = config
@@ -34,6 +45,7 @@ class MinIO:
 
         if self.config['wgOn'] and self.config['wgRegistered']:
             self.start_mc()
+            self.start_all()
 
         Log.log("MinIO: Initialization Completed")
 
@@ -60,11 +72,44 @@ class MinIO:
         # Skip
         return True
 
+    def start_all(self):
+        self.minios_on = self.minio_docker.start_all()
+        return self.minios_on
+
+    def stop_all(self):
+        self.minios_on = False
+        return self.minio_docker.stop_all()
+
+    def stop_mc(self):
+        return self.mc_docker.stop(self.mc_name)
+
     def stop_minio(self, name):
         return self.minio_docker.stop(name)
     
     def delete(self, name):
         return self.minio_docker.delete(name)
+
+    def export(self, patp):
+        name = f"minio_{patp}"
+        Log.log(f"{name}: Attempting to export bucket")
+        c = self.minio_docker.get_container(name)
+        if c:
+            file_name = f"bucket_{patp}.zip"
+            memory_file = BytesIO()
+            file_path=f"{self._volume_directory}/{name}/_data/bucket"
+
+            Log.log(f"{name}: Compressing bucket")
+
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(file_path):
+                    arc_dir = root[root.find("_data/")+6:]
+                    for file in files:
+                        zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
+
+            memory_file.seek(0)
+
+            Log.log(f"{patp}: Pier successfully exported")
+            return send_file(memory_file, download_name=file_name, as_attachment=True)
 
     def mc_setup(self, name, pier_config):
         Log.log(f"{name}: Attempting to create MinIO admin account")
@@ -82,25 +127,30 @@ class MinIO:
 
         return False
 
-    '''
     def make_service_account(self, patp, acc, pwd):
         x = None
+        name = f"minio_{patp}"
 
-        print('Updating service account credentials', file=sys.stderr)
-        x = self.container.exec_run(f"mc admin user svcacct edit \
-                --secret-key '{pwd}' \
-                patp_{patp} {acc}", tty=True).output.decode('utf-8').strip()
+        Log.log(f"{name}: Attempting to make service account")
+        try:
+            c = self.mc_docker.get_container(self.mc_name)
+            if c:
+                Log.log(f"{name}: Attempting to update service account credentials.")
+                command = f"mc admin user svcacct edit --secret-key '{pwd}' patp_{patp} {acc}"
+                x = c.exec_run(command, tty=True).output.decode('utf-8').strip()
 
-        if 'ERROR' in x:
-            print('Service account does not exist. Creating new account...', file=sys.stderr)
-            x = self.container.exec_run(f"mc admin user svcacct add \
-                    --access-key '{acc}' \
-                    --secret-key '{pwd}' \
-                    patp_{patp} {patp}").output.decode('utf-8').strip()
-        
-            if 'ERROR' in x:
-                return 400
+                if 'ERROR' in x:
+                    Log.log(f"{name}: Service account does not exist. Creating new account")
+                    command = f"mc admin user svcacct add --access-key '{acc}' --secret-key '{pwd}' patp_{patp} {patp}"
+                    x = c.exec_run(command).output.decode('utf-8').strip()
 
-        return 200
-        
-    '''
+                    if 'ERROR' in x:
+                        raise Exception(x)
+
+                Log.log(f"{name}: Service account created")
+                return True
+
+        except Exception in e:
+            Log.log(f"{name}: Failed to update service account credentials: {e}")
+
+        return False

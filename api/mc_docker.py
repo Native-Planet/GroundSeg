@@ -34,6 +34,15 @@ class MCDocker:
             Log.log("MC: Failed to start container")
             return False
 
+    def stop(self, name):
+        Log.log("MC: Attempting to stop container")
+        c = self.get_container(name)
+        if not c:
+            return False
+        c.stop()
+        Log.log("MC: Container stopped")
+        return True
+
     def get_container(self, name):
         try:
             c = client.containers.get(name)
@@ -60,10 +69,10 @@ class MCDocker:
         try:
             Log.log("MC: Building container")
             c = client.containers.create(
-                    image= image,
-                    network='container:wireguard',
-                    entrypoint='/bin/bash',
-                    stdin_open=True,
+                    image = image,
+                    network = 'container:wireguard',
+                    entrypoint = '/bin/bash',
+                    stdin_open = True,
                     name = name,
                     detach=True)
             return c
@@ -84,35 +93,15 @@ class MCDocker:
             return True
 
     def exec(self, name, command):
+        Log.log(f"{name}: Executing command")
         c = self.get_container(name)
         if c:
             try:
-                c.exec_run(command)
+                x = c.exec_run(command)
+                Log.log(f"{name}: Output: {x.output.decode('utf-8').strip()}")
+
                 return True
             except Exception as e:
-                Log.log(f"{name}: Unable to exec {command}: {e}")
+                Log.log(f"{name}: Unable to exec command: {e}")
 
         return False
-
-    '''
-    def make_service_account(self, patp, acc, pwd):
-        x = None
-
-        print('Updating service account credentials', file=sys.stderr)
-        x = self.container.exec_run(f"mc admin user svcacct edit \
-                --secret-key '{pwd}' \
-                patp_{patp} {acc}", tty=True).output.decode('utf-8').strip()
-
-        if 'ERROR' in x:
-            print('Service account does not exist. Creating new account...', file=sys.stderr)
-            x = self.container.exec_run(f"mc admin user svcacct add \
-                    --access-key '{acc}' \
-                    --secret-key '{pwd}' \
-                    patp_{patp} {patp}").output.decode('utf-8').strip()
-        
-            if 'ERROR' in x:
-                return 400
-
-        return 200
-        
-    '''

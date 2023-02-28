@@ -9,8 +9,15 @@ client = docker.from_env()
 
 class UrbitDocker:
 
-    def start(self, patp, updater_info, vol_dir):
+    def start(self, config, updater_info, arch, vol_dir):
+        patp = config['pier_name']
         Log.log(f"{patp}: Attempting to start container")
+        tag = config['urbit_version']
+        if tag == "latest" or tag == "edge":
+            sha = f"{arch}_sha256"
+            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+        else:
+            image = f"{updater_info['repo']}:{updater_info['tag']}"
 
         # Check if patp is valid
         if not Utils.check_patp(patp):
@@ -21,6 +28,13 @@ class UrbitDocker:
         c = self.get_container(patp)
         if not c:
             return "failed"
+
+        if c.attrs['Config']['Image'] != image:
+            Log.log(f"{patp}: Container and config versions are mismatched")
+            if self.delete_container(patp):
+                c = self.create(config, updater_info, arch, vol_dir, '')
+                if not c:
+                    return "failed"
 
         # Get status
         if c.status == "running":
@@ -220,88 +234,3 @@ class UrbitDocker:
         except Exception as e:
             Log.log(f"{patp}: Failed to build container: {e}")
             return False
-
-
-    # TODO:
-    '''
-    def update_wireguard_network(self, url, http_port, ames_port, s3_port, console_port):
-        changed = False
-        if not self.config['wg_url'] == url:
-            Log.log_groundseg(f"{self.pier_name}: Wireguard URL changed from {self.config['wg_url']} to {url}")
-            changed = True
-            self.config['wg_url'] = url
-
-        if not self.config['wg_http_port'] == http_port:
-            Log.log_groundseg(f"{self.pier_name}: Wireguard HTTP Port changed from {self.config['wg_http_port']} to {http_port}")
-            changed = True
-            self.config['wg_http_port'] = http_port
-
-        if not self.config['wg_ames_port'] == ames_port:
-            Log.log_groundseg(f"{self.pier_name}: Wireguard Ames Port changed from {self.config['wg_ames_port']} to {ames_port}")
-            changed = True
-            self.config['wg_ames_port'] = ames_port
-
-        if not self.config['wg_s3_port'] == s3_port:
-            Log.log_groundseg(f"{self.pier_name}: Wireguard S3 Port changed from {self.config['wg_s3_port']} to {s3_port}")
-            changed = True
-            self.config['wg_s3_port'] = s3_port
-
-        if not self.config['wg_console_port'] == console_port:
-            Log.log_groundseg(f"{self.pier_name}: Wireguard Console Port changed from {self.config['wg_console_port']} to {console_port}")
-            changed = True
-            self.config['wg_console_port'] = console_port
-
-        if changed:
-            self.save_config()
-            if self.config['network'] != "none":
-                Log.log_groundseg(f"{self.pier_name}: Rebuilding container")
-                running = False
-                
-                if self.is_running():
-                    self.stop()
-                    running = True
-
-                self.container.remove()
-                
-                self.build_container()
-                Log.log_groundseg(f"{self.pier_name}: Rebuilding completed")
-                if running:
-                    Log.log_groundseg(f"{self.pier_name}: Restarting container")
-                    self.start()
-
-    def send_poke(self, command, data, lens_addr):
-
-        f_data = dict()
-        source = dict()
-        sink = dict()
-
-        source['dojo'] = f"+landscape!s3-store/{command} '{data}'"
-        sink['app'] = "s3-store"
-
-        f_data['source'] = source
-        f_data['sink'] = sink
-
-        with open(f'{self._volume_directory}/{self.pier_name}/_data/{command}.json','w') as f :
-            json.dump(f_data, f)
-
-        x = self.container.exec_run(f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}').output.strip()
-        os.remove(f'{self._volume_directory}/{self.pier_name}/_data/{command}.json')
-
-        return x
-
-    def set_minio_endpoint(self, endpoint, access_key, secret, bucket, lens_addr):
-        self.send_poke('set-endpoint', endpoint, lens_addr)
-        self.send_poke('set-access-key-id', access_key, lens_addr)
-        self.send_poke('set-secret-access-key', secret, lens_addr)
-        self.send_poke('set-current-bucket', bucket, lens_addr)
-
-        return 200
-
-    def unlink_minio_endpoint(self, lens_addr):
-        self.send_poke('set-endpoint', '', lens_addr)
-        self.send_poke('set-access-key-id', '', lens_addr)
-        self.send_poke('set-secret-access-key', '', lens_addr)
-        self.send_poke('set-current-bucket', '', lens_addr)
-
-        return 200
-'''

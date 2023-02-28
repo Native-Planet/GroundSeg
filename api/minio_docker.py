@@ -85,13 +85,52 @@ class MinIODocker:
 
         return False
 
-    def get_container(self, name):
+    def start_all(self):
+        Log.log(f"MinIO: Attempting to start all containers")
+        try:
+            Log.log(f"MinIO: Getting list of MinIO containers")
+            c = client.containers.list(all=True)
+            for m in c:
+                if m.name != 'minio_client' and m.name.startswith('minio_'):
+                    try:
+                        m.start()
+                        Log.log(f"MinIO: Started {m.name}")
+                    except Exception as e: 
+                        Log.log(f"MinIO: Failed to start {m.name}")
+
+        except Exception as e:
+            Log.log(f"MinIO: Failed to get list of MinIO containers: {e}")
+            return False
+
+        return True
+
+    def stop_all(self):
+        Log.log(f"MinIO: Attempting to stop all containers")
+        try:
+            Log.log(f"MinIO: Getting list of MinIO containers")
+            c = client.containers.list()
+            for m in c:
+                if m.name != 'minio_client' and m.name.startswith('minio_'):
+                    try:
+                        m.stop()
+                        Log.log(f"MinIO: Stopped {m.name}")
+                    except Exception as e: 
+                        Log.log(f"MinIO: Failed to stop {m.name}")
+
+        except Exception as e:
+            Log.log(f"MinIO: Failed to get list of MinIO containers: {e}")
+            return False
+
+        return True
+
+    def get_container(self, name, show_error=True):
         try:
             c = client.containers.get(name)
             return c
         except:
-            Log.log(f"{name}: Container not found")
-            return False
+            if show_error:
+                Log.log(f"{name}: Container not found")
+        return False
 
     def create_container(self, name, image, config):
         Log.log(f"{name}: Attempting to create container")

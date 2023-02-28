@@ -1,9 +1,8 @@
+import sys
+import json
+import base64
 import requests
 import subprocess
-import base64
-import json
-import sys
-
 from time import sleep
 
 # GroundSeg modules
@@ -75,22 +74,24 @@ class Wireguard:
     def is_running(self):
         return self.wg_docker.is_running(self.data['wireguard_name'])
 
-    def off(self, urb):
+    # wgOn False
+    def off(self, urb, minio):
         for p in urb._urbits:
             if urb._urbits[p]['network'] == 'wireguard':
                  urb.toggle_network(p)
-        # TODO
-        #self.toggle_minios_off()
+        minio.stop_all()
+        minio.stop_mc()
         self.stop()
         self.config['wgOn'] = False
         self.config_object.save_config()
 
         return 200
 
-    def on(self, urb):
+    # wgOn False
+    def on(self, minio):
         self.start()
-        # TODO
-        #self.toggle_minios_on()
+        minio.start_mc()
+        minio.start_all()
         self.config['wgOn'] = True
         self.config_object.save_config()
 
@@ -103,7 +104,7 @@ class Wireguard:
 
         return 200
 
-    def restart(self, urb):
+    def restart(self, urb, minio):
         try:
             Log.log("Wireguard: Attempting to restart wireguard")
             self.config_object.anchor_ready = False
@@ -113,8 +114,8 @@ class Wireguard:
                 if urb._urbits[patp]['network'] != 'none':
                     remote.append(patp)
 
-            if self.off(urb) == 200:
-                if self.on(urb) == 200:
+            if self.off(urb, minio) == 200:
+                if self.on(minio) == 200:
                     if len(remote) <= 0:
                         return 200
                     for patp in remote:
@@ -123,7 +124,7 @@ class Wireguard:
                             self.config_object.anchor_ready = True
                             return 200
         except Exception as e:
-            Log.log("Wireguard: Failed to restart wireguard: {e}")
+            Log.log(f"Wireguard: Failed to restart wireguard: {e}")
 
         return 400
 
