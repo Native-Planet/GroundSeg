@@ -1,16 +1,15 @@
+# Python
 import os
 import requests
-
 from time import sleep
 
+# GroundSeg modules
 from log import Log
 
 class BinUpdater:
-
     def check_bin_update(self, config, debug_mode):
 
         try:
-
             cur_hash = config.config['binHash']
             branch = config.config['updateBranch']
             mode = config.config['updateMode']

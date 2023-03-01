@@ -11,6 +11,7 @@ import nmcli
 # GroundSeg modules
 from log import Log
 from binary_updater import BinUpdater
+from docker_updater import DockerUpdater
 
 class Utils:
     def make_hash(file):
@@ -89,7 +90,8 @@ class Utils:
                     b.check_bin_update(config, debug_mode)
 
                     if config.gs_ready:
-                        print("Updater: placeholder -- docker update here")
+                        d = DockerUpdater()
+                        d.check_docker_update(config)
                         # Run docker updates
                         sleep(config.config['updateInterval'])
                     else:
@@ -102,6 +104,12 @@ class Utils:
                 config.update_avail = False
                 Log.log(f"Updater: Unable to retrieve update information: {e}")
                 sleep(60)
+
+    def get_wifi_device():
+        for d in nmcli.device():
+            if d.device_type == 'wifi':
+                return d.device
+        return "none"
 
     def list_wifi_ssids():
         return [x.ssid for x in nmcli.device.wifi() if len(x.ssid) > 0]

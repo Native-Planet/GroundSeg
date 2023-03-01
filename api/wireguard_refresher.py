@@ -17,7 +17,8 @@ class WireguardRefresher:
     # Checks if wireguard connection is functional, restarts wireguard
     def refresh_loop(self):
         Log.log("WG Refresher: Thread started")
-        while True:
+        while False:
+        #while True:
             try:
                 if self.config['wgOn'] and self.config_object.anchor_ready:
                     copied = self.urbit._urbits

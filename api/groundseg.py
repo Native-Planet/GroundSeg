@@ -17,6 +17,7 @@ from system_monitor import SysMonitor
 from melder import Melder
 from anchor_information import AnchorUpdater
 from wireguard_refresher import WireguardRefresher
+from kill_switch import KillSwitch
 
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
@@ -27,8 +28,9 @@ Thread(target=Utils.get_version_info, args=(sys_config, sys_config.debug_mode), 
 
 # Check C2C
 if sys_config.device_mode == "c2c":
-    # start c2c kill switch
-    print("c2c mode")
+    # C2C kill switch
+    ks = KillSwitch(sys_config)
+    Thread(target=ks.kill_switch, daemon=True).start()
 
     # Flask
     c2c = C2C(sys_config)

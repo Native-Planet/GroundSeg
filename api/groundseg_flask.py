@@ -88,8 +88,16 @@ class GroundSeg:
             return message
 
         # Bug Reporting
-        #@self.app.route("/bug", methods=['POST'])
+        @self.app.route("/bug", methods=['POST'])
+        def bug_report():
+            approved, message = self.verify(request)
 
+            if approved:
+                blob = request.get_json()
+                res = self.orchestrator.handle_report(blob)
+                return jsonify(res)
+
+            return message
         
         # Pier upload
         @self.app.route("/upload", methods=['POST'])

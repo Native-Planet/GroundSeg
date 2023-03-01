@@ -12,6 +12,7 @@ from setup import Setup
 from login import Login
 from system_get import SysGet
 from system_post import SysPost
+from bug_report import BugReport
 
 # Docker
 from wireguard import Wireguard
@@ -68,6 +69,16 @@ class Orchestrator:
 
 
     #
+    #   Bug Report
+    #
+
+
+    def handle_report(self, data):
+        bp = self.config_object.base_path
+        return BugReport.submit_report(data, bp, self.config['wgRegistered'])
+
+
+    #
     #   Urbit Pier
     #
 
@@ -76,7 +87,7 @@ class Orchestrator:
     def get_urbits(self):
         return self.urbit.list_ships()
 
-   # Get all details of Urbit ID
+    # Get all details of Urbit ID
     def get_urbit(self, urbit_id):
         return self.urbit.get_info(urbit_id)
 
