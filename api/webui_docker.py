@@ -15,14 +15,14 @@ class WebUIDocker:
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{updater_info['tag']}"
+            image = f"{updater_info['repo']}:{tag}"
 
 
         Log.log("WebUI: Attempting to start container")
-        if self._get_container(name):
-            self._remove_container(name)
+        if self.get_container(name):
+            self.remove_container(name)
 
-        c = self._create_container(name, image, config)
+        c = self.create_container(name, image, config)
 
         try:
             c.start()
@@ -33,9 +33,9 @@ class WebUIDocker:
             return False
 
 
-    def _remove_container(self, name):
+    def remove_container(self, name):
         Log.log("WebUI: Attempting to remove old container")
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             Log.log("WebUI: Failed to remove container")
             return False
@@ -44,17 +44,16 @@ class WebUIDocker:
             Log.log("WebUI: Successfully removed container")
             return True
 
-    def _get_container(self, name):
+    def get_container(self, name):
         try:
             c = client.containers.get(name)
-            Log.log("WebUI: Container found")
             return c
         except:
             Log.log("WebUI: Container not found")
             return False
 
 
-    def _create_container(self, name, image, config):
+    def create_container(self, name, image, config):
         Log.log("WebUI: Attempting to create container")
         if self._pull_image(image):
                 return self._build_container(name, image, config)

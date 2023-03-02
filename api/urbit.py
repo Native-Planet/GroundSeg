@@ -50,8 +50,10 @@ class Urbit:
     def __init__(self, config, wg, minio):
         self.config_object = config
         self.config = config.config
+
         self.wg = wg
         self.minio = minio
+
         self.urb_docker = UrbitDocker()
         self._urbits = {}
 
@@ -462,7 +464,7 @@ class Urbit:
                 
                 old_network = self._urbits[patp]['network']
 
-                self.urb_docker.delete_container(patp)
+                self.urb_docker.remove_container(patp)
 
                 if old_network == "none" and wg_reg and wg_is_running:
                     self._urbits[patp]['network'] = "wireguard"
@@ -496,7 +498,7 @@ class Urbit:
                     running = True
                 
                 old_loom = self._urbits[patp]['loom_size']
-                self.urb_docker.delete_container(patp)
+                self.urb_docker.remove_container(patp)
                 self._urbits[patp]['loom_size'] = size
                 self.save_config(patp)
                 Log.log(f"{patp}: Loom size changed: {old_loom} -> {self._urbits[patp]['loom_size']}")
@@ -860,7 +862,7 @@ class Urbit:
                     c = self.urb_docker.get_container(patp)
                     if c:
                         running = c.status == "running"
-                        if self.urb_docker.delete_container(patp):
+                        if self.urb_docker.remove_container(patp):
                             self.urb_docker.create(self._urbits[patp],
                                                    self.updater_info,
                                                    self.config_object._arch,
@@ -868,11 +870,12 @@ class Urbit:
                                                    '')
                     if running:
                         self.start(patp)
+                    Log.log(f"{patp}: Wireguard network settings updated!")
+            else:
+                Log.log(f"{patp}: Nothing to change!")
         except Exception as e:
             Log.log(f"{patp}: Unable to update Wireguard network: {e}")
             return False
-
-        Log.log(f"{patp}: Wireguard network settings updated!")
         return True
 
     # Container logs

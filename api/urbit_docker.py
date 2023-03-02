@@ -34,7 +34,7 @@ class UrbitDocker:
 
         if c.attrs['Config']['Image'] != image:
             Log.log(f"{patp}: Container and config versions are mismatched")
-            if self.delete_container(patp):
+            if self.remove_container(patp):
                 c = self.create(config, updater_info, arch, vol_dir, '')
                 if not c:
                     return "failed"
@@ -53,8 +53,8 @@ class UrbitDocker:
             c.start()
             Log.log(f"{patp}: Successfully started container")
             return "succeeded"
-        except:
-            Log.log(f"{patp}: Failed to start container")
+        except Exception as e:
+            Log.log(f"{patp}: Failed to start container: {e}")
             return "failed"
 
     def stop(self, patp):
@@ -99,10 +99,10 @@ class UrbitDocker:
                     return self.add_key(key, patp, vol_dir)
 
     def delete(self, patp):
-        if self.delete_container(patp):
+        if self.remove_container(patp):
             return self.delete_volume(patp)
 
-    def delete_container(self, patp):
+    def remove_container(self, patp):
         Log.log(f"{patp}: Attempting to delete container")
         c = self.get_container(patp)
         if not c:
@@ -215,8 +215,6 @@ class UrbitDocker:
                         mounts = [mount],
                         detach=True)
             else:
-                Log.log(f"{patp}: Network is set to local")
-
                 c = client.containers.create(
                         image = image,
                         command = command, 

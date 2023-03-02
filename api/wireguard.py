@@ -171,7 +171,7 @@ class Wireguard:
             self.delete_service(f'{patp}','urbit',old_url)
             self.delete_service(f's3.{patp}','minio',old_url)
 
-        self.off(urb)
+        self.off(urb, minio)
         self.config_object.reset_pubkey()
         Log.log("Wireguard: Changed url")
         self.config_object.save_config()

@@ -13,6 +13,8 @@ from c2c_flask import C2C
 
 # Threads
 from threading import Thread
+from binary_updater import BinUpdater
+from docker_updater import DockerUpdater
 from system_monitor import SysMonitor
 from melder import Melder
 from anchor_information import AnchorUpdater
@@ -24,7 +26,8 @@ base_path = "/opt/nativeplanet/groundseg"
 sys_config = Config(base_path, dev)
 
 # Start Updater
-Thread(target=Utils.get_version_info, args=(sys_config, sys_config.debug_mode), daemon=True).start()
+bin_updater = BinUpdater(sys_config, sys_config.debug_mode)
+Thread(target=bin_updater.check_bin_update, daemon=True).start()
 
 # Check C2C
 if sys_config.device_mode == "c2c":
@@ -55,6 +58,10 @@ else:
     # Wireguard connection refresher
     wg_refresher = WireguardRefresher(sys_config, orchestrator)
     Thread(target=wg_refresher.refresh_loop, daemon=True).start()
+
+    # Docker updater
+    docker_updater = DockerUpdater(sys_config, orchestrator)
+    Thread(target=docker_updater.check_docker_update, daemon=True).start()
 
     # Flask
     groundseg = GroundSeg(sys_config, orchestrator)

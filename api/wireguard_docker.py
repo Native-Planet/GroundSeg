@@ -12,10 +12,10 @@ class WireguardDocker:
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{updater_info['tag']}"
+            image = f"{updater_info['repo']}:{config['tag']}"
 
         Log.log("Wireguard: Attempting to start container")
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             c = self._create_container(name, image, config)
             if not c:
@@ -45,7 +45,7 @@ class WireguardDocker:
         name = config['wireguard_name']
         Log.log("Wireguard: Attempting to stop container")
 
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             return False
         try:
@@ -58,8 +58,8 @@ class WireguardDocker:
 
     
     def remove_wireguard(self, name):
-        if self._remove_container(name):
-            return self._remove_volume(name)
+        if self.remove_container(name):
+            return self.remove_volume(name)
         return False
 
 
@@ -76,7 +76,7 @@ class WireguardDocker:
         return False
 
     def logs(self, name):
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             Log.log("Wireguard: Failed to retrieve logs")
             return False
@@ -84,15 +84,15 @@ class WireguardDocker:
 
 
     def is_running(self, name):
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             return False
         return c.status == "running"
 
 
-    def _remove_container(self, name):
+    def remove_container(self, name):
         Log.log("Wireguard: Attempting to remove container")
-        c = self._get_container(name)
+        c = self.get_container(name)
         if not c:
             Log.log("Wireguard: Failed to remove container")
             return False
@@ -102,7 +102,7 @@ class WireguardDocker:
             return True
 
 
-    def _remove_volume(self, name):
+    def remove_volume(self, name):
         Log.log("Wireguard: Attempting to remove volume")
         try:
             v = self._get_volume(name)
@@ -114,7 +114,7 @@ class WireguardDocker:
             return False
 
 
-    def _get_container(self, name):
+    def get_container(self, name):
         try:
             c = client.containers.get(name)
             return c

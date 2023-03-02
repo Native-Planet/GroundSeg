@@ -7,19 +7,49 @@ from time import sleep
 from log import Log
 
 class BinUpdater:
-    def check_bin_update(self, config, debug_mode):
+    def __init__(self, config, debug_mode):
+        self.config_object = config
+        self.config = config.config
+        self.arch = config._arch
+        self.base_path = config.base_path
+        self.debug_mode = debug_mode
 
+    def check_bin_update(self):
+        Log.log("Updater: Binary updater thread started")
+        while True:
+            try:
+                Log.log("Updater: Checking for binary updates")
+                url = self.config['updateUrl']
+                r = requests.get(url)
+
+                if r.status_code == 200:
+                    self.config_object.update_avail = True
+                    self.config_object.update_payload = r.json()
+
+                    # Run binary update check
+                    self.run_check()
+                    sleep(self.config['updateInterval'])
+
+                else:
+                    raise ValueError(f"Status code {r.status_code}")
+
+            except Exception as e:
+                config.update_avail = False
+                Log.log(f"Updater: Unable to retrieve update information: {e}")
+                sleep(60)
+
+    def run_check(self):
         try:
-            cur_hash = config.config['binHash']
-            branch = config.config['updateBranch']
-            mode = config.config['updateMode']
+            cur_hash = self.config['binHash']
+            branch = self.config['updateBranch']
+            mode = self.config['updateMode']
 
             if mode == 'auto':
                 # Remove prior failed download
                 self.remove_file('groundseg_new')
 
                 # Get payload information
-                d = config.update_payload['groundseg'][branch]['groundseg']
+                d = self.config_object.update_payload['groundseg'][branch]['groundseg']
 
                 # Get version
                 ver = f"v{d['major']}.{d['minor']}.{d['patch']}"
@@ -27,18 +57,18 @@ class BinUpdater:
                     ver = f"{ver}-edge"
 
                 # Show versions
-                Log.log(f"Updater: Current {config.config['gsVersion']} | Latest {ver}")
+                Log.log(f"Updater: Current {self.config['gsVersion']} | Latest {ver}")
 
                 # Download new version
-                if cur_hash == d[f'{config._arch}_sha256']:
+                if cur_hash == d[f'{self.arch}_sha256']:
                     Log.log("Updater: No binary update required")
                 else:
                     Log.log(f"Updater: Downloading new groundseg binary")
 
                     # Stream chunks and write to file
-                    dl = d[f"{config._arch}_url"]
+                    dl = d[f"{self.arch}_url"]
                     r = requests.get(dl)
-                    f = open(f"{config.base_path}/groundseg_new", 'wb')
+                    f = open(f"{self.base_path}/groundseg_new", 'wb')
                     for chunk in r.iter_content(chunk_size=512 * 1024):
                         if chunk:
                             f.write(chunk)
@@ -46,22 +76,22 @@ class BinUpdater:
 
                     # Remove old binary
                     Log.log("Updater: Removing old groundseg binary")
-                    self.remove_file(f"{config.base_path}/groundseg")
+                    self.remove_file(f"{self.base_path}/groundseg")
 
                     # Rename new binary
                     Log.log("Updater: Renaming new groundseg binary")
-                    self.rename_file(f"{config.base_path}/groundseg_new",
-                                     f"{config.base_path}/groundseg")
+                    self.rename_file(f"{self.base_path}/groundseg_new",
+                                     f"{self.base_path}/groundseg")
 
                     # Make binary executable
                     Log.log("Updater: Setting launch permissions for new binary")
-                    os.system(f"chmod +x {config.base_path}/groundseg")
+                    os.system(f"chmod +x {self.base_path}/groundseg")
 
                     # Pause
                     sleep(1)
 
                     # Restart GroundSeg
-                    if debug_mode:
+                    if self.debug_mode:
                         Log.log("Updater: Debug mode: Skipping restart")
                     else:
                         Log.log("Updater: Restarting groundseg...")
