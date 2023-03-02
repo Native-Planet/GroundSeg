@@ -58,7 +58,7 @@ This **DOES NOT** remove the docker volumes on the device.
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/standard_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/standard_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/standard_uninstall.sh && \
 sudo /tmp/nativeplanet/standard_uninstall.sh
 ```
@@ -70,7 +70,7 @@ This removes GroundSeg related docker containers and images, and the GroundSeg s
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/groundseg_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/groundseg_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/groundseg_uninstall.sh && \
 sudo /tmp/nativeplanet/groundseg_uninstall.sh
 ```
@@ -82,7 +82,7 @@ This wipes all docker and GroundSeg data. Make sure you have exported the data y
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/complete_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/complete_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/complete_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/complete_uninstall.sh && \
 sudo /tmp/nativeplanet/complete_uninstall.sh
 ```
