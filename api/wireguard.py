@@ -130,7 +130,7 @@ class Wireguard:
 
     # Container logs
     def logs(self):
-        return self.wg_docker.logs(self.data['wireguard_name'])
+        return self.wg_docker.full_logs(self.data['wireguard_name'])
 
     # New anchor registration
     def build_anchor(self, url, reg_key):
@@ -178,6 +178,10 @@ class Wireguard:
         if self.config['endpointUrl'] == url:
             return 200
         return 400
+
+    # Container logs
+    def logs(self, name):
+        return self.wg_docker.full_logs(name)
 
     # Load wireguard.json
     def load_config(self):

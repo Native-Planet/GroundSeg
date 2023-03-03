@@ -154,3 +154,7 @@ class MinIO:
             Log.log(f"{name}: Failed to update service account credentials: {e}")
 
         return False
+
+    # Container logs
+    def minio_logs(self, name):
+        return self.minio_docker.full_logs(name)

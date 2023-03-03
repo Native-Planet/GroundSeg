@@ -313,7 +313,7 @@ class Urbit:
             containers = [patp]
             has_bucket = False
             if self.minio.minio_docker.get_container(f"minio_{patp}", False):
-                containers.append("minio_{patp}")
+                containers.append(f"minio_{patp}")
                 has_bucket = True
 
             cfg = self._urbits[patp]
@@ -879,8 +879,8 @@ class Urbit:
         return True
 
     # Container logs
-    #def logs(self):
-    #    return self.wg_docker.logs(self.data['wireguard_name'])
+    def logs(self, patp):
+        return self.urb_docker.full_logs(patp)
 
     def load_config(self, patp):
         try:

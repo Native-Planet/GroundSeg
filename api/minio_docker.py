@@ -13,12 +13,14 @@ class MinIODocker:
             image = f"{updater_info['repo']}:{tag}"
 
         Log.log(f"{name}: Attempting to start container")
-        # Get container
+        # Remove container
         c = self.get_container(name)
+        if c:
+            self.remove_container(name)
+
+        c = self.create_container(name, image, config)
         if not c:
-            c = self.create_container(name, image, config)
-            if not c:
-                return False
+            return False
 
         # Check for version match
         if c.attrs['Config']['Image'] != image:
@@ -39,6 +41,7 @@ class MinIODocker:
             return self.exec(name, 'mkdir -p /data/bucket')
         except:
             Log.log(f"{name}: Failed to start container")
+            return False
             return False
 
     def stop(self, name):
@@ -210,3 +213,9 @@ class MinIODocker:
         except Exception as e:
             Log.log(f"{name}: Failed to build container: {e}")
             return False
+
+    def full_logs(self, name):
+        c = self.get_container(name)
+        if not c:
+            return False
+        return c.logs()

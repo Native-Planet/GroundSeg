@@ -189,3 +189,9 @@ class WireguardDocker:
         except Exception as e:
             Log.log(f"Wireguard: Failed to build container: {e}")
             return False
+
+    def full_logs(self, name):
+        c = self.get_container(name)
+        if not c:
+            return False
+        return c.logs()

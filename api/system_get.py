@@ -12,8 +12,9 @@ class SysGet:
     def get_containers():
         containers = []
         try:
-            for c in docker.from_env().containers.list(all=True):
-                containers.append(c.name)
+            for c in docker.from_env().containers.list():
+                if c.name != 'groundseg-webui' and c.name != 'minio_client':
+                    containers.append(c.name)
         except Exception as e:
             Log.log(f"System: Get container list failed: {e}")
 

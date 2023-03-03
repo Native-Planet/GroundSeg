@@ -10,10 +10,12 @@ class MCDocker:
 
         Log.log("MC: Attempting to start container")
         c = self.get_container(name)
+        if c:
+            self.remove_container(name)
+
+        c = self.create_container(name, image)
         if not c:
-            c = self.create_container(name, image)
-            if not c:
-                return False
+            return False
 
         if c.attrs['Config']['Image'] != image:
             Log.log("MC: Container and config versions are mismatched")

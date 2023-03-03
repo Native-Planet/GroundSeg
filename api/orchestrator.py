@@ -260,17 +260,6 @@ class Orchestrator:
                         return 200
             return 400
 
-        #TODO
-        '''
-        # logs module
-        if module == 'logs':
-            if data['action'] == 'view':
-                return self.get_log_lines(data['container'], data['haveLine'])
-
-            if data['action'] == 'export':
-                return '\n'.join(self.get_log_lines(data['container'], 0))
-        '''
-
         # anchor module
         if module == 'anchor':
             if data['action'] == 'get-url':
@@ -309,7 +298,29 @@ class Orchestrator:
                 url = f'https://{endpoint}/{api_version}'
                 return self.wireguard.cancel_subscription(data['key'],url)
 
+        # logs module
+        if module == 'logs':
+            if data['action'] == 'view':
+                return self.get_log_lines(data['container'], data['haveLine'])
+
+            if data['action'] == 'export':
+                return '\n'.join(self.get_log_lines(data['container'], 0))
+
         return module
+
+    def get_log_lines(self, container, line):
+        blob = ''
+
+        if container == 'wireguard':
+            blob = self.wireguard.logs()
+
+        if 'minio_' in container:
+            blob = self.minio.minio_logs(container)
+
+        if container in self.urbit._urbits:
+            blob = self.urbit.logs(container)
+
+        return blob.decode('utf-8').split('\n')[line:]
 
     def handle_upload(self, req):
         # change to temp mode (DO NOT SAVE CONFIG)
