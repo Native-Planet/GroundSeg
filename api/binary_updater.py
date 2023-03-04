@@ -54,11 +54,13 @@ class BinUpdater:
 
                 # Get version
                 ver = f"v{d['major']}.{d['minor']}.{d['patch']}"
+                old_ver = self.config['gsVersion']
                 if branch == 'edge':
                     ver = f"{ver}-edge"
+                    old_ver = f"{old_ver}-edge"
 
                 # Show versions
-                Log.log(f"Updater: Current {self.config['gsVersion']} | Latest {ver}")
+                Log.log(f"Updater: Current {old_ver} | Latest {ver}")
 
                 # Download new version
                 dl_hash = d[f'{self.arch}_sha256']
