@@ -12,7 +12,7 @@ class WireguardDocker:
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{config['tag']}"
+            image = f"{updater_info['repo']}:{tag}"
 
         Log.log("Wireguard: Attempting to start container")
         c = self.get_container(name)

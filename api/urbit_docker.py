@@ -17,7 +17,7 @@ class UrbitDocker:
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{updater_info['tag']}"
+            image = f"{updater_info['repo']}:{tag}"
 
         # Check if patp is valid
         if not Utils.check_patp(patp):
