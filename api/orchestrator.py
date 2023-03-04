@@ -203,7 +203,7 @@ class Orchestrator:
 
         ver = str(self.config_object.version)
         if self.config['updateBranch'] == 'edge':
-            settings['gsVersion'] = ver + '-edge'
+            ver = f"{ver}-edge"
 
         required = {
                 "vm": is_vm,
