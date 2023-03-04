@@ -1,5 +1,6 @@
 chardet
 flask
+python-crontab
 requests
 docker
 psutil

@@ -12,6 +12,7 @@ from time import sleep
 
 # Modules
 from pywgkey.key import WgKey
+from crontab import CronTab
 
 # GroundSeg Modules
 from log import Log
@@ -29,7 +30,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.1"
+    version = "v1.1.2"
 
     # Debug mode
     debug_mode = False
@@ -221,6 +222,29 @@ class Config:
     def set_device_mode(self):
         Log.log("Config: Setting device mode")
         self.check_mode_file()
+        self.set_update_fixer()
+        self.device_mode_internet()
+
+
+    def set_update_fixer(self):
+        # check if npbox
+        if self.device_mode == "npbox":
+            # create fixer.sh
+            fixer = f"{self.base_path}/fixer.sh"
+            if not os.path.isfile(fixer):
+                Log.log(f"Config: Update fixer script not detected. Creating!")
+                with open(fixer, "w") as f:
+                    f.write(self.fixer_script())
+                    f.close()
+                os.system(f"chmod +x {fixer}")
+            # create cron job
+            cron = CronTab(user='root')
+            if len(list(cron.find_command(fixer))) <= 0:
+                Log.log(f"Config: Updater cron job not found. Creating!")
+                job = cron.new(command=f"/bin/sh {fixer}").minute.every(5)
+                cron.write()
+
+    def device_mode_internet(self):
         internet = Utils.check_internet_access()
         if self.device_mode == "npbox":
             if not internet:
@@ -261,3 +285,13 @@ class Config:
             Log.log("Config: Saving system.json")
             json.dump(self.config, f, indent = 4)
             return True
+
+
+    def fixer_script(self):
+        return """\
+if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
+    echo "Started: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+    wget -O - only.groundseg.app | bash;
+    echo "Ended: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+fi\
+"""
