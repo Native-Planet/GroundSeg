@@ -53,64 +53,68 @@ pipeline {
                 }
             }
         } */
-        stage('amd64 build') {
-            steps {
-                /* build amd64 binary and move to web dir */
-                script {
-                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                        sh '''
-                            git checkout ${tag}
-                            mkdir -p /opt/groundseg/version/bin
-                            cd ./build-scripts
-                            docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                            cd ..
-                            rm -rf /var/jenkins_home/tmp
-                            mkdir -p /var/jenkins_home/tmp
-                            cp -r api /var/jenkins_home/tmp
-                            docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
-                            chmod +x /var/jenkins_home/tmp/binary/groundseg
-                            mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                        '''
-                    }
-                    if( "${channel}" == "latest" ) {
-                        sh '''
-                            cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest
-                            cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_latest
-                        '''
+        stage('build') {
+          parallel {
+            stage('amd64 build') {
+                steps {
+                    /* build amd64 binary and move to web dir */
+                    script {
+                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                            sh '''
+                                git checkout ${tag}
+                                mkdir -p /opt/groundseg/version/bin
+                                cd ./build-scripts
+                                docker build --tag nativeplanet/groundseg-builder:3.10.9 .
+                                cd ..
+                                rm -rf /var/jenkins_home/tmp
+                                mkdir -p /var/jenkins_home/tmp
+                                cp -r api /var/jenkins_home/tmp
+                                docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
+                                chmod +x /var/jenkins_home/tmp/binary/groundseg
+                                mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                            '''
+                        }
+                        if( "${channel}" == "latest" ) {
+                            sh '''
+                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest
+                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_latest
+                            '''
+                        }
                     }
                 }
             }
-        }
-        stage('arm64 build') {
-            agent { node { label 'arm' } }
-            steps {
-                /* build arm64 binary and stash it, build and push crossplatform webui docker image */
-                checkout([$class: 'GitSCM',
-                          branches: [[name: "${params.RELEASE_TAG}"]],
-                          doGenerateSubmoduleConfigurations: false,
-                          extensions: [],
-                          gitTool: 'Default',
-                          submoduleCfg: [],
-                          userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
-                        ])
-                script {
-                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                        sh '''
-                            git checkout ${tag}
-                            cd build-scripts
-                            docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                            cd ..
-                            docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
-                            cd ui
-                            docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
-                            cd ../..
-                        '''
-                        stash includes: 'binary/groundseg', name: 'groundseg_arm64'
+            stage('arm64 build') {
+                agent { node { label 'arm' } }
+                steps {
+                    /* build arm64 binary and stash it, build and push crossplatform webui docker image */
+                    checkout([$class: 'GitSCM',
+                              branches: [[name: "${params.RELEASE_TAG}"]],
+                              doGenerateSubmoduleConfigurations: false,
+                              extensions: [],
+                              gitTool: 'Default',
+                              submoduleCfg: [],
+                              userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
+                            ])
+                    script {
+                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                            sh '''
+                                git checkout ${tag}
+                                cd build-scripts
+                                docker build --tag nativeplanet/groundseg-builder:3.10.9 .
+                                cd ..
+                                docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
+                                cd ui
+                                docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
+                                cd ../..
+                            '''
+                            stash includes: 'binary/groundseg', name: 'groundseg_arm64'
+                        }
                     }
+                    /* workspace has to be cleaned or build will fail next time */
+                    cleanWs()
                 }
-                /* workspace has to be cleaned or build will fail next time */
-                cleanWs()
             }
+          }
         }
         stage('move binaries') {
             steps {
