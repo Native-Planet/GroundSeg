@@ -5,6 +5,7 @@ from time import sleep
 
 # GroundSeg modules
 from log import Log
+from utils import Utils
 
 class BinUpdater:
     def __init__(self, config, debug_mode):
@@ -60,13 +61,15 @@ class BinUpdater:
                 Log.log(f"Updater: Current {self.config['gsVersion']} | Latest {ver}")
 
                 # Download new version
-                if cur_hash == d[f'{self.arch}_sha256']:
+                dl_hash = d[f'{self.arch}_sha256']
+                if cur_hash == dl_hash:
                     Log.log("Updater: No binary update required")
                 else:
                     Log.log(f"Updater: Downloading new groundseg binary")
 
                     # Stream chunks and write to file
                     dl = d[f"{self.arch}_url"]
+                    Log.log(f"Updater: Download URL: {dl}")
                     r = requests.get(dl)
                     f = open(f"{self.base_path}/groundseg_new", 'wb')
                     for chunk in r.iter_content(chunk_size=512 * 1024):
@@ -74,28 +77,35 @@ class BinUpdater:
                             f.write(chunk)
                     f.close()
 
-                    # Remove old binary
-                    Log.log("Updater: Removing old groundseg binary")
-                    self.remove_file(f"{self.base_path}/groundseg")
-
-                    # Rename new binary
-                    Log.log("Updater: Renaming new groundseg binary")
-                    self.rename_file(f"{self.base_path}/groundseg_new",
-                                     f"{self.base_path}/groundseg")
-
-                    # Make binary executable
-                    Log.log("Updater: Setting launch permissions for new binary")
-                    os.system(f"chmod +x {self.base_path}/groundseg")
-
-                    # Pause
-                    sleep(1)
-
-                    # Restart GroundSeg
-                    if self.debug_mode:
-                        Log.log("Updater: Debug mode: Skipping restart")
+                    # Check new binary hash
+                    new_hash = Utils.make_hash(f"{self.base_path}/groundseg_new")
+                    if new_hash != dl_hash:
+                        Log.log(f"Updater: Version server binary hash: {dl_hash}")
+                        Log.log(f"Updater: Downloaded binary hash: {new_hash}")
+                        Log.log(f"Updater: Hash mismatched. Incorrect file downloaded")
                     else:
-                        Log.log("Updater: Restarting groundseg...")
-                        os.system("systemctl restart groundseg")
+                        # Remove old binary
+                        Log.log("Updater: Removing old groundseg binary")
+                        self.remove_file(f"{self.base_path}/groundseg")
+
+                        # Rename new binary
+                        Log.log("Updater: Renaming new groundseg binary")
+                        self.rename_file(f"{self.base_path}/groundseg_new",
+                                         f"{self.base_path}/groundseg")
+
+                        # Make binary executable
+                        Log.log("Updater: Setting launch permissions for new binary")
+                        os.system(f"chmod +x {self.base_path}/groundseg")
+
+                        # Pause
+                        sleep(1)
+
+                        # Restart GroundSeg
+                        if self.debug_mode:
+                            Log.log("Updater: Debug mode: Skipping restart")
+                        else:
+                            Log.log("Updater: Restarting groundseg...")
+                            os.system("systemctl restart groundseg")
 
         except Exception as e:
             Log.log(f"Updater: Binary updater failed: {e}")
