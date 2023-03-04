@@ -1,5 +1,5 @@
 dev = False
-dev = True
+#dev = True
 
 # GroundSeg modules
 from config import Config

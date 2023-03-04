@@ -3,7 +3,7 @@ import os
 import zipfile
 import requests
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # GroundSeg modules
 from log import Log
@@ -12,11 +12,22 @@ class BugReport:
     def submit_report(data, base_path, wg_reg):
         Log.log("Bug: Attempting to send bug report")
         try:
-            # Prep
-            report = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-            os.system(f"mkdir -p {base_path}/bug-reports/{report}")
-            current_logfile = f"{datetime.now().strftime('%Y-%m')}.log"
+            # Current date
+            now = datetime.now()
 
+            # current logfile
+            current_logfile = f"{now.strftime('%Y-%m')}.log"
+
+            # Previous logfile
+            if now.month == 1:
+                prev = datetime(now.year - 1, 12, now.day)
+            else:
+                prev = now - timedelta(days=now.day)
+            prev_logfile = f"{prev.strftime('%Y-%m')}.log"
+
+            # Make report
+            report = now.strftime('%Y-%m-%d-%H-%M-%S')
+            os.system(f"mkdir -p {base_path}/bug-reports/{report}")
             with open(f"{base_path}/bug-reports/{report}/details.txt", "w") as f:
                 Log.log(f"Bug: Saving bug report {report} locally")
                 f.write(f"Contact:\n{data['person']}\nDetails:\n{data['message']}")
@@ -42,6 +53,12 @@ class BugReport:
 
             # current log
             bug_file.write(f"{base_path}/logs/{current_logfile}", arcname=current_logfile)
+
+            # previous log
+            try:
+                bug_file.write(f"{base_path}/logs/{prev_logfile}", arcname=prev_logfile)
+            except:
+                pass
 
             # save zipfile
             bug_file.close()
