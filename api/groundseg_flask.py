@@ -162,4 +162,4 @@ class GroundSeg:
     def run(self):
         Log.log("GroundSeg: Starting Flask server")
         debug_mode = self.config_object.debug_mode
-        self.app.run(host='0.0.0.0', port=27016, threaded=True, debug=debug_mode, use_reloader=debug_mode)
+        self.app.run(host='0.0.0.0', port=27016, threaded=True, debug=debug_mode, use_reloader=False)

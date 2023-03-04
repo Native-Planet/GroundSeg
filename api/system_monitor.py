@@ -12,10 +12,12 @@ class SysMonitor:
     def sys_monitor(self):
         Log.log("Monitor: System monitor thread started")
         error = False
+        error_time = 15
         while not self.config_object.device_mode == "vm":
             if error:
-                Log.log("Monitor: System monitor error, 15 second timeout")
-                sleep(15)
+                Log.log(f"Monitor: System monitor error, Checking again in {error_time} seconds")
+                sleep(error_time)
+                error_time = error_time * 2
                 error = False
 
             # RAM info

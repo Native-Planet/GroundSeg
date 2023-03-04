@@ -138,9 +138,10 @@ class Wireguard:
         try:
             if self.register_device(url, reg_key):
                 if self.get_status(url):
-                    if self.update_wg_config(self.anchor_data['conf']):
-                        Log.log("Anchor: Registered with anchor server")
-                        return True
+                    if self.start():
+                        if self.update_wg_config(self.anchor_data['conf']):
+                            Log.log("Anchor: Registered with anchor server")
+                            return True
 
         except Exception as e:
             Log.log(f"Wireguard: Failed to build anchor: {e}")
@@ -158,7 +159,7 @@ class Wireguard:
             Log.log(f"Wireguard: Failed to update wg0.confg: {e}")
 
     # Change Anchor endpoint URL
-    def change_url(self, url, urb):
+    def change_url(self, url, urb, minio):
         Log.log(f"Wireguard: Attempting to change endopint url to {url}")
         endpoint = self.config['endpointUrl']
         api_version = self.config['apiVersion']

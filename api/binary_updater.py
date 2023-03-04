@@ -105,6 +105,9 @@ class BinUpdater:
                         # Restart GroundSeg
                         if self.debug_mode:
                             Log.log("Updater: Debug mode: Skipping restart")
+                            Log.log("Updater: Debug mode: Setting new bin hash")
+                            self.config['binHash'] = Utils.make_hash(f"{self.base_path}/groundseg")
+                            self.config_object.save_config()
                         else:
                             Log.log("Updater: Restarting groundseg...")
                             os.system("systemctl restart groundseg")

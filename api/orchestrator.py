@@ -43,7 +43,7 @@ class Orchestrator:
     def handle_setup(self, page, data):
         try:
             if page == "anchor":
-                return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit)
+                return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit, self.minio)
 
             if page == "password":
                 if self.config_object.create_password(data['password']):
@@ -381,7 +381,11 @@ class Orchestrator:
                 return "File size mismatched"
             else:
                 Log.log(f"{patp}: Upload complete")
-                return self.urbit.boot_existing(filename)
+                res = self.urbit.boot_existing(filename)
+                if self.config['updateMode'] == 'temp':
+                    self.config['updateMode'] = 'auto'
+                return res
+
         else:
             # Not final chunk yet
             return 200
