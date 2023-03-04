@@ -79,9 +79,9 @@ class BinUpdater:
 
                     # Check new binary hash
                     new_hash = Utils.make_hash(f"{self.base_path}/groundseg_new")
+                    Log.log(f"Updater: Version server binary hash: {dl_hash}")
+                    Log.log(f"Updater: Downloaded binary hash: {new_hash}")
                     if new_hash != dl_hash:
-                        Log.log(f"Updater: Version server binary hash: {dl_hash}")
-                        Log.log(f"Updater: Downloaded binary hash: {new_hash}")
                         Log.log(f"Updater: Hash mismatched. Incorrect file downloaded")
                     else:
                         # Remove old binary
