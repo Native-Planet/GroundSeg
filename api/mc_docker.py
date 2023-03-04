@@ -1,55 +1,109 @@
 import docker
-import sys
+from log import Log
 
 client = docker.from_env()
 
 class MCDocker:
-    _mc_img = "minio/mc:latest"
+    def start(self, name, updater_info, arch):
+        sha = f"{arch}_sha256"
+        image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
 
-    def __init__(self):
-        client.images.pull(self._mc_img)
+        Log.log("MC: Attempting to start container")
+        c = self.get_container(name)
+        if c:
+            self.remove_container(name)
 
-        containers = client.containers.list(all=True)
+        c = self.create_container(name, image)
+        if not c:
+            return False
 
-        for c in containers:
-            if c.name == 'minio_client':
-                try:
-                    c.stop()
-                    c.remove()
-                except Exception as e:
-                    print(f"MC removal error: {e}", file=sys.stderr)
+        if c.attrs['Config']['Image'] != image:
+            Log.log("MC: Container and config versions are mismatched")
+            if self.remove_container(name):
+                c = self.create_container(name, image)
+                if not c:
+                    return False
 
-        self.container = client.containers.run(
-                    image= f'{self._mc_img}',
-                    network='container:wireguard',
-                    entrypoint='/bin/bash',
-                    stdin_open=True,
-                    name = 'minio_client',
-                    detach=True
-                    )
+        if c.status == "running":
+            Log.log("MC: Container already started")
+            return True
 
-    def mc_setup(self, patp, port, pwd):
-        self.container.exec_run(f"mc alias set patp_{patp} http://localhost:{port} {patp} {pwd}")
-        self.container.exec_run(f"mc anonymous set public patp_{patp}/bucket")
-        return 200
+        try:
+            c.start()
+            Log.log("MC: Successfully started container")
+            return True
+        except:
+            Log.log("MC: Failed to start container")
+            return False
 
-    def make_service_account(self, patp, acc, pwd):
-        x = None
+    def stop(self, name):
+        Log.log("MC: Attempting to stop container")
+        c = self.get_container(name)
+        if not c:
+            return False
+        c.stop()
+        Log.log("MC: Container stopped")
+        return True
 
-        print('Updating service account credentials', file=sys.stderr)
-        x = self.container.exec_run(f"mc admin user svcacct edit \
-                --secret-key '{pwd}' \
-                patp_{patp} {acc}", tty=True).output.decode('utf-8').strip()
+    def get_container(self, name):
+        try:
+            c = client.containers.get(name)
+            return c
+        except:
+            Log.log("MC: Container not found")
+            return False
 
-        if 'ERROR' in x:
-            print('Service account does not exist. Creating new account...', file=sys.stderr)
-            x = self.container.exec_run(f"mc admin user svcacct add \
-                    --access-key '{acc}' \
-                    --secret-key '{pwd}' \
-                    patp_{patp} {patp}").output.decode('utf-8').strip()
-        
-            if 'ERROR' in x:
-                return 400
+    def create_container(self, name, image):
+        Log.log("MC: Attempting to create container")
+        if self.pull_image(image):
+            return self.build_container(name, image)
 
-        return 200
-        
+    def pull_image(self, image):
+        try:
+            Log.log(f"MC: Pulling {image}")
+            client.images.pull(image)
+            return True
+        except Exception as e:
+            Log.log(f"MC: Failed to pull {image}: {e}")
+            return False
+
+    def build_container(self, name, image):
+        try:
+            Log.log("MC: Building container")
+            c = client.containers.create(
+                    image = image,
+                    network = 'container:wireguard',
+                    entrypoint = '/bin/bash',
+                    stdin_open = True,
+                    name = name,
+                    detach=True)
+            return c
+
+        except Exception as e:
+            Log.log(f"MC: Failed to build container: {e}")
+            return False
+
+    def remove_container(self, name):
+        Log.log("MC: Attempting to remove container")
+        c = self.get_container(name)
+        if not c:
+            Log.log("MC: Failed to remove container")
+            return False
+        else:
+            c.remove(force=True)
+            Log.log("MC: Successfully removed container")
+            return True
+
+    def exec(self, name, command):
+        Log.log(f"{name}: Executing command")
+        c = self.get_container(name)
+        if c:
+            try:
+                x = c.exec_run(command)
+                Log.log(f"{name}: Output: {x.output.decode('utf-8').strip()}")
+
+                return True
+            except Exception as e:
+                Log.log(f"{name}: Unable to exec command: {e}")
+
+        return False
