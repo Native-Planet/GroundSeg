@@ -32,7 +32,7 @@ sudo wget -O - only.groundseg.app | bash
 
 ### Switching to the Edge branch (Unstable)
 
-1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch" to "edge"
+1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch"` to `"edge"`
 2. `sudo systemctl restart groundseg`
 
 ## Building From Source
