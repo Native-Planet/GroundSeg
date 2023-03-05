@@ -128,7 +128,8 @@ pipeline {
                         sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}'
                         sh 'rm -rf /opt/groundseg/version/bin/binary/'
                         sh '''#!/bin/bash -x
-                        #placeholder
+                        rclone -vvv --config /opt/groundseg/get/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
+                        rclone -vvv --config /opt/groundseg/get/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                         '''
                     }
                 }
@@ -198,8 +199,8 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://bin.infra.native.computer/groundseg_arm64_${tag}_${channel}"
-                amdbin = "https://bin.infra.native.computer/groundseg_amd64_${tag}_${channel}"
+                armbin = "https://files.native.computer/bin/groundseg_arm64_${tag}_${channel}"
+                amdbin = "https://files.native.computer/bin/groundseg_amd64_${tag}_${channel}"
             }
             steps {
                 script {
