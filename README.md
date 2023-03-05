@@ -30,19 +30,10 @@ This downloads the appropriate service file for you init system and the groundse
 sudo wget -O - only.groundseg.app | bash
 ```
 
-### For Windows
+### Switching to the Edge branch (Unstable)
 
-Coming soon
-
-### For MacOS
-
-Coming soon
-
-## Edge Branch Installation (Unstable)
-
-1. Go to `/opt/nativeplanet/groundseg/settings/system.json`
-2. Set `"updateBranch" to "edge"
-3. `sudo systemctl restart groundseg`
+1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch" to "edge"
+2. `sudo systemctl restart groundseg`
 
 ## Building From Source
 
