@@ -1,5 +1,8 @@
-dev = False
-#dev = True
+try:
+    import sys
+    dev = sys.argv[1] == "dev"
+except:
+    dev = False
 
 # GroundSeg modules
 from config import Config
@@ -42,7 +45,10 @@ if sys_config.device_mode == "c2c":
 else:
     # System monitoring
     sys_mon = SysMonitor(sys_config)
-    Thread(target=sys_mon.sys_monitor, daemon=True).start()
+    Thread(target=sys_mon.ram_monitor, daemon=True).start()
+    Thread(target=sys_mon.cpu_monitor, daemon=True).start()
+    Thread(target=sys_mon.temp_monitor, daemon=True).start()
+    Thread(target=sys_mon.disk_monitor, daemon=True).start()
 
     # Start GroundSeg orchestrator
     orchestrator = Orchestrator(sys_config)

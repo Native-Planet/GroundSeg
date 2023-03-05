@@ -35,9 +35,10 @@ class UrbitDocker:
         if c.attrs['Config']['Image'] != image:
             Log.log(f"{patp}: Container and config versions are mismatched")
             if self.remove_container(patp):
-                c = self.create(config, updater_info, arch, vol_dir, '')
-                if not c:
-                    return "failed"
+                if self.create(config, updater_info, arch, vol_dir, ''):
+                    c = self.get_container(patp)
+                    if not c:
+                        return "failed"
 
         # Get status
         if c.status == "running":

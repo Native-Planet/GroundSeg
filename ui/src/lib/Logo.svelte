@@ -29,12 +29,4 @@
     padding-bottom: 10px;
 
 	}
-	.home {
-    display: flex;
-		font-size: 12px;
-		margin-left: 18px;
-		margin-top: 5px;
-		color: inherit;
-    gap: 4px;
-	}
 </style>

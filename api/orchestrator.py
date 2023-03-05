@@ -1,6 +1,7 @@
 # Python 
 import os
 import time
+import socket
 from datetime import datetime
 
 # Flask
@@ -15,6 +16,7 @@ from system_post import SysPost
 from bug_report import BugReport
 
 # Docker
+from netdata import Netdata
 from wireguard import Wireguard
 from minio import MinIO
 from urbit import Urbit
@@ -29,6 +31,7 @@ class Orchestrator:
         self.config = config.config
 
         self.wireguard = Wireguard(config)
+        self.netdata = Netdata(config)
         self.minio = MinIO(config, self.wireguard)
         self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
@@ -211,7 +214,8 @@ class Orchestrator:
                 "minio": self.minio.minios_on,
                 "containers" : SysGet.get_containers(),
                 "sessions": len(self.config['sessions']),
-                "gsVersion": ver
+                "gsVersion": ver,
+                "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}"
                 }
 
         optional = {} 

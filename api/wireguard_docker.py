@@ -7,7 +7,7 @@ class WireguardDocker:
 
     def start(self, config, updater_info, arch):
         name = config['wireguard_name']
-        tag = config['tag']
+        tag = config['wireguard_version']
         if tag == "latest" or tag == "edge":
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
