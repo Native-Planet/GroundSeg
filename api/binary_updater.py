@@ -19,7 +19,7 @@ class BinUpdater:
         Log.log("Updater: Binary updater thread started")
         while True:
             try:
-                Log.log("Updater: Checking for binary updates")
+                Log.log("Updater: Fetching version server for updated information")
                 url = self.config['updateUrl']
                 r = requests.get(url)
 

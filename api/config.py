@@ -95,6 +95,10 @@ class Config:
         # load existing or create new system.json
         self.config = self.load_config(self.config_file)
 
+        # fix updateMode if set to temp
+        if self.config['updateMode'] == 'temp':
+            self.config['updateMode'] = 'auto'
+
         # if first boot, set up keys
         if self.config['firstBoot']:
             Log.log("Config: First Boot detected! GroundSeg is in setup mode")

@@ -357,6 +357,7 @@ class Orchestrator:
 
             if self.config['updateMode'] == 'temp':
                 self.config['updateMode'] = 'auto'
+                self.config_object.save_config()
 
             return "File exists, try uploading again"
 
@@ -369,6 +370,7 @@ class Orchestrator:
 
             if self.config['updateMode'] == 'temp':
                 self.config['updateMode'] = 'auto'
+                self.config_object.save_config()
 
             return "Can't write to disk"
 
@@ -381,6 +383,7 @@ class Orchestrator:
 
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'
+                    self.config_object.save_config()
 
                 # size mismatch
                 return "File size mismatched"
@@ -389,6 +392,7 @@ class Orchestrator:
                 res = self.urbit.boot_existing(filename)
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'
+                    self.config_object.save_config()
                 return res
 
         else:
@@ -397,5 +401,6 @@ class Orchestrator:
 
         if self.config['updateMode'] == 'temp':
             self.config['updateMode'] = 'auto'
+            self.config_object.save_config()
 
         return 400
