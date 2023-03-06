@@ -18,27 +18,26 @@ class BinUpdater:
     def check_bin_update(self):
         Log.log("Updater: Binary updater thread started")
         while True:
-            if self.config['updateMode'] == 'auto':
-                try:
-                    Log.log("Updater: Checking for binary updates")
-                    url = self.config['updateUrl']
-                    r = requests.get(url)
+            try:
+                Log.log("Updater: Checking for binary updates")
+                url = self.config['updateUrl']
+                r = requests.get(url)
 
-                    if r.status_code == 200:
-                        self.config_object.update_avail = True
-                        self.config_object.update_payload = r.json()
+                if r.status_code == 200:
+                    self.config_object.update_avail = True
+                    self.config_object.update_payload = r.json()
 
-                        # Run binary update check
-                        self.run_check()
-                        sleep(self.config['updateInterval'])
+                    # Run binary update check
+                    self.run_check()
+                    sleep(self.config['updateInterval'])
 
-                    else:
-                        raise ValueError(f"Status code {r.status_code}")
+                else:
+                    raise ValueError(f"Status code {r.status_code}")
 
-                except Exception as e:
-                    config.update_avail = False
-                    Log.log(f"Updater: Unable to retrieve update information: {e}")
-                    sleep(60)
+            except Exception as e:
+                config.update_avail = False
+                Log.log(f"Updater: Unable to retrieve update information: {e}")
+                sleep(60)
 
     def run_check(self):
         try:
