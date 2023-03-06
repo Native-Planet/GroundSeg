@@ -73,7 +73,7 @@ class Netdata:
 
         except Exception as e:
             Log.log(f"Netdata: Failed to open netdata.json: {e}")
-            Log.log("Netdata: New wireguard.json will be created")
+            Log.log("Netdata: New netdata.json will be created")
 
     # Save netdata.json
     def save_config(self):
