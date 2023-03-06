@@ -14,6 +14,7 @@ class DockerUpdater:
         self.webui = orchestrator.webui
         self.minio = orchestrator.minio
         self.urbit = orchestrator.urbit
+        self.netdata = orchestrator.netdata
 
     def check_docker_update(self):
         Log.log("Updater: Docker updater thread started")
@@ -25,11 +26,31 @@ class DockerUpdater:
 
                     self.config_object.anchor_ready = False
                     Log.log("Anchor: Refresh loop is unready")
-                    self.update_wireguard()
-                    self.update_webui()
-                    self.update_mc()
-                    self.update_minio()
-                    self.update_urbit()
+                    try:
+                        self.update_wireguard()
+                    except Exception as e:
+                        Log.log(f"Updater: Wireguard update failed: {e}")
+                    try:
+                        self.update_webui()
+                    except Exception as e:
+                        Log.log(f"Updater: WebUI update failed: {e}")
+                    try:
+                        self.update_mc()
+                    except Exception as e:
+                        Log.log(f"Updater: MinIO Client update failed: {e}")
+                    try:
+                        self.update_minio()
+                    except Exception as e:
+                        Log.log(f"Updater: MinIO update failed: {e}")
+                    try:
+                        self.update_urbit()
+                    except Exception as e:
+                        Log.log(f"Updater: Urbit update failed: {e}")
+                    try:
+                        self.update_netdata()
+                    except Exception as e:
+                        Log.log(f"Updater: Netdata update failed: {e}")
+
                     Log.log("Anchor: Refresh loop is ready")
                     self.config_object.anchor_ready = True
                     sleep(self.config['updateInterval'])
@@ -42,7 +63,7 @@ class DockerUpdater:
             Log.log(f"Updater: Checking for wireguard updates")
             info = self.payload['wireguard']
             wg_name = self.wireguard.data['wireguard_name']
-            tag = self.wireguard.data['tag']
+            tag = self.wireguard.data['wireguard_version']
             repo = info['repo']
 
             if tag == "latest" or tag == "edge":
@@ -92,6 +113,25 @@ class DockerUpdater:
                     Log.log(f"Updater: WebUI update complete")
             else:
                 Log.log("Updater: WebUI already correct version")
+
+    def update_netdata(self):
+        name = self.netdata.data['netdata_name']
+        tag = self.netdata.data['netdata_version']
+        info = self.payload['netdata']
+        if tag == "latest" or tag == "edge":
+            sha = f"{self.arch}_sha256"
+            image = f"{info['repo']}:tag@sha256:{info[sha]}"
+        else:
+            image = f"{updater_info['repo']}:{tag}"
+        c = self.netdata.nd_docker.get_container(name)
+        if c:
+            old_image = c.attrs['Config']['Image']
+            if old_image != image:
+                Log.log(f"Updater: Netdata update detected. Updating..")
+                if self.netdata.start():
+                    Log.log(f"Updater: Netdata update complete")
+            else:
+                Log.log("Updater: Netdata already correct version")
 
     def update_mc(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
