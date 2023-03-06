@@ -286,6 +286,7 @@ class Orchestrator:
                 url = f"https://{endpoint}/{api_version}"
 
                 if self.wireguard.build_anchor(url, data['key']):
+                    self.minio.start_mc()
                     self.config['wgRegistered'] = True
                     self.config['wgOn'] = True
 

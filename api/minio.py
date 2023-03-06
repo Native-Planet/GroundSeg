@@ -150,7 +150,7 @@ class MinIO:
                 Log.log(f"{name}: Service account created")
                 return True
 
-        except Exception in e:
+        except Exception as e:
             Log.log(f"{name}: Failed to update service account credentials: {e}")
 
         return False

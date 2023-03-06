@@ -15,6 +15,7 @@ class Setup:
             api_version = config.config['apiVersion']
             url = f"https://{endpoint}/{api_version}"
             if wg.build_anchor(url, data['key']):
+                minio.start_mc()
                 config.config['wgRegistered'] = True
                 config.config['wgOn'] = True
 
