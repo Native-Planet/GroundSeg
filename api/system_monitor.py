@@ -48,6 +48,7 @@ class SysMonitor:
         while not self.mode == "vm":
             try:
                 self.config_object._core_temp = psutil.sensors_temperatures()['coretemp'][0].current
+                sleep(1)
                 error_time = 15
             except Exception as e:
                 self.config_object._core_temp = 0.0
@@ -63,6 +64,7 @@ class SysMonitor:
         while not self.mode == "vm":
             try:
                 self.config_object._disk = shutil.disk_usage("/")
+                sleep(1)
                 error_time = 15
             except Exception as e:
                 self.config_object._disk = [0,0,0]
