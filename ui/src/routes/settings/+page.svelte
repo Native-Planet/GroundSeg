@@ -12,6 +12,7 @@
   import Logs from '$lib/Logs.svelte'
   import SysInfo from '$lib/SysInfo.svelte'
   import SysInfoLite from '$lib/SysInfoLite.svelte'
+  import Netdata from '$lib/Netdata.svelte'
   import Power from '$lib/Power.svelte'
 
   import Network from '$lib/Network.svelte'
@@ -124,6 +125,7 @@
               updateMode={$system.updateMode}
               />
           {/if}
+          <Netdata link={$system.netdata} />
         </div>
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
