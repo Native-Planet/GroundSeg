@@ -30,7 +30,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.6"
+    version = "v1.1.7"
 
     # Debug mode
     debug_mode = False

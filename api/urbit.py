@@ -765,7 +765,7 @@ class Urbit:
             string.ascii_lowercase + 
             string.digits) for i in range(40))
 
-        if self.minio.make_service_account(patp, acc, secret):
+        if self.minio.make_service_account(self._urbits[patp], patp, acc, secret):
             u = self._urbits[patp]
             endpoint = f"s3.{u['wg_url']}"
             bucket = 'bucket'

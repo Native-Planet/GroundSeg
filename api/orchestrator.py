@@ -319,6 +319,9 @@ class Orchestrator:
         if container == 'wireguard':
             blob = self.wireguard.logs()
 
+        if container == 'netdata':
+            blob = self.netdata.logs()
+
         if 'minio_' in container:
             blob = self.minio.minio_logs(container)
 

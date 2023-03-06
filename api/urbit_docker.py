@@ -45,6 +45,10 @@ class UrbitDocker:
             Log.log(f"{patp}: Container already started")
             return "succeeded"
 
+        # Check noboot
+        if config['boot_status'] == "noboot":
+            return "ignored"
+
         # Start ship container
         try:
             with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:

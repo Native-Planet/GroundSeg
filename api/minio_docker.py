@@ -42,7 +42,6 @@ class MinIODocker:
         except:
             Log.log(f"{name}: Failed to start container")
             return False
-            return False
 
     def stop(self, name):
         Log.log(f"{name}: Attempting to stop container")

@@ -127,28 +127,30 @@ class MinIO:
 
         return False
 
-    def make_service_account(self, patp, acc, pwd):
+    def make_service_account(self, pier_config, patp, acc, pwd):
         x = None
         name = f"minio_{patp}"
 
         Log.log(f"{name}: Attempting to make service account")
         try:
-            c = self.mc_docker.get_container(self.mc_name)
-            if c:
-                Log.log(f"{name}: Attempting to update service account credentials.")
-                command = f"mc admin user svcacct edit --secret-key '{pwd}' patp_{patp} {acc}"
-                x = c.exec_run(command, tty=True).output.decode('utf-8').strip()
-
-                if 'ERROR' in x:
-                    Log.log(f"{name}: Service account does not exist. Creating new account")
-                    command = f"mc admin user svcacct add --access-key '{acc}' --secret-key '{pwd}' patp_{patp} {patp}"
-                    x = c.exec_run(command).output.decode('utf-8').strip()
+            # create admin account if failed previously
+            if self.mc_setup(name, pier_config):
+                c = self.mc_docker.get_container(self.mc_name)
+                if c:
+                    Log.log(f"{name}: Attempting to update service account credentials.")
+                    command = f"mc admin user svcacct edit --secret-key '{pwd}' patp_{patp} {acc}"
+                    x = c.exec_run(command, tty=True).output.decode('utf-8').strip()
 
                     if 'ERROR' in x:
-                        raise Exception(x)
+                        Log.log(f"{name}: Service account does not exist. Creating new account")
+                        command = f"mc admin user svcacct add --access-key '{acc}' --secret-key '{pwd}' patp_{patp} {patp}"
+                        x = c.exec_run(command).output.decode('utf-8').strip()
 
-                Log.log(f"{name}: Service account created")
-                return True
+                        if 'ERROR' in x:
+                            raise Exception(x)
+
+                    Log.log(f"{name}: Service account created")
+                    return True
 
         except Exception as e:
             Log.log(f"{name}: Failed to update service account credentials: {e}")

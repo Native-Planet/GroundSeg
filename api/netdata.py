@@ -61,6 +61,10 @@ class Netdata:
     def start(self):
         return self.nd_docker.start(self.data, self.updater_info, self.config_object._arch)
 
+    # Container logs
+    def logs(self):
+        return self.nd_docker.full_logs(self.data['netdata_name'])
+
     #def stop(self):
     #    return self.nd_docker.stop()
 
