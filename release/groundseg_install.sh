@@ -8,7 +8,7 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=master
-TAG=v1.0.8
+TAG=v1.1.7_latest
 DEVICE_ARCH=$(uname -m)
 
 # Directory to save the scrips
@@ -20,11 +20,9 @@ sudo systemctl stop groundseg
 
 # Download GroundSeg binary
 if [[ $DEVICE_ARCH == "aarch64" ]]; then
-sudo wget -O $SAVE_DIR/groundseg \
-  https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg_arm64
+  sudo wget -O $SAVE_DIR/groundseg https://files.native.computer/bin/groundseg_arm64_$TAG
 elif [[ $DEVICE_ARCH == "x86_64" ]]; then
-sudo wget -O $SAVE_DIR/groundseg \
-  https://github.com/$ACC/$REPO/releases/download/$TAG/groundseg
+  sudo wget -O $SAVE_DIR/groundseg https://files.native.computer/bin/groundseg_amd64_$TAG
 fi
 
 sudo chmod +x $SAVE_DIR/groundseg
@@ -39,15 +37,6 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   sudo systemctl enable groundseg
   sudo systemctl daemon-reload 
   sudo systemctl restart groundseg
-
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-
-  # launchd daemon
-  sudo wget -O /Library/LaunchDaemons/io.nativeplanet.groundseg.plist \
-	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.groundseg.plist
-
-  # Load and start
-  sudo launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist
 
 else
   echo "Unsupported Operating System. Please reach out to ~raldeg/nativeplanet for further assistance"
