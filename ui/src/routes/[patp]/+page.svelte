@@ -136,7 +136,7 @@
           <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
         </div>
         <div transition:scale={{duration:120, delay: 200}}>
-          <PierMinIO minIOReg={urbit.minIOReg} remote={urbit.remote} minIOUrl={urbit.minIOUrl} />
+          <PierMinIO minIOReg={urbit.minIOReg} minIOUrl={urbit.minIOUrl} />
         </div>
       {/if}
 
