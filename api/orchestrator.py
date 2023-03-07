@@ -208,6 +208,10 @@ class Orchestrator:
         if self.config['updateBranch'] == 'edge':
             ver = f"{ver}-edge"
 
+        ui_branch = ''
+        if self.webui.data['webui_version'] == 'edge':
+            ui_branch = '-edge'
+
         required = {
                 "vm": is_vm,
                 "updateMode": self.config['updateMode'],
@@ -215,6 +219,7 @@ class Orchestrator:
                 "containers" : SysGet.get_containers(),
                 "sessions": len(self.config['sessions']),
                 "gsVersion": ver,
+                "uiBranch": ui_branch,
                 "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}"
                 }
 
@@ -322,11 +327,15 @@ class Orchestrator:
         if container == 'netdata':
             blob = self.netdata.logs()
 
+        if container == 'groundseg':
+            return Log.get_log()[line:]
+
         if 'minio_' in container:
             blob = self.minio.minio_logs(container)
 
         if container in self.urbit._urbits:
             blob = self.urbit.logs(container)
+
 
         return blob.decode('utf-8').split('\n')[line:]
 

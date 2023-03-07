@@ -10,7 +10,7 @@ client = docker.from_env()
 class WebUIDocker:
     def start(self, config, updater_info, arch):
         name = config['webui_name']
-        tag = config['tag']
+        tag = config['webui_version']
         if tag == "latest" or tag == "edge":
             sha = f"{arch}_sha256"
             image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"

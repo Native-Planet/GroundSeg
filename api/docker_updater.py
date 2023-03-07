@@ -97,7 +97,7 @@ class DockerUpdater:
 
     def update_webui(self):
         name = self.webui.data['webui_name']
-        tag = self.webui.data['tag']
+        tag = self.webui.data['webui_version']
         info = self.payload['webui']
         if tag == "latest" or tag == "edge":
             sha = f"{self.arch}_sha256"
