@@ -111,6 +111,14 @@ pipeline {
                             '''
                             stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                         }
+                        if( "${channel}" == "latest") {
+                            sh '''
+                                git checkout ${tag}
+                                cd ui
+                                docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
+                                cd ../..
+                            '''
+                        }
                     }
                     /* workspace has to be cleaned or build will fail next time */
                     cleanWs()
