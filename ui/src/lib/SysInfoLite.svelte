@@ -3,7 +3,7 @@
   import { scale } from 'svelte/transition'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let gsVersion, updateMode
+  export let gsVersion, uiBranch, updateMode
 
 	const toggleUpdate = () => {
     let module = 'watchtower'
@@ -43,7 +43,7 @@
     <!-- groundseg_webui version -->
     <div class="hw-version">
       <div class="word">Web UI Version</div>
-      <span>{webuiVersion}</span>
+      <span>{webuiVersion}{uiBranch}</span>
     </div>
 
     <!-- App update modes -->
