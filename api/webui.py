@@ -12,7 +12,8 @@ class WebUI:
                       "webui_name": "groundseg-webui",
                       "webui_version": "latest",
                       "image": "nativeplanet/groundseg-webui",
-                      "port": 80
+                      "port": 80,
+                      "background": ""
                       }   
 
     def __init__(self, config):
