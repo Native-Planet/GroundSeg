@@ -68,7 +68,7 @@ class DockerUpdater:
 
             if tag == "latest" or tag == "edge":
                 sha = f"{self.arch}_sha256"
-                image = f"{repo}:{tag}@sha256:{info[sha]}"
+                image = f"{repo}:tag@sha256:{info[sha]}"
             else:
                 image = f"{repo}:{tag}"
 
@@ -101,7 +101,7 @@ class DockerUpdater:
         info = self.payload['webui']
         if tag == "latest" or tag == "edge":
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:{tag}@sha256:{info[sha]}"
+            image = f"{info['repo']}:tag@sha256:{info[sha]}"
         else:
             image = f"{updater_info['repo']}:{tag}"
         c = self.webui.webui_docker.get_container(name)
@@ -120,7 +120,7 @@ class DockerUpdater:
         info = self.payload['netdata']
         if tag == "latest" or tag == "edge":
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:{tag}@sha256:{info[sha]}"
+            image = f"{info['repo']}:tag@sha256:{info[sha]}"
         else:
             image = f"{updater_info['repo']}:{tag}"
         c = self.netdata.nd_docker.get_container(name)
@@ -138,7 +138,7 @@ class DockerUpdater:
             Log.log(f"Updater: Checking for MinIO Client updates")
             info = self.payload['miniomc']
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:{tag}@sha256:{info[sha]}"
+            image = f"{info['repo']}:tag@sha256:{info[sha]}"
             mc_name = self.minio.mc_name
             c = self.minio.mc_docker.get_container(mc_name)
             if c:
@@ -169,7 +169,7 @@ class DockerUpdater:
                     tag = self.urbit._urbits[p]['minio_version']
                     if tag == "latest" or tag == "edge":
                         sha = f"{self.arch}_sha256"
-                        image = f"{info['repo']}:{tag}@sha256:{info[sha]}"
+                        image = f"{info['repo']}:tag@sha256:{info[sha]}"
                     else:
                         image = f"{info['repo']}:{tag}"
                     if c:
@@ -196,7 +196,7 @@ class DockerUpdater:
             tag = self.urbit._urbits[p]['urbit_version']
             if tag == "latest" or tag == "edge":
                 sha = f"{self.arch}_sha256"
-                image = f"{info['repo']}:{tag}@sha256:{info[sha]}"
+                image = f"{info['repo']}:tag@sha256:{info[sha]}"
             else:
                 image = f"{info['repo']}:{tag}"
             c = self.urbit.urb_docker.get_container(p)
