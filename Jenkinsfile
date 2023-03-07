@@ -76,8 +76,10 @@ pipeline {
                         }
                         if( "${channel}" == "latest" ) {
                             sh '''
-                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest
-                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_latest
+                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                             '''
                         }
                     }
@@ -108,6 +110,14 @@ pipeline {
                                 cd ../..
                             '''
                             stash includes: 'binary/groundseg', name: 'groundseg_arm64'
+                        }
+                        if( "${channel}" == "latest") {
+                            sh '''
+                                git checkout ${tag}
+                                cd ui
+                                docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
+                                cd ../..
+                            '''
                         }
                     }
                     /* workspace has to be cleaned or build will fail next time */
