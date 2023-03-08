@@ -182,9 +182,11 @@ class Urbit:
                             u['name'] = patp
                             u['running'] = c.status == "running"
                             u['url'] = f'http://{socket.gethostname()}.local:{cfg["http_port"]}'
+                            u['remote'] = False
 
                             if cfg['network'] == 'wireguard':
                                 u['url'] = f"https://{cfg['wg_url']}"
+                                u['remote'] = True
 
                             urbits.append(u)
 
