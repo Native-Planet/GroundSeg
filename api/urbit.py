@@ -395,11 +395,11 @@ class Urbit:
                         self.save_config(patp)
                         return 200
             else:
-                if self.start(patp) == "succeeded":
-                    if cfg['boot_status'] != 'off':
-                        self._urbits[patp]['boot_status'] = 'boot'
-                        Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
-                        self.save_config(patp)
+                if cfg['boot_status'] != 'off':
+                    self._urbits[patp]['boot_status'] = 'boot'
+                    Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                    self.save_config(patp)
+                    if self.start(patp) == "succeeded":
                         return 200
 
         return 400
