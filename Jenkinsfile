@@ -111,14 +111,6 @@ pipeline {
                             '''
                             stash includes: 'binary/groundseg', name: 'groundseg_arm64'
                         }
-                        if( "${channel}" == "latest") {
-                            sh '''
-                                git checkout ${tag}
-                                cd ui
-                                docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
-                                cd ../..
-                            '''
-                        }
                     }
                     /* workspace has to be cleaned or build will fail next time */
                     cleanWs()
@@ -218,6 +210,8 @@ pipeline {
                         sh '''#!/bin/bash -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
+                            webui_amd64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.amd64_sha256'`
+                            webui_arm64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.arm64_sha256'`
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/amd64_url/payload \
                                 -d "{\\"value\\":\\"${amdbin}\\"}"
