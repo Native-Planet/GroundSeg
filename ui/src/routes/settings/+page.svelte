@@ -113,6 +113,7 @@
           {#if $system.vm}
             <SysInfoLite
               gsVersion={$system.gsVersion}
+              uiBranch={$system.uiBranch}
               updateMode={$system.updateMode}
               />
           {:else}
@@ -122,6 +123,7 @@
               disk={$system.disk}
               cpu={$system.cpu}
               gsVersion={$system.gsVersion}
+              uiBranch={$system.uiBranch}
               updateMode={$system.updateMode}
               />
           {/if}

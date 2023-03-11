@@ -26,3 +26,15 @@ class Log:
                 log.close()
         except:
             pass
+
+    # Get GroundSeg logs
+    def get_log():
+        # current log file
+        current_logfile = f"{datetime.now().strftime('%Y-%m')}.log"
+
+        # read log
+        with open(f"/opt/nativeplanet/groundseg/logs/{current_logfile}") as f:
+            log = f.read()
+            f.close()
+
+        return log.split("\n")

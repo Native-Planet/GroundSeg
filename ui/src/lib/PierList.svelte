@@ -69,6 +69,7 @@
 		      	target={u.running ? "_blank" : ""}>
 	  		    <div class="patp">{u.name}</div>
             <div class="status">
+              ({u.remote ? "Remote" : "Local"})
               {
               !u.running ? 'Stopped'
               : !(u.name in $codes) ? 'Loading...'

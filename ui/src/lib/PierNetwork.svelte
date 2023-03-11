@@ -22,7 +22,7 @@
 </script>
 {#if wgReg && wgRunning}
   <div class="pier-info" class:switching={isSwitching}>
-    <div class="pier-title">Access</div>
+    <div class="pier-title">Connectivity</div>
     <div class="access-options" on:click={toggleNetwork}>
 			<button class="option" class:access-active={remote == false} >Local</button>
       <button class="option" class:access-active={remote == true} >Remote</button>

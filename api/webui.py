@@ -12,8 +12,8 @@ class WebUI:
                       "webui_name": "groundseg-webui",
                       "webui_version": "latest",
                       "image": "nativeplanet/groundseg-webui",
-                      "tag": "latest",
-                      "port": 80
+                      "port": 80,
+                      "background": ""
                       }   
 
     def __init__(self, config):
@@ -39,7 +39,7 @@ class WebUI:
         if self.config_object.update_avail:
             self.updater_info = self.config_object.update_payload['groundseg'][branch]['webui']
             self.data['image'] = self.updater_info['repo']
-            self.data['tag'] = self.updater_info['tag']
+            self.data['webui_version'] = self.updater_info['tag']
         self.data = {**self.default_config, **self.data}
 
         self.save_config()

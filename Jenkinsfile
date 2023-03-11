@@ -76,8 +76,10 @@ pipeline {
                         }
                         if( "${channel}" == "latest" ) {
                             sh '''
-                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest
-                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_latest
+                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                             '''
                         }
                     }
@@ -208,6 +210,8 @@ pipeline {
                         sh '''#!/bin/bash -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
+                            webui_amd64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.amd64_sha256'`
+                            webui_arm64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.arm64_sha256'`
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/amd64_url/payload \
                                 -d "{\\"value\\":\\"${amdbin}\\"}"
