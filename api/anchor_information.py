@@ -35,6 +35,7 @@ class AnchorUpdater:
             for patp in self.orchestrator.urbit._urbits:
                 svc_url = None
                 http_port = None
+                http_alias = None
                 ames_port = None
                 s3_port = None
                 console_port = None
@@ -45,6 +46,7 @@ class AnchorUpdater:
                         if f'{patp}.{pub_url}' == ep['url']:
                             svc_url = ep['url']
                             http_port = ep['port']
+                            http_alias = ep['alias']
                         elif f'ames.{patp}.{pub_url}' == ep['url']:
                             ames_port = ep['port']
                         elif f'bucket.s3.{patp}.{pub_url}' == ep['url']:
@@ -52,8 +54,15 @@ class AnchorUpdater:
                         elif f'console.s3.{patp}.{pub_url}' == ep['url']:
                             console_port = ep['port']
 
-                if not None in [svc_url,http_port,ames_port,s3_port,console_port]:
-                    if not self.orchestrator.urbit.update_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port):
+                if not None in [svc_url,http_port,ames_port,s3_port,console_port, http_alias]:
+                    if not self.orchestrator.urbit.update_wireguard_network(
+                            patp,
+                            svc_url,
+                            http_port,
+                            ames_port,
+                            s3_port,
+                            console_port,
+                            http_alias):
                         raise Exception("Unable to update wireguard network")
             return True
         except Exception as e:

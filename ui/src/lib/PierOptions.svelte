@@ -11,11 +11,12 @@
   import PierOptionsLogs from '$lib/PierOptionsLogs.svelte'
   import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
   import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
+  import PierOptionsDomain from '$lib/PierOptionsDomain.svelte'
   import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
   export let remote, minIOReg, hasBucket, name, running, timeNow,
     frequency, meldHour, meldMinute, meldOn, meldLast, meldNext,
-    containers, expanded, isPierDeletion, autostart, loomSize
+    containers, expanded, isPierDeletion, autostart, loomSize, wgReg, urbWebAlias
 
   let selectedContainer = name
 
@@ -99,7 +100,7 @@
    </div>
 
    {#if !isPierDeletion}
-     <div class="meld-wrapper">
+     <div class="right-wrapper">
        <PierOptionsMeld 
          {frequency}
          {timeNow}
@@ -111,6 +112,9 @@
          {meldLast}
          {meldNext}
          />
+       {#if wgReg}
+         <PierOptionsDomain {name} alias={urbWebAlias} />
+       {/if}
       </div>
    {/if}
   </div>
@@ -153,7 +157,7 @@
     gap: 12px;
   }
 
-  .meld-wrapper {
+  .right-wrapper {
     flex:3;
     display: flex;
     flex-direction: column;

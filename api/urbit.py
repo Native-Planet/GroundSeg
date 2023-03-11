@@ -10,6 +10,7 @@ import secrets
 import zipfile
 
 from io import BytesIO
+from time import sleep
 from datetime import datetime
 
 # Flask
@@ -39,7 +40,9 @@ default_pier_config = {
         "meld_time": "0000",
         "meld_last": "0",
         "meld_next": "0",
-        "boot_status": "boot"
+        "boot_status": "boot",
+        "custom_urbit_web": '',
+        "show_urbit_web": 'default'
         }
 
 
@@ -185,8 +188,12 @@ class Urbit:
                             u['remote'] = False
 
                             if cfg['network'] == 'wireguard':
-                                u['url'] = f"https://{cfg['wg_url']}"
                                 u['remote'] = True
+                                u['url'] = f"https://{cfg['wg_url']}"
+
+                                if cfg['show_urbit_web'] == 'alias':
+                                    if cfg['custom_urbit_web']:
+                                        u['url'] = f"https://{cfg['custom_urbit_web']}"
 
                             urbits.append(u)
 
@@ -339,13 +346,19 @@ class Urbit:
                 "minIOUrl": "",
                 "minIOReg": True,
                 "hasBucket": has_bucket,
-                "loomSize": cfg['loom_size']
+                "loomSize": cfg['loom_size'],
+                "showUrbWeb": 'default',
+                "urbWebAlias": cfg['custom_urbit_web']
                 }
 
-
-            if(cfg['network'] == 'wireguard'):
+            if cfg['network'] == 'wireguard':
                 urbit['remote'] = True
                 urbit['urbitUrl'] = f"https://{cfg['wg_url']}"
+
+                if cfg['show_urbit_web'] == 'alias':
+                    if cfg['custom_urbit_web']:
+                        urbit['urbitUrl'] = f"https://{cfg['custom_urbit_web']}"
+                        urbit['showUrbWeb'] = 'alias'
 
             if self.config['wgRegistered']:
                 urbit['minIOUrl'] = f"https://console.s3.{cfg['wg_url']}"
@@ -824,7 +837,7 @@ class Urbit:
 
         return False
 
-    def update_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
+    def update_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port, alias):
         Log.log(f"{patp}: Attempting to update wireguard network")
         changed = False
         try:
@@ -838,6 +851,13 @@ class Urbit:
                 Log.log(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {http_port}")
                 changed = True
                 cfg['wg_http_port'] = http_port
+
+            if alias == "null":
+                alias = ""
+            if not cfg['custom_urbit_web'] == alias:
+                Log.log(f"{patp}: Urbit Web Custom URL changed from {cfg['custom_urbit_web']} to {alias}")
+                changed = True
+                cfg['custom_urbit_web'] = alias
 
             if not cfg['wg_ames_port'] == ames_port:
                 Log.log(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {ames_port}")
@@ -880,6 +900,79 @@ class Urbit:
             return False
         return True
 
+    # Custom Domain
+    def custom_domain(self, patp, data):
+        cfg = self._urbits[patp]
+        svc = data['svc_type']
+        alias = data['alias']
+        op = data['operation']
+        if svc == 'urbit-web':
+            if op == 'create':
+                Log.log(f"{patp}: Attempting to register custom domain for {svc}")
+                if self.dns_record(patp, cfg['wg_url'], alias):
+                    if self.wg.handle_alias(patp, alias, 'post'):
+                        self._urbits[patp]['custom_urbit_web'] = alias
+                        self._urbits[patp]['show_urbit_web'] = 'alias'
+                        if self.save_config(patp):
+                            return 200
+            elif op == 'delete':
+                Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
+                if self.wg.handle_alias(patp, alias, 'delete'):
+                    self._urbits[patp]['custom_urbit_web'] = ''
+                    self._urbits[patp]['show_urbit_web'] = 'default'
+                    if self.save_config(patp):
+                        return 200
+        return 400
+
+    def dns_record(self, patp, real, mask):
+        count = 0
+        while count < 3:
+            Log.log(f"{patp}: Checking DNS records")
+            ori = False
+            alias = False
+            try:
+                ori = socket.getaddrinfo(real, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
+                Log.log(f"{patp}: {real} is {ori}")
+            except:
+                Log.log(f"{patp}: {real} has no record")
+
+            try:
+                alias = socket.getaddrinfo(mask, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
+                Log.log(f"{patp}: {mask} is {alias}")
+            except:
+                Log.log(f"{patp}: {mask} has no record")
+
+            if ori and alias:
+                if ori == alias:
+                    Log.log(f"{patp}: DNS records match")
+                    return True
+
+            count += 1
+            time = count * 2
+            Log.log(f"{patp}: Checking DNS record again in {time} seconds")
+            sleep(time)
+
+        Log.log(f"{patp}: DNS records do not match or does not exist")
+        return False
+
+    # Swap Display Url
+    def swap_url(self, patp):
+        try:
+            old = self._urbits[patp]['show_urbit_web']
+
+            if old == 'alias':
+                self._urbits[patp]['show_urbit_web'] = 'default'
+            else:
+                self._urbits[patp]['show_urbit_web'] = 'alias'
+
+            Log.log(f"{patp}: Urbit web display URL changed: {old} -> {self._urbits[patp]['show_urbit_web']}")
+            self.save_config(patp)
+            return 200
+        except Exception as e:
+            Log.log(f"{patp}: Failed to change urbit web display URL: {e}")
+        return 400
+
+
     # Container logs
     def logs(self, patp):
         return self.urb_docker.full_logs(patp)
@@ -887,7 +980,8 @@ class Urbit:
     def load_config(self, patp):
         try:
             with open(f"{self.config_object.base_path}/settings/pier/{patp}.json") as f:
-                self._urbits[patp] = json.load(f)
+                cfg = json.load(f)
+                self._urbits[patp] = {**default_pier_config, **cfg}
                 Log.log(f"{patp}: Config loaded")
                 return True
         except Exception as e:

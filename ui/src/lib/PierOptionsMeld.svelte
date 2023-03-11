@@ -21,6 +21,7 @@
   onMount(()=> cloneFreq = frequency)
 
   const sendMeldPoke = () => {
+    meldNowStatus = 'loading'
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
         credentials: "include",
@@ -39,7 +40,7 @@
   const toggleMeldSchedule = () => {
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
-        credentials: "include",
+    credentials: "include",
 		headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({'app':'pier','data':'toggle-meld'})
 		})
@@ -51,7 +52,7 @@
   const saveMeldChanges = () => {
 		fetch($api + '/urbit?urbit_id=' + name, {
 		method: 'POST',
-        credentials: "include",
+    credentials: "include",
 		headers: {'Content-Type': 'application/json'},
 		body: JSON.stringify({'app':'pier','data':'schedule-meld','frequency':cloneFreq,'hour':selectedHour,'minute':selectedMinute})
 		})
@@ -163,6 +164,7 @@
     <PrimaryButton
       background="#FFFFFF4D"
       status={meldNowStatus}
+      loading="Attempting to send poke"
       noMargin={true}
       standard="Pack and Meld now"
       success="Meld poke sent, check your logs!"

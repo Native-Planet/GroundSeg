@@ -127,7 +127,12 @@
 
     	<!-- Urbit Landscape URL -->
       <div transition:scale={{duration:120, delay: 200}}>
-    	  <PierUrl urbitUrl={urbit.urbitUrl} />
+        <PierUrl
+          name={urbit.name}
+          urbitUrl={urbit.urbitUrl}
+          showUrbWeb={urbit.showUrbWeb}
+          urbWebAlias={urbit.urbWebAlias}
+        />
       </div>
 
     	<!-- MinIO Console -->
@@ -168,6 +173,8 @@
         meldNext={urbit.meldNext}
         autostart={urbit.autostart}
         loomSize={urbit.loomSize}
+        wgReg={urbit.wgReg}
+        urbWebAlias={urbit.urbWebAlias}
         {expanded}
         {isPierDeletion}
         on:toggleExpand={()=> expanded = !expanded}
