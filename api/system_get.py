@@ -10,7 +10,7 @@ from log import Log
 
 class SysGet:
     def get_containers():
-        containers = []
+        containers = ['groundseg']
         try:
             for c in docker.from_env().containers.list():
                 if c.name != 'groundseg-webui' and c.name != 'minio_client':

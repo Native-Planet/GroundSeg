@@ -271,6 +271,39 @@ class Wireguard:
 
         return response['status']
 
+    # /v1/create/alias
+    def handle_alias(self, patp, alias, req_type):
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f"https://{endpoint}/{api_version}"
+
+        headers = {"Content-Type": "application/json"}
+
+        blob = {
+            "subdomain": patp,
+            "alias": alias,
+            "pubkey": self.config['pubkey']
+        }
+        if req_type == 'post':
+            try:
+                response = requests.post(f'{url}/create/alias',json=blob,headers=headers).json()
+                Log.log(f"Anchor: Sent alias {alias} creation request for {patp}")
+                if response['error'] == 0:
+                    return True
+            except Exception as e:
+                Log.log(f"Anchor: Failed to register alias {alias} for {patp}: {e}")
+
+        elif req_type == 'delete':
+            try:
+                response = requests.delete(f'{url}/create/alias',json=blob,headers=headers).json()
+                Log.log(f"Anchor: Sent alias {alias} deletion request for {patp}")
+                if response['error'] == 0:
+                    return True
+            except Exception as e:
+                Log.log(f"Anchor: Failed to delete alias {alias} for {patp}: {e}")
+
+        return False
+
     # /v1/delete
     def delete_service(self, subdomain, service_type, url):
         Log.log(f"Anchor: Attempting to delete service {service_type}")

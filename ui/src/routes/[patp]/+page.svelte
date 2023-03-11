@@ -127,7 +127,12 @@
 
     	<!-- Urbit Landscape URL -->
       <div transition:scale={{duration:120, delay: 200}}>
-    	  <PierUrl urbitUrl={urbit.urbitUrl} />
+        <PierUrl
+          name={urbit.name}
+          urbitUrl={urbit.urbitUrl}
+          showUrbWeb={urbit.showUrbWeb}
+          urbWebAlias={urbit.urbWebAlias}
+        />
       </div>
 
     	<!-- MinIO Console -->
@@ -136,7 +141,7 @@
           <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
         </div>
         <div transition:scale={{duration:120, delay: 200}}>
-          <PierMinIO minIOReg={urbit.minIOReg} remote={urbit.remote} minIOUrl={urbit.minIOUrl} />
+          <PierMinIO minIOReg={urbit.minIOReg} minIOUrl={urbit.minIOUrl} />
         </div>
       {/if}
 
@@ -168,6 +173,8 @@
         meldNext={urbit.meldNext}
         autostart={urbit.autostart}
         loomSize={urbit.loomSize}
+        wgReg={urbit.wgReg}
+        urbWebAlias={urbit.urbWebAlias}
         {expanded}
         {isPierDeletion}
         on:toggleExpand={()=> expanded = !expanded}

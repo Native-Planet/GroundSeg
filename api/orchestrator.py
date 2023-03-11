@@ -121,6 +121,9 @@ class Orchestrator:
                 if data['data'] == 'toggle-autostart':
                     return self.urbit.toggle_autostart(urbit_id)
 
+                if data['data'] == 'swap-url':
+                    return self.urbit.swap_url(urbit_id)
+
                 if data['data'] == 'loom':
                     return self.urbit.set_loom(urbit_id,data['size'])
 
@@ -144,6 +147,10 @@ class Orchestrator:
 
                 if data['data'] == 's3-unlink':
                     return self.urbit.unlink_minio(urbit_id)
+
+            # Custom domain
+            if data['app'] == 'cname':
+                return self.urbit.custom_domain(urbit_id, data['data'])
 
             # MinIO requests
             if data['app'] == 'minio':
@@ -208,6 +215,10 @@ class Orchestrator:
         if self.config['updateBranch'] == 'edge':
             ver = f"{ver}-edge"
 
+        ui_branch = ''
+        if self.webui.data['webui_version'] == 'edge':
+            ui_branch = '-edge'
+
         required = {
                 "vm": is_vm,
                 "updateMode": self.config['updateMode'],
@@ -215,6 +226,7 @@ class Orchestrator:
                 "containers" : SysGet.get_containers(),
                 "sessions": len(self.config['sessions']),
                 "gsVersion": ver,
+                "uiBranch": ui_branch,
                 "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}"
                 }
 
@@ -322,11 +334,15 @@ class Orchestrator:
         if container == 'netdata':
             blob = self.netdata.logs()
 
+        if container == 'groundseg':
+            return Log.get_log()[line:]
+
         if 'minio_' in container:
             blob = self.minio.minio_logs(container)
 
         if container in self.urbit._urbits:
             blob = self.urbit.logs(container)
+
 
         return blob.decode('utf-8').split('\n')[line:]
 

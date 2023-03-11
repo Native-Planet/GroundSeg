@@ -3,7 +3,7 @@
 	import EyeButton from '$lib/EyeButton.svelte'
   import Clipboard from 'clipboard'
 
-	export let minIOUrl, minIOReg, remote
+  export let minIOUrl, minIOReg
 
 	let view = false, clicked = false
 
@@ -14,7 +14,7 @@
   clicked = true; setTimeout(()=> clicked = false, 1000)})
 </script>
 
-{#if minIOReg && remote}
+{#if minIOReg}
   <div class="pier-info">
     <div class="pier-title">MinIO Local Storage Console</div>
     <div class="pier-cred-wrapper">
