@@ -288,6 +288,7 @@ class Wireguard:
             try:
                 response = requests.post(f'{url}/create/alias',json=blob,headers=headers).json()
                 Log.log(f"Anchor: Sent alias {alias} creation request for {patp}")
+                Log.log(f"Anchor: {response}")
                 if response['error'] == 0:
                     return True
             except Exception as e:
@@ -297,6 +298,7 @@ class Wireguard:
             try:
                 response = requests.delete(f'{url}/create/alias',json=blob,headers=headers).json()
                 Log.log(f"Anchor: Sent alias {alias} deletion request for {patp}")
+                Log.log(f"Anchor: {response}")
                 if response['error'] == 0:
                     return True
             except Exception as e:

@@ -42,6 +42,7 @@ default_pier_config = {
         "meld_next": "0",
         "boot_status": "boot",
         "custom_urbit_web": '',
+        "custom_s3_web": '',
         "show_urbit_web": 'default'
         }
 
@@ -348,7 +349,8 @@ class Urbit:
                 "hasBucket": has_bucket,
                 "loomSize": cfg['loom_size'],
                 "showUrbWeb": 'default',
-                "urbWebAlias": cfg['custom_urbit_web']
+                "urbWebAlias": cfg['custom_urbit_web'],
+                "s3WebAlias": cfg['custom_s3_web']
                 }
 
             if cfg['network'] == 'wireguard':
@@ -783,6 +785,8 @@ class Urbit:
         if self.minio.make_service_account(self._urbits[patp], patp, acc, secret):
             u = self._urbits[patp]
             endpoint = f"s3.{u['wg_url']}"
+            if len(u['custom_s3_web']) > 0:
+                endpoint = u['custom_s3_web']
             bucket = 'bucket'
             lens_port = self.get_loopback_addr(patp)
             try:
@@ -906,6 +910,9 @@ class Urbit:
         svc = data['svc_type']
         alias = data['alias']
         op = data['operation']
+        relink = data['relink']
+
+        # Urbit URL
         if svc == 'urbit-web':
             if op == 'create':
                 Log.log(f"{patp}: Attempting to register custom domain for {svc}")
@@ -922,6 +929,29 @@ class Urbit:
                     self._urbits[patp]['show_urbit_web'] = 'default'
                     if self.save_config(patp):
                         return 200
+
+        # MinIO URL
+        if svc == 'minio':
+            if op == 'create':
+                Log.log(f"{patp}: Attempting to register custom domain for {svc}")
+                if self.dns_record(patp, f"s3.{cfg['wg_url']}", alias):
+                    if self.wg.handle_alias(f"s3.{patp}", alias, 'post'):
+                        self._urbits[patp]['custom_s3_web'] = alias
+                        if self.save_config(patp):
+                            if not relink:
+                                return 200
+                            else:
+                                return self.set_minio(patp)
+
+            elif op == 'delete':
+                Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
+                if self.wg.handle_alias(f"s3.{patp}", alias, 'delete'):
+                    self._urbits[patp]['custom_s3_web'] = ''
+                    if self.save_config(patp):
+                        if not relink:
+                            return 200
+                        else:
+                            return self.set_minio(patp)
         return 400
 
     def dns_record(self, patp, real, mask):

@@ -1,22 +1,26 @@
 <script>
   import { createEventDispatcher } from 'svelte'
-  import Fa from 'svelte-fa'
-  import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
-  export let advanced
+  export let advanced, style = "float:right;"
   const dispatch = createEventDispatcher()
 </script>
-<div class="advanced" on:click={()=>dispatch('click')} >
-  Advanced Options
-  <Fa icon={advanced ? faChevronUp : faChevronDown} size="0.8x" />
-</div>
+<button class="advanced" on:click={()=>dispatch('click')} style={style}>
+  {advanced ? "Back" : "Advanced Options"}
+</button>
 
 <style>
   .advanced {
-    padding-top: 6px;
+    font-family: inherit;
     color: inherit;
-    font-size: 12px;
-    cursor: pointer;
-    width: 123px;
+    border: solid 1px #ffffff4d;
+    border-radius: 8px;
+    margin-top: 12px;
+    padding: 6px;
+    width: 160px;
+    font-size: 11px;
   }
-
+  .advanced:hover {
+    background: #008CFB;
+    border-color: #008CFB;
+    cursor: pointer;
+  }
 </style>

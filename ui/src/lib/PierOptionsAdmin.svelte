@@ -4,15 +4,17 @@
   import { createEventDispatcher } from 'svelte'
   import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
-  import PierDeletionCheck from '$lib/PierDeletionCheck.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let name, isPierDeletion, hasBucket, autostart, loomSize
+  export let name
+  export let isPierDeletion
+  export let hasBucket
+  export let autostart
 
-  let exportButtonText = 'Export Urbit Pier',
-    deleteButtonText = 'Delete Urbit Pier',
-    isLoading = false, showInfo = false, showLoom = false,
-    modLoomStatus = "standard", curLoomSize = loomSize
+  let exportButtonText = 'Export Urbit Pier'
+  let deleteButtonText = 'Delete Urbit Pier'
+  let isLoading = false
+  let showInfo = false
 
   const dispatch = createEventDispatcher()
 
@@ -38,27 +40,6 @@
   })}
 
   const toggleInfo = () => showInfo = !showInfo
-  const toggleLoom = () => showLoom = !showLoom
-
-  const modLoomSize = () => {
-    modLoomStatus = "loading"
-		fetch($api + '/urbit?urbit_id=' + name, {
-  		method: 'POST',
-      credentials: "include",
-	  	headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'app':'pier','data':'loom','size':curLoomSize}),
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d == 200) {
-          modLoomStatus = "success"
-        } else {
-          modLoomStatus = "failure"
-        }
-        setTimeout(()=> modLoomStatus = "standard", 3000)
-      })
-  }
-
 
   const toggleAutostart = () => {
     autostart = !autostart
@@ -73,52 +54,9 @@
         console.log(d)
   })}
 
-  const deleteUrbitPier = () => dispatch('delete') 
-
 </script> 
 
-{#if isPierDeletion}
-
-  <div in:scale={{duration:120, delay: 300}}>
-    <PierDeletionCheck {name} {hasBucket} on:cancel={()=>dispatch('delete')} /> 
-  </div>
-
-{:else}
-
-  <div class="option-title">
-    Loom Size
-    <button class="question-mark" on:click={toggleLoom} >
-      <Fa icon={faCircleQuestion} size="1.2x" />
-    </button>
-  </div>
-  {#if showLoom}
-    <div class="loom-info">
-      Loom settings set the amount of memory your ship is allocated in megabytes. 
-      Do not go below 2048MB if you do not know what you are doing!
-    </div>
-  {/if}
-
-  <div class="loom">
-    <input type="range" min="28" max="32" step="1" class="range" bind:value={curLoomSize}>
-    <div class="labels">
-      <div class="label">256</div>
-      <div class="label">512</div>
-      <div class="label">1024</div>
-      <div class="label">2048</div>
-      <div class="label">4096</div>
-    </div>
-
-    <PrimaryButton
-      on:click={modLoomSize}
-      noMargin={true}
-      status={(loomSize == curLoomSize) && (modLoomStatus == "standard") ? "disabled" : modLoomStatus}
-      standard="Modify Loom Size"
-      success="Loom size modified!"
-      failure="Something went wrong, try again"
-      loading="Modifying..."
-    />
-  </div>
-
+<div class="bg">
   <div class="option-title">Admin Actions</div>
 
   <div class="autostart" >
@@ -127,7 +65,7 @@
 
     <!-- Info button -->
     <button class="question-mark" on:click={toggleInfo} >
-      <Fa icon={faCircleQuestion} size="1.2x" />
+      <Fa icon={faCircleQuestion} size="1x" />
     </button>
   </div>
 
@@ -137,32 +75,41 @@
   </div>
   {/if}
 
-  <button class="export-pier" class:loading={isLoading} on:click={exportUrbitPier}>
-    {exportButtonText}
-  </button>
-  <button class="delete-pier" on:click={deleteUrbitPier}>{deleteButtonText}</button>
-{/if}
+  <div class="danger-zone">
+    <button class="export-pier" class:loading={isLoading} on:click={exportUrbitPier}>
+      {exportButtonText}
+    </button>
+    <button class="delete-pier" on:click={()=>dispatch('delete')}>{deleteButtonText}</button>
+  </div>
+</div>
 
 <style>
+  .bg {
+    background: #0000001d;
+    padding: 20px 0 20px 0;
+    border-radius: 12px;
+  }
   .option-title {
     font-size: 14px;
     color: inherit;
-    margin-bottom: 4px;
+    margin-bottom: 12px;
   }
 
   .export-pier {
+    padding: 12px;
+    padding-bottom: 0;
     color: orange;
     cursor: pointer;
   }
-
+  .delete-pier {
+    padding: 12px;
+    padding-bottom: 0;
+    color: red;
+    cursor: pointer;
+  }
   .loading {
     color: white;
     animation: breathe 2s infinite;
-  }
-
-  .delete-pier {
-    color: red;
-    cursor: pointer;
   }
   .autostart {
     display: flex;
@@ -176,59 +123,13 @@
   .question-mark {
     color: inherit;
     cursor: pointer;
+    padding-top: 2px;
   }
   .info-text {
     font-size: 11px;
   }
-
-  .loom {
+  .danger-zone {
     display: flex;
-    align-items: center;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 12px;
+    justify-content: center;
   }
-
-  .loom-info {
-    font-size: 11px;
-  }
-
-  .range {
-    -webkit-appearance: none;
-    width: 180px;
-    height: 11px;
-    background: #ffffff4d;
-    border-radius: 16px;
-  }
-
-  .range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: calc(180px / 5);
-    height: 16px;
-    background: var(--action-color);
-    cursor: pointer;
-    border-radius: 16px;
-  }
-
-  .range::-moz-range-thumb {
-    width: calc(180px / 5);
-    height: 16px;
-    background: var(--action-color);
-    cursor: pointer;
-    border-radius: 16px;
-  }
-
-  .labels {
-    display: flex;
-    justify-content: space-between;
-    width: 180px;
-    padding-bottom: 6px;
-  }
-
-  .label {
-    width: calc(180px / 5);
-    font-size: 11px;
-  }
-
 </style>

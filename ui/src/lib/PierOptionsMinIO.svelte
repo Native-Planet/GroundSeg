@@ -67,44 +67,62 @@
 
 </script>
 
-<div class="wrapper">
-  {#if minIOReg && remote}
-    <PrimaryButton
-	    noMargin={true}
-  		standard="Link MinIO to Urbit"
-    	success="MinIO linked!"
-      failure="Something went wrong"
-      loading="Linking..."
-	  	status={linkButtonStatus}
-	 	  on:click={updateMinIO} />
-    <PrimaryButton
-	    noMargin={true}
-      background="orange"
-  		standard="Unlink MinIO"
-    	success="MinIO unlinked from Urbit!"
-      failure="Something went wrong"
-      loading="Removing link..."
-	  	status={unlinkButtonStatus}
-	 	  on:click={unlinkMinIO} />
-  {/if}
-
-{#if hasBucket}
-  <PrimaryButton
-		noMargin={true}
-		background="#FFFFFF4D"
-		standard="Export MinIO Bucket"
-  	loading="Compressing your files.."
-		status={exportBucketStatus}
-		on:click={exportBucket} />
-{/if}
+<div class="bg">
+  <div class="option-title">MinIO Settings</div>
+  <div class="wrapper">
+    <div class="top-wrapper">
+      {#if minIOReg && remote}
+        <PrimaryButton
+          noMargin={true}
+          standard="Link to Urbit"
+          success="MinIO linked!"
+          failure="Something went wrong"
+          loading="Linking..."
+          status={linkButtonStatus}
+          on:click={updateMinIO} />
+        <PrimaryButton
+          noMargin={true}
+          background="#FFFFFF4D"
+          standard="Unlink"
+          success="MinIO unlinked from Urbit!"
+          failure="Something went wrong"
+          loading="Removing link..."
+          status={unlinkButtonStatus}
+          on:click={unlinkMinIO} />
+      {/if}
+    </div>
+    {#if hasBucket}
+      <PrimaryButton
+        noMargin={true}
+        background="#FFFFFF4D"
+        standard="Export Bucket"
+        loading="Compressing your files.."
+        status={exportBucketStatus}
+        on:click={exportBucket} />
+    {/if}
+  </div>
 </div>
 
 <style>
+  .bg {
+    background: #0000001d;
+    padding: 20px 0 20px 0;
+    border-radius: 12px;
+  }
+  .option-title {
+    font-size: 14px;
+    color: inherit;
+    margin-bottom: 12px;
+  }
   .wrapper {
-    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     text-align: center;
+  }
+  .top-wrapper {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
   }
 </style>
