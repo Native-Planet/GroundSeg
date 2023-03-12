@@ -29,6 +29,7 @@
   let code = null
   let advanced = false
   let failureCount = 0
+  let isRunning = false
 
 	// start api loop
 	onMount(()=> {
@@ -78,26 +79,31 @@
       loaded = true
       failureCount = 0
       urbit = d 
+      isRunning = urbit.running
     }
   }
 
   const getUrbitCode = () => {
     if (inView) {
-			fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
-			  method: 'POST',
-        credentials: "include",
-			  headers: {'Content-Type': 'application/json'},
-			  body: JSON.stringify({'app':'pier','data':'+code'})
-	    })
-      .then(r => r.json())
-      .then(d => {
-        code = d
-        if (d.length == 27) {
-          setTimeout(getUrbitCode, 1800000)
-        } else {
-          setTimeout(getUrbitCode, 1000)
-        }
-      })
+      if (isRunning) {
+        fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
+          method: 'POST',
+          credentials: "include",
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({'app':'pier','data':'+code'})
+        })
+        .then(r => r.json())
+        .then(d => {
+          code = d
+          if (d.length == 27) {
+            setTimeout(getUrbitCode, 1800000)
+          } else {
+            setTimeout(getUrbitCode, 1000)
+          }
+        })
+      } else {
+        setTimeout(getUrbitCode, 1000)
+      }
   }}
 
 

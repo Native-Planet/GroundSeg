@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
+	import { page } from '$app/stores'
 
 	import { api } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
@@ -11,28 +12,37 @@
   export let u
 	let inView = false
   let code = null
+  let count = 1
 
   const getUrbitCode = () => {
-    if (inView) {
-			fetch($api + '/urbit?urbit_id=' + u.name, {
-			  method: 'POST',
-        credentials: "include",
-			  headers: {'Content-Type': 'application/json'},
-			  body: JSON.stringify({'app':'pier','data':'+code'})
-	    })
-      .then(r => r.json())
-      .then(d => {
-        code = d
-        if (d.length == 27) {
-          setTimeout(getUrbitCode, 1800000)
-        } else {
-          setTimeout(getUrbitCode, 1000)
-        }
-      })
+    if (inView && ($page.url.pathname == "/")) {
+      if (u.running) {
+        fetch($api + '/urbit?urbit_id=' + u.name, {
+          method: 'POST',
+          credentials: "include",
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({'app':'pier','data':'+code'})
+        })
+        .then(r => r.json())
+        .then(d => {
+          code = d
+          if (d.length == 27) {
+            setTimeout(getUrbitCode, 1800000)
+          } else {
+            let time = 1000
+            setTimeout(getUrbitCode, time * count)
+            if (count < 5) {
+              count = ++count
+            }
+          }
+        })
+      } else {
+        setTimeout(getUrbitCode, 1000)
+      }
   }}
 
 	onMount(()=> {
-		inView = !inView
+		inView = true
     getUrbitCode()
 	})
 
