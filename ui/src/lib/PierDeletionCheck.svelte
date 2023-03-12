@@ -1,4 +1,7 @@
 <script>
+  import Fa from 'svelte-fa'
+  import { faCheck } from '@fortawesome/free-solid-svg-icons'
+
   import { createEventDispatcher } from 'svelte'
   import { api } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -65,39 +68,46 @@
 
 </script>
 
-<div class="warning">Warning!</div>
-
-<div class="line">
-  You are one step away from permanently deleting your Urbit Pier 
-  and all services related to this Urbit ID. This action cannot be 
-  undone. Please export data you want to save:
-</div>
+<div class="redbg">
+  <div class="warning">WARNING</div>
+  <div class="line">
+    Delete your Urbit Pier and all services related to this Urbit ID?
+  </div>
+  <div class="line">
+    This action cannot be undone.
+    Please export data you want to save:
+  </div>
  
-<div class="export">
-  <PrimaryButton
-    noMargin={true}
-    background="#FFFFFF4D" 
-    standard="Export Urbit Pier"
-    loading="Compressing your pier..."
-    success="Your pier has been exported"
-    status={exportPierStatus}
-    on:click={exportUrbitPier}
-    />
-
-  {#if hasBucket}
+  <div class="export">
     <PrimaryButton
-		  noMargin={true}
-  		background="#FFFFFF4D"
-	  	standard="Export MinIO Bucket"
-  	  loading="Compressing your files.."
-  		status={exportBucketStatus}
-	  	on:click={exportBucket} />
-  {/if}
-</div>
+      noMargin={true}
+      background="#FFFFFF4D" 
+      standard="Export Urbit Pier"
+      loading="Compressing your pier..."
+      success="Your pier has been exported"
+      status={exportPierStatus}
+      on:click={exportUrbitPier}
+      />
 
-<div class="final-check" on:click={()=> finalCheck = !finalCheck}>
-  <input type="checkbox" bind:checked={finalCheck} />
-  I understand that this action cannot be undone.
+    {#if hasBucket}
+      <PrimaryButton
+        noMargin={true}
+        background="#FFFFFF4D"
+        standard="Export MinIO Bucket"
+        loading="Compressing your files.."
+        status={exportBucketStatus}
+        on:click={exportBucket} />
+    {/if}
+  </div>
+
+  <div class="final-check" on:click={()=> finalCheck = !finalCheck}>
+    <div class="box" class:highlight={finalCheck}>
+      {#if finalCheck}
+        <Fa icon={faCheck} size="1x"/>
+      {/if}
+    </div>
+    I understand that this action cannot be undone.
+  </div>
 </div>
 
 <div class="buttons">
@@ -113,12 +123,19 @@
 </div>
 
 <style>
+  .redbg {
+    background: #3F00008D;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
   .warning {
     font-size: 16px;
     padding-bottom: 18px;
+    text-align: center;
   }
   .line {
-    font-size: 14px;
+    font-size: 13px;
     padding: 0 40px 18px 40px;
     text-align: center;
   }
@@ -129,8 +146,13 @@
     padding-bottom: 18px;
   }
   .final-check {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
     font-size: 14px;
-    padding: 0 20px 18px 20px;
+    padding: 20px;
     cursor: pointer;
     user-select: none;
   }
@@ -138,7 +160,18 @@
     display: flex;
     align-items: center;
   }
+  .box {
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    background: #ffffff4d;
+    border-radius: 4px;
+  }
+  .highlight {
+    background: #028AFB;
+  }
   .cancel {
+    padding-left: 20px;
     font-size: 12px;
     width: 80px;
     cursor: pointer;

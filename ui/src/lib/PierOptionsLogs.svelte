@@ -2,8 +2,9 @@
   import { createEventDispatcher } from 'svelte'
   import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
   import { api, system } from '$lib/api'
+  import ToggleAdvancedButton from '$lib/ToggleAdvancedButton.svelte'
 
-  export let name, containers, expanded
+  export let name, containers
 
   let selectedContainer = name
 
@@ -11,10 +12,6 @@
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import Logs from '$lib/Logs.svelte'
-
-  const toggleExpand = () => {
-    dispatch('toggleExpand')
-  }
 
   const exportLogs = () => {
     let module = 'logs'
@@ -37,7 +34,7 @@
   }
 
 </script>
-<Logs container={selectedContainer} maxHeight={expanded ? "50vh" : "160px"} />
+<Logs container={selectedContainer} maxHeight="50vh"/>
       <div class="bottom-panel">
         <Listbox value={selectedContainer} on:change={(e) => (selectedContainer = e.detail)}>
           <ListboxOptions as="div" class="containers-list">
@@ -50,7 +47,7 @@
           <ListboxButton class="containers-selector">{selectedContainer}</ListboxButton>
         </Listbox>
         <PrimaryButton on:click={exportLogs} background="#FFFFFF4D" standard="Export" status="standard" />
-        <PrimaryButton noMargin={true} on:click={toggleExpand} standard={expanded ? "Shrink" : "Expand"} status="standard" />
+        <ToggleAdvancedButton on:click={()=>dispatch('click')} advanced={true} style="" />
       </div>
 
 <style>

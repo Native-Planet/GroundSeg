@@ -27,6 +27,8 @@ class WebUIDocker:
         c = self.create_container(name, image, config)
 
         try:
+            # Find a better way to do this
+            '''
             if config['background'] != '':
                 try:
                     tar_data = io.BytesIO()
@@ -36,6 +38,7 @@ class WebUIDocker:
                     c.put_archive('/webui/build/client/background', tar_data.read())
                 except Exception as e:
                     Log.log(f"WebUI: Failed to put background in container: {e}")
+            '''
             c.start()
             Log.log("WebUI: Successfully started container")
             return True

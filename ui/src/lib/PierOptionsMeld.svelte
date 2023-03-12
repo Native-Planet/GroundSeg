@@ -73,109 +73,114 @@
 
 </script>
 
-<div style="display: flex; justify-content: center;">
-
-<div class="option-title">
-  Schedule Pack & Meld
-  <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
-	  <div class="switch {meldOn ? "on" : "off"}"></div>
-  </div>
-</div>
-</div>
-
-<div class="panel">
-
-  <!-- frequency selector -->
-  <div class="day">
-    <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
-      <Fa icon={faCaretLeft} size="1x" />
-    </button>
-
-    <div class="day-text">Every</div>
-    <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
-    <div class="day-text">day{cloneFreq > 1 ? "s" : ""}</div>
-
-    <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
-      <Fa icon={faCaretRight} size="1x" />
-    </button>
-
+<div class="bg">
+  <div style="display: flex; justify-content: center;">
+    <div class="option-title">
+      Schedule Pack & Meld
+      <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
+        <div class="switch {meldOn ? "on" : "off"}"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="day">
+  <div class="panel">
 
-    <div class="day-text">at</div>
+    <!-- frequency selector -->
+    <div class="day">
+      <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
+        <Fa icon={faCaretLeft} size="1x" />
+      </button>
 
-    <!-- hour selector -->
-    <TimeSelector
-      value={selectedHour}
-      listOptions={hours}
-      on:change={e => selectedHour = e.detail} 
-    />
+      <div class="day-text">Every</div>
+      <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
+      <div class="day-text">day{cloneFreq > 1 ? "s" : ""}</div>
 
-    <div class="day-text">:</div>
+      <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
+        <Fa icon={faCaretRight} size="1x" />
+      </button>
 
-    <!-- minute selector -->
-    <TimeSelector
-      value={selectedMinute}
-      listOptions={minutes}
-      on:change={e => selectedMinute = e.detail} 
-    />
+    </div>
 
-  </div>
+    <div class="day">
 
-  <!-- Current time on host device -->
-  <div class="day">
-    <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
-  </div>
+      <div class="day-text">at</div>
 
-  <div class="day">
-    <div class="current-time">Last meld: {meldLast.slice(12,-13) == "1970" ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
-  </div>
-
-  {#if meldOn}
-  <div class="day">
-    <div class="current-time">Next: {meldNext.slice(5, -4)} UTC</div>
-  </div>
-  {/if}
-
-  <div class="day-action">
-  <!-- Save new meld schedule -->
-  <PrimaryButton
-    noMargin={true}
-    standard="{
-      frequency != cloneFreq 
-      || selectedHour != meldHour 
-      || selectedMinute != meldMinute
-      ? "Save" : "No"
-    } changes"
-    success="changes saved!"
-    failure="failed to set meld schedule"
-    status={
-      frequency != cloneFreq 
-      || selectedHour != meldHour 
-      || selectedMinute != meldMinute
-      ? meldSetStatus : 'disabled'
-    }
-    on:click={saveMeldChanges}
-    />
-
-  <!-- Meld now -->
-  {#if running}
-    <PrimaryButton
-      background="#FFFFFF4D"
-      status={meldNowStatus}
-      loading="Attempting to send poke"
-      noMargin={true}
-      standard="Pack and Meld now"
-      success="Meld poke sent, check your logs!"
-      on:click={sendMeldPoke}
+      <!-- hour selector -->
+      <TimeSelector
+        value={selectedHour}
+        listOptions={hours}
+        on:change={e => selectedHour = e.detail} 
       />
-  {/if}
-  </div>
 
+      <div class="day-text">:</div>
+
+      <!-- minute selector -->
+      <TimeSelector
+        value={selectedMinute}
+        listOptions={minutes}
+        on:change={e => selectedMinute = e.detail} 
+      />
+
+    </div>
+
+    <!-- Current time on host device -->
+    <div class="day">
+      <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+    </div>
+
+    <div class="day">
+      <div class="current-time">Last meld: {meldLast.slice(12,-13) == "1970" ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
+    </div>
+
+    {#if meldOn}
+    <div class="day">
+      <div class="current-time">Next: {meldNext.slice(5, -4)} UTC</div>
+    </div>
+    {/if}
+
+    <div class="day-action">
+    <!-- Save new meld schedule -->
+    <PrimaryButton
+      noMargin={true}
+      standard="{
+        frequency != cloneFreq 
+        || selectedHour != meldHour 
+        || selectedMinute != meldMinute
+        ? "Save" : "No"
+      } changes"
+      success="changes saved!"
+      failure="failed to set meld schedule"
+      status={
+        frequency != cloneFreq 
+        || selectedHour != meldHour 
+        || selectedMinute != meldMinute
+        ? meldSetStatus : 'disabled'
+      }
+      on:click={saveMeldChanges}
+      />
+
+    <!-- Meld now -->
+    {#if running}
+      <PrimaryButton
+        background="#FFFFFF4D"
+        status={meldNowStatus}
+        loading="Attempting to send poke"
+        noMargin={true}
+        standard="Pack and Meld now"
+        success="Meld poke sent, check your logs!"
+        on:click={sendMeldPoke}
+        />
+    {/if}
+    </div>
+  </div>
 </div>
 
 <style>
+  .bg {
+    background: #0000001d;
+    padding: 20px 0 20px 0;
+    border-radius: 12px;
+  }
   .option-title {
     text-align: right;
     float: left;
