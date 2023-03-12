@@ -7,8 +7,6 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let name
-  export let isPierDeletion
-  export let hasBucket
   export let autostart
 
   let exportButtonText = 'Export Urbit Pier'

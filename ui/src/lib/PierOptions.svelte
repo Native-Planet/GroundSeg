@@ -94,12 +94,7 @@
           {meldNext}
         />
         <PierOptionsLoom {name} {loomSize} />
-        <PierOptionsAdmin
-          {name}
-          {isPierDeletion}
-          {hasBucket}
-          {autostart}
-          on:delete={()=>isPierDeletion = true}
+        <PierOptionsAdmin {name} {autostart} on:delete={()=>isPierDeletion = true}
         />
       </div>
       <div class="right-wrapper">
