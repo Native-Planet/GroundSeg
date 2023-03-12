@@ -23,14 +23,13 @@
 	updateState(data)
 
 	// default values
-  let inView = true,
-    loaded = false,
-    urbit, code = null,
-    advanced = false,
-    expanded = false,
-    isPierDeletion = false,
-    failureCount = 0
-
+  let urbit
+  let inView = true
+  let loaded = false
+  let code = null
+  let advanced = false
+  let failureCount = 0
+  let isRunning = false
 
 	// start api loop
 	onMount(()=> {
@@ -80,27 +79,37 @@
       loaded = true
       failureCount = 0
       urbit = d 
+      isRunning = urbit.running
     }
   }
 
   const getUrbitCode = () => {
     if (inView) {
-			fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
-			  method: 'POST',
-        credentials: "include",
-			  headers: {'Content-Type': 'application/json'},
-			  body: JSON.stringify({'app':'pier','data':'+code'})
-	    })
-      .then(r => r.json())
-      .then(d => {
-        code = d
-        if (d.length == 27) {
-          setTimeout(getUrbitCode, 1800000)
-        } else {
-          setTimeout(getUrbitCode, 1000)
-        }
-      })
+      if (isRunning) {
+        fetch($api + '/urbit?urbit_id=' + $page.params.patp, {
+          method: 'POST',
+          credentials: "include",
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({'app':'pier','data':'+code'})
+        })
+        .then(r => r.json())
+        .then(d => {
+          code = d
+          if (d.length == 27) {
+            setTimeout(getUrbitCode, 1800000)
+          } else {
+            setTimeout(getUrbitCode, 1000)
+          }
+        })
+      } else {
+        setTimeout(getUrbitCode, 1000)
+      }
   }}
+
+
+  const toggleAdvanced = () => {
+    advanced = !advanced
+  }
 
 </script>
 
@@ -117,46 +126,42 @@
       <PierProfile name={urbit.name} running={urbit.running} {code} />
     </div>
 
-	  <!-- Pier Credentials-->
-	  {#if (code != null) && (code.length == 27) && urbit.running && !expanded && !isPierDeletion}
+		{#if !advanced}
+      <!-- Pier Credentials-->
+      {#if (code != null) && (code.length == 27) && urbit.running}
 
-      <!-- Landscape +code -->
-      <div transition:scale={{duration:120, delay: 200}}>
-    	  <PierCode code={code} />
-      </div>
-
-    	<!-- Urbit Landscape URL -->
-      <div transition:scale={{duration:120, delay: 200}}>
-        <PierUrl
-          name={urbit.name}
-          urbitUrl={urbit.urbitUrl}
-          showUrbWeb={urbit.showUrbWeb}
-          urbWebAlias={urbit.urbWebAlias}
-        />
-      </div>
-
-    	<!-- MinIO Console -->
-      {#if urbit.wgReg && urbit.wgRunning}
-        <div transition:scale={{duration:120, delay: 200}}>
-          <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
+        <!-- Landscape +code -->
+        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+          <PierCode code={code} />
         </div>
-        <div transition:scale={{duration:120, delay: 200}}>
-          <PierMinIO minIOReg={urbit.minIOReg} minIOUrl={urbit.minIOUrl} />
+
+        <!-- Urbit Landscape URL -->
+        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+          <PierUrl
+            name={urbit.name}
+            urbitUrl={urbit.urbitUrl}
+            showUrbWeb={urbit.showUrbWeb}
+            urbWebAlias={urbit.urbWebAlias}
+          />
+        </div>
+
+        <!-- MinIO Console -->
+        {#if urbit.wgReg && urbit.wgRunning}
+          <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+            <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
+          </div>
+          <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+            <PierMinIO minIOReg={urbit.minIOReg} minIOUrl={urbit.minIOUrl} />
+          </div>
+        {/if}
+
+        <!-- Toggle Urbit Network -->
+        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+          <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
         </div>
       {/if}
-
-      <!-- Toggle Urbit Network -->
-      <div transition:scale={{duration:120, delay: 200}}>
-		    <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
-      </div>
-
-    {/if}
-
-    <!-- Advanced Options -->
-
-    <ToggleAdvancedButton {advanced} on:click={()=> {advanced = !advanced;expanded = false}} />
-
-		{#if advanced}
+      <ToggleAdvancedButton on:click={toggleAdvanced} {advanced}/>
+    {:else}
       <PierOptions
         remote={urbit.remote}
         minIOReg={urbit.minIOReg}
@@ -175,12 +180,9 @@
         loomSize={urbit.loomSize}
         wgReg={urbit.wgReg}
         urbWebAlias={urbit.urbWebAlias}
-        {expanded}
-        {isPierDeletion}
-        on:toggleExpand={()=> expanded = !expanded}
-        on:toggleDeletePier={()=> isPierDeletion = !isPierDeletion}
-        />
+        s3WebAlias={urbit.s3WebAlias}
+        on:click={toggleAdvanced}
+      />
 		{/if}
-
 	</Card>
 {/if}
