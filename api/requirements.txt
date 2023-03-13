@@ -11,3 +11,4 @@ zstandard
 ordered-set
 nmcli
 PyAccessPoint
+cryptography

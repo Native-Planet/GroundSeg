@@ -4,6 +4,7 @@ from flask_cors import CORS
 
 # GroundSeg modules
 from log import Log
+from utils import Utils
 
 # Create flask app
 class GroundSeg:
@@ -117,6 +118,12 @@ class GroundSeg:
                 return jsonify('setup')
 
             return self.orchestrator.handle_login_request(request.get_json())
+
+        # Request for pubkey
+        @self.app.route("/login/key", methods=['GET'])
+        def ask_key():
+            res = Utils.convert_pub(self.config_object.login_keys['cur']['pub'])
+            return jsonify(res)
 
         # Setup
         @self.app.route("/setup", methods=['POST'])

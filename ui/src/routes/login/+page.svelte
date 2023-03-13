@@ -1,7 +1,7 @@
 <script>
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
-  import { api, updateState, secret } from '$lib/api'
+  import { api, updateState } from '$lib/api'
   import { page } from '$app/stores'
 
 	import Card from '$lib/Card.svelte'
@@ -11,11 +11,12 @@
   export let data
   updateState(data)
 
-  let inView = false,
-    showLogin = false,
-    pwdView = false,
-    loginPassword = '',
-    buttonStatus = 'standard'
+  let inView = false
+  let showLogin = false
+  let pwdView = false
+  let loginPassword = ''
+  let buttonStatus = 'standard'
+  let pubKey = ''
 
 	onDestroy(()=> inView = false)
   onMount(()=> {
@@ -28,20 +29,33 @@
       console.log(data['status'])
     }
     inView = true
+    getLoginKey()
   })
+
+  const getLoginKey = () => {
+    if (inView && ($page.url.pathname == "/login")) {
+      fetch($api + '/login/key')
+      .then(r => r.json())
+        .then(d => {
+          pubKey = d
+        })
+      setTimeout(getLoginKey, 30000)
+  }}
 
   const togglePwdView = () => {
     pwdView = !pwdView
     document.querySelector('#login-password').type = pwdView ? 'text' : 'password'
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     buttonStatus = 'loading'
+    const enc_pwd = await encryptPassword()
+
     fetch($api + '/login', {
 			method: 'POST',
       headers: {"Content-Type" : "application/json"},
       credentials : "include",
-			body: JSON.stringify({'password':loginPassword.trim()})
+			body: JSON.stringify({'password':enc_pwd})
 	  })
       .then(r => r.json())
       .then(d => { 
@@ -59,15 +73,39 @@
     })
   }
 
+  const encryptPassword = async () => {
+    // encode password
+    const password = new TextEncoder().encode(loginPassword.trim())
+
+    // encode pubkey
+    const binaryString = atob(pubKey)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    const publicKey = await crypto.subtle.importKey(
+      "spki", bytes, { name: "RSA-OAEP", hash: "SHA-256"}, true,["encrypt"]
+    )
+
+    // encrypt password
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      publicKey,
+      password
+    )
+
+    // encode password to b64
+    return await btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
+  }
+
+
 </script>
 
 {#if inView}
-<Card width="640px">
-  <div class="main-wrapper">
+  <Card width="640px">
+    <div class="main-wrapper">
       <div class="opened-wrapper" in:scale={{delay:400, duration: 120}}>
-
         <img src="/npfull.svg" alt="Native Planet Logo" />
-
         <div class="login-wrapper">
           <input
             id="login-password"
@@ -78,7 +116,6 @@
             disabled={buttonStatus != 'standard'}
           />
         </div>
-
         <PrimaryButton
           top=24
           left={false}
@@ -86,13 +123,12 @@
           success="Login successful!"
           failure="Login failed"
           loading="Logging you in.."
-          status={loginPassword.length > 0 ? buttonStatus : 'disabled'}
+          status={(loginPassword.length > 0) && (pubKey.length > 0) ? buttonStatus : 'disabled'}
           on:click={handleLogin}
         />
-
       </div>
-  </div>
-</Card>
+    </div>
+  </Card>
 {/if}
 
 <style>
