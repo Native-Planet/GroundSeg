@@ -1,14 +1,17 @@
 <script>
+  import { page } from '$app/stores'
+  import { onMount } from 'svelte'
   import { api } from '$lib/api'
   import { scale } from 'svelte/transition'
   import { createEventDispatcher } from 'svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  let password = '',
-    confirmPassword = '',
-    passView = false,
-    confirmView = false,
-    buttonStatus = 'standard'
+  let password = ''
+  let confirmPassword = ''
+  let passView = false
+  let confirmView = false
+  let buttonStatus = 'standard'
+  let pubKey = ''
 
   const dispatch = createEventDispatcher()
 
@@ -22,9 +25,9 @@
     document.querySelector('#pass-input-1').type = confirmView ? 'text' : 'password'
   }
 
-  const createPassword = () => {
+  const createPassword = async () => {
     let step = "password"
-    let query = {"password":confirmPassword}
+    let query = await encryptPassword(pubKey)
 
     buttonStatus = "loading"
 
@@ -52,7 +55,28 @@
       })
   }
 
+  const getLoginKey = () => {
+    if ($page.url.pathname == "/setup") {
+      fetch($api + '/login/key')
+      .then(r => r.json())
+        .then(d => {
+          pubKey = d
+        })
+      setTimeout(getLoginKey, 30000)
+  }}
+
+  const encryptPassword = async pub => {
+    const encrypt = new JSEncrypt({ default_key_size: 2048 })
+    encrypt.setPublicKey(pub)
+    const encrypted = await encrypt.encrypt(confirmPassword.trim())
+    return {"password":encrypted,"pubkey":pub}
+  }
+
+  onMount(()=> getLoginKey())
+
 </script>
+
+<svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
 <div class="title" in:scale={{duration:120, delay: 200}}>Create New Password</div>
 
@@ -72,7 +96,7 @@
   {#if ((confirmPassword.length > 0) && (password == confirmPassword))}
     <PrimaryButton
       left={false}
-      status={buttonStatus}
+      status={pubKey.length > 0 ? buttonStatus : 'disabled'}
       standard="Set Password"
       failure="Something went wrong"
       success="Password set!"

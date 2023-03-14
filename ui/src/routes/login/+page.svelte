@@ -74,32 +74,15 @@
   }
 
   const encryptPassword = async () => {
-    // encode password
-    const password = new TextEncoder().encode(loginPassword.trim())
-
-    // encode pubkey
-    const binaryString = atob(pubKey)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    const publicKey = await crypto.subtle.importKey(
-      "spki", bytes, { name: "RSA-OAEP", hash: "SHA-256"}, true,["encrypt"]
-    )
-
-    // encrypt password
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: "RSA-OAEP" },
-      publicKey,
-      password
-    )
-
-    // encode password to b64
-    return await btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
+    const encrypt = new JSEncrypt({ default_key_size: 2048 })
+    encrypt.setPublicKey(pubKey)
+    const encrypted = await encrypt.encrypt(loginPassword.trim())
+    return encrypted
   }
 
-
 </script>
+
+<svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
 {#if inView}
   <Card width="640px">

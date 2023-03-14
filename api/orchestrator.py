@@ -49,8 +49,7 @@ class Orchestrator:
                 return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit, self.minio)
 
             if page == "password":
-                if self.config_object.create_password(data['password']):
-                    return 200
+                return Setup.handle_password(data, self.config_object)
 
         except Exception as e:
             Log.log(f"Setup: {e}")

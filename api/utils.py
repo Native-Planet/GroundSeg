@@ -7,7 +7,7 @@ from time import sleep
 
 # Modules
 import nmcli
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives import serialization, hashes
 
 # GroundSeg modules
@@ -92,29 +92,24 @@ class Utils:
             return False
 
     def convert_pub(pub):
-        cleaned = ""
+        converted = ""
         try:
             if pub != "":
                 converted = pub.public_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
-                    ).decode("utf-8").strip()
-                cleaned = "".join(converted.split("\n")[1:-1])
+                    ).decode("utf-8")
         except Exception as e:
             Log.log(f"Keygen: Failed to convert pubkey: {e}")
 
-        return cleaned
+        return converted
 
     def decrypt_password(priv, pwd):
         decrypted = ""
         try:
             pwd_bstr = bytes(pwd,'utf-8')
             pwd_bytes = base64.b64decode(pwd_bstr)
-            decrypted = priv.decrypt(pwd_bytes,padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-                )).decode("utf-8")
+            decrypted = priv.decrypt(pwd_bytes, PKCS1v15()).decode("utf-8")
         except Exception as e:
             Log.log(f"Keygen: Failed to decrypt password: {e}")
 
