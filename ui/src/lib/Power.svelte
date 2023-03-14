@@ -22,9 +22,10 @@
 <style>
   .control {
     display: flex;
-    background: #0404044d;
-    padding: 10px 40px 10px 40px;
-    border-radius: 15px;
+    background: #0000001d;
+    padding: 0px 30px;
+    height: 50px;
+    border-radius: 8px;
     font-size: 18px;
     gap: 16px;
     align-items: center;

@@ -44,10 +44,11 @@
     to {transform: rotate(360deg);}
   }
   .minio {
-    background: #0404044d;
-    padding: 20px 40px 20px 40px;
-    border-radius: 15px;
+    background: #0000001d;
+    padding: 20px 30px;
+    border-radius: 8px;
     font-size: 18px;
+    gap: 12px;
   }
   .title-wrapper {
     display: flex;
