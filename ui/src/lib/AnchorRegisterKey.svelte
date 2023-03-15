@@ -47,8 +47,6 @@
 <div class="reg-key-wrapper">
 
   <!-- If not registered -->
-  wg: {wgReg} 
-  rereg: {reRegCheck}
   {#if !wgReg}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>

@@ -144,7 +144,10 @@ class Urbit:
                 for root, dirs, files in os.walk(file_path):
                     arc_dir = root[root.find("_data/")+6:]
                     for file in files:
-                        zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
+                        if file != 'conn.sock':
+                            zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
+                        else:
+                            Log.log(f"{patp}: Skipping {file} while compressing")
 
             memory_file.seek(0)
 
