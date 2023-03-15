@@ -8,6 +8,7 @@ import shutil
 import string
 import secrets
 import zipfile
+import tarfile
 
 from io import BytesIO
 from time import sleep
@@ -243,11 +244,22 @@ class Urbit:
     def boot_existing(self, filename):
         patp = filename.split('.')[0]
 
-        if patp == None:
-            return "File is invalid"
+        if Utils.check_patp(patp):
+            Log.log(f"{patp}: Booting existing pier")
+            extracted = self.extract_pier(filename)
+            if extracted != "to-create":
+                self.config_object.upload_status.pop(patp)
+                return extracted
 
-        Log.log(f"{patp}: Booting existing pier")
-        return self.extract_pier(filename)
+            created = self.create_existing(patp)
+            if created != "succeeded":
+                self.config_object.upload_status.pop(patp)
+                return created
+            self.config_object.upload_status[patp] = {'status':'done'}
+            return 200
+
+        return "File is invalid"
+
 
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
@@ -255,27 +267,61 @@ class Urbit:
         compressed_dir = f"{self.config_object.base_path}/uploaded/{patp}/{filename}"
 
         try:
+            # Remove directory and make new empty one
+            self.config_object.upload_status[patp] = {'status':'setup'}
             Log.log(f"{patp}: Removing existing volume")
-            os.system(f'rm -rf {vol_dir}')
-
+            shutil.rmtree(f"{vol_dir}", ignore_errors=True)
             Log.log(f"{patp}: Creating volume directory")
             os.system(f'mkdir -p {vol_dir}/_data')
 
+            # Begin extraction
             Log.log(f"{patp}: Extracting {filename}")
+
+            '''
+            # Zipfile
             if filename.endswith("zip"):
                 with zipfile.ZipFile(compressed_dir) as zip_ref:
                     zip_ref.extractall(f"{vol_dir}/_data")
 
+            # Tarball
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
                 tar = tarfile.open(compressed_dir,"r:gz")
                 tar.extractall(f"{vol_dir}/_data")
                 tar.close()
+            '''
+
+            # Zipfile
+            if filename.endswith("zip"):
+                with zipfile.ZipFile(compressed_dir) as zip_ref:
+                    total_size = sum((file.file_size for file in zip_ref.infolist()))
+                    self.config_object.upload_status[patp] = {
+                            'status':'extracting',
+                            'progress':{
+                                'current':0,
+                                'total': total_size
+                                }
+                            }
+                    zip_ref.extractall(f"{vol_dir}/_data")
+
+            # Tarball
+            elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
+                with tarfile.open(compressed_dir, "r:gz") as tar_ref:
+                    total_size = sum((member.size for member in tar_ref.getmembers()))
+                    self.config_object.upload_status[patp] = {
+                            'status':'extracting',
+                            'progress':{
+                                'current':0,
+                                'total': total_size
+                                }
+                            }
+                    tar_ref.extractall(f"{vol_dir}/_data")
 
         except Exception as e:
-            Log.log(f"{patp}: Faileda to extract {filename}: {e}")
+            Log.log(f"{patp}: Failed to extract {filename}: {e}")
             return "File extraction failed"
 
         try:
+            self.config_object.upload_status[patp] = {'status':'cleaning'}
             shutil.rmtree(f"{self.config_object.base_path}/uploaded/{patp}", ignore_errors=True)
             Log.log(f"{patp}: Deleted {filename}")
 
@@ -283,14 +329,16 @@ class Urbit:
             Log.log(f"{patp}: Failed to remove {filename}: {e}")
             return f"Failed to remove {filename}"
 
-        return self.create_existing(patp)
+        return "to-create"
 
+    # Boot the newly uploaded pier
     def create_existing(self, patp):
         Log.log(f"{patp}: Attempting to boot new urbit ship")
         try:
             if not Utils.check_patp(patp):
                 raise Exception("Invalid @p")
 
+            self.config_object.upload_status[patp] = {'status':'booting'}
             # Get open ports
             http_port, ames_port = self.get_open_urbit_ports()
 
@@ -306,8 +354,7 @@ class Urbit:
                     api_version = self.config['apiVersion']
                     url = f"https://{endpoint}/{api_version}"
                     if self.register_urbit(patp, url):
-                        if self.start(patp) == "succeeded":
-                            return 200
+                        return self.start(patp)
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")

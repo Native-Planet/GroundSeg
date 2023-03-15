@@ -110,6 +110,18 @@ class GroundSeg:
                 return jsonify(res)
 
             return message
+        
+        # Pier upload status
+        @self.app.route("/upload/progress", methods=['POST'])
+        def pier_upload_status():
+            approved, message = self.verify(request)
+
+            if approved:
+                blob = request.get_json()
+                res = self.orchestrator.upload_status(blob)
+                return jsonify(res)
+
+            return message
 
         # Login
         @self.app.route("/login", methods=['POST'])

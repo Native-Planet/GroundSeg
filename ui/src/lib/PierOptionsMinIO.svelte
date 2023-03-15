@@ -71,7 +71,7 @@
   <div class="option-title">MinIO Settings</div>
   <div class="wrapper">
     <div class="top-wrapper">
-      {#if minIOReg && remote}
+      {#if minIOReg}
         <PrimaryButton
           noMargin={true}
           standard="Link to Urbit"

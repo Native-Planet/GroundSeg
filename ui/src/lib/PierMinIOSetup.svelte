@@ -1,7 +1,7 @@
 <script>
   import { afterUpdate } from 'svelte'
   import Fa from 'svelte-fa'
-  import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
+  import { faCheck, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
   import { faCircleQuestion } from '@fortawesome/free-regular-svg-icons'
 
   import { api } from '$lib/api'
@@ -11,10 +11,15 @@
 
   export let name, minIOReg
 
-  let textToggle = 'none',
-    minIOPassword = '', confirmPassword = '',
-    pwdView = false, cfmView = false,
-    buttonStatus = 'failure', submitted = false, showButton = true
+  let textToggle = 'none'
+  let minIOPassword = ''
+  let confirmPassword = ''
+  let pwdView = false
+  let cfmView = false
+  let buttonStatus = 'failure'
+  let submitted = false
+  let showButton = true
+  let linkCheck = true
 
 
   // Handle info and disclaimer visibility
@@ -43,9 +48,13 @@
 
     fetch($api + '/urbit?urbit_id=' + name, {
 			method: 'POST',
-        credentials: "include",
+      credentials: "include",
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'app':'minio','password':confirmPassword})
+      body: JSON.stringify({
+        'app':'minio',
+        'password':confirmPassword,
+        'link': linkCheck
+      })
 	  })
       .then(r => r.json())
       .then(d => { 
@@ -69,7 +78,7 @@
 {#if !minIOReg}
   <div class="pier-info">
 
-    <div class="pier-title">
+    <div class="pier-title title-flex">
       <!-- Password prompt title -->
       <span>Setup MinIO Local Storage Password</span>
 
@@ -82,6 +91,16 @@
       <button class="alert-mark" on:click={()=>handleTextToggle('alert')} >
         <Fa icon={faTriangleExclamation} size="1.2x" />
       </button>
+
+      <!-- Auto link to ship -->
+      <div class="link-check" on:click={()=> linkCheck = !linkCheck}>
+        <div class="box" class:highlight={linkCheck}>
+          {#if linkCheck}
+            <Fa icon={faCheck} size="1x"/>
+          {/if}
+        </div>
+        Automatically link to Urbit
+      </div>
     </div>
 
     <!-- Info text -->
@@ -124,6 +143,7 @@
         id="minio-password-1"
         bind:value={confirmPassword}
         class="minio-password"
+        class:pad={confirmPassword.length <= 0}
         type="password"
         placeholder="Enter the password again" />
 			<EyeButton on:click={toggleCfmView} view={cfmView} />
@@ -169,8 +189,15 @@
     color: inherit;
     opacity: .6;
   }
+  .pad {
+    margin-bottom: 16px;
+  }
   .minio-password:focus {
     outline: none;
+  }
+  .title-flex {
+    display: flex;
+    align-items: center;
   }
   .question-mark {
     color: inherit;
@@ -184,5 +211,26 @@
     font-size: 12px;
     margin-bottom: 12px;
     padding-right: 30px;
+  }
+  .link-check {
+    flex: 1;
+    margin-left: 20px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: end;
+    text-align: center;
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .box {
+    width: 14px;
+    height: 14px;
+    background: #ffffff4d;
+    border-radius: 4px;
+  }
+  .highlight {
+    background: #028AFB;
   }
 </style>

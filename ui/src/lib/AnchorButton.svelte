@@ -10,8 +10,8 @@
   let data = {anchor: {wgReg:false, wgRunning: false}}
 
   afterUpdate(()=> {
-    hide = ($page.routeId == 'login')
-    blur = ($page.routeId == 'startram')
+    hide = ($page.route.id == '/login')
+    blur = ($page.route.id == '/startram')
   })
 
 	// updateState loop

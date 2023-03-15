@@ -1,4 +1,5 @@
 # Python
+import os
 import ssl
 import base64
 import hashlib
@@ -125,7 +126,6 @@ class Utils:
             Log.log("Login: Failed to compare passwords: {e}")
 
         return res
-
 
     def start_script():
         return """\

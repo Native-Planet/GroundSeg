@@ -62,6 +62,9 @@ class Config:
     # Login Key Pairs
     login_keys = {"old":{"pub":"","priv":""},"cur":{"pub":"","priv":""}}
 
+    # Upload status
+    upload_status = {}
+
     # default content of system.json
     default_system_config = {
             "firstBoot": True,

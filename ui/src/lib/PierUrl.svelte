@@ -7,7 +7,7 @@
 	import EyeButton from '$lib/EyeButton.svelte'
   import Clipboard from 'clipboard'
 
-	export let name, urbitUrl, showUrbWeb, urbWebAlias
+	export let name, remote, urbitUrl, showUrbWeb, urbWebAlias
 
 	let view = false, clicked = false
   let loading = false
@@ -34,7 +34,7 @@
 </script>
 
 <div class="pier-info">
-  {#if urbWebAlias.length <= 0}
+  {#if !remote || (urbWebAlias.length <= 0)}
     <div class="pier-title">Ship Access URL</div>
   {:else}
     {#if showUrbWeb == 'alias'}

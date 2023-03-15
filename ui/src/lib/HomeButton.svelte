@@ -8,7 +8,7 @@
   let hide = false
 
   afterUpdate(()=> {
-    hide = ($page.routeId == 'login')
+    hide = ($page.route.id == '/login')
   })
 
 </script>

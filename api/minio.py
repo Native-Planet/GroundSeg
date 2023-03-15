@@ -50,13 +50,17 @@ class MinIO:
         Log.log("MinIO: Initialization Completed")
 
     # Create MinIO
-    def create_minio(self, patp, password, urb):
+    def create_minio(self, patp, password, urb, link):
         Log.log(f"{patp}: Attempting to create MinIO")
         try:
             urb._urbits[patp]['minio_password'] = password
             urb.save_config(patp)
             if self.start_minio(f"minio_{patp}", urb._urbits[patp]):
-                return 200
+                if not link:
+                    return 200
+                if urb.set_minio(patp) == 200:
+                    return 200
+
         except Exception as e:
             Log.log(f"{patp}: Failed to create MinIO: {e}")
 

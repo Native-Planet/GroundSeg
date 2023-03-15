@@ -1,6 +1,7 @@
 <script>
   import Fa from 'svelte-fa'
   import { faCircleQuestion } from '@fortawesome/free-regular-svg-icons'
+  import { faCheck } from '@fortawesome/free-solid-svg-icons'
   import { createEventDispatcher } from 'svelte'
   import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
@@ -57,15 +58,21 @@
 <div class="bg">
   <div class="option-title">Admin Actions</div>
 
-  <div class="autostart" >
-    <input type="checkbox" bind:checked={autostart} on:click={toggleAutostart} />
-    <div class="autostart-text" on:click={toggleAutostart} >Remember Urbit Ship Status</div>
-
+  <div class="autostart-wrapper">
+    <div class="autostart" on:click={toggleAutostart}>
+      <div class="box" class:highlight={autostart}>
+        {#if autostart}
+          <Fa icon={faCheck} size="1x"/>
+        {/if}
+      </div>
+      Remember Urbit Ship Status
+    </div>
     <!-- Info button -->
     <button class="question-mark" on:click={toggleInfo} >
       <Fa icon={faCircleQuestion} size="1x" />
     </button>
   </div>
+
 
   {#if showInfo}
   <div class="info-text">
@@ -109,15 +116,6 @@
     color: white;
     animation: breathe 2s infinite;
   }
-  .autostart {
-    display: flex;
-    font-size: 12px;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    cursor: pointer;
-  }
   .question-mark {
     color: inherit;
     cursor: pointer;
@@ -129,5 +127,30 @@
   .danger-zone {
     display: flex;
     justify-content: center;
+  }
+  .autostart-wrapper {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 0px;
+  }
+  .autostart {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .box {
+    width: 14px;
+    height: 14px;
+    background: #ffffff4d;
+    border-radius: 4px;
+  }
+  .highlight {
+    background: #028AFB;
   }
 </style>

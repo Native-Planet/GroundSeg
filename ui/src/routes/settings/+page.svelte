@@ -32,7 +32,7 @@
 
 	// updateState loop
   const update = () => {
-    if (($page.routeId == 'settings') && (activeTab == 'Settings') && !$noconn) {
+    if (($page.route.id == '/settings') && (activeTab == 'Settings') && !$noconn) {
       fetch($api + '/system', {
         credentials: "include"
       })
