@@ -357,7 +357,6 @@ class Orchestrator:
             if data['action'] == 'status':
                 try:
                     res = self.config_object.upload_status[patp]
-                    Log.log(res)
                     if res['status'] == 'extracting':
                         res['progress']['current'] = self.get_directory_size(f"/var/lib/docker/volumes/{patp}/_data")
                         return res

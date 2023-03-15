@@ -280,19 +280,6 @@ class Urbit:
             # Begin extraction
             Log.log(f"{patp}: Extracting {filename}")
 
-            '''
-            # Zipfile
-            if filename.endswith("zip"):
-                with zipfile.ZipFile(compressed_dir) as zip_ref:
-                    zip_ref.extractall(f"{vol_dir}/_data")
-
-            # Tarball
-            elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                tar = tarfile.open(compressed_dir,"r:gz")
-                tar.extractall(f"{vol_dir}/_data")
-                tar.close()
-            '''
-
             # Zipfile
             if filename.endswith("zip"):
                 with zipfile.ZipFile(compressed_dir) as zip_ref:
