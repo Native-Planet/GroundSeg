@@ -139,6 +139,7 @@
         <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
           <PierUrl
             name={urbit.name}
+            remote={urbit.remote}
             urbitUrl={urbit.urbitUrl}
             showUrbWeb={urbit.showUrbWeb}
             urbWebAlias={urbit.urbWebAlias}

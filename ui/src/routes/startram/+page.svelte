@@ -23,7 +23,7 @@
 
 	// updateState loop
   const update = () => {
-    if (($page.routeId == 'startram') && !$noconn) {
+    if (($page.route.id == '/startram') && !$noconn) {
       fetch($api + '/anchor', {credentials: "include"})
 			.then(raw => raw.json())
       .then(res => data = res)

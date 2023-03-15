@@ -93,17 +93,19 @@
           {meldLast}
           {meldNext}
         />
-        <PierOptionsLoom {name} {loomSize} />
-        <PierOptionsAdmin
-          {name}
-          {isPierDeletion}
-          {hasBucket}
-          {autostart}
-          on:delete={()=>isPierDeletion = true}
+        {#if minIOReg}
+          <PierOptionsLoom {name} {loomSize} />
+        {/if}
+        <PierOptionsAdmin {name} {autostart} on:delete={()=>isPierDeletion = true}
         />
       </div>
       <div class="right-wrapper">
-        <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+        {#if minIOReg}
+          <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+        {/if}
+        {#if !minIOReg}
+          <PierOptionsLoom {name} {loomSize} />
+        {/if}
         {#if wgReg}
           <PierOptionsDomain {name} alias={urbWebAlias} title="Urbit Ship Custom Domain" svcType="urbit-web" stdText="Submit ship domain">
             <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
@@ -112,13 +114,15 @@
               for more information.
             </div>
           </PierOptionsDomain>
-          <PierOptionsDomain {name} alias={s3WebAlias} title="MinIO Custom Domain" svcType="minio" stdText="Submit MinIO domain" >
-            <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
-              Set your MinIO bucket's public URL to another domain. Please read
-              <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
-              for more information.
-            </div>
-          </PierOptionsDomain>
+          {#if minIOReg}
+            <PierOptionsDomain {name} alias={s3WebAlias} title="MinIO Custom Domain" svcType="minio" stdText="Submit MinIO domain" >
+              <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
+                Set your MinIO bucket's public URL to another domain. Please read
+                <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
+                for more information.
+              </div>
+            </PierOptionsDomain>
+          {/if}
         {/if}
       </div>
     </div>

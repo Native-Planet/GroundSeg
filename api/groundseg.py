@@ -23,6 +23,7 @@ from melder import Melder
 from anchor_information import AnchorUpdater
 from wireguard_refresher import WireguardRefresher
 from kill_switch import KillSwitch
+from keygen import KeyGen
 
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
@@ -49,6 +50,10 @@ else:
     Thread(target=sys_mon.cpu_monitor, daemon=True).start()
     Thread(target=sys_mon.temp_monitor, daemon=True).start()
     Thread(target=sys_mon.disk_monitor, daemon=True).start()
+
+    # Start Key Generator
+    gen = KeyGen(sys_config)
+    Thread(target=gen.generator_loop, daemon=True).start()
 
     # Start GroundSeg orchestrator
     orchestrator = Orchestrator(sys_config)

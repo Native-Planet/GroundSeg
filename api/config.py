@@ -30,7 +30,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.9"
+    version = "v1.1.10"
 
     # Debug mode
     debug_mode = False
@@ -58,6 +58,12 @@ class Config:
 
     # system.json contents
     config = {}
+
+    # Login Key Pairs
+    login_keys = {"old":{"pub":"","priv":""},"cur":{"pub":"","priv":""}}
+
+    # Upload status
+    upload_status = {}
 
     # default content of system.json
     default_system_config = {
@@ -187,17 +193,35 @@ class Config:
         except Exception as e:
             Log.log(f"Config: {e}")
 
-    
+    # Modify current password
     def change_password(self, data):
-        encoded_str = (self.config['salt'] + data['old-pass']).encode('utf-8')
-        this_hash = hashlib.sha512(encoded_str).hexdigest()
+        used = "new"
+        Log.log("Config: Attempting to change password with current key")
+        decrypted = Utils.decrypt_password(self.login_keys['cur']['priv'], data['old-pass'])
+        if Utils.compare_password(self.config['salt'], decrypted, self.config['pwHash']):
+            Log.log("Config: Supplied password is correct")
+        else:
+            Log.log("Config: Attempting to change password with current previous key")
+            decrypted = Utils.decrypt_password(self.login_keys['old']['priv'], data['old-pass'])
+            if Utils.compare_password(self.config['salt'], decrypted, self.config['pwHash']):
+                Log.log("Config: Supplied password is correct")
+                used = "old"
+            else:
+                Log.log("Config: Supplied password is incorrect")
+                return False
 
-        Log.log("Config: Attempting to change password")
+        if used == "old":
+            decrypted = Utils.decrypt_password(self.login_keys['old']['priv'], data['new-pass'])
+        else:
+            decrypted = Utils.decrypt_password(self.login_keys['cur']['priv'], data['new-pass'])
 
-        if this_hash == self.config['pwHash']:
-            if self.create_password(data['new-pass']):
-                return True
+        if self.create_password(decrypted):
+            return True
 
+        Log.log("Config: Failed to change password")
+        return False
+
+    # Create new password
     def create_password(self, pwd):
         Log.log("Config: Attempting to create password")
         try:

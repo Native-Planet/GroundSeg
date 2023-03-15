@@ -49,8 +49,7 @@ class Orchestrator:
                 return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit, self.minio)
 
             if page == "password":
-                if self.config_object.create_password(data['password']):
-                    return 200
+                return Setup.handle_password(data, self.config_object)
 
         except Exception as e:
             Log.log(f"Setup: {e}")
@@ -156,7 +155,7 @@ class Orchestrator:
             if data['app'] == 'minio':
                 pwd = data.get('password')
                 if pwd != None:
-                    return self.minio.create_minio(urbit_id, pwd, self.urbit)
+                    return self.minio.create_minio(urbit_id, pwd, self.urbit,data['link'])
 
                 if data['data'] == 'export':
                     return self.minio.export(urbit_id)
@@ -290,7 +289,7 @@ class Orchestrator:
                 return self.wireguard.restart(self.urbit, self.minio)
 
             if data['action'] == 'change-url':
-                return self.wireguard.change_url(data['url'], self.urbit)
+                return self.wireguard.change_url(data['url'], self.urbit, self.minio)
 
             if data['action'] == 'register':
                 endpoint = self.config['endpointUrl']
@@ -345,6 +344,47 @@ class Orchestrator:
 
 
         return blob.decode('utf-8').split('\n')[line:]
+
+
+    #
+    #   Pier Upload
+    #
+
+
+    def upload_status(self, data):
+        try:
+            patp = data['patp']
+            if data['action'] == 'status':
+                try:
+                    res = self.config_object.upload_status[patp]
+                    Log.log(res)
+                    if res['status'] == 'extracting':
+                        res['progress']['current'] = self.get_directory_size(f"/var/lib/docker/volumes/{patp}/_data")
+                        return res
+                    return res
+                except Exception as e:
+                    Log.log(f"Upload: Failed to get status {e}")
+                    return {'status':'none'}
+
+            if data['action'] == 'remove':
+                self.config_object.upload_status.pop(patp)
+                return {'status':'removed'}
+
+        except Exception as e:
+            Log.log(f"Upload: Failed to get upload status: {e}")
+            return {'status':'none'}
+
+    def get_directory_size(self, directory):
+        total_size = 0
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.is_file():
+                    total_size += entry.stat().st_size
+                elif entry.is_dir():
+                    total_size += self.get_directory_size(entry.path)
+        return total_size
+
+
 
     def handle_upload(self, req):
         # change to temp mode (DO NOT SAVE CONFIG)

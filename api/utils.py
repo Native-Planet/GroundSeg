@@ -1,11 +1,15 @@
 # Python
+import os
 import ssl
+import base64
 import hashlib
 import urllib.request
 from time import sleep
 
 # Modules
 import nmcli
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives import serialization, hashes
 
 # GroundSeg modules
 from log import Log
@@ -88,6 +92,41 @@ class Utils:
             Log.log(f"WiFi: Failed to connect to network: {e}")
             return False
 
+    def convert_pub(pub):
+        converted = ""
+        try:
+            if pub != "":
+                converted = pub.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    ).decode("utf-8")
+        except Exception as e:
+            Log.log(f"Keygen: Failed to convert pubkey: {e}")
+
+        return converted
+
+    def decrypt_password(priv, pwd):
+        decrypted = ""
+        try:
+            pwd_bstr = bytes(pwd,'utf-8')
+            pwd_bytes = base64.b64decode(pwd_bstr)
+            decrypted = priv.decrypt(pwd_bytes, PKCS1v15()).decode("utf-8")
+        except Exception as e:
+            Log.log(f"Keygen: Failed to decrypt password: {e}")
+
+        return decrypted
+
+    def compare_password(salt, password, pwHash):
+        res = False
+        try:
+            encoded_str = (salt + password).encode('utf-8')
+            this_hash = hashlib.sha512(encoded_str).hexdigest()
+            res = this_hash == pwHash
+        except Exception as e:
+            Log.log("Login: Failed to compare passwords: {e}")
+
+        return res
+
     def start_script():
         return """\
 #!/bin/bash
@@ -97,6 +136,13 @@ set -eu
 amesPort="34343"
 httpPort="80"
 loom="31"
+
+# Find the first directory and start urbit with the ship therein
+dirnames="*/"
+dirs=( $dirnames )
+dirname=''${dirnames[0]}
+
+# Todo: Add patp regex
 
 # check args
 for i in "$@"
