@@ -272,7 +272,7 @@ pipeline {
                                     git checkout master
                                     git merge ${tag}
                                     git commit -am "Merge ${tag}"
-                                    git push origin master
+                                    git push
                                 '''
                             )
 			}
