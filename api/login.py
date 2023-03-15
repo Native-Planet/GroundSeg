@@ -1,24 +1,30 @@
 #Python
 import string
 import secrets
-import hashlib
 
 # Modules
 from flask import make_response, jsonify
 
 # GroundSeg modules
 from log import Log
+from utils import Utils
 
 class Login:
     def handle_login(data, config):
         Log.log("Login: Login requested")
         if 'password' in data:
-            encoded_str = (config.config['salt'] + data['password']).encode('utf-8')
-            this_hash = hashlib.sha512(encoded_str).hexdigest()
-
-            if this_hash == config.config['pwHash']:
+            Log.log("Login: Attempting with current key")
+            decrypted = Utils.decrypt_password(config.login_keys['cur']['priv'], data['password'])
+            if Utils.compare_password(config.config['salt'], decrypted, config.config['pwHash']):
                 Log.log("Login: Password is correct!")
                 return True
+
+            Log.log("Login: Attempting with previous key")
+            decrypted = Utils.decrypt_password(config.login_keys['old']['priv'], data['password'])
+            if Utils.compare_password(config.config['salt'], decrypted, config.config['pwHash']):
+                Log.log("Login: Password is correct!")
+                return True
+
 
         Log.log("Login: Password incorrect")
         return False

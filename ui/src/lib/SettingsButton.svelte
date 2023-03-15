@@ -5,8 +5,8 @@
   let hide = false
   let blur = false
   afterUpdate(()=> {
-    hide = ($page.routeId == 'login')
-    blur = ($page.routeId == 'settings')
+    hide = ($page.route.id == '/login')
+    blur = ($page.route.id == '/settings')
   })
 
 </script>

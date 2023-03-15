@@ -32,7 +32,7 @@
 
 	// updateState loop
   const update = () => {
-    if (($page.routeId == 'settings') && (activeTab == 'Settings') && !$noconn) {
+    if (($page.route.id == '/settings') && (activeTab == 'Settings') && !$noconn) {
       fetch($api + '/system', {
         credentials: "include"
       })
@@ -208,7 +208,7 @@
     margin: auto;
     margin-top: 12px;
     max-width: 360px;
-    gap: 6px;
+    gap: 8px;
   }
   .tab {
     flex: 1;
@@ -229,9 +229,9 @@
     opacity: .8;
   }
   .main-panel {
-    margin-top: 12px;
+    margin-top: 16px;
     display: flex;
-    gap: 12px;
+    gap: 14px;
   }
   .portrait { flex-direction: column;}
   .landscape { flex-direction: row;}
@@ -239,7 +239,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
 </style>

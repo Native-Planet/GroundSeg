@@ -1,12 +1,14 @@
 <script>
   import { api } from '$lib/api'
-  import { createEventDispatcher } from 'svelte'
+  import { onMount, createEventDispatcher } from 'svelte'
+  import { page } from '$app/stores'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import EyeButton from '$lib/EyeButton.svelte'
 
   let curPass = '', newPass = '', confirmPass = ''
   let curView = false, newView = false, cfmView = false
   let buttonStatus = 'standard'
+  let pubKey = ''
 
   const dispatch = createEventDispatcher()
   const cancelMod = () => dispatch('cancel')
@@ -24,14 +26,18 @@
     document.querySelector('#cfm').type = cfmView ? 'text' : 'password'
   }
 
-  const submitNewPass = () => {
+  const submitNewPass = async () => {
     buttonStatus = 'loading'
+
+    const oldPass = await encryptPassword(curPass.trim())
+    const newPass = await encryptPassword(confirmPass.trim())
+
     let module = 'session'
 	  fetch($api + '/system?module=' + module, {
 			method: 'POST',
       credentials: 'include',
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'change-pass','old-pass':curPass.trim(),'new-pass':confirmPass.trim()})
+			body: JSON.stringify({'action':'change-pass','old-pass':oldPass,'new-pass':newPass})
 	  })
       .then(d => d.json())
       .then(res => {
@@ -53,7 +59,28 @@
       })
   }
 
+  const getLoginKey = () => {
+    if ($page.url.pathname == "/settings") {
+      fetch($api + '/login/key')
+      .then(r => r.json())
+        .then(d => {
+          pubKey = d
+        })
+      setTimeout(getLoginKey, 30000)
+  }}
+
+  const encryptPassword = async pwd => {
+    const encrypt = new JSEncrypt({ default_key_size: 2048 })
+    encrypt.setPublicKey(pubKey)
+    const encrypted = await encrypt.encrypt(pwd)
+    return encrypted
+  }
+
+  onMount(()=> getLoginKey())
+
 </script>
+
+<svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
 <div class="input-wrapper">
 

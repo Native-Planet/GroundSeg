@@ -1,3 +1,4 @@
+from utils import Utils
 
 class Setup:
     def handle_anchor(data, config, wg, urbit, minio):
@@ -25,5 +26,19 @@ class Setup:
                 config.config['firstBoot'] = False
                 if config.save_config():
                     return 200
+
+        return 400
+
+    def handle_password(data, config):
+        matching = False
+        if data['pubkey'] == Utils.convert_pub(config.login_keys['cur']['pub']):
+            matching = "cur"
+        elif data['pubkey'] == Utils.convert_pub(config.login_keys['old']['pub']):
+            matching = "old"
+
+        if matching:
+            decrypted = Utils.decrypt_password(config.login_keys[matching]['priv'],data['password'])
+            if config.create_password(decrypted):
+                return 200
 
         return 400
