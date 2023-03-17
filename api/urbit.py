@@ -73,7 +73,7 @@ class Urbit:
             Log.log("Urbit: Updater information not yet ready. Checking in 3 seconds")
             sleep(3)
 
-        # Updater Wireguard information
+        # Updater Urbit information
         if self.config_object.update_avail:
             self.updater_info = self.config_object.update_payload['groundseg'][branch]['vere']
 

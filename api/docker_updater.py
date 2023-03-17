@@ -64,13 +64,14 @@ class DockerUpdater:
             info = self.payload['wireguard']
             wg_name = self.wireguard.data['wireguard_name']
             tag = self.wireguard.data['wireguard_version']
+            v_tag = info['tag']
             repo = info['repo']
 
             if tag == "latest" or tag == "edge":
                 sha = f"{self.arch}_sha256"
-                image = f"{repo}:tag@sha256:{info[sha]}"
+                image = f"{repo}:{v_tag}@sha256:{info[sha]}"
             else:
-                image = f"{repo}:{tag}"
+                image = tag
 
             c = self.wireguard.wg_docker.get_container(wg_name)
             if c:
@@ -99,11 +100,13 @@ class DockerUpdater:
         name = self.webui.data['webui_name']
         tag = self.webui.data['webui_version']
         info = self.payload['webui']
+        v_tag = info['tag']
+        repo = info['repo']
         if tag == "latest" or tag == "edge":
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
+            image = f"{repo}:{v_tag}@sha256:{info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{tag}"
+            image = tag
         c = self.webui.webui_docker.get_container(name)
         if c:
             old_image = c.attrs['Config']['Image']
@@ -118,11 +121,13 @@ class DockerUpdater:
         name = self.netdata.data['netdata_name']
         tag = self.netdata.data['netdata_version']
         info = self.payload['netdata']
+        v_tag = info['tag']
+        repo = info['repo']
         if tag == "latest" or tag == "edge":
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
+            image = f"{repo}:{v_tag}@sha256:{info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{tag}"
+            image = tag
         c = self.netdata.nd_docker.get_container(name)
         if c:
             old_image = c.attrs['Config']['Image']
@@ -138,7 +143,7 @@ class DockerUpdater:
             Log.log(f"Updater: Checking for MinIO Client updates")
             info = self.payload['miniomc']
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
+            image = f"{info['repo']}:{info['tag']}@sha256:{info[sha]}"
             mc_name = self.minio.mc_name
             c = self.minio.mc_docker.get_container(mc_name)
             if c:
@@ -162,6 +167,7 @@ class DockerUpdater:
             for p in list(copied):
                 info = self.payload['minio']
                 name = f"minio_{p}"
+                v_tag = info['tag']
                 sha = f"{self.arch}_sha256"
                 if self.urbit._urbits[p]['minio_password'] != '':
                     Log.log(f"{name}: Checking for MinIO update")
@@ -169,9 +175,9 @@ class DockerUpdater:
                     tag = self.urbit._urbits[p]['minio_version']
                     if tag == "latest" or tag == "edge":
                         sha = f"{self.arch}_sha256"
-                        image = f"{info['repo']}:tag@sha256:{info[sha]}"
+                        image = f"{info['repo']}:{v_tag}@sha256:{info[sha]}"
                     else:
-                        image = f"{info['repo']}:{tag}"
+                        image = tag
                     if c:
                         old_image = c.attrs['Config']['Image']
                         if old_image != image:
@@ -194,11 +200,13 @@ class DockerUpdater:
             sha = f"{self.arch}_sha256"
             Log.log(f"{p}: Checking for Urbit update")
             tag = self.urbit._urbits[p]['urbit_version']
+            v_tag = info['tag']
             if tag == "latest" or tag == "edge":
                 sha = f"{self.arch}_sha256"
-                image = f"{info['repo']}:tag@sha256:{info[sha]}"
+                image = f"{info['repo']}:{v_tag}@sha256:{info[sha]}"
             else:
-                image = f"{info['repo']}:{tag}"
+                image = tag
+
             c = self.urbit.urb_docker.get_container(p)
             if c:
                 old_image = c.attrs['Config']['Image']

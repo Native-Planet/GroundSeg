@@ -6,7 +6,8 @@ client = docker.from_env()
 class MCDocker:
     def start(self, name, updater_info, arch):
         sha = f"{arch}_sha256"
-        image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+        v_tag = updater_info['tag']
+        image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
 
         Log.log("MC: Attempting to start container")
         c = self.get_container(name)

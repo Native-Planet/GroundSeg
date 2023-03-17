@@ -6,11 +6,12 @@ client = docker.from_env()
 class MinIODocker:
     def start(self, name, updater_info, config, arch):
         tag = config['minio_version']
+        v_tag = updater_info['tag']
         if tag == "latest" or tag == "edge":
             sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+            image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{tag}"
+            image = tag
 
         Log.log(f"{name}: Attempting to start container")
         # Remove container

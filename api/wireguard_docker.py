@@ -8,11 +8,12 @@ class WireguardDocker:
     def start(self, config, updater_info, arch):
         name = config['wireguard_name']
         tag = config['wireguard_version']
+        v_tag = updater_info['tag']
         if tag == "latest" or tag == "edge":
             sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+            image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{tag}"
+            image = tag
 
         Log.log("Wireguard: Attempting to start container")
         c = self.get_container(name)

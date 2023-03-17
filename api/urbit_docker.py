@@ -13,11 +13,12 @@ class UrbitDocker:
         patp = config['pier_name']
         Log.log(f"{patp}: Attempting to start container")
         tag = config['urbit_version']
+        v_tag = updater_info['tag']
         if tag == "latest" or tag == "edge":
             sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
+            image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
         else:
-            image = f"{updater_info['repo']}:{tag}"
+            image = tag
 
         # Check if patp is valid
         if not Utils.check_patp(patp):
@@ -27,7 +28,7 @@ class UrbitDocker:
         # Get container
         c = self.get_container(patp)
         if not c:
-            if self.create(config, updater_info, arch, vol_dir, key=''):
+            if self.create(config, image, vol_dir, ''):
                 c = self.get_container(patp)
                 if not c:
                     return "failed"
@@ -35,7 +36,7 @@ class UrbitDocker:
         if c.attrs['Config']['Image'] != image:
             Log.log(f"{patp}: Container and config versions are mismatched")
             if self.remove_container(patp):
-                if self.create(config, updater_info, arch, vol_dir, ''):
+                if self.create(config, image, vol_dir, ''):
                     c = self.get_container(patp)
                     if not c:
                         return "failed"
@@ -84,15 +85,8 @@ class UrbitDocker:
             return False
 
 
-    def create(self, config, updater_info, arch, vol_dir, key=''):
+    def create(self, config, image, vol_dir, key=''):
         patp = config['pier_name']
-        tag = config['urbit_version']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{updater_info['tag']}"
-
         Log.log(f"{patp}: Attempting to create container")
 
         if self._pull_image(image, patp):
