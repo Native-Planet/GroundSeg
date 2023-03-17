@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store'
-export const webuiVersion = 'v1.1.10'
+export const webuiVersion = 'v1.1.11'
 
 //
 // fade transition params
