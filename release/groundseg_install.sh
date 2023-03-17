@@ -8,7 +8,7 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=master
-TAG=v1.0.8
+TAG=v1.1.11
 DEVICE_ARCH=$(uname -m)
 
 # Directory to save the scrips
@@ -40,14 +40,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   sudo systemctl daemon-reload 
   sudo systemctl restart groundseg
 
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-
-  # launchd daemon
-  sudo wget -O /Library/LaunchDaemons/io.nativeplanet.groundseg.plist \
-	  https://raw.githubusercontent.com/$ACC/$REPO/$BRANCH/release/io.nativeplanet.groundseg.plist
-
-  # Load and start
-  sudo launchctl load /Library/LaunchDaemons/io.nativeplanet.groundseg.plist
+  echo "####################################################"
+  echo ""
+  echo "  Access GroundSeg at:"
+  echo "   http://$(cat /proc/sys/kernel/hostname).local"
+  echo ""
+  echo "####################################################"
 
 else
   echo "Unsupported Operating System. Please reach out to ~raldeg/nativeplanet for further assistance"
