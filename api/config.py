@@ -9,6 +9,7 @@ import hashlib
 import platform
 
 from time import sleep
+from datetime import datetime
 
 # Modules
 from pywgkey.key import WgKey
@@ -61,6 +62,9 @@ class Config:
 
     # Login Key Pairs
     login_keys = {"old":{"pub":"","priv":""},"cur":{"pub":"","priv":""}}
+
+    # Login Status
+    login_status = {"locked": False, "end": datetime(1,1,1,0,0), "attempts": 0}
 
     # Upload status
     upload_status = {}

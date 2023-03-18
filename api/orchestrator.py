@@ -63,12 +63,31 @@ class Orchestrator:
 
 
     def handle_login_request(self, data):
-        res = Login.handle_login(data, self.config_object)
-        if res:
-            return Login.make_cookie(self.config_object)
-        else:
-            return Login.failed()
+        now = datetime.now()
+        s = self.config_object.login_status
+        unlocked = s['end'] < now
+        if unlocked:
+            res = Login.handle_login(data, self.config_object)
+            if res:
+                return Login.make_cookie(self.config_object)
+        return Login.failed(self.config_object, s['end'] < now)
 
+    def handle_login_status(self):
+        try:
+            now = datetime.now()
+            remainder = 0
+            s = self.config_object.login_status
+            locked = False
+            if s['end'] > now:
+                Log.log((s['end'] - now).total_seconds())
+                remainder = int((s['end'] - now).total_seconds())
+                locked = s['locked']
+
+            return {"locked": locked, "remainder": remainder}
+            
+        except Exception as e:
+            Log.log(f"Login: Failed to get login status: {e}")
+            return 400
 
     #
     #   Bug Report

@@ -4,6 +4,9 @@
   import { api, updateState } from '$lib/api'
   import { page } from '$app/stores'
 
+  import Fa from 'svelte-fa'
+  import { faLock } from '@fortawesome/free-solid-svg-icons'
+
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import EyeButton from '$lib/EyeButton.svelte'
@@ -17,6 +20,11 @@
   let loginPassword = ''
   let buttonStatus = 'standard'
   let pubKey = ''
+  let unlocked = true
+  let remainder = 0
+  let hours = 0
+  let minutes = 0
+  let seconds = 0
 
 	onDestroy(()=> inView = false)
   onMount(()=> {
@@ -28,6 +36,7 @@
     } else {
       console.log(data['status'])
     }
+    isLocked()
     inView = true
     getLoginKey()
   })
@@ -41,6 +50,40 @@
         })
       setTimeout(getLoginKey, 30000)
   }}
+
+  let count = 0
+
+  const isLocked = () => {
+    if ($page.url.pathname == "/login") {
+      fetch($api + '/login/status')
+      .then(r => r.json())
+      .then(d => {
+        if (d != 400) {
+          remainder = d.remainder
+          if (d.locked) {
+            startCountdown()
+          }
+        }
+      })
+      .catch(e => console.log(e))
+    }
+  }
+
+  const startCountdown = () => {
+    const countdown = setInterval(() => {
+      if (remainder <= 0) {
+        unlocked = true
+        clearInterval(countdown)
+        isLocked()
+      } else {
+        hours = Math.floor(remainder / 3600)
+        minutes = Math.floor((remainder % 3600) / 60)
+        seconds = Math.floor(remainder % 60)
+        unlocked = false
+        remainder--
+      }
+    }, 1000)
+  }
 
   const togglePwdView = () => {
     pwdView = !pwdView
@@ -65,6 +108,7 @@
         } else {
           console.log(d)
           buttonStatus = 'failure'
+          setTimeout(()=> isLocked(), 1000)
           setTimeout(()=> {
             buttonStatus = 'standard'
             loginPassword = ''
@@ -85,30 +129,37 @@
 <svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
 {#if inView}
-  <Card width="640px">
+  <Card width="640px" bgColor={unlocked ? "" : "#3F00008D"}>
     <div class="main-wrapper">
       <div class="opened-wrapper" in:scale={{delay:400, duration: 120}}>
         <img src="/npfull.svg" alt="Native Planet Logo" />
-        <div class="login-wrapper">
-          <input
-            id="login-password"
-            bind:value={loginPassword}
-            class="login-password"
-            type="password"
-            placeholder='Password'
-            disabled={buttonStatus != 'standard'}
+        {#if unlocked}
+          <div class="login-wrapper">
+            <input
+              id="login-password"
+              bind:value={loginPassword}
+              class="login-password"
+              type="password"
+              placeholder='Password'
+              disabled={buttonStatus != 'standard'}
+            />
+          </div>
+          <PrimaryButton
+            top=24
+            left={false}
+            standard="Login"
+            success="Login successful!"
+            failure="Login failed"
+            loading="Logging you in.."
+            status={(loginPassword.length > 0) && (pubKey.length > 0) ? buttonStatus : 'disabled'}
+            on:click={handleLogin}
           />
-        </div>
-        <PrimaryButton
-          top=24
-          left={false}
-          standard="Login"
-          success="Login successful!"
-          failure="Login failed"
-          loading="Logging you in.."
-          status={(loginPassword.length > 0) && (pubKey.length > 0) ? buttonStatus : 'disabled'}
-          on:click={handleLogin}
-        />
+        {:else}
+          <div class="locked">
+            <div class="locked-icon"><Fa icon={faLock} size="4x" /></div>
+            <div class="locked-text">{hours > 0 ? hours + " HOURS" : ""} {minutes > 0 ? minutes + " MINUTES" : ""} {seconds} SECONDS</div>
+          </div>
+        {/if}
       </div>
     </div>
   </Card>
@@ -147,5 +198,17 @@
   input::placeholder {
     color: inherit;
     opacity: .6;
+  }
+  .locked {
+    text-align: center;
+    margin-top: 30px;
+    line-height: 40px;
+  }
+  .locked-icon {
+    color: red;
+  }
+  .locked-text {
+    margin-top: 30px;
+    font-size: 24px;
   }
 </style>
