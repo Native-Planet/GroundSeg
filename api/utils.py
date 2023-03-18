@@ -2,8 +2,8 @@
 import os
 import ssl
 import base64
+import socket
 import hashlib
-import urllib.request
 from time import sleep
 
 # Modules
@@ -64,16 +64,13 @@ class Utils:
 
         return True
 
-    def check_internet_access():
+    def check_internet_access(addr):
         Log.log("Updater: Checking internet access")
         try:
-            context = ssl._create_unverified_context()
-            urllib.request.urlopen('https://nativeplanet.io',
-                                   timeout=1,
-                                   context=context)
-
+            socket.setdefaulttimeout(3)
+            host, port = addr.split(":")
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, int(port)))
             return True
-
         except Exception as e:
             Log.log(f"Updater: Check internet access error: {e}")
             return False

@@ -82,7 +82,8 @@ class Config:
             "pwHash": "",
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
-            "c2cInterval": 0
+            "c2cInterval": 0,
+            "netCheck": "1.1.1.1:53"
             }
 
 
@@ -277,7 +278,7 @@ class Config:
                 cron.write()
 
     def device_mode_internet(self):
-        internet = Utils.check_internet_access()
+        internet = Utils.check_internet_access(self.config['netCheck'])
         if self.device_mode == "npbox":
             if not internet:
                 Log.log("Config: No internet access, starting Connect to Connect mode")
@@ -286,7 +287,7 @@ class Config:
             while not internet:
                 Log.log("Config: No internet access, checking again in 15 seconds")
                 sleep(15)
-                internet = Utils.check_internet_access()
+                internet = Utils.check_internet_access(self.config['netCheck'])
 
 
     def check_mode_file(self):
