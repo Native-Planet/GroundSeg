@@ -79,7 +79,6 @@ class Orchestrator:
             s = self.config_object.login_status
             locked = False
             if s['end'] > now:
-                Log.log((s['end'] - now).total_seconds())
                 remainder = int((s['end'] - now).total_seconds())
                 locked = s['locked']
 
