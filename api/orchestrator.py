@@ -2,6 +2,7 @@
 import os
 import time
 import socket
+from time import sleep
 from datetime import datetime
 
 # Flask
@@ -29,6 +30,15 @@ class Orchestrator:
     def __init__(self, config):
         self.config_object = config
         self.config = config.config
+
+        if self.config['updateMode'] == 'auto':
+            count = 0
+            while not self.config_object.update_avail:
+                count += 1
+                if count >= 10:
+                    break
+                Log.log("Updater: Updater information not yet ready. Checking in 3 seconds")
+                sleep(3)
 
         self.wireguard = Wireguard(config)
         self.netdata = Netdata(config)

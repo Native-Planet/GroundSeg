@@ -4,10 +4,14 @@ from log import Log
 client = docker.from_env()
 
 class MCDocker:
-    def start(self, name, updater_info, arch):
+    def start(self, config, arch):
+        name = config['mc_name']
+        tag = config['mc_version']
         sha = f"{arch}_sha256"
-        v_tag = updater_info['tag']
-        image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
+
+        image = f"{config['repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
 
         Log.log("MC: Attempting to start container")
         c = self.get_container(name)
@@ -17,13 +21,6 @@ class MCDocker:
         c = self.create_container(name, image)
         if not c:
             return False
-
-        if c.attrs['Config']['Image'] != image:
-            Log.log("MC: Container and config versions are mismatched")
-            if self.remove_container(name):
-                c = self.create_container(name, image)
-                if not c:
-                    return False
 
         if c.status == "running":
             Log.log("MC: Container already started")
@@ -96,15 +93,15 @@ class MCDocker:
             return True
 
     def exec(self, name, command):
-        Log.log(f"{name}: Executing command")
+        Log.log(f"MC: Executing command")
         c = self.get_container(name)
         if c:
             try:
                 x = c.exec_run(command)
-                Log.log(f"{name}: Output: {x.output.decode('utf-8').strip()}")
+                Log.log(f"MC: Output: {x.output.decode('utf-8').strip()}")
 
                 return True
             except Exception as e:
-                Log.log(f"{name}: Unable to exec command: {e}")
+                Log.log(f"MC: Unable to exec command: {e}")
 
         return False

@@ -10,17 +10,16 @@ from log import Log
 client = docker.from_env()
 
 class WebUIDocker:
-    def start(self, config, updater_info, arch):
+    def start(self, config, arch):
         name = config['webui_name']
         tag = config['webui_version']
-        v_tag = updater_info['tag']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:{v_tag}@sha256:{updater_info[sha]}"
-        else:
-            image = tag
+        sha = f"{arch}_sha256"
 
+        image = f"{config['repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
         Log.log("WebUI: Attempting to start container")
+
         if self.get_container(name):
             self.remove_container(name)
 

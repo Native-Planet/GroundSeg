@@ -14,15 +14,17 @@ class Wireguard:
     _headers = {"Content-Type": "application/json"}
     data = {}
     updater_info = {}
-    default_config = { 
-                      "wireguard_name": "wireguard",
-                      "wireguard_version": "latest",
-                      "volume_dir": "/var/lib/docker/volumes",
-                      "image": "linuxserver/wireguard",
-                      "cap_add": ["NET_ADMIN","SYS_MODULE"],
-                      "volumes": ["/lib/modules:/lib/modules"],
-                      "sysctls": { "net.ipv4.conf.all.src_valid_mark": 1 }
-                      }   
+    default_config = {
+            "wireguard_name": "wireguard",
+            "wireguard_version": "latest",
+            "repo": "registry.hub.docker.com/linuxserver/wireguard",
+            "amd64_sha256": "ae6f8e8cc1303bc9c0b5fa1b1ef4176c25a2c082e29bf8b554ce1196731e7db2",
+            "arm64_sha256": "403d741b1b5bcf5df1e48eab0af8038355fae3e29419ad5980428f9aebd1576c",
+            "volume_dir": "/var/lib/docker/volumes",
+            "cap_add": ["NET_ADMIN","SYS_MODULE"],
+            "volumes": ["/lib/modules:/lib/modules"],
+            "sysctls": { "net.ipv4.conf.all.src_valid_mark": 1 }
+            }
 
     def __init__(self, config):
         self.config_object = config
@@ -31,24 +33,27 @@ class Wireguard:
         self.anchor_data = {}
         self.wg_docker = WireguardDocker()
 
+        # Set Wireguard Config
         self.load_config()
-
-        # Check if updater information is ready
         branch = self.config['updateBranch']
-        count = 0
-        while not self.config_object.update_avail:
-            count += 1
-            if count >= 30:
-                break
-
-            Log.log("Wireguard: Updater information not yet ready. Checking in 3 seconds")
-            sleep(3)
+        self.data = {**self.default_config, **self.data}
 
         # Updater Wireguard information
-        if self.config_object.update_avail:
+        if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
+            Log.log("Wireguard: Replacing local data with version server data")
             self.updater_info = self.config_object.update_payload['groundseg'][branch]['wireguard']
-            self.data['image'] = self.updater_info['repo']
-        self.data = {**self.default_config, **self.data}
+            self.data['repo'] = self.updater_info['repo']
+            self.data['wireguard_version'] = self.updater_info['tag']
+            self.data['amd64_sha256'] = self.updater_info['amd64_sha256']
+            self.data['arm64_sha256'] = self.updater_info['arm64_sha256']
+
+        # image replaced by repo
+        if 'image' in self.data:
+            self.data.pop('image')
+
+        # tag replaced by wireguard_version
+        if 'tag' in self.data:
+            self.data.pop('tag')
 
         self.save_config()
 
@@ -59,7 +64,7 @@ class Wireguard:
 
     # Start container
     def start(self):
-        return self.wg_docker.start(self.data, self.updater_info, self.config_object._arch)
+        return self.wg_docker.start(self.data, self.config_object._arch)
 
     # Stop container
     def stop(self):

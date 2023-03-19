@@ -17,6 +17,7 @@ class BinUpdater:
 
     def check_bin_update(self):
         Log.log("Updater: Binary updater thread started")
+        Log.log(f"Updater: Update mode: {self.config['updateMode']}")
         while True:
             try:
                 Log.log("Updater: Fetching version server for updated information")
@@ -35,7 +36,7 @@ class BinUpdater:
                     raise ValueError(f"Status code {r.status_code}")
 
             except Exception as e:
-                config.update_avail = False
+                self.config_object.update_avail = False
                 Log.log(f"Updater: Unable to retrieve update information: {e}")
                 sleep(60)
 
