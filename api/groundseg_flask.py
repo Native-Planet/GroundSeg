@@ -137,6 +137,12 @@ class GroundSeg:
             res = Utils.convert_pub(self.config_object.login_keys['cur']['pub'])
             return jsonify(res)
 
+        # Get login status
+        @self.app.route("/login/status", methods=['GET'])
+        def login_status():
+            res = self.orchestrator.handle_login_status()
+            return jsonify(res)
+
         # Setup
         @self.app.route("/setup", methods=['POST'])
         def setup():

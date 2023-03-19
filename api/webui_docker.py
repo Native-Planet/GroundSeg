@@ -10,35 +10,22 @@ from log import Log
 client = docker.from_env()
 
 class WebUIDocker:
-    def start(self, config, updater_info, arch):
+    def start(self, config, arch):
         name = config['webui_name']
         tag = config['webui_version']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{tag}"
+        sha = f"{arch}_sha256"
 
-
+        image = f"{config['repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
         Log.log("WebUI: Attempting to start container")
+
         if self.get_container(name):
             self.remove_container(name)
 
         c = self.create_container(name, image, config)
 
         try:
-            # Find a better way to do this
-            '''
-            if config['background'] != '':
-                try:
-                    tar_data = io.BytesIO()
-                    with tarfile.open(fileobj=tar_data, mode='w') as tar:
-                        tar.add(config['background'], arcname='.')
-                    tar_data.seek(0)
-                    c.put_archive('/webui/build/client/background', tar_data.read())
-                except Exception as e:
-                    Log.log(f"WebUI: Failed to put background in container: {e}")
-            '''
             c.start()
             Log.log("WebUI: Successfully started container")
             return True

@@ -9,6 +9,7 @@ import hashlib
 import platform
 
 from time import sleep
+from datetime import datetime
 
 # Modules
 from pywgkey.key import WgKey
@@ -30,7 +31,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.10"
+    version = "v1.1.11"
 
     # Debug mode
     debug_mode = False
@@ -62,6 +63,9 @@ class Config:
     # Login Key Pairs
     login_keys = {"old":{"pub":"","priv":""},"cur":{"pub":"","priv":""}}
 
+    # Login Status
+    login_status = {"locked": False, "end": datetime(1,1,1,0,0), "attempts": 0}
+
     # Upload status
     upload_status = {}
 
@@ -78,7 +82,8 @@ class Config:
             "pwHash": "",
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
-            "c2cInterval": 0
+            "c2cInterval": 0,
+            "netCheck": "1.1.1.1:53"
             }
 
 
@@ -273,7 +278,7 @@ class Config:
                 cron.write()
 
     def device_mode_internet(self):
-        internet = Utils.check_internet_access()
+        internet = Utils.check_internet_access(self.config['netCheck'])
         if self.device_mode == "npbox":
             if not internet:
                 Log.log("Config: No internet access, starting Connect to Connect mode")
@@ -282,7 +287,7 @@ class Config:
             while not internet:
                 Log.log("Config: No internet access, checking again in 15 seconds")
                 sleep(15)
-                internet = Utils.check_internet_access()
+                internet = Utils.check_internet_access(self.config['netCheck'])
 
 
     def check_mode_file(self):

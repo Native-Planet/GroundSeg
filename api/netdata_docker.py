@@ -3,14 +3,14 @@ from log import Log
 
 client = docker.from_env()
 class NetdataDocker:
-    def start(self, config, updater_info, arch):
+    def start(self, config, arch):
         name = config['netdata_name']
         tag = config['netdata_version']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{tag}"
+        sha = f"{arch}_sha256"
+
+        image = f"{config['repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
 
         Log.log("Netdata: Attempting to start container")
         c = self.get_container(name)

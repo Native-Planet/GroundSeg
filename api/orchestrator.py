@@ -2,6 +2,7 @@
 import os
 import time
 import socket
+from time import sleep
 from datetime import datetime
 
 # Flask
@@ -29,6 +30,15 @@ class Orchestrator:
     def __init__(self, config):
         self.config_object = config
         self.config = config.config
+
+        if self.config['updateMode'] == 'auto':
+            count = 0
+            while not self.config_object.update_avail:
+                count += 1
+                if count >= 10:
+                    break
+                Log.log("Updater: Updater information not yet ready. Checking in 3 seconds")
+                sleep(3)
 
         self.wireguard = Wireguard(config)
         self.netdata = Netdata(config)
@@ -63,12 +73,30 @@ class Orchestrator:
 
 
     def handle_login_request(self, data):
-        res = Login.handle_login(data, self.config_object)
-        if res:
-            return Login.make_cookie(self.config_object)
-        else:
-            return Login.failed()
+        now = datetime.now()
+        s = self.config_object.login_status
+        unlocked = s['end'] < now
+        if unlocked:
+            res = Login.handle_login(data, self.config_object)
+            if res:
+                return Login.make_cookie(self.config_object)
+        return Login.failed(self.config_object, s['end'] < now)
 
+    def handle_login_status(self):
+        try:
+            now = datetime.now()
+            remainder = 0
+            s = self.config_object.login_status
+            locked = False
+            if s['end'] > now:
+                remainder = int((s['end'] - now).total_seconds())
+                locked = s['locked']
+
+            return {"locked": locked, "remainder": remainder}
+            
+        except Exception as e:
+            Log.log(f"Login: Failed to get login status: {e}")
+            return 400
 
     #
     #   Bug Report
@@ -357,7 +385,6 @@ class Orchestrator:
             if data['action'] == 'status':
                 try:
                     res = self.config_object.upload_status[patp]
-                    Log.log(res)
                     if res['status'] == 'extracting':
                         res['progress']['current'] = self.get_directory_size(f"/var/lib/docker/volumes/{patp}/_data")
                         return res
