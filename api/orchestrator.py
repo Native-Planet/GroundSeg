@@ -386,7 +386,7 @@ class Orchestrator:
                 try:
                     res = self.config_object.upload_status[patp]
                     if res['status'] == 'extracting':
-                        res['progress']['current'] = self.get_directory_size(f"/var/lib/docker/volumes/{patp}/_data")
+                        res['progress']['current'] = self.get_directory_size(f"{self.config['dockerData']}/volumes/{patp}/_data")
                         return res
                     return res
                 except Exception as e:

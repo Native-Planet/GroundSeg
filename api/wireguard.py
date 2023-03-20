@@ -20,7 +20,6 @@ class Wireguard:
             "repo": "registry.hub.docker.com/linuxserver/wireguard",
             "amd64_sha256": "ae6f8e8cc1303bc9c0b5fa1b1ef4176c25a2c082e29bf8b554ce1196731e7db2",
             "arm64_sha256": "403d741b1b5bcf5df1e48eab0af8038355fae3e29419ad5980428f9aebd1576c",
-            "volume_dir": "/var/lib/docker/volumes",
             "cap_add": ["NET_ADMIN","SYS_MODULE"],
             "volumes": ["/lib/modules:/lib/modules"],
             "sysctls": { "net.ipv4.conf.all.src_valid_mark": 1 }
@@ -31,6 +30,7 @@ class Wireguard:
         self.config = config.config
         self.filename = f"{self.config_object.base_path}/settings/wireguard.json"
         self.anchor_data = {}
+        self._volume_directory = f"{self.config['dockerData']}/volumes"
         self.wg_docker = WireguardDocker()
 
         # Set Wireguard Config
@@ -54,6 +54,14 @@ class Wireguard:
         # tag replaced by wireguard_version
         if 'tag' in self.data:
             self.data.pop('tag')
+
+        # remove patp from wireguard config
+        if 'patp' in self.data:
+            self.data.pop('patp')
+
+        # remove volume directory path
+        if 'volume_dir' in self.data:
+            self.data.pop('volume_dir')
 
         self.save_config()
 
@@ -157,7 +165,7 @@ class Wireguard:
         try:
             conf = base64.b64decode(conf).decode('utf-8')
             conf = conf.replace('privkey', self.config['privkey'])
-            return self.wg_docker.add_config(self.data, conf)
+            return self.wg_docker.add_config(self._volume_directory, self.data, conf)
 
         except Exception as e:
             Log.log(f"Wireguard: Failed to update wg0.confg: {e}")

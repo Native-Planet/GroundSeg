@@ -62,6 +62,8 @@ class Urbit:
         self.config_object = config
         self.config = config.config
 
+        self._volume_directory = f"{self.config['dockerData']}/volumes"
+
         self.wg = wg
         self.minio = minio
 
@@ -266,7 +268,7 @@ class Urbit:
 
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
-        vol_dir = f'/var/lib/docker/volumes/{patp}'
+        vol_dir = f'{self._volume_directory}/{patp}'
         compressed_dir = f"{self.config_object.base_path}/uploaded/{patp}/{filename}"
 
         try:

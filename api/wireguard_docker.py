@@ -63,10 +63,11 @@ class WireguardDocker:
         return False
 
 
-    def add_config(self, config, wg0):
+    def add_config(self, vol_dir, config, wg0):
         Log.log("Wireguard: Attempting to add wg0.conf")
         try:
-            with open(f"{config['volume_dir']}/{config['wireguard_name']}/_data/wg0.conf", "w") as f:
+            with open(f"{vol_dir}/{config['wireguard_name']}/_data/wg0.conf", "w") as f:
+
                 f.write(wg0)
                 f.close()
                 return True
