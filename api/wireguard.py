@@ -131,10 +131,10 @@ class Wireguard:
                     if len(remote) <= 0:
                         return 200
                     for patp in remote:
-                        if urb.toggle_network(patp) == 200:
-                            Log.log("Anchor: Refresh loop is ready")
-                            self.config_object.anchor_ready = True
-                            return 200
+                        urb.toggle_network(patp)
+                    Log.log("Anchor: Refresh loop is ready")
+                    self.config_object.anchor_ready = True
+                    return 200
         except Exception as e:
             Log.log(f"Wireguard: Failed to restart wireguard: {e}")
 

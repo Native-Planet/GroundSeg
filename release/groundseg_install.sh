@@ -8,7 +8,7 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=master
-TAG=rc1-v1.1.11
+TAG=v1.1.12
 DEVICE_ARCH=$(uname -m)
 
 # Directory to save the scrips
@@ -47,7 +47,7 @@ if echo "$DEVICE_MODEL" | grep -iq "Raspberry Pi"; then
       # Check if provided directory is the same as default
       if [ "$DOCKER_DIR" != "$new_dir" ]; then
         # Check if directory already exists, if no, create it
-        if [ -d "$new_dir" ]; then
+        if [ ! -d "$new_dir" ]; then
           echo "$new_dir not found!"
           echo "Creating directory: $new_dir"
           sudo mkdir -p $new_dir
@@ -60,14 +60,11 @@ if echo "$DEVICE_MODEL" | grep -iq "Raspberry Pi"; then
         # Move Docker directory contents to new location
         echo "Moving Docker from $DOCKER_DIR to $new_dir" \
           && sudo mv $DOCKER_DIR/* $new_dir \
-          # Delete old Docker directory
           && echo "Removing old volumes directory: $DOCKER_DIR" \
           && sudo rm -r $DOCKER_DIR \
-          # Create daemon.json
           && echo "Creating /etc/docker/daemon.json" \
-          && sudo echo "{"data-root": "$new_dir"}" > /etc/docker/daemon.json \
-          # Start Docker
-          sudo systemctl start docker
+          && sudo echo "{\"data-root\": \"$new_dir\"}" > /etc/docker/daemon.json \
+          && sudo systemctl start docker
       else
         echo "Using default volumes directory!"
       fi

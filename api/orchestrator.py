@@ -423,6 +423,8 @@ class Orchestrator:
         filename = secure_filename(file.filename)
         patp = filename.split('.')[0]
 
+        self.config_object.upload_status[patp] = {'status':'uploading'}
+
         # Create subfolder
         file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"
         os.makedirs(file_subfolder, exist_ok=True)
