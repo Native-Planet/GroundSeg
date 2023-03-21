@@ -247,6 +247,9 @@ class Wireguard:
 
             except Exception as e:
                 Log.log(f"Anchor: /retrieve failed: {e}")
+                t = err_count * 2
+                Log.log(f"Anchor: Attempting again in {t} seconds")
+                sleep(t)
                 err_count = err_count + 1
 
         return False

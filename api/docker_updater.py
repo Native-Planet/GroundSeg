@@ -57,6 +57,8 @@ class DockerUpdater:
                 except Exception as e:
                     Log.log(f"Updater: Docker updater failed: {e}")
                     sleep(60)
+            else:
+                sleep(60)
 
     def update_wireguard(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
