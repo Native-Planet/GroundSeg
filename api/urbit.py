@@ -12,6 +12,7 @@ import tarfile
 
 from io import BytesIO
 from time import sleep
+from pathlib import Path
 from datetime import datetime
 
 # Flask
@@ -311,6 +312,68 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to extract {filename}: {e}")
             return "File extraction failed"
+
+        # Restructure directory
+        try:
+            # Get all .urb locations in directory
+            data_dir = os.path.join(vol_dir, '_data')
+            urb_loc = []
+            for root, dirs, files in os.walk(data_dir):
+                if '.urb' in dirs:
+                    urb_loc.append(root)
+
+            # Fail if more than one .urb exists
+            if len(urb_loc) > 1:
+                Log.log(f"{patp}: Multiple ships ({len(urb_loc)}) detected in pier directory")
+                return "Multiple ships detected in pier directory"
+            if len(urb_loc) < 1:
+                Log.log(f"{patp}: No ships detected in pier directory")
+                return "No Urbit ship found in pier directory"
+
+            Log.log(f"{patp}: .urb subdirectory in {urb_loc[0]}")
+
+            pier_dir = os.path.join(data_dir, patp)
+            temp_dir = os.path.join(data_dir, 'temp_dir')
+            unused_dir = os.path.join(data_dir, 'unused')
+
+            # check if .urb is in the correct location 
+            if os.path.join(pier_dir, '.urb') != os.path.join(urb_loc[0], '.urb'):
+                Log.log(f"{patp}: .urb location incorrect!")
+                Log.log(f"{patp}: Restructuring directory structure")
+
+                # move to temp dir
+                Log.log(f"{patp}: .urb found in {urb_loc[0]}")
+                Log.log(f"{patp}: Moving to {temp_dir}")
+                if data_dir == urb_loc[0]: # .urb in root
+                    # Create directory
+                    os.makedirs(temp_dir, exist_ok=True)
+                    # select everything in root except for pier_dir
+                    items = [x for x in list(Path(urb_loc[0]).iterdir()) if str(x) != pier_dir]
+                    Log.log(f"{patp}: Items to move: {items}")
+                    for item in items:
+                        shutil.move(str(item), temp_dir)
+                else:
+                    shutil.move(urb_loc[0], temp_dir)
+
+                # rename directories
+                unused = [str(x) for x in list(Path(data_dir).iterdir()) if (str(x) != temp_dir) and (str(x) != unused_dir)]
+                if len(unused) > 0:
+                    # Create directory
+                    os.makedirs(unused_dir, exist_ok=True)
+                    Log.log(f"{patp}: Moving unused items to {unused_dir}")
+                    for u in unused:
+                        Log.log(f"{patp}: Unused items to move: {unused}")
+                        shutil.move(u, unused_dir)
+
+                shutil.move(temp_dir, pier_dir)
+
+                Log.log(f"{patp}: Restructuring done!")
+            else:
+                Log.log(f"{patp}: No restructuring needed!")
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to restructure directory: {e}")
+            return f"Failed to restructure {patp}"
 
         try:
             self.config_object.upload_status[patp] = {'status':'cleaning'}
