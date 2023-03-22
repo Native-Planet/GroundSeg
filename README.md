@@ -30,19 +30,10 @@ This downloads the appropriate service file for you init system and the groundse
 sudo wget -O - only.groundseg.app | bash
 ```
 
-### For Windows
+### Switching to the Edge branch (Unstable)
 
-Coming soon
-
-### For MacOS
-
-Coming soon
-
-## Edge Branch Installation (Unstable)
-
-1. Go to `/opt/nativeplanet/groundseg/settings/system.json`
-2. Set `"updateBranch" to "edge"
-3. `sudo systemctl restart groundseg`
+1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch"` to `"edge"`
+2. `sudo systemctl restart groundseg`
 
 ## Building From Source
 
@@ -58,7 +49,7 @@ This **DOES NOT** remove the docker volumes on the device.
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/standard_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/standard_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/standard_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/standard_uninstall.sh && \
 sudo /tmp/nativeplanet/standard_uninstall.sh
 ```
@@ -70,7 +61,7 @@ This removes GroundSeg related docker containers and images, and the GroundSeg s
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/groundseg_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/groundseg_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/groundseg_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/groundseg_uninstall.sh && \
 sudo /tmp/nativeplanet/groundseg_uninstall.sh
 ```
@@ -82,7 +73,7 @@ This wipes all docker and GroundSeg data. Make sure you have exported the data y
 ```
 mkdir -p /tmp/nativeplanet && \
 sudo wget -O /tmp/nativeplanet/complete_uninstall.sh \
-https://raw.githubusercontent.com/Native-Planet/GroundSeg/main/release/complete_uninstall.sh && \
+https://raw.githubusercontent.com/Native-Planet/GroundSeg/master/release/complete_uninstall.sh && \
 sudo chmod +x /tmp/nativeplanet/complete_uninstall.sh && \
 sudo /tmp/nativeplanet/complete_uninstall.sh
 ```
