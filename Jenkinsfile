@@ -270,8 +270,7 @@ pipeline {
 			    sh (
                                 script: '''
                                     git checkout master
-                                    git merge ${tag}
-                                    git commit -am "Merge ${tag}"
+                                    git merge ${tag} -m "Merged ${tag}"
                                     git push
                                 '''
                             )
