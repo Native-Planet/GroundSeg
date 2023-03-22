@@ -14,7 +14,6 @@ class Netdata:
             "netdata_version": "latest",
             "amd64_sha256": "95e74c36f15091bcd7983ee162248f1f91c21207c235fce6b0d6f8ed9a11732a",
             "arm64_sha256": "cd3dc9d182a4561b162f03c6986f4647bbb704f8e7e4872ee0611b1b9e86e1b0",
-            "volume_dir": "/var/lib/docker/volumes",
             "cap_add": ["SYS_PTRACE"],
             "port": 19999,
             "restart": "unless-stopped",
@@ -30,6 +29,7 @@ class Netdata:
                 "/etc/os-release:/host/etc/os-release:ro"
                 ]
             }
+            #"volume_dir": "/var/lib/docker/volumes",
 
     def __init__(self, config):
         self.config_object = config
@@ -54,6 +54,10 @@ class Netdata:
         # image replaced by repo
         if 'image' in self.data:
             self.data.pop('image')
+
+        # remove volume directory path
+        if 'volume_dir' in self.data:
+            self.data.pop('volume_dir')
 
         self.save_config()
 

@@ -208,25 +208,18 @@ fi
 
 # Check if there is a keyfile, if so boot a ship with its name, and then remove the key
 if [ -e *.key ]; then
-# Get the name of the key
-keynames="*.key"
-keys=( $keynames )
-keyname=''${keys[0]}
-mv $keyname /tmp
+    # Get the name of the key
+    keynames="*.key"
+    keys=( $keynames )
+    keyname=''${keys[0]}
+    mv $keyname /tmp
 
-# Boot urbit with the key, exit when done booting
-vere $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
+    # Boot urbit with the key, exit when done booting
+    vere $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -p $amesPort -x --http-port $httpPort --loom $loom
 
-# Remove the keyfile for security
-rm /tmp/$keyname
-rm *.key || true
-elif [ -e *.comet ]; then
-cometnames="*.comet"
-comets=( $cometnames )
-cometname=''${comets[0]}
-rm *.comet
-
-vere $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
+    # Remove the keyfile for security
+    rm /tmp/$keyname
+    rm *.key || true
 fi
 
 exec vere $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname

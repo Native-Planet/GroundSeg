@@ -109,7 +109,7 @@
 
   const toggleView = () => {
     view = !view
-    document.querySelector('#input').type = view ? 'text' : 'password'
+    document.querySelector('#input-cancel').type = view ? 'text' : 'password'
   }
 
 </script>
@@ -177,7 +177,7 @@
     </div>
 
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input placeholder="Registration Key" id='input' type="password" bind:value={regKey} />
+      <input placeholder="Registration Key" id='input-cancel' type="password" bind:value={regKey} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 

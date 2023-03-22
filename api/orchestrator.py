@@ -386,7 +386,7 @@ class Orchestrator:
                 try:
                     res = self.config_object.upload_status[patp]
                     if res['status'] == 'extracting':
-                        res['progress']['current'] = self.get_directory_size(f"/var/lib/docker/volumes/{patp}/_data")
+                        res['progress']['current'] = self.get_directory_size(f"{self.config['dockerData']}/volumes/{patp}/_data")
                         return res
                     return res
                 except Exception as e:
@@ -422,6 +422,8 @@ class Orchestrator:
         file = req.files['file']
         filename = secure_filename(file.filename)
         patp = filename.split('.')[0]
+
+        self.config_object.upload_status[patp] = {'status':'uploading'}
 
         # Create subfolder
         file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"

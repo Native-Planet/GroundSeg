@@ -32,6 +32,7 @@ class MinIO:
         self.config = config.config
         self.wg = wg
         self.filename = f"{self.config_object.base_path}/settings/mc.json"
+        self._volume_directory = f"{self.config['dockerData']}/volumes"
         self.mc_docker = MCDocker()
         self.minio_docker = MinIODocker()
 

@@ -31,7 +31,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.11"
+    version = "v1.1.12"
 
     # Debug mode
     debug_mode = False
@@ -83,9 +83,9 @@ class Config:
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
             "c2cInterval": 0,
-            "netCheck": "1.1.1.1:53"
+            "netCheck": "1.1.1.1:53",
+            "dockerData": "/var/lib/docker"
             }
-
 
     def __init__(self, base_path, debug_mode=False):
         self.debug_mode = debug_mode
@@ -138,6 +138,13 @@ class Config:
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base_path
+        try:
+            with open("/etc/docker/daemon.json") as f:
+                docker_cfg = json.load(f)
+                cfg['dockerData'] = docker_cfg['data-root']
+        except:
+            pass
+
         cfg = {**self.default_system_config, **cfg}
         cfg = self.check_update_interval(cfg)
 
