@@ -14,7 +14,7 @@ class AnchorUpdater:
     def anchor_loop(self):
         Log.log("Anchor: Anchor information updater thread started")
         while True:
-            if self.config['wgRegistered']:
+            if self.config['wgRegistered'] and self.config['wgOn']:
                 try:
                     endpoint = self.config['endpointUrl']
                     api_version = self.config['apiVersion']
