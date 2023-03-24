@@ -87,7 +87,7 @@
 
 </script>
 
-<div class="netdata">
+<div class="swap">
   <div class="title-wrapper">
     <div class="title">Swap Memory
       <!-- Info button -->
@@ -151,7 +151,7 @@
 </div>
 
 <style>
-  .netdata {
+  .swap {
     background: #0000001d;
     padding: 20px 30px;
     border-radius: 8px;
