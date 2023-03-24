@@ -56,9 +56,9 @@ class BinUpdater:
                 # Get version
                 ver = f"v{d['major']}.{d['minor']}.{d['patch']}"
                 old_ver = self.config['gsVersion']
-                if branch == 'edge':
-                    ver = f"{ver}-edge"
-                    old_ver = f"{old_ver}-edge"
+                if branch != 'latest':
+                    ver = f"{ver}-{branch}"
+                    old_ver = f"{old_ver}-{branch}"
 
                 # Show versions
                 Log.log(f"Updater: Current {old_ver} | Latest {ver}")

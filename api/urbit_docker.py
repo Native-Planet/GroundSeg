@@ -15,7 +15,7 @@ class UrbitDocker:
         sha = f"urbit_{arch}_sha256"
 
         image = f"{config['urbit_repo']}:{tag}"
-        if config[sha] != "":
+        if config[sha] != "" and config[sha] != None:
             image = f"{image}@sha256:{config[sha]}"
 
         Log.log(f"{patp}: Attempting to start container")
