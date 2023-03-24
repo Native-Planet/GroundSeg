@@ -128,11 +128,11 @@ class Config:
         swap = Utils.active_swap(self.config['swapFile'])
 
         if swap != self.config['swapVal']:
-            if Utils.stop_swap(['swapFile']):
+            if Utils.stop_swap(self.config['swapFile']):
                 Log.log(f"Swap: Removing {self.config['swapFile']}")
                 os.remove(self.config['swapFile'])
 
-            if Utils.make_swap(self.config['swapFile']):
+            if Utils.make_swap(self.config['swapFile'], self.config['swapVal']):
                 Utils.start_swap(self.config['swapFile'])
 
         # Set current mode
@@ -192,7 +192,7 @@ class Config:
 
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
-        if cfg['updateBranch'] != 'edge':
+        if cfg['updateBranch'] != 'edge' or cfg['updateBranch'] != 'canary':
             min_allowed = 3600
             if not 'updateInterval' in cfg:
                 cfg['updateInterval'] = min_allowed

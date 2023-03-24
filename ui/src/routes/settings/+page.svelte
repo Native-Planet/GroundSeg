@@ -17,6 +17,7 @@
 
   import Network from '$lib/Network.svelte'
   import MinIO from '$lib/MinIO.svelte'
+  import Swap from '$lib/Swap.svelte'
   import Sessions from '$lib/Sessions.svelte'
   import Contact from '$lib/Contact.svelte'
 
@@ -135,6 +136,7 @@
             <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           {/if}
           <MinIO minio={$system.minio} />
+          <Swap swapVal={$system.swapVal} maxSwap={$system.maxSwap}/>
           <Sessions sessions={$system.sessions} />
           {#if $system.vm}
             <Contact />
