@@ -126,7 +126,7 @@
       <PierProfile name={urbit.name} running={urbit.running} {code} />
     </div>
 
-		{#if !advanced}
+    {#if !advanced}
       <!-- Pier Credentials-->
       {#if (code != null) && (code.length == 27) && urbit.running}
 
@@ -134,8 +134,10 @@
         <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
           <PierCode code={code} />
         </div>
+      {/if}
 
-        <!-- Urbit Landscape URL -->
+      <!-- Urbit Landscape URL -->
+      {#if urbit.running}
         <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
           <PierUrl
             name={urbit.name}
@@ -145,6 +147,7 @@
             urbWebAlias={urbit.urbWebAlias}
           />
         </div>
+      {/if}
 
         <!-- MinIO Console -->
         {#if urbit.wgReg && urbit.wgRunning}
@@ -160,7 +163,6 @@
         <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
           <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
         </div>
-      {/if}
       <ToggleAdvancedButton on:click={toggleAdvanced} {advanced}/>
     {:else}
       <PierOptions
