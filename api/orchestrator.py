@@ -15,6 +15,7 @@ from login import Login
 from system_get import SysGet
 from system_post import SysPost
 from bug_report import BugReport
+from utils import Utils
 
 # Docker
 from netdata import Netdata
@@ -239,12 +240,12 @@ class Orchestrator:
         is_vm = "vm" == self.config_object.device_mode
 
         ver = str(self.config_object.version)
-        if self.config['updateBranch'] == 'edge':
-            ver = f"{ver}-edge"
+        if self.config['updateBranch'] != 'latest':
+            ver = f"{ver}-{self.config['updateBranch']}"
 
-        ui_branch = ''
-        if self.webui.data['webui_version'] == 'edge':
-            ui_branch = '-edge'
+        ui_branch = ""
+        if self.webui.data['webui_version'] != 'latest':
+            ui_branch = f"-{self.webui.data['webui_version']}"
 
         required = {
                 "vm": is_vm,
@@ -254,16 +255,18 @@ class Orchestrator:
                 "sessions": len(self.config['sessions']),
                 "gsVersion": ver,
                 "uiBranch": ui_branch,
-                "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}"
+                "ram": self.config_object._ram,
+                "cpu": self.config_object._cpu,
+                "temp": self.config_object._core_temp,
+                "disk": self.config_object._disk,
+                "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}",
+                "swapVal": self.config['swapVal'],
+                "maxSwap": Utils.max_swap(self.config['swapFile'])
                 }
 
         optional = {} 
         if not is_vm:
             optional = {
-                    "ram": self.config_object._ram,
-                    "cpu": self.config_object._cpu,
-                    "temp": self.config_object._core_temp,
-                    "disk": self.config_object._disk,
                     "connected": SysGet.get_connection_status(),
                     "ethOnly": SysGet.get_ethernet_status()
                     }
@@ -302,6 +305,21 @@ class Orchestrator:
                         time.sleep(1)
                         return 200
             return 400
+
+        # swap module
+        if module == 'swap':
+            if data['action'] == 'set':
+                val = data['val']
+                if val != self.config['swapVal']:
+                    if Utils.stop_swap(self.config['swapFile']):
+                        Log.log(f"Swap: Removing {self.config['swapFile']}")
+                        os.remove(self.config['swapFile'])
+
+                        if Utils.make_swap(self.config['swapFile'], val):
+                            if Utils.start_swap(self.config['swapFile']):
+                                self.config['swapVal'] = val
+                                self.config_object.save_config()
+                                return 200
 
         # anchor module
         if module == 'anchor':

@@ -31,7 +31,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.12"
+    version = "v1.1.13"
 
     # Debug mode
     debug_mode = False
@@ -84,7 +84,9 @@ class Config:
             "updateUrl": "https://version.groundseg.app",
             "c2cInterval": 0,
             "netCheck": "1.1.1.1:53",
-            "dockerData": "/var/lib/docker"
+            "dockerData": "/var/lib/docker",
+            "swapFile": "/opt/nativeplanet/groundseg/swapfile",
+            "swapVal": 16
             }
 
     def __init__(self, base_path, debug_mode=False):
@@ -117,6 +119,21 @@ class Config:
 
         # Save latest config to system.json
         self.save_config()
+
+        # Set swap
+        if not os.path.isfile(self.config['swapFile']):
+            Utils.make_swap(self.config['swapFile'], self.config['swapVal'])
+
+        Utils.start_swap(self.config['swapFile'])
+        swap = Utils.active_swap(self.config['swapFile'])
+
+        if swap != self.config['swapVal']:
+            if Utils.stop_swap(self.config['swapFile']):
+                Log.log(f"Swap: Removing {self.config['swapFile']}")
+                os.remove(self.config['swapFile'])
+
+            if Utils.make_swap(self.config['swapFile'], self.config['swapVal']):
+                Utils.start_swap(self.config['swapFile'])
 
         # Set current mode
         self.set_device_mode()
@@ -175,7 +192,7 @@ class Config:
 
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
-        if cfg['updateBranch'] != 'edge':
+        if cfg['updateBranch'] != 'edge' or cfg['updateBranch'] != 'canary':
             min_allowed = 3600
             if not 'updateInterval' in cfg:
                 cfg['updateInterval'] = min_allowed

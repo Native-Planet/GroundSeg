@@ -11,12 +11,12 @@
 
   import Logs from '$lib/Logs.svelte'
   import SysInfo from '$lib/SysInfo.svelte'
-  import SysInfoLite from '$lib/SysInfoLite.svelte'
   import Netdata from '$lib/Netdata.svelte'
   import Power from '$lib/Power.svelte'
 
   import Network from '$lib/Network.svelte'
   import MinIO from '$lib/MinIO.svelte'
+  import Swap from '$lib/Swap.svelte'
   import Sessions from '$lib/Sessions.svelte'
   import Contact from '$lib/Contact.svelte'
 
@@ -110,23 +110,15 @@
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
-          {#if $system.vm}
-            <SysInfoLite
-              gsVersion={$system.gsVersion}
-              uiBranch={$system.uiBranch}
-              updateMode={$system.updateMode}
-              />
-          {:else}
-            <SysInfo
-              ram={$system.ram} 
-              temp={$system.temp}
-              disk={$system.disk}
-              cpu={$system.cpu}
-              gsVersion={$system.gsVersion}
-              uiBranch={$system.uiBranch}
-              updateMode={$system.updateMode}
-              />
-          {/if}
+          <SysInfo
+            ram={$system.ram} 
+            temp={$system.temp}
+            disk={$system.disk}
+            cpu={$system.cpu}
+            gsVersion={$system.gsVersion}
+            uiBranch={$system.uiBranch}
+            updateMode={$system.updateMode}
+            />
           <Netdata link={$system.netdata} />
         </div>
 
@@ -135,6 +127,7 @@
             <Network ethOnly={$system.ethOnly} connected={$system.connected} />
           {/if}
           <MinIO minio={$system.minio} />
+          <Swap swapVal={$system.swapVal} maxSwap={$system.maxSwap}/>
           <Sessions sessions={$system.sessions} />
           {#if $system.vm}
             <Contact />
