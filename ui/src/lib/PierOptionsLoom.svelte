@@ -41,19 +41,20 @@
   </div>
   {#if showLoom}
     <div class="loom-info">
-      Loom settings set the amount of memory your ship is allocated in megabytes. 
-      Do not go below 2048MB if you do not know what you are doing!
+      Loom settings set the amount of memory your ship is allocated. 
+      Do not go below 2G if you do not know what you are doing!
     </div>
   {/if}
 
   <div class="loom">
-    <input type="range" min="28" max="32" step="1" class="range" bind:value={curLoomSize}>
+    <input type="range" min="28" max="33" step="1" class="range" bind:value={curLoomSize}>
     <div class="labels">
-      <div class="label">256</div>
-      <div class="label">512</div>
-      <div class="label">1024</div>
-      <div class="label">2048</div>
-      <div class="label">4096</div>
+      <div class="label danger-loom">256M</div>
+      <div class="label danger-loom">512M</div>
+      <div class="label danger-loom">1G</div>
+      <div class="label">2G</div>
+      <div class="label">4G</div>
+      <div class="label">8G</div>
     </div>
 
     <PrimaryButton
@@ -91,25 +92,29 @@
   }
   .loom-info {
     font-size: 11px;
+    padding: 0 20px 12px 20px;
   }
   .range {
     -webkit-appearance: none;
-    width: 180px;
+    width: 240px;
     height: 11px;
     background: #ffffff4d;
     border-radius: 16px;
   }
+  .danger-loom {
+    color: #ffa500;
+  }
   .range::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: calc(180px / 5);
+    width: calc((240px / 6) - 8px);
     height: 16px;
     background: var(--action-color);
     cursor: pointer;
     border-radius: 16px;
   }
   .range::-moz-range-thumb {
-    width: calc(180px / 5);
+    width: calc(240px / 6);
     height: 16px;
     background: var(--action-color);
     cursor: pointer;
@@ -118,7 +123,7 @@
   .labels {
     display: flex;
     justify-content: space-between;
-    width: 180px;
+    width: 240px;
     padding-bottom: 6px;
   }
   .label {

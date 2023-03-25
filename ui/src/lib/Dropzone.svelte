@@ -76,6 +76,7 @@
 	  })
 			.then(raw => raw.json())
       .then(res => {
+        console.log(res)
         showStatuses = Array.from(statuses)
         if (res.status == 'removed') {
           current = ''
@@ -97,6 +98,8 @@
           statuses.add(res.status)
           current = res.status
           extractProg = res.progress
+          setTimeout(()=>getUploadStatus(n,act), 1000)
+        } else if (res.status == 'uploading') {
           setTimeout(()=>getUploadStatus(n,act), 1000)
         } else {
           statuses.add(res.status)

@@ -9,6 +9,7 @@ import hashlib
 import platform
 
 from time import sleep
+from datetime import datetime
 
 # Modules
 from pywgkey.key import WgKey
@@ -30,7 +31,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.10"
+    version = "v1.1.13"
 
     # Debug mode
     debug_mode = False
@@ -62,6 +63,9 @@ class Config:
     # Login Key Pairs
     login_keys = {"old":{"pub":"","priv":""},"cur":{"pub":"","priv":""}}
 
+    # Login Status
+    login_status = {"locked": False, "end": datetime(1,1,1,0,0), "attempts": 0}
+
     # Upload status
     upload_status = {}
 
@@ -78,9 +82,12 @@ class Config:
             "pwHash": "",
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
-            "c2cInterval": 0
+            "c2cInterval": 0,
+            "netCheck": "1.1.1.1:53",
+            "dockerData": "/var/lib/docker",
+            "swapFile": "/opt/nativeplanet/groundseg/swapfile",
+            "swapVal": 16
             }
-
 
     def __init__(self, base_path, debug_mode=False):
         self.debug_mode = debug_mode
@@ -113,6 +120,21 @@ class Config:
         # Save latest config to system.json
         self.save_config()
 
+        # Set swap
+        if not os.path.isfile(self.config['swapFile']):
+            Utils.make_swap(self.config['swapFile'], self.config['swapVal'])
+
+        Utils.start_swap(self.config['swapFile'])
+        swap = Utils.active_swap(self.config['swapFile'])
+
+        if swap != self.config['swapVal']:
+            if Utils.stop_swap(self.config['swapFile']):
+                Log.log(f"Swap: Removing {self.config['swapFile']}")
+                os.remove(self.config['swapFile'])
+
+            if Utils.make_swap(self.config['swapFile'], self.config['swapVal']):
+                Utils.start_swap(self.config['swapFile'])
+
         # Set current mode
         self.set_device_mode()
 
@@ -133,6 +155,13 @@ class Config:
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base_path
+        try:
+            with open("/etc/docker/daemon.json") as f:
+                docker_cfg = json.load(f)
+                cfg['dockerData'] = docker_cfg['data-root']
+        except:
+            pass
+
         cfg = {**self.default_system_config, **cfg}
         cfg = self.check_update_interval(cfg)
 
@@ -163,7 +192,7 @@ class Config:
 
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
-        if cfg['updateBranch'] != 'edge':
+        if cfg['updateBranch'] != 'edge' or cfg['updateBranch'] != 'canary':
             min_allowed = 3600
             if not 'updateInterval' in cfg:
                 cfg['updateInterval'] = min_allowed
@@ -273,7 +302,7 @@ class Config:
                 cron.write()
 
     def device_mode_internet(self):
-        internet = Utils.check_internet_access()
+        internet = Utils.check_internet_access(self.config['netCheck'])
         if self.device_mode == "npbox":
             if not internet:
                 Log.log("Config: No internet access, starting Connect to Connect mode")
@@ -282,7 +311,7 @@ class Config:
             while not internet:
                 Log.log("Config: No internet access, checking again in 15 seconds")
                 sleep(15)
-                internet = Utils.check_internet_access()
+                internet = Utils.check_internet_access(self.config['netCheck'])
 
 
     def check_mode_file(self):

@@ -4,13 +4,13 @@ from log import Log
 client = docker.from_env()
 
 class MinIODocker:
-    def start(self, name, updater_info, config, arch):
+    def start(self, name, config, arch):
         tag = config['minio_version']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{tag}"
+        sha = f"minio_{arch}_sha256"
+
+        image = f"{config['minio_repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
 
         Log.log(f"{name}: Attempting to start container")
         # Remove container

@@ -5,14 +5,14 @@ client = docker.from_env()
 
 class WireguardDocker:
 
-    def start(self, config, updater_info, arch):
+    def start(self, config, arch):
         name = config['wireguard_name']
         tag = config['wireguard_version']
-        if tag == "latest" or tag == "edge":
-            sha = f"{arch}_sha256"
-            image = f"{updater_info['repo']}:tag@sha256:{updater_info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{tag}"
+        sha = f"{arch}_sha256"
+
+        image = f"{config['repo']}:{tag}"
+        if config[sha] != "":
+            image = f"{image}@sha256:{config[sha]}"
 
         Log.log("Wireguard: Attempting to start container")
         c = self.get_container(name)
@@ -63,10 +63,11 @@ class WireguardDocker:
         return False
 
 
-    def add_config(self, config, wg0):
+    def add_config(self, vol_dir, config, wg0):
         Log.log("Wireguard: Attempting to add wg0.conf")
         try:
-            with open(f"{config['volume_dir']}/{config['wireguard_name']}/_data/wg0.conf", "w") as f:
+            with open(f"{vol_dir}/{config['wireguard_name']}/_data/wg0.conf", "w") as f:
+
                 f.write(wg0)
                 f.close()
                 return True

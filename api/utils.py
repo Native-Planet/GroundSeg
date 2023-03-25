@@ -1,9 +1,12 @@
 # Python
 import os
 import ssl
+import math
 import base64
+import socket
+import psutil
 import hashlib
-import urllib.request
+import subprocess
 from time import sleep
 
 # Modules
@@ -33,6 +36,10 @@ class Utils:
         if patp.startswith("~"):
             patp = patp[1:]
 
+        # patps cannot start with doz
+        if patp.startswith("doz"):
+            return False
+
         # valid
         pre = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
         suf = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
@@ -60,16 +67,13 @@ class Utils:
 
         return True
 
-    def check_internet_access():
+    def check_internet_access(addr):
         Log.log("Updater: Checking internet access")
         try:
-            context = ssl._create_unverified_context()
-            urllib.request.urlopen('https://nativeplanet.io',
-                                   timeout=1,
-                                   context=context)
-
+            socket.setdefaulttimeout(3)
+            host, port = addr.split(":")
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, int(port)))
             return True
-
         except Exception as e:
             Log.log(f"Updater: Check internet access error: {e}")
             return False
@@ -123,9 +127,60 @@ class Utils:
             this_hash = hashlib.sha512(encoded_str).hexdigest()
             res = this_hash == pwHash
         except Exception as e:
-            Log.log("Login: Failed to compare passwords: {e}")
+            Log.log(f"Login: Failed to compare passwords: {e}")
 
         return res
+
+    def start_swap(loc):
+        try:
+            subprocess.call(["swapon", loc])
+        except Exception as e:
+            Log.log(f"Swap: Failed to run swapon: {e}")
+            return False
+        return True
+
+    def stop_swap(loc):
+        try:
+            subprocess.call(["swapoff", loc])
+        except Exception as e:
+            Log.log(f"Swap: Failed to run swapoff: {e}")
+            return False
+        return True
+
+    def make_swap(loc, val):
+        try:
+            subprocess.call(["fallocate", "-l", f"{val}G", loc])
+            subprocess.call(["chmod", "600", loc])
+            subprocess.call(["mkswap", loc])
+        except Exception as e:
+            Log.log(f"Swap: Failed to make swap: {e}")
+            return False
+        return True
+
+    def active_swap(loc):
+        count = 0
+        while count < 3:
+            try:
+                res = subprocess.run(["swapon", "--show"], capture_output=True)
+                swap_arr = [x for x in res.stdout.decode("utf-8").split('\n') if loc in x]
+                return int("".join(filter(str.isdigit, [x for x in swap_arr[0].split(" ") if x != ""][2])))
+            except Exception as e:
+                Log.log(f"Swap: Failed to get active swap: {e}")
+                count += 1
+                sleep(count * 2)
+
+            # Returns None if failed
+
+    def max_swap(loc):
+        free = 16
+        cap = 32 # arbitrary cap for the webui
+        try:
+            free = math.ceil(psutil.disk_usage(loc).free / (1024 ** 3)) - 2
+            if free > 32:
+                free = 32
+        except Exception as e:
+            Log.log(f"Swap: Failed to get maximum swap: {e}")
+        return free
 
     def start_script():
         return """\
@@ -142,7 +197,36 @@ dirnames="*/"
 dirs=( $dirnames )
 dirname=''${dirnames[0]}
 
-# Todo: Add patp regex
+# Patp checker
+check_patp() {
+    patp="$1"
+    pre="dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+    suf="zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+    [[ "${patp:0:1}" == "~" ]] && patp="${patp:1}"
+    patp_arr=(${patp//-/ })
+
+    [[ "${patp:0:3}" == "doz" ]] && return
+
+    if [[ ${#patp} -eq 3 ]]; then
+        [[ $suf == *"$patp"* ]] && echo "$patp" && return
+    else
+        for p in "${patp_arr[@]}"; do
+            [[ ${#p} -eq 6 && $pre == *"${p:0:3}"* && $suf == *"${p:3:3}"* ]] || return
+        done
+        echo "$patp"
+    fi
+}
+
+# Find a directory with a valid patp
+for patp in *; do
+    if [[ -d $patp ]]; then
+        result=$(echo $(check_patp "$patp"))
+        if [[ -n $result ]]; then
+          dirname=$result
+          break
+        fi
+    fi
+done
 
 # check args
 for i in "$@"
@@ -178,26 +262,19 @@ fi
 
 # Check if there is a keyfile, if so boot a ship with its name, and then remove the key
 if [ -e *.key ]; then
-# Get the name of the key
-keynames="*.key"
-keys=( $keynames )
-keyname=''${keys[0]}
-mv $keyname /tmp
+    # Get the name of the key
+    keynames="*.key"
+    keys=( $keynames )
+    keyname=''${keys[0]}
+    mv $keyname /tmp
 
-# Boot urbit with the key, exit when done booting
-vere $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -c $(basename $keyname .key) -p $amesPort -x --http-port $httpPort --loom $loom
+    # Boot urbit with the key, exit when done booting
+    urbit $ttyflag -w $(basename $keyname .key) -k /tmp/$keyname -p $amesPort -x --http-port $httpPort --loom $loom
 
-# Remove the keyfile for security
-rm /tmp/$keyname
-rm *.key || true
-elif [ -e *.comet ]; then
-cometnames="*.comet"
-comets=( $cometnames )
-cometname=''${comets[0]}
-rm *.comet
-
-vere $ttyflag -c $(basename $cometname .comet) -p $amesPort -x --http-port $httpPort --loom $loom
+    # Remove the keyfile for security
+    rm /tmp/$keyname
+    rm *.key || true
 fi
 
-exec vere $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname 
+exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
 """

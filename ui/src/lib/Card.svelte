@@ -2,8 +2,7 @@
   import { fade } from 'svelte/transition'
   import { fadeIn, fadeOut, isPortrait } from '$lib/api'
 
-	export let width, maxHeight = "80vh", padding = true, home = false
-
+	export let width, maxHeight = "80vh", padding = true, home = false, bgColor = "#6d6d6d33"
 	let innerWidth = 0
   let innerHeight = 0
 
@@ -22,7 +21,8 @@
       $isPortrait
       ? home ? '100vw' : 'calc(100vw - 40px)'
 			  : width
-    };">
+        };
+      background: {bgColor};">
 	<slot/>
 </div>
 
@@ -38,7 +38,6 @@
     
     border-radius: 20px;
 
-    background: #6d6d6d33;
     backdrop-filter: blur(60px);
     -moz-backdrop-filter: blur(60px);
     -o-backdrop-filter: blur(60px);

@@ -1,7 +1,9 @@
 # Python
 import os
+import json
 import zipfile
 from io import BytesIO
+from time import sleep
 
 # Flask
 from flask import send_file
@@ -12,10 +14,15 @@ from mc_docker import MCDocker
 from minio_docker import MinIODocker
 
 class MinIO:
-    data = {}
+    mc_data = {}
     updater_mc = {}
-    updater_minio = {}
-    mc_name = "minio_client"
+    default_mc_config = {
+            "mc_name": "minio_client",
+            "mc_version": "latest",
+            "repo": "registry.hub.docker.com/minio/mc",
+            "amd64_sha256": "6ffd76764e8ca484de12c6ecaa352db3d8efd5c9d44f393718b29b6600e0a559",
+            "arm64_sha256": "6825aecd2f123c9d4408e660aba8a72f9e547a3774350b8f4d2d9b674e99e424"
+            }
     minios_on = False
 
     _volume_directory = '/var/lib/docker/volumes'
@@ -24,27 +31,30 @@ class MinIO:
         self.config_object = config
         self.config = config.config
         self.wg = wg
+        self.filename = f"{self.config_object.base_path}/settings/mc.json"
+        self._volume_directory = f"{self.config['dockerData']}/volumes"
         self.mc_docker = MCDocker()
         self.minio_docker = MinIODocker()
 
-        # Check if updater information is ready
+        # Set MC Config
+        self.load_config()
         branch = self.config['updateBranch']
-        count = 0
-        while not self.config_object.update_avail:
-            count += 1
-            if count >= 30:
-                break
-
-            Log.log("MinIO: Updater information not yet ready. Checking in 3 seconds")
-            sleep(3)
+        self.mc_data = {**self.default_mc_config, **self.mc_data}
 
         # Updater MC information
-        if self.config_object.update_avail:
+        if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
+            Log.log("MC: Replacing local data with version server data")
             self.updater_mc = self.config_object.update_payload['groundseg'][branch]['miniomc']
-            self.updater_minio = self.config_object.update_payload['groundseg'][branch]['minio']
+            self.mc_data['repo'] = self.updater_mc['repo']
+            self.mc_data['mc_version'] = self.updater_mc['tag']
+            self.mc_data['amd64_sha256'] = self.updater_mc['amd64_sha256']
+            self.mc_data['arm64_sha256'] = self.updater_mc['arm64_sha256']
+
+        self.save_config()
 
         if self.config['wgOn'] and self.config['wgRegistered']:
             self.start_mc()
+            sleep(3)
             self.start_all()
 
         Log.log("MinIO: Initialization Completed")
@@ -67,11 +77,11 @@ class MinIO:
         return 400
 
     def start_mc(self):
-        return self.mc_docker.start(self.mc_name, self.updater_mc, self.config_object._arch)
+        return self.mc_docker.start(self.mc_data, self.config_object._arch)
 
     def start_minio(self, name, pier_config):
         if self.config['wgOn'] and self.config['wgRegistered'] and pier_config['minio_password'] != '':
-            if self.minio_docker.start(name, self.updater_minio, pier_config, self.config_object._arch):
+            if self.minio_docker.start(name, pier_config, self.config_object._arch):
                 return self.mc_setup(name, pier_config)
         # Skip
         return True
@@ -85,7 +95,7 @@ class MinIO:
         return self.minio_docker.stop_all()
 
     def stop_mc(self):
-        return self.mc_docker.stop(self.mc_name)
+        return self.mc_docker.stop(self.mc_data['mc_name'])
 
     def stop_minio(self, name):
         return self.minio_docker.stop(name)
@@ -121,8 +131,8 @@ class MinIO:
             patp = pier_config['pier_name']
             port = pier_config['wg_s3_port']
             pwd = pier_config['minio_password']
-            self.mc_docker.exec(self.mc_name, f"mc alias set patp_{patp} http://localhost:{port} {patp} {pwd}")
-            self.mc_docker.exec(self.mc_name, f"mc anonymous set public patp_{patp}/bucket")
+            self.mc_docker.exec(self.mc_data['mc_name'], f"mc alias set patp_{patp} http://localhost:{port} {patp} {pwd}")
+            self.mc_docker.exec(self.mc_data['mc_name'], f"mc anonymous set public patp_{patp}/bucket")
             Log.log(f"{name}: Created MinIO admin account")
             return True
 
@@ -139,7 +149,7 @@ class MinIO:
         try:
             # create admin account if failed previously
             if self.mc_setup(name, pier_config):
-                c = self.mc_docker.get_container(self.mc_name)
+                c = self.mc_docker.get_container(self.mc_data['mc_name'])
                 if c:
                     Log.log(f"{name}: Attempting to update service account credentials.")
                     command = f"mc admin user svcacct edit --secret-key '{pwd}' patp_{patp} {acc}"
@@ -164,3 +174,20 @@ class MinIO:
     # Container logs
     def minio_logs(self, name):
         return self.minio_docker.full_logs(name)
+
+    # Load mc.json
+    def load_config(self):
+        try:
+            with open(self.filename) as f:
+                self.mc_data = json.load(f)
+                Log.log("MC: Successfully loaded mc.json")
+
+        except Exception as e:
+            Log.log(f"MC: Failed to open mc.json: {e}")
+            Log.log("MC: New mc.json will be created")
+
+    # Save mc.json
+    def save_config(self):
+        with open(self.filename,'w') as f:
+            json.dump(self.mc_data, f, indent=4)
+            f.close()

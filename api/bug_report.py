@@ -1,5 +1,6 @@
 # Python
 import os
+import json
 import zipfile
 import requests
 import subprocess
@@ -37,6 +38,48 @@ class BugReport:
             bug_file = zipfile.ZipFile(
                     f"{base_path}/bug-reports/{report}/{report}.zip", 'w', zipfile.ZIP_DEFLATED
                     )
+
+            # Load configs
+            try:
+                cfgs = {}
+                for j in [c for c in os.listdir(f"{base_path}/settings") if c.endswith(".json")]:
+                    try:
+                        with open(f"{base_path}/settings/{j}") as f:
+                            cfgs[j] = json.load(f)
+
+                        if j == "system.json":
+                            cfgs[j].pop("sessions")
+                            cfgs[j].pop("privkey")
+                            cfgs[j].pop("salt")
+                            cfgs[j].pop("pwHash")
+
+                        bug_file.writestr(j, json.dumps(cfgs[j], indent = 4))
+                    except Exception as e:
+                        Log.log(f"Bug: Failed to load {j}: {e}")
+                        bug_file.writestr(f"failed_{j}", e)
+
+            except Exception as e:
+                Log.log(f"Bug: Failed to load configs: {e}")
+                bug_file.writestr("cfgs_failed", e)
+
+            # Load pier configs
+            try:
+                pcfgs = {}
+                for j in [c for c in os.listdir(f"{base_path}/settings/pier") if c.endswith(".json")]:
+                    try:
+                        with open(f"{base_path}/settings/pier/{j}") as f:
+                            pcfgs[j] = json.load(f)
+
+                        pcfgs[j].pop("minio_password")
+
+                        bug_file.writestr(j, json.dumps(pcfgs[j], indent = 4))
+                    except Exception as e:
+                        Log.log(f"Bug: Failed to load {j}: {e}")
+                        bug_file.writestr(f"failed_{j}", e)
+
+            except Exception as e:
+                Log.log(f"Bug: Failed to load pier configs: {e}")
+                bug_file.writestr("pier_cfgs_failed", e)
 
             # wireguard config
             if wg_reg:

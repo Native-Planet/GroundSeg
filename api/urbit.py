@@ -12,6 +12,7 @@ import tarfile
 
 from io import BytesIO
 from time import sleep
+from pathlib import Path
 from datetime import datetime
 
 # Flask
@@ -27,8 +28,14 @@ default_pier_config = {
         "http_port":8080,
         "ames_port":34343,
         "loom_size":31,
-        "urbit_version":"latest",
+        "urbit_version":"v2.0",
         "minio_version":"latest",
+        "urbit_repo": "registry.hub.docker.com/nativeplanet/urbit",
+        "minio_repo": "registry.hub.docker.com/minio/minio",
+        "urbit_amd64_sha256": "8bd616e0815ec8aef447ebc8b0c604d286fa4fb3528aa6b380a785de13f6f933",
+        "minio_amd64_sha256": "f6a3001a765dc59a8e365149ade0ea628494230e984891877ead016eb24ba9a9",
+        "urbit_arm64_sha256": "44431c6a1ef47045f86073b2a3a3214b55c15c9a4f22edf701a8be17ab82d95e",
+        "minio_arm64_sha256": "567779c9f29aca670f84d066051290faeaae6c3ad3a3b7062de4936aaab2a29d",
         "minio_password": "",
         "network":"none",
         "wg_url": "nan",
@@ -56,37 +63,32 @@ class Urbit:
         self.config_object = config
         self.config = config.config
 
+        self._volume_directory = f"{self.config['dockerData']}/volumes"
+
         self.wg = wg
         self.minio = minio
 
         self.urb_docker = UrbitDocker()
         self._urbits = {}
 
-        # Check if updater information is ready
         branch = self.config['updateBranch']
-        count = 0
-        while not self.config_object.update_avail:
-            count += 1
-            if count >= 30:
-                break
 
-            Log.log("Urbit: Updater information not yet ready. Checking in 3 seconds")
-            sleep(3)
-
-        # Updater Wireguard information
-        if self.config_object.update_avail:
+        # Updater Urbit information
+        if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
             self.updater_info = self.config_object.update_payload['groundseg'][branch]['vere']
+            self.updater_minio = self.config_object.update_payload['groundseg'][branch]['minio']
 
         self.start_all(self.config['piers'])
 
     # Start container
-    def start(self, patp):
+    def start(self, patp, key=''):
         if self.load_config(patp):
             if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
                 return self.urb_docker.start(self._urbits[patp],
-                                             self.updater_info,
                                              self.config_object._arch,
-                                             self._volume_directory)
+                                             self._volume_directory,
+                                             key
+                                             )
         else:
             return "failed"
 
@@ -229,15 +231,16 @@ class Urbit:
 
             # Delete existing ship if exists
             if self.urb_docker.delete(patp):
-                # Create the docker container
-                if self.urb_docker.create(cfg, self.updater_info, self.config_object._arch, self._volume_directory, key):
-                    if self.add_urbit(patp):
-                        endpoint = self.config['endpointUrl']
-                        api_version = self.config['apiVersion']
-                        url = f"https://{endpoint}/{api_version}"
-                        if self.register_urbit(patp, url):
-                            if self.start(patp) == "succeeded":
-                                return 200
+                # Add to system.json
+                if self.add_urbit(patp):
+                    # Register the service
+                    endpoint = self.config['endpointUrl']
+                    api_version = self.config['apiVersion']
+                    url = f"https://{endpoint}/{api_version}"
+                    if self.register_urbit(patp, url):
+                        # Create the docker container
+                        if self.start(patp, key) == "succeeded":
+                            return 200
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
@@ -266,7 +269,7 @@ class Urbit:
 
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
-        vol_dir = f'/var/lib/docker/volumes/{patp}'
+        vol_dir = f'{self._volume_directory}/{patp}'
         compressed_dir = f"{self.config_object.base_path}/uploaded/{patp}/{filename}"
 
         try:
@@ -279,19 +282,6 @@ class Urbit:
 
             # Begin extraction
             Log.log(f"{patp}: Extracting {filename}")
-
-            '''
-            # Zipfile
-            if filename.endswith("zip"):
-                with zipfile.ZipFile(compressed_dir) as zip_ref:
-                    zip_ref.extractall(f"{vol_dir}/_data")
-
-            # Tarball
-            elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                tar = tarfile.open(compressed_dir,"r:gz")
-                tar.extractall(f"{vol_dir}/_data")
-                tar.close()
-            '''
 
             # Zipfile
             if filename.endswith("zip"):
@@ -323,6 +313,68 @@ class Urbit:
             Log.log(f"{patp}: Failed to extract {filename}: {e}")
             return "File extraction failed"
 
+        # Restructure directory
+        try:
+            # Get all .urb locations in directory
+            data_dir = os.path.join(vol_dir, '_data')
+            urb_loc = []
+            for root, dirs, files in os.walk(data_dir):
+                if '.urb' in dirs:
+                    urb_loc.append(root)
+
+            # Fail if more than one .urb exists
+            if len(urb_loc) > 1:
+                Log.log(f"{patp}: Multiple ships ({len(urb_loc)}) detected in pier directory")
+                return "Multiple ships detected in pier directory"
+            if len(urb_loc) < 1:
+                Log.log(f"{patp}: No ships detected in pier directory")
+                return "No Urbit ship found in pier directory"
+
+            Log.log(f"{patp}: .urb subdirectory in {urb_loc[0]}")
+
+            pier_dir = os.path.join(data_dir, patp)
+            temp_dir = os.path.join(data_dir, 'temp_dir')
+            unused_dir = os.path.join(data_dir, 'unused')
+
+            # check if .urb is in the correct location 
+            if os.path.join(pier_dir, '.urb') != os.path.join(urb_loc[0], '.urb'):
+                Log.log(f"{patp}: .urb location incorrect!")
+                Log.log(f"{patp}: Restructuring directory structure")
+
+                # move to temp dir
+                Log.log(f"{patp}: .urb found in {urb_loc[0]}")
+                Log.log(f"{patp}: Moving to {temp_dir}")
+                if data_dir == urb_loc[0]: # .urb in root
+                    # Create directory
+                    os.makedirs(temp_dir, exist_ok=True)
+                    # select everything in root except for pier_dir
+                    items = [x for x in list(Path(urb_loc[0]).iterdir()) if str(x) != pier_dir]
+                    Log.log(f"{patp}: Items to move: {items}")
+                    for item in items:
+                        shutil.move(str(item), temp_dir)
+                else:
+                    shutil.move(urb_loc[0], temp_dir)
+
+                # rename directories
+                unused = [str(x) for x in list(Path(data_dir).iterdir()) if (str(x) != temp_dir) and (str(x) != unused_dir)]
+                if len(unused) > 0:
+                    # Create directory
+                    os.makedirs(unused_dir, exist_ok=True)
+                    Log.log(f"{patp}: Moving unused items to {unused_dir}")
+                    for u in unused:
+                        Log.log(f"{patp}: Unused items to move: {unused}")
+                        shutil.move(u, unused_dir)
+
+                shutil.move(temp_dir, pier_dir)
+
+                Log.log(f"{patp}: Restructuring done!")
+            else:
+                Log.log(f"{patp}: No restructuring needed!")
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to restructure directory: {e}")
+            return f"Failed to restructure {patp}"
+
         try:
             self.config_object.upload_status[patp] = {'status':'cleaning'}
             shutil.rmtree(f"{self.config_object.base_path}/uploaded/{patp}", ignore_errors=True)
@@ -350,14 +402,15 @@ class Urbit:
             self._urbits[patp] = cfg
             self.save_config(patp)
 
-            # Create the docker container
-            if self.urb_docker.create(cfg, self.updater_info, self.config_object._arch, self._volume_directory, ""):
-                if self.add_urbit(patp):
-                    endpoint = self.config['endpointUrl']
-                    api_version = self.config['apiVersion']
-                    url = f"https://{endpoint}/{api_version}"
-                    if self.register_urbit(patp, url):
-                        return self.start(patp)
+            # Add to system.json
+            if self.add_urbit(patp):
+                # Register the service
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f"https://{endpoint}/{api_version}"
+                if self.register_urbit(patp, url):
+                    # Create the docker container
+                    return self.start(patp)
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
@@ -541,11 +594,11 @@ class Urbit:
                 Log.log(f"{patp}: Network changed: {old_network} -> {self._urbits[patp]['network']}")
                 self.save_config(patp)
 
-                created = self.urb_docker.create(self._urbits[patp],
-                                                 self.updater_info,
-                                                 self.config_object._arch,
-                                                 self._volume_directory)
-                if created and running:
+                created = self.urb_docker.start(self._urbits[patp],
+                                                self.config_object._arch,
+                                                self._volume_directory
+                                                )
+                if (created == "succeeded") and running:
                     self.start(patp)
 
                 return 200
@@ -570,11 +623,11 @@ class Urbit:
                 self.save_config(patp)
                 Log.log(f"{patp}: Loom size changed: {old_loom} -> {self._urbits[patp]['loom_size']}")
 
-                created = self.urb_docker.create(self._urbits[patp],
-                                                 self.updater_info,
-                                                 self.config_object._arch,
-                                                 self._volume_directory)
-                if created and running:
+                created = self.urb_docker.start(self._urbits[patp],
+                                                self.config_object._arch,
+                                                self._volume_directory
+                                                )
+                if (created == "succeeded") and running:
                     self.start(patp)
 
                 return 200
@@ -939,13 +992,13 @@ class Urbit:
                     if c:
                         running = c.status == "running"
                         if self.urb_docker.remove_container(patp):
-                            self.urb_docker.create(self._urbits[patp],
-                                                   self.updater_info,
-                                                   self.config_object._arch,
-                                                   self._volume_directory,
-                                                   '')
-                    if running:
-                        self.start(patp)
+                            created = self.urb_docker.start(self._urbits[patp],
+                                                            self.config_object._arch,
+                                                            self._volume_directory
+                                                            )
+                            if (created == "succeeded") and running:
+                                self.start(patp)
+
                     Log.log(f"{patp}: Wireguard network settings updated!")
             else:
                 Log.log(f"{patp}: Nothing to change!")
@@ -1062,6 +1115,23 @@ class Urbit:
             with open(f"{self.config_object.base_path}/settings/pier/{patp}.json") as f:
                 cfg = json.load(f)
                 self._urbits[patp] = {**default_pier_config, **cfg}
+
+                # Updater Urbit information
+                try:
+                    if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
+                        Log.log(f"{patp}: Replacing local data with version server data")
+                        self._urbits[patp]['urbit_repo'] = self.updater_info['repo']
+                        self._urbits[patp]['urbit_version'] = self.updater_info['tag']
+                        self._urbits[patp]['urbit_amd64_sha256'] = self.updater_info['amd64_sha256']
+                        self._urbits[patp]['urbit_arm64_sha256'] = self.updater_info['arm64_sha256']
+                        self._urbits[patp]['minio_repo'] = self.updater_minio['repo']
+                        self._urbits[patp]['minio_version'] = self.updater_minio['tag']
+                        self._urbits[patp]['minio_amd64_sha256'] = self.updater_minio['amd64_sha256']
+                        self._urbits[patp]['minio_arm64_sha256'] = self.updater_minio['arm64_sha256']
+                        self.save_config(patp)
+                except:
+                    pass
+
                 Log.log(f"{patp}: Config loaded")
                 return True
         except Exception as e:

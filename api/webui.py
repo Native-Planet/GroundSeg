@@ -11,7 +11,7 @@ class WebUI:
     default_config = { 
                       "webui_name": "groundseg-webui",
                       "webui_version": "latest",
-                      "image": "nativeplanet/groundseg-webui",
+                      "repo": "nativeplanet/groundseg-webui",
                       "port": 80,
                       "background": ""
                       }   
@@ -24,23 +24,27 @@ class WebUI:
 
         self.load_config()
 
-        # Check if updater information is ready
+        # Set Netdata Config
+        self.load_config()
         branch = self.config['updateBranch']
-        count = 0
-        while not self.config_object.update_avail:
-            count += 1
-            if count >= 30:
-                break
-
-            Log.log("WebUI: Updater information not yet ready. Checking in 3 seconds")
-            sleep(3)
+        self.data = {**self.default_config, **self.data}
 
         # Updater WebUI information
-        if self.config_object.update_avail:
+        if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
+            Log.log("WebUI: Replacing local data with version server data")
             self.updater_info = self.config_object.update_payload['groundseg'][branch]['webui']
-            self.data['image'] = self.updater_info['repo']
+            self.data['repo'] = self.updater_info['repo']
             self.data['webui_version'] = self.updater_info['tag']
-        self.data = {**self.default_config, **self.data}
+            self.data['amd64_sha256'] = self.updater_info['amd64_sha256']
+            self.data['arm64_sha256'] = self.updater_info['arm64_sha256']
+
+        # image replaced by repo
+        if 'image' in self.data:
+            self.data.pop('image')
+
+        # tag replaced by wireguard_version
+        if 'tag' in self.data:
+            self.data.pop('tag')
 
         self.save_config()
 
@@ -49,7 +53,7 @@ class WebUI:
 
     # Start container
     def start(self):
-        return self.webui_docker.start(self.data,self.updater_info, self.config_object._arch)
+        return self.webui_docker.start(self.data, self.config_object._arch)
 
     # Load webui.json
     def load_config(self):

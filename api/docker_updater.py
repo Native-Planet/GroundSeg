@@ -57,102 +57,166 @@ class DockerUpdater:
                 except Exception as e:
                     Log.log(f"Updater: Docker updater failed: {e}")
                     sleep(60)
+            else:
+                sleep(60)
 
     def update_wireguard(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
-            Log.log(f"Updater: Checking for wireguard updates")
-            info = self.payload['wireguard']
-            wg_name = self.wireguard.data['wireguard_name']
-            tag = self.wireguard.data['wireguard_version']
-            repo = info['repo']
+            Log.log(f"Updater: Checking for Wireguard updates")
 
-            if tag == "latest" or tag == "edge":
-                sha = f"{self.arch}_sha256"
-                image = f"{repo}:tag@sha256:{info[sha]}"
-            else:
-                image = f"{repo}:{tag}"
+            # Update payload
+            srv = self.payload['wireguard'] 
 
-            c = self.wireguard.wg_docker.get_container(wg_name)
-            if c:
-                old_image = c.attrs['Config']['Image']
-                if old_image != image:
+            # Local info
+            loc = self.wireguard.data
+
+            # Modify if changed
+            changed = False
+            if srv['repo'] != loc['repo']:
+                Log.log(f"Updater: Wireguard repo: {loc['repo']} -> {srv['repo']}")
+                loc['repo'] = srv['repo']
+                changed = True
+
+            if srv['tag'] != loc['wireguard_version']:
+                Log.log(f"Updater: Wireguard tag: {loc['wireguard_version']} -> {srv['tag']}")
+                loc['wireguard_version'] = srv['tag']
+                changed = True
+
+            sha = f"{self.arch}_sha256"
+            if srv[sha] != loc[sha]:
+                Log.log(f"Updater: Wireguard {sha} {loc[sha]} -> {srv[sha]}")
+                loc[sha] = srv[sha]
+                changed = True
+
+            if changed:
+                try:
                     Log.log(f"Updater: Wireguard update detected. Updating..")
-                    try:
-                        remote = []
-                        for patp in self.urbit._urbits:
-                            if self.urbit._urbits[patp]['network'] != 'none':
-                                remote.append(patp)
+                    # Save new config
+                    self.wireguard.save_config()
 
-                        if self.wireguard.off(self.urbit, self.minio) == 200:
-                            if self.wireguard.remove():
-                                if self.wireguard.on(self.minio) == 200:
-                                    if len(remote) > 0:
-                                        for patp in remote:
-                                            if self.urbit.toggle_network(patp) == 200:
-                                                Log.log(f"Updater: Wireguard update complete")
-                    except Exception as e:
-                        Log.log(f"Updater: Failed to update wireguard: {e}")
-                else:
-                    Log.log(f"Updater: Wireguard already on correct version")
+                    # List ships that are in remote
+                    remote = []
+                    for patp in self.urbit._urbits:
+                        if self.urbit._urbits[patp]['network'] != 'none':
+                            remote.append(patp)
+
+                    if self.wireguard.off(self.urbit, self.minio) == 200:
+                        if self.wireguard.remove():
+                            if self.wireguard.on(self.minio) == 200:
+                                if len(remote) > 0:
+                                    for patp in remote:
+                                        if self.urbit.toggle_network(patp) == 200:
+                                            Log.log(f"Updater: Wireguard update complete")
+
+                except Exception as e:
+                    Log.log(f"Updater: Failed to update wireguard: {e}")
+            else:
+                Log.log(f"Updater: Wireguard already on correct version")
 
     def update_webui(self):
-        name = self.webui.data['webui_name']
-        tag = self.webui.data['webui_version']
-        info = self.payload['webui']
-        if tag == "latest" or tag == "edge":
-            sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
+        # Update payload
+        srv = self.payload['webui'] 
+
+        # Local info
+        loc = self.webui.data
+
+        # Modify if changed
+        changed = False
+        if srv['repo'] != loc['repo']:
+            Log.log(f"Updater: WebUI repo: {loc['repo']} -> {srv['repo']}")
+            loc['repo'] = srv['repo']
+            changed = True
+
+        if srv['tag'] != loc['webui_version']:
+            Log.log(f"Updater: WebUI tag: {loc['webui_version']} -> {srv['tag']}")
+            loc['webui_version'] = srv['tag']
+            changed = True
+
+        sha = f"{self.arch}_sha256"
+        if srv[sha] != loc[sha]:
+            Log.log(f"Updater: WebUI {sha} {loc[sha]} -> {srv[sha]}")
+            loc[sha] = srv[sha]
+            changed = True
+
+        if changed:
+            Log.log(f"Updater: WebUI update detected. Updating..")
+            # Save new config
+            self.webui.save_config()
+            if self.webui.start():
+                Log.log(f"Updater: WebUI update complete")
         else:
-            image = f"{updater_info['repo']}:{tag}"
-        c = self.webui.webui_docker.get_container(name)
-        if c:
-            old_image = c.attrs['Config']['Image']
-            if old_image != image:
-                Log.log(f"Updater: WebUI update detected. Updating..")
-                if self.webui.start():
-                    Log.log(f"Updater: WebUI update complete")
-            else:
-                Log.log("Updater: WebUI already correct version")
+            Log.log("Updater: WebUI already correct version")
 
     def update_netdata(self):
-        name = self.netdata.data['netdata_name']
-        tag = self.netdata.data['netdata_version']
-        info = self.payload['netdata']
-        if tag == "latest" or tag == "edge":
-            sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
-        else:
-            image = f"{updater_info['repo']}:{tag}"
-        c = self.netdata.nd_docker.get_container(name)
-        if c:
-            old_image = c.attrs['Config']['Image']
-            if old_image != image:
-                Log.log(f"Updater: Netdata update detected. Updating..")
-                if self.netdata.start():
-                    Log.log(f"Updater: Netdata update complete")
+        # Update payload
+        srv = self.payload['netdata'] 
+
+        # Local info
+        loc = self.netdata.data
+
+        # Modify if changed
+        changed = False
+        if srv['repo'] != loc['repo']:
+            Log.log(f"Updater: Netdata repo: {loc['repo']} -> {srv['repo']}")
+            loc['repo'] = srv['repo']
+            changed = True
+
+        if srv['tag'] != loc['netdata_version']:
+            Log.log(f"Updater: Netdata tag: {loc['netdata_version']} -> {srv['tag']}")
+            loc['netdata_version'] = srv['tag']
+            changed = True
+
+        sha = f"{self.arch}_sha256"
+        if srv[sha] != loc[sha]:
+            Log.log(f"Updater: Netdata {sha} {loc[sha]} -> {srv[sha]}")
+            loc[sha] = srv[sha]
+            changed = True
+
+        if changed:
+            Log.log(f"Updater: Netdata update detected. Updating..")
+            # Save new config
+            self.netdata.save_config()
+
+            if self.netdata.start():
+                Log.log(f"Updater: Netdata update complete")
             else:
                 Log.log("Updater: Netdata already correct version")
 
     def update_mc(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
             Log.log(f"Updater: Checking for MinIO Client updates")
-            info = self.payload['miniomc']
+            # Update payload
+            srv = self.payload['miniomc'] 
+
+            # Local info
+            loc = self.minio.mc_data
+
+            # Modify if changed
+            changed = False
+            if srv['repo'] != loc['repo']:
+                Log.log(f"Updater: MC repo: {loc['repo']} -> {srv['repo']}")
+                loc['repo'] = srv['repo']
+                changed = True
+
+            if srv['tag'] != loc['mc_version']:
+                Log.log(f"Updater: MC tag: {loc['wireguard_version']} -> {srv['tag']}")
+                loc['mc_version'] = srv['tag']
+                changed = True
+
             sha = f"{self.arch}_sha256"
-            image = f"{info['repo']}:tag@sha256:{info[sha]}"
-            mc_name = self.minio.mc_name
-            c = self.minio.mc_docker.get_container(mc_name)
-            if c:
-                old_image = c.attrs['Config']['Image']
-                if old_image != image:
-                    Log.log(f"Updater: MinIO Client update detected. Updating..")
-                    try:
-                        if self.minio.mc_docker.remove_container(mc_name):
-                            if self.minio.start_mc():
-                                Log.log(f"Updater: MinIO Client update complete")
-                    except Exception as e:
-                        Log.log(f"Updater: Failed to update MinIO Client: {e}")
-                else:
-                    Log.log(f"Updater: MinIO Client already on correct version")
+            if srv[sha] != loc[sha]:
+                Log.log(f"Updater: MC {sha}: {loc[sha]} -> {srv[sha]}")
+                loc[sha] = srv[sha]
+                changed = True
+
+            if changed:
+                Log.log(f"Updater: MinIO Client update detected. Updating..")
+                # Save new config
+                self.minio.save_config()
+                if self.minio.start_mc():
+                    Log.log(f"Updater: MinIO Client update complete")
+            else:
+                Log.log(f"Updater: MinIO Client already on correct version")
 
 
     def update_minio(self):
@@ -160,55 +224,80 @@ class DockerUpdater:
             Log.log(f"Updater: Checking for MinIO updates")
             copied = self.urbit._urbits
             for p in list(copied):
-                info = self.payload['minio']
+                # Update payload
+                srv = self.payload['minio'] 
+
+                # Local info
+                loc = self.urbit._urbits[p]
+
                 name = f"minio_{p}"
+                Log.log(f"{name}: Checking for MinIO update")
+
+                # Modify if changed
+                changed = False
+                if srv['repo'] != loc['minio_repo']:
+                    Log.log(f"{name}: MinIO repo: {loc['minio_repo']} -> {srv['repo']}")
+                    loc['minio_repo'] = srv['repo']
+                    changed = True
+
+                if srv['tag'] != loc['minio_version']:
+                    Log.log(f"{name}: MinIO tag: {loc['minio_version']} -> {srv['tag']}")
+                    loc['minio_version'] = srv['tag']
+                    changed = True
+
                 sha = f"{self.arch}_sha256"
-                if self.urbit._urbits[p]['minio_password'] != '':
-                    Log.log(f"{name}: Checking for MinIO update")
-                    c = self.minio.minio_docker.get_container(name)
-                    tag = self.urbit._urbits[p]['minio_version']
-                    if tag == "latest" or tag == "edge":
-                        sha = f"{self.arch}_sha256"
-                        image = f"{info['repo']}:tag@sha256:{info[sha]}"
-                    else:
-                        image = f"{info['repo']}:{tag}"
-                    if c:
-                        old_image = c.attrs['Config']['Image']
-                        if old_image != image:
-                            Log.log(f"{name}: MinIO update detected. Updating..")
-                            try:
-                                if self.minio.minio_docker.remove_container(name):
-                                    if self.minio.start_minio(name, self.urbit._urbits[p]):
-                                        Log.log(f"{name}: MinIO update complete")
-                            except Exception as e:
-                                Log.log(f"{name}: Failed to update MinIO: {e}")
-                        else:
-                            Log.log(f"{name}: MinIO already on correct version")
+                loc_sha = f"minio_{sha}"
+                if srv[sha] != loc[loc_sha]:
+                    Log.log(f"{name}: MinIO {sha}: {loc[loc_sha]} -> {srv[sha]}")
+                    loc[loc_sha] = srv[sha]
+                    changed = True
+
+                if changed:
+                    self.urbit.save_config(p)
+                    Log.log(f"{name}: MinIO update detected. Updating..")
+                    if self.minio.minio_docker.remove_container(name):
+                        if self.minio.start_minio(name, self.urbit._urbits[p]):
+                            Log.log(f"{name}: MinIO update complete")
+                else:
+                    Log.log(f"{name}: MinIO already on correct version")
 
 
     def update_urbit(self):
         Log.log(f"Updater: Checking for Urbit updates")
         copied = self.urbit._urbits
         for p in list(copied):
-            info = self.payload['vere']
-            sha = f"{self.arch}_sha256"
+            # Update payload
+            srv = self.payload['vere'] 
+
+            # Local info
+            loc = self.urbit._urbits[p]
+
             Log.log(f"{p}: Checking for Urbit update")
-            tag = self.urbit._urbits[p]['urbit_version']
-            if tag == "latest" or tag == "edge":
-                sha = f"{self.arch}_sha256"
-                image = f"{info['repo']}:tag@sha256:{info[sha]}"
+
+            # Modify if changed
+            changed = False
+            if srv['repo'] != loc['urbit_repo']:
+                Log.log(f"{p}: Urbit repo: {loc['urbit_repo']} -> {srv['repo']}")
+                loc['urbit_repo'] = srv['repo']
+                changed = True
+
+            if srv['tag'] != loc['urbit_version']:
+                Log.log(f"{p}: Urbit tag: {loc['urbit_version']} -> {srv['tag']}")
+                loc['urbit_version'] = srv['tag']
+                changed = True
+
+            sha = f"{self.arch}_sha256"
+            loc_sha = f"urbit_{sha}"
+            if srv[sha] != loc[loc_sha]:
+                Log.log(f"{p}: Urbit {sha}: {loc[loc_sha]} -> {srv[sha]}")
+                loc[loc_sha] = srv[sha]
+                changed = True
+
+            if changed:
+                self.urbit.save_config(p)
+                Log.log(f"{p}: Urbit update detected. Updating..")
+                if self.urbit.urb_docker.remove_container(p):
+                    if self.urbit.start(p) == "succeeded":
+                        Log.log(f"{p}: Urbit update complete")
             else:
-                image = f"{info['repo']}:{tag}"
-            c = self.urbit.urb_docker.get_container(p)
-            if c:
-                old_image = c.attrs['Config']['Image']
-                if old_image != image:
-                    Log.log(f"{p}: Urbit update detected. Updating..")
-                    try:
-                        if self.urbit.urb_docker.remove_container(p):
-                            if self.urbit.start(p) == "succeeded":
-                                Log.log(f"{p}: Urbit update complete")
-                    except Exception as e:
-                        Log.log(f"{p}: Failed to update Urbit: {e}")
-                else:
-                    Log.log(f"{p}: Urbit already on correct version")
+                Log.log(f"{p}: Urbit already on correct version")

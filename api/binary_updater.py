@@ -17,6 +17,7 @@ class BinUpdater:
 
     def check_bin_update(self):
         Log.log("Updater: Binary updater thread started")
+        Log.log(f"Updater: Update mode: {self.config['updateMode']}")
         while True:
             try:
                 Log.log("Updater: Fetching version server for updated information")
@@ -35,7 +36,7 @@ class BinUpdater:
                     raise ValueError(f"Status code {r.status_code}")
 
             except Exception as e:
-                config.update_avail = False
+                self.config_object.update_avail = False
                 Log.log(f"Updater: Unable to retrieve update information: {e}")
                 sleep(60)
 
@@ -55,9 +56,9 @@ class BinUpdater:
                 # Get version
                 ver = f"v{d['major']}.{d['minor']}.{d['patch']}"
                 old_ver = self.config['gsVersion']
-                if branch == 'edge':
-                    ver = f"{ver}-edge"
-                    old_ver = f"{old_ver}-edge"
+                if branch != 'latest':
+                    ver = f"{ver}-{branch}"
+                    old_ver = f"{old_ver}-{branch}"
 
                 # Show versions
                 Log.log(f"Updater: Current {old_ver} | Latest {ver}")

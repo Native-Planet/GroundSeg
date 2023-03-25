@@ -53,6 +53,7 @@
       <li>GroundSeg logs</li>
       <li>StarTram information (if available)</li>
       <li>List of docker containers on your device</li>
+      <li>GroundSeg and docker container configurations (sensitive information not sent)</li>
     </ul>
   </div>
   <div class="input-title">How should we contact you?</div>

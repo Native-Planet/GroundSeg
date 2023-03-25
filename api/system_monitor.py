@@ -14,7 +14,7 @@ class SysMonitor:
     def ram_monitor(self):
         Log.log("Monitor: RAM monitor thread started")
         error_time = 15
-        while not self.mode == "vm":
+        while True:
             try:
                 self.config_object._ram = psutil.virtual_memory().percent
                 sleep(1)
@@ -30,7 +30,7 @@ class SysMonitor:
     def cpu_monitor(self):
         Log.log("Monitor: CPU monitor thread started")
         error_time = 15
-        while not self.mode == "vm":
+        while True:
             try:
                 self.config_object._cpu = psutil.cpu_percent(1)
                 error_time = 15
@@ -45,7 +45,7 @@ class SysMonitor:
     def temp_monitor(self):
         Log.log("Monitor: Core temperature monitor thread started")
         error_time = 15
-        while not self.mode == "vm":
+        while True:
             try:
                 self.config_object._core_temp = psutil.sensors_temperatures()['coretemp'][0].current
                 sleep(1)
@@ -61,7 +61,7 @@ class SysMonitor:
     def disk_monitor(self):
         Log.log("Monitor: Disk monitor thread started")
         error_time = 15
-        while not self.mode == "vm":
+        while True:
             try:
                 self.config_object._disk = shutil.disk_usage("/")
                 sleep(1)

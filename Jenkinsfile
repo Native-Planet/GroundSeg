@@ -232,6 +232,26 @@ pipeline {
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/minor/${minor}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://version.groundseg.app/modify/groundseg/latest/groundseg/patch/${patch}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/webui/amd64_sha256/${webui_amd64_hash}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/webui/arm64_sha256/${webui_arm64_hash}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://version.groundseg.app/modify/groundseg/canary/groundseg/patch/${patch}
                         '''
                     }
                     if( "${channel}" == "edge" ) {
@@ -270,9 +290,8 @@ pipeline {
 			    sh (
                                 script: '''
                                     git checkout master
-                                    git merge ${tag}
-                                    git commit -am "Merge ${tag}"
-                                    git push origin master
+                                    git merge ${tag} -m "Merged ${tag}"
+                                    git push
                                 '''
                             )
 			}
