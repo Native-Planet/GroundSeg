@@ -306,7 +306,7 @@ class Config:
         if self.device_mode == "npbox":
             if not internet:
                 Log.log("Config: No internet access, starting Connect to Connect mode")
-                self.device_mode == "c2c"
+                self.device_mode = "c2c"
         else:
             while not internet:
                 Log.log("Config: No internet access, checking again in 15 seconds")
