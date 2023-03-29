@@ -30,7 +30,7 @@
       return done()
     } else { 
       failed = patp + " is not a valid name!"
-      setTimeout(()=>failed = "", 2400) 
+      setTimeout(()=>failed = "", 3000) 
     }
   }
 
@@ -63,9 +63,18 @@
     } else if (res == 404) {
       window.location.href = "/login"
     } else {
-      failed = "Upload failed to complete"
-      setTimeout(()=>failed = "", 2400)
+      working = false
+      failed = res
+      statuses = new Set([])
+      setTimeout(()=>failed = "", 3000)
     }
+  }
+
+  const onError = (e) => {
+    working = false
+    failed = e
+    statuses = new Set([])
+    setTimeout(()=>failed = "", 3000)
   }
 
   const handleSuccess = n => {
@@ -83,67 +92,63 @@
     .catch(err => console.log(err))
   }
 
-  const onError = (e) => {
-    failed = e
-    setTimeout(()=>failed = "", 2400)
-  }
-
   let err_count = 0
-
   const getUploadStatus = (n,act) => {
-    fetch($api + '/upload/progress', {
-			method: 'POST',
-      credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'patp': n,'action': act })
-	  })
-			.then(raw => raw.json())
-      .then(res => {
-        console.log(res)
-        showStatuses = Array.from(statuses)
+    if (working) {
+      fetch($api + '/upload/progress', {
+        method: 'POST',
+        credentials: "include",
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({'patp': n,'action': act })
+      })
+        .then(raw => raw.json())
+        .then(res => {
+          console.log(res)
+          showStatuses = Array.from(statuses)
 
-        if (res.status == 'removed') {
-          err_count = 0
-          current = ''
-
-        } else if (res.status == 'done') {
-          err_count = 0
-          current = ''
-
-        } else if (res.status == 'none') {
-          if (!(showStatuses.includes('done'))) {
-            if (err_count < 5) {
-              ++err_count
-              setTimeout(()=>getUploadStatus(n, act), 1000)
-            } else {
-              current = ''
-              failed = "Unable to get progress"
-            }
-            setTimeout(()=>failed = "", 2400)
-          } else {
+          if (res.status == 'removed') {
             err_count = 0
             current = ''
+
+          } else if (res.status == 'done') {
+            err_count = 0
+            current = ''
+
+          } else if (res.status == 'none') {
+            if (!(showStatuses.includes('done'))) {
+              if (err_count < 5) {
+                ++err_count
+                setTimeout(()=>getUploadStatus(n, act), 1000)
+              } else {
+                current = ''
+                failed = "Unable to get progress"
+              }
+              setTimeout(()=>failed = "", 3000)
+            } else {
+              err_count = 0
+              current = ''
+            }
+
+          } else if (res.status == 'extracting') {
+            statuses.add(res.status)
+            current = res.status
+            extractProg = res.progress
+            err_count = 0
+            setTimeout(()=>getUploadStatus(n,act), 1000)
+
+          } else if (res.status == 'uploading') {
+            err_count = 0
+            setTimeout(()=>getUploadStatus(n,act), 1000)
+
+          } else {
+            statuses.add(res.status)
+            current = res.status
+            err_count = 0
+            setTimeout(()=>getUploadStatus(n,act), 1000)
           }
-
-        } else if (res.status == 'extracting') {
-          statuses.add(res.status)
-          current = res.status
-          extractProg = res.progress
-          err_count = 0
-          setTimeout(()=>getUploadStatus(n,act), 1000)
-
-        } else if (res.status == 'uploading') {
-          err_count = 0
-          setTimeout(()=>getUploadStatus(n,act), 1000)
-
-        } else {
-          statuses.add(res.status)
-          current = res.status
-          err_count = 0
-          setTimeout(()=>getUploadStatus(n,act), 1000)
-        }
-      })
-    .catch(err => console.log(err))
+        })
+      .catch(err => console.log(err))
+    }
   }
 
   // Dropzone params
