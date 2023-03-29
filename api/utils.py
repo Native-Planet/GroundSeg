@@ -171,15 +171,16 @@ class Utils:
 
             # Returns None if failed
 
-    def max_swap(loc):
-        free = 16
+    def max_swap(loc, val):
         cap = 32 # arbitrary cap for the webui
+        free = cap
         try:
             free = math.ceil(psutil.disk_usage(loc).free / (1024 ** 3)) - 2
-            if free > 32:
-                free = 32
+            if free > cap:
+                free = cap
         except Exception as e:
-            Log.log(f"Swap: Failed to get maximum swap: {e}")
+            if val > 0:
+                Log.log(f"Swap: Failed to get maximum swap: {e}")
         return free
 
     def start_script():

@@ -116,7 +116,7 @@
     {:else}
       <Slider 
         on:change={(e) => curSwapVal = e.detail.value}
-        min={1}
+        min={0}
         max={maxSwap}
         initialValue={swapVal}
         value={curSwapVal}
