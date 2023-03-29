@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { api, isPatp } from '$lib/api'
   import Fa from 'svelte-fa'
-  import { faCheck } from '@fortawesome/free-solid-svg-icons'
+  import { faCheck, faRotate } from '@fortawesome/free-solid-svg-icons'
 
   import Dropzone from "dropzone"
   import LinkButton from '$lib/LinkButton.svelte'
@@ -30,7 +30,6 @@
       return done()
     } else { 
       failed = patp + " is not a valid name!"
-      setTimeout(()=>failed = "", 3000) 
     }
   }
 
@@ -66,7 +65,6 @@
       working = false
       failed = res
       statuses = new Set([])
-      setTimeout(()=>failed = "", 3000)
     }
   }
 
@@ -74,7 +72,6 @@
     working = false
     failed = e
     statuses = new Set([])
-    setTimeout(()=>failed = "", 3000)
   }
 
   const handleSuccess = n => {
@@ -123,7 +120,6 @@
                 current = ''
                 failed = "Unable to get progress"
               }
-              setTimeout(()=>failed = "", 3000)
             } else {
               err_count = 0
               current = ''
@@ -173,6 +169,9 @@
 
 <div class="wrapper">
 
+  {#if failed.length > 0}
+    <button class="okay" on:click={()=>failed = ""}><Fa icon={faRotate} size="1x" /></button>
+  {/if}
   <!-- Main dropper area -->
   <div id="dropper" class:failure={failed.length > 0} class:dz-border={!working} class:dz-text={!working}>
     {#if !working}
@@ -261,6 +260,14 @@
     margin-bottom: 20px;
     cursor: pointer;
     border: solid 1px none;
+  }
+  .okay {
+    width: 100%;
+    text-align: right;
+    cursor: pointer;
+    color: white;
+    font-family: inherit;
+    margin: 0 8px 8px 0;
   }
   .dz-text {
     line-height: 120px;

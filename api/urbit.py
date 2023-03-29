@@ -324,7 +324,7 @@ class Urbit:
 
             # Fail if more than one .urb exists
             if len(urb_loc) > 1:
-                text = "Multiple ships ({len(urb_loc)}) detected in pier directory"
+                text = f"Multiple ships ({len(urb_loc)}) detected in pier directory"
                 Log.log(f"{patp}: {text}")
                 return text
             if len(urb_loc) < 1:
