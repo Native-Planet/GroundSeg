@@ -242,8 +242,11 @@ class Wireguard:
         err_count = 0
         while err_count < 6:
             try:
-                self.anchor_data = requests.get(full_url,headers=self._headers).json()
-                return True
+                data = requests.get(full_url,headers=self._headers).json()
+                if data['conf'] != None:
+                    self.anchor_data = data
+                    return True
+                raise Exception("conf is null")
 
             except Exception as e:
                 Log.log(f"Anchor: /retrieve failed: {e}")
