@@ -261,7 +261,7 @@ class Orchestrator:
                 "disk": self.config_object._disk,
                 "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}",
                 "swapVal": self.config['swapVal'],
-                "maxSwap": Utils.max_swap(self.config['swapFile'])
+                "maxSwap": Utils.max_swap(self.config['swapFile'], self.config['swapVal'])
                 }
 
         optional = {} 
@@ -311,15 +311,21 @@ class Orchestrator:
             if data['action'] == 'set':
                 val = data['val']
                 if val != self.config['swapVal']:
-                    if Utils.stop_swap(self.config['swapFile']):
-                        Log.log(f"Swap: Removing {self.config['swapFile']}")
-                        os.remove(self.config['swapFile'])
+                    if self.config['swapVal'] > 0:
+                        if Utils.stop_swap(self.config['swapFile']):
+                            Log.log(f"Swap: Removing {self.config['swapFile']}")
+                            os.remove(self.config['swapFile'])
 
+                    if val > 0:
                         if Utils.make_swap(self.config['swapFile'], val):
                             if Utils.start_swap(self.config['swapFile']):
                                 self.config['swapVal'] = val
                                 self.config_object.save_config()
                                 return 200
+                    else:
+                        self.config['swapVal'] = val
+                        self.config_object.save_config()
+                        return 200
 
         # anchor module
         if module == 'anchor':

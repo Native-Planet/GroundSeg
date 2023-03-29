@@ -31,7 +31,7 @@ class Config:
     _arch = ""
 
     # Current version
-    version = "v1.1.14"
+    version = "v1.1.15"
 
     # Debug mode
     debug_mode = False
@@ -121,19 +121,20 @@ class Config:
         self.save_config()
 
         # Set swap
-        if not os.path.isfile(self.config['swapFile']):
-            Utils.make_swap(self.config['swapFile'], self.config['swapVal'])
+        if self.config['swapVal'] > 0:
+            if not os.path.isfile(self.config['swapFile']):
+                Utils.make_swap(self.config['swapFile'], self.config['swapVal'])
 
-        Utils.start_swap(self.config['swapFile'])
-        swap = Utils.active_swap(self.config['swapFile'])
+            Utils.start_swap(self.config['swapFile'])
+            swap = Utils.active_swap(self.config['swapFile'])
 
-        if swap != self.config['swapVal']:
-            if Utils.stop_swap(self.config['swapFile']):
-                Log.log(f"Swap: Removing {self.config['swapFile']}")
-                os.remove(self.config['swapFile'])
+            if swap != self.config['swapVal']:
+                if Utils.stop_swap(self.config['swapFile']):
+                    Log.log(f"Swap: Removing {self.config['swapFile']}")
+                    os.remove(self.config['swapFile'])
 
-            if Utils.make_swap(self.config['swapFile'], self.config['swapVal']):
-                Utils.start_swap(self.config['swapFile'])
+                if Utils.make_swap(self.config['swapFile'], self.config['swapVal']):
+                    Utils.start_swap(self.config['swapFile'])
 
         # Set current mode
         self.set_device_mode()

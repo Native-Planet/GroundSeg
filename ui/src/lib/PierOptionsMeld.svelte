@@ -129,7 +129,7 @@
     </div>
 
     <div class="day">
-      <div class="current-time">Last meld: {meldLast.slice(12,-13) == "1970" ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
+      <div class="current-time">Last meld: {meldLast.slice(12,-13) < 1971 ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
     </div>
 
     {#if meldOn}
