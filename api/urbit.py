@@ -28,13 +28,13 @@ default_pier_config = {
         "http_port":8080,
         "ames_port":34343,
         "loom_size":31,
-        "urbit_version":"v2.0",
+        "urbit_version":"v2.1",
         "minio_version":"latest",
         "urbit_repo": "registry.hub.docker.com/nativeplanet/urbit",
         "minio_repo": "registry.hub.docker.com/minio/minio",
-        "urbit_amd64_sha256": "8bd616e0815ec8aef447ebc8b0c604d286fa4fb3528aa6b380a785de13f6f933",
+        "urbit_amd64_sha256": "f08cd1717c6191a277f7cee46807eee8d772d8001c61c0610a53455bd56c5a77",
+        "urbit_arm64_sha256": "ed13a935b30e9a7666686c153464748ff2b768f1803df39c56ead2cf9e9c29df",
         "minio_amd64_sha256": "f6a3001a765dc59a8e365149ade0ea628494230e984891877ead016eb24ba9a9",
-        "urbit_arm64_sha256": "44431c6a1ef47045f86073b2a3a3214b55c15c9a4f22edf701a8be17ab82d95e",
         "minio_arm64_sha256": "567779c9f29aca670f84d066051290faeaae6c3ad3a3b7062de4936aaab2a29d",
         "minio_password": "",
         "network":"none",
@@ -319,7 +319,7 @@ class Urbit:
             data_dir = os.path.join(vol_dir, '_data')
             urb_loc = []
             for root, dirs, files in os.walk(data_dir):
-                if '.urb' in dirs:
+                if ('.urb' in dirs) and ('__MACOSX' not in root):
                     urb_loc.append(root)
 
             # Fail if more than one .urb exists
