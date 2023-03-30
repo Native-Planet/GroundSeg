@@ -84,7 +84,9 @@ class Wireguard:
 
     # Is container running
     def is_running(self):
-        return self.wg_docker.is_running(self.data['wireguard_name'])
+        if self.config['wgRegistered']:
+            return self.wg_docker.is_running(self.data['wireguard_name'])
+        return False
 
     # wgOn False
     def off(self, urb, minio):
