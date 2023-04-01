@@ -127,7 +127,7 @@ class Orchestrator:
         try:
             # Boot new Urbit
             if data['app'] == 'boot-new':
-                return self.urbit.create(urbit_id, data.get('data'))
+                return self.urbit.create(urbit_id, data.get('key'), data.get('remote'))
 
             # Check if Urbit Pier exists
             if not self.urbit.urb_docker.get_container(urbit_id):
@@ -379,23 +379,28 @@ class Orchestrator:
     def get_log_lines(self, container, line):
         blob = ''
 
-        if container == 'wireguard':
-            blob = self.wireguard.logs()
+        try:
+            if container == 'wireguard':
+                blob = self.wireguard.logs()
 
-        if container == 'netdata':
-            blob = self.netdata.logs()
+            if container == 'netdata':
+                blob = self.netdata.logs()
 
-        if container == 'groundseg':
-            return Log.get_log()[line:]
+            if container == 'groundseg':
+                return Log.get_log()[line:]
 
-        if 'minio_' in container:
-            blob = self.minio.minio_logs(container)
+            if 'minio_' in container:
+                blob = self.minio.minio_logs(container)
 
-        if container in self.urbit._urbits:
-            blob = self.urbit.logs(container)
+            if container in self.urbit._urbits:
+                blob = self.urbit.logs(container)
 
+            blob = blob.decode('utf-8').split('\n')[line:]
 
-        return blob.decode('utf-8').split('\n')[line:]
+        except Exception as e:
+            Log.log(f"Logs: Failed to get logs for {container}")
+
+        return blob
 
 
     #
@@ -443,7 +448,17 @@ class Orchestrator:
             self.config['updateMode'] = 'temp'
 
         # Uploaded pier
-        file = req.files['file']
+        remote = False
+        try:
+            file = req.files['file-true']
+            remote = True
+        except:
+            try:
+                file = req.files['file-false']
+            except:
+                Log.log(f"Upload: File request fail")
+                return "Invalid file type"
+
         filename = secure_filename(file.filename)
         patp = filename.split('.')[0]
 
@@ -501,7 +516,7 @@ class Orchestrator:
                 return "File size mismatched"
             else:
                 Log.log(f"{patp}: Upload complete")
-                res = self.urbit.boot_existing(filename)
+                res = self.urbit.boot_existing(filename, remote)
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'
                     self.config_object.save_config()

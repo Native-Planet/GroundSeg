@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store'
-export const webuiVersion = 'v1.1.16'
+export const webuiVersion = 'v1.1.17'
 
 //
 // fade transition params
@@ -11,7 +11,7 @@ export const fadeOut = {duration:200}
 // writable stores
 //
 export const noconn = writable(false)
-export const secret = writable('') // unused??
+export const startram = writable({anchor: {wgReg:false, wgRunning: false}})
 export const codes = writable({})
 export const urbits = writable([])
 export const system = writable({})
@@ -24,11 +24,13 @@ export const power = writable('')
 // state update
 //
 export const updateState = update => {
+  updateAnchor(update['anchor'])
   updateConnStatus(update['status'])
 	updateUrbits(update['urbits'])
   updateSystemInformation(update['system'])
 }
 
+const updateAnchor = a => {if (a) {startram.set(a)}}
 const updateConnStatus = c => noconn.set(c == 'noconn')
 const updateUrbits = p => {if (p) {urbits.set(p)}}
 const updateSystemInformation = s => {if (s) {system.set(s)}}

@@ -63,6 +63,15 @@ class UrbitDocker:
             Log.log(f"{patp}: Failed to start container: {e}")
             return "failed"
 
+    def is_running(self, patp):
+        try:
+            c = self.get_container(patp)
+            if c:
+                return c.status == "running"
+        except:
+            pass
+        return False
+
     def stop(self, patp):
         Log.log(f"{patp}: Attempting to stop container")
         c = self.get_container(patp)

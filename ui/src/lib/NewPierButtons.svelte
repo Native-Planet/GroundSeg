@@ -1,10 +1,12 @@
 <script>
   import { blur } from 'svelte/transition'
-  import { api, isPatp } from '$lib/api'
+  import { api, isPatp, startram } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import LinkButton from '$lib/LinkButton.svelte'
 
-  export let name='', key=''
+  export let name = ''
+  export let key = ''
+  export let remoteCheck
 
   let buttonStatus = 'standard'
   let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
@@ -26,7 +28,11 @@
 
     if (isPatp(n)) {
       let nr = n.replace(/~/g,'')
-      const query = {"app":"boot-new", "data": k }
+      let checked = false
+      if ($startram.wgReg && $startram.wgRunning) {
+        checked = remoteCheck
+      }
+      const query = {"app":"boot-new", "key": k, "remote": checked}
 			fetch($api + '/urbit?urbit_id=' + nr, {
 					method: 'POST',
           credentials: 'include',
@@ -86,6 +92,6 @@
 <style>
   div {
     display: flex;
-    margin-top: 24px;
+    margin-top: 2px;
   }
 </style>

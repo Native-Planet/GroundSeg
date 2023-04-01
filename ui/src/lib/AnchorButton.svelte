@@ -1,13 +1,12 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-	import { updateState, api, system, noconn } from '$lib/api'
+	import { updateState, api, system, noconn, startram } from '$lib/api'
   import { page } from '$app/stores'
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
   let hide = true
   let blur = false
-  let data = {anchor: {wgReg:false, wgRunning: false}}
 
   afterUpdate(()=> {
     hide = ($page.route.id == '/login')
@@ -19,7 +18,7 @@
     if (!$noconn) {
       fetch($api + '/anchor', {credentials: "include"})
       .then(raw => raw.json())
-      .then(res => data = res)
+      .then(res => updateState(res))
       .catch(err => {
         if ((typeof err) == 'object') {
           updateState({status:'noconn'})
@@ -41,8 +40,8 @@
   <a href='/startram' class:hide={hide} class:blur={blur}>
     <div 
       class="img" 
-      class:connected={data.anchor.wgReg && data.anchor.wgRunning}
-      class:not-connected={data.anchor.wgReg && !data.anchor.wgRunning}
+      class:connected={$startram.wgReg && $startram.wgRunning}
+      class:not-connected={$startram.wgReg && !$startram.wgRunning}
     >
       <Fa icon={faSatelliteDish} size="1.2x" />
     </div>

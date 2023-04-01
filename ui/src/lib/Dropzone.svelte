@@ -1,11 +1,14 @@
 <script>
   import { onMount } from 'svelte'
-  import { api, isPatp } from '$lib/api'
+  import { api, isPatp, startram } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faCheck, faRotate } from '@fortawesome/free-solid-svg-icons'
 
   import Dropzone from "dropzone"
   import LinkButton from '$lib/LinkButton.svelte'
+
+  // Remote
+  let remoteCheck = true
 
   // Failure text
   let failed = ""
@@ -150,7 +153,7 @@
   // Dropzone params
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
-      paramName: "file", // The name that will be used to transfer the file
+      paramName: nameFile,//"file", // The name that will be used to transfer the file
       acceptedFiles: '.zip, .tar, .tgz, .gz',
       withCredentials: true,
       chunking: true,
@@ -165,7 +168,27 @@
       chunkSize: 50000000 // bytes
   })})
 
+  const nameFile = () => {
+    if ($startram.wgReg && $startram.wgRunning) {
+      return "file-" + remoteCheck
+    } else {
+      return "file-false"
+    }
+  }
+
 </script>
+
+<!-- Remote Autoset -->
+{#if $startram.wgReg && $startram.wgRunning}
+  <div class="remote-check" class:freeze={working}>
+    <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
+      {#if remoteCheck}
+        <Fa icon={faCheck} size="1x"/>
+      {/if}
+    </div>
+    <span on:click={()=> remoteCheck = !remoteCheck}>Automatically enable remote access</span>
+  </div>
+{/if}
 
 <div class="wrapper">
 
@@ -325,5 +348,34 @@
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  .remote-check {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    text-align: center;
+    font-size: 11px;
+    margin: 0 0 16px 4px;
+  }
+  .box {
+    width: 14px;
+    height: 14px;
+    background: #ffffff4d;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+  span {
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .highlight {
+    background: #028AFB;
+  }
+  .freeze {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

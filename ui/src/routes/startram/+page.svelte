@@ -6,7 +6,7 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-	import { updateState, api, system, noconn } from '$lib/api'
+	import { updateState, api, system, noconn, startram } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 
@@ -26,7 +26,7 @@
     if (($page.route.id == '/startram') && !$noconn) {
       fetch($api + '/anchor', {credentials: "include"})
 			.then(raw => raw.json())
-      .then(res => data = res)
+      .then(res => updateState(res))
       .catch(err => {
         console.log(err)
         if ((typeof err) == 'object') {
@@ -60,14 +60,14 @@
   <Card width="460px">
 
     <!-- Header -->
-    <AnchorHeader wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning}>
+    <AnchorHeader wgReg={$startram.wgReg} wgRunning={$startram.wgRunning}>
       <Logo t='StarTram'/>
     </AnchorHeader>
 
-    {#if data.anchor.lease != null}
+    {#if $startram.lease != null}
       <div class="lease" transition:scale={{duration:120, delay: 200}}>
-        <span>Your subscription expires on {data.anchor.lease.slice(5,-12)}</span>
-        {#if data.anchor.ongoing}
+        <span>Your subscription expires on {$startram.lease.slice(5,-12)}</span>
+        {#if $startram.ongoing}
           <span class="autorenew">
             <Fa icon={faCheck} size="1x" />
             auto-renew
@@ -77,7 +77,7 @@
     {/if}
 
     <!-- Register Key -->
-    <AnchorRegisterKey wgReg={data.anchor.wgReg} />
+    <AnchorRegisterKey wgReg={$startram.wgReg} />
 
     <div class="sign-up">
       <a href="https://www.nativeplanet.io/startram" target="_blank">
@@ -86,7 +86,7 @@
     </div>
 
     <!-- Advanced Options -->
-    <AnchorAdvanced wgReg={data.anchor.wgReg} wgRunning={data.anchor.wgRunning} />
+    <AnchorAdvanced wgReg={$startram.wgReg} wgRunning={$startram.wgRunning} />
   </Card>
 {/if}
 

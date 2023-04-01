@@ -13,6 +13,7 @@ import tarfile
 from io import BytesIO
 from time import sleep
 from pathlib import Path
+from threading import Thread
 from datetime import datetime
 
 # Flask
@@ -213,20 +214,21 @@ class Urbit:
         return {'urbits': urbits}
 
     # Boot new pier from key
-    def create(self, patp, key):
+    def create(self, patp, key, remote):
         Log.log(f"{patp}: Attempting to boot new urbit ship")
         try:
             if not Utils.check_patp(patp):
                 raise Exception("Invalid @p")
 
             # TODO: Add check if exists, return prompt to user for further action
-            
+
             # Get open ports
             http_port, ames_port = self.get_open_urbit_ports()
 
             # Generate config file for pier
             cfg = self.build_config(patp, http_port, ames_port)
             self._urbits[patp] = cfg
+
             self.save_config(patp)
 
             # Delete existing ship if exists
@@ -240,6 +242,8 @@ class Urbit:
                     if self.register_urbit(patp, url):
                         # Create the docker container
                         if self.start(patp, key) == "succeeded":
+                            if remote:
+                                Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
                             return 200
 
         except Exception as e:
@@ -247,7 +251,25 @@ class Urbit:
 
         return 400
 
-    def boot_existing(self, filename):
+    def new_pier_remote_toggle(self, patp):
+        Log.log(f"{patp}: New pier remote toggle thread started")
+        try:
+            running = self.urb_docker.is_running(patp)
+            booted = len(self.get_code(patp)) == 27
+            count = 0
+            while not (running and booted):
+                Log.log(f"{patp}: Ship not ready for remote toggle yet")
+                time.sleep(count * 2)
+                if count < 5:
+                    count += 1
+                running = self.urb_docker.is_running(patp)
+                booted = len(self.get_code(patp)) == 27
+                
+            self.toggle_network(patp)
+        except Exception as e:
+            Log.log(f"{patp}: Failed to start new pier remote toggle thread: {e}")
+
+    def boot_existing(self, filename, remote):
         patp = filename.split('.')[0]
 
         if Utils.check_patp(patp):
@@ -261,6 +283,8 @@ class Urbit:
             if created != "succeeded":
                 self.config_object.upload_status.pop(patp)
                 return created
+            if remote:
+                Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
             self.config_object.upload_status[patp] = {'status':'done'}
             return 200
 
@@ -861,7 +885,6 @@ class Urbit:
                         break
 
             return self.set_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port)
-
         return True
 
     def set_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
