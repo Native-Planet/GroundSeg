@@ -455,8 +455,8 @@ class Orchestrator:
         except:
             try:
                 file = req.files['file-false']
-            except:
-                Log.log(f"Upload: File request fail")
+            except Exception as e:
+                Log.log(f"Upload: File request fail: {e}")
                 return "Invalid file type"
 
         filename = secure_filename(file.filename)
