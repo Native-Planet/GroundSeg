@@ -158,6 +158,8 @@
       withCredentials: true,
       chunking: true,
       forceChunking: true,
+      retryChunks: true,
+      retryChunksLimit: 5,
       url: $api + '/upload',
       disablePreviews: true,
       uploadprogress: checkUpdate,
