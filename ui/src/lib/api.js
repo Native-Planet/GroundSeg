@@ -31,9 +31,23 @@ export const updateState = update => {
 }
 
 const updateAnchor = a => {if (a) {startram.set(a)}}
-const updateConnStatus = c => noconn.set(c == 'noconn')
 const updateUrbits = p => {if (p) {urbits.set(p)}}
 const updateSystemInformation = s => {if (s) {system.set(s)}}
+
+let noconncount = 0
+const updateConnStatus = c => {
+  if (c == 'noconn') {
+    if (noconncount < 3) {
+      ++noconncount
+      console.log("No connection to GroundSeg API (" + noconncount + ")")
+    } else {
+      noconn.set(true)
+    }
+  } else {
+    noconn.set(false)
+    noconncount = 0
+  }
+}
 
 //
 // misc
