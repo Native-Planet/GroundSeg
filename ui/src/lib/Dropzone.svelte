@@ -7,8 +7,9 @@
   import Dropzone from "dropzone"
   import LinkButton from '$lib/LinkButton.svelte'
 
-  // Remote
+  // Checkboxes
   let remoteCheck = true
+  let fixCheck = true
 
   // Failure text
   let failed = ""
@@ -171,26 +172,46 @@
   })})
 
   const nameFile = () => {
+    let remote = "local"
+    if (remoteCheck) {
+      remote = "remote"
+    }
+    let fixer = "no"
+    if (fixCheck) {
+      fixer = "yes"
+    }
     if ($startram.wgReg && $startram.wgRunning) {
-      return "file-" + remoteCheck
+      return "file-" + remote + "-" + fixer
     } else {
-      return "file-false"
+      return "file-local-" + fixer
     }
   }
 
 </script>
 
-<!-- Remote Autoset -->
-{#if $startram.wgReg && $startram.wgRunning}
-  <div class="remote-check" class:freeze={working}>
-    <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
-      {#if remoteCheck}
+<div class="checker-wrapper">
+  <!-- Remote Autoset -->
+  {#if $startram.wgReg && $startram.wgRunning}
+    <div class="checker remote" class:freeze={working}>
+      <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
+        {#if remoteCheck}
+          <Fa icon={faCheck} size="1x"/>
+        {/if}
+      </div>
+      <span on:click={()=> remoteCheck = !remoteCheck}>Automatically enable remote access</span>
+    </div>
+  {/if}
+
+  <!-- Fixer -->
+  <div class="checker fixer" class:freeze={working}>
+    <div class="box" class:highlight={fixCheck} on:click={()=> fixCheck = !fixCheck}>
+      {#if fixCheck}
         <Fa icon={faCheck} size="1x"/>
       {/if}
     </div>
-    <span on:click={()=> remoteCheck = !remoteCheck}>Automatically enable remote access</span>
+    <span on:click={()=> fixCheck = !fixCheck}>Fix common issues</span>
   </div>
-{/if}
+</div>
 
 <div class="wrapper">
 
@@ -351,14 +372,22 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
-  .remote-check {
-    flex: 1;
+  .checker-wrapper {
+    display: flex;
+  }
+  .checker {
     display: flex;
     gap: 6px;
     align-items: center;
     text-align: center;
     font-size: 11px;
     margin: 0 0 16px 4px;
+  }
+  .remote {
+    flex: 3;
+  }
+  .fixer {
+    flex: 2;
   }
   .box {
     width: 14px;

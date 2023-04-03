@@ -264,12 +264,29 @@ class Urbit:
                     count += 1
                 running = self.urb_docker.is_running(patp)
                 booted = len(self.get_code(patp)) == 27
-                
             self.toggle_network(patp)
         except Exception as e:
             Log.log(f"{patp}: Failed to start new pier remote toggle thread: {e}")
 
-    def boot_existing(self, filename, remote):
+    def fix_pokes(self, patp):
+        Log.log(f"{patp}: Pier upload fix pokes thread started")
+        try:
+            running = self.urb_docker.is_running(patp)
+            booted = len(self.get_code(patp)) == 27
+            count = 0
+            while not (running and booted):
+                Log.log(f"{patp}: Ship not ready for pokes yet")
+                time.sleep(count * 2)
+                if count < 5:
+                    count += 1
+                running = self.urb_docker.is_running(patp)
+                booted = len(self.get_code(patp)) == 27
+            self.fix_acme(patp)
+        except Exception as e:
+            Log.log(f"{patp}: Failed to start fix pokes thread: {e}")
+
+    def boot_existing(self, filename, remote, fix):
+        Log.log(f"Upload: Configuration - remote: {remote} - fix: {fix}")
         patp = filename.split('.')[0]
 
         if Utils.check_patp(patp):
@@ -285,6 +302,8 @@ class Urbit:
                 return created
             if remote:
                 Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
+            if fix:
+                Thread(target=self.fix_pokes, args=(patp,), daemon=True).start()
             self.config_object.upload_status[patp] = {'status':'done'}
             return 200
 
@@ -967,6 +986,39 @@ class Urbit:
             Log.log(f"{patp}: Failed to send {command}: {e}")
 
         return False
+
+    def fix_acme(self, patp):
+        lens_addr = self.get_loopback_addr(patp)
+        try:
+            p_data = {"source": {"dojo": "+hood/pass [%e %rule %cert ~]"}, "sink": {"app": "hood"}}
+            with open(f'{self._volume_directory}/{patp}/_data/acmepass.json','w') as f :
+                json.dump(p_data, f)
+
+            pass_command = f'curl -s -X POST -H "Content-Type: application/json" -d @acmepass.json {lens_addr}'
+            res = self.urb_docker.exec(patp, pass_command)
+
+            os.remove(f'{self._volume_directory}/{patp}/_data/acmepass.json')
+
+            if res.output.decode('utf-8').strip() == '">="':
+                Log.log(f"{patp}: acme pass command sent successfully")
+                i_data = {"source": {"dojo": "%init"}, "sink": {"app": "acme"}}
+                with open(f'{self._volume_directory}/{patp}/_data/acmeinit.json','w') as f :
+                    json.dump(i_data, f)
+
+                init_command = f'curl -s -X POST -H "Content-Type: application/json" -d @acmeinit.json {lens_addr}'
+                res = self.urb_docker.exec(patp, init_command)
+
+                os.remove(f'{self._volume_directory}/{patp}/_data/acmeinit.json')
+
+                if res.output.decode('utf-8').strip() == '">="':
+                    Log.log(f"{patp}: acme init command sent successfully")
+                else:
+                    Log.log(f"{patp}: Failed to send acme init command")
+            else:
+                Log.log(f"{patp}: Failed to send acme pass command")
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to clear acme: {e}")
 
     def update_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port, alias):
         Log.log(f"{patp}: Attempting to update wireguard network")

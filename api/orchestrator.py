@@ -450,14 +450,22 @@ class Orchestrator:
         # Uploaded pier
         remote = False
         try:
-            file = req.files['file-true']
-            remote = True
-        except:
-            try:
-                file = req.files['file-false']
-            except Exception as e:
-                Log.log(f"Upload: File request fail: {e}")
-                return "Invalid file type"
+            for f in req.files:
+                con = f
+                break
+
+            remote = False
+            fix = False
+
+            if 'remote' in con:
+                remote = True
+            if 'yes' in con:
+                fix = True
+            file = req.files[con]
+
+        except Exception as e:
+            Log.log(f"Upload: File request fail: {e}")
+            return "Invalid file type"
 
         filename = secure_filename(file.filename)
         patp = filename.split('.')[0]
@@ -516,7 +524,7 @@ class Orchestrator:
                 return "File size mismatched"
             else:
                 Log.log(f"{patp}: Upload complete")
-                res = self.urbit.boot_existing(filename, remote)
+                res = self.urbit.boot_existing(filename, remote, fix)
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'
                     self.config_object.save_config()
