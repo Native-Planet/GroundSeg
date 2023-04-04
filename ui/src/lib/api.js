@@ -11,6 +11,7 @@ export const fadeOut = {duration:200}
 // writable stores
 //
 export const noconn = writable(false)
+export const linuxUpdate = writable(false)
 export const startram = writable({anchor: {wgReg:false, wgRunning: false}})
 export const codes = writable({})
 export const urbits = writable([])
@@ -25,12 +26,14 @@ export const power = writable('')
 //
 export const updateState = update => {
   updateAnchor(update['anchor'])
+  updateLinux(update['system_update'])
   updateConnStatus(update['status'])
 	updateUrbits(update['urbits'])
   updateSystemInformation(update['system'])
 }
 
 const updateAnchor = a => {if (a) {startram.set(a)}}
+const updateLinux = u => {if (u) {linuxUpdate.set(u)}}
 const updateUrbits = p => {if (p) {urbits.set(p)}}
 const updateSystemInformation = s => {if (s) {system.set(s)}}
 

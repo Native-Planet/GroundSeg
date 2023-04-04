@@ -234,6 +234,12 @@ class Orchestrator:
     #   System Settings
     #
 
+    # Update linux and restart the device
+    def update_restart_linux(self):
+        Log.log("Updater: Update and restart requested")
+        subprocess.run(['apt','upgrade','-y'])
+        subprocess.run('reboot')
+        return 200
 
     # Get all system information
     def get_system_settings(self):
