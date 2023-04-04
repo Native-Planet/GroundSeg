@@ -205,12 +205,6 @@ fi"""
         return """\
 #!/bin/bash
 
-# Install tmux for alpine
-if ! command -v tmux &> /dev/null
-then
-    apk update && apk install tmux
-fi
-
 set -eu
 # set defaults
 amesPort="34343"
