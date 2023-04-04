@@ -206,7 +206,10 @@ fi"""
 #!/bin/bash
 
 # Install tmux for alpine
-apk update && apk install tmux
+if ! command -v tmux &> /dev/null
+then
+    apk update && apk install tmux
+fi
 
 set -eu
 # set defaults
