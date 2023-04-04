@@ -69,6 +69,9 @@ class Config:
     # Upload status
     upload_status = {}
 
+    # Linux updates
+    linux_updates = False
+
     # default content of system.json
     default_system_config = {
             "firstBoot": True,

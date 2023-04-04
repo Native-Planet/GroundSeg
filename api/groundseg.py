@@ -17,6 +17,7 @@ from c2c_flask import C2C
 # Threads
 from threading import Thread
 from binary_updater import BinUpdater
+from linux_updater import LinuxUpdater
 from docker_updater import DockerUpdater
 from system_monitor import SysMonitor
 from melder import Melder
@@ -54,6 +55,11 @@ else:
     # Start Key Generator
     gen = KeyGen(sys_config)
     Thread(target=gen.generator_loop, daemon=True).start()
+
+    # Linux updater
+    if sys_config.device_mode == "npbox":
+        lin_updater = LinuxUpdater(sys_config)
+        Thread(target=lin_updater.updater_loop, daemon=True).start()
 
     # Start GroundSeg orchestrator
     orchestrator = Orchestrator(sys_config)

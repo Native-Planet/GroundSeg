@@ -183,6 +183,24 @@ class Utils:
                 Log.log(f"Swap: Failed to get maximum swap: {e}")
         return free
 
+    def linux_update_script():
+        return """\
+#!/bin/bash
+
+# Update package index
+sudo apt-get update
+
+# Upgrade packages
+sudo apt-get -y upgrade
+
+# Check if a reboot is required
+if [ -f /var/run/reboot-required ]; then
+  echo "System restart required. Restarting now..."
+  sudo reboot
+else
+  echo "No restart required."
+fi"""
+
     def start_script():
         return """\
 #!/bin/bash
