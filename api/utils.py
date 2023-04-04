@@ -312,7 +312,7 @@ if [ $devMode == "True" ]; then
     done
     tmux kill-session -t urbit
     exit 0
-fi
 else
-exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+    exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+fi
 """
