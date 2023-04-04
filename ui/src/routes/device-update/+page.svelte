@@ -6,7 +6,7 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-	import { updateState, api, system, noconn, updateLinux } from '$lib/api'
+	import { updateState, api, system, noconn, linuxUpdate } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -45,7 +45,7 @@
       </div>
       <PrimaryButton 
         on:click={updateDevice}
-        standard={$updateLinux ? "Update and Restart Device" : "No Updates, Run Anyways"}
+        standard={$linuxUpdate ? "Update and Restart Device" : "No Updates, Run Anyways"}
         status={buttonStatus}
         loading="Updating..."
         failure="Something went wrong"
