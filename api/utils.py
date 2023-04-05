@@ -302,7 +302,7 @@ fi
 
 if [ $devMode == "True" ]; then
     # Run urbit inside a tmux pane (no logs)
-    tmux new -d -s urbit "script -q -c 'exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
+    tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
     tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
     while kill -0 "$tmux_pid" 2> /dev/null; do
     sleep 3
