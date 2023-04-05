@@ -239,9 +239,9 @@ class Orchestrator:
     def update_restart_linux(self):
         Log.log("Updater: Update and restart requested")
         try:
-            output = subprocess.check_output(['apt','upgrade','-y'])
+            output = subprocess.check_output(['apt','upgrade','-y'], shell=True)
             if output:
-                subprocess.run('reboot')
+                subprocess.run(['reboot'], shell=True)
                 return 200
         except Exception as e:
             Log.log(f"Updater: Failed to send updgrade command: {e}")

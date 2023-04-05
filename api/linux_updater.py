@@ -21,10 +21,10 @@ class LinuxUpdater:
                 upgrade, new, remove, ignore = [0,0,0,0]
 
                 # Update package list
-                subprocess.run(['apt','update'])
+                subprocess.run(['apt','update'], shell=True)
 
                 # Simulate upgrade
-                output = subprocess.check_output(['apt','upgrade','-s']).decode('utf-8').strip().split('\n')[-1]
+                output = subprocess.check_output(['apt','upgrade','-s'], shell=True).decode('utf-8').strip().split('\n')[-1]
 
                 # Regex
                 pattern = r"(\d+) upgraded, (\d+) newly installed, (\d+) to remove and (\d+) not upgraded."
