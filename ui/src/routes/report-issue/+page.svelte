@@ -66,7 +66,7 @@
       noMargin={true}
       status={(person.length > 0) && (description.length > 0) ? buttonStatus : "disabled"}
       standard="Submit Report"
-      loading="Submitting your but report..."
+      loading="Submitting your bug report..."
       success="Bug report sent!"
       failure="Something went wrong"
     />
