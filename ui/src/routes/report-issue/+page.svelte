@@ -114,7 +114,9 @@
         {#each $urbits as u, i}
           <BugPier bind:this={bugChecker[i]} name={u.name} on:update={addPier} submitting={!(buttonStatus == 'standard')}/>
         {/each}
-        <BugPier bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={!(buttonStatus == 'standard')}/>
+        {#if $urbits.length > 1}
+          <BugPier bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={!(buttonStatus == 'standard')}/>
+        {/if}
       </div>
     {/if}
 
