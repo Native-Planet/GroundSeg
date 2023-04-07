@@ -39,6 +39,18 @@ class BugReport:
                     f"{base_path}/bug-reports/{report}/{report}.zip", 'w', zipfile.ZIP_DEFLATED
                     )
 
+            # Pier logs
+            try:
+                for p in data['logs']:
+                    try:
+                        bug_file.writestr(f'{p}.log', subprocess.check_output(['docker', 'logs', p]).decode('utf-8'))
+                    except Exception as e:
+                        Log.log(f"Bug: Failed to get {p} logs: {e}")
+                        bug_file.writestr(f'failed_{p}.log',e)
+            except Exception as e:
+                Log.log(f"Bug: Failed to get pier logs: {e}")
+                bug_file.writestr(f'failed_pier_logs',e)
+
             # Load configs
             try:
                 cfgs = {}
@@ -94,14 +106,15 @@ class BugReport:
             # docker ps -a
             bug_file.writestr('docker.txt', subprocess.check_output(['docker', 'ps', '-a']).decode('utf-8'))
 
-            # current log
-            bug_file.write(f"{base_path}/logs/{current_logfile}", arcname=current_logfile)
-
             # previous log
             try:
                 bug_file.write(f"{base_path}/logs/{prev_logfile}", arcname=prev_logfile)
             except:
                 pass
+
+
+            # current log
+            bug_file.write(f"{base_path}/logs/{current_logfile}", arcname=current_logfile)
 
             # save zipfile
             bug_file.close()

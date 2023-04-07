@@ -1,20 +1,35 @@
 <script>
   import { onMount } from 'svelte'
+	import { updateState, api, urbits } from '$lib/api'
+
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
-	import { updateState, api } from '$lib/api'
+  import BugPier from '$lib/BugPier.svelte'
 
 	export let data
 	updateState(data)
 
-  let description = '', buttonStatus = 'standard', person = ''
+  let description = ''
+  let buttonStatus = 'standard'
+  let person = ''
+  let pierLogs = []
+  let bugChecker = []
+  let selectAll
 
   onMount(()=> {
     if (data['status'] == 404) {
       window.location.href = "/login"
+    } else {
+      getUrbits()
     }
   })
+
+  const forceSet = b => {
+    for (let i = 0; i < bugChecker.length; i++) {
+      bugChecker[i].forceSet(b)
+    }
+  }
 
   const submitReport = () => {
     buttonStatus = 'loading'
@@ -22,7 +37,7 @@
       method: 'POST',
       credentials: "include",
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'person':person,'message':description.trim()})
+      body: JSON.stringify({'person':person,'message':description.trim(),'logs':pierLogs})
 	})
 		.then(raw => raw.json())	
     .then(res => { 
@@ -30,6 +45,8 @@
         buttonStatus = 'success'
         setTimeout(()=> person = '', 3000)
         setTimeout(()=> description = '', 3000)
+        setTimeout(()=> forceSet(false), 3000)
+        setTimeout(()=> selectAll.forceSet(false), 3000)
       } else {
         buttonStatus = 'failure'
       }
@@ -42,6 +59,42 @@
     })
 	}
 
+  let succeeded = false
+  const getUrbits = () => {
+    if (!succeeded) {
+      fetch($api + '/urbits', {credentials:"include"})
+      .then(raw => raw.json())
+      .then(res => {
+        updateState(res)
+        succeeded = true
+      })
+      .catch(err => {
+        console.log(err)
+        if ((typeof err) == 'object') {
+          updateState({status:'noconn'})
+        }
+      })
+      setTimeout(getUrbits, 3000)
+    }
+  }
+
+  const addPier = e => {
+    const { name, check } = e.detail
+    if (check) {
+      if (!pierLogs.includes(name)) {
+              pierLogs.push(name);
+      }
+    } else {
+      const index = pierLogs.indexOf(name);
+      if (index > -1) {
+        pierLogs.splice(index, 1);
+      }
+    }
+  }
+
+  const handleCheckAll = e => {
+    forceSet(e.detail.check)
+  }
 
 </script>
 
@@ -53,8 +106,18 @@
       <li>GroundSeg logs</li>
       <li>StarTram information (if available)</li>
       <li>List of docker containers on your device</li>
-      <li>GroundSeg and docker container configurations (sensitive information not sent)</li>
+      <li>GroundSeg and docker container configs (removed private information)</li>
     </ul>
+    {#if $urbits.length > 0}
+      <div class="title">Send Pier Logs (Optional):</div>
+      <div class="check-wrapper">
+        {#each $urbits as u, i}
+          <BugPier bind:this={bugChecker[i]} name={u.name} on:update={addPier} submitting={!(buttonStatus == 'standard')}/>
+        {/each}
+        <BugPier bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={!(buttonStatus == 'standard')}/>
+      </div>
+    {/if}
+
   </div>
   <div class="input-title">How should we contact you?</div>
   <input type="text" bind:value={person} placeholder="~sampel-palnet or example@email.com" />
@@ -126,5 +189,8 @@
   .submit {
     margin-top: 24px;
     text-align: center;
+  }
+  .check-wrapper {
+    margin-top: 12px;
   }
 </style>
