@@ -84,7 +84,8 @@ class GroundSeg:
 
             if approved:
                 if request.method == 'GET':
-                    return jsonify({"system_update":self.config_object.linux_updates})
+                    #return jsonify({"system_update":self.config_object.linux_updates})
+                    return jsonify({"system_update":False})
                 if request.method == 'POST':
                     res = self.orchestrator.update_restart_linux()
                     return jsonify(res)

@@ -57,9 +57,9 @@ else:
     Thread(target=gen.generator_loop, daemon=True).start()
 
     # Linux updater
-    if sys_config.device_mode == "npbox":
-        lin_updater = LinuxUpdater(sys_config)
-        Thread(target=lin_updater.updater_loop, daemon=True).start()
+    #if sys_config.device_mode == "npbox":
+    #    lin_updater = LinuxUpdater(sys_config)
+    #    Thread(target=lin_updater.updater_loop, daemon=True).start()
 
     # Start GroundSeg orchestrator
     orchestrator = Orchestrator(sys_config)
