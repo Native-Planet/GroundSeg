@@ -22,10 +22,16 @@ class LinuxUpdater:
                     upgrade, new, remove, ignore = [0,0,0,0]
 
                     # Update package list
-                    subprocess.run(['apt','update'], shell=True)
+                    try:
+                        subprocess.run(['apt','update'], shell=True)
+                    except Exception as e:
+                        Log.log(f"Updater: Failed to run apt update: {e}")
 
                     # Simulate upgrade
-                    output = subprocess.check_output(['apt','upgrade','-s'], shell=True).decode('utf-8').strip().split('\n')[-1]
+                    try:
+                        output = subprocess.check_output(['apt','upgrade','-s'], shell=True).decode('utf-8').strip().split('\n')[-1]
+                    except Exception as e:
+                        Log.log(f"Updater: Failed to run apt upgrade -s: {e}")
 
                     # Regex
                     pattern = r"(\d+) upgraded, (\d+) newly installed, (\d+) to remove and (\d+) not upgraded."
