@@ -4,12 +4,15 @@
   import { api } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faCaretLeft, faCaretRight } from '@fortawesome/free-solid-svg-icons'
+  import { faCircleQuestion} from '@fortawesome/free-regular-svg-icons'
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import TimeSelector from '$lib/TimeSelector.svelte'
 
   export let timeNow, frequency, running, name, meldHour, meldMinute, meldOn, meldLast, meldNext
     
+  let showInfo = false
+
   let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
@@ -74,14 +77,17 @@
 </script>
 
 <div class="bg">
-  <div style="display: flex; justify-content: center;">
-    <div class="option-title">
-      Schedule Pack & Meld
-      <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
-        <div class="switch {meldOn ? "on" : "off"}"></div>
-      </div>
+  <div class="title-wrapper">
+    <div class="title-text">Schedule Pack & Meld</div>
+    <div class="question-mark" on:click={()=>showInfo = !showInfo}><Fa icon={faCircleQuestion} size="1x" /></div>
+    <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
+      <div class="switch {meldOn ? "on" : "off"}"></div>
     </div>
   </div>
+
+  {#if showInfo}
+    <div class="title-info">Defragment and deduplicate your memory. Helps improve performance!</div>
+  {/if}
 
   <div class="panel">
 
@@ -181,11 +187,24 @@
     padding: 20px 0 20px 0;
     border-radius: 12px;
   }
-  .option-title {
-    text-align: right;
+  .title-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .question-mark {
+    margin: 0 16px 0 8px;
+    padding-top: 1px;
+    cursor: pointer;
+  }
+  .title-text {
     float: left;
     font-size: 14px;
     color: inherit;
+  }
+  .title-info {
+    font-size: 11px;
+    margin: 8px 20px;
   }
   .switch-wrapper {
     margin-left: 6px;
