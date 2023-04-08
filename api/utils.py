@@ -183,6 +183,7 @@ class Utils:
                 Log.log(f"Swap: Failed to get maximum swap: {e}")
         return free
 
+    '''
     def linux_update_script():
         return """\
 #!/bin/bash
@@ -200,6 +201,7 @@ if [ -f /var/run/reboot-required ]; then
 else
   echo "No restart required."
 fi"""
+    '''
 
     def start_script():
         return """\
