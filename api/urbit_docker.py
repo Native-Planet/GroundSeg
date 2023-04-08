@@ -204,10 +204,10 @@ class UrbitDocker:
                 return False
 
 
-    def _build_container(self, patp, image, mount, config):
+    def _build_container(self, patp, image, mount, config, devmode=None):
         try:
             Log.log(f"{patp}: Building container")
-            command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]} --dirname={patp}'
+            command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]} --dirname={patp} --devmode={devmode}'
 
             if config["network"] != "none":
                 Log.log(f"{patp}: Network is set to wireguard")

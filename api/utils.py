@@ -210,6 +210,7 @@ set -eu
 amesPort="34343"
 httpPort="80"
 loom="31"
+devMode="False"
 
 # Find the first directory and start urbit with the ship therein
 dirnames="*/"
@@ -267,6 +268,10 @@ case $i in
       dirname="${i#*=}"
       shift
       ;;
+   --devmode=*)
+      devMode="${i#*=}"
+      shift
+      ;;
 esac
 done
 
@@ -295,5 +300,16 @@ if [ -e *.key ]; then
     rm *.key || true
 fi
 
-exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+if [ $devMode == "True" ]; then
+    # Run urbit inside a tmux pane (no logs)
+    tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
+    tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
+    while kill -0 "$tmux_pid" 2> /dev/null; do
+    sleep 3
+    done
+    tmux kill-session -t urbit
+    exit 0
+else
+    exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+fi
 """
