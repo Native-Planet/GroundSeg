@@ -621,16 +621,25 @@ class Urbit:
     def toggle_devmode(self, on, patp):
         Log.log(f"{patp}: Attempting to toggle developer mode")
         Log.log(f"{patp}: Dev mode: {self._urbits[patp]['dev_mode']} -> {on}")
-        self._urbits[patp]['dev_mode'] = on
-        if self.urb_docker.remove_container(patp):
-            created = self.urb_docker.start(self._urbits[patp],
-                                            self.config_object._arch,
-                                            self._volume_directory
-                                            )
-            if created == "succeeded":
-                self.save_config(patp)
-                if self.start(patp):
-                    return 200
+        try:
+            self._urbits[patp]['dev_mode'] = on
+            if self.urb_docker.remove_container(patp):
+                created = self.urb_docker.start(self._urbits[patp],
+                                                self.config_object._arch,
+                                                self._volume_directory
+                                                )
+                if created == "succeeded":
+                    self.save_config(patp)
+                    x = self.start(patp)
+                    if x:
+                        return 200
+                    else:
+                        raise Exception("start returned {x}")
+                raise Exception(f"created: {created}")
+        except Exception as e:
+            Log.log(f"{patp}: Failed to toggle dev mode: {e}")
+
+        return 400
 
     def toggle_network(self, patp):
         Log.log(f"{patp}: Attempting to toggle network")
