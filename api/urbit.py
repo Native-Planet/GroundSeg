@@ -52,7 +52,8 @@ default_pier_config = {
         "boot_status": "boot",
         "custom_urbit_web": '',
         "custom_s3_web": '',
-        "show_urbit_web": 'default'
+        "show_urbit_web": 'default',
+        "dev_mode": False
         }
 
 
@@ -94,7 +95,10 @@ class Urbit:
             return "failed"
 
     def stop(self, patp):
-        return self.urb_docker.stop(patp)
+        self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
+        if self.urb_docker.exec(patp, f"kill $(cat {patp}/.vere.lock"):
+            self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
+            return self.urb_docker.stop(patp)
                 
 
     # Delete Urbit Pier and MiniO
@@ -156,6 +160,7 @@ class Urbit:
 
             Log.log(f"{patp}: Pier successfully exported")
             return send_file(memory_file, download_name=file_name, as_attachment=True)
+
 
     # Start all valid containers
     def start_all(self, patps):
@@ -474,7 +479,6 @@ class Urbit:
                 has_bucket = True
 
             cfg = self._urbits[patp]
-
             urbit = {
                 "name": patp,
                 "running": c.status == "running",
@@ -497,7 +501,8 @@ class Urbit:
                 "loomSize": cfg['loom_size'],
                 "showUrbWeb": 'default',
                 "urbWebAlias": cfg['custom_urbit_web'],
-                "s3WebAlias": cfg['custom_s3_web']
+                "s3WebAlias": cfg['custom_s3_web'],
+                "devMode": cfg['dev_mode']
                 }
 
             if cfg['network'] == 'wireguard':
@@ -612,6 +617,20 @@ class Urbit:
                 Log.log(f"{patp}: Unable to toggle autostart: {e}")
 
         return 400
+
+    def toggle_devmode(self, on, patp):
+        Log.log(f"{patp}: Attempting to toggle developer mode")
+        Log.log(f"{patp}: Dev mode: {self._urbits[patp]['dev_mode']} -> {on}")
+        self._urbits[patp]['dev_mode'] = on
+        if self.urb_docker.remove_container(patp):
+            created = self.urb_docker.start(self._urbits[patp],
+                                            self.config_object._arch,
+                                            self._volume_directory
+                                            )
+            if created == "succeeded":
+                self.save_config(patp)
+                if self.start(patp):
+                    return 200
 
     def toggle_network(self, patp):
         Log.log(f"{patp}: Attempting to toggle network")

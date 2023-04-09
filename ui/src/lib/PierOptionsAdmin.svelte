@@ -14,6 +14,7 @@
   let deleteButtonText = 'Delete Urbit Pier'
   let isLoading = false
   let showInfo = false
+  let devButtonStatus = 'standard'
 
   const dispatch = createEventDispatcher()
 
@@ -38,6 +39,31 @@
         setTimeout(()=> exportButtonText = 'Export Urbit Pier', 5000)
   })}
 
+  const setDevMode = on => {
+    devButtonStatus = 'loading'
+    console.log(on)
+		fetch($api + '/urbit?urbit_id=' + name, {
+  		method: 'POST',
+      credentials: "include",
+	  	headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({'app':'pier','data':'devmode','on':on})
+    }).then(res => res.json())
+      .then(d => {
+        console.log(d)
+        if (d == 200) {
+          devButtonStatus = 'success'
+          setTimeout(()=> devButtonStatus = 'standard')
+          // reload
+        } else {
+          devButtonStatus = 'failure'
+          setTimeout(()=> devButtonStatus = 'standard', 3000)
+        }}).catch(err => {
+          devButtonStatus = 'failure'
+          setTimeout(()=> devButtonStatus = 'standard', 3000)
+          console.log(err)
+        })
+  }
+
   const toggleInfo = () => showInfo = !showInfo
 
   const toggleAutostart = () => {
@@ -57,6 +83,18 @@
 
 <div class="bg">
   <div class="option-title">Admin Actions</div>
+
+  <PrimaryButton 
+    status={devButtonStatus}
+    standard="Developer Mode" 
+    loading="starting developer mode.."
+    failure="something went wrong"
+    success="developer mode enabled!"
+    on:click={()=> setDevMode(true)} />
+
+  <PrimaryButton 
+    standard="Disable Developer Mode" 
+    on:click={()=> setDevMode(false)} />
 
   <div class="autostart-wrapper">
     <div class="autostart" on:click={toggleAutostart}>

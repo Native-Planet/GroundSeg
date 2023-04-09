@@ -303,15 +303,18 @@ if [ -e *.key ]; then
 fi
 
 if [ $devMode == "True" ]; then
+    echo "Developer mode: $devMode"
+    echo "No logs will display"
+    # [ -e "${dirname}/.vere.lock" ] && rm "${dirname}/.vere.lock" && echo "Deleted ${dirname}/.vere.lock"
     # Run urbit inside a tmux pane (no logs)
     tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
     tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
     while kill -0 "$tmux_pid" 2> /dev/null; do
-    sleep 3
+        sleep 3
     done
     tmux kill-session -t urbit
     exit 0
 else
-    exec urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+    urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
 fi
 """

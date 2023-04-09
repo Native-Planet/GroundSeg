@@ -171,6 +171,9 @@ class Orchestrator:
                 if data['data'] == 'export':
                     return self.urbit.export(urbit_id)
 
+                if data['data'] == 'devmode':
+                    return self.urbit.toggle_devmode(data['on'], urbit_id)
+
                 if data['data'] == 's3-update':
                     return self.urbit.set_minio(urbit_id)
 
