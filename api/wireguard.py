@@ -223,13 +223,13 @@ class Wireguard:
     def register_device(self, url, reg_key):
         Log.log("Anchor: Attempting to register device")
         try:
-            update_data = {"reg_code" : f"{reg_key}","pubkey":self.config['pubkey']}
+            update_data = {"reg_code" : reg_key,"pubkey":self.config['pubkey'],"region":"asia"}
             response = None
 
             res = requests.post(f'{url}/register',json=update_data,headers=self._headers).json()
             Log.log(f"Anchor: /register response: {res}")
             if res['error'] != 0:
-                raise Exception("error not 0")
+                raise Exception(f"error not 0: {res}")
 
             return True
 
@@ -248,7 +248,7 @@ class Wireguard:
                 if data['conf'] != None:
                     self.anchor_data = data
                     return True
-                raise Exception("conf is null")
+                raise Exception(f"conf is null: {data}")
 
             except Exception as e:
                 Log.log(f"Anchor: /retrieve failed: {e}")
