@@ -9,7 +9,6 @@ class Click:
         for ln in out:
             if (not avow) and ('%avow' not in ln):
                 trace = f"{trace}{ln}\n"
-                Log.log(trace)
             else:
                 avow = True
                 result = f"{result}{ln}\n"
