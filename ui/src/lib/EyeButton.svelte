@@ -19,7 +19,6 @@ button {
   height: 32px;
 }
 .eye {
-  height: 32px;
   opacity: .8;
   cursor: pointer;
 }
