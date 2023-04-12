@@ -93,7 +93,6 @@ class Urbit:
                 return self.urb_docker.start(self._urbits[patp],
                                              self.config_object._arch,
                                              self._volume_directory,
-                                             self.config_object.base_path,
                                              key
                                              )
         else:
@@ -579,10 +578,9 @@ class Urbit:
 
     # Get +code from Urbit
     def get_code(self, patp):
-        pier = os.path.join('/urbit', patp)
-        click = os.path.join('/click', 'click')
-        hoon = os.path.join(pier, '/click', 'code.hoon')
-        raw = Click.click_exec(patp, self.urb_docker.exec, pier, click, hoon)
+        hoon = os.path.join('/hoon/code.hoon')
+        raw = Click.click_exec(patp, self.urb_docker.exec, hoon)
+        Log.log(raw)
         code = Click.filter_code(patp,raw)
         self._urbits[patp]['click'] = True
 
@@ -643,8 +641,7 @@ class Urbit:
             if self.urb_docker.remove_container(patp):
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory,
-                                                self.config_object.base_path
+                                                self._volume_directory
                                                 )
                 if created == "succeeded":
                     self.save_config(patp)
@@ -686,8 +683,7 @@ class Urbit:
 
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory,
-                                                self.config_object.base_path
+                                                self._volume_directory
                                                 )
                 if (created == "succeeded") and running:
                     self.start(patp)
@@ -716,8 +712,7 @@ class Urbit:
 
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory,
-                                                self.config_object.base_path
+                                                self._volume_directory
                                                 )
                 if (created == "succeeded") and running:
                     self.start(patp)
@@ -1118,8 +1113,7 @@ class Urbit:
                         if self.urb_docker.remove_container(patp):
                             created = self.urb_docker.start(self._urbits[patp],
                                                             self.config_object._arch,
-                                                            self._volume_directory,
-                                                            self.config_object.base_path
+                                                            self._volume_directory
                                                             )
                             if (created == "succeeded") and running:
                                 self.start(patp)

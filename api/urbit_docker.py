@@ -9,7 +9,7 @@ client = docker.from_env()
 
 class UrbitDocker:
 
-    def start(self, config, arch, vol_dir, base_path, key=''):
+    def start(self, config, arch, vol_dir, key=''):
         patp = config['pier_name']
         tag = config['urbit_version']
         sha = f"urbit_{arch}_sha256"
@@ -28,7 +28,7 @@ class UrbitDocker:
         # Get container
         c = self.get_container(patp)
         if not c:
-            if self.create(config, image, vol_dir, base_path, key):
+            if self.create(config, image, vol_dir, key):
                 c = self.get_container(patp)
                 if not c:
                     return "failed"
@@ -37,7 +37,7 @@ class UrbitDocker:
             if c.attrs['Config']['Image'] != image:
                 Log.log(f"{patp}: Container and config versions are mismatched")
                 if self.remove_container(patp):
-                    if self.create(config, image, vol_dir, base_path, key):
+                    if self.create(config, image, vol_dir, key):
                         c = self.get_container(patp)
                         if not c:
                             return "failed"
@@ -51,7 +51,7 @@ class UrbitDocker:
             res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
             if self.mode_mismatch(patp, config):
                 if self.remove_container(patp):
-                    return self.start(config, arch, vol_dir, base_path, key)
+                    return self.start(config, arch, vol_dir, key)
 
             Log.log(f"{patp}: Container already started")
             return "succeeded"
@@ -69,7 +69,7 @@ class UrbitDocker:
             c.start()
             if self.mode_mismatch(patp, config):
                 if self.remove_container(patp):
-                    return self.start(config, arch, vol_dir, base_path, key)
+                    return self.start(config, arch, vol_dir, key)
             Log.log(f"{patp}: Successfully started container")
             return "succeeded"
         except Exception as e:
@@ -115,7 +115,7 @@ class UrbitDocker:
             return False
 
 
-    def create(self, config, image, vol_dir, base_path, key=''):
+    def create(self, config, image, vol_dir, key=''):
         patp = config['pier_name']
         Log.log(f"{patp}: Attempting to create container")
 
@@ -124,7 +124,7 @@ class UrbitDocker:
             if v:
                 Log.log(f"{patp}: Creating Mount object")
                 mount = docker.types.Mount(target = '/urbit/', source=patp)
-                if self.build_container(patp, image, mount, config, base_path):
+                if self.build_container(patp, image, mount, config):
                     return self.add_key(key, patp, vol_dir)
 
     def delete(self, patp):
@@ -225,11 +225,10 @@ class UrbitDocker:
                 return False
 
 
-    def build_container(self, patp, image, mount, config, base_path):
+    def build_container(self, patp, image, mount, config):
         try:
             Log.log(f"{patp}: Building container")
             command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]} --dirname={patp} --devmode={config["dev_mode"]}'
-            volumes = [f'{base_path}/click:/click']
 
             if config["network"] != "none":
                 Log.log(f"{patp}: Network is set to wireguard")
@@ -240,7 +239,6 @@ class UrbitDocker:
                 c = client.containers.create(
                         image = image,
                         command = command, 
-                        volumes = volumes,
                         name = patp,
                         network = f'container:{config["network"]}',
                         mounts = [mount],
@@ -249,7 +247,6 @@ class UrbitDocker:
                 c = client.containers.create(
                         image = image,
                         command = command, 
-                        volumes = volumes,
                         name = patp,
                         ports = {
                             '80/tcp':config['http_port'],
