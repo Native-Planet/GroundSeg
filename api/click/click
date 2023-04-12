@@ -70,8 +70,8 @@ full() {
 
     $CLICK_CMD "$HOON" $DEPS |
       $EVAL_CMD eval --jam $JAM_OPTS 
-    #  nc -U -W 1 "$PIER/.urb/conn.sock" |
-    #  $EVAL_CMD eval --cue $CUE_OPTS
+      nc -U -W 1 "$PIER/.urb/conn.sock" |
+      $EVAL_CMD eval --cue $CUE_OPTS
 }
 
 jam() {
