@@ -48,6 +48,11 @@ class UrbitDocker:
 
         # Get status
         if c.status == "running":
+            res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+            if self.mode_mismatch(patp, config):
+                if self.remove_container(patp):
+                    return self.start(config, arch, vol_dir, base_path, key)
+
             Log.log(f"{patp}: Container already started")
             return "succeeded"
 
@@ -62,11 +67,22 @@ class UrbitDocker:
                 f.write(script)
                 f.close()
             c.start()
+            if self.mode_mismatch(patp, config):
+                if self.remove_container(patp):
+                    return self.start(config, arch, vol_dir, base_path, key)
             Log.log(f"{patp}: Successfully started container")
             return "succeeded"
         except Exception as e:
             Log.log(f"{patp}: Failed to start container: {e}")
             return "failed"
+
+    def mode_mismatch(self, patp, config):
+        Log.log(f"{patp}: Checking Dev Mode")
+        res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+        Log.log(f"{patp}: Developer Mode in settings: {config['dev_mode']}")
+        Log.log(f"{patp}: Developer Mode in container: {'active' in res}")
+        return config['dev_mode'] != ('active' in res)
+
 
     def is_running(self, patp):
         try:

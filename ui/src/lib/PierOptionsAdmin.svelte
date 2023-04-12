@@ -1,6 +1,7 @@
 <script>
   import Fa from 'svelte-fa'
   import { faCircleQuestion } from '@fortawesome/free-regular-svg-icons'
+  import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   import { createEventDispatcher } from 'svelte'
   import { scale } from 'svelte/transition'
@@ -8,6 +9,8 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let name
+  export let click
+  export let devMode
   export let autostart
 
   let exportButtonText = 'Export Urbit Pier'
@@ -15,6 +18,8 @@
   let isLoading = false
   let showInfo = false
   let devButtonStatus = 'standard'
+  let noClickWarning = false
+  let oldDevMode = devMode
 
   const dispatch = createEventDispatcher()
 
@@ -52,7 +57,10 @@
         console.log(d)
         if (d == 200) {
           devButtonStatus = 'success'
-          setTimeout(()=> devButtonStatus = 'standard')
+          setTimeout(()=> {
+            devButtonStatus = 'standard'
+            oldDevMode = devMode
+          })
           // reload
         } else {
           devButtonStatus = 'failure'
@@ -83,18 +91,29 @@
 
 <div class="bg">
   <div class="option-title">Admin Actions</div>
-
-  <PrimaryButton 
-    status={devButtonStatus}
-    standard="Developer Mode" 
-    loading="starting developer mode.."
-    failure="something went wrong"
-    success="developer mode enabled!"
-    on:click={()=> setDevMode(true)} />
-
-  <PrimaryButton 
-    standard="Disable Developer Mode" 
-    on:click={()=> setDevMode(false)} />
+    <div class="click-wrapper">
+      <PrimaryButton 
+        status={devButtonStatus}
+        standard="{oldDevMode ? "Disable" : "Enable"} Developer Mode" 
+        loading="{oldDevMode ? "stopping" : "starting"} developer mode.."
+        failure="something went wrong"
+        success="developer mode {oldDevMode ? "disabled" : "enabled"}!"
+        noMargin={true}
+        on:click={()=> setDevMode(!devMode)}
+      />
+      <!-- Dev mode disclaimer button -->
+      {#if !click && !oldDevMode}
+        <button class="alert-mark" on:click={()=>noClickWarning = !noClickWarning} >
+          <Fa icon={faTriangleExclamation} size="1.2x" />
+        </button>
+      {/if}
+    </div>
+    <!-- Dev mode disclaimer text -->
+    {#if noClickWarning}
+      <div class="click-info click-alert">
+      Click Not Active. WebUI will display limited information while in developer mode
+      </div>
+    {/if}
 
   <div class="autostart-wrapper">
     <div class="autostart" on:click={toggleAutostart}>
@@ -188,7 +207,24 @@
     background: #ffffff4d;
     border-radius: 4px;
   }
+  .click-wrapper {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
   .highlight {
     background: #028AFB;
+  }
+  .alert-mark {
+    color: orange;
+    cursor: pointer;
+  }
+  .click-info {
+    font-size: 12px;
+    margin-bottom: 12px;
+    padding: 8px 20px;
+  }
+  .click-alert {
+    color: orange;
   }
 </style>

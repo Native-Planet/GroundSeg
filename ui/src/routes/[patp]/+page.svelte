@@ -114,19 +114,24 @@
 </script>
 
 {#if inView && loaded}
-<Card width="600px">
-
+  <Card width="600px" devMode={urbit.devMode}>
 		<!-- Pier Header -->
-		<PierHeader running={urbit.running} name={urbit.name}>
-  		<Logo t="Urbit Ship Control Panel"/>
-		</PierHeader>
+    <PierHeader running={urbit.running} name={urbit.name}>
+      <Logo t="Urbit Ship Control Panel"/>
+    </PierHeader>
 
-		<!-- Pier Profile (public information) -->
+    <!-- Pier Profile (public information) -->
     <div transition:scale={{duration:120, delay: 200}}>
-      <PierProfile name={urbit.name} running={urbit.running} {code} />
+      <PierProfile
+        {code}
+        name={urbit.name}
+        running={urbit.running}
+        devMode={urbit.devMode}
+        click={urbit.click}
+      />
     </div>
 
-		{#if !advanced}
+    {#if !advanced}
       <!-- Pier Credentials-->
       {#if (code != null) && (code.length == 27) && urbit.running}
 
@@ -182,8 +187,11 @@
         wgReg={urbit.wgReg}
         urbWebAlias={urbit.urbWebAlias}
         s3WebAlias={urbit.s3WebAlias}
+        click={urbit.click}
+        devMode={urbit.devMode}
         on:click={toggleAdvanced}
       />
-		{/if}
+    {/if}
 	</Card>
 {/if}
+

@@ -2,7 +2,11 @@
   import { api } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let minIOReg, remote, hasBucket, name
+  export let minIOReg
+  export let remote
+  export let hasBucket
+  export let name
+  export let disabled
 
   // Button status
   let linkButtonStatus = 'standard',
@@ -67,7 +71,7 @@
 
 </script>
 
-<div class="bg">
+<div class="bg" class:disabled={disabled}>
   <div class="option-title">MinIO Settings</div>
   <div class="wrapper">
     <div class="top-wrapper">
@@ -124,5 +128,11 @@
     display: flex;
     gap: 8px;
     justify-content: center;
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
+    background: #FF000033;
+    color: #FF000033;
   }
 </style>

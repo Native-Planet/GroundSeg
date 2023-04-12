@@ -23,7 +23,6 @@ class Click:
             res = result.split(' ')[-1][1:-1]
             if len(res) == 27:
                 code = res
-                Log.log(f"{patp}: +code: {code}")
         else:
             return False
 

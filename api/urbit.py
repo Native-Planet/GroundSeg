@@ -56,7 +56,8 @@ default_pier_config = {
         "custom_urbit_web": '',
         "custom_s3_web": '',
         "show_urbit_web": 'default',
-        "dev_mode": False
+        "dev_mode": False,
+        "click": False
         }
 
 
@@ -506,7 +507,8 @@ class Urbit:
                 "showUrbWeb": 'default',
                 "urbWebAlias": cfg['custom_urbit_web'],
                 "s3WebAlias": cfg['custom_s3_web'],
-                "devMode": cfg['dev_mode']
+                "devMode": cfg['dev_mode'],
+                "click": cfg['click']
                 }
 
             if cfg['network'] == 'wireguard':
@@ -582,8 +584,10 @@ class Urbit:
         hoon = os.path.join(pier, '/click', 'code.hoon')
         raw = Click.click_exec(patp, self.urb_docker.exec, pier, click, hoon)
         code = Click.filter_code(patp,raw)
+        self._urbits[patp]['click'] = True
 
         if not code:
+            self._urbits[patp]['click'] = False
             code = ''
             lens_addr = self.get_loopback_addr(patp)
 
@@ -602,6 +606,7 @@ class Urbit:
 
         elif code == 'not-yet':
             code = ''
+        self.save_config(patp)
         return code
 
     # Toggle Autostart
