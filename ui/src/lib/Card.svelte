@@ -2,7 +2,17 @@
   import { fade } from 'svelte/transition'
   import { fadeIn, fadeOut, isPortrait } from '$lib/api'
 
-	export let width, maxHeight = "80vh", padding = true, home = false, bgColor = "#6d6d6d33"
+  export let width
+  export let maxHeight = "80vh"
+  export let padding = true
+  export let home = false
+  export let bgColor = "#6d6d6d33"
+  export let devMode = false
+
+  if (devMode) {
+    bgColor = "#FFF7C422"
+  }
+
 	let innerWidth = 0
   let innerHeight = 0
 
@@ -48,5 +58,4 @@
 
     overflow: scroll;
 	}
-
 </style>

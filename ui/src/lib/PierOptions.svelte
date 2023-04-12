@@ -36,6 +36,8 @@
   export let wgReg
   export let urbWebAlias
   export let s3WebAlias
+  export let click
+  export let devMode
 
   let activeTab = 'Settings'
   let cur = null
@@ -83,6 +85,7 @@
     <div class="main-wrapper" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
       <div class="left-wrapper">
         <PierOptionsMeld 
+          disabled={devMode}
           {frequency}
           {timeNow}
           {running}
@@ -96,12 +99,12 @@
         {#if minIOReg}
           <PierOptionsLoom {name} {loomSize} />
         {/if}
-        <PierOptionsAdmin {name} {autostart} on:delete={()=>isPierDeletion = true}
+        <PierOptionsAdmin {name} {click} {devMode} {autostart} on:delete={()=>isPierDeletion = true}
         />
       </div>
       <div class="right-wrapper">
         {#if minIOReg}
-          <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name}/>
+          <PierOptionsMinIO {minIOReg} {remote} {hasBucket} {name} disabled={devMode}/>
         {/if}
         {#if !minIOReg}
           <PierOptionsLoom {name} {loomSize} />

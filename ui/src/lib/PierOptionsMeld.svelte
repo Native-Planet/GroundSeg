@@ -9,7 +9,16 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import TimeSelector from '$lib/TimeSelector.svelte'
 
-  export let timeNow, frequency, running, name, meldHour, meldMinute, meldOn, meldLast, meldNext
+  export let timeNow
+  export let disabled
+  export let frequency
+  export let running
+  export let name
+  export let meldHour
+  export let meldMinute
+  export let meldOn
+  export let meldLast
+  export let meldNext
     
   let showInfo = false
 
@@ -76,7 +85,7 @@
 
 </script>
 
-<div class="bg">
+<div class="bg" class:disabled={disabled}>
   <div class="title-wrapper">
     <div class="title-text">Schedule Pack & Meld</div>
     <div class="question-mark" on:click={()=>showInfo = !showInfo}><Fa icon={faCircleQuestion} size="1x" /></div>
@@ -266,6 +275,12 @@
     font-family: inherit;
     padding: none;
     margin: none;
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
+    background: #FF000033;
+    color: #FF000033;
   }
   input:focus {outline: none;}
   input::-webkit-outer-spin-button,

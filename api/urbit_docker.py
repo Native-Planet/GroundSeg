@@ -9,7 +9,7 @@ client = docker.from_env()
 
 class UrbitDocker:
 
-    def start(self, config, arch, vol_dir, key=''):
+    def start(self, config, arch, vol_dir, base_path, key=''):
         patp = config['pier_name']
         tag = config['urbit_version']
         sha = f"urbit_{arch}_sha256"
@@ -28,21 +28,31 @@ class UrbitDocker:
         # Get container
         c = self.get_container(patp)
         if not c:
-            if self.create(config, image, vol_dir, key):
+            if self.create(config, image, vol_dir, base_path, key):
                 c = self.get_container(patp)
                 if not c:
                     return "failed"
 
-        if c.attrs['Config']['Image'] != image:
-            Log.log(f"{patp}: Container and config versions are mismatched")
-            if self.remove_container(patp):
-                if self.create(config, image, vol_dir, key):
-                    c = self.get_container(patp)
-                    if not c:
-                        return "failed"
+        try:
+            if c.attrs['Config']['Image'] != image:
+                Log.log(f"{patp}: Container and config versions are mismatched")
+                if self.remove_container(patp):
+                    if self.create(config, image, vol_dir, base_path, key):
+                        c = self.get_container(patp)
+                        if not c:
+                            return "failed"
+        except Exception as e:
+            Log.log(f"{patp}: Failed to check for version match: {e}")
+            exit()
+            return "failed"
 
         # Get status
         if c.status == "running":
+            res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+            if self.mode_mismatch(patp, config):
+                if self.remove_container(patp):
+                    return self.start(config, arch, vol_dir, base_path, key)
+
             Log.log(f"{patp}: Container already started")
             return "succeeded"
 
@@ -57,11 +67,22 @@ class UrbitDocker:
                 f.write(script)
                 f.close()
             c.start()
+            if self.mode_mismatch(patp, config):
+                if self.remove_container(patp):
+                    return self.start(config, arch, vol_dir, base_path, key)
             Log.log(f"{patp}: Successfully started container")
             return "succeeded"
         except Exception as e:
             Log.log(f"{patp}: Failed to start container: {e}")
             return "failed"
+
+    def mode_mismatch(self, patp, config):
+        Log.log(f"{patp}: Checking Dev Mode")
+        res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+        Log.log(f"{patp}: Developer Mode in settings: {config['dev_mode']}")
+        Log.log(f"{patp}: Developer Mode in container: {'active' in res}")
+        return config['dev_mode'] != ('active' in res)
+
 
     def is_running(self, patp):
         try:
@@ -94,7 +115,7 @@ class UrbitDocker:
             return False
 
 
-    def create(self, config, image, vol_dir, key=''):
+    def create(self, config, image, vol_dir, base_path, key=''):
         patp = config['pier_name']
         Log.log(f"{patp}: Attempting to create container")
 
@@ -103,7 +124,7 @@ class UrbitDocker:
             if v:
                 Log.log(f"{patp}: Creating Mount object")
                 mount = docker.types.Mount(target = '/urbit/', source=patp)
-                if self._build_container(patp, image, mount, config):
+                if self.build_container(patp, image, mount, config, base_path):
                     return self.add_key(key, patp, vol_dir)
 
     def delete(self, patp):
@@ -204,11 +225,11 @@ class UrbitDocker:
                 return False
 
 
-    def _build_container(self, patp, image, mount, config):
+    def build_container(self, patp, image, mount, config, base_path):
         try:
             Log.log(f"{patp}: Building container")
             command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]} --dirname={patp} --devmode={config["dev_mode"]}'
-            #command = f'bash /urbit/start_urbit.sh --loom={config["loom_size"]} --dirname={patp} --devmode=False'
+            volumes = [f'{base_path}/click:/click']
 
             if config["network"] != "none":
                 Log.log(f"{patp}: Network is set to wireguard")
@@ -219,6 +240,7 @@ class UrbitDocker:
                 c = client.containers.create(
                         image = image,
                         command = command, 
+                        volumes = volumes,
                         name = patp,
                         network = f'container:{config["network"]}',
                         mounts = [mount],
@@ -227,6 +249,7 @@ class UrbitDocker:
                 c = client.containers.create(
                         image = image,
                         command = command, 
+                        volumes = volumes,
                         name = patp,
                         ports = {
                             '80/tcp':config['http_port'],

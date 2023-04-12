@@ -302,10 +302,20 @@ if [ -e *.key ]; then
     rm *.key || true
 fi
 
+file="${dirname}/.vere.lock"
+if [ -e "$file" ]; then
+    content=$(cat "$file")
+    if [ "$content" == "1" ]; then
+        rm "$file"
+        echo "File .vere.lock containing PID 1 has been deleted."
+    fi
+fi
+
+
+#urbit dock $dirname
 if [ $devMode == "True" ]; then
     echo "Developer mode: $devMode"
     echo "No logs will display"
-    # [ -e "${dirname}/.vere.lock" ] && rm "${dirname}/.vere.lock" && echo "Deleted ${dirname}/.vere.lock"
     # Run urbit inside a tmux pane (no logs)
     tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
     tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")

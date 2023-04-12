@@ -5,9 +5,17 @@
 	import Sigil from '$lib/Sigil.svelte'
 	import Clipboard from 'clipboard'
 
-	export let name, running, code
+  import Fa from 'svelte-fa'
+  import { faWrench } from '@fortawesome/free-solid-svg-icons'
 
-	let copyPatp, clickedPatp = false
+  export let name
+  export let running
+  export let code
+  export let devMode
+  export let click
+
+  let copyPatp
+  let clickedPatp = false
 
 	onMount(()=> {
  		copyPatp = new Clipboard('#patp')
@@ -26,7 +34,7 @@
     {:else if code == null}
       <div class="status loading">Loading...</div>
     {:else if code.length != 27}
-      <div class="status booting">Booting</div>
+      <div class="status booting">{ devMode && !click ? "Boot Status: Unknown" : "Booting"}</div>
     {:else}
        <div class="status running">Running</div>
     {/if}
@@ -36,6 +44,12 @@
       data-clipboard-text={name}
       id="patp"
       class="patp">
+      {#if devMode}
+        <div class="dev-mode">
+          <Fa icon={faWrench} size="1x"/>
+        <div class="dev-text">dev mode</div>
+        </div>
+      {/if}
       {clickedPatp ? "copied!" : name}
     </div>
 	</div>
@@ -66,10 +80,25 @@
     color: lime;
   }
   .patp {
+    display: flex;
+    gap: 8px;
     font-size: 16px;
     cursor: pointer;
+    align-items: center;
   }
   .info {
 		text-align: left;
+  }
+  .dev-mode {
+    display: flex;
+    gap: 8px;
+    border-radius: 12px;
+    background: #E6812F66;
+    font-size: 10px;
+    padding: 8px 12px;
+    align-items: center;
+  }
+  .disabled {
+    color: grey;
   }
 </style>

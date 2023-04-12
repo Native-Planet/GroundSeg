@@ -1,5 +1,6 @@
 # Python
 import os
+import re
 import copy
 import time
 import json
@@ -9,6 +10,7 @@ import string
 import secrets
 import zipfile
 import tarfile
+import subprocess
 
 from io import BytesIO
 from time import sleep
@@ -23,6 +25,7 @@ from flask import send_file
 from log import Log
 from utils import Utils
 from urbit_docker import UrbitDocker
+from click_wrapper import Click
 
 default_pier_config = {
         "pier_name":"",
@@ -53,7 +56,8 @@ default_pier_config = {
         "custom_urbit_web": '',
         "custom_s3_web": '',
         "show_urbit_web": 'default',
-        "dev_mode": False
+        "dev_mode": False,
+        "click": False
         }
 
 
@@ -89,6 +93,7 @@ class Urbit:
                 return self.urb_docker.start(self._urbits[patp],
                                              self.config_object._arch,
                                              self._volume_directory,
+                                             self.config_object.base_path,
                                              key
                                              )
         else:
@@ -502,7 +507,8 @@ class Urbit:
                 "showUrbWeb": 'default',
                 "urbWebAlias": cfg['custom_urbit_web'],
                 "s3WebAlias": cfg['custom_s3_web'],
-                "devMode": cfg['dev_mode']
+                "devMode": cfg['dev_mode'],
+                "click": cfg['click']
                 }
 
             if cfg['network'] == 'wireguard':
@@ -573,23 +579,34 @@ class Urbit:
 
     # Get +code from Urbit
     def get_code(self, patp):
-        code = ''
-        lens_addr = self.get_loopback_addr(patp)
-        try:
-            f_data = {"source": {"dojo": "+code"}, "sink": {"stdout": None}}
-            with open(f'{self._volume_directory}/{patp}/_data/code.json','w') as f :
-                json.dump(f_data, f)
+        pier = os.path.join('/urbit', patp)
+        click = os.path.join('/click', 'click')
+        hoon = os.path.join(pier, '/click', 'code.hoon')
+        raw = Click.click_exec(patp, self.urb_docker.exec, pier, click, hoon)
+        code = Click.filter_code(patp,raw)
+        self._urbits[patp]['click'] = True
 
-            command = f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}'
-            res = self.urb_docker.exec(patp, command)
-            if res:
-                code = res.output.decode('utf-8').strip().split('\\')[0][1:]
+        if not code:
+            self._urbits[patp]['click'] = False
+            code = ''
+            lens_addr = self.get_loopback_addr(patp)
 
-            os.remove(f'{self._volume_directory}/{patp}/_data/code.json')
+            try:
+                f_data = {"source": {"dojo": "+code"}, "sink": {"stdout": None}}
+                with open(f'{self._volume_directory}/{patp}/_data/code.json','w') as f :
+                    json.dump(f_data, f)
 
-        except Exception as e:
-            Log.log(f"{patp}: Failed to get +code {e}")
+                command = f'curl -s -X POST -H "Content-Type: application/json" -d @code.json {lens_addr}'
+                res = self.urb_docker.exec(patp, command)
+                if res:
+                    code = res.output.decode('utf-8').strip().split('\\')[0][1:]
+                    os.remove(f'{self._volume_directory}/{patp}/_data/code.json')
+            except Exception as e:
+                Log.log(f"{patp}: Failed to get +code {e}")
 
+        elif code == 'not-yet':
+            code = ''
+        self.save_config(patp)
         return code
 
     # Toggle Autostart
@@ -626,7 +643,8 @@ class Urbit:
             if self.urb_docker.remove_container(patp):
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory
+                                                self._volume_directory,
+                                                self.config_object.base_path
                                                 )
                 if created == "succeeded":
                     self.save_config(patp)
@@ -668,7 +686,8 @@ class Urbit:
 
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory
+                                                self._volume_directory,
+                                                self.config_object.base_path
                                                 )
                 if (created == "succeeded") and running:
                     self.start(patp)
@@ -697,7 +716,8 @@ class Urbit:
 
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
-                                                self._volume_directory
+                                                self._volume_directory,
+                                                self.config_object.base_path
                                                 )
                 if (created == "succeeded") and running:
                     self.start(patp)
@@ -1098,7 +1118,8 @@ class Urbit:
                         if self.urb_docker.remove_container(patp):
                             created = self.urb_docker.start(self._urbits[patp],
                                                             self.config_object._arch,
-                                                            self._volume_directory
+                                                            self._volume_directory,
+                                                            self.config_object.base_path
                                                             )
                             if (created == "succeeded") and running:
                                 self.start(patp)
