@@ -6,7 +6,12 @@
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let name, alias, title, svcType, stdText
+  export let name
+  export let alias
+  export let title
+  export let svcType
+  export let stdText
+  export let disabled = false
 
   let removeStatus = "standard"
   let saveStatus = "standard"
@@ -101,7 +106,7 @@
   }
 </script>
 
-<div class="bg">
+<div class="bg" class:disabled={disabled}>
   <div class="option-title">{title}
     <button class="question-mark" on:click={()=> info = !info} >
       <Fa icon={faCircleQuestion} size="1.2x" />
@@ -206,5 +211,11 @@
   }
   .highlight {
     background: #028AFB;
+  }
+  .disabled {
+    pointer-events: none;
+    background: #FF000033;
+    opacity: .6;
+    color: #ffffff4d;
   }
 </style>

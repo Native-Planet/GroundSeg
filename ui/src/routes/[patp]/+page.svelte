@@ -3,20 +3,38 @@
 
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
-	import { api, updateState, noconn } from '$lib/api'
+	import { isPortrait, api, updateState, noconn } from '$lib/api'
 
 	import Card from '$lib/Card.svelte'
   import Logo from '$lib/Logo.svelte'
   import ToggleAdvancedButton from '$lib/ToggleAdvancedButton.svelte'
+	import PrimaryButton from '$lib/PrimaryButton.svelte'
 
 	import PierHeader from '$lib/PierHeader.svelte'
+
+  import PierNavigation from '$lib/PierNavigation.svelte'
+  import PierOptionsLogs from '$lib/PierOptionsLogs.svelte'
+
 	import PierProfile from '$lib/PierProfile.svelte'
 	import PierCode from '$lib/PierCode.svelte'
 	import PierUrl from '$lib/PierUrl.svelte'
   import PierMinIOSetup from '$lib/PierMinIOSetup.svelte'
   import PierMinIO from '$lib/PierMinIO.svelte'
 	import PierNetwork from '$lib/PierNetwork.svelte'
-  import PierOptions from '$lib/PierOptions.svelte'
+
+  // Left Advanced
+  import PierAdvancedCode from '$lib/PierAdvancedCode.svelte'
+  import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
+  import PierOptionsLoom from '$lib/PierOptionsLoom.svelte'
+
+  // Center Advanced
+  import PierAdvancedUrl from '$lib/PierAdvancedUrl.svelte'
+  import PierAdvancedNetwork from '$lib/PierAdvancedNetwork.svelte'
+  import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
+  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
+
+  // Right Advanced
+  import PierOptionsDomain from '$lib/PierOptionsDomain.svelte'
 
 	// load data into store
 	export let data
@@ -27,9 +45,13 @@
   let inView = true
   let loaded = false
   let code = null
-  let advanced = false
   let failureCount = 0
   let isRunning = false
+  let isPierDeletion = false
+
+  let activeTab = 'Basic' //TODO: set to last tab
+  
+  let advanced = (activeTab == "Advanced")
 
 	// start api loop
 	onMount(()=> {
@@ -104,6 +126,7 @@
       } else {
         setTimeout(getUrbitCode, 1000)
       }
+      console.log(code)
   }}
 
 
@@ -111,11 +134,17 @@
     advanced = !advanced
   }
 
+  // Switch tabs
+  const switchTab = e => {
+    activeTab = e.detail
+    advanced = activeTab == "Advanced"
+  }
 </script>
 
 {#if inView && loaded}
-  <Card width="600px" devMode={urbit.devMode}>
-		<!-- Pier Header -->
+  <Card width="{advanced ? 900 : 600}px" devMode={urbit.devMode}>
+
+    <!-- Pier Header -->
     <PierHeader running={urbit.running} name={urbit.name}>
       <Logo t="Urbit Ship Control Panel"/>
     </PierHeader>
@@ -131,67 +160,194 @@
       />
     </div>
 
-    {#if !advanced}
-      <!-- Pier Credentials-->
-      {#if (code != null) && (code.length == 27) && urbit.running}
+    <!-- Navbar -->
+    <PierNavigation on:click={switchTab} {activeTab} />
 
-        <!-- Landscape +code -->
-        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
-          <PierCode code={code} />
-        </div>
+    <!-- Tab Contents -->
+    {#if activeTab == 'Logs'}
+      <div in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
+        <PierOptionsLogs name={urbit.name} containers={urbit.containers} on:click={()=>console.log("export")}/>
+      </div>
+    {/if}
 
-        <!-- Urbit Landscape URL -->
-        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
-          <PierUrl
-            name={urbit.name}
-            remote={urbit.remote}
-            urbitUrl={urbit.urbitUrl}
-            showUrbWeb={urbit.showUrbWeb}
-            urbWebAlias={urbit.urbWebAlias}
-          />
-        </div>
+    {#if activeTab == 'Basic'}
+      <!-- Landscape +code -->
+      <div class:disabled={(code == null) || (code.length != 27) || !urbit.running} in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+        <PierCode code={code} />
+      </div>
 
-        <!-- MinIO Console -->
-        {#if urbit.wgReg && urbit.wgRunning}
-          <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
-            <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
-          </div>
+      <!-- Urbit Landscape URL -->
+      <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+        <PierUrl
+          name={urbit.name}
+          remote={urbit.remote}
+          urbitUrl={urbit.urbitUrl}
+          showUrbWeb={urbit.showUrbWeb}
+          urbWebAlias={urbit.urbWebAlias}
+        />
+      </div>
+
+      <!-- MinIO Console -->
+      {#if urbit.wgReg && urbit.wgRunning}
+        {#if urbit.minIOReg}
           <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
             <PierMinIO minIOReg={urbit.minIOReg} minIOUrl={urbit.minIOUrl} />
           </div>
+        {:else}
+          <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+            <PierMinIOSetup name={urbit.name} minIOReg={urbit.minIOReg} />
+          </div>
         {/if}
-
-        <!-- Toggle Urbit Network -->
-        <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
-          <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
-        </div>
       {/if}
-      <ToggleAdvancedButton on:click={toggleAdvanced} {advanced}/>
-    {:else}
-      <PierOptions
-        remote={urbit.remote}
-        minIOReg={urbit.minIOReg}
-        hasBucket={urbit.hasBucket}
-        name={urbit.name}
-        running={urbit.running}
-        timeNow={urbit.timeNow}
-        frequency={urbit.frequency}
-        meldHour={urbit.meldHour}
-        meldMinute={urbit.meldMinute}
-        containers={urbit.containers}
-        meldOn={urbit.meldOn}
-        meldLast={urbit.meldLast}
-        meldNext={urbit.meldNext}
-        autostart={urbit.autostart}
-        loomSize={urbit.loomSize}
-        wgReg={urbit.wgReg}
-        urbWebAlias={urbit.urbWebAlias}
-        s3WebAlias={urbit.s3WebAlias}
-        click={urbit.click}
-        devMode={urbit.devMode}
-        on:click={toggleAdvanced}
-      />
+
+      <!-- Toggle Urbit Network -->
+      <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
+        <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
+      </div>
+    {/if}
+
+    <!-- Advanced Options -->
+    {#if activeTab == 'Advanced'}
+      <!-- Three columns -->
+      <div class="main-wrapper" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
+        <!-- Left side -->
+        <div class="left-wrapper">
+          <PierAdvancedCode {code} disabled={(code == null) || (code.length != 27) || !urbit.running} />
+          <PierOptionsMeld 
+            disabled={urbit.devMode}
+            timeNow={urbit.timeNow}
+            frequency={urbit.frequency}
+            name={urbit.name}
+            running={urbit.running}
+            meldHour={urbit.meldHour}
+            meldMinute={urbit.meldMinute}
+            meldOn={urbit.meldOn}
+            meldLast={urbit.meldLast}
+            meldNext={urbit.meldNext}
+          />
+          {#if $isPortrait}
+            <PierOptionsLoom name={urbit.name} loomSize={urbit.loomSize} />
+          {/if}
+          <PierOptionsAdmin 
+            name={urbit.name}
+            devMode={urbit.devMode}
+            click={urbit.click}
+            autostart={urbit.autostart}
+            on:delete={()=>isPierDeletion = true}
+          />
+        </div>
+        <!-- Center -->
+        {#if !$isPortrait}
+          <div class="center-wrapper">
+            <PierAdvancedUrl
+              name={urbit.name}
+              remote={urbit.remote}
+              urbitUrl={urbit.urbitUrl}
+              showUrbWeb={urbit.showUrbWeb}
+              urbWebAlias={urbit.urbWebAlias}
+            />
+            <PierAdvancedNetwork
+              name={urbit.name}
+              remote={urbit.remote}
+              wgReg={urbit.wgReg}
+              wgRunning={urbit.wgRunning}
+            />
+            <PierOptionsLoom name={urbit.name} loomSize={urbit.loomSize} />
+          </div>
+        {/if}
+        <!-- Right side -->
+        <div class="right-wrapper">
+          {#if $isPortrait}
+            <PierAdvancedUrl
+              name={urbit.name}
+              remote={urbit.remote}
+              urbitUrl={urbit.urbitUrl}
+              showUrbWeb={urbit.showUrbWeb}
+              urbWebAlias={urbit.urbWebAlias}
+            />
+            <PierAdvancedNetwork
+              name={urbit.name}
+              remote={urbit.remote}
+              wgReg={urbit.wgReg}
+              wgRunning={urbit.wgRunning}
+            />
+          {/if}
+          <PierOptionsMinIO 
+            remote={urbit.remote}
+            minIOReg={urbit.minIOReg}
+            hasBucket={urbit.hasBucket}
+            disabled={urbit.devMode || !urbit.minIOReg}
+          />
+          <PierOptionsDomain
+            name={urbit.name}
+            disabled={!urbit.wgReg}
+            alias={urbit.urbWebAlias}
+            title="Urbit Ship Custom Domain"
+            svcType="urbit-web"
+            stdText="Submit ship domain"
+            >
+            <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
+              Access your Urbit ship from a second domain. Please read
+              <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
+              for more information.
+            </div>
+          </PierOptionsDomain>
+          <PierOptionsDomain
+            name={urbit.name}
+            disabled={!urbit.wgReg || !urbit.minIOReg}
+            alias={urbit.s3WebAlias}
+            title="MinIO Custom Domain"
+            svcType="minio"
+            stdText="Submit MinIO domain"
+            >
+            <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
+              Set your MinIO bucket's public URL to another domain. Please read
+              <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
+              for more information.
+            </div>
+          </PierOptionsDomain>
+        </div>
+      </div>
     {/if}
 	</Card>
 {/if}
 
+<style>
+  .disabled {
+    color: #ff00004d;
+    pointer-events: none;
+    opacity: .6;
+  }
+  .main-wrapper {
+    display: flex;
+    text-align: center;
+    align-items: start;
+    gap: 12px;
+  }
+  .left-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .center-wrapper {
+    flex:1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .right-wrapper {
+    flex:1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .info {
+    font-size: 11px;
+    padding: 8px 20px 8px 20px;
+  }
+  a {
+    color: inherit;
+    text-decoration: underline;
+  }
+</style>

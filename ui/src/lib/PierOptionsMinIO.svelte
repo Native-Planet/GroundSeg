@@ -75,35 +75,31 @@
   <div class="option-title">MinIO Settings</div>
   <div class="wrapper">
     <div class="top-wrapper">
-      {#if minIOReg}
-        <PrimaryButton
-          noMargin={true}
-          standard="Link to Urbit"
-          success="MinIO linked!"
-          failure="Something went wrong"
-          loading="Linking..."
-          status={linkButtonStatus}
-          on:click={updateMinIO} />
-        <PrimaryButton
-          noMargin={true}
-          background="#FFFFFF4D"
-          standard="Unlink"
-          success="MinIO unlinked from Urbit!"
-          failure="Something went wrong"
-          loading="Removing link..."
-          status={unlinkButtonStatus}
-          on:click={unlinkMinIO} />
-      {/if}
+      <PrimaryButton
+        noMargin={true}
+        standard="Link to Urbit"
+        success="MinIO linked!"
+        failure="Something went wrong"
+        loading="Linking..."
+        status={linkButtonStatus}
+        on:click={updateMinIO} />
+      <PrimaryButton
+        noMargin={true}
+        background="#FFFFFF4D"
+        standard="Unlink"
+        success="MinIO unlinked from Urbit!"
+        failure="Something went wrong"
+        loading="Removing link..."
+        status={unlinkButtonStatus}
+        on:click={unlinkMinIO} />
     </div>
-    {#if hasBucket}
       <PrimaryButton
         noMargin={true}
         background="#FFFFFF4D"
         standard="Export Bucket"
         loading="Compressing your files.."
-        status={exportBucketStatus}
+        status={hasBucket ? exportBucketStatus : "disabled"}
         on:click={exportBucket} />
-    {/if}
   </div>
 </div>
 
@@ -133,6 +129,6 @@
     opacity: .6;
     pointer-events: none;
     background: #FF000033;
-    color: #FF000033;
+    color: #ffffff4d;
   }
 </style>

@@ -2,7 +2,6 @@
   import { createEventDispatcher } from 'svelte'
   import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@rgossiaux/svelte-headlessui"
   import { api, system } from '$lib/api'
-  import ToggleAdvancedButton from '$lib/ToggleAdvancedButton.svelte'
 
   export let name, containers
 
@@ -47,7 +46,6 @@
           <ListboxButton class="containers-selector">{selectedContainer}</ListboxButton>
         </Listbox>
         <PrimaryButton on:click={exportLogs} background="#FFFFFF4D" standard="Export" status="standard" />
-        <ToggleAdvancedButton on:click={()=>dispatch('click')} advanced={true} style="" />
       </div>
 
 <style>
@@ -78,19 +76,3 @@
   }
 
 </style>
-<!--
-<div class="info">
-	<div class="title">Logs</div>
-  <div class="button-wrapper">
-		<PrimaryButton
-			standard="View Urbit Pier Logs"
-			noMargin={true}
-			on:click={()=>dispatch('toggleLogs')} />
-		<PrimaryButton
-			standard="Export Urbit Pier Logs" 
-	 		noMargin={true}
-			background='#FFFFFF4D'
-		 	on:click={exportLog} />
-  </div>
-</div>
--->

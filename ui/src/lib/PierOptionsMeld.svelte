@@ -280,7 +280,7 @@
     opacity: .6;
     pointer-events: none;
     background: #FF000033;
-    color: #FF000033;
+    color: #ffffff4d;
   }
   input:focus {outline: none;}
   input::-webkit-outer-spin-button,

@@ -29,3 +29,22 @@ button { appearance: none; border: none; background: none }
   flex: 1;
   cursor: pointer;
 }
+.option-title {
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  padding-bottom: 12px;
+  color: inherit;
+}
+.option-cred-wrapper {
+  margin: 0 20px;
+}
+.option-cred {
+  font-style: italic;
+  font-size: 12px;
+  padding: 8px;
+  background: #ffffff4d;
+  border-radius: 6px;
+  flex: 1;
+  cursor: pointer;
+}
