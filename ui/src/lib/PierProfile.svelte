@@ -56,12 +56,11 @@
 </div>
 
 <style>
-
   .wrapper {
     display: flex;
     gap: 20px;
     align-items: center;
-		padding: 20px 0 20px 0;
+		padding: 20px 0 10px 0;
   }
   .status {
     opacity: .8;
@@ -97,8 +96,5 @@
     font-size: 10px;
     padding: 8px 12px;
     align-items: center;
-  }
-  .disabled {
-    color: grey;
   }
 </style>

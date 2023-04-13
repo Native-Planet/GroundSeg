@@ -25,5 +25,3 @@
 				<EyeButton on:click={toggleView} {view} />
       </div>
     </div>
-
-

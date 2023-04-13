@@ -1,8 +1,8 @@
 from log import Log
 
 class Click:
-    def click_exec(patp, docker_exec, pier, click, hoon):
-        out = docker_exec(patp, f"{click} -kp -i {hoon} {pier}").output.decode("utf-8").strip().split("\n")
+    def click_exec(patp, docker_exec, hoon):
+        out = docker_exec(patp, f"click -b urbit -kp -i {hoon} {patp}").output.decode("utf-8").strip().split("\n")
         avow = False
         result = ""
         trace = ""
