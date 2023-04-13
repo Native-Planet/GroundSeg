@@ -273,10 +273,12 @@
             />
           {/if}
           <PierOptionsMinIO 
+            minIOUrl={urbit.minIOUrl} 
             remote={urbit.remote}
             minIOReg={urbit.minIOReg}
             hasBucket={urbit.hasBucket}
-            disabled={urbit.devMode || !urbit.minIOReg}
+            name={urbit.name}
+            disabled={urbit.devMode}
           />
           <PierOptionsDomain
             name={urbit.name}

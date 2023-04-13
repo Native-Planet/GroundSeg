@@ -2,11 +2,17 @@
   import { api } from '$lib/api'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
+  import PierAdvancedMinIOSetup from '$lib/PierAdvancedMinIOSetup.svelte'
+  import PierAdvancedMinIO from '$lib/PierAdvancedMinIO.svelte'
+
   export let minIOReg
+  export let minIOUrl
   export let remote
   export let hasBucket
   export let name
-  export let disabled
+  export let disabled = false
+
+  let showSetup = false
 
   // Button status
   let linkButtonStatus = 'standard',
@@ -71,36 +77,49 @@
 
 </script>
 
-<div class="bg" class:disabled={disabled}>
+<div class="bg">
   <div class="option-title">MinIO Settings</div>
-  <div class="wrapper">
-    <div class="top-wrapper">
-      <PrimaryButton
-        noMargin={true}
-        standard="Link to Urbit"
-        success="MinIO linked!"
-        failure="Something went wrong"
-        loading="Linking..."
-        status={linkButtonStatus}
-        on:click={updateMinIO} />
-      <PrimaryButton
-        noMargin={true}
-        background="#FFFFFF4D"
-        standard="Unlink"
-        success="MinIO unlinked from Urbit!"
-        failure="Something went wrong"
-        loading="Removing link..."
-        status={unlinkButtonStatus}
-        on:click={unlinkMinIO} />
-    </div>
+  {#if showSetup}
+    <PierAdvancedMinIOSetup {name} {minIOReg} on:cancel={()=>showSetup = false} />
+  {:else}
+    <div class="wrapper">
+      {#if minIOReg}
+        <PierAdvancedMinIO {minIOUrl} />
+      {:else}
+        <PrimaryButton
+          noMargin={true}
+          standard="Setup MinIO Local Storage"
+          on:click={()=> showSetup = true}
+        />
+      {/if}
+      <div class="mid-wrapper">
+        <PrimaryButton
+          noMargin={true}
+          standard="Link to Urbit"
+          success="MinIO linked!"
+          failure="Something went wrong"
+          loading="Linking..."
+          status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
+          on:click={updateMinIO} />
+        <PrimaryButton
+          noMargin={true}
+          background="#FFFFFF4D"
+          standard="Unlink"
+          success="MinIO unlinked from Urbit!"
+          failure="Something went wrong"
+          loading="Removing link..."
+          status={disabled || !minIOReg ? "disabled" : unlinkButtonStatus}
+          on:click={unlinkMinIO} />
+      </div>
       <PrimaryButton
         noMargin={true}
         background="#FFFFFF4D"
         standard="Export Bucket"
         loading="Compressing your files.."
-        status={hasBucket ? exportBucketStatus : "disabled"}
+        status={hasBucket && minIOReg ? exportBucketStatus : "disabled"}
         on:click={exportBucket} />
-  </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -120,15 +139,9 @@
     gap: 8px;
     text-align: center;
   }
-  .top-wrapper {
+  .mid-wrapper {
     display: flex;
     gap: 8px;
     justify-content: center;
-  }
-  .disabled {
-    opacity: .6;
-    pointer-events: none;
-    background: #FF000033;
-    color: #ffffff4d;
   }
 </style>
