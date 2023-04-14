@@ -75,9 +75,18 @@
         {/if}
       </div>
     {/if}
+    {#if $startram.wgReg && ($startram.region != null)}
+      <div class="region">
+        Active Region: {$startram.regions.find(obj => obj.name == $startram.region).desc}
+      </div>
+    {/if}
 
     <!-- Register Key -->
-    <AnchorRegisterKey wgReg={$startram.wgReg} />
+    <AnchorRegisterKey
+      wgReg={$startram.wgReg}
+      region={$startram.region}
+      regions={$startram.regions}
+    />
 
     <div class="sign-up">
       <a href="https://www.nativeplanet.io/startram" target="_blank">
@@ -110,5 +119,9 @@
     font-size: 12px;
     text-decoration: underline;
     cursor: pointer;
+  }
+  .region {
+    padding-top: 8px;
+    font-size: 12px;
   }
 </style>

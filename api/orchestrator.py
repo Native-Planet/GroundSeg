@@ -209,6 +209,7 @@ class Orchestrator:
     def get_anchor_settings(self):
         lease_end = None
         ongoing = False
+        #active_region = "us-east"
 
         try:
             lease = self.wireguard.anchor_data['lease']
@@ -220,16 +221,45 @@ class Orchestrator:
         except:
             ongoing = False
 
+        try:
+            active_region = self.wireguard.anchor_data['region']
+        except:
+            active_region = None
+
         if lease != None:
             x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
+
+        try:
+            regions = []
+            data = self.wireguard.region_data
+            for r in data.keys():
+                region = {
+                        "name": r,
+                        "country": data[r]['country'],
+                        "desc": data[r]['desc']
+                        }
+
+                regions.append(region)
+        except Exception as e:
+            Log.log(f"Anchor: Failed to get regions: {e}")
+            regions = None
+
+        try:
+            if not (active_region in self.wireguard.region_data):
+                active_region = None
+        except Exception as e:
+            Log.log("Anchor: Failed to check active region: {e}")
+            active_region = None
 
         return { "anchor": 
                 {
                 "wgReg": self.config['wgRegistered'],
                 "wgRunning": self.wireguard.is_running(),
                 "lease": lease_end,
-                "ongoing": ongoing
+                "ongoing": ongoing,
+                "region": active_region,
+                "regions": regions
                 }
             }
 
@@ -364,7 +394,7 @@ class Orchestrator:
                 api_version = self.config['apiVersion']
                 url = f"https://{endpoint}/{api_version}"
 
-                if self.wireguard.build_anchor(url, data['key']):
+                if self.wireguard.build_anchor(url, data['key'], data['region']):
                     self.minio.start_mc()
                     self.config['wgRegistered'] = True
                     self.config['wgOn'] = True

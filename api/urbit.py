@@ -580,7 +580,6 @@ class Urbit:
     def get_code(self, patp):
         hoon = os.path.join('/hoon/code.hoon')
         raw = Click.click_exec(patp, self.urb_docker.exec, hoon)
-        Log.log(raw)
         code = Click.filter_code(patp,raw)
         self._urbits[patp]['click'] = True
 

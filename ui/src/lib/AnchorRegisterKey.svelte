@@ -4,12 +4,22 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let wgReg
+  export let region
+  export let regions
 
-  let key = '',
-    view = false,
-    loading = false,
-    buttonStatus = 'standard',
-    reRegCheck = true
+  let key = ''
+  let view = false
+  let loading = false
+  let buttonStatus = 'standard'
+  let reRegCheck = true
+
+  let selectedRegion
+
+  if (region == null) {
+    selectedRegion = "us-east"
+  } else {
+    selectedRegion = region
+  }
 
   const toggleView = () => {
     view = !view
@@ -23,7 +33,7 @@
 			method: 'POST',
       credentials: "include",
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'register','key':key.trim()})
+			body: JSON.stringify({'action':'register','key':key.trim(),'region':selectedRegion})
 	  })
       .then(d => d.json())
       .then(res => {
@@ -42,6 +52,7 @@
       .catch(err => console.log(err))
   }
 
+
 </script>
 
 <div class="reg-key-wrapper">
@@ -54,6 +65,21 @@
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
+    {#if regions != null}
+      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Region</div>
+      <div class="regions-wrapper">
+        {#each regions as r}
+          <div 
+            on:click={()=>selectedRegion = r.name}
+            class="region"
+            class:region-active={r.name == selectedRegion}
+            >
+            {r.desc}
+          </div>
+        {/each}
+      </div>
+    {/if}
+
   <!-- if registered -->
   {:else if !reRegCheck}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
@@ -61,14 +87,50 @@
       <input id='input' type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
+
+    {#if regions != null}
+      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Region</div>
+      <div class="regions-wrapper">
+        {#each regions as r}
+          <div 
+            on:click={()=>selectedRegion = r.name}
+            class="region"
+            class:region-active={r.name == selectedRegion}
+            >
+            {r.desc}
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
+  {#if wgReg && reRegCheck}
+    <PrimaryButton
+      left={true}
+      on:click={()=>reRegCheck = false}
+      standard="Register Again or Change Region"
+      status="standard"
+      top="26"
+    />
+  {:else}
+    <PrimaryButton
+      left={true}
+      on:click={registerKey}
+      standard="Register"
+      success="Key registered"
+      failure="Registration failed"
+      loading="Processing..."
+      status={key.length <= 0 ? "disabled" : buttonStatus}
+      top="12"
+    />
+  {/if}
+    <!--
     <PrimaryButton
       left={true}
       on:click={wgReg && reRegCheck ? ()=>reRegCheck = false : registerKey }
-      standard="Register{wgReg && reRegCheck ? " A New StarTram Key" : ""}"
+      standard="Register {!reRegCheck && (regions != null) ? "in " + regions.find(obj => obj.name === selectedRegion)} : ""} {wgReg && reRegCheck ? " Again or Change Region" : ""}"
       success="Key registered"
       failure="Registration failed"
       loading="Processing..."
@@ -78,6 +140,7 @@
       }
       top="{wgReg && reRegCheck ? "26" : "12"}"
     />
+    -->
   </div>
 </div>
 
@@ -88,10 +151,11 @@
   }
   .reg-title {
     font-size: 14px;
-    padding-bottom: 6px;
+    margin-bottom: 16px;
   }
   .reg-key {
     display: flex;
+    margin-bottom: 18px;
   }
   .reg-key > input {
     font-family: inherit;
@@ -110,5 +174,23 @@
     padding-left: 12px;
     opacity: .8;
     cursor: pointer;
+  }
+  .regions-wrapper {
+    display: flex;
+    margin: 12px 0 30px 0;
+    gap: 12px;
+    border-radius: 4px;
+  }
+  .region {
+    flex: 1;
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    border: solid 1px white;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .region-active {
+    background: #008eff;
   }
 </style>

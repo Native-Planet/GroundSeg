@@ -19,6 +19,7 @@
   let showInfo = false
   let devButtonStatus = 'standard'
   let noClickWarning = false
+  let devInfo = 'none'
   let oldDevMode = devMode
 
   const dispatch = createEventDispatcher()
@@ -74,6 +75,15 @@
 
   const toggleInfo = () => showInfo = !showInfo
 
+  // Devmode noclick
+  const toggleDevModeInfo = e => {
+    if (devInfo == e) {
+      devInfo = 'none'
+    } else {
+      devInfo = e
+    }
+  }
+
   const toggleAutostart = () => {
     autostart = !autostart
 		fetch($api + '/urbit?urbit_id=' + name, {
@@ -102,16 +112,24 @@
         on:click={()=> setDevMode(!devMode)}
       />
       <!-- Dev mode disclaimer button -->
-      {#if !click && !oldDevMode}
-        <button class="alert-mark" on:click={()=>noClickWarning = !noClickWarning} >
+      {#if !click}
+        <button class="alert-mark" on:click={()=>toggleDevModeInfo('alert')} >
           <Fa icon={faTriangleExclamation} size="1.2x" />
         </button>
       {/if}
+      <button class="question-mark" on:click={()=>toggleDevModeInfo('info')} >
+        <Fa icon={faCircleQuestion} size="1.2x" />
+      </button>
     </div>
     <!-- Dev mode disclaimer text -->
-    {#if noClickWarning}
+    {#if devInfo == 'alert'}
       <div class="click-info click-alert">
-      Click Not Active. WebUI will display limited information while in developer mode
+        Can't access some information while in developer mode. <a href="https://manual.groundseg.app/guide/devmode.html#warning" target="_blank">More Info</a>
+      </div>
+    {/if}
+    {#if devInfo == 'info'}
+      <div class="click-info">
+        Enable accessing your ship's console via SSH. <a href="https://manual.groundseg.app/guide/devmode.html" target="_blank">More Info</a>
       </div>
     {/if}
 
@@ -221,10 +239,18 @@
   }
   .click-info {
     font-size: 12px;
-    margin-bottom: 12px;
-    padding: 8px 20px;
+    padding: 12px 20px 0 20px;
   }
   .click-alert {
     color: orange;
+    cursor: pointer;
+  }
+  .question-mark {
+    color: inherit;
+    cursor: pointer;
+  }
+  a {
+    color: inherit;
+    text-decoration: underline;
   }
 </style>

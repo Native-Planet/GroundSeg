@@ -30,6 +30,7 @@ class Wireguard:
         self.config = config.config
         self.filename = f"{self.config_object.base_path}/settings/wireguard.json"
         self.anchor_data = {}
+        self.region_data = {}
         self._volume_directory = f"{self.config['dockerData']}/volumes"
         self.wg_docker = WireguardDocker()
 
@@ -147,10 +148,10 @@ class Wireguard:
         return self.wg_docker.full_logs(self.data['wireguard_name'])
 
     # New anchor registration
-    def build_anchor(self, url, reg_key):
+    def build_anchor(self, url, reg_key, region):
         Log.log("Wireguard: Attempting to build anchor")
         try:
-            if self.register_device(url, reg_key):
+            if self.register_device(url, reg_key, region):
                 if self.get_status(url):
                     if self.start():
                         if self.update_wg_config(self.anchor_data['conf']):
@@ -220,10 +221,10 @@ class Wireguard:
 #
 
     # /v1/register
-    def register_device(self, url, reg_key):
+    def register_device(self, url, reg_key, region):
         Log.log("Anchor: Attempting to register device")
         try:
-            update_data = {"reg_code" : reg_key,"pubkey":self.config['pubkey'],"region":"asia"}
+            update_data = {"reg_code" : reg_key,"pubkey":self.config['pubkey'],"region":region}
             response = None
 
             res = requests.post(f'{url}/register',json=update_data,headers=self._headers).json()
@@ -235,6 +236,24 @@ class Wireguard:
 
         except Exception as e:
             Log.log(f"Anchor: Request to /register failed: {e}")
+
+        return False
+
+    # /v1/regions
+    def get_regions(self, url):
+        full_url = f"{url}/regions"
+        err_count = 0
+        while err_count < 3:
+            try:
+                self.region_data = requests.get(full_url,headers=self._headers).json()
+                return True
+
+            except Exception as e:
+                Log.log(f"Anchor: /regions failed: {e}")
+                t = err_count * 2
+                Log.log(f"Anchor: Attempting /regions again in {t} seconds")
+                sleep(t)
+                err_count = err_count + 1
 
         return False
 
@@ -253,7 +272,7 @@ class Wireguard:
             except Exception as e:
                 Log.log(f"Anchor: /retrieve failed: {e}")
                 t = err_count * 2
-                Log.log(f"Anchor: Attempting again in {t} seconds")
+                Log.log(f"Anchor: Attempting /retrieve again in {t} seconds")
                 sleep(t)
                 err_count = err_count + 1
 

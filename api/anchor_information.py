@@ -13,12 +13,19 @@ class AnchorUpdater:
     # Get updated Anchor information every 12 hours
     def anchor_loop(self):
         Log.log("Anchor: Anchor information updater thread started")
+
         while True:
+            endpoint = self.config['endpointUrl']
+            api_version = self.config['apiVersion']
+            url = f"https://{endpoint}/{api_version}"
+
+            try:
+                self.orchestrator.wireguard.get_regions(url)
+            except:
+                pass
+
             if self.config['wgRegistered'] and self.config['wgOn']:
                 try:
-                    endpoint = self.config['endpointUrl']
-                    api_version = self.config['apiVersion']
-                    url = f"https://{endpoint}/{api_version}"
                     if self.orchestrator.wireguard.get_status(url):
                         wg_conf = self.orchestrator.wireguard.anchor_data['conf']
                         if self.orchestrator.wireguard.update_wg_config(wg_conf):

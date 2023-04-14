@@ -43,12 +43,10 @@ class UrbitDocker:
                             return "failed"
         except Exception as e:
             Log.log(f"{patp}: Failed to check for version match: {e}")
-            exit()
             return "failed"
 
         # Get status
         if c.status == "running":
-            res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
             if self.mode_mismatch(patp, config):
                 if self.remove_container(patp):
                     return self.start(config, arch, vol_dir, key)
