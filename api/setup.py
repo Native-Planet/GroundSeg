@@ -1,6 +1,18 @@
+from log import Log
 from utils import Utils
 
 class Setup:
+    def handle_regions(data, config, wg):
+        res = {"error":1,"regions":None}
+        if 'endpoint' in data:
+            endpoint = data['endpoint']
+            api_version = config['apiVersion']
+            url = f"https://{endpoint}/{api_version}"
+            if wg.get_regions(url, tries=1):
+                res['regions'] = Utils.convert_region_data(wg.region_data)
+                res['error'] = 0
+        return res
+
     def handle_anchor(data, config, wg, urbit, minio):
         # set endpoint
         if 'skip' in data:
@@ -15,7 +27,7 @@ class Setup:
             endpoint = config.config['endpointUrl']
             api_version = config.config['apiVersion']
             url = f"https://{endpoint}/{api_version}"
-            if wg.build_anchor(url, data['key']):
+            if wg.build_anchor(url, data['key'], data['region']):
                 minio.start_mc()
                 config.config['wgRegistered'] = True
                 config.config['wgOn'] = True

@@ -78,19 +78,17 @@
 
 <svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
-<div class="title" in:scale={{duration:120, delay: 200}}>Create New Password</div>
+<div class="title" in:scale={{duration:120, delay: 200}}>Set new password</div>
 
 <div class="pass-key" in:scale={{duration:120, delay: 200}}>
-  <input id='pass-input-0' type="password" bind:value={password} />
+  <input id='pass-input-0' placeholder="new password" type="password" bind:value={password} />
   <img on:click={togglePassView} src="/eye-{passView ? "closed" : "open"}.svg" alt="eye" />
 </div>
 
-{#if password.length > 0}
-  <div class="pass-key" in:scale={{duration:120, delay: 200}}>
-    <input placeholder="Confirm Password" id='pass-input-1' type="password" bind:value={confirmPassword} />
-    <img on:click={toggleConfirmView} src="/eye-{confirmView ? "closed" : "open"}.svg" alt="eye" />
-  </div>
-{/if}
+<div class="pass-key" in:scale={{duration:120, delay: 200}}>
+  <input placeholder="confirm your password" id='pass-input-1' type="password" bind:value={confirmPassword} />
+  <img on:click={toggleConfirmView} src="/eye-{confirmView ? "closed" : "open"}.svg" alt="eye" />
+</div>
 
 <div class="button">
   {#if ((confirmPassword.length > 0) && (password == confirmPassword))}
@@ -108,12 +106,12 @@
 
 <style>
   .title {
-    text-align: center;
-    padding: 12px;
+    text-align: left;
+    padding: 12px 0 12px 32px;
+    font-size: 12px;
   }
   .pass-key {
     display: flex;
-    padding: 0 20px 20px 20px;
   }
   input {
     text-align: center;
@@ -125,6 +123,7 @@
     padding: 8px;
     border: none;
     flex: 1;
+    margin-bottom: 20px; 
   }
   input:focus {
     outline: none;

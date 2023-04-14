@@ -61,7 +61,7 @@
   {#if !wgReg}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input id='input' type="password" bind:value={key} />
+      <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
@@ -84,7 +84,7 @@
   {:else if !reRegCheck}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input id='input' type="password" bind:value={key} />
+      <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
@@ -169,6 +169,10 @@
   }
   input:focus {
     outline: none;
+  }
+  input::placeholder {
+    color: white;
+    opacity: .6;
   }
   .reg-key > img {
     padding-left: 12px;

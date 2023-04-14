@@ -274,4 +274,8 @@
     cursor: pointer;
     color: orange;
   }
+  input::placeholder {
+    color: white;
+    opacity: .6;
+  }
 </style>

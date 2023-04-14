@@ -56,7 +56,10 @@ class Orchestrator:
     #
 
     def handle_setup(self, page, data):
+        content = page
         try:
+            if content == "regions":
+                return Setup.handle_regions(data, self.config, self.wireguard)
             if page == "anchor":
                 return Setup.handle_anchor(data, self.config_object, self.wireguard, self.urbit, self.minio)
 
@@ -230,20 +233,7 @@ class Orchestrator:
             x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
 
-        try:
-            regions = []
-            data = self.wireguard.region_data
-            for r in data.keys():
-                region = {
-                        "name": r,
-                        "country": data[r]['country'],
-                        "desc": data[r]['desc']
-                        }
-
-                regions.append(region)
-        except Exception as e:
-            Log.log(f"Anchor: Failed to get regions: {e}")
-            regions = None
+        regions = Utils.convert_region_data(self.wireguard.region_data)
 
         try:
             if not (active_region in self.wireguard.region_data):

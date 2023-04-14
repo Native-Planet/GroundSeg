@@ -240,10 +240,10 @@ class Wireguard:
         return False
 
     # /v1/regions
-    def get_regions(self, url):
+    def get_regions(self, url, tries=3):
         full_url = f"{url}/regions"
         err_count = 0
-        while err_count < 3:
+        while err_count < tries:
             try:
                 self.region_data = requests.get(full_url,headers=self._headers).json()
                 return True

@@ -15,7 +15,8 @@
 	updateState(data)
   console.log(data)
 
-  let inViewSetup = false, setupPage = 0
+  let inViewSetup = false
+  let setupPage = 0
 
   onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
@@ -36,7 +37,14 @@
       <SetupAnchor on:prevPage={()=> setupPage = 0}/>
     {/if}
 
+    <div class="page-num">{setupPage + 1} of 2</div>
   </Card>
 {/if}
 
-
+<style>
+  .page-num {
+    text-align: left;
+    font-size: 10px;
+    margin-top: 12px;
+  }
+</style>

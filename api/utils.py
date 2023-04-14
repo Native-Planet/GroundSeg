@@ -67,6 +67,24 @@ class Utils:
 
         return True
 
+    def convert_region_data(data):
+        try:
+            regions = []
+            for r in data.keys():
+                region = {
+                        "name": r,
+                        "country": data[r]['country'],
+                        "desc": data[r]['desc']
+                        }
+
+                regions.append(region)
+        except Exception as e:
+            Log.log(f"Util: Failed to convert region data: {e}")
+            regions = None
+
+        return(regions)
+
+
     def check_internet_access(addr):
         Log.log("Updater: Checking internet access")
         try:
