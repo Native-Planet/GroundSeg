@@ -290,7 +290,7 @@
             >
             <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
               Access your Urbit ship from a second domain. Please read
-              <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
+              <a href="https://manual.groundseg.app/guide/custom-domains.html" target="_blank">this guide</a>
               for more information.
             </div>
           </PierOptionsDomain>
@@ -304,7 +304,7 @@
             >
             <div class="info" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
               Set your MinIO bucket's public URL to another domain. Please read
-              <a href="https://www.nativeplanet.io/custom-startram-domains" target="_blank">this guide</a>
+              <a href="https://manual.groundseg.app/guide/custom-domains.html" target="_blank">this guide</a>
               for more information.
             </div>
           </PierOptionsDomain>
