@@ -11,6 +11,7 @@
 	import Card from '$lib/Card.svelte'
 
   import AnchorHeader from '$lib/AnchorHeader.svelte'
+  import AnchorInformation from '$lib/AnchorInformation.svelte'
   import AnchorRegisterKey from '$lib/AnchorRegisterKey.svelte'
   import AnchorAdvanced from '$lib/AnchorAdvanced.svelte'
 
@@ -64,22 +65,12 @@
       <Logo t='StarTram'/>
     </AnchorHeader>
 
-    {#if $startram.lease != null}
-      <div class="lease" transition:scale={{duration:120, delay: 200}}>
-        <span>Your subscription expires on {$startram.lease.slice(5,-12)}</span>
-        {#if $startram.ongoing}
-          <span class="autorenew">
-            <Fa icon={faCheck} size="1x" />
-            auto-renew
-          </span>
-        {/if}
-      </div>
-    {/if}
-    {#if $startram.wgReg && ($startram.region != null)}
-      <div class="region">
-        Active Region: {$startram.regions.find(obj => obj.name == $startram.region).desc}
-      </div>
-    {/if}
+    <AnchorInformation
+      region={$startram.region}
+      regions={$startram.regions}
+      ongoing={$startram.ongoing}
+      lease={$startram.lease}
+    />
 
     <!-- Register Key -->
     <AnchorRegisterKey
@@ -104,12 +95,6 @@
     padding-top: 20px;
     font-size: 12px;
   }
-  .autorenew {
-    margin-left: 4px;
-    background: green;
-    padding: 2px 8px;
-    border-radius: 8px;
-  }
   .sign-up {
     margin-top: 12px;
     margin-left: 2px;
@@ -119,9 +104,5 @@
     font-size: 12px;
     text-decoration: underline;
     cursor: pointer;
-  }
-  .region {
-    padding-top: 8px;
-    font-size: 12px;
   }
 </style>

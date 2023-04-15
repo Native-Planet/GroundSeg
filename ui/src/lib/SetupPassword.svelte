@@ -78,7 +78,7 @@
 
 <svelte:head><script src="/jsencrypt.min.js"></script></svelte:head>
 
-<div class="title" in:scale={{duration:120, delay: 200}}>Set new password</div>
+<div class="title" in:scale={{duration:120, delay: 200}}>Create a password</div>
 
 <div class="pass-key" in:scale={{duration:120, delay: 200}}>
   <input id='pass-input-0' placeholder="new password" type="password" bind:value={password} />
@@ -106,9 +106,8 @@
 
 <style>
   .title {
-    text-align: left;
-    padding: 12px 0 12px 32px;
-    font-size: 12px;
+    text-align: center;
+    padding: 8px 0 18px 0;
   }
   .pass-key {
     display: flex;

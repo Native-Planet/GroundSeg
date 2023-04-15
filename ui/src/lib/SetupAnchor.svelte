@@ -128,6 +128,12 @@
   </div>
 {/if}
 
+<div class="sign-up">
+  <a href="https://www.nativeplanet.io/startram" target="_blank">
+    Need a startram registration key? Get one here!
+  </a>
+</div>
+
 <div class="button">
   <PrimaryButton
     background="#ffffff4d"
@@ -204,5 +210,15 @@
   }
   .region-active {
     background: #008eff;
+  }
+  .sign-up {
+    margin-top: 16px;
+    margin-left: 20px;
+  }
+  a {
+    color: inherit;
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>

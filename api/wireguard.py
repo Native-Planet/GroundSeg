@@ -250,11 +250,11 @@ class Wireguard:
 
             except Exception as e:
                 Log.log(f"Anchor: /regions failed: {e}")
-                t = err_count * 2
-                Log.log(f"Anchor: Attempting /regions again in {t} seconds")
-                sleep(t)
+                if not (tries - err_count == 1):
+                    t = err_count * 2
+                    Log.log(f"Anchor: Attempting /regions again in {t} seconds")
+                    sleep(t)
                 err_count = err_count + 1
-
         return False
 
     # /v1/retrieve

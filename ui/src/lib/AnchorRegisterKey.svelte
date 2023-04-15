@@ -106,41 +106,26 @@
 
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
-  {#if wgReg && reRegCheck}
-    <PrimaryButton
-      left={true}
-      on:click={()=>reRegCheck = false}
-      standard="Register Again or Change Region"
-      status="standard"
-      top="26"
-    />
-  {:else}
-    <PrimaryButton
-      left={true}
-      on:click={registerKey}
-      standard="Register"
-      success="Key registered"
-      failure="Registration failed"
-      loading="Processing..."
-      status={key.length <= 0 ? "disabled" : buttonStatus}
-      top="12"
-    />
-  {/if}
-    <!--
-    <PrimaryButton
-      left={true}
-      on:click={wgReg && reRegCheck ? ()=>reRegCheck = false : registerKey }
-      standard="Register {!reRegCheck && (regions != null) ? "in " + regions.find(obj => obj.name === selectedRegion)} : ""} {wgReg && reRegCheck ? " Again or Change Region" : ""}"
-      success="Key registered"
-      failure="Registration failed"
-      loading="Processing..."
-      status={
-        wgReg && reRegCheck ? buttonStatus :
-        key == '' ? "disabled" : buttonStatus
-      }
-      top="{wgReg && reRegCheck ? "26" : "12"}"
-    />
-    -->
+    {#if wgReg && reRegCheck}
+      <PrimaryButton
+        left={true}
+        on:click={()=>reRegCheck = false}
+        standard="Register Another Key or Change Region"
+        status="standard"
+        top="16"
+      />
+    {:else}
+      <PrimaryButton
+        left={true}
+        on:click={registerKey}
+        standard="Register"
+        success="Key registered"
+        failure="Registration failed"
+        loading="Registering your key..(might take a while)"
+        status={key.length <= 0 ? "disabled" : buttonStatus}
+        top="12"
+      />
+    {/if}
   </div>
 </div>
 
