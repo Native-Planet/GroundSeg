@@ -2,5 +2,5 @@
   (strand ,vase)
 ;<    ~  
     bind:m
-  (poke [~nallux-dozryl %hood] %helm-pack !>(''))
+  (poke [~zod %hood] %helm-pack !>(''))
 (pure:m !>('success'))
