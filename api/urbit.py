@@ -576,12 +576,38 @@ class Urbit:
 
         return 400
 
+    # Create .hoon for pokes
+    def create_hoon(self, patp, name, hoon):
+        try:
+            with open(f'{self._volume_directory}/{patp}/_data/{name}.hoon','w') as f :
+                f.write(hoon)
+                f.close()
+        except Exception as e:
+            Log.log(f"{patp}: Creating {name}.hoon failed")
+            return False
+        return True
+
+    # Create .hoon for pokes
+    def delete_hoon(self, patp, name):
+        try:
+            hoon_file = f'{self._volume_directory}/{patp}/_data/{name}.hoon'
+            if os.path.exists(hoon_file):
+                os.remove(hoon_file)
+        except Exception as e:
+            Log.log(f"{patp}: Deleting {name}.hoon failed")
+            return False
+        return True
+
     # Get +code from Urbit
     def get_code(self, patp):
-        hoon = os.path.join('/hoon/code.hoon')
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon)
-        code = Click.filter_code(patp,raw)
+        name = "code"
+        hoon = "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  code=@p  bind:m  (scry @p /j/code/(scot %p our))  (pure:m !>((crip (slag 1 (scow %p code)))))"
+        hoon_file = f"{name}.hoon"
+        self.create_hoon(patp, name, hoon)
+        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
+        code = Click.filter_code(raw)
         self._urbits[patp]['click'] = True
+        self.delete_hoon(patp, name)
 
         if not code:
             self._urbits[patp]['click'] = False
@@ -785,68 +811,109 @@ class Urbit:
 
     def send_pack_meld(self, patp):
         lens_addr = self.get_loopback_addr(patp)
-        if self.send_pack(patp, lens_addr):
-            if self.send_meld(patp, lens_addr):
+        pack = "=/  m  (strand ,vase)  ;<  ~  bind:m  (flog [%pack ~])  (pure:m !>('success'))"
+        meld = "=/  m  (strand ,vase)  ;<  ~  bind:m  (flog [%meld ~])  (pure:m !>('success'))"
+        if self.send_pack(patp, pack, lens_addr):
+            if self.send_meld(patp, meld, lens_addr):
                 return 200
-
         return 400
 
-    def send_pack(self, patp, lens_addr):
+    def send_pack(self, patp, hoon, lens_addr):
         Log.log(f"{patp}: Attempting to send |pack")
-        try:
-            data = {"source": {"dojo": "+hood/pack"}, "sink": {"app": "hood"}}
-            with open(f'{self._volume_directory}/{patp}/_data/pack.json','w') as f :
-                json.dump(data, f)
+        # Naming the hoon file
+        name = "pack"
+        hoon_file = f"{name}.hoon"
+        self.create_hoon(patp, name, hoon)
+        # Executing the hoon file
+        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
+        pack = Click.filter_pack_meld(raw)
+        # Set click support to True
+        self._urbits[patp]['click'] = True
+        # If pack failed
+        if not pack:
+            try:
+                # Set click support to False
+                self._urbits[patp]['click'] = False
+                data = {"source": {"dojo": "+hood/pack"}, "sink": {"app": "hood"}}
+                with open(f'{self._volume_directory}/{patp}/_data/pack.json','w') as f :
+                    json.dump(data, f)
 
-            command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
-            res = self.urb_docker.exec(patp, command)
-            if res:
+                command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
+                pack = self.urb_docker.exec(patp, command)
+            except Exception as e:
+                Log.log(f"{patp}: Failed to send |pack: {e}")
+                # Set pack to false when error
+                pack = False
+
+        # If pack succeeded
+        if pack:
+            self.delete_hoon(patp, name)
+            try:
                 os.remove(f'{self._volume_directory}/{patp}/_data/pack.json')
-                Log.log(f"{patp}: |pack sent successfully")
-                return True
+            except:
+                pass
 
-        except Exception as e:
-            Log.log(f"{patp}: Failed to send |pack: {e}")
+            Log.log(f"{patp}: |pack sent successfully")
+            self.save_config(patp)
+            return True
 
         return False
 
-    def send_meld(self, patp, lens_addr):
+
+    def send_meld(self, patp, hoon, lens_addr):
         Log.log(f"{patp}: Attempting to send |meld")
-        try:
-            data = {"source": {"dojo": "+hood/meld"}, "sink": {"app": "hood"}}
-            with open(f'{self._volume_directory}/{patp}/_data/meld.json','w') as f :
-                json.dump(data, f)
+        # Naming the hoon file
+        name = "meld"
+        hoon_file = f"{name}.hoon"
+        self.create_hoon(patp, name, hoon)
+        # Executing the hoon file
+        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
+        meld = Click.filter_pack_meld(raw)
+        # Set click support to True
+        self._urbits[patp]['click'] = True
+        # If meld failed
+        if not meld:
+            try:
+                # Set click support to False
+                self._urbits[patp]['click'] = False
+                data = {"source": {"dojo": "+hood/meld"}, "sink": {"app": "hood"}}
+                with open(f'{self._volume_directory}/{patp}/_data/meld.json','w') as f :
+                    json.dump(data, f)
 
-            command = f'curl -s -X POST -H "Content-Type: application/json" -d @meld.json {lens_addr}'
-            res = self.urb_docker.exec(patp, command)
-            if res:
+                command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
+                meld = self.urb_docker.exec(patp, command)
+            except Exception as e:
+                Log.log(f"{patp}: Failed to send |meld")
+                # Set meld to false when error
+                meld = False
+
+        # If meld succeeded
+        if meld:
+            self.delete_hoon(patp, name)
+            try:
                 os.remove(f'{self._volume_directory}/{patp}/_data/meld.json')
-                Log.log(f"{patp}: |meld sent successfully")
+            except:
+                pass
 
-                now = datetime.utcnow()
-                self._urbits[patp]['meld_last'] = str(int(now.timestamp()))
+            now = datetime.utcnow()
+            self._urbits[patp]['meld_last'] = str(int(now.timestamp()))
 
-                hour, minute = self._urbits[patp]['meld_time'][0:2], self._urbits[patp]['meld_time'][2:]
-                meld_next = int(now.replace(hour=int(hour), minute=int(minute), second=0).timestamp())
-                day = 60 * 60 * 24 * self._urbits[patp]['meld_frequency']
+            hour, minute = self._urbits[patp]['meld_time'][0:2], self._urbits[patp]['meld_time'][2:]
+            meld_next = int(now.replace(hour=int(hour), minute=int(minute), second=0).timestamp())
+            day = 60 * 60 * 24 * self._urbits[patp]['meld_frequency']
 
-                self._urbits[patp]['meld_next'] = str(meld_next + day)
+            self._urbits[patp]['meld_next'] = str(meld_next + day)
 
-                if self._urbits[patp]['meld_frequency'] > 1:
-                    days = "days"
-                else:
-                    days = "day"
+            if self._urbits[patp]['meld_frequency'] > 1:
+                days = "days"
+            else:
+                days = "day"
 
-                Log.log(f"{patp}: Next meld in {self._urbits[patp]['meld_frequency']} {days}")
-                self.save_config(patp)
-
-                return True
-
-        except Exception as e:
-            Log.log(f"{patp}: Failed to send |meld")
-
+            Log.log(f"{patp}: |meld sent successfully")
+            Log.log(f"{patp}: Next meld in {self._urbits[patp]['meld_frequency']} {days}")
+            self.save_config(patp)
+            return True
         return False
-
 
     # Get looback address of Urbit Pier
     def get_loopback_addr(self, patp):
