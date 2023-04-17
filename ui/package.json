@@ -11,7 +11,7 @@
 		"@fortawesome/free-regular-svg-icons": "^6.3.0",
 		"@fortawesome/free-solid-svg-icons": "^6.3.0",
 		"@rgossiaux/svelte-headlessui": "^1.0.2",
-    "@sveltejs/adapter-node": "^1.2.2",
+		"@sveltejs/adapter-node": "^1.2.2",
 		"@sveltejs/kit": "^1.0.0-next.589",
 		"@tlon/sigil-js": "^1.4.5",
 		"clipboard": "^2.0.11",
@@ -20,5 +20,8 @@
 		"svelte-fa": "^3.0.3",
 		"vite": "^4.1.4"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"ws": "^8.13.0"
+	}
 }
