@@ -11,6 +11,7 @@
 	import PrimaryButton from '$lib/PrimaryButton.svelte'
 
 	import PierHeader from '$lib/PierHeader.svelte'
+  import PierDeletionCheck from '$lib/PierDeletionCheck.svelte'
 
   import PierNavigation from '$lib/PierNavigation.svelte'
   import PierOptionsLogs from '$lib/PierOptionsLogs.svelte'
@@ -159,6 +160,16 @@
         click={urbit.click}
       />
     </div>
+
+    {#if isPierDeletion}
+    <div transition:scale={{duration:120, delay: 200}}>
+      <PierDeletionCheck
+        name={urbit.name}
+        hasBucket={urbit.hasBucket}
+        on:cancel={()=> isPierDeletion = false}
+        />
+    </div>
+    {:else}
 
     <!-- Navbar -->
     <PierNavigation on:click={switchTab} {activeTab} />
@@ -310,6 +321,7 @@
           </PierOptionsDomain>
         </div>
       </div>
+    {/if}
     {/if}
 	</Card>
 {/if}
