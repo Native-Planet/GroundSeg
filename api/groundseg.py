@@ -82,7 +82,7 @@ else:
     Thread(target=docker_updater.check_docker_update, daemon=True).start()
 
     from websocket_handler import GSWebSocket
-    ws = GSWebSocket()
+    ws = GSWebSocket(sys_config)
     ws.daemon = True
     ws.start()
     #Thread(target=ws.run, daemon=True).start()

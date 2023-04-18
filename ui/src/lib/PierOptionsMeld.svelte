@@ -1,6 +1,7 @@
 <script>
   // WebSocket Store
   import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
+  import { genRequestId } from '$lib/scripts/session.js'
 
   import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
@@ -64,7 +65,23 @@
 
   const sendUrthMeld = () => {
     if ($socketInfo.metadata.connected) {
-      send($socket, {"urth":"meld"})
+      let payload = {
+        "category": "urbits",
+        "payload": {
+          "patp": name,
+          "module": "meld",
+          "action": "urth"
+        }
+      }
+        /*
+          "action": "on"
+          "action": "off"
+          "action": "toggle"
+          "action": "now"
+          "action": "set"
+        */
+      let id = send($socket, document.cookie, payload)
+      console.log("Activity ID: " + id)
     } else {
       console.error("Unable to send urth meld to websocket")
     }

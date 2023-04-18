@@ -5,23 +5,83 @@ import time
 import threading
 
 from log import Log
+from websocket_util import WSUtil
 
 class GSWebSocket(threading.Thread):
-    def __init__(self, host='0.0.0.0', port=8000):
+    def __init__(self, config, host='0.0.0.0', port=8000):
         super().__init__()
+        self.config = config.config
         self.host = host
         self.port = port
         self.connected_clients = set()
 
     async def handle(self, websocket, path):
-        data = await websocket.recv()
-        cmd = json.loads(data)
+        try:
+            async for message in websocket:
+                # Variables
+                message = json.loads(message)
+                valid = True
+                try:
+                    # Check authentication
+                    valid = message['sessionid'] in self.config['sessions']
+                    if valid:
+                        # Add client to connected clients set
+                        self.connected_clients.add(websocket)
+                    else:
+                        raise Exception("no sessionid provided")
+                except Exception as e:
+                    valid = False
+                    Log.log(f"WS: Authentication failed: {e}")
 
-        self.connected_clients.add(websocket)
-        print(self.connected_clients)
-        async for message in websocket:
-            Log.log(f"WS: Request: {message}")
-            await websocket.send(message)
+                try:
+                    if valid:
+                        # if category is urbits
+                        if message['category'] == 'urbits':
+                            # get patp
+                            # get module
+                            # get action
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                            Log.log(message)
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                            Log.log("-------------------------")
+                        else:
+                            raise Exception("'{message['category']}' is not a valid category")
+                except Exception as e:
+                    valid = False
+                    Log.log(f"WS: Action failed to start: {e}")
+
+                res = WSUtil.make_response(message['id'],valid)
+                await websocket.send(res)
+
+        except websockets.ConnectionClosed:
+            Log.log("WS: Connection closed")
+
+        finally:
+            # Remove client from connected clients set
+            self.connected_clients.remove(websocket)
+
+
+    async def broadcast_message(self):
+        while True:
+            for client in self.connected_clients.copy():
+                if client.open:
+                    message = {
+                            "urbits": {
+                                "bilder-nallux-dozryl": {
+                                    "code":"something",
+                                    "status": "pack"
+                                    }
+                                }
+                            }
+                    await client.send(json.dumps(message))
+                else:
+                    self.connected_clients.remove(client)
+            await asyncio.sleep(1)  # Send the message 5 times a second
 
     def run(self):
         try:
@@ -33,19 +93,6 @@ class GSWebSocket(threading.Thread):
             asyncio.get_event_loop().run_forever()
         except Exception as e:
             Log.log(f"WS: Failed to start WebSocket Thread: {e}")
-
-    async def broadcast_message(self):
-        count = 0
-        while True:
-            for client in self.connected_clients.copy():
-                Log.log(f"broadcast message: {client}")
-                if client.open:
-                    message = str(count)
-                    await client.send(message)
-                else:
-                    self.connected_clients.remove(client)
-            await asyncio.sleep(1)  # Send the message every 5 seconds
-            count += 1
 
     '''
     connected_clients = set()

@@ -1,4 +1,9 @@
+//
+// Store and API for Websocket payload
+//
+
 import { writable } from 'svelte/store'
+import { genRequestId, getCookie } from '/src/lib/scripts/session.js'
 
 export const socketInfo = writable({
   "metadata": {
@@ -6,7 +11,8 @@ export const socketInfo = writable({
     "connected": false,
   },
   "urbits": {},
-  "system": {}
+  "system": {},
+  "activity": {}
 })
 export const socket = writable()
 
@@ -14,16 +20,24 @@ export const disconnect = ws => {
   if (ws) { ws.close() }
 }
 
-export const send = (ws, msg) => {
-  console.log("Request sent: " + JSON.stringify(msg))
+export const send = (ws, cookie, msg) => {
+  msg = msg || {}
+  let id = genRequestId(16)
+  let sid = getCookie(cookie, 'sessionid')
+  msg['id'] = id
+  msg['sessionid'] = sid
   ws.send(JSON.stringify(msg))
+  return id
 }
 
-export const connect = async addr => {
+export const connect = async (addr, cookie) => {
   let ws = new WebSocket(addr)
   let connected = false
-  ws.addEventListener('open', e => updateMetadata("connected", e.returnValue))
-  ws.addEventListener('message', e => updateData(e))
+  ws.addEventListener('open', e => {
+    updateMetadata("connected", e.returnValue)
+    send(ws,cookie)
+  })
+  ws.addEventListener('message', e => updateData(e.data))
   ws.addEventListener('error', e => console.log('error:', e))
   ws.addEventListener('close', e => console.log('closed:', e))
   socket.set(ws)
@@ -44,5 +58,24 @@ const updateMetadata = (item, val) => {
 }
 
 const updateData = data => {
-  console.log(data)
+  data = JSON.parse(data)
+  socketInfo.update(i => {
+    let obj = deepMerge(i, data)
+    console.log(obj)
+    return obj
+  })
+}
+
+const deepMerge = (target, source) => {
+  for (const key in source) {
+    if (typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key] !== null) {
+      if (!target.hasOwnProperty(key)) {
+        target[key] = {};
+      }
+      deepMerge(target[key], source[key])
+    } else {
+      target[key] = source[key]
+    }
+  }
+  return target
 }

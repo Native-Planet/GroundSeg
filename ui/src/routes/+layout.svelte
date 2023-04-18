@@ -51,7 +51,7 @@
   onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
     checkStatus()
-    connect("ws://" + $page.url.hostname + ":8000")
+    connect("ws://" + $page.url.hostname + ":8000", document.cookie)
   })
 
 </script>
