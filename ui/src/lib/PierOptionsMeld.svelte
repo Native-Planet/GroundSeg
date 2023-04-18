@@ -1,13 +1,21 @@
 <script>
-  import { onMount } from 'svelte'
+  // WebSocket Store
+  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
+  import { genRequestId } from '$lib/scripts/session.js'
+
+  import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
   import { api } from '$lib/api'
+  import { page } from '$app/stores'
   import Fa from 'svelte-fa'
   import { faCaretLeft, faCaretRight } from '@fortawesome/free-solid-svg-icons'
   import { faCircleQuestion} from '@fortawesome/free-regular-svg-icons'
 
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import TimeSelector from '$lib/TimeSelector.svelte'
+
+  // TEMP
+  //import store from '$lib/store.js'
 
   export let timeNow
   export let disabled
@@ -23,6 +31,7 @@
   let showInfo = false
 
   let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
+  let urthMeldStatus = 'standard'
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let inView = true
@@ -30,15 +39,17 @@
   let minutes = Array.from(Array(60).keys()) 
   let hours = Array.from(Array(24).keys())
 
-  onMount(()=> cloneFreq = frequency)
+  onMount(()=> {
+    cloneFreq = frequency
+  })
 
   const sendMeldPoke = () => {
     meldNowStatus = 'loading'
 		fetch($api + '/urbit?urbit_id=' + name, {
-		method: 'POST',
-        credentials: "include",
-		headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({'app':'pier','data':'do-meld'})
+      method: 'POST',
+      credentials: "include",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({'app':'pier','data':'do-meld'})
 		})
       .then(d=>d.json())
       .then(r=> {
@@ -47,6 +58,33 @@
         setTimeout(()=>{meldNowStatus = 'standard'}, 3000)
       })
 		  .catch(err => console.log(err))
+  }
+
+  let message = ''
+  let response = ''
+
+  const sendUrthMeld = () => {
+    if ($socketInfo.metadata.connected) {
+      let payload = {
+        "category": "urbits",
+        "payload": {
+          "patp": name,
+          "module": "meld",
+          "action": "urth"
+        }
+      }
+        /*
+          "action": "on"
+          "action": "off"
+          "action": "toggle"
+          "action": "now"
+          "action": "set"
+        */
+      let id = send($socket, document.cookie, payload)
+      console.log("Activity ID: " + id)
+    } else {
+      console.error("Unable to send urth meld to websocket")
+    }
   }
 
   const toggleMeldSchedule = () => {
@@ -85,6 +123,7 @@
 
 </script>
 
+
 <div class="bg" class:disabled={disabled}>
   <div class="title-wrapper">
     <div class="title-text">Schedule Pack & Meld</div>
@@ -99,7 +138,6 @@
   {/if}
 
   <div class="panel">
-
     <!-- frequency selector -->
     <div class="day">
       <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
@@ -187,6 +225,16 @@
         />
     {/if}
     </div>
+    <!-- Urth Meld -->
+    <PrimaryButton
+      background="#FF00004D"
+      status={urthMeldStatus}
+      loading="Attempting to send poke"
+      noMargin={true}
+      standard="Urth Pack and Meld"
+      success="Meld poke sent, check your logs!"
+      on:click={sendUrthMeld}
+      />
   </div>
 </div>
 
@@ -256,6 +304,7 @@
     justify-content: center;
     align-items: center;
     padding: 4px;
+    margin-bottom: 4px;
   }
 
   .day-text {

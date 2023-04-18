@@ -1,10 +1,10 @@
 chardet
 flask
+flask-cors
 python-crontab
 requests
 docker
 psutil
-flask-cors
 pywgkey
 nuitka
 zstandard
@@ -12,3 +12,5 @@ ordered-set
 nmcli
 PyAccessPoint
 cryptography
+tornado
+asyncio

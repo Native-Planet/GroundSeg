@@ -168,6 +168,9 @@ class Orchestrator:
                 if data['data'] == 'do-meld':
                     return self.urbit.send_pack_meld(urbit_id)
 
+                if data['data'] == 'urth-meld':
+                    return self.urbit.urth_meld(urbit_id)
+
                 if data['data'] == 'delete':
                     return self.urbit.delete(urbit_id)
 

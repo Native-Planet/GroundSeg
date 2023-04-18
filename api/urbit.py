@@ -818,6 +818,14 @@ class Urbit:
                 return 200
         return 400
 
+    '''
+    def urth_meld(self, patp):
+        from urth import Urth
+        urth = Urth(patp, self._urbits[patp])
+        return urth.pack_meld()
+    '''
+
+
     def send_pack(self, patp, hoon, lens_addr):
         Log.log(f"{patp}: Attempting to send |pack")
         # Naming the hoon file

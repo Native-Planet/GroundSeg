@@ -25,6 +25,7 @@ from anchor_information import AnchorUpdater
 from wireguard_refresher import WireguardRefresher
 from kill_switch import KillSwitch
 from keygen import KeyGen
+#from websocket_handler import GSWebSocket
 
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
@@ -80,6 +81,17 @@ else:
     docker_updater = DockerUpdater(sys_config, orchestrator)
     Thread(target=docker_updater.check_docker_update, daemon=True).start()
 
+    from websocket_handler import GSWebSocket
+    ws = GSWebSocket(sys_config)
+    ws.daemon = True
+    ws.start()
+    #Thread(target=ws.run, daemon=True).start()
+
     # Flask
     groundseg = GroundSeg(sys_config, orchestrator)
     groundseg.run()
+
+    # Tornado
+    #from websocket_handler import WebSocket
+    #ws = WebSocket(groundseg.app)
+    #ws.start()
