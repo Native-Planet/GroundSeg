@@ -1,6 +1,5 @@
 # Python
 import os
-import re
 import copy
 import time
 import json
@@ -10,7 +9,6 @@ import string
 import secrets
 import zipfile
 import tarfile
-import subprocess
 
 from io import BytesIO
 from time import sleep
@@ -171,7 +169,7 @@ class Urbit:
         Log.log("Urbit: Starting all ships")
         res = {"failed":[],"succeeded":[],"ignored":[],"invalid":[]}
         if len(patps) < 1:
-            Log.log(f"Urbit: No ships detected in system.json! Skipping..")
+            Log.log("Urbit: No ships detected in system.json! Skipping..")
             return True
 
         for p in patps:
@@ -582,7 +580,7 @@ class Urbit:
             with open(f'{self._volume_directory}/{patp}/_data/{name}.hoon','w') as f :
                 f.write(hoon)
                 f.close()
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Creating {name}.hoon failed")
             return False
         return True
@@ -593,7 +591,7 @@ class Urbit:
             hoon_file = f'{self._volume_directory}/{patp}/_data/{name}.hoon'
             if os.path.exists(hoon_file):
                 os.remove(hoon_file)
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Deleting {name}.hoon failed")
             return False
         return True
@@ -818,14 +816,6 @@ class Urbit:
                 return 200
         return 400
 
-    '''
-    def urth_meld(self, patp):
-        from urth import Urth
-        urth = Urth(patp, self._urbits[patp])
-        return urth.pack_meld()
-    '''
-
-
     def send_pack(self, patp, hoon, lens_addr):
         Log.log(f"{patp}: Attempting to send |pack")
         # Naming the hoon file
@@ -890,7 +880,7 @@ class Urbit:
 
                 command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
                 meld = self.urb_docker.exec(patp, command)
-            except Exception as e:
+            except Exception:
                 Log.log(f"{patp}: Failed to send |meld")
                 # Set meld to false when error
                 meld = False
@@ -941,7 +931,7 @@ class Urbit:
             self.config['piers'].append(patp)
             self.config_object.save_config()
             return True
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Failed to add @p to system.json")
 
         return False
@@ -1032,7 +1022,7 @@ class Urbit:
             self._urbits[patp]['wg_s3_port'] = s3_port
             self._urbits[patp]['wg_console_port'] = console_port
             return self.save_config(patp)
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Failed to set wireguard information")
             return False
 
@@ -1340,3 +1330,44 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to save config: {e}")
             return False
+
+
+    #
+    #   Websocket API
+    #
+
+    def meld_urth(self, patp):
+        # detect is running
+        running = self.urb_docker.is_running(patp)
+        # stop the pier
+        if running:
+            self.stop(patp)
+
+        # devmode
+        dev_mode = self._urbits[patp]['dev_mode'] 
+        # detect if devmode
+        if dev_mode:
+            # turn off devmode
+            dev_mode = False
+            self.save_config(patp)
+
+        # start container for packing
+        self.ws_start(patp, 'pack')
+
+
+        # start with pack start script
+        # wait until stopped
+        # start with meld start script
+        # wait until stopped
+        # if was dev, set dev again
+        # if was running, start again
+
+    # Wrapper for urb_docker.start()
+    def ws_start(self, patp, act):
+        return self.urb_docker.start(self._urbits[patp],
+                                     self.config_object._arch,
+                                     self._volume_directory,
+                                     '',
+                                     act
+                                     )
+

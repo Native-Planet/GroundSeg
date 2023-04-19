@@ -51,7 +51,7 @@ class SysPost:
             try:
                 os.system("systemctl restart groundseg")
                 return 200
-            except Exception as e:
+            except Exception:
                 Log.log("GroundSeg: Binary restart failed: {e}")
 
         return 400

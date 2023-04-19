@@ -6,19 +6,27 @@ import { writable } from 'svelte/store'
 import { genRequestId, getCookie } from '/src/lib/scripts/session.js'
 
 export const socketInfo = writable({
+  "activity": {},
   "metadata": {
     "address": "",
     "connected": false,
   },
   "urbits": {},
-  "system": {},
-  "activity": {}
+  "system": {}
 })
 export const socket = writable()
 
 export const disconnect = ws => {
   if (ws) { ws.close() }
 }
+
+export const removeActivity = id => {
+  socketInfo.update(i => {
+    delete i.activity[id]
+    return i
+  })
+}
+
 
 export const send = (ws, cookie, msg) => {
   msg = msg || {}
@@ -35,7 +43,7 @@ export const connect = async (addr, cookie) => {
   let connected = false
   ws.addEventListener('open', e => {
     updateMetadata("connected", e.returnValue)
-    send(ws,cookie)
+    send(ws,cookie,{"category":"ping"}) 
   })
   ws.addEventListener('message', e => updateData(e.data))
   ws.addEventListener('error', e => console.log('error:', e))
@@ -61,7 +69,6 @@ const updateData = data => {
   data = JSON.parse(data)
   socketInfo.update(i => {
     let obj = deepMerge(i, data)
-    console.log(obj)
     return obj
   })
 }

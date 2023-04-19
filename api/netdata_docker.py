@@ -75,7 +75,7 @@ class NetdataDocker:
         try:
             vols = config['volumes']
             cap_add = config['cap_add']
-            restart = config['restart']
+            config['restart']
 
             Log.log("Netdata: Building container")
             c = client.containers.create(

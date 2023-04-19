@@ -9,13 +9,14 @@ client = docker.from_env()
 
 class UrbitDocker:
 
-    def start(self, config, arch, vol_dir, key=''):
+    def start(self, config, arch, vol_dir, key='', act='boot'):
+        success_message = "succeeded"
         patp = config['pier_name']
         tag = config['urbit_version']
         sha = f"urbit_{arch}_sha256"
 
         image = f"{config['urbit_repo']}:{tag}"
-        if config[sha] != "" and config[sha] != None:
+        if config[sha] != "" and config[sha] is not None:
             image = f"{image}@sha256:{config[sha]}"
 
         Log.log(f"{patp}: Attempting to start container")
@@ -47,12 +48,13 @@ class UrbitDocker:
 
         # Get status
         if c.status == "running":
-            if self.mode_mismatch(patp, config):
-                if self.remove_container(patp):
-                    return self.start(config, arch, vol_dir, key)
+            if act == "boot":
+                if self.mode_mismatch(patp, config):
+                    if self.remove_container(patp):
+                        return self.start(config, arch, vol_dir, key)
 
-            Log.log(f"{patp}: Container already started")
-            return "succeeded"
+                Log.log(f"{patp}: Container already started")
+                return success_message
 
         # Check noboot
         if config['boot_status'] == "noboot":
@@ -62,14 +64,18 @@ class UrbitDocker:
         try:
             with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
                 script = Utils.start_script()
+                if act == "pack":
+                    success_message = "pack"
+                    script = Utils.pack_script()
                 f.write(script)
                 f.close()
             c.start()
-            if self.mode_mismatch(patp, config):
-                if self.remove_container(patp):
-                    return self.start(config, arch, vol_dir, key)
+            if act == "boot":
+                if self.mode_mismatch(patp, config):
+                    if self.remove_container(patp):
+                        return self.start(config, arch, vol_dir, key)
             Log.log(f"{patp}: Successfully started container")
-            return "succeeded"
+            return success_message
         except Exception as e:
             Log.log(f"{patp}: Failed to start container: {e}")
             return "failed"
@@ -97,7 +103,7 @@ class UrbitDocker:
         if c:
             try:
                 c.stop()
-            except Exception as e:
+            except Exception:
                 Log.log(f"{patp}: Failed to stop container")
                 return False
 

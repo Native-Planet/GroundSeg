@@ -42,16 +42,16 @@ class C2C:
         # nplogo.svg
         if not os.path.isfile(f"{self.static_dir}/nplogo.svg"):
             if not static_files.make_if_valid("nplogo.svg"):
-                Log.log(f"C2C: Failed to create nplogo.svg")
+                Log.log("C2C: Failed to create nplogo.svg")
             else:
-                Log.log(f"C2C: Created nplogo.svg")
+                Log.log("C2C: Created nplogo.svg")
             
         # Inter-SemiBold.otf
         if not os.path.isfile(f"{self.static_dir}/Inter-SemiBold.otf"):
             if not static_files.make_if_valid("Inter-SemiBold.otf"):
-                Log.log(f"C2C: Failed to create Inter-SemiBold.otf")
+                Log.log("C2C: Failed to create Inter-SemiBold.otf")
             else:
-                Log.log(f"C2C: Created Inter-SemiBold.otf")
+                Log.log("C2C: Created Inter-SemiBold.otf")
 
         self.ap = pyaccesspoint.AccessPoint(wlan=self.wifi_device,
                                             ssid='NativePlanet_c2c',
@@ -84,7 +84,7 @@ class C2C:
 
             if request.method == 'POST':
                 Log.log(f"C2C: Requested to connect to SSID: {ssid}")
-                Log.log(f"C2C: Turning off Access Point")
+                Log.log("C2C: Turning off Access Point")
                 # turn off ap
                 try:
                     if self.ap.stop():
@@ -109,7 +109,7 @@ class C2C:
                             completed = Utils.wifi_connect(ssid, request.form['password'])
                             if completed and self.config['c2cInterval'] == 0:
                                 self.config['c2cInterval'] = 600
-                                Log.log(f"C2C: Setting c2c interval to 600 seconds")
+                                Log.log("C2C: Setting c2c interval to 600 seconds")
                                 self.config_object.save_config()
 
                             if self.config_object.debug_mode:
@@ -136,38 +136,38 @@ class C2C:
             nmcli.radio.wifi_on()
             wifi_on = nmcli.radio.wifi()
             while not wifi_on:
-                Log.log(f"C2C: Wireless adapter not turned on yet. Trying again..")
+                Log.log("C2C: Wireless adapter not turned on yet. Trying again..")
                 nmcli.radio.wifi.on()
                 time.sleep(1)
                 wifi_on = nmcli.radio.wifi()
 
             time.sleep(1)
-            Log.log(f"C2C: Scanning for available SSIDs")
+            Log.log("C2C: Scanning for available SSIDs")
             nmcli.device.wifi_rescan()
             time.sleep(8)
 
             self.ssids = Utils.list_wifi_ssids()
 
             if len(self.ssids) < 1:
-                Log.log(f"C2C: No SSIDs available, exiting..")
+                Log.log("C2C: No SSIDs available, exiting..")
                 sys.exit()
 
             Log.log(f"C2C: Available SSIDs: {self.ssids}")
-            Log.log(f"C2C: Stopping systemd-resolved")
+            Log.log("C2C: Stopping systemd-resolved")
             x = subprocess.check_output("systemctl stop systemd-resolved", shell=True)
             if x.decode('utf-8') == '':
                 if self.ap.stop():
                     if self.ap.start():
-                        Log.log(f"C2C: Access Point enabled")
+                        Log.log("C2C: Access Point enabled")
                     else:
-                        Log.log(f"C2C: Unable to start Access Point. Exiting..")
+                        Log.log("C2C: Unable to start Access Point. Exiting..")
                         sys.exit()
                 else:
-                    Log.log(f"C2C: Something went wrong. Exiting..")
+                    Log.log("C2C: Something went wrong. Exiting..")
                     sys.exit()
         except Exception as e:
             Log.log(f"C2C: Connect to connect error: {e}")
-            Log.log(f"C2C: Exiting..")
+            Log.log("C2C: Exiting..")
             sys.exit()
 
 

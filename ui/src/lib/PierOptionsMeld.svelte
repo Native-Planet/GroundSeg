@@ -1,6 +1,6 @@
 <script>
   // WebSocket Store
-  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
+  import { socket, socketInfo, send, removeActivity } from "$lib/stores/websocket.js" 
   import { genRequestId } from '$lib/scripts/session.js'
 
   import { onMount, onDestroy } from 'svelte'
@@ -60,10 +60,7 @@
 		  .catch(err => console.log(err))
   }
 
-  let message = ''
-  let response = ''
-
-  const sendUrthMeld = () => {
+  const sendUrthMeld = async () => {
     if ($socketInfo.metadata.connected) {
       let payload = {
         "category": "urbits",
@@ -80,8 +77,28 @@
           "action": "now"
           "action": "set"
         */
-      let id = send($socket, document.cookie, payload)
-      console.log("Activity ID: " + id)
+      let id = await send($socket, document.cookie, payload)
+      const make = async () => {
+        if (!$socketInfo.activity.hasOwnProperty(id)) {
+          console.log("meld-urth:" + id + " checking broadcast..")
+          setTimeout(make, 500)
+        } else {
+          console.log("meld-urth:" + id + " Returned!")
+          let res = $socketInfo.activity[id]
+          if (res.error === 0) {
+            console.log(res)
+          } else {
+            console.error("meld-urth:" + id + " " + JSON.stringify(res))
+          }
+          let deleted = await removeActivity(id)
+          if (deleted) {
+            console.log("meld-urth:" + id + " deleted!")
+            console.log("meld-urth:" + id + " " + JSON.stringify($socketInfo.activity))
+            console.log("meld-urth:" + id + " done")
+          }
+        }
+      }
+      make()
     } else {
       console.error("Unable to send urth meld to websocket")
     }

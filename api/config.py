@@ -1,6 +1,5 @@
 # Python
 import os
-import ssl
 import json
 import base64
 import string
@@ -182,7 +181,7 @@ class Config:
 
         # Remove old config information
         if 'reg_key' in cfg:
-            if cfg['reg_key'] != None:
+            if cfg["reg_key"] is not None:
                 cfg['wgRegistered'] = True
             cfg.pop('reg_key')
 
@@ -198,7 +197,7 @@ class Config:
     def check_update_interval(self, cfg):
         if cfg['updateBranch'] != 'edge' or cfg['updateBranch'] != 'canary':
             min_allowed = 3600
-            if not 'updateInterval' in cfg:
+            if "updateInterval" not in cfg:
                 cfg['updateInterval'] = min_allowed
                 Log.log(f"Config: updateInterval doesn't exist! Creating with default value: {min_allowed}")
 
@@ -273,7 +272,7 @@ class Config:
             self.config['pwHash'] = hashed
             self.save_config()
             Log.log("Config: Password set!")
-        except Exception as e:
+        except Exception:
             Log.log("Config: Create password failed: {e}")
             return False
 
@@ -293,7 +292,7 @@ class Config:
             # create fixer.sh
             fixer = f"{self.base_path}/fixer.sh"
             if not os.path.isfile(fixer):
-                Log.log(f"Config: Update fixer script not detected. Creating!")
+                Log.log("Config: Update fixer script not detected. Creating!")
                 with open(fixer, "w") as f:
                     f.write(self.fixer_script())
                     f.close()
@@ -301,8 +300,8 @@ class Config:
             # create cron job
             cron = CronTab(user='root')
             if len(list(cron.find_command(fixer))) <= 0:
-                Log.log(f"Config: Updater cron job not found. Creating!")
-                job = cron.new(command=f"/bin/sh {fixer}").minute.every(5)
+                Log.log("Config: Updater cron job not found. Creating!")
+                cron.new(command=f"/bin/sh {fixer}").minute.every(5)
                 cron.write()
 
     def device_mode_internet(self):

@@ -1,4 +1,3 @@
-from log import Log
 from utils import Utils
 
 class Setup:

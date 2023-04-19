@@ -1,4 +1,3 @@
-from log import Log
 
 class Click:
     def click_exec(patp, docker_exec, hoon_file):

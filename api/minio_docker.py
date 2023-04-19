@@ -49,7 +49,7 @@ class MinIODocker:
         if c:
             try:
                 c.stop()
-            except Exception as e:
+            except Exception:
                 Log.log(f"{name}: Failed to stop container")
                 return False
 
@@ -88,16 +88,16 @@ class MinIODocker:
         return False
 
     def start_all(self):
-        Log.log(f"MinIO: Attempting to start all containers")
+        Log.log("MinIO: Attempting to start all containers")
         try:
-            Log.log(f"MinIO: Getting list of MinIO containers")
+            Log.log("MinIO: Getting list of MinIO containers")
             c = client.containers.list(all=True)
             for m in c:
                 if m.name != 'minio_client' and m.name.startswith('minio_'):
                     try:
                         m.start()
                         Log.log(f"MinIO: Started {m.name}")
-                    except Exception as e: 
+                    except Exception: 
                         Log.log(f"MinIO: Failed to start {m.name}")
 
         except Exception as e:
@@ -107,16 +107,16 @@ class MinIODocker:
         return True
 
     def stop_all(self):
-        Log.log(f"MinIO: Attempting to stop all containers")
+        Log.log("MinIO: Attempting to stop all containers")
         try:
-            Log.log(f"MinIO: Getting list of MinIO containers")
+            Log.log("MinIO: Getting list of MinIO containers")
             c = client.containers.list()
             for m in c:
                 if m.name != 'minio_client' and m.name.startswith('minio_'):
                     try:
                         m.stop()
                         Log.log(f"MinIO: Stopped {m.name}")
-                    except Exception as e: 
+                    except Exception: 
                         Log.log(f"MinIO: Failed to stop {m.name}")
 
         except Exception as e:

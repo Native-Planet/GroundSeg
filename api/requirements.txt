@@ -12,5 +12,4 @@ ordered-set
 nmcli
 PyAccessPoint
 cryptography
-tornado
 asyncio

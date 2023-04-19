@@ -164,7 +164,7 @@ class WireguardDocker:
                 v = client.volumes.create(name=name)
                 Log.log("Wireguard: Volume created")
                 return v
-            except Exception as e:
+            except Exception:
                 Log.log("Wireguard: Failed to create volume: {e}")
                 return False
 

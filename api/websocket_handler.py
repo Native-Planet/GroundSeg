@@ -1,61 +1,54 @@
 import asyncio
 import websockets
 import json
-import time
-import threading
+from threading import Thread
 
 from log import Log
 from websocket_util import WSUtil
+#from response_builder import ResponseBuilder
 
-class GSWebSocket(threading.Thread):
-    def __init__(self, config, host='0.0.0.0', port=8000):
+class GSWebSocket(Thread):
+    def __init__(self, config, orchestrator, host='0.0.0.0', port=8000):
         super().__init__()
+        self.config_class = config
         self.config = config.config
+        self.orchestrator = orchestrator
         self.host = host
         self.port = port
-        self.connected_clients = set()
 
     async def handle(self, websocket, path):
         try:
             async for message in websocket:
-                # Variables
-                message = json.loads(message)
+                data = json.loads(message)
                 valid = True
+                msg = "default-fail"
                 try:
                     # Check authentication
-                    valid = message['sessionid'] in self.config['sessions']
+                    valid = data['sessionid'] in self.config['sessions']
                     if valid:
                         # Add client to connected clients set
-                        self.connected_clients.add(websocket)
+                        self.orchestrator.authorized_clients.add(websocket)
+                        msg = "client added"
                     else:
                         raise Exception("no sessionid provided")
                 except Exception as e:
                     valid = False
                     Log.log(f"WS: Authentication failed: {e}")
+                    msg = "auth-fail"
 
-                try:
-                    if valid:
-                        # if category is urbits
-                        if message['category'] == 'urbits':
-                            # get patp
-                            # get module
-                            # get action
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                            Log.log(message)
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                            Log.log("-------------------------")
-                        else:
-                            raise Exception("'{message['category']}' is not a valid category")
-                except Exception as e:
-                    valid = False
-                    Log.log(f"WS: Action failed to start: {e}")
+                if valid:
+                    # If valid ping, return received
+                    if data['category'] == 'ping':
+                        msg = "authenticated"
+                    else:
+                        try:
+                            msg = self.orchestrator.ws_command(data, websocket)
+                        except Exception as e:
+                            Log.log(f"WS: Failed to run ws_command: {e}")
+                            valid = False
+                            msg = "ws_command:operation-fail"
 
-                res = WSUtil.make_response(message['id'],valid)
+                res = WSUtil.make_response(data['id'], valid, msg)
                 await websocket.send(res)
 
         except websockets.ConnectionClosed:
@@ -63,24 +56,16 @@ class GSWebSocket(threading.Thread):
 
         finally:
             # Remove client from connected clients set
-            self.connected_clients.remove(websocket)
-
+            self.orchestrator.authorized_clients.remove(websocket)
 
     async def broadcast_message(self):
         while True:
-            for client in self.connected_clients.copy():
+            for client in self.orchestrator.authorized_clients.copy():
                 if client.open:
-                    message = {
-                            "urbits": {
-                                "bilder-nallux-dozryl": {
-                                    "code":"something",
-                                    "status": "pack"
-                                    }
-                                }
-                            }
+                    message = self.orchestrator.structure
                     await client.send(json.dumps(message))
                 else:
-                    self.connected_clients.remove(client)
+                    self.orchestrator.authorized_clients.remove(client)
             await asyncio.sleep(1)  # Send the message 5 times a second
 
     def run(self):
@@ -93,54 +78,3 @@ class GSWebSocket(threading.Thread):
             asyncio.get_event_loop().run_forever()
         except Exception as e:
             Log.log(f"WS: Failed to start WebSocket Thread: {e}")
-
-    '''
-    connected_clients = set()
-    async def websocket_handler(self, websocket, path):
-        try:
-            # Authenticate client
-            auth_message = await websocket.recv()
-            auth_data = json.loads(auth_message)
-
-            # Check authentication
-            if auth_data["username"] == "user" and auth_data["password"] == "password":
-                await websocket.send("Authentication successful")
-                print(f"Authenticated: {auth_data['username']}")
-
-                # Add client to connected clients set
-                self.connected_clients.add(websocket)
-
-                # Handle messages
-                while True:
-                    message = await websocket.recv()
-                    print(f"Received message: {message}")
-                    await websocket.send(f"Server response: {message}")
-            else:
-                await websocket.send("Authentication failed")
-                print("Authentication failed")
-
-        except websockets.ConnectionClosed:
-            print("Connection closed")
-        finally:
-            # Remove client from connected clients set
-            connected_clients.remove(websocket)
-
-    async def broadcast_message(self):
-        count = 0
-        while True:
-            for client in connected_clients.copy():
-                if client.open:
-                    message = str(count)
-                    await client.send(message)
-                else:
-                    connected_clients.remove(client)
-            await asyncio.sleep(5)  # Send the message every 5 seconds
-            count += 1
-
-
-    def run(self):
-        start_server = websockets.serve(self.websocket_handler, "localhost", 8000)
-        asyncio.get_event_loop().create_task(self.broadcast_message())
-        asyncio.get_event_loop().run_until_complete(start_server)
-        asyncio.get_event_loop().run_forever()
-    '''

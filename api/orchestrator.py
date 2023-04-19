@@ -5,6 +5,7 @@ import socket
 import subprocess
 from time import sleep
 from datetime import datetime
+from threading import Thread
 
 # Flask
 from werkzeug.utils import secure_filename
@@ -28,6 +29,12 @@ from webui import WebUI
 class Orchestrator:
 
     wireguard = None
+    authorized_clients = set()
+    unauthorized_clients = set() # unused for now
+    structure = {
+            "urbits": {},
+            "system": {}
+            }
 
     def __init__(self, config):
         self.config_object = config
@@ -50,6 +57,57 @@ class Orchestrator:
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
+
+    #
+    #   Websocket API
+    #
+
+    def ws_command(self, data, websocket):
+        try:
+            payload = data['payload']
+            # if category is urbits
+            if data['category'] == 'urbits':
+                patp = payload['patp']
+                module = payload['module']
+                action = payload['action']
+
+                self.ws_add_ship(patp)
+                self.ws_add_ship_module(patp, module)
+                self.ws_add_ship_action(patp, module, action)
+                if module == "meld":
+                    if action == "urth":
+                        Thread(target=self.urbit.meld_urth, args=(patp,)).start()
+                        return "succeeded"
+            raise Exception(f"'{data['category']}' is not a valid category")
+        except Exception as e:
+            raise Exception(f"{e}")
+
+    def ws_add_ship(self, patp):
+        try:
+            if (patp not in self.structure['urbits']) or (not isinstance(self.structure['urbits'], dict)):
+                self.structure['urbits'][patp] = {}
+        except Exception as e:
+            Log.log(f"WS: ship '{patp}' failed to be added to broadcast dump: {e}")
+            return False
+        return True
+
+    def ws_add_ship_module(self, patp, module):
+        try:
+            if (module not in self.structure['urbits'][patp]) or (not isinstance(self.structure['urbits'][patp], dict)):
+                self.structure['urbits'][patp][module] = {}
+        except Exception as e:
+            Log.log(f"WS: module '{patp}:{module}' failed to be added to broadcast dump: {e}")
+            return False
+        return True
+
+    def ws_add_ship_action(self, patp, module, action):
+        try:
+            self.structure['urbits'][patp][module][action] = ""
+        except Exception as e:
+            Log.log(f"WS: action '{patp}:{module}:{action}' failed to be added to broadcast dump: {e}")
+            return False
+        return True
+
 
     #
     #   Setup
@@ -193,7 +251,7 @@ class Orchestrator:
             # MinIO requests
             if data['app'] == 'minio':
                 pwd = data.get('password')
-                if pwd != None:
+                if pwd is not None:
                     return self.minio.create_minio(urbit_id, pwd, self.urbit,data['link'])
 
                 if data['data'] == 'export':
@@ -232,16 +290,16 @@ class Orchestrator:
         except:
             active_region = None
 
-        if lease != None:
+        if lease is not None:
             x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
 
         regions = Utils.convert_region_data(self.wireguard.region_data)
 
         try:
-            if not (active_region in self.wireguard.region_data):
+            if active_region not in self.wireguard.region_data:
                 active_region = None
-        except Exception as e:
+        except Exception:
             Log.log("Anchor: Failed to check active region: {e}")
             active_region = None
 
@@ -436,7 +494,7 @@ class Orchestrator:
 
             blob = blob.decode('utf-8').split('\n')[line:]
 
-        except Exception as e:
+        except Exception:
             Log.log(f"Logs: Failed to get logs for {container}")
 
         return blob
@@ -515,7 +573,7 @@ class Orchestrator:
         file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"
         os.makedirs(file_subfolder, exist_ok=True)
 
-        fn = save_path = f"{file_subfolder}/{filename}"
+        save_path = f"{file_subfolder}/{filename}"
         current_chunk = int(req.form['dzchunkindex'])
 
         if current_chunk == 0:

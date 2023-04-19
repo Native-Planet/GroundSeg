@@ -62,7 +62,7 @@ class DockerUpdater:
 
     def update_wireguard(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
-            Log.log(f"Updater: Checking for Wireguard updates")
+            Log.log("Updater: Checking for Wireguard updates")
 
             # Update payload
             srv = self.payload['wireguard'] 
@@ -90,7 +90,7 @@ class DockerUpdater:
 
             if changed:
                 try:
-                    Log.log(f"Updater: Wireguard update detected. Updating..")
+                    Log.log("Updater: Wireguard update detected. Updating..")
                     # Save new config
                     self.wireguard.save_config()
 
@@ -106,12 +106,12 @@ class DockerUpdater:
                                 if len(remote) > 0:
                                     for patp in remote:
                                         if self.urbit.toggle_network(patp) == 200:
-                                            Log.log(f"Updater: Wireguard update complete")
+                                            Log.log("Updater: Wireguard update complete")
 
                 except Exception as e:
                     Log.log(f"Updater: Failed to update wireguard: {e}")
             else:
-                Log.log(f"Updater: Wireguard already on correct version")
+                Log.log("Updater: Wireguard already on correct version")
 
     def update_webui(self):
         # Update payload
@@ -139,11 +139,11 @@ class DockerUpdater:
             changed = True
 
         if changed:
-            Log.log(f"Updater: WebUI update detected. Updating..")
+            Log.log("Updater: WebUI update detected. Updating..")
             # Save new config
             self.webui.save_config()
             if self.webui.start():
-                Log.log(f"Updater: WebUI update complete")
+                Log.log("Updater: WebUI update complete")
         else:
             Log.log("Updater: WebUI already correct version")
 
@@ -173,18 +173,18 @@ class DockerUpdater:
             changed = True
 
         if changed:
-            Log.log(f"Updater: Netdata update detected. Updating..")
+            Log.log("Updater: Netdata update detected. Updating..")
             # Save new config
             self.netdata.save_config()
 
             if self.netdata.start():
-                Log.log(f"Updater: Netdata update complete")
+                Log.log("Updater: Netdata update complete")
             else:
                 Log.log("Updater: Netdata already correct version")
 
     def update_mc(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
-            Log.log(f"Updater: Checking for MinIO Client updates")
+            Log.log("Updater: Checking for MinIO Client updates")
             # Update payload
             srv = self.payload['miniomc'] 
 
@@ -210,18 +210,18 @@ class DockerUpdater:
                 changed = True
 
             if changed:
-                Log.log(f"Updater: MinIO Client update detected. Updating..")
+                Log.log("Updater: MinIO Client update detected. Updating..")
                 # Save new config
                 self.minio.save_config()
                 if self.minio.start_mc():
-                    Log.log(f"Updater: MinIO Client update complete")
+                    Log.log("Updater: MinIO Client update complete")
             else:
-                Log.log(f"Updater: MinIO Client already on correct version")
+                Log.log("Updater: MinIO Client already on correct version")
 
 
     def update_minio(self):
         if self.config['wgOn'] and self.config['wgRegistered']:
-            Log.log(f"Updater: Checking for MinIO updates")
+            Log.log("Updater: Checking for MinIO updates")
             copied = self.urbit._urbits
             for p in list(copied):
                 # Update payload
@@ -263,7 +263,7 @@ class DockerUpdater:
 
 
     def update_urbit(self):
-        Log.log(f"Updater: Checking for Urbit updates")
+        Log.log("Updater: Checking for Urbit updates")
         copied = self.urbit._urbits
         for p in list(copied):
             # Update payload

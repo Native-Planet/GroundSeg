@@ -17,7 +17,7 @@ class KillSwitch:
             if debug_mode:
                 Log.log("C2C: Debug mode: Skipping device restart")
             else:
-                Log.log(f"C2C: Restarting device")
+                Log.log("C2C: Restarting device")
                 os.system("reboot")
         else:
             Log.log("C2C: Connect to connect interval not set!")
