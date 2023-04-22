@@ -66,7 +66,7 @@ class GSWebSocket(Thread):
                     await client.send(json.dumps(message))
                 else:
                     self.orchestrator.authorized_clients.remove(client)
-            await asyncio.sleep(1)  # Send the message 5 times a second
+            await asyncio.sleep(0.5)  # Send the message twice a second
 
     def run(self):
         try:

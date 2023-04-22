@@ -1336,7 +1336,9 @@ class Urbit:
     #   Websocket API
     #
 
+    '''
     def meld_urth(self, patp):
+        
         # detect is running
         running = self.urb_docker.is_running(patp)
         # stop the pier
@@ -1344,23 +1346,47 @@ class Urbit:
             self.stop(patp)
 
         # devmode
+        start_dev = False
         dev_mode = self._urbits[patp]['dev_mode'] 
         # detect if devmode
         if dev_mode:
             # turn off devmode
             dev_mode = False
+            start_dev = True
             self.save_config(patp)
 
         # start container for packing
-        self.ws_start(patp, 'pack')
+        pack_res = self.ws_start(patp, 'pack')
+        if pack_res == "pack":
+            Log.log(f"{patp}: Successfully started container for packing")
+            while self.urb_docker.is_running(patp):
+                sleep(0.5)
+        else:
+            Log.log(f"{patp}: Failed to pack")
 
+        # wait until stopped
+        Log.log(f"{patp}: Done packing, meld next")
 
-        # start with pack start script
+        # start container for melding
+        if meld_res == "meld":
+            Log.log(f"{patp}: Successfully started container for melding")
+            while self.urb_docker.is_running(patp):
+                sleep(0.5)
+        else:
+            Log.log(f"{patp}: Failed to meld")
         # wait until stopped
-        # start with meld start script
-        # wait until stopped
+        Log.log(f"{patp}: Done melding")
+
         # if was dev, set dev again
+        if start_dev:
+            dev_mode = True
+            self.save_config(patp)
+
         # if was running, start again
+        if running:
+            res = self.ws_start(patp, 'boot')
+            if res == "succeeded":
+                Log.log(f"{patp}: Urth Pack and Meld action completed")
 
     # Wrapper for urb_docker.start()
     def ws_start(self, patp, act):
@@ -1371,3 +1397,4 @@ class Urbit:
                                      act
                                      )
 
+    '''

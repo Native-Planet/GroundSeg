@@ -14,9 +14,6 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import TimeSelector from '$lib/TimeSelector.svelte'
 
-  // TEMP
-  //import store from '$lib/store.js'
-
   export let timeNow
   export let disabled
   export let frequency
@@ -31,7 +28,7 @@
   let showInfo = false
 
   let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
-  let urthMeldStatus = 'standard'
+  $: urthMeldInfo = $socketInfo.urbits[name].meld.urth
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let inView = true
@@ -60,6 +57,13 @@
 		  .catch(err => console.log(err))
   }
 
+  /*
+    "action": "on"
+    "action": "off"
+    "action": "toggle"
+    "action": "now"
+    "action": "set"
+  */
   const sendUrthMeld = async () => {
     if ($socketInfo.metadata.connected) {
       let payload = {
@@ -70,32 +74,16 @@
           "action": "urth"
         }
       }
-        /*
-          "action": "on"
-          "action": "off"
-          "action": "toggle"
-          "action": "now"
-          "action": "set"
-        */
       let id = await send($socket, document.cookie, payload)
       const make = async () => {
         if (!$socketInfo.activity.hasOwnProperty(id)) {
           console.log("meld-urth:" + id + " checking broadcast..")
           setTimeout(make, 500)
         } else {
-          console.log("meld-urth:" + id + " Returned!")
-          let res = $socketInfo.activity[id]
-          if (res.error === 0) {
-            console.log(res)
-          } else {
-            console.error("meld-urth:" + id + " " + JSON.stringify(res))
-          }
-          let deleted = await removeActivity(id)
-          if (deleted) {
-            console.log("meld-urth:" + id + " deleted!")
-            console.log("meld-urth:" + id + " " + JSON.stringify($socketInfo.activity))
-            console.log("meld-urth:" + id + " done")
-          }
+          console.log("meld-urth:" + id + " returned")
+          console.log("meld-urth:" + id + " " + JSON.stringify(res))
+          removeActivity(id)
+          console.log("meld-urth:" + id + " done")
         }
       }
       make()
@@ -143,116 +131,133 @@
 
 <div class="bg" class:disabled={disabled}>
   <div class="title-wrapper">
-    <div class="title-text">Schedule Pack & Meld</div>
+    <div class="title-text">Pack & Meld</div>
     <div class="question-mark" on:click={()=>showInfo = !showInfo}><Fa icon={faCircleQuestion} size="1x" /></div>
-    <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
-      <div class="switch {meldOn ? "on" : "off"}"></div>
-    </div>
+      {#if urthMeldInfo.length < 1}
+        <div in:scale={{duration:100,delay:300, amount:10}} on:click={toggleMeldSchedule} class="switch-wrapper">
+          <div class="switch {meldOn ? "on" : "off"}"></div>
+        </div>
+      {/if}
   </div>
-
-  {#if showInfo}
-    <div class="title-info">Defragment and deduplicate your memory. Helps improve performance!</div>
-  {/if}
-
-  <div class="panel">
-    <!-- frequency selector -->
-    <div class="day">
-      <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
-        <Fa icon={faCaretLeft} size="1x" />
-      </button>
-
-      <div class="day-text">Every</div>
-      <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
-      <div class="day-text">day{cloneFreq > 1 ? "s" : ""}</div>
-
-      <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
-        <Fa icon={faCaretRight} size="1x" />
-      </button>
-
-    </div>
-
-    <div class="day">
-
-      <div class="day-text">at</div>
-
-      <!-- hour selector -->
-      <TimeSelector
-        value={selectedHour}
-        listOptions={hours}
-        on:change={e => selectedHour = e.detail} 
-      />
-
-      <div class="day-text">:</div>
-
-      <!-- minute selector -->
-      <TimeSelector
-        value={selectedMinute}
-        listOptions={minutes}
-        on:change={e => selectedMinute = e.detail} 
-      />
-
-    </div>
-
-    <!-- Current time on host device -->
-    <div class="day">
-      <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
-    </div>
-
-    <div class="day">
-      <div class="current-time">Last meld: {meldLast.slice(12,-13) < 1971 ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
-    </div>
-
-    {#if meldOn}
-    <div class="day">
-      <div class="current-time">Next: {meldNext.slice(5, -4)} UTC</div>
-    </div>
+  <!-- {#if $socketInfo.urbits[name].meld.urth.length < 1} -->
+  {#if urthMeldInfo.length < 1}
+    {#if showInfo}
+      <div class="title-info">Defragment and deduplicate your memory. Helps improve performance!</div>
     {/if}
 
-    <div class="day-action">
-    <!-- Save new meld schedule -->
-    <PrimaryButton
-      noMargin={true}
-      standard="{
-        frequency != cloneFreq 
-        || selectedHour != meldHour 
-        || selectedMinute != meldMinute
-        ? "Save" : "No"
-      } changes"
-      success="changes saved!"
-      failure="failed to set meld schedule"
-      status={
-        frequency != cloneFreq 
-        || selectedHour != meldHour 
-        || selectedMinute != meldMinute
-        ? meldSetStatus : 'disabled'
-      }
-      on:click={saveMeldChanges}
-      />
+    <div class="panel">
+      <!-- frequency selector -->
+      <div class="day">
+        <button disabled={cloneFreq <= 1} class="day-button" on:click={()=> cloneFreq = --cloneFreq }>
+          <Fa icon={faCaretLeft} size="1x" />
+        </button>
 
-    <!-- Meld now -->
-    {#if running}
-      <PrimaryButton
-        background="#FFFFFF4D"
-        status={meldNowStatus}
-        loading="Attempting to send poke"
-        noMargin={true}
-        standard="Pack and Meld now"
-        success="Meld poke sent, check your logs!"
-        on:click={sendMeldPoke}
+        <div class="day-text">Every</div>
+        <input type="number" class="day-input" bind:value={cloneFreq} min=1 max=365 />
+        <div class="day-text">day{cloneFreq > 1 ? "s" : ""}</div>
+
+        <button class="day-button" on:click={()=>cloneFreq = ++cloneFreq}>
+          <Fa icon={faCaretRight} size="1x" />
+        </button>
+
+      </div>
+
+      <div class="day">
+
+        <div class="day-text">at</div>
+
+        <!-- hour selector -->
+        <TimeSelector
+          value={selectedHour}
+          listOptions={hours}
+          on:change={e => selectedHour = e.detail} 
         />
-    {/if}
-    </div>
-    <!-- Urth Meld -->
-    <PrimaryButton
-      background="#FF00004D"
-      status={urthMeldStatus}
-      loading="Attempting to send poke"
-      noMargin={true}
-      standard="Urth Pack and Meld"
-      success="Meld poke sent, check your logs!"
-      on:click={sendUrthMeld}
+
+        <div class="day-text">:</div>
+
+        <!-- minute selector -->
+        <TimeSelector
+          value={selectedMinute}
+          listOptions={minutes}
+          on:change={e => selectedMinute = e.detail} 
+        />
+
+      </div>
+
+      <!-- Current time on host device -->
+      <div class="day">
+        <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+      </div>
+
+      <div class="day">
+        <div class="current-time">Last meld: {meldLast.slice(12,-13) < 1971 ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
+      </div>
+
+      {#if meldOn}
+      <div class="day">
+        <div class="current-time">Next: {meldNext.slice(5, -4)} UTC</div>
+      </div>
+      {/if}
+
+      <div class="day-action">
+      <!-- Save new meld schedule -->
+      <PrimaryButton
+        noMargin={true}
+        standard="{
+          frequency != cloneFreq 
+          || selectedHour != meldHour 
+          || selectedMinute != meldMinute
+          ? "Set Schedule" : "No changes"
+        }"
+        success="changes saved!"
+        failure="failed to set meld schedule"
+        status={
+          frequency != cloneFreq 
+          || selectedHour != meldHour 
+          || selectedMinute != meldMinute
+          ? meldSetStatus : 'disabled'
+        }
+        on:click={saveMeldChanges}
+        />
+
+      <!-- Meld now -->
+      {#if running}
+        <PrimaryButton
+          background="#FFFFFF4D"
+          status={meldNowStatus}
+          loading="Attempting to send poke"
+          noMargin={true}
+          standard="Pack and Meld now"
+          success="Meld poke sent, check your logs!"
+          on:click={sendMeldPoke}
+          />
+      {/if}
+      </div>
+      <!-- Urth Meld -->
+      <PrimaryButton
+        background="#FF00004D"
+        noMargin={true}
+        standard="Urth Pack and Meld"
+        on:click={sendUrthMeld}
       />
-  </div>
+    </div>
+  {:else}
+    {#if urthMeldInfo == "stopping"}
+      <div class="urth-meld orange">Stopping your Urbit Ship</div>
+    {/if}
+    {#if urthMeldInfo == "packing"}
+      <div class="urth-meld white">Packing your Urbit Ship</div>
+    {/if}
+    {#if urthMeldInfo == "melding"}
+      <div class="urth-meld white">Melding your Urbit Ship</div>
+    {/if}
+    {#if urthMeldInfo == "success"}
+      <div class="urth-meld lime">Urth Pack & Meld Succesful!</div>
+    {/if}
+    {#if urthMeldInfo == "failure"}
+      <div class="urth-meld red">Urth Pack & Meld Failed</div>
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -352,4 +357,23 @@
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {-webkit-appearance: none;margin: 0;}
   input[type=number] {-moz-appearance: textfield;}
+  .urth-meld {
+    font-size: 12px;
+    line-height: 48px;
+    margin-top: 12px;
+    animation: breathe 2s infinite;
+  }
+  .orange {
+    color: orange;
+  }
+  .white {
+    color: white;
+  }
+  .red {
+    color: red;
+  }
+  .lime {
+    color: lime;
+    animation: none;
+  }
 </style>

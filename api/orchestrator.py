@@ -18,6 +18,7 @@ from system_get import SysGet
 from system_post import SysPost
 from bug_report import BugReport
 from utils import Utils
+from ws_urbits import WSUrbits
 
 # Docker
 from netdata import Netdata
@@ -54,6 +55,7 @@ class Orchestrator:
         self.minio = MinIO(config, self.wireguard)
         self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
+        self.ws_urbits = WSUrbits(self.config_object, self.structure, self.urbit)
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
@@ -71,43 +73,18 @@ class Orchestrator:
                 module = payload['module']
                 action = payload['action']
 
-                self.ws_add_ship(patp)
-                self.ws_add_ship_module(patp, module)
-                self.ws_add_ship_action(patp, module, action)
+                # TODO: streamline condition check
+                # Check for structure in whitelist 
+                # before adding action
+                if True:
+                    self.ws_urbits.set_action(patp, module, action,'initializing')
                 if module == "meld":
                     if action == "urth":
-                        Thread(target=self.urbit.meld_urth, args=(patp,)).start()
+                        Thread(target=self.ws_urbits.meld_urth, args=(patp,)).start()
                         return "succeeded"
             raise Exception(f"'{data['category']}' is not a valid category")
         except Exception as e:
             raise Exception(f"{e}")
-
-    def ws_add_ship(self, patp):
-        try:
-            if (patp not in self.structure['urbits']) or (not isinstance(self.structure['urbits'], dict)):
-                self.structure['urbits'][patp] = {}
-        except Exception as e:
-            Log.log(f"WS: ship '{patp}' failed to be added to broadcast dump: {e}")
-            return False
-        return True
-
-    def ws_add_ship_module(self, patp, module):
-        try:
-            if (module not in self.structure['urbits'][patp]) or (not isinstance(self.structure['urbits'][patp], dict)):
-                self.structure['urbits'][patp][module] = {}
-        except Exception as e:
-            Log.log(f"WS: module '{patp}:{module}' failed to be added to broadcast dump: {e}")
-            return False
-        return True
-
-    def ws_add_ship_action(self, patp, module, action):
-        try:
-            self.structure['urbits'][patp][module][action] = ""
-        except Exception as e:
-            Log.log(f"WS: action '{patp}:{module}:{action}' failed to be added to broadcast dump: {e}")
-            return False
-        return True
-
 
     #
     #   Setup

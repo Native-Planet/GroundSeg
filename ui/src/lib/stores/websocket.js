@@ -6,6 +6,7 @@ import { writable } from 'svelte/store'
 import { genRequestId, getCookie } from '/src/lib/scripts/session.js'
 
 export const socketInfo = writable({
+  "count": 0,
   "activity": {},
   "metadata": {
     "address": "",
@@ -25,6 +26,7 @@ export const removeActivity = id => {
     delete i.activity[id]
     return i
   })
+  return true
 }
 
 
@@ -69,6 +71,16 @@ const updateData = data => {
   data = JSON.parse(data)
   socketInfo.update(i => {
     let obj = deepMerge(i, data)
+    /*
+    if (obj.count == 0) {
+      console.log(obj)
+    }
+    if (i.count < 5) {
+      obj.count = ++i.count
+    } else {
+      obj.count = 0
+    }
+    */
     return obj
   })
 }

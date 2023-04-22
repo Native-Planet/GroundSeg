@@ -67,6 +67,9 @@ class UrbitDocker:
                 if act == "pack":
                     success_message = "pack"
                     script = Utils.pack_script()
+                if act == "meld":
+                    success_message = "meld"
+                    script = Utils.meld_script()
                 f.write(script)
                 f.close()
             c.start()
