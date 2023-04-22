@@ -1,19 +1,24 @@
 from time import sleep
+from datetime import datetime
+
 from log import Log
 
 class MeldUrth:
-    def __init__(self, patp, urb, set_action):
+    def __init__(self, parent, patp, urb):
+        self.start = parent.start # start function
+        self.set_action = parent.set_action # set action is structure
+        self.get_config = parent.get_config # retrieves value from <patp>.json
+        self.set_config = parent.set_config # modify <patp>.json
         self.patp = patp
         self.urb = urb
-        self.set_action = set_action
-        # TODO: Avoid interacting with urb_docker directly
         self.urb_docker = urb.urb_docker
 
-    def full(self, start):
+    def run(self):
         # start is container start command (see ws_urbits.py)
         patp = self.patp
         running = self.stop_running(patp)
         devmode = self.stop_devmode(patp)
+        start = self.start
 
         try:
             if self.action(patp,'pack', start):
@@ -21,6 +26,7 @@ class MeldUrth:
                     self.revert_devmode(patp, devmode)
                     if self.revert_running(patp, running, start):
                         Log.log(f"{patp}: Urth Pack and Meld action completed")
+                        self.set_meld_status(patp)
                         self.broadcast("success")
                     else:
                         raise Exception()
@@ -31,7 +37,6 @@ class MeldUrth:
         except Exception:
             Log.log(f"{patp}: Urth Pack and Meld action did not complete")
             self.broadcast("failure")
-
         sleep(3)
         self.broadcast("")
 
@@ -80,3 +85,21 @@ class MeldUrth:
         else:
             Log.log(f"{patp}: Failed to Urth {act}")
             return False
+
+    # Set last Meld
+    def set_meld_status(self, patp):
+        # Get the current time
+        now = datetime.utcnow()
+        # set current time in as meld_last
+        self.set_config(patp, 'meld_last', str(int(now.timestamp())))
+
+        # set next meld schedule
+        meld_time = self.get_config(patp, 'meld_time')
+        hour = meld_time[0:2]
+        minute = meld_time[2:]
+        day = self.get_config(patp, 'meld_frequency') * 60 * 60 * 24
+        next_time = int(now.replace(hour=int(hour),
+                                    minute=int(minute),
+                                    second=0
+                                    ).timestamp())
+        self.set_config(patp, 'meld_next', str(next_time + day))

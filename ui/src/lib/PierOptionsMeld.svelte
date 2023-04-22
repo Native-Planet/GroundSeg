@@ -80,8 +80,6 @@
           console.log("meld-urth:" + id + " checking broadcast..")
           setTimeout(make, 500)
         } else {
-          console.log("meld-urth:" + id + " returned")
-          console.log("meld-urth:" + id + " " + JSON.stringify(res))
           removeActivity(id)
           console.log("meld-urth:" + id + " done")
         }

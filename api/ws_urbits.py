@@ -15,6 +15,7 @@ class WSUrbits:
             self.set_action(patp, 'meld', 'urth')
         Log.log("WS: Data ready for broadcast")
 
+    # send to structure dict
     def set_action(self, patp, module, action, info=""):
         # Set patp to dict
         try:
@@ -44,17 +45,37 @@ class WSUrbits:
         return True
 
     #
-    #   Actions
+    #   interacting with self._urbits dict (config)
+    #
+
+    def get_config(self, patp, key):
+        try:
+            return self._urbits[patp][key]
+        except:
+            return None
+
+    def set_config(self, patp, key, value):
+        try:
+            old_value = self._urbits[patp][key]
+            self._urbits[patp][key] = value
+            Log.log(f"WS: {patp}: '{key}':{old_value} -> '{key}':{value}")
+            self.urb.save_config(patp)
+            return True
+        except Exception as e:
+            Log.log(f"WS: {patp} set config failed: {e}")
+        return False
+
+    #
+    #   actions sent to the Urbit container
     #
 
     def meld_urth(self, patp):
-        MeldUrth(patp, self.urb, self.set_action).full(self.start)
+        MeldUrth(self, patp, self.urb).run()
 
     def start(self, patp, act):
         ship = self._urbits[patp]
         arch = self.config_object._arch
         vol = self.urb._volume_directory
         key = ''
-
         res = self.urb.urb_docker.start(ship, arch, vol, key, act)
         return res
