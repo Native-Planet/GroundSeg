@@ -70,11 +70,16 @@
       <SettingsButton />
       <AnchorButton />
       <HomeButton />
+      <!-- {#if !$socketInfo.metadata.connected} -->
+      <!-- {/if} -->
       <!--LinuxButton /-->
       {/if}
       <slot/>
       <BugButton />
     </div>
+  {/if}
+  {#if !$socketInfo.metadata.connected}
+    <div class="ws">websocket api retrying</div>
   {/if}
 </div>
 
@@ -98,5 +103,15 @@
   .frozen {
     opacity: 0;
     pointer-events: none;
+  }
+  .ws {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    color: orange;
+    font-size: 12px;
+    margin: 12px;
   }
 </style>

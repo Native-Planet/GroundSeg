@@ -23,14 +23,18 @@ export const disconnect = ws => {
 
 export const connect = async (addr, cookie, info) => {
   let ws = new WebSocket(addr)
-  let connected = false
   ws.addEventListener('open', e => {
     updateMetadata("connected", e.returnValue)
     send(ws, info, cookie, {"category":"ping"}) 
   })
   ws.addEventListener('message', e => updateData(e.data))
   ws.addEventListener('error', e => console.log('error:', e))
-  ws.addEventListener('close', e => console.log('closed:', e))
+  ws.addEventListener('close', e =>setTimeout(()=>{
+    console.log("Websocket closed")
+    updateMetadata("connected", false)
+    console.log("Attempting to reconnect")
+    connect(addr, cookie, info)
+  }, 1000))
   socket.set(ws)
   updateMetadata("address", addr)
 }
