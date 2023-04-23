@@ -1,6 +1,6 @@
 <script>
   // WebSocket Store
-  import { socket, socketInfo, send, removeActivity } from "$lib/stores/websocket.js" 
+  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
   import { genRequestId } from '$lib/scripts/session.js'
 
   import { onMount, onDestroy } from 'svelte'
@@ -64,30 +64,12 @@
     "action": "now"
     "action": "set"
   */
-  const sendUrthMeld = async () => {
-    if ($socketInfo.metadata.connected) {
-      let payload = {
-        "category": "urbits",
-        "payload": {
-          "patp": name,
-          "module": "meld",
-          "action": "urth"
-        }
-      }
-      let id = await send($socket, document.cookie, payload)
-      const make = async () => {
-        if (!$socketInfo.activity.hasOwnProperty(id)) {
-          console.log("meld-urth:" + id + " checking broadcast..")
-          setTimeout(make, 500)
-        } else {
-          removeActivity(id)
-          console.log("meld-urth:" + id + " done")
-        }
-      }
-      make()
-    } else {
-      console.error("Unable to send urth meld to websocket")
+  const sendUrthMeld = () => {
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "meld", "action": "urth"}
     }
+    send($socket, $socketInfo, document.cookie, payload)
   }
 
   const toggleMeldSchedule = () => {

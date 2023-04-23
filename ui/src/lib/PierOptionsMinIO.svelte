@@ -1,5 +1,6 @@
 <script>
   import { api } from '$lib/api'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   import PierAdvancedMinIOSetup from '$lib/PierAdvancedMinIOSetup.svelte'
@@ -14,6 +15,8 @@
 
   let showSetup = false
 
+  $: linkInfo = $socketInfo.urbits[name].minio.link
+
   // Button status
   let linkButtonStatus = 'standard',
     unlinkButtonStatus = 'standard',
@@ -21,22 +24,11 @@
 
 	// Update Urbit S3 endpoint
 	const updateMinIO = () => {
-      linkButtonStatus = 'loading'
-			fetch($api + '/urbit?urbit_id=' + name, {
-			method: 'POST',
-        credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'app':'pier','data':'s3-update'})
-	  })
-      .then(r => r.json())
-			.then(d => { if (d == 200) {
-				linkButtonStatus = 'success'
-				setTimeout(()=>linkButtonStatus='standard', 3000)
-			} else {
-				linkButtonStatus = 'failure'
-				setTimeout(()=>linkButtonStatus='standard', 3000)
-        }})
-      .catch(err => console.log(err))
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "minio", "action": "link"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
   }
 
 	const unlinkMinIO = () => {
@@ -93,14 +85,29 @@
         />
       {/if}
       <div class="mid-wrapper">
-        <PrimaryButton
-          noMargin={true}
-          standard="Link to Urbit"
-          success="MinIO linked!"
-          failure="Something went wrong"
-          loading="Linking..."
-          status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
-          on:click={updateMinIO} />
+        {#if linkInfo.length <= 0}
+          <PrimaryButton
+            noMargin={true}
+            standard="Link to Urbit"
+            status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
+            on:click={updateMinIO} />
+        {:else}
+          {#if linkInfo == "create-account"}
+            <div class="link-info">creating secret key</div>
+          {/if}
+          {#if linkInfo == "link-click"}
+            <div class="link-info">trying with click</div>
+          {/if}
+          {#if linkInfo == "link-lens"}
+            <div class="link-info orange">trying with lens</div>
+          {/if}
+          {#if linkInfo == "success"}
+            <div class="link-info lime">linked!</div>
+          {/if}
+          {#if linkInfo == "failure red"}
+            <div class="link-info">failed to link</div>
+          {/if}
+        {/if}
         <PrimaryButton
           noMargin={true}
           background="#FFFFFF4D"
@@ -143,5 +150,21 @@
     display: flex;
     gap: 8px;
     justify-content: center;
+  }
+  .link-info {
+    font-size: 12px;
+    margin: auto 0;
+    width: 95px;
+    animation: breathe 2s infinite;
+  }
+  .red {
+    color: red;
+  }
+  .orange {
+    color: orange;
+  }
+  .lime {
+    color: lime;
+    animation: none;
   }
 </style>

@@ -127,7 +127,6 @@
       } else {
         setTimeout(getUrbitCode, 1000)
       }
-      console.log(code)
   }}
 
 

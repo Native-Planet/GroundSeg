@@ -2,6 +2,7 @@ from log import Log
 
 # Action imports
 from action_meld_urth import MeldUrth
+from action_minio_link import MinIOLink
 
 class WSUrbits:
     def __init__(self, config, structure, urb):
@@ -13,6 +14,7 @@ class WSUrbits:
 
         for patp in self.config['piers']:
             self.set_action(patp, 'meld', 'urth')
+            self.set_action(patp, 'minio', 'link')
         Log.log("WS: Data ready for broadcast")
 
     # send to structure dict
@@ -69,9 +71,6 @@ class WSUrbits:
     #   actions sent to the Urbit container
     #
 
-    def meld_urth(self, patp):
-        MeldUrth(self, patp, self.urb).run()
-
     def start(self, patp, act):
         ship = self._urbits[patp]
         arch = self.config_object._arch
@@ -79,3 +78,10 @@ class WSUrbits:
         key = ''
         res = self.urb.urb_docker.start(ship, arch, vol, key, act)
         return res
+
+    def meld_urth(self, patp):
+        self.set_action(patp, 'meld', 'urth','initializing')
+        MeldUrth(self, patp, self.urb).run()
+
+    def minio_link(self, pier_config, acc, secret, bucket):
+        MinIOLink(self, self.urb).link(pier_config, acc, secret, bucket)

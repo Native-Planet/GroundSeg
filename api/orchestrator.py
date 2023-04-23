@@ -18,7 +18,10 @@ from system_get import SysGet
 from system_post import SysPost
 from bug_report import BugReport
 from utils import Utils
+
+# Websocket
 from ws_urbits import WSUrbits
+from ws_minios import WSMinIOs
 
 # Docker
 from netdata import Netdata
@@ -56,6 +59,7 @@ class Orchestrator:
         self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
         self.ws_urbits = WSUrbits(self.config_object, self.structure, self.urbit)
+        self.ws_minios = WSMinIOs(self.minio, self.ws_urbits.set_action)
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
@@ -69,22 +73,45 @@ class Orchestrator:
             payload = data['payload']
             # if category is urbits
             if data['category'] == 'urbits':
+                # hardcoded list of allowed modules
+                whitelist = [
+                        'meld',
+                        'minio'
+                        ]
                 patp = payload['patp']
                 module = payload['module']
                 action = payload['action']
 
-                # TODO: streamline condition check
-                # Check for structure in whitelist 
-                # before adding action
-                if True:
-                    self.ws_urbits.set_action(patp, module, action,'initializing')
+                if module not in whitelist:
+                    raise Exception(f"{module} is not a valid module")
+
+                # MinIO
+                if module == "minio":
+                    if action == "link":
+                        Thread(target=self.minio_link, args=(patp,)).start()
+
+                # Pack and Meld
                 if module == "meld":
                     if action == "urth":
                         Thread(target=self.ws_urbits.meld_urth, args=(patp,)).start()
-                        return "succeeded"
+
+                return "succeeded"
+
             raise Exception(f"'{data['category']}' is not a valid category")
         except Exception as e:
-            raise Exception(f"{e}")
+            raise Exception(e)
+
+    # Combo functions
+    def minio_link(self, patp):
+        # create minio service account
+        pier_config = self.urbit._urbits[patp]
+        acc, secret = self.ws_minios.create_account(pier_config)
+        if acc and secret:
+            bucket = 'bucket'
+            # set in urbit
+            res = self.ws_urbits.minio_link(pier_config, acc, secret, bucket)
+        else:
+            Log.log("WS: {patp} minio:link failed") 
 
     #
     #   Setup
@@ -203,9 +230,6 @@ class Orchestrator:
                 if data['data'] == 'do-meld':
                     return self.urbit.send_pack_meld(urbit_id)
 
-                if data['data'] == 'urth-meld':
-                    return self.urbit.urth_meld(urbit_id)
-
                 if data['data'] == 'delete':
                     return self.urbit.delete(urbit_id)
 
@@ -214,9 +238,6 @@ class Orchestrator:
 
                 if data['data'] == 'devmode':
                     return self.urbit.toggle_devmode(data['on'], urbit_id)
-
-                if data['data'] == 's3-update':
-                    return self.urbit.set_minio(urbit_id)
 
                 if data['data'] == 's3-unlink':
                     return self.urbit.unlink_minio(urbit_id)
@@ -417,22 +438,25 @@ class Orchestrator:
             if data['action'] == 'change-url':
                 return self.wireguard.change_url(data['url'], self.urbit, self.minio)
 
-            if data['action'] == 'register':
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f"https://{endpoint}/{api_version}"
+            try:
+                if data['action'] == 'register':
+                    endpoint = self.config['endpointUrl']
+                    api_version = self.config['apiVersion']
+                    url = f"https://{endpoint}/{api_version}"
 
-                if self.wireguard.build_anchor(url, data['key'], data['region']):
-                    self.minio.start_mc()
-                    self.config['wgRegistered'] = True
-                    self.config['wgOn'] = True
+                    if self.wireguard.build_anchor(url, data['key'], data['region']):
+                        self.minio.start_mc()
+                        self.config['wgRegistered'] = True
+                        self.config['wgOn'] = True
 
-                    for patp in self.config['piers']:
-                        self.urbit.register_urbit(patp, url)
+                        for patp in self.config['piers']:
+                            self.urbit.register_urbit(patp, url)
 
-                    if self.config_object.save_config():
-                        if self.wireguard.start():
-                            return 200
+                        if self.config_object.save_config():
+                            if self.wireguard.start():
+                                return 200
+            except Exception as e:
+                Log.log(f"Anchor: Failed to register endpoint")
 
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']
