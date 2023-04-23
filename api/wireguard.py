@@ -190,6 +190,9 @@ class Wireguard:
         Log.log("Wireguard: Changed url")
         self.config_object.save_config()
         if self.config['endpointUrl'] == url:
+            self.region_data = {}
+            self.anchor_data = {}
+            self.get_regions(f"https://{url}/{api_version}")
             return 200
         return 400
 
@@ -238,6 +241,8 @@ class Wireguard:
 
     # /v1/regions
     def get_regions(self, url, tries=3):
+        Log.log("Anchor: Attempting to get regions")
+        self.region_data = {}
         full_url = f"{url}/regions"
         err_count = 0
         while err_count < tries:
