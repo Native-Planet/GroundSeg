@@ -13,3 +13,4 @@ nmcli
 PyAccessPoint
 cryptography
 asyncio
+websockets
