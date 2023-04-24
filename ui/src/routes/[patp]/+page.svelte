@@ -127,7 +127,6 @@
       } else {
         setTimeout(getUrbitCode, 1000)
       }
-      console.log(code)
   }}
 
 
@@ -289,7 +288,7 @@
             minIOReg={urbit.minIOReg}
             hasBucket={urbit.hasBucket}
             name={urbit.name}
-            disabled={urbit.devMode}
+            disabled={urbit.click ? false : urbit.devMode}
           />
           <PierOptionsDomain
             name={urbit.name}

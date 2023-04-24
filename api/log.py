@@ -16,7 +16,7 @@ class Log:
             current_logfile = f"{datetime.now().strftime('%Y-%m')}.log"
 
             # move legacy logfile to new directory
-            if os.path.isfile(f"/opt/nativeplanet/groundseg/groundseg.log"):
+            if os.path.isfile("/opt/nativeplanet/groundseg/groundseg.log"):
                 shutil.move("/opt/nativeplanet/groundseg/groundseg.log",
                             f"/opt/nativeplanet/groundseg/logs/{current_logfile}")
 

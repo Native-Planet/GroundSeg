@@ -1,5 +1,6 @@
 <script>
   import { api } from '$lib/api'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   import PierAdvancedMinIOSetup from '$lib/PierAdvancedMinIOSetup.svelte'
@@ -14,48 +15,29 @@
 
   let showSetup = false
 
+  $: linkInfo = $socketInfo.urbits[name].minio.link
+  $: unlinkInfo = $socketInfo.urbits[name].minio.unlink
+
   // Button status
-  let linkButtonStatus = 'standard',
-    unlinkButtonStatus = 'standard',
-    exportBucketStatus = 'standard'
+  let linkButtonStatus = 'standard'
+  let unlinkButtonStatus = 'standard'
+  let exportBucketStatus = 'standard'
 
 	// Update Urbit S3 endpoint
 	const updateMinIO = () => {
-      linkButtonStatus = 'loading'
-			fetch($api + '/urbit?urbit_id=' + name, {
-			method: 'POST',
-        credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'app':'pier','data':'s3-update'})
-	  })
-      .then(r => r.json())
-			.then(d => { if (d == 200) {
-				linkButtonStatus = 'success'
-				setTimeout(()=>linkButtonStatus='standard', 3000)
-			} else {
-				linkButtonStatus = 'failure'
-				setTimeout(()=>linkButtonStatus='standard', 3000)
-        }})
-      .catch(err => console.log(err))
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "minio", "action": "link"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
   }
 
 	const unlinkMinIO = () => {
-      unlinkButtonStatus = 'loading'
-			fetch($api + '/urbit?urbit_id=' + name, {
-			method: 'POST',
-        credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'app':'pier','data':'s3-unlink'})
-	  })
-      .then(r => r.json())
-			.then(d => { if (d == 200) {
-				unlinkButtonStatus = 'success'
-				setTimeout(()=>unlinkButtonStatus='standard', 3000)
-			} else {
-				unlinkButtonStatus = 'failure'
-				setTimeout(()=>unlinkButtonStatus='standard', 3000)
-        }})
-      .catch(err => console.log(err))
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "minio", "action": "unlink"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
   }
 
   const exportBucket = () => {
@@ -93,23 +75,51 @@
         />
       {/if}
       <div class="mid-wrapper">
-        <PrimaryButton
-          noMargin={true}
-          standard="Link to Urbit"
-          success="MinIO linked!"
-          failure="Something went wrong"
-          loading="Linking..."
-          status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
-          on:click={updateMinIO} />
-        <PrimaryButton
-          noMargin={true}
-          background="#FFFFFF4D"
-          standard="Unlink"
-          success="MinIO unlinked from Urbit!"
-          failure="Something went wrong"
-          loading="Removing link..."
-          status={disabled || !minIOReg ? "disabled" : unlinkButtonStatus}
-          on:click={unlinkMinIO} />
+        {#if linkInfo.length <= 0}
+          <PrimaryButton
+            noMargin={true}
+            standard="Link to Urbit"
+            status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
+            on:click={updateMinIO} />
+        {:else}
+          {#if linkInfo == "create-account"}
+            <div class="link-info">creating secret key</div>
+          {/if}
+          {#if linkInfo == "link-click"}
+            <div class="link-info">trying with click</div>
+          {/if}
+          {#if linkInfo == "link-lens"}
+            <div class="link-info orange">trying with lens</div>
+          {/if}
+          {#if linkInfo == "success"}
+            <div class="link-info lime">linked!</div>
+          {/if}
+          {#if linkInfo == "failure red"}
+            <div class="link-info">failed to link</div>
+          {/if}
+        {/if}
+        {#if unlinkInfo.length <= 0}
+          <PrimaryButton
+            noMargin={true}
+            background="#FFFFFF4D"
+            standard="Unlink"
+            status={disabled || !minIOReg ? "disabled" : unlinkButtonStatus}
+            on:click={unlinkMinIO}
+          />
+        {:else}
+          {#if unlinkInfo == "link-click"}
+            <div class="link-info">trying with click</div>
+          {/if}
+          {#if unlinkInfo == "link-lens"}
+            <div class="link-info orange">trying with lens</div>
+          {/if}
+          {#if unlinkInfo == "success"}
+            <div class="link-info lime">unlinked!</div>
+          {/if}
+          {#if unlinkInfo == "failure red"}
+            <div class="link-info">failed to unlink</div>
+          {/if}
+        {/if}
       </div>
       <PrimaryButton
         noMargin={true}
@@ -117,7 +127,8 @@
         standard="Export Bucket"
         loading="Compressing your files.."
         status={hasBucket && minIOReg ? exportBucketStatus : "disabled"}
-        on:click={exportBucket} />
+        on:click={exportBucket}
+      />
     </div>
   {/if}
 </div>
@@ -143,5 +154,21 @@
     display: flex;
     gap: 8px;
     justify-content: center;
+  }
+  .link-info {
+    font-size: 12px;
+    margin: auto 0;
+    width: 95px;
+    animation: breathe 2s infinite;
+  }
+  .red {
+    color: red;
+  }
+  .orange {
+    color: orange;
+  }
+  .lime {
+    color: lime;
+    animation: none;
   }
 </style>

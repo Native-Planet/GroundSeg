@@ -93,7 +93,7 @@ class MCDocker:
             return True
 
     def exec(self, name, command):
-        Log.log(f"MC: Executing command")
+        Log.log("MC: Executing command")
         c = self.get_container(name)
         if c:
             try:

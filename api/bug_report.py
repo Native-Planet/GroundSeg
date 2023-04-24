@@ -49,7 +49,7 @@ class BugReport:
                         bug_file.writestr(f'failed_{p}.log',e)
             except Exception as e:
                 Log.log(f"Bug: Failed to get pier logs: {e}")
-                bug_file.writestr(f'failed_pier_logs',e)
+                bug_file.writestr('failed_pier_logs',e)
 
             # Load configs
             try:

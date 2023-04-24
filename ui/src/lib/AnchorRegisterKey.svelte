@@ -65,7 +65,7 @@
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
-    {#if regions != null}
+    {#if regions.length > 0}
       <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Region</div>
       <div class="regions-wrapper">
         {#each regions as r}

@@ -20,6 +20,20 @@ class GroundSeg:
         #   Routes
         #
 
+        # temp get regions
+        @self.app.route("/get-regions", methods=['GET'])
+        def temp_get_regions():
+            approved, message = self.verify(request)
+            if approved:
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f"https://{endpoint}/{api_version}"
+                if self.orchestrator.wireguard.get_regions(url):
+                    return jsonify(200)
+                return jsonify(400)
+
+            return message
+
         # Check if cookie is valid
         @self.app.route("/cookies", methods=['GET'])
         def check_cookies():

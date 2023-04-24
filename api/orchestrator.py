@@ -5,6 +5,7 @@ import socket
 import subprocess
 from time import sleep
 from datetime import datetime
+from threading import Thread
 
 # Flask
 from werkzeug.utils import secure_filename
@@ -18,6 +19,10 @@ from system_post import SysPost
 from bug_report import BugReport
 from utils import Utils
 
+# Websocket
+from ws_urbits import WSUrbits
+from ws_minios import WSMinIOs
+
 # Docker
 from netdata import Netdata
 from wireguard import Wireguard
@@ -28,6 +33,12 @@ from webui import WebUI
 class Orchestrator:
 
     wireguard = None
+    authorized_clients = set()
+    unauthorized_clients = set() # unused for now
+    structure = {
+            "urbits": {},
+            "system": {}
+            }
 
     def __init__(self, config):
         self.config_object = config
@@ -47,9 +58,82 @@ class Orchestrator:
         self.minio = MinIO(config, self.wireguard)
         self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
+        self.ws_urbits = WSUrbits(self.config_object, self.structure, self.urbit)
+        self.ws_minios = WSMinIOs(self.minio, self.ws_urbits.set_action)
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
+
+    #
+    #   Websocket API
+    #
+
+    def ws_command(self, data, websocket):
+        try:
+            payload = data['payload']
+            # if category is urbits
+            if data['category'] == 'urbits':
+                # hardcoded list of allowed modules
+                whitelist = [
+                        'meld',
+                        'minio'
+                        ]
+                patp = payload['patp']
+                module = payload['module']
+                action = payload['action']
+
+                if module not in whitelist:
+                    raise Exception(f"{module} is not a valid module")
+
+                # MinIO
+                if module == "minio":
+                    if action == "link":
+                        Thread(target=self.minio_link, args=(patp,)).start()
+                    if action == "unlink":
+                        Thread(target=self.minio_unlink, args=(patp,)).start()
+
+                # Pack and Meld
+                if module == "meld":
+                    if action == "urth":
+                        Thread(target=self.ws_urbits.meld_urth, args=(patp,)).start()
+
+                return "succeeded"
+
+            raise Exception(f"'{data['category']}' is not a valid category")
+        except Exception as e:
+            raise Exception(e)
+
+    #
+    # Combo functions
+    #
+
+    def minio_link(self, patp):
+        # create minio service account
+        pier_config = self.urbit._urbits[patp]
+        acc, secret = self.ws_minios.create_account(pier_config)
+        if acc and secret:
+            bucket = 'bucket'
+            # set in urbit
+            self.ws_urbits.minio_link(pier_config, acc, secret, bucket)
+        else:
+            Log.log("WS: {patp} minio:link failed") 
+
+    def minio_unlink(self, patp): # temp
+        pier_config = self.urbit._urbits[patp]
+        self.ws_urbits.minio_link(pier_config, unlink=True) # unlink shorthand
+
+    def minio_create(self, patp, pwd, link):
+        res = self.minio.create_minio(patp, pwd, self.urbit)
+        if link and (res == 200):
+            self.minio_link(patp)
+        return res
+
+    def domain_cname(self, patp, data):
+        link = data['relink']
+        res = self.urbit.custom_domain(patp, data)
+        if link and (res == 200):
+            self.minio_link(patp)
+        return res
 
     #
     #   Setup
@@ -168,9 +252,6 @@ class Orchestrator:
                 if data['data'] == 'do-meld':
                     return self.urbit.send_pack_meld(urbit_id)
 
-                if data['data'] == 'urth-meld':
-                    return self.urbit.urth_meld(urbit_id)
-
                 if data['data'] == 'delete':
                     return self.urbit.delete(urbit_id)
 
@@ -180,21 +261,21 @@ class Orchestrator:
                 if data['data'] == 'devmode':
                     return self.urbit.toggle_devmode(data['on'], urbit_id)
 
-                if data['data'] == 's3-update':
-                    return self.urbit.set_minio(urbit_id)
-
                 if data['data'] == 's3-unlink':
                     return self.urbit.unlink_minio(urbit_id)
 
             # Custom domain
             if data['app'] == 'cname':
-                return self.urbit.custom_domain(urbit_id, data['data'])
+                # reroute to websocket
+                return self.domain_cname(urbit_id, data['data'])
 
             # MinIO requests
             if data['app'] == 'minio':
                 pwd = data.get('password')
-                if pwd != None:
-                    return self.minio.create_minio(urbit_id, pwd, self.urbit,data['link'])
+                if pwd is not None:
+                    link = data.get('link')
+                    # reroute to websocket
+                    return self.minio_create(urbit_id, pwd, link)
 
                 if data['data'] == 'export':
                     return self.minio.export(urbit_id)
@@ -232,16 +313,16 @@ class Orchestrator:
         except:
             active_region = None
 
-        if lease != None:
+        if lease is not None:
             x = list(map(int,lease.split('-')))
             lease_end = datetime(x[0], x[1], x[2], 0, 0)
 
         regions = Utils.convert_region_data(self.wireguard.region_data)
 
         try:
-            if not (active_region in self.wireguard.region_data):
+            if active_region not in self.wireguard.region_data:
                 active_region = None
-        except Exception as e:
+        except Exception:
             Log.log("Anchor: Failed to check active region: {e}")
             active_region = None
 
@@ -382,22 +463,25 @@ class Orchestrator:
             if data['action'] == 'change-url':
                 return self.wireguard.change_url(data['url'], self.urbit, self.minio)
 
-            if data['action'] == 'register':
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f"https://{endpoint}/{api_version}"
+            try:
+                if data['action'] == 'register':
+                    endpoint = self.config['endpointUrl']
+                    api_version = self.config['apiVersion']
+                    url = f"https://{endpoint}/{api_version}"
 
-                if self.wireguard.build_anchor(url, data['key'], data['region']):
-                    self.minio.start_mc()
-                    self.config['wgRegistered'] = True
-                    self.config['wgOn'] = True
+                    if self.wireguard.build_anchor(url, data['key'], data['region']):
+                        self.minio.start_mc()
+                        self.config['wgRegistered'] = True
+                        self.config['wgOn'] = True
 
-                    for patp in self.config['piers']:
-                        self.urbit.register_urbit(patp, url)
+                        for patp in self.config['piers']:
+                            self.urbit.register_urbit(patp, url)
 
-                    if self.config_object.save_config():
-                        if self.wireguard.start():
-                            return 200
+                        if self.config_object.save_config():
+                            if self.wireguard.start():
+                                return 200
+            except Exception as e:
+                Log.log(f"Anchor: Failed to register endpoint")
 
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']
@@ -436,7 +520,7 @@ class Orchestrator:
 
             blob = blob.decode('utf-8').split('\n')[line:]
 
-        except Exception as e:
+        except Exception:
             Log.log(f"Logs: Failed to get logs for {container}")
 
         return blob
@@ -515,7 +599,7 @@ class Orchestrator:
         file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"
         os.makedirs(file_subfolder, exist_ok=True)
 
-        fn = save_path = f"{file_subfolder}/{filename}"
+        save_path = f"{file_subfolder}/{filename}"
         current_chunk = int(req.form['dzchunkindex'])
 
         if current_chunk == 0:

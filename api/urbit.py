@@ -1,6 +1,5 @@
 # Python
 import os
-import re
 import copy
 import time
 import json
@@ -10,7 +9,6 @@ import string
 import secrets
 import zipfile
 import tarfile
-import subprocess
 
 from io import BytesIO
 from time import sleep
@@ -171,7 +169,7 @@ class Urbit:
         Log.log("Urbit: Starting all ships")
         res = {"failed":[],"succeeded":[],"ignored":[],"invalid":[]}
         if len(patps) < 1:
-            Log.log(f"Urbit: No ships detected in system.json! Skipping..")
+            Log.log("Urbit: No ships detected in system.json! Skipping..")
             return True
 
         for p in patps:
@@ -582,7 +580,7 @@ class Urbit:
             with open(f'{self._volume_directory}/{patp}/_data/{name}.hoon','w') as f :
                 f.write(hoon)
                 f.close()
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Creating {name}.hoon failed")
             return False
         return True
@@ -593,7 +591,7 @@ class Urbit:
             hoon_file = f'{self._volume_directory}/{patp}/_data/{name}.hoon'
             if os.path.exists(hoon_file):
                 os.remove(hoon_file)
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Deleting {name}.hoon failed")
             return False
         return True
@@ -604,8 +602,8 @@ class Urbit:
         hoon = "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  code=@p  bind:m  (scry @p /j/code/(scot %p our))  (pure:m !>((crip (slag 1 (scow %p code)))))"
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        code = Click.filter_code(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        code = Click().filter_code(raw)
         self._urbits[patp]['click'] = True
         self.delete_hoon(patp, name)
 
@@ -818,14 +816,6 @@ class Urbit:
                 return 200
         return 400
 
-    '''
-    def urth_meld(self, patp):
-        from urth import Urth
-        urth = Urth(patp, self._urbits[patp])
-        return urth.pack_meld()
-    '''
-
-
     def send_pack(self, patp, hoon, lens_addr):
         Log.log(f"{patp}: Attempting to send |pack")
         # Naming the hoon file
@@ -833,8 +823,8 @@ class Urbit:
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        pack = Click.filter_pack_meld(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        pack = Click().filter_pack_meld(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If pack failed
@@ -875,8 +865,8 @@ class Urbit:
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        meld = Click.filter_pack_meld(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        meld = Click().filter_pack_meld(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If meld failed
@@ -890,7 +880,7 @@ class Urbit:
 
                 command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
                 meld = self.urb_docker.exec(patp, command)
-            except Exception as e:
+            except Exception:
                 Log.log(f"{patp}: Failed to send |meld")
                 # Set meld to false when error
                 meld = False
@@ -941,7 +931,7 @@ class Urbit:
             self.config['piers'].append(patp)
             self.config_object.save_config()
             return True
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Failed to add @p to system.json")
 
         return False
@@ -1032,25 +1022,12 @@ class Urbit:
             self._urbits[patp]['wg_s3_port'] = s3_port
             self._urbits[patp]['wg_console_port'] = console_port
             return self.save_config(patp)
-        except Exception as e:
+        except Exception:
             Log.log(f"{patp}: Failed to set wireguard information")
             return False
 
     # Update/Set Urbit S3 Endpoint
-    def set_minio(self, patp):
-        Log.log(f"{patp}: Attempting to set MinIO endpoint")
-        acc = 'urbit_minio'
-        secret = ''.join(secrets.choice(
-            string.ascii_uppercase + 
-            string.ascii_lowercase + 
-            string.digits) for i in range(40))
 
-        if self.minio.make_service_account(self._urbits[patp], patp, acc, secret):
-            u = self._urbits[patp]
-            endpoint = f"s3.{u['wg_url']}"
-            if len(u['custom_s3_web']) > 0:
-                endpoint = u['custom_s3_web']
-            bucket = 'bucket'
             lens_port = self.get_loopback_addr(patp)
             try:
                 return self.set_minio_endpoint(patp, endpoint, acc, secret, bucket, lens_port)
@@ -1059,50 +1036,6 @@ class Urbit:
                 Log.log(f"{patp}: Failed to set MinIO endpoint: {e}")
 
         return 400
-
-    def unlink_minio(self, patp):
-        Log.log(f"{patp}: Attempting to unlink MinIO endpoint")
-        try:
-            lens_port = self.get_loopback_addr(patp)
-            return self.unlink_minio_endpoint(patp, lens_port)
-        except Exception as e:
-            Log.log(f"{patp}: Failed to unlink MinIO endpoint: {e}")
-        return 400
-
-    def set_minio_endpoint(self, patp, endpoint, access_key, secret, bucket, lens_addr):
-        self.send_poke(patp, 'set-endpoint', endpoint, lens_addr)
-        self.send_poke(patp, 'set-access-key-id', access_key, lens_addr)
-        self.send_poke(patp, 'set-secret-access-key', secret, lens_addr)
-        self.send_poke(patp, 'set-current-bucket', bucket, lens_addr)
-
-        return 200
-
-    def unlink_minio_endpoint(self, patp, lens_addr):
-        self.send_poke(patp, 'set-endpoint', '', lens_addr)
-        self.send_poke(patp, 'set-access-key-id', '', lens_addr)
-        self.send_poke(patp, 'set-secret-access-key', '', lens_addr)
-        self.send_poke(patp, 'set-current-bucket', '', lens_addr)
-
-        return 200
-
-    def send_poke(self, patp, command, data, lens_addr):
-        Log.log(f"{patp}: Attempting to send {command} poke")
-        try:
-            data = {"source": {"dojo": f"+landscape!s3-store/{command} '{data}'"}, "sink": {"app": "s3-store"}}
-            with open(f'{self._volume_directory}/{patp}/_data/{command}.json','w') as f :
-                json.dump(data, f)
-
-            cmd = f'curl -s -X POST -H "Content-Type: application/json" -d @{command}.json {lens_addr}'
-            res = self.urb_docker.exec(patp, cmd)
-            if res:
-                os.remove(f'{self._volume_directory}/{patp}/_data/{command}.json')
-                Log.log(f"{patp}: {command} sent successfully")
-                return True
-
-        except Exception as e:
-            Log.log(f"{patp}: Failed to send {command}: {e}")
-
-        return False
 
     def fix_acme(self, patp):
         lens_addr = self.get_loopback_addr(patp)
@@ -1206,7 +1139,6 @@ class Urbit:
         svc = data['svc_type']
         alias = data['alias']
         op = data['operation']
-        relink = data['relink']
 
         # Urbit URL
         if svc == 'urbit-web':
@@ -1234,20 +1166,14 @@ class Urbit:
                     if self.wg.handle_alias(f"s3.{patp}", alias, 'post'):
                         self._urbits[patp]['custom_s3_web'] = alias
                         if self.save_config(patp):
-                            if not relink:
-                                return 200
-                            else:
-                                return self.set_minio(patp)
+                            return 200
 
             elif op == 'delete':
                 Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
                 if self.wg.handle_alias(f"s3.{patp}", alias, 'delete'):
                     self._urbits[patp]['custom_s3_web'] = ''
                     if self.save_config(patp):
-                        if not relink:
-                            return 200
-                        else:
-                            return self.set_minio(patp)
+                        return 200
         return 400
 
     def dns_record(self, patp, real, mask):

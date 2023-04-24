@@ -1,9 +1,5 @@
 import docker
-import json
-import pathlib
 import socket
-import tarfile
-import io
 
 from log import Log
 

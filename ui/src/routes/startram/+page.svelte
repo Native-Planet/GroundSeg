@@ -48,12 +48,24 @@
     if (data['status'] == 'setup') {
       window.location.href = "/setup"
     }
-
 		update()
     inView = true
+    tempGetRegions()
 	})
 
   onDestroy(()=> inView = false)
+
+  const tempGetRegions = () => {
+    fetch($api + "/get-regions",{credentials: "include"})
+      .then(r => r.json())
+      .then(x => {
+        if (x==200) {
+          console.log("regions requested")
+        } else {
+          setTimeout(tempGetRegions, 3000)
+        }
+      })
+  }
 	
 </script>
 
@@ -65,12 +77,14 @@
       <Logo t='StarTram'/>
     </AnchorHeader>
 
-    <AnchorInformation
-      region={$startram.region}
-      regions={$startram.regions}
-      ongoing={$startram.ongoing}
-      lease={$startram.lease}
-    />
+    {#if $startram.wgReg}
+      <AnchorInformation
+        region={$startram.region}
+        regions={$startram.regions}
+        ongoing={$startram.ongoing}
+        lease={$startram.lease}
+      />
+    {/if}
 
     <!-- Register Key -->
     <AnchorRegisterKey

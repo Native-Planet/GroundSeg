@@ -32,7 +32,7 @@ class AnchorUpdater:
                             if self.update_urbit():
                                 time.sleep((60 * 60 * 12) - 60)
 
-                except Exception as e:
+                except Exception:
                     Log.log("Anchor: Failed to get updated anchor information: {e}")
 
             time.sleep(60)
@@ -61,7 +61,7 @@ class AnchorUpdater:
                         elif f'console.s3.{patp}.{pub_url}' == ep['url']:
                             console_port = ep['port']
 
-                if not None in [svc_url,http_port,ames_port,s3_port,console_port, http_alias]:
+                if None not in [svc_url, http_port, ames_port, s3_port, console_port, http_alias]:
                     if not self.orchestrator.urbit.update_wireguard_network(
                             patp,
                             svc_url,

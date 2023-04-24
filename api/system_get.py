@@ -1,5 +1,4 @@
 # Python
-import subprocess
 
 # Modules
 import docker
@@ -35,6 +34,6 @@ class SysGet:
                 if con.conn_type == "wifi":
                     return con.name
         except:
-            Log.log(f"System: Can't get WiFi connection status")
+            Log.log("System: Can't get WiFi connection status")
 
         return ''

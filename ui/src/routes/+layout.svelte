@@ -1,6 +1,6 @@
 <script>
   // WebSocket Store
-  import { connect } from "$lib/stores/websocket.js" 
+  import { connect, socketInfo } from "$lib/stores/websocket.js" 
 
   import { onMount, afterUpdate } from 'svelte'
   import { get } from 'svelte/store'
@@ -51,7 +51,7 @@
   onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
     checkStatus()
-    connect("ws://" + $page.url.hostname + ":8000", document.cookie)
+    connect("ws://" + $page.url.hostname + ":8000", document.cookie, $socketInfo)
   })
 
 </script>
@@ -70,11 +70,16 @@
       <SettingsButton />
       <AnchorButton />
       <HomeButton />
+      <!-- {#if !$socketInfo.metadata.connected} -->
+      <!-- {/if} -->
       <!--LinuxButton /-->
       {/if}
       <slot/>
       <BugButton />
     </div>
+  {/if}
+  {#if !$socketInfo.metadata.connected}
+    <div class="ws">websocket api retrying</div>
   {/if}
 </div>
 
@@ -98,5 +103,15 @@
   .frozen {
     opacity: 0;
     pointer-events: none;
+  }
+  .ws {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    color: orange;
+    font-size: 12px;
+    margin: 12px;
   }
 </style>

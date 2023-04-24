@@ -68,7 +68,7 @@ class BinUpdater:
                 if cur_hash == dl_hash:
                     Log.log("Updater: No binary update required")
                 else:
-                    Log.log(f"Updater: Downloading new groundseg binary")
+                    Log.log("Updater: Downloading new groundseg binary")
 
                     # Stream chunks and write to file
                     dl = d[f"{self.arch}_url"]
@@ -85,7 +85,7 @@ class BinUpdater:
                     Log.log(f"Updater: Version server binary hash: {dl_hash}")
                     Log.log(f"Updater: Downloaded binary hash: {new_hash}")
                     if new_hash != dl_hash:
-                        Log.log(f"Updater: Hash mismatched. Incorrect file downloaded")
+                        Log.log("Updater: Hash mismatched. Incorrect file downloaded")
                     else:
                         # Remove old binary
                         Log.log("Updater: Removing old groundseg binary")

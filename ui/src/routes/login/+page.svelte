@@ -142,7 +142,11 @@
               type="password"
               placeholder='Password'
               disabled={buttonStatus != 'standard'}
-            />
+              on:keydown={e => {
+                if (e.key === 'Enter') {
+                  handleLogin()
+                }
+            }}>
           </div>
           <PrimaryButton
             top=24

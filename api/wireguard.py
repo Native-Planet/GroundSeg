@@ -1,8 +1,6 @@
-import sys
 import json
 import base64
 import requests
-import subprocess
 from time import sleep
 
 # GroundSeg modules
@@ -192,6 +190,9 @@ class Wireguard:
         Log.log("Wireguard: Changed url")
         self.config_object.save_config()
         if self.config['endpointUrl'] == url:
+            self.region_data = {}
+            self.anchor_data = {}
+            self.get_regions(f"https://{url}/{api_version}")
             return 200
         return 400
 
@@ -225,7 +226,6 @@ class Wireguard:
         Log.log("Anchor: Attempting to register device")
         try:
             update_data = {"reg_code" : reg_key,"pubkey":self.config['pubkey'],"region":region}
-            response = None
 
             res = requests.post(f'{url}/register',json=update_data,headers=self._headers).json()
             Log.log(f"Anchor: /register response: {res}")
@@ -241,6 +241,8 @@ class Wireguard:
 
     # /v1/regions
     def get_regions(self, url, tries=3):
+        Log.log("Anchor: Attempting to get regions")
+        self.region_data = {}
         full_url = f"{url}/regions"
         err_count = 0
         while err_count < tries:
@@ -264,7 +266,7 @@ class Wireguard:
         while err_count < 6:
             try:
                 data = requests.get(full_url,headers=self._headers).json()
-                if data['conf'] != None:
+                if data["conf"] is not None:
                     self.anchor_data = data
                     return True
                 raise Exception(f"conf is null: {data}")
@@ -359,13 +361,13 @@ class Wireguard:
         try:
             response = requests.post(f'{url}/delete',json=update_data,headers=headers).json()
             Log.log(f"Anchor: Service {service_type} deleted: {response}")
-        except Exception as e:
+        except Exception:
             Log.log(f"Anchor: Failed to delete service {service_type}")
             return None
         
     # /v1/stripe/cancel
     def cancel_subscription(self, reg_key, url):
-        Log.log(f"Anchor: Attempting to cancel subscription")
+        Log.log("Anchor: Attempting to cancel subscription")
         headers = {"Content-Type": "application/json"}
         data = {'reg_code': reg_key}
         response = None
@@ -374,7 +376,7 @@ class Wireguard:
             response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
             if response['error'] == 0:
                 if self.get_status(url):
-                    Log.log(f"Anchor: Successfully canceled subscription")
+                    Log.log("Anchor: Successfully canceled subscription")
                     return 200
 
         except Exception as e:
