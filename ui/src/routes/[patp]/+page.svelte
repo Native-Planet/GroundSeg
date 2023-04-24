@@ -224,7 +224,7 @@
         <div class="left-wrapper">
           <PierAdvancedCode {code} disabled={(code == null) || (code.length != 27) || !urbit.running} />
           <PierOptionsMeld 
-            disabled={urbit.devMode}
+            disabled={urbit.click ? false : urbit.devMode}
             timeNow={urbit.timeNow}
             frequency={urbit.frequency}
             name={urbit.name}

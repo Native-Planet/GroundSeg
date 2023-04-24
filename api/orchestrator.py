@@ -215,6 +215,8 @@ class Orchestrator:
         try:
             # Boot new Urbit
             if data['app'] == 'boot-new':
+                #TODO: move the entire endpoint to ws
+                self.ws_urbits.make_default(urbit_id)
                 return self.urbit.create(urbit_id, data.get('key'), data.get('remote'))
 
             # Check if Urbit Pier exists
@@ -647,6 +649,8 @@ class Orchestrator:
                 return "File size mismatched"
             else:
                 Log.log(f"{patp}: Upload complete")
+                #TODO: move the entire endpoint to ws
+                self.ws_urbits.make_default(patp)
                 res = self.urbit.boot_existing(filename, remote, fix)
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'

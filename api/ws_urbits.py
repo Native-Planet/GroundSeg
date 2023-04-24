@@ -13,10 +13,13 @@ class WSUrbits:
         self._urbits = self.urb._urbits 
 
         for patp in self.config['piers']:
-            self.set_action(patp, 'meld', 'urth')
-            self.set_action(patp, 'minio', 'link')
-            self.set_action(patp, 'minio', 'unlink')
+            self.make_default(patp)
         Log.log("WS: Data ready for broadcast")
+
+    def make_default(self, patp):
+        self.set_action(patp, 'meld', 'urth')
+        self.set_action(patp, 'minio', 'link')
+        self.set_action(patp, 'minio', 'unlink')
 
     # send to structure dict
     def set_action(self, patp, module, action, info=""):
