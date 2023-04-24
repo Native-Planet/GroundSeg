@@ -348,7 +348,7 @@ class Urbit:
 
             # Tarball
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
-                with tarfile.open(compressed_dir, "r:gz") as tar_ref:
+                with tarfile.open(compressed_dir, "r") as tar_ref:
                     total_size = sum((member.size for member in tar_ref.getmembers()))
                     self.config_object.upload_status[patp] = {
                             'status':'extracting',
