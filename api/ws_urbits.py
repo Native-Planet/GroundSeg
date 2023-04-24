@@ -15,6 +15,7 @@ class WSUrbits:
         for patp in self.config['piers']:
             self.set_action(patp, 'meld', 'urth')
             self.set_action(patp, 'minio', 'link')
+            self.set_action(patp, 'minio', 'unlink')
         Log.log("WS: Data ready for broadcast")
 
     # send to structure dict
@@ -83,5 +84,6 @@ class WSUrbits:
         self.set_action(patp, 'meld', 'urth','initializing')
         MeldUrth(self, patp, self.urb).run()
 
-    def minio_link(self, pier_config, acc, secret, bucket):
-        MinIOLink(self, self.urb).link(pier_config, acc, secret, bucket)
+    # TODO: remove unlink stuff
+    def minio_link(self, pier_config, acc="", secret="", bucket="", unlink=False):
+        MinIOLink(self, self.urb, unlink).link(pier_config, acc, secret, bucket)

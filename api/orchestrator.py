@@ -89,6 +89,8 @@ class Orchestrator:
                 if module == "minio":
                     if action == "link":
                         Thread(target=self.minio_link, args=(patp,)).start()
+                    if action == "unlink":
+                        Thread(target=self.minio_unlink, args=(patp,)).start()
 
                 # Pack and Meld
                 if module == "meld":
@@ -101,7 +103,10 @@ class Orchestrator:
         except Exception as e:
             raise Exception(e)
 
+    #
     # Combo functions
+    #
+
     def minio_link(self, patp):
         # create minio service account
         pier_config = self.urbit._urbits[patp]
@@ -109,9 +114,26 @@ class Orchestrator:
         if acc and secret:
             bucket = 'bucket'
             # set in urbit
-            res = self.ws_urbits.minio_link(pier_config, acc, secret, bucket)
+            self.ws_urbits.minio_link(pier_config, acc, secret, bucket)
         else:
             Log.log("WS: {patp} minio:link failed") 
+
+    def minio_unlink(self, patp): # temp
+        pier_config = self.urbit._urbits[patp]
+        self.ws_urbits.minio_link(pier_config, unlink=True) # unlink shorthand
+
+    def minio_create(self, patp, pwd, link):
+        res = self.minio.create_minio(patp, pwd, self.urbit)
+        if link and (res == 200):
+            self.minio_link(patp)
+        return res
+
+    def domain_cname(self, patp, data):
+        link = data['relink']
+        res = self.urbit.custom_domain(patp, data)
+        if link and (res == 200):
+            self.minio_link(patp)
+        return res
 
     #
     #   Setup
@@ -244,13 +266,16 @@ class Orchestrator:
 
             # Custom domain
             if data['app'] == 'cname':
-                return self.urbit.custom_domain(urbit_id, data['data'])
+                # reroute to websocket
+                return self.domain_cname(urbit_id, data['data'])
 
             # MinIO requests
             if data['app'] == 'minio':
                 pwd = data.get('password')
                 if pwd is not None:
-                    return self.minio.create_minio(urbit_id, pwd, self.urbit,data['link'])
+                    link = data.get('link')
+                    # reroute to websocket
+                    return self.minio_create(urbit_id, pwd, link)
 
                 if data['data'] == 'export':
                     return self.minio.export(urbit_id)

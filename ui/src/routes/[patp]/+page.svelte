@@ -288,7 +288,7 @@
             minIOReg={urbit.minIOReg}
             hasBucket={urbit.hasBucket}
             name={urbit.name}
-            disabled={urbit.devMode}
+            disabled={urbit.click ? false : urbit.devMode}
           />
           <PierOptionsDomain
             name={urbit.name}

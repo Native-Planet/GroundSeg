@@ -3,31 +3,46 @@ import json
 from time import sleep
 from datetime import datetime
 
+from click_wrapper import Click
 from log import Log
 
 class MinIOLink:
-    def __init__(self, parent, urb):
+    # TODO: remove unlink
+    def __init__(self, parent, urb, unlink=False):
+        self.unlink = unlink
         self.urb = urb #for %lens
         self.set_action = parent.set_action
+        self.pier_config = {}
 
     def link(self, pier_config, acc, secret, bucket):
         try:
+            self.pier_config = pier_config
             # current ship
-            self.patp = patp = pier_config['pier_name']
+            patp = self.patp = pier_config['pier_name']
 
             # custom url for s3?
-            endpoint = pier_config['custom_s3_web']
-            if len(endpoint) <= 0:
-                endpoint = f"s3.{pier_config['wg_url']}"
+            endpoint = "" # unlink
+            if not self.unlink:
+                endpoint = pier_config['custom_s3_web']
+                if len(endpoint) <= 0:
+                    endpoint = f"s3.{pier_config['wg_url']}"
 
             # click set endpoint
             Log.log(f"{patp}: Attempting to link with click")
             self.broadcast("link-click")
-            sleep(3)
-            click = False
-            Log.log(f"{patp}: Failed to link with click")
+            payload = {
+                    "endpoint":endpoint,
+                    "acc":acc,
+                    "secret":secret,
+                    "bucket":bucket
+                    }
+            click = Click(patp, "s3", self.urb).run(payload)
+            pier_config['click'] = click
+            self.urb.save_config(patp)
+
             # clicked failed, try lens
             if not click:
+                Log.log(f"{patp}: Failed to link with click")
                 try:
                     addr = self.urb.get_loopback_addr(patp)
                     self.broadcast("link-lens")
@@ -42,10 +57,14 @@ class MinIOLink:
             Log.log(f"WS: {patp} Failed to set endpoint: {e}")
             self.broadcast("failure")
 
+        # Default
         sleep(3)
         self.broadcast("")
+        self.pier_config = {}
 
     def broadcast(self, info):
+        if self.unlink:
+            return self.set_action(self.patp, 'minio','unlink', info)
         return self.set_action(self.patp, 'minio','link', info)
 
     def set_endpoints(self, patp, endpoint, access_key, secret, bucket, lens_addr):
@@ -53,15 +72,6 @@ class MinIOLink:
         self.lens_poke(patp, 'set-access-key-id', access_key, lens_addr)
         self.lens_poke(patp, 'set-secret-access-key', secret, lens_addr)
         self.lens_poke(patp, 'set-current-bucket', bucket, lens_addr)
-    '''
-    def unlink_minio_endpoint(self, patp, lens_addr):
-        self.send_poke(patp, 'set-endpoint', '', lens_addr)
-        self.send_poke(patp, 'set-access-key-id', '', lens_addr)
-        self.send_poke(patp, 'set-secret-access-key', '', lens_addr)
-        self.send_poke(patp, 'set-current-bucket', '', lens_addr)
-
-        return 200
-    '''
 
     def lens_poke(self, patp, command, data, lens_addr):
         Log.log(f"{patp}: Attempting to send {command} poke")

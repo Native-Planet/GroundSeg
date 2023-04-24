@@ -602,8 +602,8 @@ class Urbit:
         hoon = "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  code=@p  bind:m  (scry @p /j/code/(scot %p our))  (pure:m !>((crip (slag 1 (scow %p code)))))"
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        code = Click.filter_code(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        code = Click().filter_code(raw)
         self._urbits[patp]['click'] = True
         self.delete_hoon(patp, name)
 
@@ -823,8 +823,8 @@ class Urbit:
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        pack = Click.filter_pack_meld(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        pack = Click().filter_pack_meld(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If pack failed
@@ -865,8 +865,8 @@ class Urbit:
         hoon_file = f"{name}.hoon"
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
-        raw = Click.click_exec(patp, self.urb_docker.exec, hoon_file)
-        meld = Click.filter_pack_meld(raw)
+        raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+        meld = Click().filter_pack_meld(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If meld failed
@@ -1027,20 +1027,7 @@ class Urbit:
             return False
 
     # Update/Set Urbit S3 Endpoint
-    def set_minio(self, patp):
-        Log.log(f"{patp}: Attempting to set MinIO endpoint")
-        acc = 'urbit_minio'
-        secret = ''.join(secrets.choice(
-            string.ascii_uppercase + 
-            string.ascii_lowercase + 
-            string.digits) for i in range(40))
 
-        if self.minio.make_service_account(self._urbits[patp], patp, acc, secret):
-            u = self._urbits[patp]
-            endpoint = f"s3.{u['wg_url']}"
-            if len(u['custom_s3_web']) > 0:
-                endpoint = u['custom_s3_web']
-            bucket = 'bucket'
             lens_port = self.get_loopback_addr(patp)
             try:
                 return self.set_minio_endpoint(patp, endpoint, acc, secret, bucket, lens_port)
@@ -1048,15 +1035,6 @@ class Urbit:
             except Exception as e:
                 Log.log(f"{patp}: Failed to set MinIO endpoint: {e}")
 
-        return 400
-
-    def unlink_minio(self, patp):
-        Log.log(f"{patp}: Attempting to unlink MinIO endpoint")
-        try:
-            lens_port = self.get_loopback_addr(patp)
-            return self.unlink_minio_endpoint(patp, lens_port)
-        except Exception as e:
-            Log.log(f"{patp}: Failed to unlink MinIO endpoint: {e}")
         return 400
 
     def fix_acme(self, patp):
@@ -1161,7 +1139,6 @@ class Urbit:
         svc = data['svc_type']
         alias = data['alias']
         op = data['operation']
-        relink = data['relink']
 
         # Urbit URL
         if svc == 'urbit-web':
@@ -1189,20 +1166,14 @@ class Urbit:
                     if self.wg.handle_alias(f"s3.{patp}", alias, 'post'):
                         self._urbits[patp]['custom_s3_web'] = alias
                         if self.save_config(patp):
-                            if not relink:
-                                return 200
-                            else:
-                                return self.set_minio(patp)
+                            return 200
 
             elif op == 'delete':
                 Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
                 if self.wg.handle_alias(f"s3.{patp}", alias, 'delete'):
                     self._urbits[patp]['custom_s3_web'] = ''
                     if self.save_config(patp):
-                        if not relink:
-                            return 200
-                        else:
-                            return self.set_minio(patp)
+                        return 200
         return 400
 
     def dns_record(self, patp, real, mask):
