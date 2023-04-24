@@ -70,8 +70,6 @@
       <SettingsButton />
       <AnchorButton />
       <HomeButton />
-      <!-- {#if !$socketInfo.metadata.connected} -->
-      <!-- {/if} -->
       <!--LinuxButton /-->
       {/if}
       <slot/>
@@ -79,7 +77,7 @@
     </div>
   {/if}
   {#if !$socketInfo.metadata.connected}
-    <div class="ws">websocket api retrying</div>
+    <div class="ws">connecting</div>
   {/if}
 </div>
 
