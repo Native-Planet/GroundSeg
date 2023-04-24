@@ -5,7 +5,6 @@ from threading import Thread
 
 from log import Log
 from websocket_util import WSUtil
-#from response_builder import ResponseBuilder
 
 class GSWebSocket(Thread):
     def __init__(self, config, orchestrator, host='0.0.0.0', port=8000):
@@ -60,12 +59,15 @@ class GSWebSocket(Thread):
 
     async def broadcast_message(self):
         while True:
-            for client in self.orchestrator.authorized_clients.copy():
-                if client.open:
-                    message = self.orchestrator.structure
-                    await client.send(json.dumps(message))
-                else:
-                    self.orchestrator.authorized_clients.remove(client)
+            try:
+                for client in self.orchestrator.authorized_clients.copy():
+                    if client.open:
+                        message = self.orchestrator.structure
+                        await client.send(json.dumps(message))
+                    else:
+                        self.orchestrator.authorized_clients.remove(client)
+            except Exception as e:
+                Log.log(f"WS: Broadcast fail: {e}")
             await asyncio.sleep(0.5)  # Send the message twice a second
 
     def run(self):
