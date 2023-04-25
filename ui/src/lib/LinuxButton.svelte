@@ -14,7 +14,10 @@
     if (!$noconn && ($page.route.id != '/device-update')) {
       fetch($api + '/linux/updates', {credentials: "include"})
       .then(raw => raw.json())
-      .then(res => updateState(res))
+        .then(res => {
+          console.log(res)
+          updateState(res)
+        })
       .catch(err => {
         if ((typeof err) == 'object') {
           updateState({status:'noconn'})

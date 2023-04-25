@@ -92,19 +92,16 @@ class GroundSeg:
             return message
 
         # Handle linux updates
-        '''
         @self.app.route("/linux/updates", methods=['GET','POST'])
         def linux_updates():
             approved, message = self.verify(request)
 
             if approved:
                 if request.method == 'GET':
-                    #return jsonify({"system_update":self.config_object.linux_updates})
-                    return jsonify({"system_update":False})
+                    return jsonify({"system_update":self.config_object.linux_updates})
                 if request.method == 'POST':
                     res = self.orchestrator.update_restart_linux()
                     return jsonify(res)
-        '''
 
         # Handle anchor registration related information
         @self.app.route("/anchor", methods=['GET'])

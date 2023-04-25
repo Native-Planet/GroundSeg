@@ -40,7 +40,8 @@ class Orchestrator:
             "system": {}
             }
 
-    def __init__(self, config):
+    def __init__(self, config, debug=False):
+        self._debug = debug
         self.config_object = config
         self.config = config.config
 
@@ -348,10 +349,28 @@ class Orchestrator:
     def update_restart_linux(self):
         Log.log("Updater: Update and restart requested")
         try:
-            output = subprocess.check_output(['apt','upgrade','-y'], shell=True)
+            output = False
+            #output = subprocess.check_output(['ls','-l'], shell=True)
+            #output = subprocess.check_output(['apt','upgrade','-y'], shell=True)
+
+            cmd = ["apt", "upgrade", "-y"]
+            try:
+                result = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                print("stdout:")
+                print(result.stdout)
+                print("stderr:")
+                print(result.stderr)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: {e.returncode}\n{e.stderr}")
+
+            '''
             if output:
-                subprocess.run(['reboot'], shell=True)
+                if self._debug:
+                    Log.log("Updater: Debug mode. Not rebooting")
+                else:
+                    subprocess.run(['reboot'], shell=True)
                 return 200
+            '''
         except Exception as e:
             Log.log(f"Updater: Failed to send updgrade command: {e}")
 
