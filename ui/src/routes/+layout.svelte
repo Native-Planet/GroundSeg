@@ -10,7 +10,7 @@
   import SettingsButton from '$lib/SettingsButton.svelte'
   import AnchorButton from '$lib/AnchorButton.svelte'
   import HomeButton from '$lib/HomeButton.svelte'
-  //import LinuxButton from '$lib/LinuxButton.svelte'
+  import LinuxButton from '$lib/LinuxButton.svelte'
   import BugButton from '$lib/BugButton.svelte'
 
   import PowerScreen from '$lib/PowerScreen.svelte'
@@ -67,10 +67,10 @@
     <div class:frozen={($page.url.pathname === "/settings") 
       && (($power === 'shutdown') || ($power === 'restart'))}>
       {#if !($page.route.id == '/setup')}
-      <SettingsButton />
-      <AnchorButton />
-      <HomeButton />
-      <!--LinuxButton /-->
+        <SettingsButton />
+        <AnchorButton />
+        <HomeButton />
+        <LinuxButton />
       {/if}
       <slot/>
       <BugButton />

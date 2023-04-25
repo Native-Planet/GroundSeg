@@ -88,7 +88,8 @@ class Config:
             "netCheck": "1.1.1.1:53",
             "dockerData": "/var/lib/docker",
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
-            "swapVal": 16
+            "swapVal": 16,
+            "linuxUpdates": 172800
             }
 
     def __init__(self, base_path, debug_mode=False):
