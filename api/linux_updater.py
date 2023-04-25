@@ -43,6 +43,7 @@ class LinuxUpdater:
                         updates = re.match(pattern, ln)
                         if updates:
                             upgrade, new, remove, ignore = map(int, updates.groups())
+                            break
 
                 # Set update notification
                 self.config_object.linux_updates = (upgrade + new + remove) > 0
