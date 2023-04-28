@@ -15,7 +15,6 @@
       fetch($api + '/linux/updates', {credentials: "include"})
       .then(raw => raw.json())
         .then(res => {
-          console.log(res)
           updateState(res)
         })
       .catch(err => {
