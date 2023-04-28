@@ -28,7 +28,10 @@
   let showInfo = false
 
   let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
-  $: urthMeldInfo = $socketInfo.urbits[name].meld.urth
+
+  const getMeldStatus = ()=> {return $socketInfo.urbits[name].meld.urth || ""}
+
+  $: urthMeldInfo = getMeldStatus()
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let inView = true
@@ -166,7 +169,11 @@
 
       <!-- Current time on host device -->
       <div class="day">
-        <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+        {#if timeNow != undefined}
+          <div class="current-time">Current time: {timeNow.slice(5, -4)} UTC</div>
+        {:else}
+          <div class="current-time">Current time: error, please refresh the page</div>
+        {/if}
       </div>
 
       <div class="day">
