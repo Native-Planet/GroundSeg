@@ -29,9 +29,10 @@
 
   let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
 
-  const getMeldStatus = ()=> {return $socketInfo.urbits[name].meld.urth || ""}
+  //const getMeldStatus = ()=> {return $socketInfo.urbits[name].meld.urth || ""}
 
-  $: urthMeldInfo = getMeldStatus()
+  $: urthMeldInfo = ($socketInfo.urbits[name]?.meld?.urth) || ""
+  //  getMeldStatus()
 
   let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let inView = true
@@ -177,12 +178,15 @@
       </div>
 
       <div class="day">
-        <div class="current-time">Last meld: {meldLast.slice(12,-13) < 1971 ? "Never" : meldLast.slice(5, -4) + " UTC"}</div>
+        <div class="current-time">Last meld: {
+          ((meldLast?.slice(12,-13)) || 0) < 1971 
+          ? "Never" 
+          : ((meldLast?.slice(5, -4)) + " UTC" || "error ")}</div>
       </div>
 
       {#if meldOn}
       <div class="day">
-        <div class="current-time">Next: {meldNext.slice(5, -4)} UTC</div>
+        <div class="current-time">Next: {(meldNext?.slice(5, -4)) + " UTC" || "error"}</div>
       </div>
       {/if}
 
