@@ -1,5 +1,6 @@
 app/piers/
 app/keys/
+urbit-scripts/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
