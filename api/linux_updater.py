@@ -2,6 +2,8 @@ import re
 import subprocess
 from time import sleep
 
+import schedule
+
 from log import Log
 
 class LinuxUpdater:
@@ -10,9 +12,33 @@ class LinuxUpdater:
         self.config = config.config
         self.debug_mode = config.debug_mode
 
-    def updater_loop(self):
+    def run(self):
         Log.log("Updater: Linux updater thread started")
+        self.updater_loop()
+
+        val = self.config['linuxUpdates']['value']
+        interval = self.config['linuxUpdates']['interval']
+
+        if interval == 'week':
+            schedule.every(val).weeks.do(self.updater_loop)
+
+        if interval == 'day':
+            schedule.every(val).days.do(self.updater_loop)
+
+        if interval == 'hour':
+            schedule.every(val).hours.do(self.updater_loop)
+
+        if interval == 'minute':
+            schedule.every(val).minutes.do(self.updater_loop)
+
+        Log.log(f"Updater: Linux updates scheduled for every {val} {interval}{'s' if val > 1 else ''}")
+
         while True:
+            schedule.run_pending()
+            sleep(1)
+
+    def updater_loop(self):
+        if self.config['updateMode'] == 'auto':
             try:
                 Log.log("Updater: Checking for linux updates")
                 if self.debug_mode:
@@ -51,6 +77,3 @@ class LinuxUpdater:
                 Log.log(f"Updater: Linux updates: {upgrade} to upgrade, {new} to install, {remove} to remove, {ignore} to ignore")
             except Exception as e:
                 Log.log(f"Updater: Failed to check for linux updates: {e}")
-
-            # Set check interval -- defaults to 48 hours
-            sleep(self.config['linuxUpdates'])

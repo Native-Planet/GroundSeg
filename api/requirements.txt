@@ -14,3 +14,4 @@ zstandard
 ordered-set
 nmcli
 cryptography
+schedule

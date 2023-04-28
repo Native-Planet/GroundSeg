@@ -89,7 +89,10 @@ class Config:
             "dockerData": "/var/lib/docker",
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
             "swapVal": 16,
-            "linuxUpdates": 172800
+            "linuxUpdates": {
+                "value": 1, #Int
+                "interval":"week" # day hour minute
+                }
             }
 
     def __init__(self, base_path, debug_mode=False):
@@ -159,6 +162,7 @@ class Config:
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base_path
+
         try:
             with open("/etc/docker/daemon.json") as f:
                 docker_cfg = json.load(f)
@@ -169,14 +173,22 @@ class Config:
         cfg = {**self.default_system_config, **cfg}
         cfg = self.check_update_interval(cfg)
 
+        try:
+            if type(cfg['linuxUpdates']) != dict:
+                cfg['linuxUpdates'] = self.default_system_config['linuxUpdates']
+            if cfg['linuxUpdates']['value'] < 1:
+                Log.log("Config: linuxUpdates value '{cfg['linuxUpdates']['value']}' is invalid. Defaulting to 1")
+                cfg['linuxUpdates']['value'] = 1
+        except Exception as e:
+            Log.log(f"Config: Failed to set Linux Update settings: {e}")
+
         bin_hash = '000'
 
         try:
             bin_hash = Utils.make_hash(f"{self.base_path}/groundseg")
             Log.log(f"Config: Binary hash: {bin_hash}")
         except Exception as e:
-            print(e)
-            Log.log("Config: No binary detected!")
+            Log.log(f"Config: No binary detected!: {e}")
 
         cfg['binHash'] = bin_hash
 
