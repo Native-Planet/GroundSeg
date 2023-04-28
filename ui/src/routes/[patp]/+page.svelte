@@ -307,6 +307,7 @@
           <PierOptionsDomain
             name={urbit.name}
             disabled={!urbit.wgReg || !urbit.minIOReg}
+            s3={true}
             alias={urbit.s3WebAlias}
             title="MinIO Custom Domain"
             svcType="minio"

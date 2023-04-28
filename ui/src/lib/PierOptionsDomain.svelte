@@ -7,6 +7,7 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   export let name
+  export let s3 = false
   export let alias
   export let title
   export let svcType
@@ -17,7 +18,7 @@
   let saveStatus = "standard"
   let customDomain = alias
   let info = false
-  let relinkCheck = true
+  let relinkCheck = s3
     
   const submit = () => {
     saveStatus = 'loading'
