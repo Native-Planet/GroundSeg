@@ -8,7 +8,7 @@ sudo firewall-cmd --reload
 ACC=Native-Planet
 REPO=GroundSeg
 BRANCH=master
-TAG=v1.3.1
+TAG=rc1-v1.3.1
 DEVICE_ARCH=$(uname -m)
 
 # Directory to save the scrips
