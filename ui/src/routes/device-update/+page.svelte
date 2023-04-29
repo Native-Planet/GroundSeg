@@ -20,13 +20,15 @@
   onDestroy(()=> inView = false)
 
   let ack = false
-  afterUpdate(async ()=> {
+  afterUpdate(()=> {
     if (!(ack) && (update == "success")) {
       let payload = {
         "category": "updates",
         "payload": {"module": "linux", "action": "refresh"}
       }
-      ack = await send($socket, $socketInfo, document.cookie, payload)
+      setTimeout(async ()=> {
+        ack = await send($socket, $socketInfo, document.cookie, payload)
+      }, 3000)
     }
   })
 

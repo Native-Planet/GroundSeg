@@ -29,6 +29,7 @@ class LinuxUpdate:
                     self.config_object.save_config()
                     self.broadcast("restarting")
                     Log.log(f"updates:linux:update Updates has been installed. Restarting")
+                    sleep(1)
 
                     if self._debug:
                         Log.log("updates:linux:update Skipping device restart in debug mode")
