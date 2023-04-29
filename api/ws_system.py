@@ -12,18 +12,16 @@ class WSSystem:
         self.ws_util.system_broadcast('updates','linux','remove','0')
         self.ws_util.system_broadcast('updates','linux','ignore','0')
 
-        # updated       -  no updates
-        # initializing  -  a command was sent
-        # command       -  running apt upgrade -y
-        # restarting    -  update complete, restarting device
-        # success       -  GroundSeg has restarted
-        # failure-<err> -  Failure message
         if self.config['linuxUpdates']['previous']:
+            # updated       -  no updates
+            # initializing  -  a command was sent
+            # command       -  running apt upgrade -y
+            # restarting    -  update complete, restarting device
+            # success       -  GroundSeg has restarted
+            # failure-<err> -  Failure message
             self.ws_util.system_broadcast('updates','linux','update','success')
             self.config['linuxUpdates']['previous'] = False
             self.config_object.save_config()
-        else:
-            self.ws_util.system_broadcast('updates','linux','update','pending')
 
         # TODO
         self.ws_util.system_broadcast('updates','binary','update','updated')
