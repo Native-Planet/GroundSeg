@@ -41,7 +41,7 @@ class GSWebSocket(Thread):
                         msg = "authenticated"
                     else:
                         try:
-                            msg = self.orchestrator.ws_command(data, websocket)
+                            msg = self.orchestrator.ws_command(data)
                         except Exception as e:
                             Log.log(f"WS: Failed to run ws_command: {e}")
                             valid = False

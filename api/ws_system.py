@@ -1,34 +1,55 @@
+from action_linux_update import LinuxUpdate
+
 class WSSystem:
-    def __init__(self, ws_util):
+    def __init__(self, config, ws_util):
+        self.config_object = config
+        self.config = config.config
         self.ws_util = ws_util
 
-        # {'updates':{'linux':{x,y}}
-        self.linux_broadcast('update','pending') # updated updating <error>
-        self.linux_broadcast('upgrade','0')
-        self.linux_broadcast('new','0')
-        self.linux_broadcast('remove','0')
-        self.linux_broadcast('ignore','0')
+        # {a:{b:{c:d}}
+        self.ws_util.system_broadcast('updates','linux','upgrade','0')
+        self.ws_util.system_broadcast('updates','linux','new','0')
+        self.ws_util.system_broadcast('updates','linux','remove','0')
+        self.ws_util.system_broadcast('updates','linux','ignore','0')
 
-        # {'updates':{'binary':{x,y}}
-        self.binary_broadcast('update','updated') # updating pending
-        self.binary_broadcast('routine','auto') # notify off
+        # updated       -  no updates
+        # initializing  -  a command was sent
+        # command       -  running apt upgrade -y
+        # restarting    -  update complete, restarting device
+        # success       -  GroundSeg has restarted
+        # failure-<err> -  Failure message
+        if self.config['linuxUpdates']['previous']:
+            self.ws_util.system_broadcast('updates','linux','update','success')
+            self.config['linuxUpdates']['previous'] = False
+            self.config_object.save_config()
+        else:
+            self.ws_util.system_broadcast('updates','linux','update','pending')
 
-        # {'system':{'startram':{x,y}}
-        self.startram_broadcast("container","stopped") # running
-        self.startram_broadcast("autorenew",False)
-        self.startram_broadcast("region","us-east")
-        self.startram_broadcast("expiry",0)
-        self.startram_broadcast("endpoint","api.startram.io")
-        self.startram_broadcast("register","no")
-        self.startram_broadcast("restart","hide")
-        self.startram_broadcast("cancel","hide")
-        self.startram_broadcast("advanced",False)
+        # TODO
+        self.ws_util.system_broadcast('updates','binary','update','updated')
+        self.ws_util.system_broadcast('updates','binary','routine','auto')       # notify off
 
-    def linux_broadcast(self, action, info):
-        self.ws_util.system_broadcast('updates','linux',action,info)
+        # TODO
+        self.ws_util.system_broadcast('system','startram',"container","stopped") # running
+        self.ws_util.system_broadcast('system','startram',"autorenew",False)
+        self.ws_util.system_broadcast('system','startram',"region","us-east")
+        self.ws_util.system_broadcast('system','startram',"expiry",0)
+        self.ws_util.system_broadcast('system','startram',"endpoint","api.startram.io")
+        self.ws_util.system_broadcast('system','startram',"register","no")
+        self.ws_util.system_broadcast('system','startram',"restart","hide")
+        self.ws_util.system_broadcast('system','startram',"cancel","hide")
+        self.ws_util.system_broadcast('system','startram',"advanced",False)
 
-    def binary_broadcast(self, action, info):
-        self.ws_util.system_broadcast('updates','binary',action,info)
+    #
+    #   Actions
+    #
 
-    def startram_broadcast(self, action, info):
-        self.ws_util.system_broadcast('system','startram',action,info)
+    def linux_update(self):
+        old_info = "pending"
+        try:
+            old_info = self.ws_util.structure['updates']['linux']['update']
+        except:
+            pass
+
+        self.ws_util.system_broadcast('updates', 'linux','update','initializing')
+        LinuxUpdate(self.ws_util, self.config_object).run(old_info)

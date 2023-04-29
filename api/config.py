@@ -87,8 +87,9 @@ class Config:
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
             "swapVal": 16,
             "linuxUpdates": {
-                "value": 1, #Int
-                "interval":"week" # day hour minute
+                "value": 1,         # Int
+                "interval": "week", # day hour minute
+                "previous": False   # completed update and reboot
                 }
             }
 
@@ -173,6 +174,9 @@ class Config:
         try:
             if type(cfg['linuxUpdates']) != dict:
                 cfg['linuxUpdates'] = self.default_system_config['linuxUpdates']
+            else:
+                if 'previous' not in cfg['linuxUpdates']:
+                    cfg['linuxUpdates']['previous'] = self.default_system_config['linuxUpdates']['previous']
             if cfg['linuxUpdates']['value'] < 1:
                 Log.log("Config: linuxUpdates value '{cfg['linuxUpdates']['value']}' is invalid. Defaulting to 1")
                 cfg['linuxUpdates']['value'] = 1

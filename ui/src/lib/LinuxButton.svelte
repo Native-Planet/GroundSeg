@@ -1,42 +1,18 @@
 <script>
-  import { afterUpdate, onMount } from 'svelte'
-  import { noconn, api, linuxUpdate, updateState } from '$lib/api.js'
+  import { afterUpdate } from 'svelte'
   import { page } from '$app/stores'
-
   import { socketInfo } from '$lib/stores/websocket.js'
 
   let hide = false
-
   afterUpdate(()=> {
     hide = ($page.route.id == '/login')
   })
 
-	// updateState loop
-  const update = () => {
-    if (!$noconn && ($page.route.id != '/device-update')) {
-      fetch($api + '/linux/updates', {credentials: "include"})
-      .then(raw => raw.json())
-        .then(res => {
-          updateState(res)
-        })
-      .catch(err => {
-        if ((typeof err) == 'object') {
-          updateState({status:'noconn'})
-        }
-      })
-    }
-    setTimeout(update, 10000)
-	}
-
-	// Start the update loop
-	onMount(()=> {
-    api.set("http://" + $page.url.hostname + ":27016")
-		update()
-	})
+  $: update = ($socketInfo.updates?.linux?.update) || "updated"
 
 </script>
 
-{#if $linuxUpdate}
+{#if update == "pending"}
   <a href='/device-update' class:hide={hide}>
     <div class="updates">Update Device</div>
   </a>

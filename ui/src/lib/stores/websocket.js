@@ -64,7 +64,7 @@ export const connect = async (addr, cookie, info) => {
   updateMetadata("address", addr)
 }
 
-export const send = (ws, info, cookie, msg) => {
+export const send = (ws, info, cookie, msg, handleReturn) => {
   if (info.metadata.connected) {
     msg = msg || {}
     let id = genRequestId(16)
@@ -78,9 +78,10 @@ export const send = (ws, info, cookie, msg) => {
     if (category != 'ping') {
       payload = msg['payload']
     }
-    handleActivity(id, category, payload, info)
+    return handleActivity(id, category, payload, info)
   } else {
     console.error("Not connected to websocket")
+    return false
   }
 }
 
@@ -96,6 +97,7 @@ const handleActivity = (id, cat, load, info) => {
   } else {
     removeActivity(id)
     console.log(prefix + " send confirmed")
+    return true
   }
 }
 

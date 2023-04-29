@@ -70,44 +70,82 @@ class Orchestrator:
 
     # Duplicate of __init__ for future use
     def ws_init(self, config, debug):
-        self.ws_system = WSSystem(self.ws_util)
+        self.ws_system = WSSystem(self.config_object, self.ws_util)
         self.ws_urbits = WSUrbits(self.config_object, self.urbit, self.ws_util)
         self.ws_minios = WSMinIOs(self.minio, self.ws_util)
 
-    def ws_command(self, data, websocket):
+    # Main command function
+    def ws_command(self, data):
         try:
             payload = data['payload']
             # if category is urbits
             if data['category'] == 'urbits':
-                # hardcoded list of allowed modules
-                whitelist = [
-                        'meld',
-                        'minio'
-                        ]
-                patp = payload['patp']
-                module = payload['module']
-                action = payload['action']
+                return self.ws_command_urbit(payload)
 
-                if module not in whitelist:
-                    raise Exception(f"{module} is not a valid module")
-
-                # MinIO
-                if module == "minio":
-                    if action == "link":
-                        Thread(target=self.minio_link, args=(patp,)).start()
-                    if action == "unlink":
-                        Thread(target=self.minio_unlink, args=(patp,)).start()
-
-                # Pack and Meld
-                if module == "meld":
-                    if action == "urth":
-                        Thread(target=self.ws_urbits.meld_urth, args=(patp,)).start()
-
-                return "succeeded"
+            if data['category'] == 'updates':
+                return self.ws_command_updates(payload)
 
             raise Exception(f"'{data['category']}' is not a valid category")
         except Exception as e:
             raise Exception(e)
+
+    #
+    # Category command functions
+    #
+
+    # Urbit
+    def ws_command_urbit(self, payload):
+        # hardcoded list of allowed modules
+        whitelist = [
+                'meld',
+                'minio'
+                ]
+        patp = payload['patp']
+        module = payload['module']
+        action = payload['action']
+
+        if module not in whitelist:
+            raise Exception(f"{module} is not a valid module")
+
+        # MinIO
+        if module == "minio":
+            if action == "link":
+                Thread(target=self.minio_link, args=(patp,)).start()
+            if action == "unlink":
+                Thread(target=self.minio_unlink, args=(patp,)).start()
+
+        # Pack and Meld
+        if module == "meld":
+            if action == "urth":
+                Thread(target=self.ws_urbits.meld_urth,
+                       args=(patp,)
+                       ).start()
+
+        return "succeeded"
+
+    # Updates
+    def ws_command_updates(self, payload):
+        # hardcoded list of allowed modules
+        whitelist = [
+                'linux',
+                ]
+        module = payload['module']
+        action = payload['action']
+
+        if module not in whitelist:
+            raise Exception(f"{module} is not a valid module")
+
+        # linux updates
+        if module == "linux":
+            # clear update action
+            if action == "refresh": 
+                Thread(target=self.ws_util.system_broadcast,
+                       args=('updates','linux','update','updated')
+                       ).start()
+            if action == "update":
+                Thread(target=self.ws_system.linux_update).start()
+
+        return "succeeded"
 
     #
     # Combo functions
@@ -350,36 +388,6 @@ class Orchestrator:
     #   System Settings
     #
 
-    # Update linux and restart the device
-    def update_restart_linux(self):
-        Log.log("Updater: Update and restart requested")
-        Log.log("Skipping.......")
-        Log.log("Skipping.......")
-        Log.log("Skipping.......")
-        Log.log("Skipping.......")
-        Log.log("Skipping.......")
-
-        '''
-        try:
-            cmd = ["apt", "upgrade", "-y"]
-            try:
-                result = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if output:
-                    return 200
-            except subprocess.CalledProcessError as e:
-                print(f"Error: {e.returncode}\n{e.stderr}")
-            finally:
-                if self._debug:
-                    Log.log("Updater: Debug mode. Not rebooting")
-                else:
-                    subprocess.run(['reboot'])
-
-        except Exception as e:
-            Log.log(f"Updater: Failed to send updgrade command: {e}")
-        '''
-
-        return 400
-
     # Get all system information
     def get_system_settings(self):
         is_vm = "vm" == self.config_object.device_mode
@@ -447,7 +455,7 @@ class Orchestrator:
             if data['action'] == 'reload':
                 if self.minio.stop_all():
                     if self.minio.start_all():
-                        time.sleep(1)
+                        sleep(1)
                         return 200
             return 400
 

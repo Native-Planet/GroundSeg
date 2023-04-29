@@ -25,20 +25,18 @@
   export let meldLast
   export let meldNext
     
-  let showInfo = false
-
-  let selectedHour = meldHour, selectedMinute = meldMinute, meldSetStatus = 'standard', meldNowStatus = 'standard'
-
-  //const getMeldStatus = ()=> {return $socketInfo.urbits[name].meld.urth || ""}
-
-  $: urthMeldInfo = ($socketInfo.urbits[name]?.meld?.urth) || ""
-  //  getMeldStatus()
-
-  let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
-  let inView = true
   let cloneFreq
+  let inView = true
+  let showInfo = false
+  let selectedHour = meldHour
+  let selectedMinute = meldMinute
+  let meldSetStatus = 'standard'
+  let meldNowStatus = 'standard'
+  let exportButtonText = 'Export Urbit Pier', deleteButtonText = 'Delete Urbit Pier'
   let minutes = Array.from(Array(60).keys()) 
   let hours = Array.from(Array(24).keys())
+
+  $: urthMeldInfo = ($socketInfo.urbits[name]?.meld?.urth) || ""
 
   onMount(()=> {
     cloneFreq = frequency

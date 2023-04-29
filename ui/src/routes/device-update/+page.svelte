@@ -1,12 +1,12 @@
 <script>
-	import { onMount, onDestroy } from 'svelte'
+	import { afterUpdate, onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
   import { page } from '$app/stores'
 
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-	import { updateState, api, system, noconn, linuxUpdate } from '$lib/api'
+  import { send, socketInfo, socket } from '$lib/stores/websocket.js'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -14,25 +14,29 @@
 	let inView = false
   let buttonStatus = 'standard'
 
+  $: update = ($socketInfo.updates?.linux?.update) || "updated"
+
 	onMount(()=> inView = true)
   onDestroy(()=> inView = false)
 
+  let ack = false
+  afterUpdate(async ()=> {
+    if (!(ack) && (update == "success")) {
+      let payload = {
+        "category": "updates",
+        "payload": {"module": "linux", "action": "refresh"}
+      }
+      ack = await send($socket, $socketInfo, document.cookie, payload)
+    }
+  })
+
   const updateDevice = () => {
-    buttonStatus = 'loading'
-	  fetch($api + '/linux/updates', {
-			method: 'POST',
-      credentials: "include",
-	  })
-      .then(d=>d.json()).then(r=>{
-        if (r === 200) {
-          buttonStatus = 'success'
-          setTimeout(()=>{
-            buttonStatus = 'standard'
-          }, 3000)}
-        if (r === 400) {
-          buttonStatus = 'failure'
-          setTimeout(()=>buttonStatus = 'standard', 3000)
-   }})}
+    let payload = {
+      "category": "updates",
+      "payload": {"module": "linux", "action": "update"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
 	
 </script>
 
@@ -43,13 +47,22 @@
       <div class="text">
         Update the underlying operating system of your Native Planet Device.
       </div>
-      <PrimaryButton 
-        on:click={updateDevice}
-        standard={$linuxUpdate ? "Update and Restart Device" : "No Updates, Run Anyways"}
-        status={buttonStatus}
-        loading="Updating..."
-        failure="Something went wrong"
+      {#if update == 'success'}
+        <div class="success">Device update succeeded!</div>
+      {:else if update == 'initializing'}
+        <div class="loading">Requesting to update</div>
+      {:else if update == 'command'}
+        <div class="loading">Updating</div>
+      {:else if update == 'restarting'}
+        <div class="loading restarting">Device is restarting</div>
+      {:else if update.includes('failure')}
+        <div class="loading failure">Error: {update.split('\n')[1]}</div>
+      {:else if (update == 'pending') || (update == 'updated')}
+        <PrimaryButton 
+          on:click={updateDevice}
+          standard={update == "pending" ? "Update and Restart Device" : "No Updates, Run Anyways"}
         />
+      {/if}
     </div>
   </Card>
 {/if}
@@ -61,5 +74,23 @@
   .text {
     padding: 40px;
     font-size: 12px;
+  }
+  .loading {
+    height: 30px;
+    font-size: 12px;
+    line-height: 30px;
+    animation: breathe 2s infinite;
+  }
+  .restarting {
+    color: orange;
+  }
+  .failure {
+    color: red;
+  }
+  .success {
+    height: 30px;
+    font-size: 12px;
+    line-height: 30px;
+    color: lime;
   }
 </style>
