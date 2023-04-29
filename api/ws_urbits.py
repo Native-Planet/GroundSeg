@@ -5,50 +5,18 @@ from action_meld_urth import MeldUrth
 from action_minio_link import MinIOLink
 
 class WSUrbits:
-    def __init__(self, config, structure, urb):
+    def __init__(self, config, urb, ws_util):
         self.config_object = config
         self.config = config.config
-        self.structure = structure
+        self.structure = ws_util.structure
         self.urb = urb
         self._urbits = self.urb._urbits 
+        self.ws_util = ws_util
 
         for patp in self.config['piers']:
-            self.make_default(patp)
-        Log.log("WS: Data ready for broadcast")
-
-    def make_default(self, patp):
-        self.set_action(patp, 'meld', 'urth')
-        self.set_action(patp, 'minio', 'link')
-        self.set_action(patp, 'minio', 'unlink')
-
-    # send to structure dict
-    def set_action(self, patp, module, action, info=""):
-        # Set patp to dict
-        try:
-            not_exist = (patp not in self.structure['urbits'])
-            not_dict = (not isinstance(self.structure['urbits'], dict))
-            if not_exist or not_dict:
-                self.structure['urbits'][patp] = {}
-        except Exception as e:
-            Log.log(f"WS: ship '{patp}' failed to be added to broadcast dump: {e}")
-            return False
-
-        # Set module to dict
-        try:
-            not_exist = (module not in self.structure['urbits'][patp])
-            not_dict = (not isinstance(self.structure['urbits'][patp], dict))
-            if not_exist or not_dict:
-                self.structure['urbits'][patp][module] = {}
-        except Exception as e:
-            Log.log(f"WS: module '{patp}:{module}' failed to be added to broadcast dump: {e}")
-            return False
-        # Set action to current value
-        try:
-            self.structure['urbits'][patp][module][action] = str(info)
-        except Exception as e:
-            Log.log(f"WS: action '{patp}:{module}:{action} {info}' failed to be added to broadcast dump: {e}")
-            return False
-        return True
+            self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
+            self.ws_util.urbit_broadcast(patp, 'minio', 'link')
+            self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
 
     #
     #   interacting with self._urbits dict (config)
@@ -84,9 +52,9 @@ class WSUrbits:
         return res
 
     def meld_urth(self, patp):
-        self.set_action(patp, 'meld', 'urth','initializing')
-        MeldUrth(self, patp, self.urb).run()
+        self.ws_util.urbit_broadcast(patp, 'meld', 'urth','initializing')
+        MeldUrth(self, patp, self.urb, self.ws_util).run()
 
     # TODO: remove unlink stuff
     def minio_link(self, pier_config, acc="", secret="", bucket="", unlink=False):
-        MinIOLink(self, self.urb, unlink).link(pier_config, acc, secret, bucket)
+        MinIOLink(self.urb, self.ws_util, unlink).link(pier_config, acc, secret, bucket)

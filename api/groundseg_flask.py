@@ -8,10 +8,11 @@ from utils import Utils
 
 # Create flask app
 class GroundSeg:
-    def __init__(self, config, orchestrator):
+    def __init__(self, config, orchestrator, ws_util):
         self.config_object = config
         self.config = config.config
         self.orchestrator = orchestrator
+        self.ws_util = ws_util
 
         self.app = Flask(__name__)
         CORS(self.app, supports_credentials=True)
@@ -98,7 +99,7 @@ class GroundSeg:
 
             if approved:
                 if request.method == 'GET':
-                    return jsonify({"system_update":self.config_object.linux_updates})
+                    return jsonify({"system_update":True})
                 if request.method == 'POST':
                     res = self.orchestrator.update_restart_linux()
                     return jsonify(res)

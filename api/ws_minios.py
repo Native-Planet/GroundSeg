@@ -4,9 +4,9 @@ import secrets
 from log import Log
 
 class WSMinIOs:
-    def __init__(self, minio, set_action):
+    def __init__(self, minio, ws_util):
         self.minio = minio
-        self.set_action = set_action
+        self.ws_util = ws_util
 
     def create_account(self, pier_config):
         patp = pier_config['pier_name']
@@ -23,4 +23,4 @@ class WSMinIOs:
         return False, False
 
     def broadcast(self, patp, action, info):
-        return self.set_action(patp,'minio',action, info)
+        return self.ws_util.urbit_broadcast(patp,'minio',action, info)

@@ -20,6 +20,7 @@ from bug_report import BugReport
 from utils import Utils
 
 # Websocket
+from ws_system import WSSystem
 from ws_urbits import WSUrbits
 from ws_minios import WSMinIOs
 
@@ -35,15 +36,12 @@ class Orchestrator:
     wireguard = None
     authorized_clients = set()
     unauthorized_clients = set() # unused for now
-    structure = {
-            "urbits": {},
-            "system": {}
-            }
 
-    def __init__(self, config, debug=False):
+    def __init__(self, config, ws_util, debug=False):
         self._debug = debug
         self.config_object = config
         self.config = config.config
+        self.ws_util = ws_util
 
         if self.config['updateMode'] == 'auto':
             count = 0
@@ -59,8 +57,9 @@ class Orchestrator:
         self.minio = MinIO(config, self.wireguard)
         self.urbit = Urbit(config, self.wireguard, self.minio)
         self.webui = WebUI(config)
-        self.ws_urbits = WSUrbits(self.config_object, self.structure, self.urbit)
-        self.ws_minios = WSMinIOs(self.minio, self.ws_urbits.set_action)
+
+        # TODO: temp
+        self.ws_init(config, debug)
 
         self.config_object.gs_ready = True
         Log.log("GroundSeg: Initialization completed")
@@ -68,6 +67,12 @@ class Orchestrator:
     #
     #   Websocket API
     #
+
+    # Duplicate of __init__ for future use
+    def ws_init(self, config, debug):
+        self.ws_system = WSSystem(self.ws_util)
+        self.ws_urbits = WSUrbits(self.config_object, self.urbit, self.ws_util)
+        self.ws_minios = WSMinIOs(self.minio, self.ws_util)
 
     def ws_command(self, data, websocket):
         try:
@@ -348,31 +353,30 @@ class Orchestrator:
     # Update linux and restart the device
     def update_restart_linux(self):
         Log.log("Updater: Update and restart requested")
-        try:
-            output = False
-            #output = subprocess.check_output(['ls','-l'], shell=True)
-            #output = subprocess.check_output(['apt','upgrade','-y'], shell=True)
+        Log.log("Skipping.......")
+        Log.log("Skipping.......")
+        Log.log("Skipping.......")
+        Log.log("Skipping.......")
+        Log.log("Skipping.......")
 
+        '''
+        try:
             cmd = ["apt", "upgrade", "-y"]
             try:
                 result = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                print("stdout:")
-                print(result.stdout)
-                print("stderr:")
-                print(result.stderr)
+                if output:
+                    return 200
             except subprocess.CalledProcessError as e:
                 print(f"Error: {e.returncode}\n{e.stderr}")
-
-            '''
-            if output:
+            finally:
                 if self._debug:
                     Log.log("Updater: Debug mode. Not rebooting")
                 else:
-                    subprocess.run(['reboot'], shell=True)
-                return 200
-            '''
+                    subprocess.run(['reboot'])
+
         except Exception as e:
             Log.log(f"Updater: Failed to send updgrade command: {e}")
+        '''
 
         return 400
 

@@ -4,14 +4,14 @@ from datetime import datetime
 from log import Log
 
 class MeldUrth:
-    def __init__(self, parent, patp, urb):
+    def __init__(self, parent, patp, urb, ws_util):
         self.start = parent.start # start function
-        self.set_action = parent.set_action # set action is structure
         self.get_config = parent.get_config # retrieves value from <patp>.json
         self.set_config = parent.set_config # modify <patp>.json
         self.patp = patp
         self.urb = urb
         self.urb_docker = urb.urb_docker
+        self.ws_util = ws_util
 
     def run(self):
         # start is container start command (see ws_urbits.py)
@@ -41,7 +41,7 @@ class MeldUrth:
         self.broadcast("")
 
     def broadcast(self, info):
-        return self.set_action(self.patp, 'meld','urth', info)
+        return self.ws_util.urbit_broadcast(self.patp, 'meld','urth', info)
 
     def stop_running(self, patp):
         # stop pier if running and returns

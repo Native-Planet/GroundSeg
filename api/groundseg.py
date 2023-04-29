@@ -5,6 +5,7 @@ except:
     dev = False
 
 # GroundSeg modules
+from ws_util import WSUtil
 from config import Config
 from orchestrator import Orchestrator
 
@@ -27,6 +28,7 @@ from keygen import KeyGen
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
 sys_config = Config(base_path, dev)
+ws_util = WSUtil()
 
 # Start Updater
 bin_updater = BinUpdater(sys_config, sys_config.debug_mode)
@@ -56,11 +58,11 @@ else:
 
     # Linux updater
     if sys_config.device_mode == "npbox":
-        apt_cmd = LinuxUpdater(sys_config)
+        apt_cmd = LinuxUpdater(sys_config, ws_util)
         Thread(target=apt_cmd.run, daemon=True).start()
 
     # Start GroundSeg orchestrator
-    orchestrator = Orchestrator(sys_config, dev)
+    orchestrator = Orchestrator(sys_config, ws_util, dev)
 
     # Scheduled melds
     meld_loop = Melder(sys_config, orchestrator)
@@ -80,10 +82,10 @@ else:
 
     # Websocket API
     from websocket_handler import GSWebSocket
-    ws = GSWebSocket(sys_config, orchestrator)
+    ws = GSWebSocket(sys_config, orchestrator, ws_util)
     ws.daemon = True
     ws.start()
 
     # Flask
-    groundseg = GroundSeg(sys_config, orchestrator)
+    groundseg = GroundSeg(sys_config, orchestrator, ws_util)
     groundseg.run()

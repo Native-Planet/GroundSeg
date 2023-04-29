@@ -8,11 +8,11 @@ from log import Log
 
 class MinIOLink:
     # TODO: remove unlink
-    def __init__(self, parent, urb, unlink=False):
+    def __init__(self, urb, ws_util, unlink=False):
         self.unlink = unlink
         self.urb = urb #for %lens
-        self.set_action = parent.set_action
         self.pier_config = {}
+        self.ws_util = ws_util
 
     def link(self, pier_config, acc, secret, bucket):
         try:
@@ -64,8 +64,8 @@ class MinIOLink:
 
     def broadcast(self, info):
         if self.unlink:
-            return self.set_action(self.patp, 'minio','unlink', info)
-        return self.set_action(self.patp, 'minio','link', info)
+            return self.ws_util.urbit_broadcast(self.patp, 'minio','unlink', info)
+        return self.ws_util.urbit_broadcast(self.patp, 'minio','link', info)
 
     def set_endpoints(self, patp, endpoint, access_key, secret, bucket, lens_addr):
         self.lens_poke(patp, 'set-endpoint', endpoint, lens_addr)

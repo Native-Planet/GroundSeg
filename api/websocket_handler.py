@@ -4,14 +4,14 @@ import json
 from threading import Thread
 
 from log import Log
-from websocket_util import WSUtil
 
 class GSWebSocket(Thread):
-    def __init__(self, config, orchestrator, host='0.0.0.0', port=8000):
+    def __init__(self, config, orchestrator, ws_util, host='0.0.0.0', port=8000):
         super().__init__()
         self.config_class = config
         self.config = config.config
         self.orchestrator = orchestrator
+        self.ws_util = ws_util
         self.host = host
         self.port = port
 
@@ -47,7 +47,7 @@ class GSWebSocket(Thread):
                             valid = False
                             msg = "ws_command:operation-fail"
 
-                res = WSUtil.make_response(data['id'], valid, msg)
+                res = self.orchestrator.ws_util.make_activity(data['id'], valid, msg)
                 await websocket.send(res)
 
         except websockets.ConnectionClosed:
@@ -62,7 +62,7 @@ class GSWebSocket(Thread):
             try:
                 for client in self.orchestrator.authorized_clients.copy():
                     if client.open:
-                        message = self.orchestrator.structure
+                        message = self.ws_util.structure
                         await client.send(json.dumps(message))
                     else:
                         self.orchestrator.authorized_clients.remove(client)

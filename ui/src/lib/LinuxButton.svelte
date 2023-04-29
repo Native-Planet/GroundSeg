@@ -3,6 +3,8 @@
   import { noconn, api, linuxUpdate, updateState } from '$lib/api.js'
   import { page } from '$app/stores'
 
+  import { socketInfo } from '$lib/stores/websocket.js'
+
   let hide = false
 
   afterUpdate(()=> {

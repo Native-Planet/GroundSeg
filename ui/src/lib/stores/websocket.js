@@ -12,7 +12,32 @@ export const socketInfo = writable({
     "connected": false,
   },
   "urbits": {},
-  "system": {}
+  "updates": {
+    "linux": {
+      "update": "updated",
+      "upgrade": 0,
+      "new": 0,
+      "remove": 0,
+      "ignore": 0
+    },
+    "binary": {
+      "update": "updated",
+      "auto": true
+    }
+  },
+  "system": {
+    "startram": {
+      "container": "stopped",
+      "autorenew": false,
+      "region": "us-east",
+      "expiry": 0,
+      "endpoint": "api.startram.io",
+      "register": "no",
+      "restart": "hide",
+      "cancel": "hide",
+      "advanced": false
+    }
+  }
 })
 
 export const socket = writable()
