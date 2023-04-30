@@ -824,7 +824,7 @@ class Urbit:
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
         raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
-        pack = Click().filter_pack_meld(raw)
+        pack = Click().filter_success(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If pack failed
@@ -866,7 +866,7 @@ class Urbit:
         self.create_hoon(patp, name, hoon)
         # Executing the hoon file
         raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
-        meld = Click().filter_pack_meld(raw)
+        meld = Click().filter_success(raw)
         # Set click support to True
         self._urbits[patp]['click'] = True
         # If meld failed

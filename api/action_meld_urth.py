@@ -75,6 +75,7 @@ class MeldUrth:
 
     # Pack or Meld?
     def action(self, patp, act, start):
+        # act is either pack or meld
         if start(patp, act) == act:
             Log.log(f"{patp}: Successfully started container for Urth {act}ing")
             self.broadcast(f"{act}ing")
