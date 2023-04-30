@@ -8,7 +8,6 @@
 
   export let minIOReg
   export let minIOUrl
-  export let remote
   export let hasBucket
   export let name
   export let disabled = false
@@ -94,8 +93,8 @@
           {#if linkInfo == "success"}
             <div class="link-info lime">linked!</div>
           {/if}
-          {#if linkInfo == "failure red"}
-            <div class="link-info">failed to link</div>
+          {#if linkInfo == "failure"}
+            <div class="link-info red">failed to link</div>
           {/if}
         {/if}
         {#if unlinkInfo.length <= 0}
