@@ -1,12 +1,12 @@
 <script>
 	import { onMount } from 'svelte'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
 
-	import { api } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
 	import Clipboard from 'clipboard'
 
   import Fa from 'svelte-fa'
-  import { faWrench } from '@fortawesome/free-solid-svg-icons'
+  import { faWrench, faHammer } from '@fortawesome/free-solid-svg-icons'
 
   export let name
   export let running
@@ -23,10 +23,20 @@
     clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
 	})
 
+  $: rebuildInfo = ($socketInfo.urbits[name]?.container?.rebuild) || ""
+
+  const rebuildContainer = () => {
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "container", "action": "rebuild"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
+
 </script>
 
 <div class="wrapper">
-	<Sigil patp={name} size="72px" rad="12px" />
+  <Sigil patp={name} size="80px" rad="12px" />
 
 	<div class="info">
     {#if !running}
@@ -52,6 +62,22 @@
       {/if}
       {clickedPatp ? "copied!" : name}
     </div>
+    {#if rebuildInfo.length < 1}
+      <button class="rebuild" on:click={rebuildContainer}>
+        <Fa icon={faHammer} size="1x" />
+        <span class="rebuild-text">
+          Rebuild
+        </span>
+      </button>
+    {:else if rebuildInfo == "removing"}
+      <div class="loading">Removing the container</div>
+    {:else if rebuildInfo == "starting"}
+      <div class="loading">Restarting the ship</div>
+    {:else if rebuildInfo == "success"}
+      <div class="loading success">Rebuild completed!</div>
+    {:else if rebuildInfo.includes('failure')}
+      <div class="loading failure">Error: {update.split('\n')[1]}</div>
+    {/if}
 	</div>
 </div>
 
@@ -66,7 +92,6 @@
     opacity: .8;
     font-weight: 400;
     font-size: .8em;
-    padding-bottom: 6px;
     color: red;
   }
   .loading {
@@ -96,5 +121,30 @@
     font-size: 10px;
     padding: 8px 12px;
     align-items: center;
+  }
+  .rebuild {
+    margin-top: 10px;
+    cursor: pointer;
+    color: inherit;
+    height: 24px;
+    background: #ffffff4d;
+    font-size: 12px;
+    padding: 2px 16px;
+    border-radius: 4px;
+  }
+  .loading {
+    animation: breathe 2s infinite;
+    height: 24px;
+    padding: 2px 0;
+    line-height: 24px;
+    font-size: 12px;
+  }
+  .success {
+    color: lime;
+    animation: none;
+  }
+  .failure {
+    color: red;
+    animation: none;
   }
 </style>

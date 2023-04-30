@@ -98,7 +98,8 @@ class Orchestrator:
         # hardcoded list of allowed modules
         whitelist = [
                 'meld',
-                'minio'
+                'minio',
+                'container'
                 ]
         patp = payload['patp']
         module = payload['module']
@@ -118,6 +119,13 @@ class Orchestrator:
         if module == "meld":
             if action == "urth":
                 Thread(target=self.ws_urbits.meld_urth,
+                       args=(patp,)
+                       ).start()
+
+        # Urbit Docker Container
+        if module == "container":
+            if action == "rebuild":
+                Thread(target=self.ws_urbits.container_rebuild,
                        args=(patp,)
                        ).start()
 

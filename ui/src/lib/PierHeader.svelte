@@ -2,6 +2,9 @@
 	import { api } from '$lib/api'
 	import { scale } from 'svelte/transition'
 
+  import Fa from 'svelte-fa'
+  import { faHammer } from '@fortawesome/free-solid-svg-icons'
+
 	export let running, name
 
   let loading = false

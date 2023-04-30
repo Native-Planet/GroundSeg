@@ -14,6 +14,12 @@ class WSUrbits:
         self.ws_util = ws_util
 
         for patp in self.config['piers']:
+            # removing      -  deleting old container
+            # starting      -  starting ship
+            # success       -  ship has started
+            # failure\n<err> -  Failure message
+            self.ws_util.urbit_broadcast(patp, 'container','rebuild')
+
             self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
             self.ws_util.urbit_broadcast(patp, 'minio', 'link')
             self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
@@ -40,7 +46,7 @@ class WSUrbits:
         return False
 
     #
-    #   actions sent to the Urbit container
+    #   interactions with the Urbit Docker container
     #
 
     def start(self, patp, act):
@@ -50,6 +56,36 @@ class WSUrbits:
         key = ''
         res = self.urb.urb_docker.start(ship, arch, vol, key, act)
         return res
+
+    def remove_container(self, patp):
+        return self.urb.urb_docker.remove_container(patp)
+
+    #
+    #   Actions
+    #
+
+
+    # TODO: Make this its own action file
+    def container_rebuild(self, patp):
+        success = False
+        try:
+            self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'removing')
+            running = self.urb.urb_docker.is_running(patp)
+            if self.remove_container(patp):
+                success = True
+                if running:
+                    self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'starting')
+                    res = self.start(patp,'boot')
+                    success = res == "succeeded"
+            if success:
+                self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'success')
+        except Exception as e:
+            Log.log(f"{patp}:container:rebuild Failed to rebuild container {e}")
+            self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', f'failure\n{e}')
+
+        import time
+        time.sleep(3)
+        self.ws_util.urbit_broadcast(patp, 'container', 'rebuild')
 
     def meld_urth(self, patp):
         self.ws_util.urbit_broadcast(patp, 'meld', 'urth','initializing')
