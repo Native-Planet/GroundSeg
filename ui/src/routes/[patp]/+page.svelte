@@ -26,15 +26,16 @@
   // Left Advanced
   import PierAdvancedCode from '$lib/PierAdvancedCode.svelte'
   import PierOptionsMeld from '$lib/PierOptionsMeld.svelte'
-  import PierOptionsLoom from '$lib/PierOptionsLoom.svelte'
+  import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
 
   // Center Advanced
   import PierAdvancedUrl from '$lib/PierAdvancedUrl.svelte'
   import PierAdvancedNetwork from '$lib/PierAdvancedNetwork.svelte'
-  import PierOptionsAdmin from '$lib/PierOptionsAdmin.svelte'
-  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
+  import PierOptionsLoom from '$lib/PierOptionsLoom.svelte'
+  import PierAdvancedInformation from '$lib/PierAdvancedInformation.svelte'
 
   // Right Advanced
+  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
   import PierOptionsDomain from '$lib/PierOptionsDomain.svelte'
 
 	// load data into store
@@ -263,6 +264,10 @@
               wgRunning={urbit.wgRunning}
             />
             <PierOptionsLoom name={urbit.name} loomSize={urbit.loomSize} />
+            <PierAdvancedInformation
+              name={urbit.name}
+              running={urbit.running}
+            />
           </div>
         {/if}
         <!-- Right side -->
@@ -284,7 +289,6 @@
           {/if}
           <PierOptionsMinIO 
             minIOUrl={urbit.minIOUrl} 
-            remote={urbit.remote}
             minIOReg={urbit.minIOReg}
             hasBucket={urbit.hasBucket}
             name={urbit.name}

@@ -1,3 +1,4 @@
+from threading import Thread
 from log import Log
 
 # Action imports
@@ -23,6 +24,9 @@ class WSUrbits:
             self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
             self.ws_util.urbit_broadcast(patp, 'minio', 'link')
             self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
+            self.ws_util.urbit_broadcast(patp, 'vere', 'version')
+
+            Thread(target=self.vere_version, args=(patp,), daemon=True).start()
 
     #
     #   interacting with self._urbits dict (config)
@@ -64,6 +68,20 @@ class WSUrbits:
     #   Actions
     #
 
+    # TODO: Make this its own action file
+    def vere_version(self, patp):
+        Log.log(f"{patp}:vere:version Thread started")
+        while True:
+            try:
+                res = self.urb.urb_docker.exec(patp, 'urbit --version')
+                if res:
+                    res = res.output.decode("utf-8").strip().split("\n")[0]
+                    self.ws_util.urbit_broadcast(patp, 'vere', 'version', str(res))
+            except Exception as e:
+                self.ws_util.urbit_broadcast(patp, 'vere', 'version', f'error: {e}')
+
+            import time
+            time.sleep(30)
 
     # TODO: Make this its own action file
     def container_rebuild(self, patp):
