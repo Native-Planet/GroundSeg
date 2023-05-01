@@ -73,10 +73,11 @@ class WSUrbits:
         Log.log(f"{patp}:vere:version Thread started")
         while True:
             try:
-                res = self.urb.urb_docker.exec(patp, 'urbit --version')
-                if res:
-                    res = res.output.decode("utf-8").strip().split("\n")[0]
-                    self.ws_util.urbit_broadcast(patp, 'vere', 'version', str(res))
+                if self.urb.urb_docker.is_running(patp):
+                    res = self.urb.urb_docker.exec(patp, 'urbit --version')
+                    if res:
+                        res = res.output.decode("utf-8").strip().split("\n")[0]
+                        self.ws_util.urbit_broadcast(patp, 'vere', 'version', str(res))
             except Exception as e:
                 self.ws_util.urbit_broadcast(patp, 'vere', 'version', f'error: {e}')
 

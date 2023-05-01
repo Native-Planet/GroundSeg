@@ -13,7 +13,8 @@
           Active Region
         </div>
         <div class="info-content">
-          {regions.find(obj => obj.name == region).desc}
+          {regions.find(obj => obj.name == region)}
+          <!--.desc}-->
         </div>
       </div>
     {/if}
@@ -22,7 +23,11 @@
         Expiry Date
       </div>
       <div class="info-content">
+        {lease}
+        <!--
+          ^ temp
         {lease.slice(5,-12)}
+        -->
       </div>
     </div>
     <div class="info">

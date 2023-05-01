@@ -30,6 +30,7 @@ export const socketInfo = writable({
       "container": "stopped",
       "autorenew": false,
       "region": "us-east",
+      "regions": ["us-east"],
       "expiry": 0,
       "endpoint": "api.startram.io",
       "register": "no",

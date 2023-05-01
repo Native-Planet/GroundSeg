@@ -76,7 +76,7 @@
     {:else if rebuildInfo == "success"}
       <div class="loading success">Rebuild completed!</div>
     {:else if rebuildInfo.includes('failure')}
-      <div class="loading failure">Error: {update.split('\n')[1]}</div>
+      <div class="loading failure">Error: {rebuildInfo.split('\n')[1]}</div>
     {/if}
 	</div>
 </div>

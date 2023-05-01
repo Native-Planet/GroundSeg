@@ -6,7 +6,9 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-	import { updateState, api, system, noconn, startram } from '$lib/api'
+  import { socketInfo } from '$lib/stores/websocket.js'
+
+	//import { updateState, api, system, noconn, startram } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 
@@ -15,57 +17,22 @@
   import AnchorRegisterKey from '$lib/AnchorRegisterKey.svelte'
   import AnchorAdvanced from '$lib/AnchorAdvanced.svelte'
 
-	// load data into store
-	export let data
-  updateState(data)
-
-	// init
 	let inView = false
 
-	// updateState loop
-  const update = () => {
-    if (($page.route.id == '/startram') && !$noconn) {
-      fetch($api + '/anchor', {credentials: "include"})
-			.then(raw => raw.json())
-      .then(res => updateState(res))
-      .catch(err => {
-        console.log(err)
-        if ((typeof err) == 'object') {
-          updateState({status:'noconn'})
-        }
-      })
+  $: startram = ($socketInfo.system?.startram) || {}
+  $: register = (startram?.register) || "no"
+  $: container = (startram?.container) || "stopped"
+  $: region = (startram?.region) || "us-east"
+  $: regions = (startram?.regions) || ["us-east"]
+  $: autorenew = (startram?.autorenew) || false
+  $: expiry = (startram?.expiry) || 0
+  $: endpoint = (startram?.endpoint) || "api.startram.io"
+  $: restart = (startram?.restart) || "hide"
+  $: cancel = (startram?.cancel) || "hide"
+  $: advanced = (startram?.advanced) || false
 
-			setTimeout(update, 1000)
-	}}
-
-	// Start the update loop
-	onMount(()=> {
-    api.set("http://" + $page.url.hostname + ":27016")
-    if (data['status'] == 404) {
-      window.location.href = "/login"
-    }
-
-    if (data['status'] == 'setup') {
-      window.location.href = "/setup"
-    }
-		update()
-    inView = true
-    tempGetRegions()
-	})
-
+	onMount(()=> inView = true)
   onDestroy(()=> inView = false)
-
-  const tempGetRegions = () => {
-    fetch($api + "/get-regions",{credentials: "include"})
-      .then(r => r.json())
-      .then(x => {
-        if (x==200) {
-          console.log("regions requested")
-        } else {
-          setTimeout(tempGetRegions, 3000)
-        }
-      })
-  }
 	
 </script>
 
@@ -73,20 +40,20 @@
   <Card width="460px">
 
     <!-- Header -->
-    <AnchorHeader wgReg={$startram.wgReg} wgRunning={$startram.wgRunning}>
+    <AnchorHeader wgReg={register == "yes"} wgRunning={container == "running"}>
       <Logo t='StarTram'/>
     </AnchorHeader>
 
-    {#if $startram.wgReg}
+    {#if register == "yes"}
       <AnchorInformation
-        region={$startram.region}
-        regions={$startram.regions}
-        ongoing={$startram.ongoing}
-        lease={$startram.lease}
+        region={region}
+        regions={regions}
+        ongoing={autorenew}
+        lease={expiry}
       />
     {/if}
 
-    <!-- Register Key -->
+    <!-- Register Key --
     <AnchorRegisterKey
       wgReg={$startram.wgReg}
       region={$startram.region}
@@ -99,8 +66,9 @@
       </a>
     </div>
 
-    <!-- Advanced Options -->
+    <!-- Advanced Options --
     <AnchorAdvanced wgReg={$startram.wgReg} wgRunning={$startram.wgRunning} />
+    -->
   </Card>
 {/if}
 
