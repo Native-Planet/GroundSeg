@@ -71,12 +71,14 @@
       </button>
     {:else if rebuildInfo == "removing"}
       <div class="loading">Removing the container</div>
+    {:else if rebuildInfo == "rebuilding"}
+      <div class="loading">Rebuilding the container</div>
     {:else if rebuildInfo == "starting"}
       <div class="loading">Restarting the ship</div>
     {:else if rebuildInfo == "success"}
       <div class="loading success">Rebuild completed!</div>
     {:else if rebuildInfo.includes('failure')}
-      <div class="loading failure">Error: {update.split('\n')[1]}</div>
+      <div class="loading failure">Error: {rebuildInfo.split('\n')[1]}</div>
     {/if}
 	</div>
 </div>
@@ -129,8 +131,11 @@
     height: 24px;
     background: #ffffff4d;
     font-size: 12px;
-    padding: 2px 16px;
+    padding: 2px 8px;
     border-radius: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
   }
   .loading {
     animation: breathe 2s infinite;

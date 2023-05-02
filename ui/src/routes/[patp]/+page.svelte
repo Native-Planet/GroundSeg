@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
 
+  import { socketInfo } from '$lib/stores/websocket.js'
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
 	import { isPortrait, api, updateState, noconn } from '$lib/api'
@@ -55,6 +56,8 @@
   
   let advanced = (activeTab == "Advanced")
 
+  $: name = ($socketInfo?.urbits?.[$page.params.patp]) || null
+
 	// start api loop
 	onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
@@ -95,7 +98,7 @@
     if (d == 400) { 
       failureCount = ++failureCount
 
-      if (failureCount > 3) {
+      if ((failureCount > 3) && (name == null)){
         window.location.href = "/" }
     }
 
