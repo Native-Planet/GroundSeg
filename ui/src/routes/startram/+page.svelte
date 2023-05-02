@@ -19,14 +19,14 @@
 
 	let inView = false
 
-  $: startram = ($socketInfo.system?.startram) || {}
+  $: startram = ($socketInfo.system?.startram) || null
   $: register = (startram?.register) || "no"
   $: container = (startram?.container) || "stopped"
-  $: region = (startram?.region) || "us-east"
-  $: regions = (startram?.regions) || ["us-east"]
+  $: region = (startram?.region) || null
+  $: regions = (startram?.regions) || []
   $: autorenew = (startram?.autorenew) || false
-  $: expiry = (startram?.expiry) || 0
-  $: endpoint = (startram?.endpoint) || "api.startram.io"
+  $: expiry = (startram?.expiry) || null
+  $: endpoint = (startram?.endpoint) || null
   $: restart = (startram?.restart) || "hide"
   $: cancel = (startram?.cancel) || "hide"
   $: advanced = (startram?.advanced) || false
@@ -36,9 +36,8 @@
 	
 </script>
 
-{#if inView}
+{#if inView && (register != null)}
   <Card width="460px">
-
     <!-- Header -->
     <AnchorHeader wgReg={register == "yes"} wgRunning={container == "running"}>
       <Logo t='StarTram'/>
@@ -46,18 +45,18 @@
 
     {#if register == "yes"}
       <AnchorInformation
-        region={region}
-        regions={regions}
+        {region}
+        {regions}
         ongoing={autorenew}
         lease={expiry}
       />
     {/if}
 
-    <!-- Register Key --
+    <!-- Register Key -->
     <AnchorRegisterKey
-      wgReg={$startram.wgReg}
-      region={$startram.region}
-      regions={$startram.regions}
+      {region}
+      {regions}
+      {register}
     />
 
     <div class="sign-up">
@@ -66,17 +65,16 @@
       </a>
     </div>
 
-    <!-- Advanced Options --
-    <AnchorAdvanced wgReg={$startram.wgReg} wgRunning={$startram.wgRunning} />
-    -->
+    <!-- Advanced Options -->
+    <AnchorAdvanced 
+      {endpoint}
+      wgReg={register == "yes"}
+      wgRunning={container == "running"}
+    />
   </Card>
 {/if}
 
 <style>
-  .lease {
-    padding-top: 20px;
-    font-size: 12px;
-  }
   .sign-up {
     margin-top: 12px;
     margin-left: 2px;

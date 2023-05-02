@@ -6,6 +6,9 @@ from threading import Thread
 from log import Log
 
 class GSWebSocket(Thread):
+    authorized_clients = {}
+    unauthorized_clients = {} # unused for now
+
     def __init__(self, config, orchestrator, ws_util, host='0.0.0.0', port=8000):
         super().__init__()
         self.config_class = config
@@ -23,11 +26,11 @@ class GSWebSocket(Thread):
                 msg = "default-fail"
                 try:
                     # Check authentication
-                    valid = data['sessionid'] in self.config['sessions']
+                    sid = data.get('sessionid')
+                    valid = sid in self.config['sessions']
                     if valid:
-                        # Add client to connected clients set
-                        self.orchestrator.authorized_clients.add(websocket)
-                        msg = "client added"
+                        # Add client to whitelist
+                        self.authorized_clients[websocket] = {}
                     else:
                         raise Exception("no sessionid provided")
                 except Exception as e:
@@ -54,21 +57,27 @@ class GSWebSocket(Thread):
             Log.log("WS: Connection closed")
 
         finally:
-            # Remove client from connected clients set
-            self.orchestrator.authorized_clients.remove(websocket)
+            # Remove client
+            self.authorized_clients.pop(websocket)
 
     async def broadcast_message(self):
+        #count = 0
         while True:
             try:
-                for client in self.orchestrator.authorized_clients.copy():
+                clients = self.authorized_clients.copy()
+                for client in clients:
+                    #client = clients[sid]
                     if client.open:
+                        #if (count % 20) == 0:
+                        #    print(client)
                         message = self.ws_util.structure
                         await client.send(json.dumps(message))
                     else:
-                        self.orchestrator.authorized_clients.remove(client)
+                        self.authorized_clients.pop(sid)
             except Exception as e:
                 Log.log(f"WS: Broadcast fail: {e}")
             await asyncio.sleep(0.5)  # Send the message twice a second
+            #count += 1
 
     def run(self):
         try:

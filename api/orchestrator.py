@@ -70,7 +70,7 @@ class Orchestrator:
 
     # Duplicate of __init__ for future use
     def ws_init(self, config, debug):
-        self.ws_system = WSSystem(self.config_object, self.ws_util)
+        self.ws_system = WSSystem(self.config_object, self.wireguard, self.ws_util)
         self.ws_urbits = WSUrbits(self.config_object, self.urbit, self.ws_util)
         self.ws_minios = WSMinIOs(self.minio, self.ws_util)
 
@@ -85,13 +85,30 @@ class Orchestrator:
             if data['category'] == 'updates':
                 return self.ws_command_updates(payload)
 
+            if data['category'] == 'forms':
+                return self.ws_command_forms(payload)
+
             raise Exception(f"'{data['category']}' is not a valid category")
         except Exception as e:
             raise Exception(e)
 
+
     #
     # Category command functions
     #
+
+    # Forms
+    def ws_command_forms(self, data):
+        try:
+            whitelist = ['startram']
+
+            if data['template'] in whitelist:
+                Log.log(data['item'])
+                Log.log(data['value'])
+
+        except Exception as e:
+            raise Exception(e)
+        return "succeeded"
 
     # Urbit
     def ws_command_urbit(self, payload):
@@ -343,56 +360,6 @@ class Orchestrator:
 
 
     #
-    #   Anchor Settings
-    #
-
-    # Get anchor registration information
-    def get_anchor_settings(self):
-        lease_end = None
-        ongoing = False
-        #active_region = "us-east"
-
-        try:
-            lease = self.wireguard.anchor_data['lease']
-        except:
-            lease = None
-
-        try:
-            ongoing = self.wireguard.anchor_data['ongoing'] == 1
-        except:
-            ongoing = False
-
-        try:
-            active_region = self.wireguard.anchor_data['region']
-        except:
-            active_region = None
-
-        if lease is not None:
-            x = list(map(int,lease.split('-')))
-            lease_end = datetime(x[0], x[1], x[2], 0, 0)
-
-        regions = Utils.convert_region_data(self.wireguard.region_data)
-
-        try:
-            if active_region not in self.wireguard.region_data:
-                active_region = None
-        except Exception:
-            Log.log("Anchor: Failed to check active region: {e}")
-            active_region = None
-
-        return { "anchor": 
-                {
-                "wgReg": self.config['wgRegistered'],
-                "wgRunning": self.wireguard.is_running(),
-                "lease": lease_end,
-                "ongoing": ongoing,
-                "region": active_region,
-                "regions": regions
-                }
-            }
-
-
-    #
     #   System Settings
     #
 
@@ -490,9 +457,6 @@ class Orchestrator:
 
         # anchor module
         if module == 'anchor':
-            if data['action'] == 'get-url':
-                return self.config['endpointUrl']
-
             if data['action'] == 'toggle':
                 if self.wireguard.is_running():
                     return self.wireguard.off(self.urbit, self.minio)

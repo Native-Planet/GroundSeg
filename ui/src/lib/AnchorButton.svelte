@@ -1,9 +1,15 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-	import { updateState, api, system, noconn, startram } from '$lib/api'
   import { page } from '$app/stores'
+
+  import { socketInfo } from '$lib/stores/websocket.js'
+
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
+
+  $: startram = ($socketInfo.system?.startram) || {}
+  $: register = (startram?.register) || "no"
+  $: container = (startram?.container) || "stopped"
 
   let hide = true
   let blur = false
@@ -13,35 +19,14 @@
     blur = ($page.route.id == '/startram')
   })
 
-	// updateState loop
-  const update = () => {
-    if (!$noconn) {
-      fetch($api + '/anchor', {credentials: "include"})
-      .then(raw => raw.json())
-      .then(res => updateState(res))
-      .catch(err => {
-        if ((typeof err) == 'object') {
-          updateState({status:'noconn'})
-        }
-      })
-    }
-    setTimeout(update, 10000)
-	}
-
-	// Start the update loop
-	onMount(()=> {
-    api.set("http://" + $page.url.hostname + ":27016")
-		update()
-	})
-
 </script>
 
 {#if !hide}
   <a href='/startram' class:hide={hide} class:blur={blur}>
     <div 
       class="img" 
-      class:connected={$startram.wgReg && $startram.wgRunning}
-      class:not-connected={$startram.wgReg && !$startram.wgRunning}
+      class:connected={(register == "yes") && (container == "running")}
+      class:not-connected={(register == "yes") && !(container == "running")}
     >
       <Fa icon={faSatelliteDish} size="1.2x" />
     </div>

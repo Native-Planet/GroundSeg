@@ -36,6 +36,7 @@
     } else {
       console.log(data['status'])
     }
+    api.set("http://" + $page.url.hostname + ":27016")
     isLocked()
     inView = true
     getLoginKey()

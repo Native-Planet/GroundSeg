@@ -1,9 +1,11 @@
+from threading import Thread
 from action_linux_update import LinuxUpdate
 
 class WSSystem:
-    def __init__(self, config, ws_util):
+    def __init__(self, config, wg, ws_util):
         self.config_object = config
         self.config = config.config
+        self.wg = wg
         self.ws_util = ws_util
 
         # {a:{b:{c:d}}
@@ -27,25 +29,17 @@ class WSSystem:
         self.ws_util.system_broadcast('updates','binary','update','updated')
         self.ws_util.system_broadcast('updates','binary','routine','auto')       # notify off
 
-        # no            -  unregistered
-        # yes           -  a command was sent
-        # <reg loading> -  TODO
-        # success       -  registered successfully
-        # failure\n<err> -  Failure message
-        self.ws_util.system_broadcast('system','startram','register','yes')
+        self.update_startram()
 
-        # running  -  Wireguard container is running
-        # stopped  -  Wireguard container is stopped
-        self.ws_util.system_broadcast('system','startram',"container","running")
+    #
+    #   Threads
+    #
 
-        self.ws_util.system_broadcast('system','startram',"autorenew",False)
-        self.ws_util.system_broadcast('system','startram',"region","us-east")
-        self.ws_util.system_broadcast('system','startram',"regions",["us-east"])
-        self.ws_util.system_broadcast('system','startram',"expiry",0)
-        self.ws_util.system_broadcast('system','startram',"endpoint","api.startram.io")
-        self.ws_util.system_broadcast('system','startram',"restart","hide")
-        self.ws_util.system_broadcast('system','startram',"cancel","hide")
-        self.ws_util.system_broadcast('system','startram',"advanced",False)
+    def update_startram(self):
+        from update_startram import UpdateStarTram
+        from time import sleep
+        startram = UpdateStarTram(self.config_object, self.wg, self.ws_util)
+        Thread(target=startram.run, daemon=True).start()
 
     #
     #   Actions
@@ -57,6 +51,5 @@ class WSSystem:
             old_info = self.ws_util.structure['updates']['linux']['update']
         except:
             pass
-
         self.ws_util.system_broadcast('updates', 'linux','update','initializing')
         LinuxUpdate(self.ws_util, self.config_object).run(old_info)

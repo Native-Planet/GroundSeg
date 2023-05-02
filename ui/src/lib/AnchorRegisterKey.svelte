@@ -1,20 +1,46 @@
 <script>
   import { scale } from 'svelte/transition'
-  import { api } from '$lib/api'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let wgReg
+  export let register
   export let region
   export let regions
 
-  let key = ''
   let view = false
   let loading = false
   let buttonStatus = 'standard'
   let reRegCheck = true
 
-  let selectedRegion
+  $: connected = ($socketInfo?.metadata?.connected) || false
+  $: key = updateForm('key',handleKey(key))
 
+  const handleKey = key => {
+    if (typeof key === 'string' || key instanceof String) {
+      return key.trim()
+    }
+    else {
+      return ''
+    }
+  }
+
+  const updateForm = (item, data) => {
+    if (connected) {
+      let payload = {
+        "category": "forms",
+        "payload": {
+          "template": "startram",
+          "item": item,
+          "value": data,
+        }
+      }
+      send($socket, $socketInfo, document.cookie, payload)
+    }
+    return data
+  }
+
+  // Region
+  let selectedRegion
   if (region == null) {
     selectedRegion = "us-east"
   } else {
@@ -26,39 +52,13 @@
     document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
-  const registerKey = () => {
-    buttonStatus = 'loading'
-    let module = 'anchor'
-	  fetch($api + '/system?module=' + module, {
-			method: 'POST',
-      credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'register','key':key.trim(),'region':selectedRegion})
-	  })
-      .then(d => d.json())
-      .then(res => {
-        if (res === 200) {
-          console.log(res)
-          buttonStatus = 'success'
-          setTimeout(()=>{
-            buttonStatus = 'standard'
-            reRegCheck = true
-            key = ''}, 3000)
-        } else {
-          console.log(res)
-          buttonStatus = 'failure'
-          setTimeout(()=> {buttonStatus = 'standard';reRegCheck = true}, 3000)
-        }})
-      .catch(err => console.log(err))
-  }
-
 
 </script>
 
 <div class="reg-key-wrapper">
 
   <!-- If not registered -->
-  {#if !wgReg}
+  {#if register == "no"}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
@@ -106,7 +106,7 @@
 
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
-    {#if wgReg && reRegCheck}
+    {#if (register == "yes") && reRegCheck}
       <PrimaryButton
         left={true}
         on:click={()=>reRegCheck = false}
@@ -117,14 +117,16 @@
     {:else}
       <PrimaryButton
         left={true}
-        on:click={registerKey}
         standard="Register"
+        status={key.length <= 0 ? "disabled" : 'standard'}
+        top="12"
+      />
+      <!--
+        on:click={registerKey}
         success="Key registered"
         failure="Registration failed"
         loading="Registering your key..(might take a while)"
-        status={key.length <= 0 ? "disabled" : buttonStatus}
-        top="12"
-      />
+      -->
     {/if}
   </div>
 </div>

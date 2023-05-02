@@ -82,6 +82,7 @@ class Wireguard:
         return self.wg_docker.remove_wireguard(self.data['wireguard_name'])
 
     # Is container running
+    # TODO: Remove when no longer needed
     def is_running(self):
         if self.config['wgRegistered']:
             return self.wg_docker.is_running(self.data['wireguard_name'])

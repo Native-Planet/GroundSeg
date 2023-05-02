@@ -73,5 +73,4 @@ class WSUtil:
         except Exception as e:
             Log.log(f"ws-util:urbit-broadcast {e}")
             return False
-
         return True

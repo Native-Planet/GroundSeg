@@ -5,39 +5,25 @@
   import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let wgReg, wgRunning
+  export let wgReg
+  export let wgRunning
+  export let endpoint
 
-  let advanced = false,
-    currentEpKey = '',
-    epKey = '',
-    defaultEpKey = 'api.startram.io',
-    epButtonStatus = 'standard',
-    cancelButtonStatus = 'standard',
-    restartButtonStatus = 'standard',
-    confirmCancel = false,
-    regKey = '', view = false,
-    restarting = false,
-    showEpInfo = false
+  let advanced = false
+  let defaultEpKey = 'api.startram.io'
+  let epButtonStatus = 'standard'
+  let cancelButtonStatus = 'standard'
+  let restartButtonStatus = 'standard'
+  let confirmCancel = false
+  let regKey = ''
+  let view = false
+  let restarting = false
+  let showEpInfo = false
 
+  $: currentEpKey = endpoint
 
-  const insertNP = () => epKey = defaultEpKey
-
-  const toggleAdvanced = () => {
-    if (!advanced) {getEndpoint()}
-    advanced = !advanced
-  }
-  
-  const getEndpoint = () => {
-    let module = 'anchor'
-	  fetch($api + '/system?module=' + module, {
-			method: 'POST',
-      credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'get-url'})
-	  })
-      .then(d=>d.json())
-      .then(r=>{currentEpKey = r; epKey = r})
-  }
+  const insertNP = () => currentEpKey = defaultEpKey
+  const toggleAdvanced = () => advanced = !advanced
 
   const connectEndpoint = () => {
     epButtonStatus = 'loading'
@@ -46,7 +32,7 @@
 			method: 'POST',
       credentials: "include",
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'change-url','url':epKey})
+			body: JSON.stringify({'action':'change-url','url':endpoint})
 	  })
       .then(d=>d.json()).then(r=>{
         if (r === 200) {
@@ -153,23 +139,23 @@
     {/if}
 
     <div class="ep-key"transition:scale={{duration:120, delay: 200}}>
-      <input type="text" bind:value={epKey} />
+      <input type="text" bind:value={currentEpKey} />
       <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
     </div>
 
-    {#if currentEpKey != epKey}
-      <div transition:scale={{duration:120, delay: 200}}>
+    <div transition:scale={{duration:120, delay: 200}}>
       <PrimaryButton
         on:click={connectEndpoint}
-        standard="Set to {defaultEpKey == epKey ? "Native Planet" : "Custom"} Endpoint"
-        success="Endpoint successfully changed"
-        failure="Failed to change endpoint"
-        loading="Changing to your new endpoint.."
-        status={epButtonStatus}
+        standard="Set to {defaultEpKey == currentEpKey ? "Native Planet" : "Custom"} Endpoint"
+        status={currentEpKey == endpoint ? 'disabled': 'standard'}
         top="12"
       />
-      </div>
-    {/if}
+    <!--
+      success="Endpoint successfully changed"
+      failure="Failed to change endpoint"
+      loading="Changing to your new endpoint.."
+    -->
+    </div>
 
     {#if wgReg}
     <div class="ep-title" transition:scale={{duration:120, delay: 200}}>

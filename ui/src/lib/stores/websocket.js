@@ -10,34 +10,6 @@ export const socketInfo = writable({
   "metadata": {
     "address": "",
     "connected": false,
-  },
-  "urbits": {},
-  "updates": {
-    "linux": {
-      "update": "updated",
-      "upgrade": 0,
-      "new": 0,
-      "remove": 0,
-      "ignore": 0
-    },
-    "binary": {
-      "update": "updated",
-      "auto": true
-    }
-  },
-  "system": {
-    "startram": {
-      "container": "stopped",
-      "autorenew": false,
-      "region": "us-east",
-      "regions": ["us-east"],
-      "expiry": 0,
-      "endpoint": "api.startram.io",
-      "register": "no",
-      "restart": "hide",
-      "cancel": "hide",
-      "advanced": false
-    }
   }
 })
 
@@ -65,7 +37,7 @@ export const connect = async (addr, cookie, info) => {
   updateMetadata("address", addr)
 }
 
-export const send = (ws, info, cookie, msg, handleReturn) => {
+export const send = (ws, info, cookie, msg) => {
   if (info.metadata.connected) {
     msg = msg || {}
     let id = genRequestId(16)
@@ -88,7 +60,9 @@ export const send = (ws, info, cookie, msg, handleReturn) => {
 
 const handleActivity = (id, cat, load, info) => {
   let prefix = id + ":" + cat
-  if (cat != "ping") {
+  if (cat == "forms") {
+    prefix = prefix + ":" + load.template + ":" + load.item
+  } else if (cat != "ping") {
     prefix = prefix + ":" + load.module + ":" + load.action
   }
 
@@ -112,6 +86,9 @@ const removeActivity = id => {
 
 const updateData = data => {
   data = JSON.parse(data)
+  if (data.hasOwnProperty('forms')) {
+    console.log(Data)
+  }
   socketInfo.update(i => {
     let obj = deepMerge(i, data)
     return obj

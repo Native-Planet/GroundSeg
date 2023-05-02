@@ -17,13 +17,7 @@
   let copyPatp
   let clickedPatp = false
 
-	onMount(()=> {
- 		copyPatp = new Clipboard('#patp')
-    copyPatp.on("success", ()=> {
-    clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
-	})
-
-  $: rebuildInfo = ($socketInfo.urbits[name]?.container?.rebuild) || ""
+  $: rebuildInfo = ($socketInfo?.urbits?.[name]?.container?.rebuild) || ""
 
   const rebuildContainer = () => {
     let payload = {
@@ -32,6 +26,14 @@
     }
     send($socket, $socketInfo, document.cookie, payload)
   }
+
+  const patpClipboard = () => {
+ 		copyPatp = new Clipboard('#patp')
+    copyPatp.on("success", ()=> {
+    clickedPatp = true; setTimeout(()=> clickedPatp = false, 1000)})
+  }
+
+	onMount(()=> patpClipboard())
 
 </script>
 

@@ -3,6 +3,8 @@
   export let regions
   export let ongoing
   export let lease
+  let regions2 = ['aa','bb']
+  let region2 = 'aa'
 </script>
 
 <div class="info-wrapper">
@@ -13,8 +15,7 @@
           Active Region
         </div>
         <div class="info-content">
-          {regions.find(obj => obj.name == region)}
-          <!--.desc}-->
+          {regions.find(obj => obj.name == region)?.desc}
         </div>
       </div>
     {/if}
@@ -22,13 +23,7 @@
       <div class="info-header">
         Expiry Date
       </div>
-      <div class="info-content">
-        {lease}
-        <!--
-          ^ temp
-        {lease.slice(5,-12)}
-        -->
-      </div>
+      <div class="info-content">{lease}</div>
     </div>
     <div class="info">
       <div class="info-header">
