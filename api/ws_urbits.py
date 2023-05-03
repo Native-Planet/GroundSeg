@@ -64,6 +64,28 @@ class WSUrbits:
     def remove_container(self, patp):
         return self.urb.urb_docker.remove_container(patp)
 
+    def create_container(self, patp):
+        ship = self._urbits[patp]
+        image = self.temp_image(patp)
+        vol = self.urb._volume_directory
+        key = ''
+        res = self.urb.urb_docker.create(ship, image, vol, key)
+        return res
+
+    def temp_image(self, patp):
+        repo = self._urbits[patp]['urbit_repo']
+        tag = self._urbits[patp]['urbit_version']
+        image = f"{repo}:{tag}"
+
+        arch = self.config_object._arch
+        sha = f"urbit_{arch}_sha256"
+        hash_str = self._urbits[patp][sha]
+
+        if hash_str != "" and hash_str is not None:
+            image = f"{image}@sha256:{hash_str}"
+
+        return image
+
     #
     #   Actions
     #
@@ -91,11 +113,13 @@ class WSUrbits:
             self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'removing')
             running = self.urb.urb_docker.is_running(patp)
             if self.remove_container(patp):
-                success = True
-                if running:
-                    self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'starting')
-                    res = self.start(patp,'boot')
-                    success = res == "succeeded"
+                self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'rebuilding')
+                if self.create_container(patp):
+                    success = True
+                    if running:
+                        self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'starting')
+                        res = self.start(patp,'boot')
+                        success = res == "succeeded"
             if success:
                 self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'success')
         except Exception as e:

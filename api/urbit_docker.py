@@ -121,7 +121,6 @@ class UrbitDocker:
             Log.log(f"{patp}: Container not found")
             return False
 
-
     def create(self, config, image, vol_dir, key=''):
         patp = config['pier_name']
         Log.log(f"{patp}: Attempting to create container")
