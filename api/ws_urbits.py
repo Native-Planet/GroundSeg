@@ -24,6 +24,7 @@ class WSUrbits:
             self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
             self.ws_util.urbit_broadcast(patp, 'minio', 'link')
             self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
+            self.ws_util.urbit_broadcast(patp, 'click', 'exist', False)
             self.ws_util.urbit_broadcast(patp, 'vere', 'version')
 
             Thread(target=self.vere_version, args=(patp,), daemon=True).start()

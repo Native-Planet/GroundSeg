@@ -70,11 +70,25 @@ class GSWebSocket(Thread):
                 Log.log(f"WS: Broadcast fail: {e}")
             await asyncio.sleep(0.5)  # Send the message twice a second
 
+    async def urbits_broadcast(self):
+        while True:
+            try:
+                for patp in self.orchestrator.urbit._urbits.copy():
+                    try:
+                        click = self.orchestrator.urbit._urbits[patp]['click']
+                    except:
+                        click = False
+                    self.ws_util.urbit_broadcast(patp, 'click', 'exist', click)
+            except Exception as e:
+                Log.log(f"WS: Urbits Broadcast fail: {e}")
+            await asyncio.sleep(1)
+
     def run(self):
         try:
             Log.log("WS: Starting WebSocket Thread")
             asyncio.set_event_loop(asyncio.new_event_loop())
             server = websockets.serve(self.handle, self.host, self.port)
+            asyncio.get_event_loop().create_task(self.urbits_broadcast())
             asyncio.get_event_loop().create_task(self.broadcast_message())
             asyncio.get_event_loop().run_until_complete(server)
             asyncio.get_event_loop().run_forever()

@@ -22,7 +22,7 @@ class Click:
                     return self.filter_code(raw)
 
             # s3
-            if self.name == "s3":
+            if self.name in ["s3","s3-legacy"]:
                 if self.create_hoon(payload):
                     raw = self.click_exec(
                             self.patp,
@@ -119,6 +119,27 @@ class Click:
 """
         if name == "s3":
 # s3
+            return f"""
+=/  m  (strand ,vase)
+;<    our=@p
+    bind:m
+  get-our
+;<    ~
+    bind:m
+  (poke [our %storage] %s3-action !>([%set-endpoint '{payload['endpoint']}']))
+;<    ~
+    bind:m
+  (poke [our %storage] %s3-action !>([%set-access-key-id '{payload['acc']}']))
+;<    ~
+    bind:m
+  (poke [our %storage] %s3-action !>([%set-secret-access-key '{payload['secret']}']))
+;<    ~
+    bind:m
+  (poke [our %storage] %s3-action !>([%set-current-bucket '{payload['bucket']}']))
+(pure:m !>('success'))
+"""
+        if name == "s3-legacy":
+# s3-legacy
             return f"""
 =/  m  (strand ,vase)
 ;<    our=@p

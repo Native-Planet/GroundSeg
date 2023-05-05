@@ -168,7 +168,7 @@ class Orchestrator:
             # set in urbit
             self.ws_urbits.minio_link(pier_config, acc, secret, bucket)
         else:
-            Log.log("WS: {patp} minio:link failed") 
+            Log.log(f"WS: {patp} minio:link failed") 
 
     def minio_unlink(self, patp): # temp
         pier_config = self.urbit._urbits[patp]

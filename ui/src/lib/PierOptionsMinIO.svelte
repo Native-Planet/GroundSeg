@@ -14,8 +14,9 @@
 
   let showSetup = false
 
-  $: linkInfo = $socketInfo.urbits[name].minio.link
-  $: unlinkInfo = $socketInfo.urbits[name].minio.unlink
+  $: linkInfo = ($socketInfo?.urbits?.[name]?.minio?.link) || ""
+  $: unlinkInfo = ($socketInfo?.urbits?.[name]?.minio?.unlink) || ""
+  $: clickExist = ($socketInfo?.urbits?.[name]?.click?.exist) || false
 
   // Button status
   let linkButtonStatus = 'standard'
@@ -78,23 +79,23 @@
           <PrimaryButton
             noMargin={true}
             standard="Link to Urbit"
-            status={disabled || !minIOReg ? "disabled" : linkButtonStatus}
+            status={disabled || !minIOReg || !clickExist ? "disabled" : linkButtonStatus}
             on:click={updateMinIO} />
         {:else}
           {#if linkInfo == "create-account"}
             <div class="link-info">creating secret key</div>
           {/if}
-          {#if linkInfo == "link-click"}
-            <div class="link-info">trying with click</div>
+          {#if linkInfo == "link"}
+            <div class="link-info">attempting to link</div>
           {/if}
-          {#if linkInfo == "link-lens"}
-            <div class="link-info orange">trying with lens</div>
+          {#if linkInfo == "link-legacy"}
+            <div class="link-info orange">trying legacy agent</div>
           {/if}
           {#if linkInfo == "success"}
             <div class="link-info lime">linked!</div>
           {/if}
-          {#if linkInfo == "failure"}
-            <div class="link-info red">failed to link</div>
+          {#if linkInfo.includes("failure")}
+            <div class="link-info red">failed: {linkInfo.split("\n")[1]}</div>
           {/if}
         {/if}
         {#if unlinkInfo.length <= 0}
@@ -102,21 +103,21 @@
             noMargin={true}
             background="#FFFFFF4D"
             standard="Unlink"
-            status={disabled || !minIOReg ? "disabled" : unlinkButtonStatus}
+            status={disabled || !minIOReg || !clickExist ? "disabled" : unlinkButtonStatus}
             on:click={unlinkMinIO}
           />
         {:else}
-          {#if unlinkInfo == "link-click"}
-            <div class="link-info">trying with click</div>
+          {#if unlinkInfo == "link"}
+            <div class="link-info">attempting to unlink</div>
           {/if}
-          {#if unlinkInfo == "link-lens"}
-            <div class="link-info orange">trying with lens</div>
+          {#if unlinkInfo == "link-legacy"}
+            <div class="link-info orange">trying legacy agent</div>
           {/if}
           {#if unlinkInfo == "success"}
             <div class="link-info lime">unlinked!</div>
           {/if}
-          {#if unlinkInfo == "failure red"}
-            <div class="link-info">failed to unlink</div>
+          {#if unlinkInfo.includes("failure")}
+            <div class="link-info red">failed: {unlinkInfo.split("\n")[1]}</div>
           {/if}
         {/if}
       </div>
@@ -162,6 +163,7 @@
   }
   .red {
     color: red;
+    animation: none;
   }
   .orange {
     color: orange;
