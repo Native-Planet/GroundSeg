@@ -188,11 +188,12 @@ class UrbitDocker:
     def exec(self, patp, command):
         c = self.get_container(patp)
         if c:
-            try:
-                res = c.exec_run(command)
-                return res
-            except Exception as e:
-                Log.log(f"{patp}: Unable to exec {command}: {e}")
+            if c.status == "running":
+                try:
+                    res = c.exec_run(command)
+                    return res
+                except Exception as e:
+                    Log.log(f"{patp}: Unable to exec {command}: {e}")
 
         return False
 
