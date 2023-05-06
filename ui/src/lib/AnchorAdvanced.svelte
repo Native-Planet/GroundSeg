@@ -39,7 +39,6 @@
           epButtonStatus = 'success'
           setTimeout(()=>{
             epButtonStatus = 'standard'
-            getEndpoint()
           }, 3000)}
         if (r === 400) {
           epButtonStatus = 'failure'

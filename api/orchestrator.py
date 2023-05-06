@@ -101,8 +101,8 @@ class Orchestrator:
     def ws_command_forms(self, data):
         try:
             whitelist = ['startram']
-
-            if data['template'] in whitelist:
+            template = data['template']
+            if template in whitelist:
                 Log.log(data['item'])
                 Log.log(data['value'])
 

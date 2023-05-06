@@ -9,6 +9,7 @@ class UpdateStarTram:
         self.config = config.config
         self.wg = wg
         self.ws_util = ws_util
+        self.count = 0
 
     def run(self):
         Log.log("ws_system:update_startram Starting thread")
@@ -18,7 +19,6 @@ class UpdateStarTram:
             self.ws_util.system_broadcast('system','startram',"cancel","hide")
             self.ws_util.system_broadcast('system','startram',"advanced",False)
 
-
             self._container()
             self._register()
             self._autorenew()
@@ -26,6 +26,7 @@ class UpdateStarTram:
             self._region()
             self._regions()
             self._endpoint()
+            self.count += 1
             sleep(1)
 
     def _container(self):

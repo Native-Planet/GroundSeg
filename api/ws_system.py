@@ -35,6 +35,8 @@ class WSSystem:
     #   Threads
     #
 
+    #def update_system(self):
+    #def update_urbits(self): # this goes into ws_urbits.py
     def update_startram(self):
         from update_startram import UpdateStarTram
         from time import sleep
