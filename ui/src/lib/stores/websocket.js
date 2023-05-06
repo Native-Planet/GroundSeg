@@ -58,7 +58,7 @@ export const send = (ws, info, cookie, msg) => {
   }
 }
 
-const handleActivity = (id, cat, load, info) => {
+const handleActivity = async (id, cat, load, info) => {
   let prefix = id + ":" + cat
   if (cat == "forms") {
     prefix = prefix + ":" + load.template + ":" + load.item
@@ -70,14 +70,23 @@ const handleActivity = (id, cat, load, info) => {
     console.log(prefix + " checking broadcast..")
     setTimeout(()=>handleActivity(id, cat, load, info), 500)
   } else {
-    removeActivity(id)
-    console.log(prefix + " send confirmed")
+    return await removeActivity(prefix, id)
     return true
   }
 }
 
-const removeActivity = id => {
-  socketInfo.update(i => {
+const removeActivity = async (prefix, id) => {
+  await socketInfo.update(i => {
+    let act = i.activity[id]
+    if (act.error == 0) {
+      console.log(prefix + " send confirmed")
+    } else {
+      if (act.message.includes("auth-fail")) {
+        console.log("jump to login")
+        
+      }
+      console.error(prefix + " sent but error: " + act.message + ", error code: " + act.error)
+    }
     delete i.activity[id]
     return i
   })

@@ -58,7 +58,8 @@ class GSWebSocket(Thread):
 
         finally:
             # Remove client
-            self.authorized_clients.pop(websocket)
+            if websocket in self.authorized_clients:
+                self.authorized_clients.pop(websocket)
 
     async def broadcast_message(self):
         #count = 0
