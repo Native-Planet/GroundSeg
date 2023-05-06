@@ -85,7 +85,7 @@ const removeActivity = async (prefix, id) => {
         console.log("jump to login")
         
       }
-      console.error(prefix + " sent but error: " + act.message + ", error code: " + act.error)
+      console.warn(prefix + " sent but error: " + act.message + ", error code: " + act.error)
     }
     delete i.activity[id]
     return i
