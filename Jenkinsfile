@@ -49,7 +49,7 @@ pipeline {
             }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.python.version=3.10"
+                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.python.version=3.11"
                 }
             }
         } */
@@ -64,12 +64,12 @@ pipeline {
                                 git checkout ${tag}
                                 mkdir -p /opt/groundseg/version/bin
                                 cd ./build-scripts
-                                docker build --tag nativeplanet/groundseg-builder:3.10.9 .
+                                docker build --tag nativeplanet/groundseg-builder:3.11.2 .
                                 cd ..
                                 rm -rf /var/jenkins_home/tmp
                                 mkdir -p /var/jenkins_home/tmp
                                 cp -r api /var/jenkins_home/tmp
-                                docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.10.9
+                                docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.11.2
                                 chmod +x /var/jenkins_home/tmp/binary/groundseg
                                 mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
                             '''

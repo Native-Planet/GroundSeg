@@ -10,10 +10,10 @@ RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
 RUN update-ca-certificates --fresh
 RUN export SSL_CERT_DIR=/etc/ssl/certs
 
-RUN wget https://www.python.org/ftp/python/3.10.9/Python-3.10.9.tgz
-RUN tar xzvf Python-3.10.9.tgz
+RUN wget https://www.python.org/ftp/python/3.11.2/Python-3.11.2.tgz
+RUN tar xzvf Python-3.11.2.tgz
 
-WORKDIR /Python-3.10.9
+WORKDIR /Python-3.11.2
 
 RUN ./configure --enable-optimizations --with-ensurepip=install
 RUN make -j 8
