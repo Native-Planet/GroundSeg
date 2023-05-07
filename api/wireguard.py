@@ -146,6 +146,7 @@ class Wireguard:
     def logs(self):
         return self.wg_docker.full_logs(self.data['wireguard_name'])
 
+    '''
     # New anchor registration
     def build_anchor(self, url, reg_key, region):
         Log.log("Wireguard: Attempting to build anchor")
@@ -161,6 +162,7 @@ class Wireguard:
             Log.log(f"Wireguard: Failed to build anchor: {e}")
 
         return False
+    '''
 
     # Update wg0.confg
     def update_wg_config(self, conf):

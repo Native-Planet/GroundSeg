@@ -55,3 +55,5 @@ class WSSystem:
             pass
         self.ws_util.system_broadcast('updates', 'linux','update','initializing')
         LinuxUpdate(self.ws_util, self.config_object).run(old_info)
+
+    #def startram_register(self):

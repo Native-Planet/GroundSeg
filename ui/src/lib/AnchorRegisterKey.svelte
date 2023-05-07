@@ -56,6 +56,17 @@
     return data
   }
 
+  const registerKey = () => {
+    let payload = {
+      "category": "system",
+      "payload": {
+        "module": "startram",
+        "action": "register"
+      }
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
+
   // Registration Key input visibility
   const toggleView = () => {
     view = !view
@@ -137,13 +148,8 @@
         standard="Register"
         status={key.length <= 0 ? "disabled" : 'standard'}
         top="12"
-      />
-      <!--
         on:click={registerKey}
-        success="Key registered"
-        failure="Registration failed"
-        loading="Registering your key..(might take a while)"
-      -->
+      />
     {/if}
   </div>
 </div>

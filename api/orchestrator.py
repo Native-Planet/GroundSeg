@@ -85,6 +85,9 @@ class Orchestrator:
             if data['category'] == 'updates':
                 return self.ws_command_updates(payload)
 
+            if data['category'] == 'system':
+                return self.ws_command_system(data)
+
             if data['category'] == 'forms':
                 return self.ws_command_forms(data)
 
@@ -118,6 +121,24 @@ class Orchestrator:
             raise Exception(e)
         return "succeeded"
 
+    # System
+    def ws_command_system(self, data):
+        # hardcoded list of allowed modules
+        whitelist = [
+                'startram',
+                ]
+        payload = data['payload']
+        module = payload['module']
+        action = payload['action']
+
+        if module not in whitelist:
+            raise Exception(f"{module} is not a valid module")
+
+        if module == "startram":
+            if action == "register":
+                Thread(target=self.startram_register).start()
+
+        return "succeeded"
     # Urbit
     def ws_command_urbit(self, payload):
         # hardcoded list of allowed modules
@@ -183,6 +204,48 @@ class Orchestrator:
     #
     # Combo functions
     #
+
+    def startram_register(self):
+        Log.log("new register stuff goes here")
+        # create wireguard container
+        # stop wireguard container
+        # register device
+        # update wg0.conf
+        # start wg container
+        # register services
+        '''
+        endpoint = self.config['endpointUrl']
+        api_version = self.config['apiVersion']
+        url = f"https://{endpoint}/{api_version}"
+
+        if self.wireguard.build_anchor(url, data['key'], data['region']):
+            self.minio.start_mc()
+            self.config['wgRegistered'] = True
+            self.config['wgOn'] = True
+
+            for patp in self.config['piers']:
+                self.urbit.register_urbit(patp, url)
+
+            if self.config_object.save_config():
+                if self.wireguard.start():
+                    return 200
+
+    # New anchor registration
+    def build_anchor(self, url, reg_key, region):
+        Log.log("Wireguard: Attempting to build anchor")
+        try:
+            if self.register_device(url, reg_key, region):
+                if self.get_status(url):
+                    if self.start():
+                        if self.update_wg_config(self.anchor_data['conf']):
+                            Log.log("Anchor: Registered with anchor server")
+                            return True
+
+        except Exception as e:
+            Log.log(f"Wireguard: Failed to build anchor: {e}")
+
+        return False
+        '''
 
     def minio_link(self, patp):
         # create minio service account
@@ -475,6 +538,7 @@ class Orchestrator:
             if data['action'] == 'change-url':
                 return self.wireguard.change_url(data['url'], self.urbit, self.minio)
 
+            '''
             try:
                 if data['action'] == 'register':
                     endpoint = self.config['endpointUrl']
@@ -494,6 +558,7 @@ class Orchestrator:
                                 return 200
             except Exception as e:
                 Log.log(f"Anchor: Failed to register endpoint")
+            '''
 
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']
