@@ -86,7 +86,7 @@ class Orchestrator:
                 return self.ws_command_updates(payload)
 
             if data['category'] == 'forms':
-                return self.ws_command_forms(payload)
+                return self.ws_command_forms(data)
 
             raise Exception(f"'{data['category']}' is not a valid category")
         except Exception as e:
@@ -100,11 +100,19 @@ class Orchestrator:
     # Forms
     def ws_command_forms(self, data):
         try:
-            whitelist = ['startram']
-            template = data['template']
+            # hardcoded whitelist
+            whitelist = [
+                    'startram'
+                    ]
+
+            payload = data['payload']
+            sid = data['sessionid']
+            template = payload['template']
+
             if template in whitelist:
-                Log.log(data['item'])
-                Log.log(data['value'])
+                if template == "startram":
+                    self.ws_util.edit_startram(data)
+
 
         except Exception as e:
             raise Exception(e)

@@ -243,7 +243,6 @@ class Wireguard:
     # /v1/regions
     def get_regions(self, url, tries=3):
         Log.log("Anchor: Attempting to get regions")
-        self.region_data = {}
         full_url = f"{url}/regions"
         err_count = 0
         while err_count < tries:

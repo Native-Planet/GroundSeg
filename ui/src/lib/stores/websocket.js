@@ -95,9 +95,6 @@ const removeActivity = async (prefix, id) => {
 
 const updateData = data => {
   data = JSON.parse(data)
-  if (data.hasOwnProperty('forms')) {
-    console.log(Data)
-  }
   socketInfo.update(i => {
     let obj = deepMerge(i, data)
     return obj

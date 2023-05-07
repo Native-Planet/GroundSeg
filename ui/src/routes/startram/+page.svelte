@@ -8,7 +8,6 @@
 
   import { socketInfo } from '$lib/stores/websocket.js'
 
-	//import { updateState, api, system, noconn, startram } from '$lib/api'
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
 
@@ -31,7 +30,7 @@
   $: cancel = (startram?.cancel) || "hide"
   $: advanced = (startram?.advanced) || false
 
-	onMount(()=> inView = true)
+  onMount(()=> inView = true)
   onDestroy(()=> inView = false)
 	
 </script>
@@ -53,11 +52,7 @@
     {/if}
 
     <!-- Register Key -->
-    <AnchorRegisterKey
-      {region}
-      {regions}
-      {register}
-    />
+    <AnchorRegisterKey />
 
     <div class="sign-up">
       <a href="https://www.nativeplanet.io/startram" target="_blank">

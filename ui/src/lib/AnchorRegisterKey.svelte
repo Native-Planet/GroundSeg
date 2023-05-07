@@ -1,29 +1,46 @@
 <script>
+  import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
   import { send, socket, socketInfo } from '$lib/stores/websocket.js'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
-  export let register
-  export let region
-  export let regions
-
+  // legacy
   let view = false
   let loading = false
   let buttonStatus = 'standard'
   let reRegCheck = true
 
+  // Connection status
   $: connected = ($socketInfo?.metadata?.connected) || false
-  $: key = updateForm('key',handleKey(key))
 
+  // Startram form
+  $: form = ($socketInfo?.forms?.startram) || null
+
+  // Startram information
+  $: startram = ($socketInfo?.system?.startram) || null
+  $: register = (startram?.register) || "no"
+
+  // Registration Key Logic
+  $: key = updateForm('key',handleKey(key))
   const handleKey = key => {
     if (typeof key === 'string' || key instanceof String) {
       return key.trim()
-    }
-    else {
-      return ''
-    }
+    } else {return ''}
   }
 
+  // Region Logic
+  $: region = (form?.region) || "us-east"
+  $: regions = (startram?.regions) || []
+
+  let selectedRegion = null
+  const selectRegion = name => {
+    if (selectedRegion != null) {
+      updateForm('region',name)
+    }
+    selectedRegion = name
+  }
+
+  // Send to API
   const updateForm = (item, data) => {
     if (connected) {
       let payload = {
@@ -39,19 +56,19 @@
     return data
   }
 
-  // Region
-  let selectedRegion
-  if (region == null) {
-    selectedRegion = "us-east"
-  } else {
-    selectedRegion = region
-  }
-
+  // Registration Key input visibility
   const toggleView = () => {
     view = !view
     document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
+  // Load up saved form
+  onMount(()=> init())
+  const init = () => {
+    form == null ? setTimeout(init,100) : 
+      key = form.key
+      selectRegion(region)
+  }
 
 </script>
 
@@ -70,7 +87,7 @@
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
-            on:click={()=>selectedRegion = r.name}
+            on:click={()=>selectRegion(r.name)}
             class="region"
             class:region-active={r.name == selectedRegion}
             >
@@ -93,7 +110,7 @@
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
-            on:click={()=>selectedRegion = r.name}
+            on:click={()=>selectRegion(r.name)}
             class="region"
             class:region-active={r.name == selectedRegion}
             >

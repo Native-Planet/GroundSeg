@@ -30,7 +30,7 @@ class GSWebSocket(Thread):
                     valid = sid in self.config['sessions']
                     if valid:
                         # Add client to whitelist
-                        self.authorized_clients[websocket] = {}
+                        self.authorized_clients[websocket] = sid
                     else:
                         raise Exception("no sessionid provided")
                 except Exception as e:
@@ -67,14 +67,23 @@ class GSWebSocket(Thread):
             try:
                 clients = self.authorized_clients.copy()
                 for client in clients:
-                    #client = clients[sid]
                     if client.open:
                         #if (count % 20) == 0:
                         #    print(client)
-                        message = self.ws_util.structure
+                        message = self.ws_util.structure.copy()
+                        sid = self.authorized_clients[client]
+                        try:
+                            forms = self.ws_util.forms.get(sid)
+                            if forms != None:
+                                forms = {"forms":forms}
+                            else:
+                                raise Exception()
+                        except:
+                            forms = {}
+                        message = {**forms, **message}
                         await client.send(json.dumps(message))
                     else:
-                        self.authorized_clients.pop(sid)
+                        self.authorized_clients.pop(client)
             except Exception as e:
                 Log.log(f"WS: Broadcast fail: {e}")
             await asyncio.sleep(0.5)  # Send the message twice a second

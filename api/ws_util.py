@@ -4,6 +4,7 @@ from log import Log
 
 class WSUtil:
     structure = {}
+    forms = {}
 
     # send activity response
     def make_activity(self, aid, success, msg):
@@ -74,3 +75,19 @@ class WSUtil:
             Log.log(f"ws-util:urbit-broadcast {e}")
             return False
         return True
+
+    def edit_startram(self, data):
+        # form belongs to which session
+        root = self.forms
+        sid = data['sessionid']
+        if not root.get(sid) or not isinstance(root[sid], dict):
+            root[sid] = {}
+        # template
+        root = root[sid]
+        if not root.get('startram') or not isinstance(root['startram'], dict):
+            root['startram'] = {}
+        # key, value
+        root = root['startram']
+        item = data['payload']['item']
+        value = data['payload']['value']
+        root[item] = value
