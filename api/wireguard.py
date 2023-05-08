@@ -64,8 +64,14 @@ class Wireguard:
 
         self.save_config()
 
-        if self.config['wgOn'] and self.config['wgRegistered']:
-            self.start()
+        # TODO: temporary
+        name = self.data['wireguard_name']
+        tag = self.data['wireguard_version']
+        sha = f"{self.config_object._arch}_sha256"
+        image = f"{self.data['repo']}:{tag}"
+        if self.wg_docker.create_container(name,image,self.data):
+            if self.config['wgOn'] and self.config['wgRegistered']:
+                self.start()
 
         Log.log("Wireguard: Initialization Completed")
 

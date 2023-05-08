@@ -15,16 +15,14 @@ class WireguardDocker:
             image = f"{image}@sha256:{config[sha]}"
 
         Log.log("Wireguard: Attempting to start container")
-        c = self.get_container(name)
+        c = self.create_container(name, image, config)
         if not c:
-            c = self._create_container(name, image, config)
-            if not c:
-                return False
+            return False
 
         if c.attrs['Config']['Image'] != image:
             Log.log("Wireguard: Container and config versions are mismatched")
             if self.remove_wireguard(name):
-                c = self._create_container(name, image, config)
+                c = self.create_container(name, image, config)
                 if not c:
                     return False
 
@@ -124,7 +122,9 @@ class WireguardDocker:
             return False
 
 
-    def _create_container(self, name, image, config):
+    def create_container(self, name, image, config):
+        if self.get_container(name):
+            return True
         Log.log("Wireguard: Attempting to create container")
         if self._pull_image(image):
             v = self._build_volume(name)
