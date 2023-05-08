@@ -76,7 +76,7 @@ class WSUtil:
             return False
         return True
 
-    def edit_startram(self, data):
+    def edit_form(self, data, template):
         # form belongs to which session
         root = self.forms
         sid = data['sessionid']
@@ -84,10 +84,16 @@ class WSUtil:
             root[sid] = {}
         # template
         root = root[sid]
-        if not root.get('startram') or not isinstance(root['startram'], dict):
-            root['startram'] = {}
+        if not root.get(template) or not isinstance(root[template], dict):
+            root[template] = {}
         # key, value
-        root = root['startram']
+        root = root[template]
         item = data['payload']['item']
         value = data['payload']['value']
         root[item] = value
+
+    def grab_form(self, sid, template, item):
+        try:
+            return self.forms[sid][template][item]
+        except:
+            return None
