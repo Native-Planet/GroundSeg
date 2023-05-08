@@ -4,7 +4,7 @@ from time import sleep
 from log import Log
 from utils import Utils
 
-class UpdateStarTram:
+class StarTramLoop:
     def __init__(self, config, wg, ws_util): 
         self.config = config.config
         self.wg = wg
@@ -12,7 +12,7 @@ class UpdateStarTram:
         self.count = 0
 
     def run(self):
-        Log.log("ws_system:update_startram Starting thread")
+        Log.log("ws_system:startram_loop Starting thread")
         while True:
             # temp
             self.ws_util.system_broadcast('system','startram',"restart","hide")
@@ -58,25 +58,33 @@ class UpdateStarTram:
             self.ws_util.system_broadcast('system','startram','register',status)
 
     def _autorenew(self):
-        try:
-            autorenew = self.wg.anchor_data['ongoing'] == 1
-        except:
-            autorenew = False
-        self.ws_util.system_broadcast('system','startram','autorenew',autorenew)
+        if type(self.wg.anchor_data) == str:
+            autorenew = self.wg.anchor_data
+        else:
+            try:
+                autorenew = self.wg.anchor_data['ongoing'] == 1
+            except:
+                autorenew = False
+            self.ws_util.system_broadcast('system','startram','autorenew',autorenew)
 
     def _expiry(self):
-        expiry = None
-        try:
-            expiry = self.wg.anchor_data['lease']
-        except:
-            pass
+        if type(self.wg.anchor_data) == str:
+            expiry = self.wg.anchor_data
+        else:
+            try:
+                expiry = self.wg.anchor_data['lease']
+            except:
+                expiry = None
         self.ws_util.system_broadcast('system','startram','expiry',expiry)
 
     def _region(self):
-        try:
-            region = self.wg.anchor_data['region']
-        except:
-           region = None
+        if type(self.wg.anchor_data) == str:
+            region = self.wg.anchor_data
+        else:
+            try:
+                region = self.wg.anchor_data['region']
+            except:
+               region = None
         self.ws_util.system_broadcast('system','startram','region',region)
 
     def _regions(self):
