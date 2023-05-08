@@ -16,6 +16,20 @@
   // Startram form
   $: form = ($socketInfo?.forms?.startram) || null
 
+  // Services
+  $: urbits = ($socketInfo?.urbits) || {}
+  /*
+  const getRegistered = v => {
+    if (
+      (v.urbit_web == "unregistered") &&
+      (v.urbit_ames == "unregistered") &&
+      (v.minio == "unregistered")
+    ) { return "unregistered" } else {
+      return "registered
+    }
+  }
+  */
+
   // Startram information
   $: startram = ($socketInfo?.system?.startram) || null
   $: register = (startram?.register) || "no"
@@ -122,6 +136,23 @@
     {/if}
   {/if}
 
+  <div class="ship-table">
+    <div class="row-title">
+      <div class="col-0 service-title">Urbit ID</div>
+      <div class="col-1 service-title">Set to Remote</div>
+    </div>
+    {#each Object.entries(urbits) as [k,v]}
+      <div class="row">
+        <div class="col-0 heading">{k}</div>
+        <div class="col-1">checkbox</div>
+      </div>
+    {/each}
+    <div class="row">
+      <div class="col-0 heading">All ships</div>
+      <div class="col-1">checkbox</div>
+    </div>
+  </div>
+
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
     {#if (register == "yes") && reRegCheck}
@@ -196,5 +227,28 @@
   }
   .region-active {
     background: #008eff;
+  }
+  .ship-table {
+    display: flex;
+    flex-direction: column;
+  }
+  .row-title {
+    display: flex;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+    gap: 4px;
+  }
+  .row {
+    display: flex;
+    font-size: 13px;
+    line-height: 24px;
+    text-align: center;
+  }
+  .row:hover {background: #0000004D;}
+  .col-0 {flex: 4;text-align:right;}
+  .col-1 {flex: 5;}
+  .heading {
+    padding: 4px 0;
   }
 </style>
