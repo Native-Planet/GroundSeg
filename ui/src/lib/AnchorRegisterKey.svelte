@@ -29,16 +29,8 @@
   }
 
   // Region Logic
-  $: region = (form?.region) || "us-east"
+  $: region = (form?.region) || null
   $: regions = (startram?.regions) || []
-
-  let selectedRegion = null
-  const selectRegion = name => {
-    if (selectedRegion != null) {
-      updateForm('region',name)
-    }
-    selectedRegion = name
-  }
 
   // Send to API
   const updateForm = (item, data) => {
@@ -75,11 +67,9 @@
 
   // Load up saved form
   onMount(()=> init())
-  const init = () => {
-    form == null ? setTimeout(init,100) : 
-      key = form.key
-      selectRegion(region)
-  }
+  const init = () => form == null 
+    ? setTimeout(init,100)
+    : key = form.key
 
 </script>
 
@@ -98,9 +88,9 @@
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
-            on:click={()=>selectRegion(r.name)}
+            on:click={()=>updateForm("region",r.name)}
             class="region"
-            class:region-active={r.name == selectedRegion}
+            class:region-active={region == null ? r.name == "us-east" : r.name == region}
             >
             {r.desc}
           </div>
@@ -121,9 +111,9 @@
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
-            on:click={()=>selectRegion(r.name)}
+            on:click={()=>updateForm("region",r.name)}
             class="region"
-            class:region-active={r.name == selectedRegion}
+            class:region-active={region == null ? r.name == "us-east" : r.name == region}
             >
             {r.desc}
           </div>
