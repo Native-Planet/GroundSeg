@@ -1,4 +1,6 @@
+from time import sleep
 from threading import Thread
+
 from log import Log
 
 # Action imports
@@ -14,20 +16,9 @@ class WSUrbits:
         self._urbits = self.urb._urbits 
         self.ws_util = ws_util
 
-        for patp in self.config['piers']:
-            # removing      -  deleting old container
-            # starting      -  starting ship
-            # success       -  ship has started
-            # failure\n<err> -  Failure message
-            self.ws_util.urbit_broadcast(patp, 'container','rebuild')
-
-            self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
-            self.ws_util.urbit_broadcast(patp, 'minio', 'link')
-            self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
-            self.ws_util.urbit_broadcast(patp, 'click', 'exist', False)
-            self.ws_util.urbit_broadcast(patp, 'vere', 'version')
-
-            Thread(target=self.vere_version, args=(patp,), daemon=True).start()
+        from urbits_loop import UrbitsLoop
+        urbits = UrbitsLoop(self.config_object, self.urb, self.ws_util)
+        Thread(target=urbits.run, daemon=True).start()
 
     #
     #   interacting with self._urbits dict (config)
@@ -87,28 +78,19 @@ class WSUrbits:
 
         return image
 
+
+    # TODO: Make this its own action file
+
     #
     #   Actions
     #
 
     # TODO: Make this its own action file
-    def vere_version(self, patp):
-        Log.log(f"{patp}:vere:version Thread started")
-        while True:
-            try:
-                if self.urb.urb_docker.is_running(patp):
-                    res = self.urb.urb_docker.exec(patp, 'urbit --version')
-                    if res:
-                        res = res.output.decode("utf-8").strip().split("\n")[0]
-                        self.ws_util.urbit_broadcast(patp, 'vere', 'version', str(res))
-            except Exception as e:
-                self.ws_util.urbit_broadcast(patp, 'vere', 'version', f'error: {e}')
-
-            import time
-            time.sleep(30)
-
-    # TODO: Make this its own action file
     def container_rebuild(self, patp):
+        # removing      -  deleting old container
+        # starting      -  starting ship
+        # success       -  ship has started
+        # failure\n<err> -  Failure message
         success = False
         try:
             self.ws_util.urbit_broadcast(patp, 'container', 'rebuild', 'removing')
