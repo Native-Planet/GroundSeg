@@ -42,20 +42,35 @@ class StartramAPI:
 
     # /v1/retrieve
     def retrieve_status(self, max_tries=1):
-        url = f"{self.url}/retrieve?pubkey={self.config['pubkey']}"
         tries = 0
+        pubkey = f"pubkey={self.config['pubkey']}"
         while True:
             try:
-                status = requests.post(url, headers=self._headers).json()
+                Log.log(f"{self._f}:retrieve_status Attempting to retrieve information")
+                status = requests.post(f"{self.url}/retrieve?{pubkey}",
+                                       headers=self._headers
+                                       ).json()
+                '''
+                Log.log(f"{self.url}/retrieve?{pubkey}")
+                Log.log(status)
+                return True
+                '''
+                Log.log(f"{self._f}:retrieve_status Response: {status}")
                 if status and status['conf']:
                     self.wg.anchor_data = status
+                    Log.log(f"{self._f}:retrieve_status Response: {status}")
                     return True
                 else:
                     raise Exception()
-            except:
+
+            except Exception as e:
+                Log.log(f"{self._f}:retrieve_status Failed to retrieve status from '{self.url}/retrieve': {e}")
                 if tries >= max_tries:
+                    Log.log(f"{self._f}:retrieve_status Max retries exceeded ({max_tries})")
                     return False
-            sleep(count * 2)
+
+            Log.log(f"{self._f}:retrieve_status Retrying in {tries * 2} seconds")
+            sleep(tries * 2)
             tries += 1
 
     # /v1/create
@@ -69,14 +84,14 @@ class StartramAPI:
         while True:
             try:
                 res = requests.post(f"{self.url}/create",json=data,headers=self._headers).json()
-                Log.log(f"startram_api:register_service:{subdomain} Sent service creation request")
+                Log.log(f"{self._f}:register_service:{subdomain} Sent service creation request")
             except Exception as e:
-                    Log.log(f"startram_api:register_service:{subdomain} Failed to register service {service_type}: {e}")
+                Log.log(f"{self._f}:register_service:{subdomain} Failed to register service {service_type}: {e}")
                 if tries >= max_tries:
-                    Log.log(f"startram_api:register_service:{subdomain} Max retries exceeded ({max_tries})")
+                    Log.log(f"{self._f}:register_service:{subdomain} Max retries exceeded ({max_tries})")
                     return
-            Log.log(f"startram_api:register_service:{subdomain} Retrying in {count * 2} seconds")
-            sleep(count * 2)
+            Log.log(f"{self._f}:register_service:{subdomain} Retrying in {tries * 2} seconds")
+            sleep(tries * 2)
             tries += 1
         
         # check response for creating
