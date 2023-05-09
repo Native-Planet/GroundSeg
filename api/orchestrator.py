@@ -210,7 +210,6 @@ class Orchestrator:
     def startram_register(self, sid):
         # register device
         if self.startram_api.register_device(sid):
-
             # update wg0.conf
             if self.startram_api.retrieve_status(10):
                 conf = self.wireguard.anchor_data['conf'] # TODO: temporary
@@ -226,6 +225,7 @@ class Orchestrator:
                         # start mc
                         self.minio.start_mc()
 
+                        '''
                         # register services
                         sub = self.wireguard.anchor_data['subdomains']
                         for patp in self.config['piers']:
@@ -239,11 +239,13 @@ class Orchestrator:
 
                             # One or more of the urbit services is not registered
                             if not (uw and ua):
-                                Thread(target=self.startram_api.register_service(patp, 'urbit', 10)
+                                Thread(target=self.startram_api.register_service(patp, 'urbit', 10))
  
                             # One or more of the minio services is not registered
                             if not (m and mc and mb):
-                                Thread(target=self.startram_api.register_service(f"s3.{patp}", 'minio', 10)
+                                Thread(target=self.startram_api.register_service(f"s3.{patp}", 'minio', 10))
+                        '''
+
 
                         # toggle remote
 
