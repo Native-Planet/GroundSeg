@@ -6,7 +6,7 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-  import { socketInfo } from '$lib/stores/websocket.js'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
 
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'

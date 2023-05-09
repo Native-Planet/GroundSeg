@@ -1,10 +1,16 @@
 import json
-
 from log import Log
 
 class WSUtil:
     structure = {}
     forms = {}
+
+    def __init__(self, config):
+        self.config = config.config
+
+    #
+    #   Broadcasts
+    #
 
     # send activity response
     def make_activity(self, aid, success, msg):
@@ -76,6 +82,11 @@ class WSUtil:
             return False
         return True
 
+    #
+    #   Form Management
+    #
+
+    # modify form
     def edit_form(self, data, template):
         # form belongs to which session
         root = self.forms
@@ -86,14 +97,56 @@ class WSUtil:
         root = root[sid]
         if not root.get(template) or not isinstance(root[template], dict):
             root[template] = {}
+
         # key, value
         root = root[template]
         item = data['payload']['item']
         value = data['payload']['value']
-        root[item] = value
 
+        if item == "ships":
+            if isinstance(value, str):
+                if value == "all":
+                    root[item] = self.config['piers'].copy()
+                elif value == "none":
+                    root[item] = []
+            elif not root.get(item) or not isinstance(root[item], list):
+                root[item] = value
+            else:
+                for patp in value:
+                    if patp in root[item]:
+                        root[item].remove(patp)
+                    else:
+                        root[item].append(patp)
+        else:
+            root[item] = value
+
+    # read form
     def grab_form(self, sid, template, item):
         try:
             return self.forms[sid][template][item]
         except:
             return None
+
+
+    #
+    #   Registration  
+    #
+
+    # check if service exists for patp
+    def services_exist(self, patp, subdomains):
+        # Define services
+        services = {
+                    "urbit-web":False,
+                    "urbit-ames":False,
+                    "minio":False,
+                    "minio-console":False,
+                    "minio-bucket":False
+                    }
+        for ep in subdomains:
+            ep_patp = ep['url'].split('.')[-3]
+            ep_svc = ep['svc_type']
+            if ep_patp == patp:
+                for s in services.keys():
+                    if ep_svc == s:
+                        services[s] = True
+        return services

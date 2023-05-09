@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
   import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+
+  import CheckBox from '$lib/CheckBox.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   // legacy
@@ -16,19 +18,9 @@
   // Startram form
   $: form = ($socketInfo?.forms?.startram) || null
 
-  // Services
+  // Ships
   $: urbits = ($socketInfo?.urbits) || {}
-  /*
-  const getRegistered = v => {
-    if (
-      (v.urbit_web == "unregistered") &&
-      (v.urbit_ames == "unregistered") &&
-      (v.minio == "unregistered")
-    ) { return "unregistered" } else {
-      return "registered
-    }
-  }
-  */
+  $: unchecked = (form?.ships) || []
 
   // Startram information
   $: startram = ($socketInfo?.system?.startram) || null
@@ -62,6 +54,14 @@
     return data
   }
 
+  // Toggle remote access after registration
+  const addShip = e => {
+    updateForm("ships",[e.detail])
+  }
+  const addAllShips = e => {
+    updateForm("ships", e.detail ? "none" : "all")
+  }
+
   const registerKey = () => {
     let payload = {
       "category": "system",
@@ -88,7 +88,6 @@
 </script>
 
 <div class="reg-key-wrapper">
-
   <!-- If not registered -->
   {#if register == "no"}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
@@ -98,7 +97,7 @@
     </div>
 
     {#if regions.length > 0}
-      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Region</div>
+      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Select a Region</div>
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
@@ -136,21 +135,12 @@
     {/if}
   {/if}
 
+  <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Automatically Set to Remote</div>
   <div class="ship-table">
-    <div class="row-title">
-      <div class="col-0 service-title">Urbit ID</div>
-      <div class="col-1 service-title">Set to Remote</div>
-    </div>
     {#each Object.entries(urbits) as [k,v]}
-      <div class="row">
-        <div class="col-0 heading">{k}</div>
-        <div class="col-1">checkbox</div>
-      </div>
+      <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
     {/each}
-    <div class="row">
-      <div class="col-0 heading">All ships</div>
-      <div class="col-1">checkbox</div>
-    </div>
+    <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
   </div>
 
   <!-- Submit button -->
@@ -231,24 +221,5 @@
   .ship-table {
     display: flex;
     flex-direction: column;
-  }
-  .row-title {
-    display: flex;
-    font-size: 14px;
-    line-height: 24px;
-    text-align: center;
-    gap: 4px;
-  }
-  .row {
-    display: flex;
-    font-size: 13px;
-    line-height: 24px;
-    text-align: center;
-  }
-  .row:hover {background: #0000004D;}
-  .col-0 {flex: 4;text-align:right;}
-  .col-1 {flex: 5;}
-  .heading {
-    padding: 4px 0;
   }
 </style>

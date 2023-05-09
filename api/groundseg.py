@@ -28,7 +28,7 @@ from keygen import KeyGen
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
 sys_config = Config(base_path, dev)
-ws_util = WSUtil()
+ws_util = WSUtil(sys_config)
 
 # Start Updater
 bin_updater = BinUpdater(sys_config, sys_config.debug_mode)

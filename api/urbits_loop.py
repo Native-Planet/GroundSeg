@@ -33,8 +33,7 @@ class UrbitsLoop:
         Log.log("ws_urbits:urbits_loop Starting thread")
         while True:
             for patp in self.config['piers'].copy():
-                #self._startram_urbit_web(patp)
-                #self._vere_version(patp)
+                #Thread(target=self._startram_urbit_web, args=(patp,), daemon=True).start()
                 Thread(target=self._vere_version, args=(patp,), daemon=True).start()
             self.count += 1
             sleep(1)
