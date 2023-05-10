@@ -127,6 +127,14 @@ class WSUtil:
         except:
             return None
 
+    # delete form
+    def delete_form(self, sid, template):
+        try:
+            self.form[sid][template] = {}
+            return True
+        except:
+            return False
+
 
     #
     #   Registration  

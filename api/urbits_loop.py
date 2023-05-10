@@ -22,26 +22,17 @@ class UrbitsLoop:
             self.ws_util.urbit_broadcast(patp, 'click', 'exist', False)
             self.ws_util.urbit_broadcast(patp, 'vere', 'version')
 
-            self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local
-            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit-web', 'unregistered') # registered
-            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit-ames', 'unregistered') # registered
-            self.ws_util.urbit_broadcast(patp, 'startram', 'minio', 'unregistered') # registered
-            self.ws_util.urbit_broadcast(patp, 'startram', 'minio-console', 'unregistered') # registered
-            self.ws_util.urbit_broadcast(patp, 'startram', 'minio-bucket', 'unregistered') # registered
+            self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local, to-remote, to-local
+            self.ws_util.urbit_broadcast(patp, 'startram', 'minio', 'unregistered') # registered, registering
+            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit', 'unregistered') # registered, registering
 
     def run(self):
         Log.log("ws_urbits:urbits_loop Starting thread")
         while True:
             for patp in self.config['piers'].copy():
-                #Thread(target=self._startram_urbit_web, args=(patp,), daemon=True).start()
                 Thread(target=self._vere_version, args=(patp,), daemon=True).start()
             self.count += 1
             sleep(1)
-
-    #def _startram_urbit_web(self, patp):
-        # check for all service registrations
-        #self.wg.anchor_data['subdomains']..
-        #self.ws_util.urbit_broadcast(patp,'startram','urbit-web','registering')
 
     def _vere_version(self, patp):
         if self.count == 0 or self.count % 30 == 0:

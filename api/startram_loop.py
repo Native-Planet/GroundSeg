@@ -42,15 +42,19 @@ class StarTramLoop:
         self.ws_util.system_broadcast('system','startram','container', status)
 
     def _register(self):
-        # no            -  unregistered
-        # yes           -  a command was sent
-        # <reg loading> -  TODO
-        # success       -  registered successfully
+        # no             -  unregistered
+        # yes            -  registered
+        # registering    -  attempting /register
+        # updating       -  updating wg0.conf
+        # start-wg       -  starting wireguard container
+        # start-mc       -  starting mc_docker
+        # success        -  registered successfully
         # failure\n<err> -  Failure message
         try:
             reg = self.ws_util.structure['system']['startram']['register']
         except:
             reg = "no"
+
         if reg == "yes" or reg == "no":
             status = "no"
             if self.config['wgRegistered']:

@@ -208,46 +208,87 @@ class Orchestrator:
     #
 
     def startram_register(self, sid):
-        # register device
-        if self.startram_api.register_device(sid):
-            # update wg0.conf
-            if self.startram_api.retrieve_status(10):
-                conf = self.wireguard.anchor_data['conf'] # TODO: temporary
-                if self.wireguard.update_wg_config(self, conf):
-                    self.config['wgRegistered'] = True
-                    self.config_object.save_config()
+        registered = "no"
+        def broadcast(t):
+            self.ws_util.system_broadcast('system','startram','register',t)
 
-                    # start wg container
-                    if self.wireguard.start():
-                        self.config['wgOn'] = True
+        try:
+            # register device
+            broadcast("registering")
+            if self.startram_api.register_device(sid):
+                # update wg0.conf
+                broadcast("updating")
+                if self.startram_api.retrieve_status(10):
+                    conf = self.wireguard.anchor_data['conf'] # TODO: temporary
+                    if self.wireguard.update_wg_config(conf):
+                        self.config['wgRegistered'] = True
                         self.config_object.save_config()
 
-                        # start mc
-                        self.minio.start_mc()
+                        # start wg container
+                        if self.wireguard.start():
+                            broadcast("start-wg")
+                            self.config['wgOn'] = True
+                            self.config_object.save_config()
 
-                        '''
-                        # register services
-                        sub = self.wireguard.anchor_data['subdomains']
-                        for patp in self.config['piers']:
-                            res = self.ws_util.services_exist(patp, sub)
+                            # start mc
+                            broadcast("start-mc")
+                            self.minio.start_mc()
+                            broadcast("success")
+                            registered = "yes"
 
-                            uw = services['urbit-web']
-                            ua = services['urbit-ames']
-                            m = services['minio']
-                            mc = services['minio-console']
-                            mb = services['minio-bucket']
+                            # register services
+                            sub = self.wireguard.anchor_data['subdomains']
+                            for patp in self.config['piers'].copy():
+                                try:
+                                    res = self.ws_util.services_exist(patp, sub)
+                                    uw = res['urbit-web']
+                                    ua = res['urbit-ames']
+                                    m = res['minio']
+                                    mc = res['minio-console']
+                                    mb = res['minio-bucket']
 
-                            # One or more of the urbit services is not registered
-                            if not (uw and ua):
-                                Thread(target=self.startram_api.register_service(patp, 'urbit', 10))
- 
-                            # One or more of the minio services is not registered
-                            if not (m and mc and mb):
-                                Thread(target=self.startram_api.register_service(f"s3.{patp}", 'minio', 10))
-                        '''
+                                    # One or more of the urbit services is not registered
+                                    if not (uw and ua):
+                                        Thread(target=self.startram_api.create_service(patp, 'urbit', 10))
+         
+                                    # One or more of the minio services is not registered
+                                    if not (m and mc and mb):
+                                        Thread(target=self.startram_api.create_service(f"s3.{patp}", 'minio', 10))
+                                except Exception as e:
+                                    Log.log(f"orchestrator:startram_register:{patp} failed to create service: {e}")
 
+                            Log.log("10 sec here")
+                            sleep(10)
 
-                        # toggle remote
+                            # Loop forever until all is done
+                            for patp in self.config['piers'].copy():
+                                self.ws_util.urbit_broadcast(patp, 'startram', 'minio','registered')
+                                self.ws_util.urbit_broadcast(patp, 'startram', 'urbit','registered')
+                                sleep(1)
+
+                            for patp in self.config['piers'].copy():
+                                self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'to-remote')
+                                sleep(1)
+
+                            # toggle remote
+                            for patp in self.config['piers'].copy():
+                                self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'remote')
+                                sleep(1)
+                        else:
+                            raise Exception("failed to start wireguard container")
+                    else:
+                        raise Exception("failed to update wg0.conf")
+                else:
+                    raise Exception("failed to retrieve status")
+            else:
+                raise Exception("failed to register device")
+        except Exception as e:
+            Log.log(f"orchestrator:startram_register Error: {e}")
+            broadcast(f"failure\n{e}")
+
+        sleep(3)
+        broadcast(registered)
+
 
     def minio_link(self, patp):
         # create minio service account

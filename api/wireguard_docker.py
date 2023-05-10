@@ -123,8 +123,9 @@ class WireguardDocker:
 
 
     def create_container(self, name, image, config):
-        if self.get_container(name):
-            return True
+        c = self.get_container(name)
+        if c:
+            return c
         Log.log("Wireguard: Attempting to create container")
         if self._pull_image(image):
             v = self._build_volume(name)

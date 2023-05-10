@@ -71,6 +71,7 @@
       }
     }
     send($socket, $socketInfo, document.cookie, payload)
+    reRegCheck = true
   }
 
   // Registration Key input visibility
@@ -84,6 +85,14 @@
   const init = () => form == null 
     ? setTimeout(init,100)
     : key = form.key
+
+  const options = {
+    "registering":"Registering your StarTram key",
+    "updating":"Retrieving updated information from StarTram API",
+    "start-wg":"Starting Wireguard connecion",
+    "start-mc":"Initializing MinIO",
+    "success":"Successfully Registered Your StarTram Key"
+  }
 
 </script>
 
@@ -111,8 +120,18 @@
       </div>
     {/if}
 
+    {#if Object.entries(urbits).length > 0} 
+      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Automatically Set to Remote</div>
+      <div class="ship-table">
+        {#each Object.entries(urbits) as [k,v]}
+          <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
+        {/each}
+          <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
+      </div>
+    {/if}
+
   <!-- if registered -->
-  {:else if !reRegCheck}
+  {:else if (!reRegCheck) && (register == "yes")}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
       <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
@@ -120,7 +139,7 @@
     </div>
 
     {#if regions != null}
-      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Region</div>
+      <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Select a Region</div>
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
@@ -133,27 +152,30 @@
         {/each}
       </div>
     {/if}
-  {/if}
 
-  <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Automatically Set to Remote</div>
-  <div class="ship-table">
-    {#each Object.entries(urbits) as [k,v]}
-      <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
-    {/each}
-    <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
-  </div>
+    <!-- TODO: handle service creation -->
+    <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Automatically Set to Remote</div>
+    <div class="ship-table">
+      {#each Object.entries(urbits) as [k,v]}
+        <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
+      {/each}
+      {#if Object.entries(urbits).length > 0} 
+        <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
+      {/if}
+    </div>
+
+  {/if}
 
   <!-- Submit button -->
   <div transition:scale={{duration:120, delay: 200}}>
-    {#if (register == "yes") && reRegCheck}
+    {#if register == "yes"}
       <PrimaryButton
         left={true}
-        on:click={()=>reRegCheck = false}
-        standard="Register Another Key or Change Region"
-        status="standard"
+        on:click={()=> !reRegCheck ? registerKey() : reRegCheck = false}
+        standard={reRegCheck ? "Register Another Key or Change Region" : "Register"}
         top="16"
       />
-    {:else}
+    {:else if register == "no"}
       <PrimaryButton
         left={true}
         standard="Register"
@@ -161,6 +183,36 @@
         top="12"
         on:click={registerKey}
       />
+    {:else}
+      {#if options.hasOwnProperty(register)}
+        <div class="loading {register}">{options[register]}</div>
+      {:else if register.includes("failure")}
+        <div class="loading failure">{register.split("\n")[1]}</div>
+      {/if}
+      {#each Object.entries(urbits) as [k,v]}
+        {#if !unchecked.includes(k)}
+          <div class="row">
+            <div class="ship">{k}</div>
+            {#if (v.startram.urbit == "registering") || (v.startram.minio == "registering")}
+              <div class="ship-status">Registering Services</div>
+            {:else if v.startram.access == "to-remote"}
+              <div class="ship-status">Switching to Remote Access</div>
+            {:else if (v.startram.access == "remote")}
+              <div class="ship-status remote">Remote Access Active</div>
+            {:else if (v.startram.urbit == "unregistered") || (v.startram.minio == "unregistered")}
+              <div class="ship-status">Awaiting Registration</div>
+            {:else if (v.startram.urbit == "registered") || (v.startram.minio == "registered")}
+              <div class="ship-status">StarTram API confirmed registration</div>
+            {:else}
+              <div class="ship-status unknown">
+                <div>Unknown Status</div>
+                <div>Non-pretty version of data:</div>
+                <div>{JSON.stringify(v.startram)}</div>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      {/each}
     {/if}
   </div>
 </div>
@@ -221,5 +273,42 @@
   .ship-table {
     display: flex;
     flex-direction: column;
+  }
+  .loading {
+    animation: breathe 2s infinite;
+    text-align: center;
+    font-size: 14px;
+    margin: 40px;
+  }
+  .success {
+    color: lime;
+    animation: none;
+  }
+  .failure {
+    color: red;
+    animation: none;
+  }
+  .row {
+    display: flex;
+    font-size: 12px;
+    gap: 24px;
+    padding: 8px;
+  }
+  .row:hover {
+    background: #0000004D;
+  }
+  .ship {
+    flex: 1;
+    text-align: right;
+  }
+  .ship-status {
+    flex: 1;
+    text-align: left;
+  }
+  .unknown {
+    color: orange;
+  }
+  .remote {
+    color: lime;
   }
 </style>

@@ -7,15 +7,26 @@
   export let all = false
   export let check = true
   export let submitting = false
+
   const dispatch = createEventDispatcher()
 
+  let gray = false
+
+  $: check = loading(check)
+
+  const loading = c => {
+    gray = false
+    return c
+  }
+
   const handleCheck = () => {
+    gray = true
     dispatch('update', all ? !check : name)
   }
 </script>
 
 <!-- Checkbox -->
-<div class="checker" class:freeze={submitting}>
+<div class="checker" class:freeze={submitting || gray}>
   <div class="box" class:highlight={check} on:click={handleCheck}>
     {#if check}
       <Fa icon={faCheck} size="1x"/>
