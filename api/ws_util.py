@@ -141,7 +141,7 @@ class WSUtil:
     #
 
     # check if service exists for patp
-    def services_exist(self, patp, subdomains):
+    def services_exist(self, patp, subdomains, is_registered=False):
         # Define services
         services = {
                     "urbit-web":False,
@@ -156,5 +156,8 @@ class WSUtil:
             if ep_patp == patp:
                 for s in services.keys():
                     if ep_svc == s:
-                        services[s] = True
+                        if is_registered:
+                            services[s] = ep['status']
+                        else:
+                            services[s] = True
         return services

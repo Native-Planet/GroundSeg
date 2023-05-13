@@ -63,6 +63,7 @@
   }
 
   const registerKey = () => {
+    updateForm("key",key)
     let payload = {
       "category": "system",
       "payload": {
@@ -190,28 +191,30 @@
         <div class="loading failure">{register.split("\n")[1]}</div>
       {/if}
       {#each Object.entries(urbits) as [k,v]}
-        {#if !unchecked.includes(k)}
-          <div class="row">
-            <div class="ship">{k}</div>
-            {#if (v.startram.urbit == "registering") || (v.startram.minio == "registering")}
-              <div class="ship-status">Registering Services</div>
-            {:else if v.startram.access == "to-remote"}
-              <div class="ship-status">Switching to Remote Access</div>
-            {:else if (v.startram.access == "remote")}
-              <div class="ship-status remote">Remote Access Active</div>
-            {:else if (v.startram.urbit == "unregistered") || (v.startram.minio == "unregistered")}
-              <div class="ship-status">Awaiting Registration</div>
-            {:else if (v.startram.urbit == "registered") || (v.startram.minio == "registered")}
-              <div class="ship-status">StarTram API confirmed registration</div>
-            {:else}
-              <div class="ship-status unknown">
-                <div>Unknown Status</div>
-                <div>Non-pretty version of data:</div>
-                <div>{JSON.stringify(v.startram)}</div>
-              </div>
-            {/if}
-          </div>
-        {/if}
+        <div class="row">
+          <div class="ship">{k}</div>
+          {#if (v.startram.urbit == "registering") || (v.startram.minio == "registering")}
+            <div class="ship-status">Registering Services</div>
+          {:else if v.startram.access == "to-remote"}
+            <div class="ship-status">Toggling Remote Access</div>
+          {:else if v.startram.access == "to-local"}
+            <div class="ship-status">Toggling Local Access</div>
+          {:else if (v.startram.access == "remote")}
+            <div class="ship-status remote">Remote Acess Active</div>
+          {:else if (v.startram.access == "local")}
+            <div class="ship-status remote">Local Access Active</div>
+          {:else if (v.startram.urbit == "unregistered") || (v.startram.minio == "unregistered")}
+            <div class="ship-status">Awaiting Registration</div>
+          {:else if (v.startram.urbit == "registered") || (v.startram.minio == "registered")}
+            <div class="ship-status">Services Registered</div>
+          {:else}
+            <div class="ship-status unknown">
+              <div>Unknown Status</div>
+              <div>Non-pretty version of data:</div>
+              <div>{JSON.stringify(v.startram)}</div>
+            </div>
+          {/if}
+        </div>
       {/each}
     {/if}
   </div>

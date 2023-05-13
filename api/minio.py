@@ -87,14 +87,10 @@ class MinIO:
         self.minios_on = self.minio_docker.start_all()
         return self.minios_on
 
-    def stop_all(self):
-        self.minios_on = False
-        return self.minio_docker.stop_all()
-
     def stop_mc(self):
         return self.mc_docker.stop(self.mc_data['mc_name'])
 
-    def stop_minio(self, name):
+    def stop(self, name):
         return self.minio_docker.stop(name)
     
     def delete(self, name):

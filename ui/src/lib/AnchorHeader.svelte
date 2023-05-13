@@ -1,40 +1,34 @@
 <script>
 	import { api } from '$lib/api'
 	import { scale } from 'svelte/transition'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
 
-	export let wgRunning, wgReg
-
-  let loading = false
+  $: startram = ($socketInfo.system?.startram) || null
+  $: register = (startram?.register) || "no"
+  $: container = (startram?.container) || "stopped"
 
 	// toggle anchor on or off
 	const toggleAnchor = () => {
-    loading = true
-    let module = 'anchor'
-	  fetch($api + '/system?module=' + module, {
-			method: 'POST',
-      credentials:"include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'toggle'})
-	  })
-      .then(d => d.json())
-      .then(res => {
-        if (res == 200) {
-          loading = false
-        }
-        console.log(res)
-      })
+    let act = (container == "running" ? "stop" : "start")
+    let payload = {
+      "category": "system",
+      "payload": {
+        "module": "startram",
+        "action": act,
+      }
     }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
 
 </script>
 <div class="wrapper">
 	<div class="slot"><slot/></div>
-  {#if wgReg}
+  {#if register == "yes"}
     <div 
       in:scale={{duration:100,delay:300, amount:10}}
       on:click={toggleAnchor}
-      class:loading={loading}
       class="switch-wrapper">
-      <div class="switch {wgRunning ? "on" : "off"}" />
+      <div class="switch {container == "running" ? "on" : "off"}" />
 	  </div>
   {/if}
 </div>

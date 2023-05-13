@@ -138,6 +138,10 @@ class Orchestrator:
         if module == "startram":
             if action == "register":
                 Thread(target=self.startram_register, args=(data['sessionid'],)).start()
+            if action == "stop":
+                Thread(target=self.startram_stop).start()
+            if action == "start":
+                Thread(target=self.startram_start).start()
 
         return "succeeded"
 
@@ -147,7 +151,8 @@ class Orchestrator:
         whitelist = [
                 'meld',
                 'minio',
-                'container'
+                'container',
+                'access'
                 ]
         patp = payload['patp']
         module = payload['module']
@@ -176,6 +181,11 @@ class Orchestrator:
                 Thread(target=self.ws_urbits.container_rebuild,
                        args=(patp,)
                        ).start()
+
+        # Access
+        if module == "access":
+            if action == "toggle":
+                Thread(target=self.ws_urbits.access_toggle, args=(patp,)).start()
 
         return "succeeded"
 
@@ -237,8 +247,9 @@ class Orchestrator:
                             registered = "yes"
 
                             # register services
+                            piers = self.config['piers'].copy()
                             sub = self.wireguard.anchor_data['subdomains']
-                            for patp in self.config['piers'].copy():
+                            for patp in piers:
                                 try:
                                     res = self.ws_util.services_exist(patp, sub)
                                     uw = res['urbit-web']
@@ -250,30 +261,46 @@ class Orchestrator:
                                     # One or more of the urbit services is not registered
                                     if not (uw and ua):
                                         Thread(target=self.startram_api.create_service(patp, 'urbit', 10))
-         
                                     # One or more of the minio services is not registered
                                     if not (m and mc and mb):
                                         Thread(target=self.startram_api.create_service(f"s3.{patp}", 'minio', 10))
                                 except Exception as e:
                                     Log.log(f"orchestrator:startram_register:{patp} failed to create service: {e}")
 
-                            Log.log("10 sec here")
-                            sleep(10)
+                            # Loop until all services are done
+                            done = set()
+                            while len(done) != len(piers):
+                                if self.startram_api.retrieve_status(1):
+                                    sub = self.wireguard.anchor_data['subdomains']
+                                    for patp in piers: 
+                                        res = self.ws_util.services_exist(patp, sub, True)
+                                        urbit_ready = True
+                                        minio_ready = True
+                                        for svc in res:
+                                            if res[svc] != "ok":
+                                                if 'urbit' in svc:
+                                                    urbit_ready = False
+                                                else:
+                                                    minio_ready = False
+                                        if urbit_ready:
+                                            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit','registered')
+                                        if minio_ready:
+                                            self.ws_util.urbit_broadcast(patp, 'startram', 'minio','registered')
 
-                            # Loop forever until all is done
-                            for patp in self.config['piers'].copy():
-                                self.ws_util.urbit_broadcast(patp, 'startram', 'minio','registered')
-                                self.ws_util.urbit_broadcast(patp, 'startram', 'urbit','registered')
-                                sleep(1)
-
-                            for patp in self.config['piers'].copy():
-                                self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'to-remote')
-                                sleep(1)
+                                        if minio_ready and urbit_ready:
+                                            done.add(patp)
+                                sleep(5)
 
                             # toggle remote
-                            for patp in self.config['piers'].copy():
-                                self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'remote')
-                                sleep(1)
+                            ignored = self.ws_util.grab_form(sid, 'startram', 'ships')
+                            if ignored == None:
+                                ignored = []
+                            for patp in piers:
+                                remote = self.urbit._urbits[patp]['network'] == "wireguard"
+                                if remote or (patp not in ignored):
+                                    self.ws_urbits.access_toggle(patp, "remote")
+                                else:
+                                    self.ws_urbits.access_toggle(patp, "local")
                         else:
                             raise Exception("failed to start wireguard container")
                     else:
@@ -289,6 +316,35 @@ class Orchestrator:
         sleep(3)
         broadcast(registered)
 
+    def startram_stop(self):
+        self.ws_util.system_broadcast('startram','container','loading')
+        # mc
+        Thread(target=self.minio.stop_mc).start()
+        for p in self.urbit._urbits.copy():
+            # minio
+            Thread(target=self.ws_minios.stop,args=(p,)).start()
+            # urbit
+            if self.urbit._urbits[p]['network'] == 'wireguard':
+                Thread(target=self.ws_urbits.access_toggle,args=(p,"local")).start()
+
+        # wireguard
+        if self.wireguard.stop():
+            self.config['wgOn'] = False
+            self.config_object.save_config()
+        self.ws_util.system_broadcast('startram','container','')
+
+    def startram_start(self):
+        self.ws_util.system_broadcast('startram','container','loading')
+        # wireguard
+        if self.wireguard.start():
+            self.config['wgOn'] = True
+            self.config_object.save_config()
+            # mc
+            self.minio.start_mc()
+            # minio
+            for p in self.urbit._urbits.copy():
+                Thread(target=self.ws_minios.start,args=(p,self.urbit._urbits[p])).start()
+        self.ws_util.system_broadcast('startram','container','')
 
     def minio_link(self, patp):
         # create minio service account
@@ -570,38 +626,11 @@ class Orchestrator:
 
         # anchor module
         if module == 'anchor':
-            if data['action'] == 'toggle':
-                if self.wireguard.is_running():
-                    return self.wireguard.off(self.urbit, self.minio)
-                return self.wireguard.on(self.minio)
-
             if data['action'] == 'restart':
                 return self.wireguard.restart(self.urbit, self.minio)
 
             if data['action'] == 'change-url':
                 return self.wireguard.change_url(data['url'], self.urbit, self.minio)
-
-            '''
-            try:
-                if data['action'] == 'register':
-                    endpoint = self.config['endpointUrl']
-                    api_version = self.config['apiVersion']
-                    url = f"https://{endpoint}/{api_version}"
-
-                    if self.wireguard.build_anchor(url, data['key'], data['region']):
-                        self.minio.start_mc()
-                        self.config['wgRegistered'] = True
-                        self.config['wgOn'] = True
-
-                        for patp in self.config['piers']:
-                            self.urbit.register_urbit(patp, url)
-
-                        if self.config_object.save_config():
-                            if self.wireguard.start():
-                                return 200
-            except Exception as e:
-                Log.log(f"Anchor: Failed to register endpoint")
-            '''
 
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']

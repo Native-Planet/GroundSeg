@@ -106,25 +106,6 @@ class MinIODocker:
 
         return True
 
-    def stop_all(self):
-        Log.log("MinIO: Attempting to stop all containers")
-        try:
-            Log.log("MinIO: Getting list of MinIO containers")
-            c = client.containers.list()
-            for m in c:
-                if m.name != 'minio_client' and m.name.startswith('minio_'):
-                    try:
-                        m.stop()
-                        Log.log(f"MinIO: Stopped {m.name}")
-                    except Exception: 
-                        Log.log(f"MinIO: Failed to stop {m.name}")
-
-        except Exception as e:
-            Log.log(f"MinIO: Failed to get list of MinIO containers: {e}")
-            return False
-
-        return True
-
     def get_container(self, name, show_error=True):
         try:
             c = client.containers.get(name)

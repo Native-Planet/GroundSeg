@@ -94,36 +94,6 @@ class Wireguard:
             return self.wg_docker.is_running(self.data['wireguard_name'])
         return False
 
-    # wgOn False
-    def off(self, urb, minio):
-        for p in urb._urbits:
-            if urb._urbits[p]['network'] == 'wireguard':
-                 urb.toggle_network(p)
-        minio.stop_all()
-        minio.stop_mc()
-        self.stop()
-        self.config['wgOn'] = False
-        self.config_object.save_config()
-
-        return 200
-
-    # wgOn False
-    def on(self, minio):
-        self.start()
-        minio.start_mc()
-        minio.start_all()
-        self.config['wgOn'] = True
-        self.config_object.save_config()
-
-        endpoint = self.config['endpointUrl']
-        api_version = self.config['apiVersion']
-        url = f'https://{endpoint}/{api_version}'
-
-        if self.get_status(url):
-            self.update_wg_config(self.anchor_data['conf'])
-
-        return 200
-
     def restart(self, urb, minio):
         try:
             Log.log("Wireguard: Attempting to restart wireguard")
@@ -151,24 +121,6 @@ class Wireguard:
     # Container logs
     def logs(self):
         return self.wg_docker.full_logs(self.data['wireguard_name'])
-
-    '''
-    # New anchor registration
-    def build_anchor(self, url, reg_key, region):
-        Log.log("Wireguard: Attempting to build anchor")
-        try:
-            if self.register_device(url, reg_key, region):
-                if self.get_status(url):
-                    if self.start():
-                        if self.update_wg_config(self.anchor_data['conf']):
-                            Log.log("Anchor: Registered with anchor server")
-                            return True
-
-        except Exception as e:
-            Log.log(f"Wireguard: Failed to build anchor: {e}")
-
-        return False
-    '''
 
     # Update wg0.confg
     def update_wg_config(self, conf):

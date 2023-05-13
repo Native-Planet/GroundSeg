@@ -24,3 +24,9 @@ class WSMinIOs:
 
     def broadcast(self, patp, action, info):
         return self.ws_util.urbit_broadcast(patp,'minio',action, info)
+
+    def stop(self, patp):
+        self.minio.stop(f"minio_{patp}")
+
+    def start(self, patp, pier_config):
+        self.minio.start_minio(f"minio_{patp}", pier_config)

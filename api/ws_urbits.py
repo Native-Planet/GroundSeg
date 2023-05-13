@@ -6,6 +6,7 @@ from log import Log
 # Action imports
 from action_meld_urth import MeldUrth
 from action_minio_link import MinIOLink
+from action_access_toggle import AccessToggle
 
 class WSUrbits:
     def __init__(self, config, urb, ws_util):
@@ -120,3 +121,9 @@ class WSUrbits:
     # TODO: remove unlink stuff
     def minio_link(self, pier_config, acc="", secret="", bucket="", unlink=False):
         MinIOLink(self.urb, self.ws_util, unlink).link(pier_config, acc, secret, bucket)
+
+    def access_toggle(self, patp, t=None):
+        if t:
+            AccessToggle(patp, self.config_object, self.urb, self.ws_util).set(t)
+        else:
+            AccessToggle(patp, self.config_object, self.urb, self.ws_util).toggle()

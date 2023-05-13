@@ -1,5 +1,6 @@
 <script>
 	import { api } from '$lib/api'
+  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
 
 	export let name, remote, wgReg, wgRunning
 
@@ -7,17 +8,12 @@
 
 	// toggle network
   const toggleNetwork = () => { 
-		isSwitching = true
-		fetch($api + '/urbit?urbit_id=' + name, {
-		method: 'POST',
-        credentials: "include",
-		headers: {'Content-Type': 'application/json'},
-		body: JSON.stringify({'app':'wireguard','data':'toggle'})
-		})
-		.then(raw => raw.json())	
-		.then(res => { console.log(res); isSwitching = false})
-		.catch(err => console.log(err))
-	}
+    let payload = {
+      "category": "urbits",
+      "payload": {"patp": name, "module": "access", "action": "toggle"}
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
 
 </script>
 {#if wgReg && wgRunning}

@@ -38,7 +38,7 @@
 {#if inView && (register != null)}
   <Card width="460px">
     <!-- Header -->
-    <AnchorHeader wgReg={register == "yes"} wgRunning={container == "running"}>
+    <AnchorHeader>
       <Logo t='StarTram'/>
     </AnchorHeader>
 
