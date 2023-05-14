@@ -116,7 +116,6 @@ class Orchestrator:
 
             if template in whitelist:
                 if template == "startram":
-                    Log.log(data)
                     self.ws_util.edit_form(data, template)
 
         except Exception as e:
@@ -238,7 +237,7 @@ class Orchestrator:
                 self.ws_util.system_broadcast('system','startram','endpoint','rm-services')
                 for patp in self.config['piers'].copy():
                     res = self.ws_util.services_exist(patp, sub)
-                    if True in list(res.values):
+                    if True in list(res.values()):
                         Thread(target=self.startram_api.delete_service,
                                args=(patp,'urbit')
                                ).start()
