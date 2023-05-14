@@ -17,7 +17,7 @@ class WireguardRefresher:
 
     # Checks if wireguard connection is functional, restarts wireguard
     def refresh_loop(self):
-        Log.log("WG Refresher: Thread started")
+        Log.log("wireguard_refresher:refresh_loop Thread started")
         count = 0
         while True:
             if count > 1:
@@ -36,9 +36,10 @@ class WireguardRefresher:
                             res = requests.get(f"https://{copied[p]['wg_url']}/~_~/healthz")
                             if res.status_code == 502:
                                 if self.failure_check(p):
-                                    Log.log("WG Refresher: Anchor connection is broken. Restarting")
+                                    Log.log(f"wireguard_refresher:refresh_loop Failed: {self.failed}")
+                                    Log.log("wireguard_refresher:refresh_loop StarTram connection is broken. Restarting")
                                     self.failed = []
-                                    self.wireguard.restart(self.urbit, self.minio)
+                                    self.orchestrator.startram_restart()
                                     break
 
             except Exception as e:

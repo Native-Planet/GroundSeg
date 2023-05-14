@@ -13,12 +13,9 @@ class StarTramLoop:
 
     def run(self):
         Log.log("ws_system:startram_loop Starting thread")
+        self.ws_util.system_broadcast('system','startram',"restart","")
+        self.ws_util.system_broadcast('system','startram',"cancel","")
         while True:
-            # temp
-            self.ws_util.system_broadcast('system','startram',"restart","hide")
-            self.ws_util.system_broadcast('system','startram',"cancel","hide")
-            self.ws_util.system_broadcast('system','startram',"advanced",False)
-
             self._container()
             self._register()
             self._autorenew()
@@ -100,7 +97,15 @@ class StarTramLoop:
 
     def _endpoint(self):
         try:
-            endpoint = self.config['endpointUrl']
+            busy= ['stopping','rm-services','reset-pubkey','changing','updating','success']
+            ep = self.ws_util.structure.get('system', {}
+                                              ).get('startram', {}
+                                                    ).get('endpoint', "")
+            # update information
+            if ep not in busy:
+                endpoint = self.config['endpointUrl']
+            else:
+                return
         except:
             endpoint = None
         self.ws_util.system_broadcast('system','startram','endpoint',endpoint)

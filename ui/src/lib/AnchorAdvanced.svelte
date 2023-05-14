@@ -1,13 +1,10 @@
 <script>
+  import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
-  import { api } from '$lib/api'
+  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
-
-  export let wgReg
-  export let wgRunning
-  export let endpoint
 
   let advanced = false
   let defaultEpKey = 'api.startram.io'
@@ -15,87 +12,129 @@
   let cancelButtonStatus = 'standard'
   let restartButtonStatus = 'standard'
   let confirmCancel = false
-  let regKey = ''
   let view = false
   let restarting = false
   let showEpInfo = false
 
+  $: connected = ($socketInfo?.metadata?.connected) || false
+  $: startram = ($socketInfo.system?.startram) || null
+  $: register = (startram?.register) || "no"
+  $: container = (startram?.container) || "stopped"
+  $: restart = (startram?.restart) || ""
+  $: cancel = (startram?.cancel) || ""
+  $: endpoint = (startram?.endpoint) || null
+
+  $: form = ($socketInfo?.forms?.startram) || null
+  $: formEndpoint = (form?.endpoint) || ""
+  $: formCancel = (form?.cancel) || ""
+
   $: currentEpKey = endpoint
+  $: currentEpKey = modifyEpKey(currentEpKey)
+  const modifyEpKey = e => {
+    if (!endpointData.hasOwnProperty(e)) {
+      updateForm("endpoint",e)
+      return e
+    }
+  }
 
   const insertNP = () => currentEpKey = defaultEpKey
   const toggleAdvanced = () => advanced = !advanced
 
-  const connectEndpoint = () => {
-    epButtonStatus = 'loading'
-    let module = 'anchor'
-	  fetch($api + '/system?module=' + module, {
-			method: 'POST',
-      credentials: "include",
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({'action':'change-url','url':endpoint})
-	  })
-      .then(d=>d.json()).then(r=>{
-        if (r === 200) {
-          epButtonStatus = 'success'
-          setTimeout(()=>{
-            epButtonStatus = 'standard'
-          }, 3000)}
-        if (r === 400) {
-          epButtonStatus = 'failure'
-          setTimeout(()=>epButtonStatus = 'standard', 3000)
-   }})}
-
+  // Cancel Key Logic
+  $: regKey = updateForm('cancel',handleKey(regKey))
+  const handleKey = key => {
+    if (typeof key === 'string' || key instanceof String) {
+      return key.trim()
+    } else {
+      return ''
+    }
+  }
   const cancelSubscription = () => {
     if (confirmCancel) {
-      cancelButtonStatus = 'loading'
-      let module = 'anchor'
-
-  	  fetch($api + '/system?module=' + module, {
-	  		method: 'POST',
-        credentials: "include",
-		  	headers: {'Content-Type': 'application/json'},
-			  body: JSON.stringify({'action':'unsubscribe','key':regKey.trim()})
-  	  })
-       .then(d=>d.json())
-        .then(r=>{
-          if (r == 200) {
-            cancelButtonStatus = 'success'
-            regKey = ''
-          } else {
-            cancelButtonStatus = 'failure'
-          }
-          setTimeout(()=> cancelButtonStatus = 'standard', 3000)
-          confirmCancel = !confirmCancel
-       })
+      updateForm("cancel", regKey.trim())
+      let payload = {
+        "category": "system",
+        "payload": {
+          "module": "startram",
+          "action": "cancel"
+        }
+      }
+      send($socket, $socketInfo, document.cookie, payload)
     } else {
       confirmCancel = !confirmCancel
   }}
 
-  const restartAnchor = () => {
-    restartButtonStatus = 'loading'
-    restarting = true
-    let module = 'anchor'
+  const restartStarTram = () => {
+    let payload = {
+      "category": "system",
+      "payload": {
+        "module": "startram",
+        "action": "restart"
+      }
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
 
-    fetch($api + '/system?module=' + module, {
-      method: 'POST',
-      credentials: "include",
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'action':'restart'})
-    })
-      .then(d=>d.json())
-      .then(r=>{
-        if (r == 200) {restartButtonStatus = 'success'}
-        else {restartButtonStatus = 'failure'}
-        setTimeout(()=> {
-          restartButtonStatus = 'standard'
-          restarting = false
-        }, 3000)
-  })}
+  const connectEndpoint = () => {
+    updateForm("endpoint", currentEpKey)
+    let payload = {
+      "category": "system",
+      "payload": {
+        "module": "startram",
+        "action": "endpoint"
+      }
+    }
+    send($socket, $socketInfo, document.cookie, payload)
+  }
+
+  // Send to API
+  const updateForm = (i,v) => {
+    if (connected) {
+      let payload = {
+        "category": "forms",
+        "payload": {
+          "template": "startram",
+          "item": i,
+          "value": v,
+        }
+      }
+      send($socket, $socketInfo, document.cookie, payload)
+    }
+    return v
+  }
+
+  const restartData = {
+    "initializing":"Attempting to restart StarTram",
+    "stopping":"StarTram is stopping",
+    "starting":"StarTram is starting",
+    "success":"Restart Succeeded!"
+  }
+
+  const endpointData = {
+    "stopping":"Stopping StarTram",
+    "rm-services":"Removing Existing Services",
+    "reset-pubkey":"Resetting Public Key",
+    "changing":"Modifying Endpoint URL",
+    "updating":"Updating Local Data",
+    "success":"Endpoint Changed!"
+  }
+
+  const cancelData = {
+    "cancelling":"Cancelling your subscription",
+    "success":"Subscription Cancelled!",
+    "failed":"An error has occured. Please send us a report"
+  }
 
   const toggleView = () => {
     view = !view
     document.querySelector('#input-cancel').type = view ? 'text' : 'password'
   }
+
+  // Load up saved form
+  onMount(()=> init())
+  const init = () => form == null 
+    ? setTimeout(init,100)
+    : regKey = formCancel
 
 </script>
 
@@ -106,25 +145,25 @@
   </div>
 
   {#if advanced}
-    {#if (wgRunning || restarting)}
+    {#if container == "running"}
       <div class="ep-title" transition:scale={{duration:120, delay: 200}}>Restart StarTram</div>
       <div transition:scale={{duration:120, delay: 200}}>
-        <PrimaryButton
-          on:click={restartAnchor}
-          background="black"
-          standard="Restart"
-          success="Successfully restarted StarTram!"
-          failure="Something went wrong, please try again"
-          loading="Restarting..."
-          status={restartButtonStatus}
-          top="12"
-        />
+        {#if restart === ""}
+          <PrimaryButton
+            on:click={restartStarTram}
+            background="black"
+            standard="Restart"
+            top="12"
+          />
+        {:else}
+          <div class="restart {restart}">{(restartData?.[restart]) || "error: " + restart}</div>
+        {/if}
       </div>
     {/if}
 
     <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
       Set Endpoint
-      {#if wgReg}
+      {#if register == "yes"}
         <button class="alert-mark" on:click={()=>showEpInfo = !showEpInfo} >
           <Fa icon={faTriangleExclamation} size="1.2x" />
         </button>
@@ -137,52 +176,56 @@
       </div>
     {/if}
 
-    <div class="ep-key"transition:scale={{duration:120, delay: 200}}>
-      <input type="text" bind:value={currentEpKey} />
-      <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
-    </div>
+    {#if !endpointData.hasOwnProperty(endpoint)}
+      <div class="ep-key">
+        <input type="text" bind:value={currentEpKey} />
+        <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
+      </div>
 
-    <div transition:scale={{duration:120, delay: 200}}>
-      <PrimaryButton
-        on:click={connectEndpoint}
-        standard="Set to {defaultEpKey == currentEpKey ? "Native Planet" : "Custom"} Endpoint"
-        status={currentEpKey == endpoint ? 'disabled': 'standard'}
-        top="12"
-      />
-    <!--
-      success="Endpoint successfully changed"
-      failure="Failed to change endpoint"
-      loading="Changing to your new endpoint.."
-    -->
-    </div>
+      <div>
+        <PrimaryButton
+          on:click={connectEndpoint}
+          standard="Set to {defaultEpKey == currentEpKey ? "Native Planet" : "Custom"} Endpoint"
+          status={currentEpKey == endpoint ? 'disabled': 'standard'}
+          top="12"
+        />
+      </div>
+    {:else}
+      <div class="ep-key blocked">
+        <input type="text" bind:value={formEndpoint} />
+        <img on:click={insertNP} width="24px" src="/nplogo.svg" alt="np logo" />
+      </div>
+      <div class="buttons {endpoint}">{(endpointData?.[endpoint]) || "error: " + endpoint}</div>
+    {/if}
 
-    {#if wgReg}
-    <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
-      Cancelation
-    </div>
+    {#if register == "yes"}
+      <div class="ep-title" transition:scale={{duration:120, delay: 200}}>
+        Cancelation
+      </div>
 
-    <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input placeholder="Registration Key" id='input-cancel' type="password" bind:value={regKey} />
-      <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
-    </div>
+      <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
+        <input id='input-cancel' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={regKey} />
+        <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
+      </div>
 
-    <div transition:scale={{duration:120, delay: 200}}>
-      <PrimaryButton
-        on:click={cancelSubscription}
-        background="#bb3f3f"
-        standard="
-          {
-            confirmCancel ? "Click again to cancel your" : "Cancel my"
-          } {
-            defaultEpKey == currentEpKey ? "StarTram" : "Anchor"
-          } subscription"
-        success="Subscription successfully canceled!"
-        failure="Something went wrong, please try again"
-        loading="Canceling your subscription"
-        status={regKey.length < 1 ? 'disabled' : cancelButtonStatus}
-        top="12"
-      />
-    </div>
+      <div transition:scale={{duration:120, delay: 200}}>
+        {#if !cancelData.hasOwnProperty(cancel)}
+          <PrimaryButton
+            on:click={cancelSubscription}
+            background="#bb3f3f"
+            standard="
+              {
+                confirmCancel ? "Click again to cancel your" : "Cancel my"
+              } {
+                defaultEpKey == currentEpKey ? "StarTram" : "Anchor"
+              } subscription"
+            status={regKey == "" ? 'disabled' : 'standard'}
+            top="12"
+          />
+        {:else}
+          <div class="buttons {cancel}">{(cancelData?.[cancel]) || "error: " + cancel}</div>
+        {/if}
+      </div>
     {/if}
 
   {/if}
@@ -262,5 +305,24 @@
   input::placeholder {
     color: white;
     opacity: .6;
+  }
+  .restart {
+    font-size: 12px;
+    line-height: 24px;
+    padding-top: 12px;
+    animation: breathe 2s infinite;
+  }
+  .buttons {
+    font-size: 12px;
+    line-height: 18px;
+    padding: 12px 0 6px 0;
+    animation: breathe 2s infinite;
+  }
+  .success {
+    color: lime;
+    animation: none;
+  }
+  .blocked {
+    pointer-events: none;
   }
 </style>

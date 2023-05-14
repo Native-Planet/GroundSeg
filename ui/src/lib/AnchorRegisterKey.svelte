@@ -127,7 +127,9 @@
         {#each Object.entries(urbits) as [k,v]}
           <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
         {/each}
+        {#if Object.entries(urbits).length > 1} 
           <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
+        {/if}
       </div>
     {/if}
 
@@ -154,13 +156,12 @@
       </div>
     {/if}
 
-    <!-- TODO: handle service creation -->
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>Automatically Set to Remote</div>
     <div class="ship-table">
       {#each Object.entries(urbits) as [k,v]}
         <CheckBox name={k} check={!unchecked.includes(k)} on:update={addShip} submitting={false} />
       {/each}
-      {#if Object.entries(urbits).length > 0} 
+      {#if Object.entries(urbits).length > 1} 
         <CheckBox all={true} check={unchecked.length <= 0} on:update={addAllShips} submitting={false} />
       {/if}
     </div>

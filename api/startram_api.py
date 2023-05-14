@@ -45,7 +45,7 @@ class StartramAPI:
 
     # /v1/retrieve
     def retrieve_status(self, max_tries=1):
-        tries = 0
+        tries = 1
         pubkey = f"pubkey={self.config['pubkey']}"
         url = f"{self.url}/retrieve?{pubkey}"
 
@@ -105,3 +105,54 @@ class StartramAPI:
             Log.log(f"{self._f}:create_service:{subdomain} Retrying in {tries * 2} seconds")
             sleep(tries * 2)
             tries += 1
+
+    # /v1/delete
+    def delete_service(self, subdomain, service_type):
+        data = {
+                "subdomain" : f"{subdomain}",
+                "pubkey":self.config['pubkey'],
+                "svc_type": service_type
+                }
+        try:
+            response = requests.post(f'{self.url}/delete',json=data,headers=self._headers).json()
+            Log.log(f"startram_api:delete_service Service {service_type} deleted: {response}")
+        except Exception:
+            Log.log(f"startram_api:delete_service Failed to delete service {service_type}")
+        
+    # /v1/regions
+    def get_regions(self, max_tries=1):
+        Log.log(f"{self._f}:get_regions Attempting to get regions")
+        tries = 1
+        while True:
+            try:
+                self.wg.region_data = requests.get(
+                        f"{self.url}/regions",
+                        headers=self._headers
+                        ).json()
+                return True
+            except Exception as e:
+                Log.log(f"{self._f}:get_regions Failed: {e}")
+                if tries >= max_tries:
+                    Log.log(f"{self._f}:get_regions Max retries exceeded ({max_tries})")
+                    self.wg.region_data = {}
+                    break
+            Log.log(f"{self._f}:get_regions Retrying in {tries * 2} seconds")
+            sleep(tries * 2)
+            tries += 1
+        return False
+
+    # /v1/stripe/cancel
+    def cancel_subscription(self, key):
+        try:
+            Log.log(f"{self._f}:cancel_subscription Attempting to cancel StarTram subscription")
+            data = {'reg_code': reg_key}
+            res = requests.post(f'{self.url}/stripe/cancel',json=data,headers=headers).json()
+            if res['error'] == 0:
+                if self.retrieve_status():
+                    Log.log(f"{self._f}:cancel_subscription StarTram subscription canceled")
+                    return True
+                else:
+                    raise Exception(f"non-zero error code: {res}")
+        except Exception as e:
+            Log.log(f"{self._f}:cancel_subscription Failed: {e}")
+        return False

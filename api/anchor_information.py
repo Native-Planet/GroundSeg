@@ -12,28 +12,19 @@ class AnchorUpdater:
 
     # Get updated Anchor information every 12 hours
     def anchor_loop(self):
-        Log.log("Anchor: Anchor information updater thread started")
-
+        Log.log("anchor_information:anchor_loop Thread started")
         while True:
-            endpoint = self.config['endpointUrl']
-            api_version = self.config['apiVersion']
-            url = f"https://{endpoint}/{api_version}"
-
-            try:
-                self.orchestrator.wireguard.get_regions(url)
-            except:
-                pass
-
+            self.orchestrator.startram_api.get_regions()
             if self.config['wgRegistered'] and self.config['wgOn']:
                 try:
-                    if self.orchestrator.wireguard.get_status(url):
+                    if self.orchestrator.startram_api.retrieve_status():
                         wg_conf = self.orchestrator.wireguard.anchor_data['conf']
                         if self.orchestrator.wireguard.update_wg_config(wg_conf):
                             if self.update_urbit():
                                 time.sleep((60 * 60 * 12) - 60)
 
-                except Exception:
-                    Log.log("Anchor: Failed to get updated anchor information: {e}")
+                except Exception as e:
+                    Log.log(f"anchor_information:anchor_loop Failed to get updated anchor information: {e}")
 
             time.sleep(60)
 

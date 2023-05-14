@@ -94,30 +94,6 @@ class Wireguard:
             return self.wg_docker.is_running(self.data['wireguard_name'])
         return False
 
-    def restart(self, urb, minio):
-        try:
-            Log.log("Wireguard: Attempting to restart wireguard")
-            self.config_object.anchor_ready = False
-            Log.log("Anchor: Refresh loop is unready")
-            remote = []
-            for patp in urb._urbits:
-                if urb._urbits[patp]['network'] != 'none':
-                    remote.append(patp)
-
-            if self.off(urb, minio) == 200:
-                if self.on(minio) == 200:
-                    if len(remote) <= 0:
-                        return 200
-                    for patp in remote:
-                        urb.toggle_network(patp)
-                    Log.log("Anchor: Refresh loop is ready")
-                    self.config_object.anchor_ready = True
-                    return 200
-        except Exception as e:
-            Log.log(f"Wireguard: Failed to restart wireguard: {e}")
-
-        return 400
-
     # Container logs
     def logs(self):
         return self.wg_docker.full_logs(self.data['wireguard_name'])
@@ -131,31 +107,6 @@ class Wireguard:
 
         except Exception as e:
             Log.log(f"Wireguard: Failed to update wg0.confg: {e}")
-
-    # Change Anchor endpoint URL
-    def change_url(self, url, urb, minio):
-        Log.log(f"Wireguard: Attempting to change endopint url to {url}")
-        endpoint = self.config['endpointUrl']
-        api_version = self.config['apiVersion']
-        old_url = f'https://{endpoint}/{api_version}'
-        self.config['endpointUrl'] = url
-        self.config['wgRegistered'] = False
-        self.config['wgOn'] = False
-
-        for patp in self.config['piers']:
-            self.delete_service(f'{patp}','urbit',old_url)
-            self.delete_service(f's3.{patp}','minio',old_url)
-
-        self.off(urb, minio)
-        self.config_object.reset_pubkey()
-        Log.log("Wireguard: Changed url")
-        self.config_object.save_config()
-        if self.config['endpointUrl'] == url:
-            self.region_data = {}
-            self.anchor_data = {}
-            self.get_regions(f"https://{url}/{api_version}")
-            return 200
-        return 400
 
     # Container logs
     def logs(self, name):
@@ -181,97 +132,6 @@ class Wireguard:
 #
 #   StarTram API
 #
-
-    # /v1/register
-    def register_device(self, url, reg_key, region):
-        Log.log("Anchor: Attempting to register device")
-        try:
-            update_data = {"reg_code" : reg_key,"pubkey":self.config['pubkey'],"region":region}
-
-            res = requests.post(f'{url}/register',json=update_data,headers=self._headers).json()
-            Log.log(f"Anchor: /register response: {res}")
-            if res['error'] != 0:
-                raise Exception(f"error not 0: {res}")
-
-            return True
-
-        except Exception as e:
-            Log.log(f"Anchor: Request to /register failed: {e}")
-
-        return False
-
-    # /v1/regions
-    def get_regions(self, url, tries=3):
-        Log.log("Anchor: Attempting to get regions")
-        full_url = f"{url}/regions"
-        err_count = 0
-        while err_count < tries:
-            try:
-                self.region_data = requests.get(full_url,headers=self._headers).json()
-                return True
-
-            except Exception as e:
-                Log.log(f"Anchor: /regions failed: {e}")
-                if not (tries - err_count == 1):
-                    t = err_count * 2
-                    Log.log(f"Anchor: Attempting /regions again in {t} seconds")
-                    sleep(t)
-                err_count = err_count + 1
-        return False
-
-    # /v1/retrieve
-    def get_status(self, url):
-        full_url = f"{url}/retrieve?pubkey={self.config['pubkey']}"
-        err_count = 0
-        while err_count < 6:
-            try:
-                data = requests.get(full_url,headers=self._headers).json()
-                if data["conf"] is not None:
-                    self.anchor_data = data
-                    return True
-                raise Exception(f"conf is null: {data}")
-
-            except Exception as e:
-                Log.log(f"Anchor: /retrieve failed: {e}")
-                t = err_count * 2
-                Log.log(f"Anchor: Attempting /retrieve again in {t} seconds")
-                sleep(t)
-                err_count = err_count + 1
-
-        return False
-
-    # /v1/create
-    def register_service(self, subdomain, service_type, url):
-        update_data = {
-            "subdomain" : f"{subdomain}",
-            "pubkey":self.config['pubkey'],
-            "svc_type": service_type
-        }
-        headers = {"Content-Type": "application/json"}
-
-        response = False
-        while not response:
-            try:
-                response = requests.post(f'{url}/create',json=update_data,headers=headers).json()
-                Log.log(f"Anchor: Sent creation request for {service_type}")
-            except Exception as e:
-                Log.log(f"Anchor: Failed to register service {service_type}: {e}")
-        
-        # wait for it to be created
-        while response['status'] == 'creating':
-            try:
-                response = requests.get(
-                        f'{url}/retrieve?pubkey={update_data["pubkey"]}',
-                        headers=headers).json()
-                Log.log(f"Anchor: Retrieving response for {service_type}")
-            except Exception as e:
-                Log.log(f"Anchor: Failed to retrieve response: {e}")
-
-            if(response['status'] == 'creating'):
-                Log.log("Anchor: Waiting for endpoint to be created")
-                sleep(60)
-
-        return response['status']
 
     # /v1/create/alias
     def handle_alias(self, patp, alias, req_type):
@@ -307,38 +167,3 @@ class Wireguard:
                 Log.log(f"Anchor: Failed to delete alias {alias} for {patp}: {e}")
 
         return False
-
-    # /v1/delete
-    def delete_service(self, subdomain, service_type, url):
-        Log.log(f"Anchor: Attempting to delete service {service_type}")
-        update_data = {
-            "subdomain" : f"{subdomain}",
-            "pubkey":self.config['pubkey'],
-            "svc_type": service_type
-        }
-        headers = {"Content-Type": "application/json"}
-
-        try:
-            response = requests.post(f'{url}/delete',json=update_data,headers=headers).json()
-            Log.log(f"Anchor: Service {service_type} deleted: {response}")
-        except Exception:
-            Log.log(f"Anchor: Failed to delete service {service_type}")
-            return None
-        
-    # /v1/stripe/cancel
-    def cancel_subscription(self, reg_key, url):
-        Log.log("Anchor: Attempting to cancel subscription")
-        headers = {"Content-Type": "application/json"}
-        data = {'reg_code': reg_key}
-        response = None
-
-        try:
-            response = requests.post(f'{url}/stripe/cancel',json=data,headers=headers).json()
-            if response['error'] == 0:
-                if self.get_status(url):
-                    Log.log("Anchor: Successfully canceled subscription")
-                    return 200
-
-        except Exception as e:
-            Log.log(f"Anchor: Cancelation failed: {e}")
-            return 400

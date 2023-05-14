@@ -116,6 +116,7 @@ class Orchestrator:
 
             if template in whitelist:
                 if template == "startram":
+                    Log.log(data)
                     self.ws_util.edit_form(data, template)
 
         except Exception as e:
@@ -142,6 +143,16 @@ class Orchestrator:
                 Thread(target=self.startram_stop).start()
             if action == "start":
                 Thread(target=self.startram_start).start()
+            if action == "restart":
+                Thread(target=self.startram_restart).start()
+            if action == "endpoint":
+                Thread(target=self.startram_change_endpoint,
+                       args=(data['sessionid'],)
+                       ).start()
+            if action == "cancel":
+                Thread(target=self.startram_cancel,
+                       args=(data['sessionid'],)
+                       ).start()
 
         return "succeeded"
 
@@ -216,6 +227,115 @@ class Orchestrator:
     #
     # Combo functions
     #
+
+    def startram_change_endpoint(self,sid):
+        # stop startram
+        self.ws_util.system_broadcast('system','startram','endpoint','stopping')
+        if self.startram_stop():
+            # delete services
+            sub = self.wireguard.anchor_data.get('subdomains')
+            if sub:
+                self.ws_util.system_broadcast('system','startram','endpoint','rm-services')
+                for patp in self.config['piers'].copy():
+                    res = self.ws_util.services_exist(patp, sub)
+                    if True in list(res.values):
+                        Thread(target=self.startram_api.delete_service,
+                               args=(patp,'urbit')
+                               ).start()
+                        Thread(target=self.startram_api.delete_service,
+                               args=(f's3.{patp}','minio')
+                               ).start()
+            # reset pubkey
+            self.ws_util.system_broadcast('system','startram','endpoint','reset-pubkey')
+            self.config_object.reset_pubkey()
+            # change endpoint
+            self.ws_util.system_broadcast('system','startram','endpoint','changing')
+            self.config['endpointUrl'] = self.ws_util.grab_form(sid, 'startram', 'endpoint')
+            self.config['wgRegistered'] = False
+            self.config['wgOn'] = False
+            self.config_object.save_config()
+
+            # update information
+            self.ws_util.system_broadcast('system','startram','endpoint','updating')
+            self.region_data = {}
+            self.anchor_data = {}
+            self.startram_api.url = f"https://{self.config['endpointUrl']}/{self.config['apiVersion']}"
+            self.startram_api.get_regions()
+            self.ws_util.system_broadcast('system','startram','endpoint','success')
+        sleep(3)
+        self.ws_util.system_broadcast('system','startram','endpoint','')
+
+    def startram_cancel(self, sid):
+        '''
+        self.ws_util.system_broadcast('system','startram','cancel','cancelling')
+        key = self.ws_util.grab_form(sid,'startram','cancel')
+        '''
+        if True:
+        #if self.startram_api.cancel_subscription(key):
+            self.ws_util.system_broadcast('system','startram','cancel','success')
+        else:
+            self.ws_util.system_broadcast('system','startram','cancel','failed')
+        sleep(3)
+        data = {
+                'category': 'forms',
+                'payload': {
+                    'template': 'startram',
+                    'item': 'cancel',
+                    'value': ''
+                    },
+                'sessionid': sid
+                }
+        self.ws_util.edit_form(data,"startram")
+        self.ws_util.system_broadcast('system','startram','cancel','')
+
+    def startram_stop(self):
+        # mc
+        Thread(target=self.minio.stop_mc).start()
+        for p in self.urbit._urbits.copy():
+            # minio
+            Thread(target=self.ws_minios.stop,args=(p,)).start()
+            # urbit
+            if self.urbit._urbits[p]['network'] == 'wireguard':
+                Thread(target=self.ws_urbits.access_toggle,args=(p,"local")).start()
+
+        # wireguard
+        if self.wireguard.stop():
+            self.config['wgOn'] = False
+            self.config_object.save_config()
+            return True
+        return False
+
+    def startram_start(self):
+        # wireguard
+        if self.wireguard.start():
+            self.config['wgOn'] = True
+            self.config_object.save_config()
+            # mc
+            self.minio.start_mc()
+            # minio
+            for p in self.urbit._urbits.copy():
+                Thread(target=self.ws_minios.start,args=(p,self.urbit._urbits[p])).start()
+            return True
+        return False
+
+    def startram_restart(self):
+        self.ws_util.system_broadcast('system','startram','restart','initializing')
+        # get list of patps in remote
+        remote = set()
+        for patp in self.config['piers']:
+            if self.urbit._urbits[patp]['network'] == "wireguard":
+                remote.add(patp)
+        # restart startram
+        self.ws_util.system_broadcast('system','startram','restart','stopping')
+        if self.startram_stop():
+            self.ws_util.system_broadcast('system','startram','restart','starting')
+            if self.startram_start():
+                # toggle remote
+                for p in remote:
+                    Thread(target=self.ws_urbits.access_toggle,args=(p,"remote")).start()
+        self.ws_util.system_broadcast('system','startram','restart','success')
+        sleep(3)
+        self.ws_util.system_broadcast('system','startram','restart')
 
     def startram_register(self, sid):
         registered = "no"
@@ -315,36 +435,6 @@ class Orchestrator:
 
         sleep(3)
         broadcast(registered)
-
-    def startram_stop(self):
-        self.ws_util.system_broadcast('startram','container','loading')
-        # mc
-        Thread(target=self.minio.stop_mc).start()
-        for p in self.urbit._urbits.copy():
-            # minio
-            Thread(target=self.ws_minios.stop,args=(p,)).start()
-            # urbit
-            if self.urbit._urbits[p]['network'] == 'wireguard':
-                Thread(target=self.ws_urbits.access_toggle,args=(p,"local")).start()
-
-        # wireguard
-        if self.wireguard.stop():
-            self.config['wgOn'] = False
-            self.config_object.save_config()
-        self.ws_util.system_broadcast('startram','container','')
-
-    def startram_start(self):
-        self.ws_util.system_broadcast('startram','container','loading')
-        # wireguard
-        if self.wireguard.start():
-            self.config['wgOn'] = True
-            self.config_object.save_config()
-            # mc
-            self.minio.start_mc()
-            # minio
-            for p in self.urbit._urbits.copy():
-                Thread(target=self.ws_minios.start,args=(p,self.urbit._urbits[p])).start()
-        self.ws_util.system_broadcast('startram','container','')
 
     def minio_link(self, patp):
         # create minio service account
@@ -626,12 +716,6 @@ class Orchestrator:
 
         # anchor module
         if module == 'anchor':
-            if data['action'] == 'restart':
-                return self.wireguard.restart(self.urbit, self.minio)
-
-            if data['action'] == 'change-url':
-                return self.wireguard.change_url(data['url'], self.urbit, self.minio)
-
             if data['action'] == 'unsubscribe':
                 endpoint = self.config['endpointUrl']
                 api_version = self.config['apiVersion']

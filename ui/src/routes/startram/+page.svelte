@@ -25,10 +25,6 @@
   $: regions = (startram?.regions) || []
   $: autorenew = (startram?.autorenew) || false
   $: expiry = (startram?.expiry) || null
-  $: endpoint = (startram?.endpoint) || null
-  $: restart = (startram?.restart) || "hide"
-  $: cancel = (startram?.cancel) || "hide"
-  $: advanced = (startram?.advanced) || false
 
   onMount(()=> inView = true)
   onDestroy(()=> inView = false)
@@ -38,9 +34,7 @@
 {#if inView && (register != null)}
   <Card width="460px">
     <!-- Header -->
-    <AnchorHeader>
-      <Logo t='StarTram'/>
-    </AnchorHeader>
+    <AnchorHeader><Logo t='StarTram'/></AnchorHeader>
 
     {#if register == "yes"}
       <AnchorInformation
@@ -61,11 +55,7 @@
     </div>
 
     <!-- Advanced Options -->
-    <AnchorAdvanced 
-      {endpoint}
-      wgReg={register == "yes"}
-      wgRunning={container == "running"}
-    />
+    <AnchorAdvanced />
   </Card>
 {/if}
 
