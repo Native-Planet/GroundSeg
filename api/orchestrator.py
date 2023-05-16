@@ -97,6 +97,10 @@ class Orchestrator:
         except Exception as e:
             raise Exception(e)
 
+    def setup_command(self, data):
+        Log.log(data)
+        return "123"
+
 
     #
     # Category command functions

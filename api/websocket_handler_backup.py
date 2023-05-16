@@ -1,89 +1,25 @@
 import asyncio
-#import websockets
+import websockets
 import json
+#from threading import Thread
 
-from websockets.server import serve
-
-class API:
-    def __init__(self, host='0.0.0.0', port=8000):
-        self.host = host
-        self.port = port
-
-    async def handle(self, websocket):
-        async for message in websocket:
-            data = json.loads(message)
-            token = data.get('token')
-            if token:
-                # token received
-                res = self.handle_request(data)
-            else:
-                # token not received
-                res = self.handle_init(data,websocket)
-
-            # check if token is legit
-            # return appropriate data
-
-            # give us token
-
-            await websocket.send(res)
-
-    def handle_request(self, data):
-        token = data['token']
-        print(token)
-        print(token)
-        print(token)
-        print(token)
-        print(token)
-        return json.dumps({"doing":"this"})
-
-    def handle_init(self, data, websocket):
-        ip = websocket.remote_address[0]
-        user_agent = websocket.request_headers.get('User-Agent')
-        cat = data['category']
-        if cat == "init":
-            #id = self.ws_util.make_id()
-            id = '12312312321312312312312312312321312312312312321312312312'
-            # define token
-            contents = {
-                    "id":id,
-                    "ip":ip,
-                    "user_agent":user_agent,
-                    "secret":"some-random-string",
-                    "padding":"another-random-sring"
-                    }
-            # create token
-            #   text = self.ws_util.encrypt(contents)
-            text = "tsrwatsratwfaptrst123fws123fqws12"
-            #   if self.ws_util.save_token(id,text):
-            res = {"token":{"id":id,"token":text}}
-                #   send token 
-            return json.dumps({"metadata": res})
-
-    async def serve(self):
-        async with serve(self.handle, self.host, self.port):
-            await asyncio.Future()
-
-    def run(self):
-        asyncio.run(self.serve())
-'''
 from log import Log
 
+#class GSWebSocket(Thread):
 class GSWebSocket:
     authorized_clients = {}
     unauthorized_clients = {} # unused for now
 
     def __init__(self, config, orchestrator, ws_util, host='0.0.0.0', port=8000):
+        super().__init__()
         self.config = config.config
         self.orchestrator = orchestrator
         self.ws_util = ws_util
         self.host = host
         self.port = port
-
+        self.setup_user = None
 
     async def handle(self, websocket, path):
-        print(websocket)
-        print(path)
-        await websocket.send(json.dumps({"a":"b"}))
         try:
             async for message in websocket:
                 data = json.loads(message)
@@ -190,4 +126,3 @@ class GSWebSocket:
             asyncio.get_event_loop().run_forever()
         except Exception as e:
             Log.log(f"WS: Failed to start WebSocket Thread: {e}")
-        '''

@@ -34,7 +34,8 @@ class Setup:
                 for patp in config.config['piers']:
                     urbit.register_urbit(patp, url)
 
-                config.config['firstBoot'] = False
+                # TODO: TEMP
+                #config.config['firstBoot'] = False
                 if config.save_config():
                     return 200
 

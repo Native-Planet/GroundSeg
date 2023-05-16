@@ -1,4 +1,5 @@
 /** @type {import('./$types').PageServerLoad} */
+/*
 import { env } from '$env/dynamic/private'
 
 export const prerender = false;
@@ -21,3 +22,4 @@ export function load({ cookies }) {
 
 	return d
 }
+*/

@@ -2,14 +2,16 @@
 // Store and API for Websocket payload
 //
 
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import { genRequestId, getCookie } from '/src/lib/scripts/session.js'
+import { generateKeys } from './gs-crypto'
 
 export const socketInfo = writable({
   "activity": {},
   "metadata": {
     "address": "",
     "connected": false,
+    "setup": false
   }
 })
 
@@ -23,7 +25,7 @@ export const connect = async (addr, cookie, info) => {
   let ws = new WebSocket(addr)
   ws.addEventListener('open', e => {
     updateMetadata("connected", e.returnValue)
-    send(ws, info, cookie, {"category":"ping"}) 
+    send(ws, info, cookie, {"category":"init"}) 
   })
   ws.addEventListener('message', e => updateData(e.data))
   ws.addEventListener('error', e => console.log('error:', e))
@@ -46,12 +48,14 @@ export const send = (ws, info, cookie, msg) => {
     msg['id'] = id
     msg['sessionid'] = sid
     ws.send(JSON.stringify(msg))
+    /*
     let category = msg['category']
     let payload = null
-    if (category != 'ping') {
+    if (category != 'init') {
       payload = msg['payload']
     }
     return handleActivity(id, category, payload, info)
+    */
   } else {
     console.error("Not connected to websocket")
     return false
@@ -71,14 +75,18 @@ const handleActivity = async (id, cat, load, info) => {
     setTimeout(()=>handleActivity(id, cat, load, info), 500)
   } else {
     return await removeActivity(prefix, id)
-    return true
   }
 }
 
 const removeActivity = async (prefix, id) => {
+  const info = get(socketInfo)
+  const message = (info?.activity?.[id]?.message) || null
   await socketInfo.update(i => {
     let act = i.activity[id]
     if (act.error == 0) {
+      if (act.message.includes("SETUP")) {
+        i.metadata['setup'] = true
+      }
       console.log(prefix + " send confirmed")
     } else {
       if (act.message.includes("auth-fail")) {
@@ -90,7 +98,7 @@ const removeActivity = async (prefix, id) => {
     delete i.activity[id]
     return i
   })
-  return true
+  return await message
 }
 
 const updateData = data => {

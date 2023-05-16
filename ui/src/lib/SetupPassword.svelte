@@ -55,6 +55,7 @@
       })
   }
 
+  /*
   const getLoginKey = () => {
     if ($page.url.pathname == "/setup") {
       fetch($api + '/login/key')
@@ -64,6 +65,7 @@
         })
       setTimeout(getLoginKey, 30000)
   }}
+*/
 
   const encryptPassword = async pub => {
     const encrypt = new JSEncrypt({ default_key_size: 2048 })
@@ -72,7 +74,7 @@
     return {"password":encrypted,"pubkey":pub}
   }
 
-  onMount(()=> getLoginKey())
+  //onMount(()=> getLoginKey())
 
 </script>
 

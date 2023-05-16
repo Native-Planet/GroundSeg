@@ -11,15 +11,14 @@
   import SetupPassword from '$lib/SetupPassword.svelte'
 
 	// load data into store
-	export let data
-	updateState(data)
-  console.log(data)
+	//export let data
+	//updateState(data)
 
   let inViewSetup = false
   let setupPage = 0
 
   onMount(()=> {
-    api.set("http://" + $page.url.hostname + ":27016")
+    //api.set("http://" + $page.url.hostname + ":27016")
     inViewSetup = true
   })
 
