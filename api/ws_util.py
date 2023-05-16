@@ -1,4 +1,10 @@
+import os
 import json
+import string
+import secrets
+
+from cryptography.fernet import Fernet
+
 from log import Log
 
 class WSUtil:
@@ -161,3 +167,51 @@ class WSUtil:
                         else:
                             services[s] = True
         return services
+
+    #
+    #   AES Keyfile
+    #
+
+    # Encrypt with keyfile
+    def keyfile_encrypt(self, contents, key):
+        if not os.path.isfile(key):
+            Log.log(f"ws_util:keyfile_encrypt {key} does not exist. Creating")
+            k = Fernet.generate_key()
+            with open(key,"wb") as f:
+                f.write(k)
+                f.close()
+        else:
+            #Log.log(f"ws_util:keyfile_encrypt {key} exists. Reading")
+            with open(key,"rb") as f:
+                k = f.read()
+        cipher_suite = Fernet(k)
+        data = json.dumps(contents).encode('utf-8')
+        text = cipher_suite.encrypt(data)
+        return text.decode('utf-8')
+
+    # Decrypt with keyfile
+    def keyfile_decrypt(self, text, key):
+        if not os.path.isfile(key):
+            Log.log(f"ws_util:keyfile_decrypt {key} does not exist. Returning None")
+            return None
+        else:
+            #Log.log(f"ws_util:keyfile_decrypt decrypting with {key}")
+            with open(key,"rb") as f:
+                k = f.read()
+        cipher_suite = Fernet(k)
+        data = cipher_suite.decrypt(text.encode('utf-8'))
+        return json.loads(data)
+
+    #
+    #   Misc
+    #
+
+    # Create a random string of characters
+    def new_secret_string(self, length):
+        secret = ''.join(secrets.choice(
+            string.ascii_uppercase + 
+            string.ascii_lowercase + 
+            string.digits) for i in range(length))
+        return secret
+
+

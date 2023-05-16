@@ -5,7 +5,9 @@ import json
 from websockets.server import serve
 
 class API:
-    def __init__(self, host='0.0.0.0', port=8000):
+    def __init__(self, config, ws_util, host='0.0.0.0', port=8000):
+        self.config = config.config
+        self.ws_util = ws_util
         self.host = host
         self.port = port
 
@@ -41,22 +43,22 @@ class API:
         user_agent = websocket.request_headers.get('User-Agent')
         cat = data['category']
         if cat == "init":
-            #id = self.ws_util.make_id()
-            id = '12312312321312312312312312312321312312312312321312312312'
-            # define token
+            # create token
+            id = self.ws_util.new_secret_string(32)
+            secret = self.ws_util.new_secret_string(128)
+            padding = self.ws_util.new_secret_string(32)
             contents = {
                     "id":id,
                     "ip":ip,
                     "user_agent":user_agent,
-                    "secret":"some-random-string",
-                    "padding":"another-random-sring"
+                    "secret":secret,
+                    "padding":padding,
+                    "authenticated":False,
                     }
-            # create token
-            #   text = self.ws_util.encrypt(contents)
-            text = "tsrwatsratwfaptrst123fws123fqws12"
-            #   if self.ws_util.save_token(id,text):
+            k = self.config['keyFile']
+            text = self.ws_util.keyfile_encrypt(contents,k)
             res = {"token":{"id":id,"token":text}}
-                #   send token 
+            #   send token 
             return json.dumps({"metadata": res})
 
     async def serve(self):

@@ -86,6 +86,7 @@ class Config:
             "dockerData": "/var/lib/docker",
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
             "swapVal": 16,
+            "keyFile": "/opt/nativeplanet/groundseg/settings/session.key",
             "linuxUpdates": {
                 "value": 1,         # Int
                 "interval": "week", # day hour minute

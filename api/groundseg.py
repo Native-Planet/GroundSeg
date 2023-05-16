@@ -25,12 +25,12 @@ from wireguard_refresher import WireguardRefresher
 from kill_switch import KillSwitch
 from keygen import KeyGen
 
-'''
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
 sys_config = Config(base_path, dev)
 ws_util = WSUtil(sys_config)
 
+'''
 # Start Updater
 bin_updater = BinUpdater(sys_config, sys_config.debug_mode)
 Thread(target=bin_updater.check_bin_update, daemon=True).start()
@@ -85,7 +85,7 @@ else:
     # Websocket API
 if True:
     from websocket_handler import API
-    api = API()
+    api = API(sys_config, ws_util)
     api.run()
     #from websocket_handler import GSWebSocket
     #ws = GSWebSocket(sys_config, orchestrator, ws_util)
