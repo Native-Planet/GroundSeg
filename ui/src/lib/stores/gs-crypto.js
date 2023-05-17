@@ -1,14 +1,24 @@
-import nacl from 'tweetnacl';
-import { encodeBase64 } from 'tweetnacl-util'
+//
+//  Session
+//
 
-export const generateKeys = () => {
-  const keys = nacl.box.keyPair()
-
-  const pub = encodeBase64(keys.publicKey)
-  const priv = encodeBase64(keys.secretKey)
-
-  return {
-    "pubkey":pub,
-    "privkey":priv
-  }
+export const saveSession = token => {
+  localStorage.setItem('id',token.id)
+  localStorage.setItem('token',token.token)
 }
+
+export const loadSession = () => {
+  const id = localStorage.getItem('id')
+  const token = localStorage.getItem('token')
+  if ((id === null) || (token === null)) {
+    return null
+  }
+  return {'id':id,'token':token}
+}
+
+//
+//  Misc
+//
+
+export const generateRandom = n => 
+    [...Array(n)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')

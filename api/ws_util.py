@@ -19,11 +19,11 @@ class WSUtil:
     #
 
     # send activity response
-    def make_activity(self, aid, success, msg):
+    def make_activity(self, id, success, msg):
         if success:
-            res = {"activity":{aid:{"message":msg,"error": 0}}}
+            res = {"activity":{id:{"message":msg,"error": 0}}}
         else:
-            res = {"activity":{aid:{"message":msg,"error": 1}}}
+            res = {"activity":{id:{"message":msg,"error": 1}}}
         return json.dumps(res)
 
     # Broadcast action for System and Updates

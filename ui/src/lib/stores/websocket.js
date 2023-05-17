@@ -1,10 +1,8 @@
 //
 // Store and API for Websocket payload
 //
-
 import { get, writable } from 'svelte/store'
-import { genRequestId, getCookie } from '/src/lib/scripts/session.js'
-import { generateKeys } from './gs-crypto'
+import { generateRandom, saveSession, loadSession } from './gs-crypto'
 
 export const socketInfo = writable({
   "activity": {},
@@ -16,16 +14,16 @@ export const socketInfo = writable({
 })
 
 export const socket = writable()
-
 export const disconnect = ws => {
   if (ws) { ws.close() }
 }
 
-export const connect = async (addr, cookie, info) => {
+export const connect = async (addr,info) => {
   let ws = new WebSocket(addr)
   ws.addEventListener('open', e => {
     updateMetadata("connected", e.returnValue)
-    send(ws, info, cookie, {"category":"init"}) 
+    let payload = {"category":"token"}
+    send(ws, info, payload) 
   })
   ws.addEventListener('message', e => updateData(e.data))
   ws.addEventListener('error', e => console.log('error:', e))
@@ -33,29 +31,28 @@ export const connect = async (addr, cookie, info) => {
     console.log("Websocket closed")
     updateMetadata("connected", false)
     console.log("Attempting to reconnect")
-    connect(addr, cookie, info)
+    connect(addr, info)
   }, 1000))
   socket.set(ws)
   updateMetadata("address", addr)
 }
 
-export const send = (ws, info, cookie, msg) => {
+export const send = async (ws, info, msg={}) => {
   if (info.metadata.connected) {
-    msg = msg || {}
-    let id = genRequestId(16)
+    let id = await generateRandom(16)
     console.log(id + " attempting to send message.." )
-    let sid = getCookie(cookie, 'sessionid')
+    let token = await loadSession()
+    if (token !== null) {
+      msg['token'] = token
+    }
     msg['id'] = id
-    msg['sessionid'] = sid
     ws.send(JSON.stringify(msg))
-    /*
     let category = msg['category']
     let payload = null
     if (category != 'init') {
       payload = msg['payload']
     }
     return handleActivity(id, category, payload, info)
-    */
   } else {
     console.error("Not connected to websocket")
     return false
@@ -63,18 +60,29 @@ export const send = (ws, info, cookie, msg) => {
 }
 
 const handleActivity = async (id, cat, load, info) => {
+  // Prefix
   let prefix = id + ":" + cat
   if (cat == "forms") {
     prefix = prefix + ":" + load.template + ":" + load.item
-  } else if (cat != "ping") {
+  } else if (cat != "token") {
     prefix = prefix + ":" + load.module + ":" + load.action
   }
 
-  if (!info.activity.hasOwnProperty(id)) {
-    console.log(prefix + " checking broadcast..")
-    setTimeout(()=>handleActivity(id, cat, load, info), 500)
+  // Handle
+  if (cat == "token") {
+    if (!info.metadata.hasOwnProperty('token')) {
+      console.log(prefix + " checking broadcast..")
+      setTimeout(()=>handleActivity(id, cat, load, info), 500)
+    } else {
+      saveSession(info.metadata.token)
+    }
   } else {
-    return await removeActivity(prefix, id)
+    if (!info.activity.hasOwnProperty(id)) {
+      console.log(prefix + " checking broadcast..")
+      setTimeout(()=>handleActivity(id, cat, load, info), 500)
+    } else {
+      return await removeActivity(prefix, id)
+    }
   }
 }
 

@@ -76,31 +76,10 @@ class Orchestrator:
         self.ws_urbits = WSUrbits(self.config_object, self.urbit, self.ws_util)
         self.ws_minios = WSMinIOs(self.minio, self.ws_util)
 
-    # Main command function
-    def ws_command(self, data):
-        try:
-            payload = data['payload']
-            # if category is urbits
-            if data['category'] == 'urbits':
-                return self.ws_command_urbit(payload)
-
-            if data['category'] == 'updates':
-                return self.ws_command_updates(payload)
-
-            if data['category'] == 'system':
-                return self.ws_command_system(data)
-
-            if data['category'] == 'forms':
-                return self.ws_command_forms(data)
-
-            raise Exception(f"'{data['category']}' is not a valid category")
-        except Exception as e:
-            raise Exception(e)
-
+    # TODO: TEMP
     def setup_command(self, data):
         Log.log(data)
         return "123"
-
 
     #
     # Category command functions

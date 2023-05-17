@@ -14,31 +14,55 @@ class API:
     async def handle(self, websocket):
         async for message in websocket:
             data = json.loads(message)
-            token = data.get('token')
-            if token:
-                # token received
-                res = self.handle_request(data)
-            else:
-                # token not received
-                res = self.handle_init(data,websocket)
-
-            # check if token is legit
-            # return appropriate data
-
-            # give us token
-
+            res = self.handle_request(data,websocket)
             await websocket.send(res)
 
-    def handle_request(self, data):
-        token = data['token']
-        print(token)
-        print(token)
-        print(token)
-        print(token)
-        print(token)
-        return json.dumps({"doing":"this"})
+    # TODO: TOKEN HANDLING
+    def handle_request(self, data, websocket):
+        # check if session is available
+        token = data.get('token')
+        if token == None:
+            if data['category'] == 'token':
+                self.create_token()
+            else:
+        else:
+            try:
+                # setup
+                if msg == "SETUP":
+                    return self.ws_util.make_activity(data['id'], True, "SETUP")
+                if msg == "unauthorized":
+                    res = {}
 
-    def handle_init(self, data, websocket):
+                payload = data['payload']
+
+                if data['category'] == 'urbits':
+                    res = self.orchestrator.ws_command_urbit(payload)
+
+                if data['category'] == 'updates':
+                    res = self.ws_command_updates(payload)
+
+                if data['category'] == 'system':
+                    res = self.ws_command_system(data)
+
+                if data['category'] == 'forms':
+                    res = self.ws_command_forms(data)
+
+                raise Exception(f"'{data['category']}' is not a valid category")
+        except Exception as e:
+            raise Exception(e)
+
+        return self.ws_util.make_activity(data['id'], valid, msg)
+
+    def verify_session(self,token):
+        if self.config['firstBoot']:
+            return "SETUP"
+        elif token == None:
+            return "unauthorized"
+        else:
+            print(token)
+            return "default-fail"
+
+    def create_token(self, data, websocket):
         ip = websocket.remote_address[0]
         user_agent = websocket.request_headers.get('User-Agent')
         cat = data['category']
