@@ -77,7 +77,10 @@ class Config:
             "wgRegistered": False,
             "wgOn": False,
             "updateMode": "auto",
-            "sessions": [],
+            "sessions": {
+                "authorized": {},
+                "unauthorized": {}
+                },
             "pwHash": "",
             "updateBranch": "latest",
             "updateUrl": "https://version.groundseg.app",
@@ -173,6 +176,9 @@ class Config:
         cfg = self.check_update_interval(cfg)
 
         try:
+            if type(cfg['sessions']) != dict:
+                cfg['sessions'] = {}
+
             if type(cfg['linuxUpdates']) != dict:
                 cfg['linuxUpdates'] = self.default_system_config['linuxUpdates']
             else:

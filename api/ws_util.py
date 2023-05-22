@@ -1,8 +1,10 @@
 import os
 import json
 import string
+import hashlib
 import secrets
 
+from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 
 from log import Log
@@ -19,11 +21,19 @@ class WSUtil:
     #
 
     # send activity response
-    def make_activity(self, id, success, msg):
-        if success:
-            res = {"activity":{id:{"message":msg,"error": 0}}}
-        else:
-            res = {"activity":{id:{"message":msg,"error": 1}}}
+    def make_activity(self, id, status_code, msg, token=None):
+        res = {
+                "activity": {
+                    id: {
+                        "message":msg,
+                        "status_code":status_code
+                        }
+                    }
+                }
+
+        if token:
+            res['activity'][id]['token'] = token
+
         return json.dumps(res)
 
     # Broadcast action for System and Updates
@@ -195,7 +205,6 @@ class WSUtil:
             Log.log(f"ws_util:keyfile_decrypt {key} does not exist. Returning None")
             return None
         else:
-            #Log.log(f"ws_util:keyfile_decrypt decrypting with {key}")
             with open(key,"rb") as f:
                 k = f.read()
         cipher_suite = Fernet(k)
@@ -206,6 +215,19 @@ class WSUtil:
     #   Misc
     #
 
+    # Check Session Hash
+    def check_token_hash(self, id, token):
+        s = self.config['sessions']
+        a = s['authorized']
+        u = s['unauthorized']
+        if id in a:
+            if self.hash_string(token) == a[id]['hash']:
+                return True
+        if id in u:
+            if self.hash_string(token) == u[id]['hash']:
+                return True
+        return False
+
     # Create a random string of characters
     def new_secret_string(self, length):
         secret = ''.join(secrets.choice(
@@ -214,4 +236,26 @@ class WSUtil:
             string.digits) for i in range(length))
         return secret
 
+    # hash string
+    def hash_string(self,s):
+        # Create a new SHA256 hash object
+        hash_object = hashlib.sha256()
+        # Update the hash object with the bytes of the string
+        hash_object.update(s.encode('utf-8'))
+        # Get the hexadecimal representation of the hash
+        hex_dig = hash_object.hexdigest()
+        return hex_dig
 
+    def check_token_content(self, websocket, token):
+        if websocket.remote_address[0] != token['ip']:
+            return False
+
+        if websocket.request_headers.get('User-Agent') != token['user_agent']:
+            return False
+
+        expire = datetime.strptime(token['created'], "%Y-%m-%d_%H:%M:%S") + timedelta(days=30)
+        now = datetime.now()
+        if expire <= now:
+            return False
+
+        return True

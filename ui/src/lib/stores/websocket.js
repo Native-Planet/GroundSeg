@@ -4,88 +4,128 @@
 import { get, writable } from 'svelte/store'
 import { generateRandom, saveSession, loadSession } from './gs-crypto'
 
+// Main Structure
 export const socketInfo = writable({
   "activity": {},
   "metadata": {
     "address": "",
     "connected": false,
-    "setup": false
   }
 })
 
+// The websocket connection
 export const socket = writable()
+
+// Disconnect from websocket connection
 export const disconnect = ws => {
   if (ws) { ws.close() }
 }
 
+// Connect to websocket
 export const connect = async (addr,info) => {
+  // New Websocket
   let ws = new WebSocket(addr)
+
+  // Handle open
   ws.addEventListener('open', e => {
     updateMetadata("connected", e.returnValue)
-    let payload = {"category":"token"}
+    let payload = {
+      "payload":{
+        "category":"token",
+        "module":null,
+        "action":null
+      }
+    }
     send(ws, info, payload) 
   })
+
+  // Handle message
   ws.addEventListener('message', e => updateData(e.data))
+
+  // Handle error
   ws.addEventListener('error', e => console.log('error:', e))
+
+  // Handle connection close
   ws.addEventListener('close', e =>setTimeout(()=>{
     console.log("Websocket closed")
     updateMetadata("connected", false)
     console.log("Attempting to reconnect")
     connect(addr, info)
-  }, 1000))
+  }, 10000))
+
+  // Update stores
   socket.set(ws)
   updateMetadata("address", addr)
 }
 
+// Send message to websocket
 export const send = async (ws, info, msg={}) => {
+  // Make sure websocket connection is open
   if (info.metadata.connected) {
+
+    // Activity ID
     let id = await generateRandom(16)
+    msg['id'] = id
     console.log(id + " attempting to send message.." )
+
+    // Get current token
     let token = await loadSession()
     if (token !== null) {
       msg['token'] = token
     }
-    msg['id'] = id
+
+    // Send
     ws.send(JSON.stringify(msg))
-    let category = msg['category']
-    let payload = null
-    if (category != 'init') {
-      payload = msg['payload']
-    }
-    return handleActivity(id, category, payload, info)
+    return handleActivity(id, msg, info)
   } else {
     console.error("Not connected to websocket")
     return false
   }
 }
 
-const handleActivity = async (id, cat, load, info) => {
-  // Prefix
+// Prefix
+const actionPrefix = (id, msg) => {
+  let payload = msg['payload']
+  let cat = payload['category']
   let prefix = id + ":" + cat
   if (cat == "forms") {
-    prefix = prefix + ":" + load.template + ":" + load.item
-  } else if (cat != "token") {
-    prefix = prefix + ":" + load.module + ":" + load.action
+    return prefix + ":" + payload.template + ":" + payload.item
+  } else if (cat != "token"){
+    return prefix + ":" + payload.module + ":" + payload.action
   }
+  return prefix
+}
 
+// Handle Activity
+const handleActivity = async (id, msg, info) => {
+  // Prefix
+  let prefix = await actionPrefix(id, msg)
   // Handle
-  if (cat == "token") {
-    if (!info.metadata.hasOwnProperty('token')) {
-      console.log(prefix + " checking broadcast..")
-      setTimeout(()=>handleActivity(id, cat, load, info), 500)
-    } else {
-      saveSession(info.metadata.token)
-    }
+  if (!info.activity.hasOwnProperty(id)) {
+    console.log(prefix + " checking broadcast..")
+    setTimeout(()=>handleActivity(id, msg, info), 500)
   } else {
-    if (!info.activity.hasOwnProperty(id)) {
-      console.log(prefix + " checking broadcast..")
-      setTimeout(()=>handleActivity(id, cat, load, info), 500)
-    } else {
-      return await removeActivity(prefix, id)
-    }
+    return await processActivity(prefix, id, info, msg['payload'])
   }
 }
 
+const processActivity = (prefix, id, info, payload) => {
+  const act = info.activity[id]
+  if (payload['category'] == "token") {
+    if (act.status_code == 0) {
+      console.log(prefix + " Token verified!")
+    } else if ((act.status_code == 2) && (act.message == "NEW_TOKEN")) {
+      console.log(prefix + " New Token recieved!")
+      saveSession(act.token.token)
+      console.log(prefix + " Login Required")
+    }
+  } else {
+    removeActivity(prefix, id)
+  }
+  
+}
+
+// Remove Activity
 const removeActivity = async (prefix, id) => {
   const info = get(socketInfo)
   const message = (info?.activity?.[id]?.message) || null

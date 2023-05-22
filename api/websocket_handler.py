@@ -1,31 +1,35 @@
 import asyncio
-#import websockets
 import json
-
 from websockets.server import serve
+from datetime import datetime, timedelta
 
 class API:
     def __init__(self, config, ws_util, host='0.0.0.0', port=8000):
+        self.authorized_clients = {}
+        self.unauthorized_clients = {}
+        self.config_object = config
         self.config = config.config
         self.ws_util = ws_util
         self.host = host
         self.port = port
 
     async def handle(self, websocket):
-        async for message in websocket:
-            data = json.loads(message)
-            res = self.handle_request(data,websocket)
-            await websocket.send(res)
+        try:
+            async for message in websocket:
+                data = json.loads(message)
+                res = self.handle_request(data,websocket)
+                await websocket.send(res)
+        except Exception as e:
+            print(e)
 
-    # TODO: TOKEN HANDLING
     def handle_request(self, data, websocket):
-        # check if session is available
-        token = data.get('token')
-        if token == None:
-            if data['category'] == 'token':
-                self.create_token()
-            else:
+        status_code, msg, token = self.verify_session(data, websocket)
+
+        if status_code != 0:
+            return self.ws_util.make_activity(data['id'], status_code, msg, token)
         else:
+            return self.ws_util.make_activity(data['id'], status_code, msg)
+        '''
             try:
                 # setup
                 if msg == "SETUP":
@@ -51,26 +55,61 @@ class API:
         except Exception as e:
             raise Exception(e)
 
-        return self.ws_util.make_activity(data['id'], valid, msg)
+        '''
 
-    def verify_session(self,token):
-        if self.config['firstBoot']:
-            return "SETUP"
-        elif token == None:
-            return "unauthorized"
-        else:
-            print(token)
-            return "default-fail"
+    def verify_session(self, data, websocket):
+        token = data.get('token')
+        cat = data['payload']['category']
+        token_object = None
+        try:
+            if token == None:
+                raise Exception()
+
+            i = token['id']
+            t = token['token']
+            if self.ws_util.check_token_hash(i,t):
+                d = self.ws_util.keyfile_decrypt(t,self.config['keyFile'])
+                if self.ws_util.check_token_content(websocket,d):
+                    if d.get('authorized'):
+                        self.authorized_clients[websocket] = token
+                        try:
+                            self.unauthorized_clients.pop(websocket)
+                        except:
+                            pass
+                    else:
+                        self.unauthorized_clients[websocket] = token
+                        try:
+                            self.authorized_clients.pop(websocket)
+                        except:
+                            pass
+
+                    status_code = 0
+                    msg = "RECEIVED"
+                else:
+                    raise Exception()
+            else:
+                raise Exception()
+        except:
+            if cat != "token":
+                status_code = 1
+                msg = "not authorized"
+            else:
+                token_object = self.create_token(data,websocket)
+                status_code = 2
+                msg = "NEW_TOKEN"
+
+        return status_code, msg, token_object
 
     def create_token(self, data, websocket):
         ip = websocket.remote_address[0]
         user_agent = websocket.request_headers.get('User-Agent')
-        cat = data['category']
-        if cat == "init":
+        cat = data['payload']['category']
+        if cat == "token":
             # create token
             id = self.ws_util.new_secret_string(32)
             secret = self.ws_util.new_secret_string(128)
             padding = self.ws_util.new_secret_string(32)
+            now = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             contents = {
                     "id":id,
                     "ip":ip,
@@ -78,15 +117,91 @@ class API:
                     "secret":secret,
                     "padding":padding,
                     "authenticated":False,
+                    "created":now
                     }
             k = self.config['keyFile']
             text = self.ws_util.keyfile_encrypt(contents,k)
-            res = {"token":{"id":id,"token":text}}
-            #   send token 
-            return json.dumps({"metadata": res})
+            self.config['sessions']['unauthorized'][id] = {
+                    "hash": self.ws_util.hash_string(text),
+                    "created": now
+                    }
+            self.config_object.save_config()
+            return {
+                    "token": {
+                        "id":id,
+                        "token":text
+                        }
+                    }
+
+    async def broadcast_message(self):
+        #count = 0
+        while True:
+            try:
+                clients = self.unauthorized_clients.copy()
+                for client in clients:
+                    if client.open:
+                        #if (count % 20) == 0:
+                        #    print(client)
+                        message = self.ws_util.structure.copy()
+                        message = {
+                                "system":{
+                                    "login":"unauthenticated",
+                                    "access": "allowed",
+                                    "attempts": 0,
+                                    "cooldown": 0
+                                    },
+                                "setup": {
+                                    "status": "done"
+                                    }
+                                }
+                        # only send login and setup info
+                        '''
+                        sid = self.authorized_clients[client]
+                        try:
+                            forms = self.ws_util.forms.get(sid)
+                            if forms != None:
+                                forms = {"forms":forms}
+                            else:
+                                raise Exception()
+                        except:
+                            forms = {}
+                        message = {**forms, **message}
+                        '''
+                        await client.send(json.dumps(message))
+                    else:
+                        self.unauthorized_clients.pop(client)
+            except Exception as e:
+                Log.log(f"websocket_handler:broadcast_message Broadcast fail: {e}")
+            '''
+            try:
+                clients = self.authorized_clients.copy()
+                for client in clients:
+                    if client.open:
+                        #if (count % 20) == 0:
+                        #    print(client)
+                        message = self.ws_util.structure.copy()
+                        sid = self.authorized_clients[client]
+                        try:
+                            forms = self.ws_util.forms.get(sid)
+                            if forms != None:
+                                forms = {"forms":forms}
+                            else:
+                                raise Exception()
+                        except:
+                            forms = {}
+                        message = {**forms, **message}
+                        await client.send(json.dumps(message))
+                    else:
+                        self.authorized_clients.pop(client)
+            except Exception as e:
+                Log.log(f"websocket_handler:broadcast_message Broadcast fail: {e}")
+            '''
+            await asyncio.sleep(0.5)  # Send the message twice a second
+            #count += 1
 
     async def serve(self):
         async with serve(self.handle, self.host, self.port):
+            await asyncio.get_event_loop().create_task(self.broadcast_message())
             await asyncio.Future()
 
     def run(self):
@@ -163,34 +278,6 @@ class GSWebSocket:
                 self.authorized_clients.pop(websocket)
             if websocket == self.setup_user:
                 self.setup_user = None
-
-    async def broadcast_message(self):
-        #count = 0
-        while True:
-            try:
-                clients = self.authorized_clients.copy()
-                for client in clients:
-                    if client.open:
-                        #if (count % 20) == 0:
-                        #    print(client)
-                        message = self.ws_util.structure.copy()
-                        sid = self.authorized_clients[client]
-                        try:
-                            forms = self.ws_util.forms.get(sid)
-                            if forms != None:
-                                forms = {"forms":forms}
-                            else:
-                                raise Exception()
-                        except:
-                            forms = {}
-                        message = {**forms, **message}
-                        await client.send(json.dumps(message))
-                    else:
-                        self.authorized_clients.pop(client)
-            except Exception as e:
-                Log.log(f"WS: Broadcast fail: {e}")
-            await asyncio.sleep(0.5)  # Send the message twice a second
-            #count += 1
 
     async def urbits_broadcast(self):
         while True:
