@@ -1,61 +1,62 @@
 import asyncio
 import json
+from threading import Thread
 from websockets.server import serve
 from datetime import datetime, timedelta
 
 class API:
-    def __init__(self, config, ws_util, host='0.0.0.0', port=8000):
+    def __init__(self, config, ws_util, orchestrator, host='0.0.0.0', port=8000):
         self.authorized_clients = {}
         self.unauthorized_clients = {}
+
         self.config_object = config
         self.config = config.config
+
         self.ws_util = ws_util
+        self.orchestrator = orchestrator
+
         self.host = host
         self.port = port
 
     async def handle(self, websocket):
         try:
             async for message in websocket:
-                data = json.loads(message)
-                res = self.handle_request(data,websocket)
-                await websocket.send(res)
+                action = json.loads(message)
+                activity = self.handle_request(action, websocket)
+                await websocket.send(activity)
         except Exception as e:
             print(e)
 
     def handle_request(self, data, websocket):
-        status_code, msg, token = self.verify_session(data, websocket)
 
+        status_code, msg, token = self.verify_session(data, websocket)
         if status_code != 0:
             return self.ws_util.make_activity(data['id'], status_code, msg, token)
-        else:
-            return self.ws_util.make_activity(data['id'], status_code, msg)
-        '''
-            try:
-                # setup
-                if msg == "SETUP":
-                    return self.ws_util.make_activity(data['id'], True, "SETUP")
-                if msg == "unauthorized":
-                    res = {}
+        try:
+            cat = data.get('payload').get('category')
+            if cat == "token":
+                pass
+            elif cat == "system":
+                if websocket in self.unauthorized_clients:
+                    status_code, msg, token = self.system_action(data,websocket)
 
-                payload = data['payload']
-
+                '''
                 if data['category'] == 'urbits':
                     res = self.orchestrator.ws_command_urbit(payload)
 
                 if data['category'] == 'updates':
                     res = self.ws_command_updates(payload)
 
-                if data['category'] == 'system':
-                    res = self.ws_command_system(data)
-
                 if data['category'] == 'forms':
                     res = self.ws_command_forms(data)
-
-                raise Exception(f"'{data['category']}' is not a valid category")
+                '''
+            else:
+                raise Exception(f"'{cat}' is not a valid category")
         except Exception as e:
             raise Exception(e)
 
-        '''
+        return self.ws_util.make_activity(data['id'], status_code, msg,token)
+
 
     def verify_session(self, data, websocket):
         token = data.get('token')
@@ -63,7 +64,7 @@ class API:
         token_object = None
         try:
             if token == None:
-                raise Exception()
+                raise Exception("no token")
 
             i = token['id']
             t = token['token']
@@ -85,18 +86,21 @@ class API:
 
                     status_code = 0
                     msg = "RECEIVED"
+
                 else:
-                    raise Exception()
+                    raise Exception("incorrect contents")
             else:
-                raise Exception()
-        except:
-            if cat != "token":
-                status_code = 1
-                msg = "not authorized"
-            else:
+                raise Exception("hash mismatch")
+        except Exception as e:
+            print(f"websocket_handler:verify_session {e}")
+
+            if cat == "token":
                 token_object = self.create_token(data,websocket)
                 status_code = 2
                 msg = "NEW_TOKEN"
+            else:
+                status_code = 1
+                msg = "UNAUTHORIZED"
 
         return status_code, msg, token_object
 
@@ -133,7 +137,62 @@ class API:
                         }
                     }
 
-    async def broadcast_message(self):
+    def modify_token(self, token):
+        print(token)
+        # decrypt
+        # set authenticated = True
+        # encrypt
+        # return
+        return token
+
+
+    # System
+    def system_action(self, data, websocket):
+        # hardcoded list of allowed modules
+        whitelist = [
+                'login',
+                'startram',
+                ]
+        payload = data['payload']
+        module = payload['module']
+        action = payload['action']
+
+        if module not in whitelist:
+            raise Exception(f"{module} is not a valid module")
+
+        if module == "login":
+            if websocket in self.unauthorized_clients:
+                pwd = action.get('password')
+                # check if password is correct
+                if True: # self.ws_util.check_password(pwd):
+                    token = self.modify_token(data.get('token'))
+                    status_code = 3
+                    msg = "AUTHORIZED"
+                else:
+                    status_code = 1
+                    msg = "authentication failed"
+
+        if module == "startram":
+            if action == "register":
+                Thread(target=self.orchestrator.startram_register, args=(data['sessionid'],)).start()
+            if action == "stop":
+                Thread(target=self.orchestrator.startram_stop).start()
+            if action == "start":
+                Thread(target=self.orchestrator.startram_start).start()
+            if action == "restart":
+                Thread(target=self.orchestrator.startram_restart).start()
+            if action == "endpoint":
+                Thread(target=self.orchestrator.startram_change_endpoint,
+                       args=(data['sessionid'],)
+                       ).start()
+            if action == "cancel":
+                Thread(target=self.orchestrator.startram_cancel,
+                       args=(data['sessionid'],)
+                       ).start()
+
+        return status_code, msg, token
+
+    async def broadcast_unauthorized(self):
         #count = 0
         while True:
             try:
@@ -142,19 +201,27 @@ class API:
                     if client.open:
                         #if (count % 20) == 0:
                         #    print(client)
-                        message = self.ws_util.structure.copy()
+                        # only send login and setup info
                         message = {
                                 "system":{
                                     "login":"unauthenticated",
                                     "access": "allowed",
-                                    "attempts": 0,
+                                    "attempts": self.config_object.login_status['attempts'],
                                     "cooldown": 0
                                     },
                                 "setup": {
                                     "status": "done"
                                     }
                                 }
-                        # only send login and setup info
+
+                        if self.config_object.login_status['locked']:
+                            message['system']['access'] = "not-allowed"
+
+                        end = self.config_object.login_status['end']
+                        now = datetime.now()
+                        if end > now:
+                            message['system']['cooldown'] = int((end - now).total_seconds())
+
                         '''
                         sid = self.authorized_clients[client]
                         try:
@@ -201,7 +268,8 @@ class API:
 
     async def serve(self):
         async with serve(self.handle, self.host, self.port):
-            await asyncio.get_event_loop().create_task(self.broadcast_message())
+            # await asyncio.get_event_loop().create_task(self.broadcast_authenticated())
+            await asyncio.get_event_loop().create_task(self.broadcast_unauthorized())
             await asyncio.Future()
 
     def run(self):

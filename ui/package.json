@@ -18,12 +18,12 @@
 		"dropzone": "^6.0.0-beta.2",
 		"svelte": "^3.56.0",
 		"svelte-fa": "^3.0.3",
-		"vite": "^4.1.4"
-	},
-	"type": "module",
-	"dependencies": {
+		"vite": "^4.1.4",
 		"tweetnacl": "^1.0.3",
 		"tweetnacl-util": "^0.15.1",
 		"ws": "^8.13.0"
+	},
+	"type": "module",
+	"dependencies": {
 	}
 }

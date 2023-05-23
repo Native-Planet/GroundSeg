@@ -35,8 +35,6 @@ from webui import WebUI
 class Orchestrator:
 
     wireguard = None
-    authorized_clients = set()
-    unauthorized_clients = set() # unused for now
 
     def __init__(self, config, ws_util, debug=False):
         self._debug = debug
@@ -103,39 +101,6 @@ class Orchestrator:
 
         except Exception as e:
             raise Exception(e)
-        return "succeeded"
-
-    # System
-    def ws_command_system(self, data):
-        # hardcoded list of allowed modules
-        whitelist = [
-                'startram',
-                ]
-        payload = data['payload']
-        module = payload['module']
-        action = payload['action']
-
-        if module not in whitelist:
-            raise Exception(f"{module} is not a valid module")
-
-        if module == "startram":
-            if action == "register":
-                Thread(target=self.startram_register, args=(data['sessionid'],)).start()
-            if action == "stop":
-                Thread(target=self.startram_stop).start()
-            if action == "start":
-                Thread(target=self.startram_start).start()
-            if action == "restart":
-                Thread(target=self.startram_restart).start()
-            if action == "endpoint":
-                Thread(target=self.startram_change_endpoint,
-                       args=(data['sessionid'],)
-                       ).start()
-            if action == "cancel":
-                Thread(target=self.startram_cancel,
-                       args=(data['sessionid'],)
-                       ).start()
-
         return "succeeded"
 
     # Urbit

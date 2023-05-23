@@ -1,8 +1,83 @@
+import { writable } from 'svelte/store'
+import GroundSegJS from "../../../../tools/groundseg-js"
+import { loadSession, saveSession, generateRandom } from './gs-crypto'
+
+// The websocket connection
+export let SESSION;
+export let PENDING = new Set();
+export const structure = writable({});
+
+// Handle messages from API
+const listen = async () => {
+  // Update the main structure
+  structure.set(SESSION.structure)
+  // Activity Checker
+  let act,cid;
+  for (let id of PENDING) {
+    if (SESSION.activity.activity.hasOwnProperty(id)) {
+      act = await SESSION.activity.activity[id]
+      cid = await id
+      break
+    }
+  }
+  let message = (act?.message) || null
+  if ((message === "NEW_TOKEN") || (message === "AUTHORIZED")) {
+    saveSession(act.token.token)
+    verify()
+  }
+  if (cid) {
+    SESSION.deleteActivity(cid)
+    PENDING.delete(cid)
+  }
+  setTimeout(listen, 500)
+}
+
+// Connect to API
+export const connect = async url => {
+  SESSION = new GroundSegJS(url, structure)
+  const connected = await SESSION.connect()
+  if (connected) {
+    verify()
+    listen()
+  }
+}
+
+// Verify (token category)
+export const verify = async () => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.verify(id,token)
+}
+
+// Send Login
+export const login = async password => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.login(id,password,token)
+}
+
+export const send = async msg => {
+  // Activity ID
+  let id = await generateRandom(16)
+  msg['id'] = id
+
+  // Get current token
+  let token = await loadSession()
+  if (token !== null) {
+    msg['token'] = token
+  }
+
+  // Send
+  SESSION.send(msg)
+  PENDING.add(id)
+}
+
 //
 // Store and API for Websocket payload
-//
+/*
 import { get, writable } from 'svelte/store'
-import { generateRandom, saveSession, loadSession } from './gs-crypto'
 
 // Main Structure
 export const socketInfo = writable({
@@ -13,8 +88,6 @@ export const socketInfo = writable({
   }
 })
 
-// The websocket connection
-export const socket = writable()
 
 // Disconnect from websocket connection
 export const disconnect = ws => {
@@ -76,28 +149,15 @@ export const send = async (ws, info, msg={}) => {
 
     // Send
     ws.send(JSON.stringify(msg))
-    return handleActivity(id, msg, info)
+    return handleActivity(ws, id, msg, info)
   } else {
     console.error("Not connected to websocket")
     return false
   }
 }
 
-// Prefix
-const actionPrefix = (id, msg) => {
-  let payload = msg['payload']
-  let cat = payload['category']
-  let prefix = id + ":" + cat
-  if (cat == "forms") {
-    return prefix + ":" + payload.template + ":" + payload.item
-  } else if (cat != "token"){
-    return prefix + ":" + payload.module + ":" + payload.action
-  }
-  return prefix
-}
-
 // Handle Activity
-const handleActivity = async (id, msg, info) => {
+const handleActivity = async (ws, id, msg, info) => {
   // Prefix
   let prefix = await actionPrefix(id, msg)
   // Handle
@@ -105,85 +165,37 @@ const handleActivity = async (id, msg, info) => {
     console.log(prefix + " checking broadcast..")
     setTimeout(()=>handleActivity(id, msg, info), 500)
   } else {
-    return await processActivity(prefix, id, info, msg['payload'])
+    return await processActivity(ws, prefix, id, info, msg['payload'])
   }
 }
 
-const processActivity = (prefix, id, info, payload) => {
-  const act = info.activity[id]
-  if (payload['category'] == "token") {
+const processActivity = (ws, prefix, id, info, payload) => {
+
+  const handleToken = act => {
     if (act.status_code == 0) {
       console.log(prefix + " Token verified!")
     } else if ((act.status_code == 2) && (act.message == "NEW_TOKEN")) {
       console.log(prefix + " New Token recieved!")
       saveSession(act.token.token)
-      console.log(prefix + " Login Required")
+      let payload = {
+        "payload":{
+          "category":"token",
+          "module":null,
+          "action":null
+        }
+      }
+      send(ws, info, payload) 
     }
+  }
+
+  const act = info.activity[id]
+
+  if (payload['category'] == "token") {
+    console.log(act)
+    handleToken(act)
   } else {
     removeActivity(prefix, id)
   }
   
 }
-
-// Remove Activity
-const removeActivity = async (prefix, id) => {
-  const info = get(socketInfo)
-  const message = (info?.activity?.[id]?.message) || null
-  await socketInfo.update(i => {
-    let act = i.activity[id]
-    if (act.error == 0) {
-      if (act.message.includes("SETUP")) {
-        i.metadata['setup'] = true
-      }
-      console.log(prefix + " send confirmed")
-    } else {
-      if (act.message.includes("auth-fail")) {
-        console.log("jump to login")
-        
-      }
-      console.warn(prefix + " sent but error: " + act.message + ", error code: " + act.error)
-    }
-    delete i.activity[id]
-    return i
-  })
-  return await message
-}
-
-const updateData = data => {
-  data = JSON.parse(data)
-  socketInfo.update(i => {
-    let obj = deepMerge(i, data)
-    return obj
-  })
-}
-
-const updateMetadata = (item, val) => {
-  socketInfo.update(i => {
-    if (item == "address") {
-      i.metadata.address = val
-    }
-    if (item == "connected") {
-      i.metadata.connected = val
-      if (val) {
-        console.log("Websocket Successfully Connected")
-      } else {
-        console.error("Websocket Failed to connect")
-      }
-    }
-    return i
-  })
-}
-
-const deepMerge = (target, source) => {
-  for (const key in source) {
-    if (typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key] !== null) {
-      if (!target.hasOwnProperty(key)) {
-        target[key] = {};
-      }
-      deepMerge(target[key], source[key])
-    } else {
-      target[key] = source[key]
-    }
-  }
-  return target
-}
+*/

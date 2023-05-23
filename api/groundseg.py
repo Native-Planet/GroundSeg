@@ -5,9 +5,8 @@ except:
     dev = False
 
 # GroundSeg modules
-from ws_util import WSUtil
 from config import Config
-from orchestrator import Orchestrator
+#from orchestrator import Orchestrator
 
 # Flask apps
 from groundseg_flask import GroundSeg
@@ -28,9 +27,7 @@ from keygen import KeyGen
 # Setup System Config
 base_path = "/opt/nativeplanet/groundseg"
 sys_config = Config(base_path, dev)
-ws_util = WSUtil(sys_config)
 
-'''
 # Start Updater
 bin_updater = BinUpdater(sys_config, sys_config.debug_mode)
 Thread(target=bin_updater.check_bin_update, daemon=True).start()
@@ -46,6 +43,7 @@ if sys_config.device_mode == "c2c":
     c2c.run()
 
 else:
+    '''
     # System monitoring
     sys_mon = SysMonitor(sys_config)
     Thread(target=sys_mon.ram_monitor, daemon=True).start()
@@ -62,8 +60,6 @@ else:
         apt_cmd = LinuxUpdater(sys_config, ws_util)
         Thread(target=apt_cmd.run, daemon=True).start()
 
-    # Start GroundSeg orchestrator
-    orchestrator = Orchestrator(sys_config, ws_util, dev)
 
     # Scheduled melds
     meld_loop = Melder(sys_config, orchestrator)
@@ -82,16 +78,18 @@ else:
     Thread(target=docker_updater.check_docker_update, daemon=True).start()
 
     '''
+    # Websocket Util
+    from ws_util import WSUtil
+    ws_util = WSUtil(sys_config)
+
+    # Orchestrator
+    from orchestrator import Orchestrator
+    orchestrator = Orchestrator(sys_config, ws_util, dev)
+
     # Websocket API
-if True:
     from websocket_handler import API
-    api = API(sys_config, ws_util)
+    api = API(sys_config, ws_util, orchestrator)
     api.run()
-    #from websocket_handler import GSWebSocket
-    #ws = GSWebSocket(sys_config, orchestrator, ws_util)
-    #ws.daemon = True
-    #ws.start()
-    #ws.run()
 
     '''
     # Flask

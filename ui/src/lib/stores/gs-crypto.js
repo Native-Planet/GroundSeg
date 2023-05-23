@@ -2,7 +2,7 @@
 //  Session
 //
 
-export const saveSession = token => {
+export const saveSession = async token => {
   localStorage.setItem('id',token.id)
   localStorage.setItem('token',token.token)
 }
