@@ -3,15 +3,18 @@ export default class GroundSegJS {
   constructor(url) {
     this.connected = false;
     this.url = url;
-    this.ws = new WebSocket(this.url);
     this.structure = {};
     this.activity = {}
   }
 
+  // Connect to websocket API
   connect() {
+    console.log("attempting to connect..")
+    this.ws = new WebSocket(this.url);
     return new Promise((resolve, reject) => {
       this.ws.onopen = () => {
         this.connected = true
+        console.log("connected")
         resolve(this.connected)
       };
 
@@ -22,24 +25,42 @@ export default class GroundSegJS {
       this.ws.onerror = (error) => {
         console.log("connection failed", error);
       };
+
+      this.ws.onclose = () => {
+        this.connected = false
+        console.log("closed")
+      };
     });
   };
 
+  // Login macro
   login(id,pwd="",token=null) {
     let data = {"id":id,"payload":{"category":"system","module":"login","action":{"password":pwd}}}
-    this.send(data,token)
+    console.log(id + " attempting to login.." )
+    this.silentSend(data,token)
   }
 
+  // Send token for verification
   verify(id,token=null) {
     let data = {"id":id,"payload":{"category":"token","module":null,"action":null}}
-    this.send(data,token)
+    console.log(id + " attempting to verify token.." )
+    this.silentSend(data,token)
   }
 
+  // Send raw action
   send(data,token=null) {
     if (token) {
       data['token'] = token
     }
     console.log(data.id + " attempting to send message.." )
+    this.ws.send(JSON.stringify(data));
+  }
+
+  // Same as send but without logging
+  silentSend(data,token=null) {
+    if (token) {
+      data['token'] = token
+    }
     this.ws.send(JSON.stringify(data));
   }
 

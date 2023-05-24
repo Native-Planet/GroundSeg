@@ -12,6 +12,9 @@ from log import Log
 class WSUtil:
     structure = {}
     forms = {}
+    authorized_clients = {}
+    unauthorized_clients = {}
+
 
     def __init__(self, config):
         self.config = config.config

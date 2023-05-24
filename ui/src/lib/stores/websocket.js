@@ -8,9 +8,19 @@ export let PENDING = new Set();
 export const structure = writable({});
 
 // Handle messages from API
+let count = 0;
 const listen = async () => {
+  // Make sure session is connected
+  if (!SESSION.connected) { 
+    if (count % 10 == 0) {
+      SESSION.connect()
+      count = 0;
+    }
+  }
+
   // Update the main structure
   structure.set(SESSION.structure)
+
   // Activity Checker
   let act,cid;
   for (let id of PENDING) {
@@ -20,6 +30,7 @@ const listen = async () => {
       break
     }
   }
+
   let message = (act?.message) || null
   if ((message === "NEW_TOKEN") || (message === "AUTHORIZED")) {
     saveSession(act.token.token)
@@ -29,16 +40,24 @@ const listen = async () => {
     SESSION.deleteActivity(cid)
     PENDING.delete(cid)
   }
+  count += 1
   setTimeout(listen, 500)
+}
+
+// Reconnect to API
+export const reconnect = async () => {
+  
 }
 
 // Connect to API
 export const connect = async url => {
-  SESSION = new GroundSegJS(url, structure)
+  SESSION = new GroundSegJS(url)
   const connected = await SESSION.connect()
   if (connected) {
     verify()
     listen()
+  } else {
+    connect(url)
   }
 }
 

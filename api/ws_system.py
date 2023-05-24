@@ -29,6 +29,10 @@ class WSSystem:
         self.ws_util.system_broadcast('updates','binary','update','updated')
         self.ws_util.system_broadcast('updates','binary','routine','auto')       # notify off
 
+        from unauthorized_loop import UnauthorizedLoop
+        _unauthorized = UnauthorizedLoop(self.config_object, self.ws_util)
+        Thread(target=_unauthorized.run, daemon=True).start()
+
         from startram_loop import StarTramLoop
         startram = StarTramLoop(self.config_object, self.wg, self.ws_util)
         Thread(target=startram.run, daemon=True).start()
