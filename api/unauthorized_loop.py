@@ -28,22 +28,20 @@ class UnauthorizedLoop:
     def clean_unauthorized(self):
         # check if past 5 minutes
         sessions = self.config['sessions']['unauthorized'].copy()
-        print(sessions)
         for token in sessions:
             created = sessions[token]['created']
             expire = datetime.strptime(created, "%Y-%m-%d_%H:%M:%S") + timedelta(minutes=1)
-            print(token)
-            print("created ",created)
-            print("expire ", expire)
             now = datetime.now()
             if now >= expire:
                 # remove from config
+                Log.log(f"unauthorized_loop:clean_unauthorized Removing token {token}")
                 self.config['sessions']['unauthorized'].pop(token)
                 # close the user's connection
                 for websocket in self.ws_util.unauthorized_clients:
-                    print(token)
-                    print(self.ws_util.unauthorized_clients[websocket])
-                #await websocket.close(code=1000, reason="unauthorized session expired")
+                    if self.ws_util.unauthorized_clients[websocket]['id'] == token:
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        loop.run_until_complete(websocket.close(code=1000, reason="unauthorized session expired"))
 
 
     #

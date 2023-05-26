@@ -4,8 +4,11 @@ from threading import Thread
 from websockets.server import serve
 from datetime import datetime, timedelta
 
+from log import Log
+
 class API:
     def __init__(self, config, ws_util, orchestrator, host='0.0.0.0', port=8000):
+        print("inited")
         self.config_object = config
         self.config = config.config
 
@@ -16,16 +19,17 @@ class API:
         self.port = port
 
     async def handle(self, websocket):
+        Log.log("websocket_handler:handle Message received")
         try:
             async for message in websocket:
                 action = json.loads(message)
                 activity = self.handle_request(action, websocket)
                 await websocket.send(activity)
         except Exception as e:
-            print(e)
+            Log.log(f"websocket_handler:handle Error: {e}")
 
     def handle_request(self, data, websocket):
-
+        Log.log(f"websocket_handler:handle_request id: {data['id']}")
         status_code, msg, token = self.verify_session(data, websocket)
         if status_code != 0:
             return self.ws_util.make_activity(data['id'], status_code, msg, token)
