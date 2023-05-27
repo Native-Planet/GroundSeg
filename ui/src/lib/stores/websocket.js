@@ -21,14 +21,15 @@ const listen = async () => {
   // Update the main structure
   structure.set(SESSION.structure)
 
-  // Activity Checker
+  /* Activity Checker
   let act,cid;
   for (let id of PENDING) {
+    /*
     if (SESSION.activity.activity.hasOwnProperty(id)) {
       act = await SESSION.activity.activity[id]
       cid = await id
       break
-    }
+    //}
   }
 
   let message = (act?.message) || null
@@ -42,6 +43,7 @@ const listen = async () => {
   }
   count += 1
   setTimeout(listen, 500)
+      */
 }
 
 // Reconnect to API
