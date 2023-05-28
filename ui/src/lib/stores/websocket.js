@@ -13,7 +13,7 @@ const listen = async () => {
   // Make sure session is connected
   if (!SESSION.connected) { 
     if (count % 10 == 0) {
-      SESSION.connect()
+      connect(SESSION.url)
       count = 0;
     }
   }
@@ -21,21 +21,34 @@ const listen = async () => {
   // Update the main structure
   structure.set(SESSION.structure)
 
-  /* Activity Checker
+  // Activity Checker
   let act,cid;
   for (let id of PENDING) {
-    /*
     if (SESSION.activity.activity.hasOwnProperty(id)) {
       act = await SESSION.activity.activity[id]
       cid = await id
       break
-    //}
+    }
   }
 
   let message = (act?.message) || null
-  if ((message === "NEW_TOKEN") || (message === "AUTHORIZED")) {
+  let newToken = (message === "NEW_TOKEN")
+  let authorized = (message === "AUTHORIZED")
+  if (newToken || authorized) {
     saveSession(act.token.token)
     verify()
+  }
+
+  let orchNotReady = (message === "ORCHESTRATOR_NOT_READY")
+  let cfgNotReady = (message === "CONFIG_NOT_READY")
+  if (orchNotReady || cfgNotReady) {
+    console.log(cid, message)
+    verify()
+  }
+
+  let authFailed = (message === "AUTH_FAILED")
+  if (authFailed) {
+    console.log(cid, message)
   }
   if (cid) {
     SESSION.deleteActivity(cid)
@@ -43,12 +56,6 @@ const listen = async () => {
   }
   count += 1
   setTimeout(listen, 500)
-      */
-}
-
-// Reconnect to API
-export const reconnect = async () => {
-  
 }
 
 // Connect to API

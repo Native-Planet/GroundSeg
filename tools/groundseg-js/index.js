@@ -76,15 +76,12 @@ export default class GroundSegJS {
   }
 
   updateData(data) {
-    console.log(data)
-    /*
     data = JSON.parse(data)
     if (data.hasOwnProperty('activity')) {
       this.activity = this.deepMerge(this.activity, data)
     } else {
       this.structure = this.deepMerge(this.structure, data);
     }
-    */
   };
 
   deepMerge(target, source) {
