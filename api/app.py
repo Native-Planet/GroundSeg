@@ -7,26 +7,29 @@ from threading import Thread
 from websockets.server import serve
 
 # GroundSeg Modules
+from threader.threader import Threader
 from auth.auth import Auth
 
 class GroundSeg:
     def __init__(self,debug=False):
         # The entire state of GroundSeg
         self.state = {
-                "config": None,
-                "orchestrator": None,
-                "debug":debug,
-                "ready": {
+                "config": None,           # System Configs
+                "orchestrator": None,     # Main GroundSeg module
+                "threader": {},           # Coroutines
+                "debug":debug,            # True if ./groundseg dev
+                "ready": {                # Classes fully inited
                     "config":False,
-                    "orchestrator":False
+                    "orchestrator":False,
+                    "threader":False
                     },
-                "host": '0.0.0.0',
-                "port": '8000',
-                "broadcast": {},
-                "personal_broadcast": {},
-                "tokens": {},
-                "dockers": {},
-                "clients": {
+                "host": '0.0.0.0',        # Websocket Host. Keep it at 0.0.0.0
+                "port": '8000',           # Websocket Port
+                "broadcast": {},          # Main broadcast from GroundSeg
+                "personal_broadcast": {}, # {id:{broadcast}} additional/unique entries for a specific user session
+                "tokens": {},             # Current active tokens (unused?)
+                "dockers": {},            # config files of docker containers
+                "clients": {              # websocket sessions
                     "authorized": {},
                     "unauthorized": {}
                     }
@@ -177,26 +180,57 @@ class GroundSeg:
 
     async def serve(self):
         async with serve(self.handle, self.state.get('host'), self.state.get('port')):
-            # Broadcast here
-            '''
-            from broadcast import Broadcast
-            b = Broadcast(
-                    self.ws_util.authorized_clients,
-                    self.ws_util.unauthorized_clients,
-                    self.ws_util
-                    )
-            asyncio.get_event_loop().create_task(b.authorized())
-            asyncio.get_event_loop().create_task(b.unauthorized())
-            '''
+            t = Threader(self.state)
+            this = self.state['threader']
+
+            #
+            #   Before orchestrator
+            #
+
+            # C2C kill switch (if c2c)
+            #asyncio.get_event_loop().create_task(t.c2c_killswitch())
+
+            # binary updater
+            #asyncio.get_event_loop().create_task(t.binary_updater())
+
+            # Linux updater
+            #asyncio.get_event_loop().create_task(t.linux_updater())
+
+            # System monitoring
+            #asyncio.get_event_loop().create_task(t.ram_monitor())
+            #asyncio.get_event_loop().create_task(t.cpu_monitor())
+            #asyncio.get_event_loop().create_task(t.temp_monitor())
+            #asyncio.get_event_loop().create_task(t.disk_monitor())
+
+            #
+            #   After orchestrator
+            #
+
+            # docker updater
+            #asyncio.get_event_loop().create_task(t.docker_updater())
+
+            # Scheduled melds
+            #asyncio.get_event_loop().create_task(t.meld_timer())
+
+            # Anchor information
+            #asyncio.get_event_loop().create_task(t.anchor_information())
+
+            # Wireguard connection refresher
+            #asyncio.get_event_loop().create_task(t.wireguard_refresher())
+
+            # broadcast
+            this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
+            this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())
+            print(this)
+
+            # sessions cleanup
+            #asyncio.create_task(t.session_cleanup())
+
+            # task watcher
+            #asyncio.create_task(self.watch_tasks(this))
+
             await asyncio.Future()
 
 dev = sys.argv[1] == "dev" if len(sys.argv) > 1 else False
 groundseg = GroundSeg(dev)
 groundseg.run()
-
-'''
-# Start Updater
-from binary_updater import BinUpdater
-bin_updater = BinUpdater(sys_config, sys_config.debug_mode)
-Thread(target=bin_updater.check_bin_update, daemon=True).start()
-'''
