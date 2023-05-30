@@ -100,13 +100,6 @@ class Config:
         self.state = state
         self.debug_mode = self.state['debug']
 
-        # Announce
-        if self.debug_mode:
-            print("---------- Starting GroundSeg in debug mode ----------")
-        else:
-            print("----------------- Starting GroundSeg -----------------")
-            print("------------------ Urbit is love <3 ------------------")
-
         # Get architecture
         self._arch = self.get_arch()
 

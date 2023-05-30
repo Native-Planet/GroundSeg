@@ -221,16 +221,25 @@ class GroundSeg:
             # broadcast
             this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
             this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())
-            print(this)
 
             # sessions cleanup
-            #asyncio.create_task(t.session_cleanup())
+            this['s_cleanup'] = asyncio.create_task(t.session_cleanup())
 
             # task watcher
             #asyncio.create_task(self.watch_tasks(this))
 
             await asyncio.Future()
 
+# Args
 dev = sys.argv[1] == "dev" if len(sys.argv) > 1 else False
+
+# Announce
+if dev:
+    print("---------- Starting GroundSeg in debug mode ----------")
+else:
+    print("----------------- Starting GroundSeg -----------------")
+    print("------------------ Urbit is love <3 ------------------")
+
+# Start
 groundseg = GroundSeg(dev)
 groundseg.run()

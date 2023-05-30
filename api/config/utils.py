@@ -13,9 +13,9 @@ from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives import serialization
 
 # GroundSeg modules
-import config.start_script
-import config.pack_script
-import config.meld_script
+import config.start_script as start_script
+import config.pack_script as pack_script
+import config.meld_script as meld_script
 
 class Utils:
     def make_hash(file):
