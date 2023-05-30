@@ -9,6 +9,7 @@ from websockets.server import serve
 # GroundSeg Modules
 from threader.threader import Threader
 from auth.auth import Auth
+from broadcaster import Broadcaster
 
 class GroundSeg:
     def __init__(self,debug=False):
@@ -17,6 +18,7 @@ class GroundSeg:
                 "config": None,           # System Configs
                 "orchestrator": None,     # Main GroundSeg module
                 "threader": {},           # Coroutines
+                "broadcaster": None,      # Broadcaster util class
                 "debug":debug,            # True if ./groundseg dev
                 "ready": {                # Classes fully inited
                     "config":False,
@@ -42,6 +44,8 @@ class GroundSeg:
         # Setup Orchestrator
         Thread(target=self.init_orchestrator).start()
 
+        # Start broadcaster class
+        self.state['broadcaster'] = Broadcaster(self.state)
         # start websocket
         asyncio.run(self.serve())
 
@@ -218,6 +222,13 @@ class GroundSeg:
             # Wireguard connection refresher
             #asyncio.get_event_loop().create_task(t.wireguard_refresher())
 
+            # Websocket Classes
+            '''
+            this['system'] =  System(self.state)
+            this['urbits'] = Urbits(self.state)
+            this['minios'] = MinIOs(self.state)
+            '''
+            
             # broadcast
             this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
             this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())

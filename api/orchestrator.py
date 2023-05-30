@@ -1,5 +1,4 @@
 from time import sleep
-#from lib.system import System
 
 # Docker
 from dockers.netdata import Netdata
@@ -7,6 +6,11 @@ from dockers.wireguard import Wireguard
 from dockers.minio import MinIO
 from dockers.urbit import Urbit
 from dockers.webui import WebUI
+
+# Websocket
+from lib.system import System
+from lib.urbits import Urbits
+from lib.minios import MinIOs
 
 class Orchestrator:
     def __init__(self, state):
@@ -21,7 +25,6 @@ class Orchestrator:
             self.config_object = self.state['config']
 
         self.config = self.config_object.config
-        #self.sys = System(self.state)
 
         if self.config['updateMode'] == 'auto':
             count = 0

@@ -34,10 +34,7 @@ class Threader:
                 clients = self.state['clients']['authorized'].copy()
                 for s in clients:
                     if s.open:
-                        #message = self.state['broadcast']
-                        login = "100"
-                        setup = "200"
-                        message = {"system": {"login":login,"setup":setup}}
+                        message = self.state['broadcast']
                         #message['system']['login']['access'] = "authorized"
                         await s.send(json.dumps(message))
                     else:
@@ -71,3 +68,9 @@ class Threader:
                 print(e)
 
             await asyncio.sleep(1)
+
+    async def urbits(self):
+        while True:
+            # urbits_loop
+            await asyncio.sleep(1)
+

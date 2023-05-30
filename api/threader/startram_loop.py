@@ -5,7 +5,10 @@ from log import Log
 from utils import Utils
 
 class StarTramLoop:
-    def __init__(self, config, wg, ws_util): 
+    def __init__(self, state): 
+        self.state = state
+        self.config_object = self.state['config']
+        self.structure = self.state['broadcast']
         self.config = config.config
         self.wg = wg
         self.ws_util = ws_util
