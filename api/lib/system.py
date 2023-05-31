@@ -1,7 +1,7 @@
 from threading import Thread
 #from action_linux_update import LinuxUpdate
 
-class System:
+class WSSystem:
     def __init__(self, state):
         self.state = state
         self.config_object = self.state['config']

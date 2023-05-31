@@ -8,9 +8,11 @@ from dockers.urbit import Urbit
 from dockers.webui import WebUI
 
 # Websocket
-from lib.system import System
-from lib.urbits import Urbits
-from lib.minios import MinIOs
+'''
+from lib.system import WSSystem
+from lib.urbits import WSUrbits
+from lib.minios import WSMinIOs
+'''
 
 class Orchestrator:
     def __init__(self, state):
@@ -20,12 +22,12 @@ class Orchestrator:
         self._debug = self.state['debug']
 
         while self.config_object == None:
-            print(self.config_object)
             sleep(0.5)
             self.config_object = self.state['config']
 
         self.config = self.config_object.config
 
+        '''
         if self.config['updateMode'] == 'auto':
             count = 0
             while not self.config_object.update_avail:
@@ -34,6 +36,7 @@ class Orchestrator:
                     break
                 print("orchestrator:__init__ Updater information not yet ready. Checking in 3 seconds")
                 sleep(3)
+        '''
 
         self.wireguard = self.state['dockers']['wireguard'] = Wireguard(self.config_object)
         self.netdata = self.state['dockers']['netdata'] = Netdata(self.config_object)

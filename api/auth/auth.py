@@ -8,7 +8,8 @@ from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 
 class Auth:
-    def __init__(self, state):
+    def __init__(self, state, urbit=False):
+        self.urbit = urbit
         self.state = state
         self.config_object = self.state['config']
         self.config = self.config_object.config
@@ -147,8 +148,14 @@ class Auth:
         return True
 
     def create_token(self, data, websocket):
-        ip = websocket.remote_address[0]
-        user_agent = websocket.request_headers.get('User-Agent')
+        if self.urbit:
+            print(self.urbit)
+            ip = '11111111'
+            user_agent = 'MARS'
+        else:
+            ip = websocket.remote_address[0]
+            user_agent = websocket.request_headers.get('User-Agent')
+
         cat = data['payload']['category']
         if cat == "token":
             # create token

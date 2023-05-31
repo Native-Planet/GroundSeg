@@ -1,3 +1,4 @@
+import os
 import json
 import asyncio
 from datetime import datetime, timedelta
@@ -6,6 +7,21 @@ class Threader:
     def __init__(self,state):
         self.state = state
         self.state['ready']['threader'] = True 
+
+    async def watch_gallseg(self,gs):
+        action_file = "/opt/nativeplanet/groundseg/action" # TEMP
+        patp = "sampel-palnet"
+        while True:
+            try:
+                if os.path.exists(action_file):
+                    with open(action_file) as action:
+                        act = json.loads(action.read())
+                        res = await gs.handle(patp,act)
+                        print(f"poke: {res}")
+                    os.remove(action_file)
+            except Exception as e:
+                print(e)
+            await asyncio.sleep(0.5)
 
     async def broadcast_unauthorized(self):
         while True:
@@ -34,8 +50,11 @@ class Threader:
                 clients = self.state['clients']['authorized'].copy()
                 for s in clients:
                     if s.open:
-                        message = self.state['broadcast']
+                        #message = self.state['broadcast']
                         #message['system']['login']['access'] = "authorized"
+                        login = "1000"
+                        setup = "2000"
+                        message = {"system": {"login":login,"setup":setup}}
                         await s.send(json.dumps(message))
                     else:
                         self.state['clients']['authorized'].pop(s)
@@ -57,7 +76,7 @@ class Threader:
                         now = datetime.now()
                         if now >= expire:
                             # remove from config
-                            print(f"unauthorized_loop:clean_unauthorized Removing token {token}")
+                            print(f"threader:session_cleanup Removing unauthorized token {token}")
                             self.state['config'].config['sessions']['unauthorized'].pop(token)
                             # close the user's connection
                             for websocket in self.state['clients']['unauthorized']:
@@ -73,4 +92,9 @@ class Threader:
         while True:
             # urbits_loop
             await asyncio.sleep(1)
+
+
+    async def urbits_loop(self):
+        from threader.urbits import UrbitsLoop
+        
 
