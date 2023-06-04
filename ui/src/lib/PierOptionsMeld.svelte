@@ -1,7 +1,6 @@
 <script>
   // WebSocket Store
   import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
-  import { genRequestId } from '$lib/scripts/session.js'
 
   import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'

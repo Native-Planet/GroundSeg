@@ -1,33 +1,33 @@
-from datetime import datetime
 from time import sleep
 
-from log import Log
-from utils import Utils
+from config.utils import Utils
 
 class StarTramLoop:
     def __init__(self, state): 
         self.state = state
+        self.broadcaster = self.state['broadcaster']
+
         self.config_object = self.state['config']
-        self.structure = self.state['broadcast']
-        self.config = config.config
-        self.wg = wg
-        self.ws_util = ws_util
-        self.count = 0
+        while self.config_object == None:
+            sleep(0.5)
+            self.config_object = self.state['config']
+        self.config = self.config_object.config
+
+        self.wg = None
+        while self.wg == None:
+            try:
+                self.wg = self.state['dockers']['wireguard']
+            except:
+                sleep(0.5)
 
     def run(self):
-        Log.log("ws_system:startram_loop Starting thread")
-        self.ws_util.system_broadcast('system','startram',"restart","")
-        self.ws_util.system_broadcast('system','startram',"cancel","")
-        while True:
-            self._container()
-            self._register()
-            self._autorenew()
-            self._expiry()
-            self._region()
-            self._regions()
-            self._endpoint()
-            self.count += 1
-            sleep(1)
+        self._container()
+        self._register()
+        self._autorenew()
+        self._expiry()
+        self._region()
+        self._regions()
+        self._endpoint()
 
     def _container(self):
         # running  -  Wireguard container is running
@@ -39,7 +39,7 @@ class StarTramLoop:
                     status = "running"
         except:
             pass
-        self.ws_util.system_broadcast('system','startram','container', status)
+        self.broadcaster.system_broadcast('system','startram','container', status)
 
     def _register(self):
         # no             -  unregistered
@@ -59,7 +59,7 @@ class StarTramLoop:
             status = "no"
             if self.config['wgRegistered']:
                 status = "yes"
-            self.ws_util.system_broadcast('system','startram','register',status)
+            self.broadcaster.system_broadcast('system','startram','register',status)
 
     def _autorenew(self):
         if type(self.wg.anchor_data) == str:
@@ -69,7 +69,7 @@ class StarTramLoop:
                 autorenew = self.wg.anchor_data['ongoing'] == 1
             except:
                 autorenew = False
-            self.ws_util.system_broadcast('system','startram','autorenew',autorenew)
+            self.broadcaster.system_broadcast('system','startram','autorenew',autorenew)
 
     def _expiry(self):
         if type(self.wg.anchor_data) == str:
@@ -79,7 +79,7 @@ class StarTramLoop:
                 expiry = self.wg.anchor_data['lease']
             except:
                 expiry = None
-        self.ws_util.system_broadcast('system','startram','expiry',expiry)
+        self.broadcaster.system_broadcast('system','startram','expiry',expiry)
 
     def _region(self):
         if type(self.wg.anchor_data) == str:
@@ -89,19 +89,19 @@ class StarTramLoop:
                 region = self.wg.anchor_data['region']
             except:
                region = None
-        self.ws_util.system_broadcast('system','startram','region',region)
+        self.broadcaster.system_broadcast('system','startram','region',region)
 
     def _regions(self):
         try:
             regions = Utils.convert_region_data(self.wg.region_data)
         except:
             regions = []
-        self.ws_util.system_broadcast('system','startram','regions',regions)
+        self.broadcaster.system_broadcast('system','startram','regions',regions)
 
     def _endpoint(self):
         try:
             busy= ['stopping','rm-services','reset-pubkey','changing','updating','success']
-            ep = self.ws_util.structure.get('system', {}
+            ep = self.broadcaster.structure.get('system', {}
                                               ).get('startram', {}
                                                     ).get('endpoint', "")
             # update information
@@ -111,4 +111,4 @@ class StarTramLoop:
                 return
         except:
             endpoint = None
-        self.ws_util.system_broadcast('system','startram','endpoint',endpoint)
+        self.broadcaster.system_broadcast('system','startram','endpoint',endpoint)

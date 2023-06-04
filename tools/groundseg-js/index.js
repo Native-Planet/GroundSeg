@@ -47,6 +47,19 @@ export default class GroundSegJS {
     this.silentSend(data,token)
   }
 
+  // Update form for session
+  updateForm(id,template,item,value,token=null) {
+    let data = {"id":id,"payload":{"category":"forms","template":template,"item":item,"value":value}}
+    console.log(id + " updating " + template + " form" )
+    this.silentSend(data,token)
+  }
+
+  registerStarTram(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"register"}}
+    console.log(id + " attempting to register StarTram")
+    this.silentSend(data,token)
+  }
+
   // Send raw action
   send(data,token=null) {
     if (token) {
@@ -87,10 +100,12 @@ export default class GroundSegJS {
   deepMerge(target, source) {
     for (const key in source) {
       if (typeof source[key] === 'object' && !Array.isArray(source[key]) && source[key] !== null) {
-        if (!target.hasOwnProperty(key)) {
-          target[key] = {};
+        if (target !== null) {
+          if ((target !== null) && (!target.hasOwnProperty(key))) {
+            target[key] = {};
+          }
+          this.deepMerge(target[key], source[key])
         }
-        this.deepMerge(target[key], source[key])
       } else {
         target[key] = source[key]
       }

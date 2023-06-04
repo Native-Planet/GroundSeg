@@ -9,24 +9,15 @@ from log import Log
 #from action_access_toggle import AccessToggle
 
 class WSUrbits:
-    def __init__(self,state):
+    def __init__(self, state): 
         self.state = state
+        self.broadcaster = self.state['broadcaster']
+
         self.config_object = self.state['config']
         while self.config_object == None:
-            print(self.config_object)
             sleep(0.5)
             self.config_object = self.state['config']
-
         self.config = self.config_object.config
-
-        self.structure = ws_util.structure
-        self.urb = urb
-        self._urbits = self.urb._urbits 
-        self.ws_util = ws_util
-
-        from urbits_loop import UrbitsLoop
-        urbits = UrbitsLoop(self.config_object, self.urb, self.ws_util)
-        Thread(target=urbits.run, daemon=True).start()
 
     #
     #   interacting with self._urbits dict (config)

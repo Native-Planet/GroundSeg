@@ -1,14 +1,17 @@
 <script>
 	import { api } from '$lib/api'
 	import { scale } from 'svelte/transition'
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  //import { send, socket, structure } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket'
 
-  $: startram = ($socketInfo.system?.startram) || null
+  $: startram = ($structure.system?.startram) || null
   $: register = (startram?.register) || "no"
   $: container = (startram?.container) || "stopped"
 
 	// toggle anchor on or off
 	const toggleAnchor = () => {
+    console.log("toggle anchor")
+    /*
     let act = (container == "running" ? "stop" : "start")
     let payload = {
       "category": "system",
@@ -17,7 +20,8 @@
         "action": act,
       }
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    send($socket, $structure, document.cookie, payload)
+*/
   }
 
 </script>

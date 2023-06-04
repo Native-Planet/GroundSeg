@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  import { connected, structure, updateForm, registerStarTram } from '$lib/stores/websocket'
 
   import CheckBox from '$lib/CheckBox.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -12,22 +12,19 @@
   let buttonStatus = 'standard'
   let reRegCheck = true
 
-  // Connection status
-  $: connected = ($socketInfo?.metadata?.connected) || false
-
   // Startram form
-  $: form = ($socketInfo?.forms?.startram) || null
+  $: form = ($structure?.forms?.startram) || null
 
   // Ships
-  $: urbits = ($socketInfo?.urbits) || {}
+  $: urbits = ($structure?.urbits) || {}
   $: unchecked = (form?.ships) || []
 
   // Startram information
-  $: startram = ($socketInfo?.system?.startram) || null
+  $: startram = ($structure?.system?.startram) || null
   $: register = (startram?.register) || "no"
 
   // Registration Key Logic
-  $: key = updateForm('key',handleKey(key))
+  $: key = updateStarTramForm('key',handleKey(key))
   const handleKey = key => {
     if (typeof key === 'string' || key instanceof String) {
       return key.trim()
@@ -39,46 +36,28 @@
   $: regions = (startram?.regions) || []
 
   // Send to API
-  const updateForm = (item, data) => {
-    if (connected) {
-      let payload = {
-        "category": "forms",
-        "payload": {
-          "template": "startram",
-          "item": item,
-          "value": data,
-        }
-      }
-      send($socket, $socketInfo, document.cookie, payload)
-    }
+  const updateStarTramForm = (item, data) => {
+    updateForm('startram',item,data)
     return data
   }
 
   // Toggle remote access after registration
   const addShip = e => {
-    updateForm("ships",[e.detail])
+    updateStarTramForm("ships",[e.detail])
   }
   const addAllShips = e => {
-    updateForm("ships", e.detail ? "none" : "all")
+    updateStarTramForm("ships", e.detail ? "none" : "all")
   }
 
   const registerKey = () => {
-    updateForm("key",key)
-    let payload = {
-      "category": "system",
-      "payload": {
-        "module": "startram",
-        "action": "register"
-      }
-    }
-    send($socket, $socketInfo, document.cookie, payload)
-    reRegCheck = true
+    // final send just in case
+    updateStarTramForm("key",key)
+    registerStarTram()
   }
 
   // Registration Key input visibility
   const toggleView = () => {
     view = !view
-    document.querySelector('#input').type = view ? 'text' : 'password'
   }
 
   // Load up saved form
@@ -102,7 +81,11 @@
   {#if register == "no"}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
+      {#if view}
+        <input id='input' placeholder="NativePlanet-some-word-another-word" type="text" bind:value={key} />
+      {:else}
+        <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
+      {/if}
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 
@@ -111,7 +94,7 @@
       <div class="regions-wrapper">
         {#each regions as r}
           <div 
-            on:click={()=>updateForm("region",r.name)}
+            on:click={()=>updateStarTramForm("region",r.name)}
             class="region"
             class:region-active={region == null ? r.name == "us-east" : r.name == region}
             >
@@ -137,7 +120,11 @@
   {:else if (!reRegCheck) && (register == "yes")}
     <div class="reg-title" transition:scale={{duration:120, delay: 200}}>StarTram Key Registration</div>
     <div class="reg-key" transition:scale={{duration:120, delay: 200}}>
-      <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
+      {#if view}
+        <input id='input' placeholder="NativePlanet-some-word-another-word" type="text" bind:value={key} />
+      {:else}
+        <input id='input' placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key} />
+      {/if}
       <img on:click={toggleView} src="/eye-{view ? "closed" : "open"}.svg" alt="eye" />
     </div>
 

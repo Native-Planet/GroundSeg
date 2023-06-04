@@ -1,5 +1,6 @@
 import json
 import asyncio
+from threading import Thread
 
 from auth.auth import Auth
 
@@ -58,10 +59,7 @@ class WSGroundSeg:
 
             # System
             elif cat == "system":
-                if websocket in self.state['clients']['unauthorized']:
-                    status_code, msg, token = self.system_action(action, websocket, status_code, msg)
-                elif websocket in self.state['clients']['authorized']:
-                    print(self.state['clients']['authorized'])
+                status_code, msg, token = self.system_action(action, websocket, status_code, msg)
 
                 '''
             elif cat == 'urbits':
@@ -69,10 +67,15 @@ class WSGroundSeg:
 
             elif cat == 'updates':
                 status_code, msg = self.ws_command_updates(payload)
+                '''
 
             elif cat == 'forms':
-                status_code, msg = self.ws_command_forms(action)
-                '''
+                token = None
+                if websocket in self.state['clients']['authorized']:
+                    status_code, msg = self.forms_action(action, status_code, msg)
+                else:
+                    status_code = 1
+                    msg = "UNAUTHORIZED"
             else:
                 status_code = 1
                 msg = "INVALID_CATEGORY"
@@ -85,45 +88,73 @@ class WSGroundSeg:
     # System
     def system_action(self, data, websocket, status_code, msg):
         # hardcoded list of allowed modules
+        token = None
         whitelist = [
                 'login',
                 'startram',
                 ]
-        payload = data['payload']
-        module = payload['module']
-        action = payload['action']
+        payload = data.get('payload')
+        id = data.get('id')
+        module = payload.get('module')
+        action = payload.get('action')
 
         if module not in whitelist:
-            raise Exception(f"{module} is not a valid module")
+            status_code = 1
+            msg = "INVALID_MODULE"
+        else:
+            if module == "login":
+                status_code, msg, token = Auth(self.state).handle_login(data,websocket,status_code,msg)
+            elif websocket in self.state['clients']['authorized']:
+                if module == "startram":
+                    self.orchestrator = self.state['orchestrator']
+                    if action == "register":
+                        Thread(target=self.orchestrator.startram_register, args=(id,)).start()
+                    if action == "stop":
+                        Thread(target=self.orchestrator.startram_stop).start()
+                    if action == "start":
+                        Thread(target=self.orchestrator.startram_start).start()
+                    if action == "restart":
+                        Thread(target=self.orchestrator.startram_restart).start()
+                    if action == "endpoint":
+                        Thread(target=self.orchestrator.startram_change_endpoint,
+                               args=(data['sessionid'],)
+                               ).start()
+                    if action == "cancel":
+                        Thread(target=self.orchestrator.startram_cancel,
+                               args=(data['sessionid'],)
+                               ).start()
 
-        if module == "login":
-            status_code, msg, token = Auth(self.state).handle_login(data,
-                                                                    websocket,
-                                                                    status_code,
-                                                                    msg
-                                                                    )
-
-        '''
-        if module == "startram":
-            if action == "register":
-                Thread(target=self.orchestrator.startram_register, args=(data['sessionid'],)).start()
-            if action == "stop":
-                Thread(target=self.orchestrator.startram_stop).start()
-            if action == "start":
-                Thread(target=self.orchestrator.startram_start).start()
-            if action == "restart":
-                Thread(target=self.orchestrator.startram_restart).start()
-            if action == "endpoint":
-                Thread(target=self.orchestrator.startram_change_endpoint,
-                       args=(data['sessionid'],)
-                       ).start()
-            if action == "cancel":
-                Thread(target=self.orchestrator.startram_cancel,
-                       args=(data['sessionid'],)
-                       ).start()
-
-        '''
         return status_code, msg, token
+
+    # Forms
+    def forms_action(self, action, status_code, msg):
+        template = action.get('payload').get('template')
+        if template == "startram":
+            Thread(target=self.state['orchestrator'].edit_form, args=(action,), daemon=True).start()
+        else:
+            status_code = 1
+            msg = "INVALID_TEMPLATE"
+        return status_code, msg
+
+        '''
+        try:
+            # hardcoded whitelist
+            whitelist = [
+                    'startram'
+                    ]
+
+            payload = data['payload']
+            sid = data['sessionid']
+            template = payload['template']
+
+            if template in whitelist:
+                if template == "startram":
+                    self.ws_util.edit_form(data, template)
+
+        except Exception as e:
+            raise Exception(e)
+        return "succeeded"
+        '''
 
     def make_activity(self, id, status_code, msg, token=None):
         res = {"activity":{id:{"message":msg,"status_code":status_code}}}

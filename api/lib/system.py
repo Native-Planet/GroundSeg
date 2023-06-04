@@ -5,6 +5,7 @@ class WSSystem:
     def __init__(self, state):
         self.state = state
         self.config_object = self.state['config']
+        self.broadcaster = self.state['broadcaster']
 
         while self.config_object == None:
             print(self.config_object)
@@ -14,10 +15,10 @@ class WSSystem:
         self.config = self.config_object.config
 
         # {a:{b:{c:d}}
-        self.state['broadcaster'].system_broadcast('updates','linux','upgrade','0')
-        self.state['broadcaster'].system_broadcast('updates','linux','new','0')
-        self.state['broadcaster'].system_broadcast('updates','linux','remove','0')
-        self.state['broadcaster'].system_broadcast('updates','linux','ignore','0')
+        self.broadcaster.system_broadcast('updates','linux','upgrade','0')
+        self.broadcaster.system_broadcast('updates','linux','new','0')
+        self.broadcaster.system_broadcast('updates','linux','remove','0')
+        self.broadcaster.system_broadcast('updates','linux','ignore','0')
 
         if self.config['linuxUpdates']['previous']:
             # updated       -  no updates
@@ -26,19 +27,13 @@ class WSSystem:
             # restarting    -  update complete, restarting device
             # success       -  GroundSeg has restarted
             # failure\n<err> -  Failure message
-            self.ws_util.system_broadcast('updates','linux','update','success')
+            self.broadcaster.system_broadcast('updates','linux','update','success')
             self.config['linuxUpdates']['previous'] = False
             self.config_object.save_config()
 
         # TODO
-        self.state['broadcaster'].system_broadcast('updates','binary','update','updated')
-        self.state['broadcaster'].system_broadcast('updates','binary','routine','auto')       # notify off
-
-        '''
-
-        from startram_loop import StarTramLoop
-        startram = StarTramLoop(self.config_object, self.wg, self.ws_util)
-        Thread(target=startram.run, daemon=True).start()
+        self.broadcaster.system_broadcast('updates','binary','update','updated')
+        self.broadcaster.system_broadcast('updates','binary','routine','auto')       # notify off
 
     #
     #   Actions
@@ -52,4 +47,3 @@ class WSSystem:
             pass
         self.state['broadcaster'].system_broadcast('updates', 'linux','update','initializing')
         #LinuxUpdate(self.ws_util, self.config_object).run(old_info)
-        '''

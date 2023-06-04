@@ -8,17 +8,8 @@
   import Dropzone from '$lib/Dropzone.svelte'
   import LinkButton from '$lib/LinkButton.svelte'
 
-	export let data
-	updateState(data)
-
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
-
-  onMount(()=> {
-    if (data['status'] == 404) {
-      window.location.href = "/login"
-    }
-  })
 
 </script>
 

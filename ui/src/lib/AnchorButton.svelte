@@ -2,12 +2,12 @@
   import { onMount, afterUpdate } from 'svelte'
   import { page } from '$app/stores'
 
-  import { socketInfo } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket.js'
 
   import Fa from 'svelte-fa'
   import { faSatelliteDish } from '@fortawesome/free-solid-svg-icons'
 
-  $: startram = ($socketInfo.system?.startram) || {}
+  $: startram = ($structure.system?.startram) || {}
   $: register = (startram?.register) || "no"
   $: container = (startram?.container) || "stopped"
 

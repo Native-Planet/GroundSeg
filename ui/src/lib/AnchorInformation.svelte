@@ -3,8 +3,6 @@
   export let regions
   export let ongoing
   export let lease
-  let regions2 = ['aa','bb']
-  let region2 = 'aa'
 </script>
 
 <div class="info-wrapper">

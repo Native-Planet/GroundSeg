@@ -1,4 +1,5 @@
 <script>
+  import { login, structure, loginStatus } from '$lib/stores/websocket'
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
   import { api, updateState } from '$lib/api'
@@ -11,118 +12,27 @@
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import EyeButton from '$lib/EyeButton.svelte'
 
-  export let data
-  updateState(data)
-
   let inView = false
-  let showLogin = false
-  let pwdView = false
   let loginPassword = ''
   let buttonStatus = 'standard'
-  let pubKey = ''
-  let unlocked = true
-  let remainder = 0
-  let hours = 0
-  let minutes = 0
-  let seconds = 0
 
-	onDestroy(()=> inView = false)
+  $: loginModule = ($structure.system?.login) || null
+  $: remainder = (loginModule?.cooldown) || 0
+  $: unlocked = (remainder <= 0)
+
+  $: hours = Math.floor(remainder / 3600)
+  $: minutes = Math.floor((remainder % 3600) / 60)
+  $: seconds = Math.floor(remainder % 60)
+
   onMount(()=> {
-    if (data['status'] == 200) {
-      console.log("logged in")
-      window.location.href = "/"
-    } else if (data['status'] == 'setup') {
-      window.location.href = "/setup"
-    } else {
-      console.log(data['status'])
-    }
     api.set("http://" + $page.url.hostname + ":27016")
-    isLocked()
     inView = true
-    getLoginKey()
   })
 
-  const getLoginKey = () => {
-    if (inView && ($page.url.pathname == "/login")) {
-      fetch($api + '/login/key')
-      .then(r => r.json())
-        .then(d => {
-          pubKey = d
-        })
-      setTimeout(getLoginKey, 30000)
-  }}
-
-  let count = 0
-
-  const isLocked = () => {
-    if ($page.url.pathname == "/login") {
-      fetch($api + '/login/status')
-      .then(r => r.json())
-      .then(d => {
-        if (d != 400) {
-          remainder = d.remainder
-          if (d.locked) {
-            startCountdown()
-          }
-        }
-      })
-      .catch(e => console.log(e))
-    }
-  }
-
-  const startCountdown = () => {
-    const countdown = setInterval(() => {
-      if (remainder <= 0) {
-        unlocked = true
-        clearInterval(countdown)
-        isLocked()
-      } else {
-        hours = Math.floor(remainder / 3600)
-        minutes = Math.floor((remainder % 3600) / 60)
-        seconds = Math.floor(remainder % 60)
-        unlocked = false
-        remainder--
-      }
-    }, 1000)
-  }
-
-  const togglePwdView = () => {
-    pwdView = !pwdView
-    document.querySelector('#login-password').type = pwdView ? 'text' : 'password'
-  }
+	onDestroy(()=> inView = false)
 
   const handleLogin = async () => {
-    buttonStatus = 'loading'
-    const enc_pwd = await encryptPassword()
-
-    fetch($api + '/login', {
-			method: 'POST',
-      headers: {"Content-Type" : "application/json"},
-      credentials : "include",
-			body: JSON.stringify({'password':enc_pwd})
-	  })
-      .then(r => r.json())
-      .then(d => { 
-        if (d == 200) {
-          buttonStatus = 'success'
-          setTimeout(()=> window.location.href = '/', 1000)
-        } else {
-          console.log(d)
-          buttonStatus = 'failure'
-          setTimeout(()=> isLocked(), 1000)
-          setTimeout(()=> {
-            buttonStatus = 'standard'
-            loginPassword = ''
-          }, 2000)
-        }
-    })
-  }
-
-  const encryptPassword = async () => {
-    const encrypt = new JSEncrypt({ default_key_size: 2048 })
-    encrypt.setPublicKey(pubKey)
-    const encrypted = await encrypt.encrypt(loginPassword.trim())
-    return encrypted
+    login(loginPassword)
   }
 
 </script>
@@ -142,23 +52,28 @@
               class="login-password"
               type="password"
               placeholder='Password'
-              disabled={buttonStatus != 'standard'}
+              disabled={!unlocked}
               on:keydown={e => {
                 if (e.key === 'Enter') {
                   handleLogin()
                 }
             }}>
           </div>
-          <PrimaryButton
-            top=24
-            left={false}
-            standard="Login"
-            success="Login successful!"
-            failure="Login failed"
-            loading="Logging you in.."
-            status={(loginPassword.length > 0) && (pubKey.length > 0) ? buttonStatus : 'disabled'}
-            on:click={handleLogin}
-          />
+          {#if $loginStatus == "success"}
+            <div class="button-info" style="color:lime;">Success!</div>
+          {:else if $loginStatus == "loading"}
+            <div class="button-info">Attempting to login..</div>
+          {:else if $loginStatus == "AUTH_FAILED"}
+            <div class="button-info" style="color:red;">Incorrect credentials</div>
+          {:else}
+            <PrimaryButton
+              top=24
+              left={false}
+              standard="Login"
+              status={(loginPassword.length > 0) && unlocked ? 'standard' : 'disabled'}
+              on:click={handleLogin}
+            />
+          {/if}
         {:else}
           <div class="locked">
             <div class="locked-icon"><Fa icon={faLock} size="4x" /></div>
@@ -215,5 +130,10 @@
   .locked-text {
     margin-top: 30px;
     font-size: 24px;
+  }
+  .button-info {
+    line-height: 30px;
+    font-size: 12px;
+    margin-top: 24px;
   }
 </style>

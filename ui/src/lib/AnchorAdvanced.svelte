@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  //import { send, socket, structure } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -16,15 +17,15 @@
   let restarting = false
   let showEpInfo = false
 
-  $: connected = ($socketInfo?.metadata?.connected) || false
-  $: startram = ($socketInfo.system?.startram) || null
+  $: connected = ($structure?.metadata?.connected) || false
+  $: startram = ($structure.system?.startram) || null
   $: register = (startram?.register) || "no"
   $: container = (startram?.container) || "stopped"
   $: restart = (startram?.restart) || ""
   $: cancel = (startram?.cancel) || ""
   $: endpoint = (startram?.endpoint) || null
 
-  $: form = ($socketInfo?.forms?.startram) || null
+  $: form = ($structure?.forms?.startram) || null
   $: formEndpoint = (form?.endpoint) || ""
   $: formCancel = (form?.cancel) || ""
 
@@ -50,6 +51,8 @@
     }
   }
   const cancelSubscription = () => {
+    console.log("cancel sub")
+    /*
     if (confirmCancel) {
       updateForm("cancel", regKey.trim())
       let payload = {
@@ -59,12 +62,16 @@
           "action": "cancel"
         }
       }
-      send($socket, $socketInfo, document.cookie, payload)
+      send($socket, $structure, document.cookie, payload)
     } else {
       confirmCancel = !confirmCancel
-  }}
+  }
+*/
+}
 
   const restartStarTram = () => {
+    console.log("restart startram")
+    /*
     let payload = {
       "category": "system",
       "payload": {
@@ -72,10 +79,13 @@
         "action": "restart"
       }
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    send($socket, $structure, document.cookie, payload)
+*/
   }
 
   const connectEndpoint = () => {
+    console.log("connect endpoint")
+    /*
     updateForm("endpoint", currentEpKey)
     let payload = {
       "category": "system",
@@ -84,11 +94,14 @@
         "action": "endpoint"
       }
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    send($socket, $structure, document.cookie, payload)
+*/
   }
 
   // Send to API
   const updateForm = (i,v) => {
+    console.log("update form " + i + " " + v)
+    /*
     if (connected) {
       let payload = {
         "category": "forms",
@@ -98,8 +111,9 @@
           "value": v,
         }
       }
-      send($socket, $socketInfo, document.cookie, payload)
+      send($socket, $structure, document.cookie, payload)
     }
+  */
     return v
   }
 

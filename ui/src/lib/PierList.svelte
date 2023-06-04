@@ -2,72 +2,33 @@
 	import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
-
 	import { api } from '$lib/api'
 	import Sigil from '$lib/Sigil.svelte'
-
   import Fa from 'svelte-fa'
   import { faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons'
 
   export let u
+  export let name
 	let inView = false
-  let code = null
-  let count = 1
-
-  const getUrbitCode = () => {
-    if (inView && ($page.url.pathname == "/")) {
-      if (u.running) {
-        fetch($api + '/urbit?urbit_id=' + u.name, {
-          method: 'POST',
-          credentials: "include",
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({'app':'pier','data':'+code'})
-        })
-        .then(r => r.json())
-        .then(d => {
-          code = d
-          if (d.length == 27) {
-            setTimeout(getUrbitCode, 1800000)
-          } else {
-            let time = 1000
-            setTimeout(getUrbitCode, time * count)
-            if (count < 5) {
-              count = ++count
-            }
-          }
-        })
-      } else {
-        setTimeout(getUrbitCode, 1000)
-      }
-  }}
-
-	onMount(()=> {
-		inView = true
-    getUrbitCode()
-	})
+  $: containerStatus = (u?.container?.status) || "loading"
+  $: containerUrl = (u?.container?.url) || ""
+	onMount(()=> inView = true)
 
 </script>
+
 {#if inView}
   <div class="pier" in:scale={{duration:120, delay: 300}}>
-    <Sigil patp={u.name} size="60px" rad="8px" />
-    <a class="info" href={u.name}>
-      <div class="patp">{u.name}</div>
-      <div class="status">
-        ({u.remote ? "Remote" : "Local"})
-        {
-        !u.running ? 'Stopped'
-        : code == null ? 'Loading...'
-        : code.length != 27 ? 'Booting'
-        : code.length == 27 ? 'Running'
-        : 'Loading...'
-        }
-      </div>
+    <Sigil patp={name} size="60px" rad="8px" />
+    <a class="info" href={name}>
+      <div class="patp">{name}</div>
+      <div class="status">{containerStatus.charAt(0).toUpperCase() + containerStatus.slice(1)}</div>
     </a>
-    <a class="ext" href={u.running ? u.url : ""} target={u.running ? "_blank" : ""}>
+    <a class="ext" href={containerStatus == "running" ? containerUrl : ""} target={containerStatus == "running" ? "_blank" : ""}>
       <Fa icon={faArrowUpRightFromSquare} size="1.2x" />
     </a>
   </div>
 {/if}
+
 <style>
 	a { color: inherit; }
   .ext:hover {

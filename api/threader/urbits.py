@@ -1,4 +1,5 @@
 #from datetime import datetime
+import socket
 from time import sleep
 from threading import Thread
 
@@ -6,33 +7,67 @@ from log import Log
 #from utils import Utils
 
 class UrbitsLoop:
-    def __init__(self, config, urb, ws_util): 
-        self.config = config.config
-        self.urb = urb
-        self.wg = urb.wg
-        self.ws_util = ws_util
+    def __init__(self,state):
         self.count = 0
+        self.state = state
+        self.broadcaster = self.state['broadcaster']
+        self.config_object = self.state['config']
+        while self.config_object == None:
+            sleep(0.5)
+            self.config_object = self.state['config']
+        self.config = self.config_object.config
+
+        self.urb = None
+        while self.urb == None:
+            try:
+                self.urb = self.state['dockers']['urbit']
+            except:
+                sleep(0.5)
 
         for patp in self.config['piers'].copy():
-            self.ws_util.urbit_broadcast(patp, 'minio', 'link')
-            self.ws_util.urbit_broadcast(patp, 'minio', 'unlink')
+            self.broadcaster.urbit_broadcast(patp, 'minio', 'link')
+            self.broadcaster.urbit_broadcast(patp, 'minio', 'unlink')
 
-            self.ws_util.urbit_broadcast(patp, 'container','rebuild')
-            self.ws_util.urbit_broadcast(patp, 'meld', 'urth')
-            self.ws_util.urbit_broadcast(patp, 'click', 'exist', False)
-            self.ws_util.urbit_broadcast(patp, 'vere', 'version')
+            self.broadcaster.urbit_broadcast(patp, 'container','rebuild')
+            self.broadcaster.urbit_broadcast(patp, 'container', 'status', "loading")
+            self.broadcaster.urbit_broadcast(patp, 'meld', 'urth')
+            self.broadcaster.urbit_broadcast(patp, 'click', 'exist', False)
+            self.broadcaster.urbit_broadcast(patp, 'vere', 'version')
 
-            self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local, to-remote, to-local
-            self.ws_util.urbit_broadcast(patp, 'startram', 'minio', 'unregistered') # registered, registering
-            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit', 'unregistered') # registered, registering
+            self.broadcaster.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local, to-remote, to-local
+            self.broadcaster.urbit_broadcast(patp, 'startram', 'minio', 'unregistered') # registered, registering
+            self.broadcaster.urbit_broadcast(patp, 'startram', 'urbit', 'unregistered') # registered, registering
 
     def run(self):
-        Log.log("ws_urbits:urbits_loop Starting thread")
-        while True:
-            for patp in self.config['piers'].copy():
-                Thread(target=self._vere_version, args=(patp,), daemon=True).start()
+        for patp in self.config['piers'].copy():
+            Thread(target=self._vere_version, args=(patp,), daemon=True).start()
+            Thread(target=self._container, args=(patp,), daemon=True).start()
+            Thread(target=self._url, args=(patp,), daemon=True).start()
             self.count += 1
-            sleep(1)
+
+    def _container(self, patp):
+        # running  -  Urbit container is running
+        # stopped  -  Urbit container is stopped
+        # loading  -  Still waiting for information
+        # booting  -  +code not ready
+        status = "stopped"
+        try:
+            if self.urb.urb_docker.is_running(patp):
+                # get +code here
+                status = "running"
+        except:
+            pass
+        self.broadcaster.urbit_broadcast(patp, 'container', 'status', status)
+
+    def _url(self, patp):
+        try:
+            cfg = self.urb._urbits[patp]
+            url = f'http://{socket.gethostname()}.local:{cfg["http_port"]}'
+            if cfg['network'] == 'wireguard':
+                url = f"https://{cfg['wg_url']}"
+        except Exception as e:
+            url = ""
+        self.broadcaster.urbit_broadcast(patp, 'container', 'url', url)
 
     def _vere_version(self, patp):
         if self.count == 0 or self.count % 30 == 0:
@@ -41,80 +76,6 @@ class UrbitsLoop:
                     res = self.urb.urb_docker.exec(patp, 'urbit --version')
                     if res:
                         res = res.output.decode("utf-8").strip().split("\n")[0]
-                        self.ws_util.urbit_broadcast(patp, 'vere', 'version', str(res))
+                        self.broadcaster.urbit_broadcast(patp, 'vere', 'version', str(res))
             except Exception as e:
-                self.ws_util.urbit_broadcast(patp, 'vere', 'version', f'error: {e}')
-
-    '''
-    def _container(self):
-        # running  -  Wireguard container is running
-        # stopped  -  Wireguard container is stopped
-        status = "stopped"
-        try:
-            if self.config['wgRegistered']:
-                if self.wg.wg_docker.is_running(self.wg.data['wireguard_name']):
-                    status = "running"
-        except:
-            pass
-        self.ws_util.system_broadcast('system','startram','container', status)
-
-    def _register(self):
-        # no            -  unregistered
-        # yes           -  a command was sent
-        # <reg loading> -  TODO
-        # success       -  registered successfully
-        # failure\n<err> -  Failure message
-        try:
-            reg = self.ws_util.structure['system']['startram']['register']
-        except:
-            reg = "no"
-        if reg == "yes" or reg == "no":
-            status = "no"
-            if self.config['wgRegistered']:
-                status = "yes"
-            self.ws_util.system_broadcast('system','startram','register',status)
-
-    def _autorenew(self):
-        if type(self.wg.anchor_data) == str:
-            autorenew = self.wg.anchor_data
-        else:
-            try:
-                autorenew = self.wg.anchor_data['ongoing'] == 1
-            except:
-                autorenew = False
-            self.ws_util.system_broadcast('system','startram','autorenew',autorenew)
-
-    def _expiry(self):
-        if type(self.wg.anchor_data) == str:
-            expiry = self.wg.anchor_data
-        else:
-            try:
-                expiry = self.wg.anchor_data['lease']
-            except:
-                expiry = None
-        self.ws_util.system_broadcast('system','startram','expiry',expiry)
-
-    def _region(self):
-        if type(self.wg.anchor_data) == str:
-            region = self.wg.anchor_data
-        else:
-            try:
-                region = self.wg.anchor_data['region']
-            except:
-               region = None
-        self.ws_util.system_broadcast('system','startram','region',region)
-
-    def _regions(self):
-        try:
-            regions = Utils.convert_region_data(self.wg.region_data)
-        except:
-            regions = []
-        self.ws_util.system_broadcast('system','startram','regions',regions)
-
-    def _endpoint(self):
-        try:
-            endpoint = self.config['endpointUrl']
-        except:
-            endpoint = None
-        self.ws_util.system_broadcast('system','startram','endpoint',endpoint)
-    '''
+                self.broadcaster.urbit_broadcast(patp, 'vere', 'version', f'error: {e}')

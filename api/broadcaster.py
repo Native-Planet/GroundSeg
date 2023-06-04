@@ -30,7 +30,38 @@ class Broadcaster:
             self.structure[category][module][action] = info
 
         except Exception as e:
-            print(f"ws-util:system-broadcast {e}")
+            print(f"broadcaster:system-broadcast {e}")
             return False
 
+        return True
+
+    # Broadcast action for Urbits
+    def urbit_broadcast(self, patp, module, action, info=""):
+        try:
+            # Set root to structure
+            root = self.structure
+            # Category
+            if not self.structure.get('urbits') or not isinstance(self.structure['urbits'], dict):
+                self.structure['urbits'] = {}
+
+            # Set root to urbits
+            root = root['urbits']
+            # Patp
+            if not root.get(patp) or not isinstance(root[patp], dict):
+                root[patp] = {}
+
+            # Set root to patp
+            root = root[patp]
+            # Module
+            if not root.get(module) or not isinstance(root[module], dict):
+                root[module] = {}
+
+            # Set root to patp
+            root = root[module]
+            # Action
+            root[action] = info
+
+        except Exception as e:
+            print(f"broadcaster:urbit-broadcast {e}")
+            return False
         return True

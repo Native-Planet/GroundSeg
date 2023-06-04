@@ -6,7 +6,8 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
 
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  //import { send, socket, structure } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket'
 
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
@@ -18,7 +19,7 @@
 
 	let inView = false
 
-  $: startram = ($socketInfo.system?.startram) || null
+  $: startram = ($structure.system?.startram) || null
   $: register = (startram?.register) || "no"
   $: container = (startram?.container) || "stopped"
   $: region = (startram?.region) || null

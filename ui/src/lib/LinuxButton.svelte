@@ -1,14 +1,14 @@
 <script>
   import { afterUpdate } from 'svelte'
   import { page } from '$app/stores'
-  import { socketInfo } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket.js'
 
   let hide = false
   afterUpdate(()=> {
     hide = ($page.route.id == '/login')
   })
 
-  $: update = ($socketInfo.updates?.linux?.update) || "updated"
+  $: update = ($structure.updates?.linux?.update) || "updated"
 
 </script>
 

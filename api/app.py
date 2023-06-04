@@ -1,14 +1,11 @@
+import os
 import sys
 import json
 import asyncio
+import subprocess
+from time import sleep
 from threading import Thread
-
-# Pip Modules
 from websockets.server import serve
-
-# GroundSeg Modules
-from threader.threader import Threader
-from broadcaster import Broadcaster
 
 class GroundSeg:
     def __init__(self,debug=False):
@@ -16,6 +13,8 @@ class GroundSeg:
         self.state = {
                 "config": None,           # System Configs
                 "orchestrator": None,     # Main GroundSeg module
+                "ws": {},                 # Websocket classes
+                "startram": None,         # StarTram API
                 "threader": {},           # Coroutines
                 "broadcaster": None,      # Broadcaster util class
                 "debug":debug,            # True if ./groundseg dev
@@ -27,7 +26,7 @@ class GroundSeg:
                 "host": '0.0.0.0',        # Websocket Host. Keep it at 0.0.0.0
                 "port": '8000',           # Websocket Port
                 "broadcast": {},          # Main broadcast from GroundSeg
-                "personal_broadcast": {}, # {id:{broadcast}} additional/unique entries for a specific user session
+                "personal_broadcast": {}, # {id:{broadcast}} additional/unique entries for a specific user session 
                 "tokens": {},             # Current active tokens (unused?)
                 "dockers": {},            # config files of docker containers
                 "clients": {              # websocket sessions
@@ -43,88 +42,140 @@ class GroundSeg:
         # Setup Orchestrator
         Thread(target=self.init_orchestrator).start()
 
+        # Setup StarTram API
+        Thread(target=self.init_startram_api).start()
+
+        # Setup Flask
+        Thread(target=self.init_flask).start()
+
         # Start broadcaster class
+        from broadcaster import Broadcaster
         self.state['broadcaster'] = Broadcaster(self.state)
+
         # start websocket
         asyncio.run(self.serve())
 
+    # Load Config Class
     def init_config(self):
         from config.config import Config
         base_path = "/opt/nativeplanet/groundseg"
         self.state['config'] = Config(base_path, self.state)
 
+    # Load Orchestrator Class
     def init_orchestrator(self):
         from orchestrator import Orchestrator
         self.state['orchestrator'] = Orchestrator(self.state)
 
+    # StarTram API 
+    def init_startram_api(self):
+        from api.startram import StarTramAPI
+        self.state['startram'] = StarTramAPI(self.state)
+
+    # Start Flask in Thread
+    def init_flask(self):
+        cfg = self.state['config']
+        while cfg == None:
+            sleep(0.5)
+            cfg = self.state['config']
+        if cfg.device_mode == "c2c":
+            print("start c2c")
+        else:
+            from legacy.groundseg_flask import GroundSegFlask
+            GroundSegFlask(self.state).run()
+
     async def serve(self):
-        # Websocket
-        from api.websocket import WSGroundSeg
-        ws = WSGroundSeg(self.state)
+        host = self.state.get('host')
+        port = self.state.get('port')
+        if not self.kill_process(port):
+            print(f"Port {port} taken. Exiting")
+        else:
+            # Websocket
+            from api.websocket import WSGroundSeg
+            ws = WSGroundSeg(self.state)
 
-        # GallSeg
-        from api.gallseg import GallSeg
-        gs = GallSeg(self.state)
+            # GallSeg
+            from api.gallseg import GallSeg
+            gs = GallSeg(self.state)
 
-        async with serve(ws.handle, self.state.get('host'), self.state.get('port')):
-            t = Threader(self.state)
-            this = self.state['threader']
-            # Start GallSeg API
-            this['gallseg'] = asyncio.create_task(t.watch_gallseg(gs))
+            async with serve(ws.handle, self.state.get('host'), self.state.get('port')):
+                from threader.threader import Threader
+                t = Threader(self.state)
+                this = self.state['threader']
 
-            #
-            #   Before orchestrator
-            #
+                # Start GallSeg API
+                this['gallseg'] = asyncio.create_task(t.watch_gallseg(gs))
 
-            # C2C kill switch (if c2c)
-            #asyncio.get_event_loop().create_task(t.c2c_killswitch())
+                #
+                #   Before orchestrator
+                #
 
-            # binary updater
-            #asyncio.get_event_loop().create_task(t.binary_updater())
+                # C2C kill switch (if c2c)
+                #asyncio.get_event_loop().create_task(t.c2c_killswitch())
 
-            # Linux updater
-            #asyncio.get_event_loop().create_task(t.linux_updater())
+                # binary updater
+                #asyncio.get_event_loop().create_task(t.binary_updater())
 
-            # System monitoring
-            #asyncio.get_event_loop().create_task(t.ram_monitor())
-            #asyncio.get_event_loop().create_task(t.cpu_monitor())
-            #asyncio.get_event_loop().create_task(t.temp_monitor())
-            #asyncio.get_event_loop().create_task(t.disk_monitor())
+                # Linux updater
+                #asyncio.get_event_loop().create_task(t.linux_updater())
 
-            #
-            #   After orchestrator
-            #
+                # System monitoring
+                #asyncio.get_event_loop().create_task(t.ram_monitor())
+                #asyncio.get_event_loop().create_task(t.cpu_monitor())
+                #asyncio.get_event_loop().create_task(t.temp_monitor())
+                #asyncio.get_event_loop().create_task(t.disk_monitor())
 
-            # docker updater
-            #asyncio.get_event_loop().create_task(t.docker_updater())
+                #
+                #   After orchestrator
+                #
 
-            # Scheduled melds
-            #asyncio.get_event_loop().create_task(t.meld_timer())
+                # docker updater
+                #asyncio.get_event_loop().create_task(t.docker_updater())
 
-            # Anchor information
-            #asyncio.get_event_loop().create_task(t.anchor_information())
+                # Scheduled melds
+                #asyncio.get_event_loop().create_task(t.meld_timer())
 
-            # Wireguard connection refresher
-            #asyncio.get_event_loop().create_task(t.wireguard_refresher())
+                # Anchor information
+                asyncio.get_event_loop().create_task(t.anchor_information())
 
-            # Websocket Classes
-            '''
-            this['system'] =  System(self.state)
-            this['urbits'] = Urbits(self.state)
-            this['minios'] = MinIOs(self.state)
-            '''
-            
-            # broadcast
-            this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
-            this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())
+                # Wireguard connection refresher
+                #asyncio.get_event_loop().create_task(t.wireguard_refresher())
 
-            # sessions cleanup
-            this['s_cleanup'] = asyncio.create_task(t.session_cleanup())
+                # startram API
+                this['startram'] = asyncio.create_task(t.startram_loop())
+                
+                # Urbit ships information
+                this['urbits'] = asyncio.create_task(t.urbits_loop())
 
-            # task watcher
-            #asyncio.create_task(self.watch_tasks(this))
+                # Session management
+                this['login'] = asyncio.create_task(t.login_loop())
+                
+                # broadcast
+                this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
+                this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())
 
-            await asyncio.Future()
+                # sessions cleanup
+                this['s_cleanup'] = asyncio.create_task(t.session_cleanup())
+
+                # task watcher
+                #asyncio.create_task(self.watch_tasks(this))
+
+                await asyncio.Future()
+
+    # Kill port for C2C
+    def kill_process(self, port):
+        process = False
+        try:
+            output = subprocess.check_output(["lsof", "-i", f"tcp:{port}"])
+            pid = int(output.split()[10])
+            process = True
+        except subprocess.CalledProcessError:
+            return True
+        if process:
+            try:
+                os.kill(pid, 9)
+                return True
+            except OSError:
+                return False
 
 # Args
 dev = sys.argv[1] == "dev" if len(sys.argv) > 1 else False

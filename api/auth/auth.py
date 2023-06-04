@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 from cryptography.fernet import Fernet
 
+from config.utils import Utils
+
 class Auth:
     def __init__(self, state, urbit=False):
         self.urbit = urbit
@@ -221,20 +223,71 @@ class Auth:
                 pwd = ""
 
             # check if password is correct
-            from config.utils import Utils
-            if Utils.compare_password(self.config['salt'], pwd, self.config['pwHash']):
-            #if self.check_password(pwd):
-                token = self.authorize_token(action.get('token'))
-                status_code = 3
-                msg = "AUTHORIZED"
-                self.authorized[websocket] = token
-                try:
-                    self.unauthorized.pop(websocket)
-                except:
-                    pass
-            else:
+            unlocked = self.config_object.login_status['end'] < datetime.now()
+            try:
+                if not unlocked:
+                    raise exception("locked")
+                if Utils.compare_password(self.config['salt'], pwd, self.config['pwHash']):
+                    token = self.authorize_token(action.get('token'))
+                    status_code = 3
+                    msg = "AUTHORIZED"
+                    self.authorized[websocket] = token
+                    self.config_object.login_status = {
+                            "locked": False,
+                            "end": datetime(1,1,1,0,0),
+                            "attempts": 0
+                            }
+                    try:
+                        self.unauthorized.pop(websocket)
+                    except:
+                        pass
+                else:
+                    raise Exception("incorrect password")
+
+            except Exception as e:
+                print(f"auth:handle_login Error {e}")
                 token = action.get('token')
                 status_code = 1
                 msg = "AUTH_FAILED"
+                self.failed(unlocked)
 
         return status_code, msg, token
+
+    def failed(self,unlocked):
+        if unlocked:
+            attempt = self.config_object.login_status['attempts']
+            attempt += 1
+            if attempt == 3:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=60)
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 4:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=300)
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 5:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=1800)
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 6:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=3600)
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 7:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=(3600 * 6))
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 8:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=(3600 * 12))
+                self.config_object.login_status['locked'] = True
+
+            if attempt == 9:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=(3600 * 24))
+                self.config_object.login_status['locked'] = True
+
+            if attempt >= 10:
+                self.config_object.login_status['end'] = datetime.now() + timedelta(seconds=(3600 * 72))
+                self.config_object.login_status['locked'] = True
+
+            self.config_object.login_status['attempts'] = attempt
+            print(f"auth:failed Rejecting login request: Attempt {attempt}")
