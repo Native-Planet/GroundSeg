@@ -18,7 +18,7 @@
   =.  unlocked.settings.state.this
     &
   =.  reconnect-interval.settings.state.this
-    1
+    ~s30
   `this
 ::
 ++  on-save
@@ -34,7 +34,9 @@
     ::  TODO:
     ::  start timer that checks and tries to establish connection with
     ::  groundseg
-    ~
+    :~
+      [%pass /timers %arvo %b %wait (add ~m1 now.bowl)]
+    ==
   ==
 ::
 ++  on-poke
@@ -72,13 +74,32 @@
         %active
       `this
     ==
-      %mars
-    =/  act  !<(mars:gs vase)
-    :_  this
-    ~
-    ::  send to put directory
-    ::  :hood &drum-put [/action/json +.act]
-    ::  eg. '{"id":id,"payload":{"category":"token","module":null,"action":null}'
+      %agent
+    =/  act  !<(agent:gs vase)
+    ::
+    ?-    -.act
+        %connect
+      ~&  >  'connect'
+      `this
+        %action
+      ::  send to put directory
+      ::  :hood &drum-put [/action/json +.act]
+      ::  eg. '{"id":id,"payload":{"category":"token","module":null,"action":null}'
+      :_  this
+      ::  card
+      :~  :*  %pass 
+            /put
+            %agent
+            [our.bowl %hood]
+            :+  %poke
+              %drum-put 
+            !>
+            :-  /action/json
+            +.act
+      ==  ==  
+      ::
+    ==
+    ::
   ==
 ::
 ++  on-watch
@@ -104,13 +125,24 @@
 ::==
 ::==
 ::
+++  on-arvo
+  |=  [=wire =sign-arvo]
+  ^-  (quip card _this)
+  ?+    wire  (on-arvo:def wire sign-arvo)
+      [%timers ~]
+    ?+    sign-arvo  (on-arvo:def wire sign-arvo)
+        [%behn %wake *]
+      ?~  error.sign-arvo
+        ((slog 'Call timer' ~) `this)
+      (on-arvo:def wire sign-arvo)
+    ==
+  ==
+::
 ++  on-leave  on-leave:def
 ::
 ++  on-peek   on-peek:def
 ::
 ++  on-agent  on-agent:def
-::
-++  on-arvo   on-arvo:def
 ::
 ++  on-fail   on-fail:def
 ::

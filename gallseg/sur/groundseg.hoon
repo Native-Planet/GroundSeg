@@ -14,7 +14,7 @@
 +$  settings
   $:
     unlocked=?
-    reconnect-interval=@ud
+    =reconnect-interval
   ==
 ::
 +$  session
@@ -26,21 +26,25 @@
     token=@t
   ==
 ::
-+$  id            @t
-+$  pending       (map id created=@da)
-+$  broadcast     @t
-+$  action        @t
-+$  activity      @t
-+$  last-contact  @da
++$  id                  @t
++$  pending             (map id created=@da)
++$  broadcast           @t
++$  action              @t
++$  activity            @t
++$  last-contact        @da
++$  reconnect-interval  @dr
++$  retry         ?
 ::
 ::  Actions
 ::
-+$  mars     [%action action]
++$  agent    $%  [%action action]
+                 [%connect retry reconnect-interval]
+             ==
 +$  earth    $%  [%broadcast broadcast]
                  [%activity activity]
              ==
 +$  control  $%  [%unlocked ?]
-                 [%interval @ud]
+                 [%interval reconnect-interval]
              ==
 ::
 --
