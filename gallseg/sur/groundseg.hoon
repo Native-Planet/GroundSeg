@@ -26,18 +26,21 @@
     token=@t
   ==
 ::
-+$  id         @t
-+$  pending    (map id created=@da)
-+$  broadcast  @t
-+$  action     @t
-+$  activity   @t
-+$  last       @da
++$  id            @t
++$  pending       (map id created=@da)
++$  broadcast     @t
++$  action        @t
++$  activity      @t
++$  last-contact  @da
 ::
 ::  Actions
 ::
-+$  earth  $%  [%broadcast broadcast]
-               [%activity activity]
-           ==
-+$  mars  [%action action]
++$  mars     [%action action]
++$  earth    $%  [%broadcast broadcast]
+                 [%activity activity]
+             ==
++$  control  $%  [%unlocked ?]
+                 [%interval @ud]
+             ==
 ::
 --

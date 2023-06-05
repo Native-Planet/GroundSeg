@@ -13,7 +13,13 @@
 ::
 ++  on-init
   ^-  (quip card _this)
-  `this(session %inactive, unlocked &)
+  =.  status.session.state.this
+    %inactive
+  =.  unlocked.settings.state.this
+    &
+  =.  reconnect-interval.settings.state.this
+    1
+  `this
 ::
 ++  on-save
   !>(state)
@@ -22,8 +28,8 @@
   |=  old-state=vase
   ^-  (quip card _this)
   =/  old  !<(versioned-state:gs old-state)
-  ?-  -.old
-        %0  
+  ?-    -.old
+      %0  
     :_  this(state old)
     ::  TODO:
     ::  start timer that checks and tries to establish connection with
@@ -38,21 +44,33 @@
       %control
     =/  act  !<(control:gs vase)
     ?-    -.act
-        %access
-          `this(unlocked +.act)
-        %
+        %unlocked
+      ::  TODO:
+      ::  lock/unlock %earth pokes
+      `this
+        %interval
+      ::  TODO:
+      ::  set reconnect interval
+      `this
+    ==
       %earth
     =/  act  !<(earth:gs vase)
     ?-    -.act
         %broadcast
       ::  TODO
       ::  merge broadcast into structure
-      `this(broadcast +.act, session %active)
+      ::  set session to %active
+      ^-  (quip card _this)
+      =.  status.session.state.this
+        %active
+      `this(broadcast +.act)
         %activity
       ::  TODO
       ::  remove id from pending
       ::  set session to %active
-      `this(session %active)
+      =.  status.session.state.this
+        %active
+      `this
     ==
       %mars
     =/  act  !<(mars:gs vase)

@@ -1,13 +1,6 @@
-/-  *groundseg
-::
-::  Library for interacting with GroundSeg
-::  
+/-  gs=groundseg
 |%
-::  returns connection status with Earth counterpart
-++  connection-status
-  |=  [=limit]
-  ^-  ?
-  ~&  >>  limit
-  %.n
+::
+++  
 ::
 --
