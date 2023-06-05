@@ -1,9 +1,6 @@
 /-  gs=groundseg
 /+  default-agent, dbug
 |%
-+$  versioned-state
-  $%  state-0:gs
-  ==
 +$  card  card:agent:gall
 --
 %-  agent:dbug
@@ -16,7 +13,7 @@
 ::
 ++  on-init
   ^-  (quip card _this)
-  `this(session %inactive, enabled &)
+  `this(session %inactive, unlocked &)
 ::
 ++  on-save
   !>(state)
@@ -24,12 +21,13 @@
 ++  on-load
   |=  old-state=vase
   ^-  (quip card _this)
-  =/  old  !<(versioned-state old-state)
+  =/  old  !<(versioned-state:gs old-state)
   ?-  -.old
         %0  
     :_  this(state old)
     ::  TODO:
-    ::  @action/json '{"id":id,"payload":{"category":"token","module":null,"action":null}'
+    ::  start timer that checks and tries to establish connection with
+    ::  groundseg
     ~
   ==
 ::
@@ -37,14 +35,23 @@
   |=  [=mark =vase]
   ^-  (quip card _this)
   ?+    mark  (on-poke:def mark vase)
+      %control
+    =/  act  !<(control:gs vase)
+    ?-    -.act
+        %access
+          `this(unlocked +.act)
+        %
       %earth
     =/  act  !<(earth:gs vase)
     ?-    -.act
         %broadcast
+      ::  TODO
       ::  merge broadcast into structure
-      `this(broadcast +.act, session %active) :: temp
+      `this(broadcast +.act, session %active)
         %activity
-      :: remove id from pending
+      ::  TODO
+      ::  remove id from pending
+      ::  set session to %active
       `this(session %active)
     ==
       %mars
@@ -53,6 +60,7 @@
     ~
     ::  send to put directory
     ::  :hood &drum-put [/action/json +.act]
+    ::  eg. '{"id":id,"payload":{"category":"token","module":null,"action":null}'
   ==
 ::
 ++  on-watch
