@@ -1,5 +1,5 @@
 /-  gs=groundseg
-/+  default-agent, dbug
+/+  default-agent, dbug, lib=groundseg, m=macro
 |%
 +$  card  card:agent:gall
 --
@@ -13,16 +13,16 @@
 ::
 ++  on-init
   ^-  (quip card _this)
-  =.  status.session.state.this
-    %inactive
-  =.  unlocked.settings.state.this
-    &
-  =.  reconnect-interval.settings.state.this
-    ~s30
-  `this
+  =+  policy=policy.state.this
+  =.  retry.policy       %allow 
+  =.  limit.policy           10
+  =.  interval.policy      ~s30
+  =.  policy.state.this  policy
+  =.  last-contact.policy   [~]
+  :_  this
+  (reconnect-cards:lib our.bowl now.bowl state.this)
 ::
-++  on-save
-  !>(state)
+++  on-save  !>(state)
 ::
 ++  on-load
   |=  old-state=vase
@@ -31,75 +31,66 @@
   ?-    -.old
       %0  
     :_  this(state old)
-    ::  TODO:
-    ::  start timer that checks and tries to establish connection with
-    ::  groundseg
-    :~
-      [%pass /timers %arvo %b %wait (add ~m1 now.bowl)]
-    ==
+    (reconnect-cards:lib our.bowl now.bowl old)
+
   ==
 ::
 ++  on-poke
   |=  [=mark =vase]
+  ?>  =(our.bowl src.bowl)
   ^-  (quip card _this)
   ?+    mark  (on-poke:def mark vase)
-      %control
-    =/  act  !<(control:gs vase)
-    ?-    -.act
-        %unlocked
-      ::  TODO:
-      ::  lock/unlock %earth pokes
-      `this
-        %interval
-      ::  TODO:
-      ::  set reconnect interval
-      `this
-    ==
-      %earth
-    =/  act  !<(earth:gs vase)
-    ?-    -.act
-        %broadcast
-      ::  TODO
-      ::  merge broadcast into structure
-      ::  set session to %active
-      ^-  (quip card _this)
-      =.  status.session.state.this
-        %active
-      `this(broadcast +.act)
-        %activity
-      ::  TODO
-      ::  remove id from pending
-      ::  set session to %active
-      =.  status.session.state.this
-        %active
-      `this
-    ==
-      %agent
-    =/  act  !<(agent:gs vase)
     ::
+    ::  configure the agent
+    ::
+      %admin
+    =/  act  !<(admin:gs vase)
     ?-    -.act
-        %connect
-      ~&  >  'connect'
+      ::
+        %valve
+      ?:  =(%open +.act)
+        [~[[%pass / %arvo %l %spin /api]] this]
+      [~[[%pass / %arvo %l %shut /api]] this]
+      ::
+        %retry
+      =.  retry.policy.state.this  +.act
       `this
-        %action
-      ::  send to put directory
-      ::  :hood &drum-put [/action/json +.act]
-      ::  eg. '{"id":id,"payload":{"category":"token","module":null,"action":null}'
-      :_  this
-      ::  card
-      :~  :*  %pass 
-            /put
-            %agent
-            [our.bowl %hood]
-            :+  %poke
-              %drum-put 
-            !>
-            :-  /action/json
-            +.act
-      ==  ==  
+      ::
+        %interval
+      =.  interval.policy.state.this  +.act
+      `this
+      ::
+        %limit
+      =.  limit.policy.state.this  +.act
+      `this
       ::
     ==
     ::
+    ::  high level mark to interact with groundseg
+    ::
+      %macro
+    =/  act  !<(macro:gs vase)
+    ?-    -.act
+      ::
+        %verify
+      :_  this
+      (verify:m bowl token.state.this)
+      ::
+        %login
+      :_  this
+      (login:m bowl token.state.this password.act)
+      ::
+    ==
+    ::
+    ::  low level mark. No reason to use this
+    ::
+      %raw
+    =/  act  !<(raw:gs vase)
+    ?-    -.act
+        %send
+      :_  this
+      (send:m our.bowl action.act)
+    ==
   ==
 ::
 ++  on-watch
@@ -128,15 +119,31 @@
 ++  on-arvo
   |=  [=wire =sign-arvo]
   ^-  (quip card _this)
-  ?+    wire  (on-arvo:def wire sign-arvo)
-      [%timers ~]
-    ?+    sign-arvo  (on-arvo:def wire sign-arvo)
-        [%behn %wake *]
-      ?~  error.sign-arvo
-        ((slog 'Call timer' ~) `this)
-      (on-arvo:def wire sign-arvo)
+  ::
+  ?+    -.sign-arvo  ~&  >>>  -.sign-arvo  `this
+      %behn
+    ?>  =(/reconnect wire)
+    :_  this
+    (reconnect-cards:lib our.bowl now.bowl state.this)
+    ::
+      %lick
+    =+  gift=+.sign-arvo
+    ?+  -.gift  ~&  >>>  gift  `this
+        %soak
+      =.  last-contact.policy.state.this  [~ now.bowl]
+      ?+    mark.gift  ~&  >>>  mark.gift  `this
+          %connect
+        :_  this(session %active)
+        (verify:m bowl token.state.this)
+        ::
+          %disconnect
+        `this(session %inactive)
+      ==
+      ::
     ==
+    ::
   ==
+  ::
 ::
 ++  on-leave  on-leave:def
 ::

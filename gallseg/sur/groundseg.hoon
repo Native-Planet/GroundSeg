@@ -2,49 +2,65 @@
 ::
 ::  State
 ::
-+$  versioned-state
-  $%
-    state-0
-  ==
-::
-+$  state-0  [%0 =settings =session =broadcast]
++$  versioned-state  $%  state-0
+                     ==
++$  state-0  $:  %0
+               =session
+               =policy
+               =pending
+               =token
+               =session
+               =broadcast
+             ==
 ::
 ::  Types
 ::
-+$  settings
-  $:
-    unlocked=?
-    =reconnect-interval
-  ==
++$  id            @t
++$  session       ?(%active %inactive)
++$  last-contact  (unit @da)
++$  retry         ?(%allow %block)
++$  valve         ?(%open %shut)
++$  limit         @ud
++$  interval      @dr
++$  pending       (map id created=@da)
++$  token         (unit [i=id t=@t])
++$  policy        [=last-contact =retry =limit =interval]
++$  password      @t
 ::
-+$  session
-  $:
-    =last-contact
-    =pending
-    status=?(%active %inactive)
-    token-id=@t
-    token=@t
-  ==
+::  GroundSeg
 ::
-+$  id                  @t
-+$  pending             (map id created=@da)
-+$  broadcast           @t
-+$  action              @t
-+$  activity            @t
-+$  last-contact        @da
-+$  reconnect-interval  @dr
-+$  retry         ?
++$  groundseg  $%  [%action @t]
+                   [%broadcast @t]
+                   [%activity @t]
+               ==
+::
+::  GroundSeg Broadcast
+::
++$  broadcast     @t
+::
+::  GroundSeg Action
+::
++$  action    [%action =id =payload =token]
++$  payload   [=category =uship =module =act]
++$  category  (unit @t)
++$  module    (unit @t)
++$  act       (unit @t)
++$  uship     (unit ship)
+::
+::  GroundSeg Activity
+::
++$  activity      @t
 ::
 ::  Actions
 ::
-+$  agent    $%  [%action action]
-                 [%connect retry reconnect-interval]
-             ==
-+$  earth    $%  [%broadcast broadcast]
-                 [%activity activity]
-             ==
-+$  control  $%  [%unlocked ?]
-                 [%interval reconnect-interval]
-             ==
-::
++$  admin  $%  [%valve =valve]
+               [%retry =retry]
+               [%interval =interval]
+               [%limit =limit]
+           ==
++$  macro  $%  [%verify ~]
+               [%login =password]
+           ==
++$  raw    $%  [%send =action]
+           ==
 --
