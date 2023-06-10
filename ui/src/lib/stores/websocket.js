@@ -77,6 +77,10 @@ export const connect = async url => {
   }
 }
 
+//
+//  Auth
+//
+
 // Verify (token category)
 export const verify = async () => {
   let id = await generateRandom(16)
@@ -94,6 +98,26 @@ export const login = async password => {
   SESSION.login(id,password,token)
 }
 
+//
+//  Urbits
+//
+
+export const urbitsAccessToggle = async ship => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.urbitsAccessToggle(id,ship,token)
+}
+
+export const urbitsMeldUrth = async ship => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.urbitsMeldUrth(id,ship,token)
+}
+
+// 
+// Update Form
 export const updateForm = async (template,item,value) => {
   let id = await generateRandom(16)
   let token = await loadSession()
@@ -101,6 +125,11 @@ export const updateForm = async (template,item,value) => {
   SESSION.updateForm(id,template,item,value,token)
 }
 
+//
+//  StarTram
+//
+
+// Register StarTram
 export const registerStarTram = async () => {
   let id = await generateRandom(16)
   let token = await loadSession()

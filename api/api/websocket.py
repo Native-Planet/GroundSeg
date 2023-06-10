@@ -61,10 +61,10 @@ class WSGroundSeg:
             elif cat == "system":
                 status_code, msg, token = self.system_action(action, websocket, status_code, msg)
 
-                '''
             elif cat == 'urbits':
-                status_code, msg = self.orchestrator.ws_command_urbit(payload)
+                status_code, msg = self.urbits_action(action, websocket, status_code, msg)
 
+                '''
             elif cat == 'updates':
                 status_code, msg = self.ws_command_updates(payload)
                 '''
@@ -84,6 +84,54 @@ class WSGroundSeg:
             print(f"app:handle_request Error {e}")
 
         return status_code, msg, token
+
+
+    def urbits_action(self, data, websocket, status_code, msg):
+        token = None
+        whitelist = [
+                'meld',
+                'minio',
+                'container',
+                'access'
+                ]
+        payload = data.get('payload')
+        id = data.get('id')
+        patp = payload.get('patp')
+        module = payload.get('module')
+        action = payload.get('action')
+
+        if module not in whitelist:
+            raise Exception(f"{module} is not a valid module")
+        if module not in whitelist:
+            status_code = 1
+            msg = "INVALID_MODULE"
+        else:
+            if websocket in self.state['clients']['authorized']:
+                # Access
+                if module == "access":
+                    if action == "toggle":
+                        Thread(target=self.orchestrator.ws_urbits.access_toggle, args=(patp,)).start()
+                # Pack and Meld
+                if module == "meld":
+                    if action == "urth":
+                        Thread(target=self.orchestrator.ws_urbits.meld_urth,
+                               args=(patp,)
+                               ).start()
+                '''
+                # MinIO
+                if module == "minio":
+                    if action == "link":
+                        Thread(target=self.minio_link, args=(patp,)).start()
+                    if action == "unlink":
+                        Thread(target=self.minio_unlink, args=(patp,)).start()
+                # Urbit Docker Container
+                if module == "container":
+                    if action == "rebuild":
+                        Thread(target=self.ws_urbits.container_rebuild,
+                               args=(patp,)
+                               ).start()
+                '''
+                return status_code, msg
 
     # System
     def system_action(self, data, websocket, status_code, msg):

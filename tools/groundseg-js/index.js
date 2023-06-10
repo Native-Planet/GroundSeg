@@ -1,5 +1,4 @@
 export default class GroundSegJS {
-
   constructor(url) {
     this.connected = false;
     this.url = url;
@@ -17,15 +16,12 @@ export default class GroundSegJS {
         console.log("connected")
         resolve(this.connected)
       };
-
       this.ws.onmessage = (event) => {
         this.updateData(event.data)
       };
-
       this.ws.onerror = (error) => {
         console.log("connection failed", error);
       };
-
       this.ws.onclose = () => {
         this.connected = false
         console.log("closed")
@@ -54,9 +50,24 @@ export default class GroundSegJS {
     this.silentSend(data,token)
   }
 
+  // Register startram
   registerStarTram(id,token=null) {
     let data = {"id":id,"payload":{"category":"system","module":"startram","action":"register"}}
     console.log(id + " attempting to register StarTram")
+    this.silentSend(data,token)
+  }
+
+  // Toggle Urbit network
+  urbitsAccessToggle(id,ship,token=null) {
+    let data = {"id":id,"payload":{"category":"urbits","ship":ship,"module":"access","action":"toggle"}}
+    console.log(id + ":" + ship + " attempting to toggle network")
+    this.silentSend(data,token)
+  }
+
+  // Meld from Urth
+  urbitsMeldUrth(id,ship,token=null) {
+    let data = {"id":id,"payload":{"category":"urbits","ship":ship,"module":"meld","action":"urth"}}
+    console.log(id + ":" + ship + " attempting to meld from urth ")
     this.silentSend(data,token)
   }
 

@@ -1,7 +1,8 @@
 <script>
 	import { onMount, onDestroy } from 'svelte'
 
-  import { structure } from '$lib/stores/websocket.js'
+  import { socketInfo } from '$lib/stores/websocket.js'
+  /*
   import { scale } from 'svelte/transition'
 	import { page } from '$app/stores'
 	import { isPortrait, api, updateState, noconn } from '$lib/api'
@@ -36,8 +37,12 @@
   import PierAdvancedInformation from '$lib/PierAdvancedInformation.svelte'
 
   // Right Advanced
-  //import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
+  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
   import PierOptionsDomain from '$lib/PierOptionsDomain.svelte'
+
+	// load data into store
+	//export let data
+	//updateState(data)
 
 	// default values
   let urbit
@@ -52,15 +57,22 @@
   
   let advanced = (activeTab == "Advanced")
 
-  $: name = ($structure?.urbits?.[$page.params.patp]) || null
+  $: name = ($socketInfo?.urbits?.[$page.params.patp]) || null
 
 	// start api loop
-  onMount(()=> {
+	onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
+    if (data['status'] == 404) {
+      window.location.href = "/login"
+    }
+
+    if (data['status'] == 'setup') {
+      window.location.href = "/setup"
+    }
+
     update()
     getUrbitCode()
   })
-
 
 	// stop api loop
 	onDestroy(()=> inView = false)
@@ -74,15 +86,14 @@
 			.then(raw => raw.json())
         .then(res => {
           if (res == 404) {
-            Window.location.href = "/login"
+            window.location.href = "/login"
           }
           handleData(res)
         })
 			.catch(err => console.log(err))
 
 			setTimeout(update, 1000)
-    }
-  }
+	}}
 
   const handleData = d => {
     if (d == 400) { 
@@ -121,8 +132,7 @@
       } else {
         setTimeout(getUrbitCode, 1000)
       }
-    }
-  }
+  }}
 
 
   const toggleAdvanced = () => {
@@ -134,17 +144,19 @@
     activeTab = e.detail
     advanced = activeTab == "Advanced"
   }
+  */
 </script>
 
+<!--
 {#if inView && loaded}
   <Card width="{advanced ? 900 : 600}px" devMode={urbit.devMode}>
 
-    <!-- Pier Header -->
+    <!-- Pier Header --
     <PierHeader running={urbit.running} name={urbit.name}>
       <Logo t="Urbit Ship Control Panel"/>
     </PierHeader>
 
-    <!-- Pier Profile (public information) -->
+    <!-- Pier Profile (public information) --
     <div transition:scale={{duration:120, delay: 200}}>
       <PierProfile
         {code}
@@ -165,10 +177,10 @@
     </div>
     {:else}
 
-    <!-- Navbar -->
+    <!-- Navbar --
     <PierNavigation on:click={switchTab} {activeTab} />
 
-    <!-- Tab Contents -->
+    <!-- Tab Contents --
     {#if activeTab == 'Logs'}
       <div in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
         <PierOptionsLogs name={urbit.name} containers={urbit.containers} on:click={()=>console.log("export")}/>
@@ -176,12 +188,12 @@
     {/if}
 
     {#if activeTab == 'Basic'}
-      <!-- Landscape +code -->
+      <!-- Landscape +code --
       <div class:disabled={(code == null) || (code.length != 27) || !urbit.running} in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
         <PierCode code={code} />
       </div>
 
-      <!-- Urbit Landscape URL -->
+      <!-- Urbit Landscape URL --
       <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
         <PierUrl
           name={urbit.name}
@@ -192,7 +204,7 @@
         />
       </div>
 
-      <!-- MinIO Console -->
+      <!-- MinIO Console --
       {#if urbit.wgReg && urbit.wgRunning}
         {#if urbit.minIOReg}
           <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
@@ -205,17 +217,17 @@
         {/if}
       {/if}
 
-      <!-- Toggle Urbit Network -->
+      <!-- Toggle Urbit Network --
       <div in:scale={{duration:120, delay: 300}} out:scale={{duration:120}}>
         <PierNetwork name={urbit.name} remote={urbit.remote} wgReg={urbit.wgReg} wgRunning={urbit.wgRunning} />
       </div>
     {/if}
 
-    <!-- Advanced Options -->
+    <!-- Advanced Options --
     {#if activeTab == 'Advanced'}
-      <!-- Three columns -->
+      <!-- Three columns --
       <div class="main-wrapper" in:scale={{duration:120, delay: 300}} out:scale={{duration:60, delay:0}}>
-        <!-- Left side -->
+        <!-- Left side --
         <div class="left-wrapper">
           <PierAdvancedCode {code} disabled={(code == null) || (code.length != 27) || !urbit.running} />
           <PierOptionsMeld 
@@ -241,7 +253,7 @@
             on:delete={()=>isPierDeletion = true}
           />
         </div>
-        <!-- Center -->
+        <!-- Center --
         {#if !$isPortrait}
           <div class="center-wrapper">
             <PierAdvancedUrl
@@ -264,7 +276,7 @@
             />
           </div>
         {/if}
-        <!-- Right side -->
+        <!-- Right side --
         <div class="right-wrapper">
           {#if $isPortrait}
             <PierAdvancedUrl
@@ -281,7 +293,6 @@
               wgRunning={urbit.wgRunning}
             />
           {/if}
-          <!--
           <PierOptionsMinIO 
             minIOUrl={urbit.minIOUrl} 
             minIOReg={urbit.minIOReg}
@@ -289,7 +300,6 @@
             name={urbit.name}
             disabled={urbit.click ? false : urbit.devMode}
           />
-          -->
           <PierOptionsDomain
             name={urbit.name}
             disabled={!urbit.wgReg}
@@ -319,12 +329,6 @@
               for more information.
             </div>
           </PierOptionsDomain>
-          {#if $isPortrait}
-            <PierAdvancedInformation
-              name={urbit.name}
-              running={urbit.running}
-            />
-          {/if}
         </div>
       </div>
     {/if}
@@ -332,6 +336,7 @@
 	</Card>
 {/if}
 
+-->
 <style>
   .disabled {
     color: #ff00004d;

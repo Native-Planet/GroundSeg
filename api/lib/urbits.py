@@ -4,9 +4,9 @@ from threading import Thread
 from log import Log
 
 # Action imports
-#from action_meld_urth import MeldUrth
+from action.urbits.meld_urth import MeldUrth
 #from action_minio_link import MinIOLink
-#from action_access_toggle import AccessToggle
+from action.urbits.access_toggle import AccessToggle
 
 class WSUrbits:
     def __init__(self, state): 
@@ -113,8 +113,8 @@ class WSUrbits:
         self.ws_util.urbit_broadcast(patp, 'container', 'rebuild')
 
     def meld_urth(self, patp):
-        self.ws_util.urbit_broadcast(patp, 'meld', 'urth','initializing')
-        MeldUrth(self, patp, self.urb, self.ws_util).run()
+        #self.ws_util.urbit_broadcast(patp, 'meld', 'urth','initializing')
+        MeldUrth(self, patp, self.state).run() #self.urb, self.ws_util).run()
 
     # TODO: remove unlink stuff
     def minio_link(self, pier_config, acc="", secret="", bucket="", unlink=False):
@@ -122,6 +122,6 @@ class WSUrbits:
 
     def access_toggle(self, patp, t=None):
         if t:
-            AccessToggle(patp, self.config_object, self.urb, self.ws_util).set(t)
+            AccessToggle(patp, self.state).set(t)
         else:
-            AccessToggle(patp, self.config_object, self.urb, self.ws_util).toggle()
+            AccessToggle(patp, self.state).toggle()

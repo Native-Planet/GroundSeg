@@ -1,25 +1,21 @@
 <script>
 	import { api } from '$lib/api'
-  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
+  import { structure, urbitsAccessToggle } from "$lib/stores/websocket" 
 
 	export let name, remote, wgReg, wgRunning
 
 	let isSwitching = false
 
 	// toggle network
-  const toggleNetwork = () => { 
-    let payload = {
-      "category": "urbits",
-      "payload": {"patp": name, "module": "access", "action": "toggle"}
-    }
-    send($socket, $socketInfo, document.cookie, payload)
+  const accessToggle = () => { 
+    urbitsAccessToggle(name)
   }
 
 </script>
 {#if wgReg && wgRunning}
   <div class="pier-info" class:switching={isSwitching}>
     <div class="pier-title">Connectivity</div>
-    <div class="access-options" on:click={toggleNetwork}>
+    <div class="access-options" on:click={accessToggle}>
 			<button class="option" class:access-active={remote == false} >Local</button>
       <button class="option" class:access-active={remote == true} >Remote</button>
     </div>

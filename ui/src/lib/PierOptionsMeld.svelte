@@ -1,6 +1,6 @@
 <script>
   // WebSocket Store
-  import { socket, socketInfo, send } from "$lib/stores/websocket.js" 
+  import { structure, urbitsMeldUrth } from "$lib/stores/websocket.js" 
 
   import { onMount, onDestroy } from 'svelte'
   import { scale } from 'svelte/transition'
@@ -35,7 +35,7 @@
   let minutes = Array.from(Array(60).keys()) 
   let hours = Array.from(Array(24).keys())
 
-  $: urthMeldInfo = ($socketInfo.urbits[name]?.meld?.urth) || ""
+  $: urthMeldInfo = ($structure.urbits[name]?.meld?.urth) || ""
 
   onMount(()=> {
     cloneFreq = frequency
@@ -66,11 +66,7 @@
     "action": "set"
   */
   const sendUrthMeld = () => {
-    let payload = {
-      "category": "urbits",
-      "payload": {"patp": name, "module": "meld", "action": "urth"}
-    }
-    send($socket, $socketInfo, document.cookie, payload)
+    urbitsMeldUrth(name)
   }
 
   const toggleMeldSchedule = () => {

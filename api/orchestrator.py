@@ -12,6 +12,8 @@ from lib.system import WSSystem
 from lib.urbits import WSUrbits
 from lib.minios import WSMinIOs
 
+# Legacy API
+from legacy.system_post import SysPost
 # Util
 from log import Log
 
@@ -229,4 +231,196 @@ class Orchestrator:
             return True
         except:
             return False
+
+
+
+#
+#   LEGACY
+#
+
+    # Get all details of Urbit ID
+    def get_urbit(self, urbit_id):
+        try:
+            res = self.urbit.get_info(urbit_id)
+        except Exception as e:
+            res = "ERROR"
+            Log.log(f"get_urbit {e}")
+        return res
+
+    # Handle POST request relating to Urbit ID
+    def urbit_post(self ,urbit_id, data):
+        try:
+            # Boot new Urbit
+            if data['app'] == 'boot-new':
+                #TODO: move the entire endpoint to ws
+                return self.urbit.create(urbit_id, data.get('key'), data.get('remote'))
+
+            # Check if Urbit Pier exists
+            if not self.urbit.urb_docker.get_container(urbit_id):
+                return 400
+
+            # Wireguard requests
+            if data['app'] == 'wireguard':
+                if data['data'] == 'toggle':
+                    return self.urbit.toggle_network(urbit_id)
+
+            # Urbit Pier requests
+            if data['app'] == 'pier':
+                if data['data'] == 'toggle':
+                    return self.urbit.toggle_power(urbit_id)
+
+                if data['data'] == '+code':
+                    return self.urbit.get_code(urbit_id)
+
+                if data['data'] == 'toggle-autostart':
+                    return self.urbit.toggle_autostart(urbit_id)
+
+                if data['data'] == 'swap-url':
+                    return self.urbit.swap_url(urbit_id)
+
+                if data['data'] == 'loom':
+                    return self.urbit.set_loom(urbit_id,data['size'])
+
+                if data['data'] == 'schedule-meld':
+                    return self.urbit.schedule_meld(urbit_id, data['frequency'], data['hour'], data['minute'])
+
+                if data['data'] == 'toggle-meld':
+                    return self.urbit.toggle_meld(urbit_id)
+
+                if data['data'] == 'do-meld':
+                    return self.urbit.send_pack_meld(urbit_id)
+
+                if data['data'] == 'delete':
+                    return self.urbit.delete(urbit_id)
+
+                if data['data'] == 'export':
+                    return self.urbit.export(urbit_id)
+
+                if data['data'] == 'devmode':
+                    return self.urbit.toggle_devmode(data['on'], urbit_id)
+
+                if data['data'] == 's3-unlink':
+                    return self.urbit.unlink_minio(urbit_id)
+
+            # Custom domain
+            if data['app'] == 'cname':
+                # reroute to websocket
+                return self.domain_cname(urbit_id, data['data'])
+
+            # MinIO requests
+            if data['app'] == 'minio':
+                pwd = data.get('password')
+                if pwd is not None:
+                    link = data.get('link')
+                    # reroute to websocket
+                    return self.minio_create(urbit_id, pwd, link)
+
+                if data['data'] == 'export':
+                    return self.minio.export(urbit_id)
+
+            return 400
+
+        except Exception as e:
+            Log.log(f"Urbit: Post Request failed: {e}")
+
+        return 400
+
+
+    # Modify system settings
+    def system_post(self, module, data, sessionid):
+
+        # sessions module
+        if module == 'session':
+            return SysPost.handle_session(data, self.config_object, sessionid)
+
+        # power module
+        if module == 'power':
+            return SysPost.handle_power(data)
+
+        # binary module
+        if module == 'binary':
+            return SysPost.handle_binary(data)
+
+        # network connectivity module
+        if module == 'network':
+            return SysPost.handle_network(data,self.config_object)
+
+        # watchtower module
+        if module == 'watchtower':
+            return SysPost.handle_updater(data, self.config_object)
+
+        # minIO module
+        if module == 'minio':
+            if data['action'] == 'reload':
+                if self.minio.stop_all():
+                    if self.minio.start_all():
+                        sleep(1)
+                        return 200
+            return 400
+
+        # swap module
+        if module == 'swap':
+            if data['action'] == 'set':
+                val = data['val']
+                if val != self.config['swapVal']:
+                    if self.config['swapVal'] > 0:
+                        if Utils.stop_swap(self.config['swapFile']):
+                            Log.log(f"Swap: Removing {self.config['swapFile']}")
+                            os.remove(self.config['swapFile'])
+
+                    if val > 0:
+                        if Utils.make_swap(self.config['swapFile'], val):
+                            if Utils.start_swap(self.config['swapFile']):
+                                self.config['swapVal'] = val
+                                self.config_object.save_config()
+                                return 200
+                    else:
+                        self.config['swapVal'] = val
+                        self.config_object.save_config()
+                        return 200
+
+        # anchor module
+        if module == 'anchor':
+            if data['action'] == 'unsubscribe':
+                endpoint = self.config['endpointUrl']
+                api_version = self.config['apiVersion']
+                url = f'https://{endpoint}/{api_version}'
+                return self.wireguard.cancel_subscription(data['key'],url)
+
+        # logs module
+        if module == 'logs':
+            if data['action'] == 'view':
+                return self.get_log_lines(data['container'], data['haveLine'])
+
+            if data['action'] == 'export':
+                return '\n'.join(self.get_log_lines(data['container'], 0))
+
+        return module
+
+    def get_log_lines(self, container, line):
+        blob = ''
+
+        try:
+            if container == 'wireguard':
+                blob = self.wireguard.logs()
+
+            if container == 'netdata':
+                blob = self.netdata.logs()
+
+            if container == 'groundseg':
+                return Log.get_log()[line:]
+
+            if 'minio_' in container:
+                blob = self.minio.minio_logs(container)
+
+            if container in self.urbit._urbits:
+                blob = self.urbit.logs(container)
+
+            blob = blob.decode('utf-8').split('\n')[line:]
+
+        except Exception:
+            Log.log(f"Logs: Failed to get logs for {container}")
+
+        return blob
+
 

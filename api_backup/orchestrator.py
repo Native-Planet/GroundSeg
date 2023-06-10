@@ -478,9 +478,11 @@ class Orchestrator:
     #
 
 
+    '''
     # List of Urbit Ships in Home Page
     def get_urbits(self):
         return self.urbit.list_ships()
+    '''
 
     # Get all details of Urbit ID
     def get_urbit(self, urbit_id):

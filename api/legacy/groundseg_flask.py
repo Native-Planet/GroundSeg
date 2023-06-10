@@ -36,6 +36,7 @@ class GroundSegFlask:
             return message
 
         # List of Urbit Ships in Home Page
+        '''
         @self.app.route("/urbits", methods=['GET'])
         def all_urbits():
             approved, message = self.verify(request)
@@ -45,6 +46,7 @@ class GroundSegFlask:
                 return make_response(jsonify(urbs))
 
             return message
+        '''
 
         # Handle urbit ID related requests
         @self.app.route('/urbit', methods=['GET','POST'])
@@ -54,7 +56,7 @@ class GroundSegFlask:
             if approved:
                 urbit_id = request.args.get('urbit_id')
                 if request.method == 'GET':
-                    urb = orchestrator.get_urbit(urbit_id)
+                    urb = self.orchestrator.get_urbit(urbit_id)
                     return jsonify(urb)
 
                 if request.method == 'POST':
@@ -151,6 +153,11 @@ class GroundSegFlask:
 
     # Check if user is authenticated
     def verify(self, req):
+        if self.orchestrator:
+            return True, None
+        else:
+            self.orchestrator = self.state['orchestrator']
+            return False, jsonify("NOT_READY")
         # User hasn't setup GroundSeg
         if self.config['firstBoot']:
             return (False, jsonify('setup'))

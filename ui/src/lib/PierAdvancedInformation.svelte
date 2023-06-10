@@ -1,8 +1,8 @@
 <script>
-  import { socketInfo } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket'
   export let name
   export let running
-  $: vere = ($socketInfo.urbits[name]?.vere?.version) || ""
+  $: vere = ($structure.urbits[name]?.vere?.version) || ""
 </script>
 
 {#if running && (vere.length > 1)}

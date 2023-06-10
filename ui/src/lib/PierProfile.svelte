@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte'
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket.js'
 
 	import Sigil from '$lib/Sigil.svelte'
 	import Clipboard from 'clipboard'
@@ -17,14 +17,14 @@
   let copyPatp
   let clickedPatp = false
 
-  $: rebuildInfo = ($socketInfo?.urbits?.[name]?.container?.rebuild) || ""
+  $: rebuildInfo = ($structure?.urbits?.[name]?.container?.rebuild) || ""
 
   const rebuildContainer = () => {
     let payload = {
       "category": "urbits",
       "payload": {"patp": name, "module": "container", "action": "rebuild"}
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    //send($socket, $socketInfo, document.cookie, payload)
   }
 
   const patpClipboard = () => {
