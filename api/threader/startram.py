@@ -51,7 +51,7 @@ class StarTramLoop:
         # success        -  registered successfully
         # failure\n<err> -  Failure message
         try:
-            reg = self.ws_util.structure['system']['startram']['register']
+            reg = self.state['broadcast']['system']['startram']['register']
         except:
             reg = "no"
 

@@ -25,7 +25,20 @@ class AnchorInformation:
                 pass
             sleep(2)
 
+        # Orchestrator
+        self.orchestrator = self.state['orchestrator']
+        while self.orchestrator == None:
+            sleep(0.5)
+            self.orchestrator = self.state['orchestrator']
+
+        # Orchestrator
+        self.wireguard = self.state['dockers']['wireguard'] or None
+        while self.wireguard == None:
+            sleep(0.5)
+            self.wireguard = self.state['dockers']['wireguard'] or None
+
         self.count = 0
+
     # Get updated Anchor information every 12 hours
     def run(self):
         n = ((60 * 60 * 6) - 60) 
@@ -33,17 +46,18 @@ class AnchorInformation:
             Thread(target=self.api.get_regions, args=(30,),daemon=True).start()
             if self.config['wgRegistered'] and self.config['wgOn']:
                 try:
-                    if self.orchestrator.startram_api.retrieve_status():
-                        wg_conf = self.orchestrator.wireguard.anchor_data['conf']
-                        if self.orchestrator.wireguard.update_wg_config(wg_conf):
+                    if self.api.retrieve_status():
+                        wg_conf = self.wireguard.anchor_data['conf']
+                        if self.wireguard.update_wg_config(wg_conf):
                             self.update_urbit()
                 except Exception as e:
                     Log.log(f"anchor_information:run Failed to get updated anchor information: {e}")
 
         self.count += 1
 
-    '''
     def update_urbit(self):
+        print("anchor_information:update_urbit called")
+        '''
         try:
             for patp in self.orchestrator.urbit._urbits:
                 svc_url = None

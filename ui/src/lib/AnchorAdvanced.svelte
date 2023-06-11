@@ -1,8 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
-  //import { send, socket, structure } from '$lib/stores/websocket.js'
-  import { structure } from '$lib/stores/websocket'
+  import { structure, updateForm, starTramEndpoint, starTramRestart, starTramCancel } from '$lib/stores/websocket'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -33,7 +32,7 @@
   $: currentEpKey = modifyEpKey(currentEpKey)
   const modifyEpKey = e => {
     if (!endpointData.hasOwnProperty(e)) {
-      updateForm("endpoint",e)
+      updateStarTramForm("endpoint",e)
       return e
     }
   }
@@ -42,7 +41,7 @@
   const toggleAdvanced = () => advanced = !advanced
 
   // Cancel Key Logic
-  $: regKey = updateForm('cancel',handleKey(regKey))
+  $: regKey = updateStarTramForm('cancel',handleKey(regKey))
   const handleKey = key => {
     if (typeof key === 'string' || key instanceof String) {
       return key.trim()
@@ -51,70 +50,24 @@
     }
   }
   const cancelSubscription = () => {
-    console.log("cancel sub")
-    /*
-    if (confirmCancel) {
-      updateForm("cancel", regKey.trim())
-      let payload = {
-        "category": "system",
-        "payload": {
-          "module": "startram",
-          "action": "cancel"
-        }
-      }
-      send($socket, $structure, document.cookie, payload)
-    } else {
-      confirmCancel = !confirmCancel
+    updateStarTramForm("cancel", regKey.trim())
+    confirmCancel
+      ? starTramCancel()
+      : confirmCancel = !confirmCancel
   }
-*/
-}
 
-  const restartStarTram = () => {
-    console.log("restart startram")
-    /*
-    let payload = {
-      "category": "system",
-      "payload": {
-        "module": "startram",
-        "action": "restart"
-      }
-    }
-    send($socket, $structure, document.cookie, payload)
-*/
+  const doRestart = () => {
+    starTramRestart()
   }
 
   const connectEndpoint = () => {
-    console.log("connect endpoint")
-    /*
     updateForm("endpoint", currentEpKey)
-    let payload = {
-      "category": "system",
-      "payload": {
-        "module": "startram",
-        "action": "endpoint"
-      }
-    }
-    send($socket, $structure, document.cookie, payload)
-*/
+    starTramEndpoint()
   }
 
-  // Send to API
-  const updateForm = (i,v) => {
-    console.log("update form " + i + " " + v)
-    /*
-    if (connected) {
-      let payload = {
-        "category": "forms",
-        "payload": {
-          "template": "startram",
-          "item": i,
-          "value": v,
-        }
-      }
-      send($socket, $structure, document.cookie, payload)
-    }
-  */
-    return v
+  const updateStarTramForm = (item, data) => {
+    updateForm('startram',item,data)
+    return data
   }
 
   const restartData = {
@@ -164,7 +117,7 @@
       <div transition:scale={{duration:120, delay: 200}}>
         {#if restart === ""}
           <PrimaryButton
-            on:click={restartStarTram}
+            on:click={doRestart}
             background="black"
             standard="Restart"
             top="12"

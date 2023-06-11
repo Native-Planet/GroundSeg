@@ -17,9 +17,10 @@ class StarTramAPI:
         self.config = self.config_object.config
 
         self.url = f"https://{self.config['endpointUrl']}/{self.config['apiVersion']}"
+        self.broadcaster = self.state['broadcaster']
 
     # /v1/register
-    def register_device(self, id, reg_code, region="us-east"):
+    def register_device(self, reg_code, region="us-east"):
         Log.log(f"{self._f}:register_device Attempting to register device")
         try:
             data = {
@@ -36,7 +37,7 @@ class StarTramAPI:
                 raise Exception(f"error not 0: {res}")
             return True
         except Exception as e:
-            Log.log(f"{self._f}:register_device Request to /register failed: {e}")
+            Log.log(f"{self._f}:register_device Request failed: {e}")
         return False
 
     # /v1/retrieve
@@ -44,9 +45,6 @@ class StarTramAPI:
         tries = 1
         pubkey = f"pubkey={self.config['pubkey']}"
         url = f"{self.url}/retrieve?{pubkey}"
-
-        print(self.state['dockers']['wireguard'])
-
         while True:
             try:
                 Log.log(f"{self._f}:retrieve_status Attempting to retrieve information")
@@ -70,7 +68,6 @@ class StarTramAPI:
             sleep(tries * 2)
             tries += 1
 
-    '''
     # /v1/create
     def create_service(self, subdomain, service_type, max_tries=1):
         data = {
@@ -88,14 +85,13 @@ class StarTramAPI:
                 Log.log(f"{self._f}:create_service:{subdomain} Sent service creation request")
                 if res.status_code == 200:
                     if "s3" in subdomain:
-                        self.ws_util.urbit_broadcast(patp, 'startram', 'minio', 'registering')
+                        self.broadcaster.urbit_broadcast(patp, 'startram', 'minio', 'registering')
                     else:
-                        self.ws_util.urbit_broadcast(patp, 'startram', 'urbit', 'registering')
+                        self.broadcaster.urbit_broadcast(patp, 'startram', 'urbit', 'registering')
                     break
                 else:
                     raise Exception(f"status code: {res.status_code}, res: {res.json()}")
-
-                    #self.ws_util.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local
+                    self.broadcaster.urbit_broadcast(patp, 'startram', 'access', 'unregistered') # remote, local
             except Exception as e:
                 Log.log(f"{self._f}:create_service:{subdomain} Failed to register service {service_type}: {e}")
                 if tries >= max_tries:
@@ -114,11 +110,10 @@ class StarTramAPI:
                 }
         try:
             response = requests.post(f'{self.url}/delete',json=data,headers=self._headers).json()
-            Log.log(f"startram_api:delete_service Service {service_type} deleted: {response}")
+            Log.log(f"api:startram:delete_service Service {service_type} deleted: {response}")
         except Exception:
-            Log.log(f"startram_api:delete_service Failed to delete service {service_type}")
+            Log.log(f"api:startram:delete_service Failed to delete service {service_type}")
 
-    '''
     # /v1/regions
     def get_regions(self, max_tries=1):
         Log.log(f"{self._f}:get_regions Attempting to get regions")
@@ -149,13 +144,12 @@ class StarTramAPI:
             tries += 1
         return False
 
-    '''
     # /v1/stripe/cancel
     def cancel_subscription(self, key):
         try:
             Log.log(f"{self._f}:cancel_subscription Attempting to cancel StarTram subscription")
             data = {'reg_code': reg_key}
-            res = requests.post(f'{self.url}/stripe/cancel',json=data,headers=headers).json()
+            res = requests.post(f'{self.url}/stripe/cancel',json=data,headers=self._headers).json()
             if res['error'] == 0:
                 if self.retrieve_status():
                     Log.log(f"{self._f}:cancel_subscription StarTram subscription canceled")
@@ -165,4 +159,3 @@ class StarTramAPI:
         except Exception as e:
             Log.log(f"{self._f}:cancel_subscription Failed: {e}")
         return False
-    '''

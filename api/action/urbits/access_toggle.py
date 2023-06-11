@@ -2,22 +2,18 @@ from log import Log
 
 class AccessToggle:
     def __init__(self, patp, state):
-        #config, urb, ws_util):
         self.patp = patp
-        '''
-        self.config_object = config
-        self.config = config.config
-        self.urb = urb
-        self.ws_util = ws_util
-        '''
+        self.state = state
+        self.broadcaster = self.state['broadcaster']
+        self.config_object = self.state['config']
+        self.config = self.config_object.config
+        self.urb = self.state['dockers']['urbit'] 
 
-    '''
     def broadcast(self, t):
-        self.ws_util.urbit_broadcast(self.patp,'startram', 'access', t)
+        self.broadcaster.urbit_broadcast(self.patp,'startram', 'access', t)
 
     def log(self, t):
         Log.log(f"ws_urbits:access_toggle:{self.patp} {t}")
-    '''
 
     def toggle(self):
         if self.urb._urbits[self.patp]['network'] == "wireguard":
@@ -26,14 +22,6 @@ class AccessToggle:
             self.set("remote")
 
     def set(self, t):
-        print(t)
-        print(t)
-        print(t)
-        print(t)
-        print(t)
-        print(t)
-        print(t)
-        '''
         patp = self.patp
         wg_reg = self.config['wgRegistered']
         wg_is_running = self.urb.wg.is_running()
@@ -62,4 +50,3 @@ class AccessToggle:
                 self.urb.start(patp)
 
             self.broadcast(t)
-        '''

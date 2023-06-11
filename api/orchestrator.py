@@ -1,4 +1,5 @@
 from time import sleep
+from threading import Thread
 
 # Docker
 from dockers.netdata import Netdata
@@ -69,36 +70,140 @@ class Orchestrator:
     # Combo functions
     #
 
-    def startram_register(self, id):
+    def startram_stop(self):
+        # mc
+        Thread(target=self.minio.stop_mc).start()
+        for p in self.urbit._urbits.copy():
+            # minio
+            Thread(target=self.ws_minios.stop,args=(p,)).start()
+            # urbit
+            if self.urbit._urbits[p]['network'] == 'wireguard':
+                Thread(target=self.ws_urbits.access_toggle,args=(p,"local")).start()
+
+        # wireguard
+        if self.wireguard.stop():
+            self.config['wgOn'] = False
+            self.config_object.save_config()
+            return True
+        return False
+
+    def startram_start(self):
+        # wireguard
+        if self.wireguard.start():
+            self.config['wgOn'] = True
+            self.config_object.save_config()
+            # mc
+            self.minio.start_mc()
+            # minio
+            for p in self.urbit._urbits.copy():
+                Thread(target=self.ws_minios.start,args=(p,self.urbit._urbits[p])).start()
+            return True
+        return False
+
+    def startram_restart(self):
+        self.broadcaster.system_broadcast('system','startram','restart','initializing')
+        # get list of patps in remote
+        remote = set()
+        for patp in self.config['piers']:
+            if self.urbit._urbits[patp]['network'] == "wireguard":
+                remote.add(patp)
+        # restart startram
+        self.broadcaster.system_broadcast('system','startram','restart','stopping')
+        if self.startram_stop():
+            self.broadcaster.system_broadcast('system','startram','restart','starting')
+            if self.startram_start():
+                # toggle remote
+                for p in remote:
+                    Thread(target=self.ws_urbits.access_toggle,args=(p,"remote")).start()
+        self.broadcaster.system_broadcast('system','startram','restart','success')
+        sleep(3)
+        self.broadcaster.system_broadcast('system','startram','restart')
+
+    def startram_change_endpoint(self,action):
+        token_id = action.get('token').get('id')
+        if token_id:
+            # stop startram
+            self.broadcaster.system_broadcast('system','startram','endpoint','stopping')
+            if self.startram_stop():
+                # delete services
+                sub = self.wireguard.anchor_data.get('subdomains')
+                if sub:
+                    self.broadcaster.system_broadcast('system','startram','endpoint','rm-services')
+                    for patp in self.config['piers'].copy():
+                        res = self.services_exist(patp, sub)
+                        if True in list(res.values()):
+                            Thread(target=self.api.delete_service,
+                                   args=(patp,'urbit')
+                                   ).start()
+                            Thread(target=self.api.delete_service,
+                                   args=(f's3.{patp}','minio')
+                                   ).start()
+                # reset pubkey
+                self.broadcaster.system_broadcast('system','startram','endpoint','reset-pubkey')
+                self.config_object.reset_pubkey()
+                # change endpoint
+                self.broadcaster.system_broadcast('system','startram','endpoint','changing')
+                self.config['endpointUrl'] = self.grab_form(token_id, 'startram', 'endpoint')
+                self.config['wgRegistered'] = False
+                self.config['wgOn'] = False
+                self.config_object.save_config()
+
+                # update information
+                self.broadcaster.system_broadcast('system','startram','endpoint','updating')
+                self.region_data = {}
+                self.anchor_data = {}
+                self.api.url = f"https://{self.config['endpointUrl']}/{self.config['apiVersion']}"
+                self.api.get_regions()
+                self.broadcaster.system_broadcast('system','startram','endpoint','success')
+            sleep(3)
+            self.broadcaster.system_broadcast('system','startram','endpoint','')
+
+    def startram_cancel(self, action):
+        token_id = action.get('token').get('id')
+        self.broadcaster.system_broadcast('system','startram','cancel','cancelling')
+        key = self.grab_form(token_id,'startram','cancel')
+        if self.api.cancel_subscription(key):
+            print("success")
+            self.broadcaster.system_broadcast('system','startram','cancel','success')
+        else:
+            print("failed")
+            self.broadcaster.system_broadcast('system','startram','cancel','failed')
+        sleep(3)
+        print("delete form")
+        self.delete_form(token_id,"startram")
+        print("clear")
+        self.broadcaster.system_broadcast('system','startram','cancel','')
+
+    # Move this to own file
+    def startram_register(self, data):
+        token_id = data.get('token').get('id')
         registered = "no"
         def broadcast(t):
             self.broadcaster.system_broadcast('system','startram','register',t)
-
         try:
             # register device
             broadcast("registering")
-            try:
-                region = self.grab_form(id,'startram','region') or "us-east"
+
+            try: # get region
+                region = self.grab_form(token_id,'startram','region') or "us-east"
+                if len(region) < 1:
+                    raise Exception()
             except:
                 region = "us-east"
 
-            print(region)
-            try:
-                reg_code = self.grab_form(id,'startram','key') or ""
-            except:
+            try: # get reg_code
+                reg_code = self.grab_form(token_id,'startram','key') or ""
+            except Exception as e:
                 reg_code = ""
 
-            if self.api.register_device(id,region):
+            if self.api.register_device(reg_code, region):
                 # update wg0.conf
                 broadcast("updating")
                 if self.api.retrieve_status(10):
                     conf = self.wireguard.anchor_data['conf'] # TODO: temporary
-                    print(conf)
-                    '''
                     if self.wireguard.update_wg_config(conf):
                         self.config['wgRegistered'] = True
                         self.config_object.save_config()
-
                         # start wg container
                         if self.wireguard.start():
                             broadcast("start-wg")
@@ -114,9 +219,10 @@ class Orchestrator:
                             # register services
                             piers = self.config['piers'].copy()
                             sub = self.wireguard.anchor_data['subdomains']
+
                             for patp in piers:
                                 try:
-                                    res = self.ws_util.services_exist(patp, sub)
+                                    res = self.services_exist(patp, sub)
                                     uw = res['urbit-web']
                                     ua = res['urbit-ames']
                                     m = res['minio']
@@ -125,20 +231,20 @@ class Orchestrator:
 
                                     # One or more of the urbit services is not registered
                                     if not (uw and ua):
-                                        Thread(target=self.startram_api.create_service(patp, 'urbit', 10))
+                                        Thread(target=self.api.create_service(patp, 'urbit', 10))
                                     # One or more of the minio services is not registered
                                     if not (m and mc and mb):
-                                        Thread(target=self.startram_api.create_service(f"s3.{patp}", 'minio', 10))
+                                        Thread(target=self.api.create_service(f"s3.{patp}", 'minio', 10))
                                 except Exception as e:
                                     Log.log(f"orchestrator:startram_register:{patp} failed to create service: {e}")
 
                             # Loop until all services are done
                             done = set()
                             while len(done) != len(piers):
-                                if self.startram_api.retrieve_status(1):
+                                if self.api.retrieve_status(1):
                                     sub = self.wireguard.anchor_data['subdomains']
                                     for patp in piers: 
-                                        res = self.ws_util.services_exist(patp, sub, True)
+                                        res = self.services_exist(patp, sub, True)
                                         urbit_ready = True
                                         minio_ready = True
                                         for svc in res:
@@ -148,16 +254,16 @@ class Orchestrator:
                                                 else:
                                                     minio_ready = False
                                         if urbit_ready:
-                                            self.ws_util.urbit_broadcast(patp, 'startram', 'urbit','registered')
+                                            self.broadcaster.urbit_broadcast(patp, 'startram', 'urbit','registered')
                                         if minio_ready:
-                                            self.ws_util.urbit_broadcast(patp, 'startram', 'minio','registered')
+                                            self.broadcaster.urbit_broadcast(patp, 'startram', 'minio','registered')
 
                                         if minio_ready and urbit_ready:
                                             done.add(patp)
-                                sleep(5)
+                                sleep(3)
 
                             # toggle remote
-                            ignored = self.ws_util.grab_form(sid, 'startram', 'ships')
+                            ignored = self.grab_form(token_id, 'startram', 'ships')
                             if ignored == None:
                                 ignored = []
                             for patp in piers:
@@ -166,11 +272,11 @@ class Orchestrator:
                                     self.ws_urbits.access_toggle(patp, "remote")
                                 else:
                                     self.ws_urbits.access_toggle(patp, "local")
+                            self.delete_form(token_id,"startram")
                         else:
                             raise Exception("failed to start wireguard container")
                     else:
                         raise Exception("failed to update wg0.conf")
-                    '''
                 else:
                     raise Exception("failed to retrieve status")
             else:
@@ -220,18 +326,39 @@ class Orchestrator:
     # read form
     def grab_form(self, id, template, item):
         try:
-            return self.forms[id][template][item]
+            return self.state['personal_broadcast'][id][template][item]
         except:
             return None
 
     # delete form
-    def delete_form(self, sid, template):
+    def delete_form(self, id, template):
         try:
-            self.form[sid][template] = {}
+            self.state['personal_broadcast'][id][template] = {}
             return True
         except:
             return False
 
+    # check if service exists for patp
+    def services_exist(self, patp, subdomains, is_registered=False):
+        # Define services
+        services = {
+                    "urbit-web":False,
+                    "urbit-ames":False,
+                    "minio":False,
+                    "minio-console":False,
+                    "minio-bucket":False
+                    }
+        for ep in subdomains:
+            ep_patp = ep['url'].split('.')[-3]
+            ep_svc = ep['svc_type']
+            if ep_patp == patp:
+                for s in services.keys():
+                    if ep_svc == s:
+                        if is_registered:
+                            services[s] = ep['status']
+                        else:
+                            services[s] = True
+        return services
 
 
 #

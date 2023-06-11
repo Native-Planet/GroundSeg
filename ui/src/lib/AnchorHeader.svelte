@@ -2,7 +2,7 @@
 	import { api } from '$lib/api'
 	import { scale } from 'svelte/transition'
   //import { send, socket, structure } from '$lib/stores/websocket.js'
-  import { structure } from '$lib/stores/websocket'
+  import { structure, starTramToggle } from '$lib/stores/websocket'
 
   $: startram = ($structure.system?.startram) || null
   $: register = (startram?.register) || "no"
@@ -10,18 +10,7 @@
 
 	// toggle anchor on or off
 	const toggleAnchor = () => {
-    console.log("toggle anchor")
-    /*
-    let act = (container == "running" ? "stop" : "start")
-    let payload = {
-      "category": "system",
-      "payload": {
-        "module": "startram",
-        "action": act,
-      }
-    }
-    send($socket, $structure, document.cookie, payload)
-*/
+    starTramToggle(container)
   }
 
 </script>

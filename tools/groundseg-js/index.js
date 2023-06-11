@@ -50,12 +50,55 @@ export default class GroundSegJS {
     this.silentSend(data,token)
   }
 
+  //
+  //  StarTram
+  //
+
+  // Update StarTram endpoint in config
+  starTramEndpoint(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"endpoint"}}
+    console.log(id + " attempting to update StarTram Endpoint")
+    this.silentSend(data,token)
+  }
+
   // Register startram
-  registerStarTram(id,token=null) {
+  starTramRegister(id,token=null) {
     let data = {"id":id,"payload":{"category":"system","module":"startram","action":"register"}}
     console.log(id + " attempting to register StarTram")
     this.silentSend(data,token)
   }
+
+  // Stop startram
+  starTramStop(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"stop"}}
+    console.log(id + " attempting to stop StarTram")
+    this.silentSend(data,token)
+  }
+
+  // Start startram
+  starTramStart(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"start"}}
+    console.log(id + " attempting to start StarTram")
+    this.silentSend(data,token)
+  }
+
+  // Restart startram
+  starTramRestart(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"restart"}}
+    console.log(id + " attempting to restart StarTram")
+    this.silentSend(data,token)
+  }
+
+  // Cancel startram subscription
+  starTramCancel(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"startram","action":"cancel"}}
+    console.log(id + " attempting to cancel StarTram Subscription")
+    this.silentSend(data,token)
+  }
+
+  //
+  //  Urbit
+  //
 
   // Toggle Urbit network
   urbitsAccessToggle(id,ship,token=null) {

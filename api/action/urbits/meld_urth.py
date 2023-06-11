@@ -10,13 +10,8 @@ class MeldUrth:
         self.get_config = parent.get_config # retrieves value from <patp>.json
         self.set_config = parent.set_config # modify <patp>.json
         self.patp = patp
-        self.urb = self.state['ws']['urbits'] 
+        self.urb = self.state['dockers']['urbit'] 
         self.urb_docker = self.urb.urb_docker
-        '''
-        self.urb = urb
-        self.urb_docker = urb.urb_docker
-        self.ws_util = ws_util
-        '''
 
     def run(self):
         # start is container start command (see ws_urbits.py)

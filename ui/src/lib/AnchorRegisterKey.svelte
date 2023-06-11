@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { scale } from 'svelte/transition'
-  import { connected, structure, updateForm, registerStarTram } from '$lib/stores/websocket'
+  import { connected, structure, updateForm, starTramRegister } from '$lib/stores/websocket'
 
   import CheckBox from '$lib/CheckBox.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -52,7 +52,7 @@
   const registerKey = () => {
     // final send just in case
     updateStarTramForm("key",key)
-    registerStarTram()
+    starTramRegister()
   }
 
   // Registration Key input visibility

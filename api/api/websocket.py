@@ -49,10 +49,10 @@ class WSGroundSeg:
     # receive action
     def handle_request(self, action, websocket, status_code, msg, token):
         print(f"app:handle_request id: {action['id']}")
+        self.orchestrator = self.state['orchestrator']
         try:
             # Get the action category
             cat = action.get('payload').get('category')
-
             # Does nothing
             if cat == "token":
                 pass
@@ -96,7 +96,7 @@ class WSGroundSeg:
                 ]
         payload = data.get('payload')
         id = data.get('id')
-        patp = payload.get('patp')
+        patp = payload.get('ship')
         module = payload.get('module')
         action = payload.get('action')
 
@@ -134,43 +134,39 @@ class WSGroundSeg:
                 return status_code, msg
 
     # System
-    def system_action(self, data, websocket, status_code, msg):
+    def system_action(self, action, websocket, status_code, msg):
         # hardcoded list of allowed modules
         token = None
         whitelist = [
                 'login',
                 'startram',
                 ]
-        payload = data.get('payload')
-        id = data.get('id')
+        payload = action.get('payload')
+        id = action.get('id')
         module = payload.get('module')
-        action = payload.get('action')
+        act = payload.get('action')
 
         if module not in whitelist:
             status_code = 1
             msg = "INVALID_MODULE"
         else:
             if module == "login":
-                status_code, msg, token = Auth(self.state).handle_login(data,websocket,status_code,msg)
+                status_code, msg, token = Auth(self.state).handle_login(action,websocket,status_code,msg)
             elif websocket in self.state['clients']['authorized']:
                 if module == "startram":
                     self.orchestrator = self.state['orchestrator']
-                    if action == "register":
-                        Thread(target=self.orchestrator.startram_register, args=(id,)).start()
-                    if action == "stop":
+                    if act == "register":
+                        Thread(target=self.orchestrator.startram_register, args=(action,)).start()
+                    if act == "stop":
                         Thread(target=self.orchestrator.startram_stop).start()
-                    if action == "start":
+                    if act == "start":
                         Thread(target=self.orchestrator.startram_start).start()
-                    if action == "restart":
+                    if act == "restart":
                         Thread(target=self.orchestrator.startram_restart).start()
-                    if action == "endpoint":
-                        Thread(target=self.orchestrator.startram_change_endpoint,
-                               args=(data['sessionid'],)
-                               ).start()
-                    if action == "cancel":
-                        Thread(target=self.orchestrator.startram_cancel,
-                               args=(data['sessionid'],)
-                               ).start()
+                    if act == "endpoint":
+                        Thread(target=self.orchestrator.startram_change_endpoint, args=(action,)).start()
+                    if act == "cancel":
+                        Thread(target=self.orchestrator.startram_cancel, args=(action,)).start()
 
         return status_code, msg, token
 
@@ -183,26 +179,6 @@ class WSGroundSeg:
             status_code = 1
             msg = "INVALID_TEMPLATE"
         return status_code, msg
-
-        '''
-        try:
-            # hardcoded whitelist
-            whitelist = [
-                    'startram'
-                    ]
-
-            payload = data['payload']
-            sid = data['sessionid']
-            template = payload['template']
-
-            if template in whitelist:
-                if template == "startram":
-                    self.ws_util.edit_form(data, template)
-
-        except Exception as e:
-            raise Exception(e)
-        return "succeeded"
-        '''
 
     def make_activity(self, id, status_code, msg, token=None):
         res = {"activity":{id:{"message":msg,"status_code":status_code}}}

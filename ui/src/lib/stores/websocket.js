@@ -53,10 +53,9 @@ const listen = async () => {
   let authFailed = (message === "AUTH_FAILED")
   if (authFailed) {
     loginStatus.set(message)
-    console.log(cid, message)
-    
   }
   if (cid) {
+    console.log(cid, message)
     SESSION.deleteActivity(cid)
     PENDING.delete(cid)
   }
@@ -118,6 +117,8 @@ export const urbitsMeldUrth = async ship => {
 
 // 
 // Update Form
+//
+
 export const updateForm = async (template,item,value) => {
   let id = await generateRandom(16)
   let token = await loadSession()
@@ -130,9 +131,43 @@ export const updateForm = async (template,item,value) => {
 //
 
 // Register StarTram
-export const registerStarTram = async () => {
+export const starTramRegister = async () => {
   let id = await generateRandom(16)
   let token = await loadSession()
   PENDING.add(id)
-  SESSION.registerStarTram(id,token)
+  SESSION.starTramRegister(id,token)
+}
+
+// Toggle StarTram
+export const starTramToggle = async c => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  c == "running"
+    ? SESSION.starTramStop(id,token)
+    : SESSION.starTramStart(id,token)
+}
+
+// Restart StarTram
+export const starTramRestart = async () => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.starTramRestart(id,token)
+}
+
+// Modify endpoint
+export const starTramEndpoint = async () => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.starTramEndpoint(id,token)
+}
+
+// Cancel StarTram Subscription
+export const starTramCancel = async () => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.starTramCancel(id,token)
 }
