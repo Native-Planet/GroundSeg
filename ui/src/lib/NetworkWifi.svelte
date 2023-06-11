@@ -64,7 +64,13 @@
 </script>
 <div class="wifi">
   <Listbox value={selectedConnection} on:change={(e) => (selectedConnection = e.detail)}>
-    <ListboxButton class="connection-selector" on:click={getNetworks} >{selectedConnection.length > 0 ? selectedConnection : "Select a wifi network"}</ListboxButton>
+    <ListboxButton class="connection-selector" on:click={getNetworks} >
+      {
+        (typeof selectedConnection === "string") && (selectedConnection.length > 0)
+           ? selectedConnection
+           : "Select a wifi network"
+      }
+    </ListboxButton>
     <ListboxOptions class="connection-list">
       {#each networks as network}
         <ListboxOption value={network}>
@@ -73,9 +79,7 @@
       {/each}
     </ListboxOptions>
   </Listbox>
-
-  {#if (connected !== selectedConnection) && (selectedConnection.length > 0)}
-
+  {#if (connected !== selectedConnection) && (typeof selectedConnection === "string") && (selectedConnection.length > 0)}
     <div class="wifi-pass-wrapper">
       <div class="pass-text">Wifi Password</div>
       <div class="wifi-pass">

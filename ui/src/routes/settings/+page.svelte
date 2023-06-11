@@ -21,8 +21,8 @@
   import Contact from '$lib/Contact.svelte'
 
 	// load data into store
-	export let data
-	updateState(data)
+	//export let data
+	//updateState(data)
 
 
   let inViewSettings = false, 
@@ -70,17 +70,9 @@
 	// Start the update loop
   onMount(()=> {
     api.set("http://" + $page.url.hostname + ":27016")
-    if (data['status'] == 404) {
-      window.location.href = "/login"
-    }
-
-    if (data['status'] == 'setup') {
-      window.location.href = "/setup"
-    }
-
     update()
     inViewSettings = true
-    selectedContainer = $system.containers[0]
+    //selectedContainer = $system.containers[0]
   })
 
 	// end the update loop
@@ -91,7 +83,6 @@
 {#if inViewSettings}
   <Card width="800px">
     <Logo t='System Settings'/>
-
     <!-- Settings Navigation -->
     <div class="navbar">
       {#each tabs as tab,i}
@@ -110,6 +101,7 @@
       <div class="main-panel {$isPortrait ? "portrait" : "landscape"}">
 
         <div class="panel" in:scale={{duration:120, delay: 200}}>
+    <!--
           <SysInfo
             ram={$system.ram} 
             temp={$system.temp}
@@ -119,6 +111,7 @@
             uiBranch={$system.uiBranch}
             updateMode={$system.updateMode}
             />
+    -->
           <Netdata link={$system.netdata} />
         </div>
 
@@ -146,7 +139,6 @@
         </div>
       {/if}
     {/if}
-
     {#if activeTab == 'Logs'}
       <div in:scale={{duration:120, delay: 200}}>
         <Logs container={selectedContainer} maxHeight="60vh" />
@@ -165,7 +157,6 @@
         <PrimaryButton on:click={exportLogs} standard="Export" status="standard" />
       </div>
     {/if}
-
   </Card>
 {/if}
 
