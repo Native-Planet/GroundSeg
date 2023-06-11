@@ -256,7 +256,6 @@ class Urbit:
 
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
-
         return 400
 
     def new_pier_remote_toggle(self, patp):

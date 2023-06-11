@@ -1,5 +1,8 @@
 <script>
   import { onMount } from 'svelte'
+  import { page } from '$app/stores'
+	import { api } from '$lib/api'
+
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
@@ -11,12 +14,13 @@
   let warningCheck = false
   let fileTypes = ['.zip','.tar','.tar.gz','.tgz']
 
+  onMount(()=> api.set("http://" + $page.url.hostname + ":27016"))
+
 </script>
 
-<Card width="480px">
-  <Logo t="Boot an existing Urbit ID"/>
-  {#if warningCheck}
-
+{#if warningCheck}
+  <Card width="480px">
+    <Logo t="Boot an existing Urbit ID"/>
     <!-- If warning check has been completed -->
     <div class="subtitle">
       <div>Accepted Extensions:</div>
@@ -24,24 +28,24 @@
         <div class="file-type">{f}</div>
       {/each}
     </div>
-
     <Dropzone />
-
-  {:else}
-
-    <!-- If warning check has not been completed -->
-    <UploadPierCheck />
-
-    <div class="buttons">
-      <LinkButton text="Back" src="/" disabled={false} />
-      <PrimaryButton
-        on:click={()=>warningCheck = !warningCheck}
-        standard="I understand"
-        left={false} />
+  </Card>
+{:else}
+  <Card width="480px">
+    <Logo t="Boot an existing Urbit ID"/>
+    <div style="display:{warningCheck ? "none" : "block"};">
+      <!-- If warning check has not been completed -->
+      <UploadPierCheck />
+      <div class="buttons">
+        <LinkButton text="Back" src="/" disabled={false} />
+        <PrimaryButton
+          on:click={()=>warningCheck = true}
+          standard="I understand"
+          left={false} />
+      </div>
     </div>
-
-  {/if}
-</Card>
+  </Card>
+{/if}
 
 <style>
   .subtitle {

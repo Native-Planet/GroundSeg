@@ -1,3 +1,4 @@
+import os
 from time import sleep
 from threading import Thread
 
@@ -14,6 +15,7 @@ from lib.urbits import WSUrbits
 from lib.minios import WSMinIOs
 
 # Legacy API
+from werkzeug.utils import secure_filename
 from legacy.system_post import SysPost
 # Util
 from log import Log
@@ -550,4 +552,137 @@ class Orchestrator:
 
         return blob
 
+    #
+    #   Pier Upload
+    #
 
+    def upload_status(self, data):
+        try:
+            patp = data['patp']
+            if data['action'] == 'status':
+                try:
+                    res = self.config_object.upload_status[patp]
+                    if res['status'] == 'extracting':
+                        res['progress']['current'] = self.get_directory_size(f"{self.config['dockerData']}/volumes/{patp}/_data")
+                        return res
+                    return res
+                except Exception as e:
+                    Log.log(f"Upload: Failed to get status {e}")
+                    return {'status':'none'}
+
+            if data['action'] == 'remove':
+                self.config_object.upload_status.pop(patp)
+                return {'status':'removed'}
+
+        except Exception as e:
+            Log.log(f"Upload: Failed to get upload status: {e}")
+            return {'status':'none'}
+
+    def get_directory_size(self, directory):
+        total_size = 0
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.is_file():
+                    total_size += entry.stat().st_size
+                elif entry.is_dir():
+                    total_size += self.get_directory_size(entry.path)
+        return total_size
+
+    def handle_upload(self, req):
+        # change to temp mode (DO NOT SAVE CONFIG)
+        if self.config['updateMode'] == 'auto':
+            self.config['updateMode'] = 'temp'
+
+        # Uploaded pier
+        remote = False
+        try:
+            for f in req.files:
+                con = f
+                break
+
+            remote = False
+            fix = False
+
+            if 'remote' in con:
+                remote = True
+            if 'yes' in con:
+                fix = True
+            file = req.files[con]
+
+        except Exception as e:
+            Log.log(f"Upload: File request fail: {e}")
+            return "Invalid file type"
+
+        filename = secure_filename(file.filename)
+        patp = filename.split('.')[0]
+
+        self.config_object.upload_status[patp] = {'status':'uploading'}
+
+        # Create subfolder
+        file_subfolder = f"{self.config_object.base_path}/uploaded/{patp}"
+        os.makedirs(file_subfolder, exist_ok=True)
+
+        save_path = f"{file_subfolder}/{filename}"
+        current_chunk = int(req.form['dzchunkindex'])
+
+        if current_chunk == 0:
+            try:
+                Log.log(f"{patp}: Starting upload")
+                os.remove(save_path)
+                Log.log(f"{patp}: Cleaning up old files")
+            except:
+                Log.log(f"{patp}: Directory is clear")
+
+        if os.path.exists(save_path) and current_chunk == 0:
+            os.remove(save_path)
+
+            if self.config['updateMode'] == 'temp':
+                self.config['updateMode'] = 'auto'
+                self.config_object.save_config()
+
+            return "File exists, try uploading again"
+
+        try:
+            with open(save_path, 'ab') as f:
+                f.seek(int(req.form['dzchunkbyteoffset']))
+                f.write(file.stream.read())
+        except Exception as e:
+            Log.log(f"{patp}: Error writing to disk: {e}")
+
+            if self.config['updateMode'] == 'temp':
+                self.config['updateMode'] = 'auto'
+                self.config_object.save_config()
+
+            return "Can't write to disk"
+
+        total_chunks = int(req.form['dztotalchunkcount'])
+
+        if current_chunk + 1 == total_chunks:
+            # This was the last chunk, the file should be complete and the size we expect
+            if os.path.getsize(save_path) != int(req.form['dztotalfilesize']):
+                Log.log(f"{patp}: File size mismatched")
+
+                if self.config['updateMode'] == 'temp':
+                    self.config['updateMode'] = 'auto'
+                    self.config_object.save_config()
+
+                # size mismatch
+                return "File size mismatched"
+            else:
+                Log.log(f"{patp}: Upload complete")
+                #TODO: move the entire endpoint to ws
+                res = self.urbit.boot_existing(filename, remote, fix)
+                if self.config['updateMode'] == 'temp':
+                    self.config['updateMode'] = 'auto'
+                    self.config_object.save_config()
+                return res
+
+        else:
+            # Not final chunk yet
+            return 200
+
+        if self.config['updateMode'] == 'temp':
+            self.config['updateMode'] = 'auto'
+            self.config_object.save_config()
+
+        return 400

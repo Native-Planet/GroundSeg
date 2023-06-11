@@ -91,7 +91,6 @@ class GroundSegFlask:
         @self.app.route("/upload", methods=['POST'])
         def pier_upload():
             approved, message = self.verify(request)
-
             if approved:
                 res = self.orchestrator.handle_upload(request)
                 return jsonify(res)
