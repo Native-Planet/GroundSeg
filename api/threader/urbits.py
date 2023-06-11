@@ -53,8 +53,10 @@ class UrbitsLoop:
         status = "stopped"
         try:
             if self.urb.urb_docker.is_running(patp):
-                # get +code here
-                status = "running"
+                if len(self.get_code(patp)) == 27:
+                    status = "running"
+                else:
+                    status = "booting"
         except:
             pass
         self.broadcaster.urbit_broadcast(patp, 'container', 'status', status)

@@ -221,50 +221,15 @@ class Urbit:
 
         return {'urbits': urbits}
 
-    '''
-    # Boot new pier from key
-    def create(self, patp, key, remote):
-        Log.log(f"{patp}: Attempting to boot new urbit ship")
-        try:
-            if not Utils.check_patp(patp):
-                raise Exception("Invalid @p")
-
-            # TODO: Add check if exists, return prompt to user for further action
-
-            # Get open ports
-            http_port, ames_port = self.get_open_urbit_ports()
-
-            # Generate config file for pier
-            cfg = self.build_config(patp, http_port, ames_port)
-            self._urbits[patp] = cfg
-
-            self.save_config(patp)
-
-            # Delete existing ship if exists
-            if self.urb_docker.delete(patp):
-                # Add to system.json
-                if self.add_urbit(patp):
-                    # Register the service
-                    endpoint = self.config['endpointUrl']
-                    api_version = self.config['apiVersion']
-                    url = f"https://{endpoint}/{api_version}"
-                    if self.register_urbit(patp, url):
-                        # Create the docker container
-                        if self.start(patp, key) == "succeeded":
-                            if remote:
-                                Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
-                            return 200
-
-        except Exception as e:
-            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
-        return 400
-    '''
-
-    def new_pier_remote_toggle(self, patp):
+    def new_pier_remote_toggle(self, toggle_func, patp):
         Log.log(f"{patp}: New pier remote toggle thread started")
         try:
             running = self.urb_docker.is_running(patp)
-            booted = len(self.get_code(patp)) == 27
+            try:
+                booted = len(self.get_code(patp)) == 27
+            except:
+                booted = False
+
             count = 0
             while not (running and booted):
                 Log.log(f"{patp}: Ship not ready for remote toggle yet")
@@ -273,7 +238,7 @@ class Urbit:
                     count += 1
                 running = self.urb_docker.is_running(patp)
                 booted = len(self.get_code(patp)) == 27
-            self.toggle_network(patp)
+                toggle_func(patp,"remote")
         except Exception as e:
             Log.log(f"{patp}: Failed to start new pier remote toggle thread: {e}")
 
@@ -294,7 +259,7 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to start fix pokes thread: {e}")
 
-    def boot_existing(self, filename, remote, fix):
+    def boot_existing(self, filename, remote, fix, toggle_func,api):
         Log.log(f"Upload: Configuration - remote: {remote} - fix: {fix}")
         patp = filename.split('.')[0]
 
@@ -305,12 +270,12 @@ class Urbit:
                 self.config_object.upload_status.pop(patp)
                 return extracted
 
-            created = self.create_existing(patp)
+            created = self.create_existing(patp,api)
             if created != "succeeded":
                 self.config_object.upload_status.pop(patp)
                 return created
             if remote:
-                Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
+                Thread(target=self.new_pier_remote_toggle, args=(toggle_func,patp), daemon=True).start()
             if fix:
                 Thread(target=self.fix_pokes, args=(patp,), daemon=True).start()
             self.config_object.upload_status[patp] = {'status':'done'}
@@ -440,7 +405,7 @@ class Urbit:
         return "to-create"
 
     # Boot the newly uploaded pier
-    def create_existing(self, patp):
+    def create_existing(self, patp, api):
         Log.log(f"{patp}: Attempting to boot new urbit ship")
         try:
             if not Utils.check_patp(patp):
@@ -458,15 +423,50 @@ class Urbit:
             # Add to system.json
             if self.add_urbit(patp):
                 # Register the service
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f"https://{endpoint}/{api_version}"
-                if self.register_urbit(patp, url):
+                try:
+                    api.create_service(patp, 'urbit', 10)
+                    api.create_service(f"s3.{patp}", 'minio', 10)
+                except Exception as e:
+                    Log.log(f"orchestrator:boot_new:{patp} failed to create service: {e}")
+
+                svc_url = None
+                http_port = None
+                ames_port = None
+                s3_port = None
+                console_port = None
+                tries = 1
+                while None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                    Log.log(f"{patp}: Checking anchor config if services are ready")
+                    if api.retrieve_status():
+                        self.wg.update_wg_config(self.wg.anchor_data['conf'])
+                    Log.log(f"Anchor: {self.wg.anchor_data['subdomains']}")
+
+                    pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+                    for ep in self.wg.anchor_data['subdomains']:
+                        if ep['status'] == 'ok':
+                            if(f'{patp}.{pub_url}' == ep['url']):
+                                svc_url = ep['url']
+                                http_port = ep['port']
+                            elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                                ames_port = ep['port']
+                            elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                                s3_port = ep['port']
+                            elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                                console_port = ep['port']
+                        else:
+                            t = tries * 2
+                            Log.log(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
+                            sleep(t)
+                            if tries <= 15:
+                                tries = tries + 1
+                            break
+
+                if self.set_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port):
                     # Create the docker container
                     return self.start(patp)
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
+            Log.log(f"{patp}: Failed to boot uploaded urbit ship: {e}")
 
         return f"Failed to boot {patp}"
 
@@ -898,83 +898,6 @@ class Urbit:
             Log.log(f"{patp}: Failed to add @p to system.json")
 
         return False
-
-    # Register Wireguard for Urbit
-    def register_urbit(self, patp, url):
-        if self.config['wgRegistered']:
-            Log.log(f"{patp}: Attempting to register anchor services")
-            if self.wg.get_status(url):
-                self.wg.update_wg_config(self.wg.anchor_data['conf'])
-
-                # Define services
-                urbit_web = False
-                urbit_ames = False
-                minio_svc = False
-                minio_console = False
-                minio_bucket = False
-
-                # Check if service exists for patp
-                for ep in self.wg.anchor_data['subdomains']:
-                    ep_patp = ep['url'].split('.')[-3]
-                    ep_svc = ep['svc_type']
-                    if ep_patp == patp:
-                        if ep_svc == 'urbit-web':
-                            urbit_web = True
-                        if ep_svc == 'urbit-ames':
-                            urbit_ames = True
-                        if ep_svc == 'minio':
-                            minio_svc = True
-                        if ep_svc == 'minio-console':
-                            minio_console = True
-                        if ep_svc == 'minio-bucket':
-                            minio_bucket = True
- 
-                # One or more of the urbit services is not registered
-                if not (urbit_web and urbit_ames):
-                    Log.log(f"{patp}: Registering ship")
-                    self.wg.register_service(f'{patp}', 'urbit', url)
- 
-                # One or more of the minio services is not registered
-                if not (minio_svc and minio_console and minio_bucket):
-                    Log.log(f"{patp}: Registering MinIO")
-                    self.wg.register_service(f's3.{patp}', 'minio', url)
-
-            svc_url = None
-            http_port = None
-            ames_port = None
-            s3_port = None
-            console_port = None
-            tries = 1
-
-            while None in [svc_url,http_port,ames_port,s3_port,console_port]:
-                Log.log(f"{patp}: Checking anchor config if services are ready")
-                if self.wg.get_status(url):
-                    self.wg.update_wg_config(self.wg.anchor_data['conf'])
-
-                Log.log(f"Anchor: {self.wg.anchor_data['subdomains']}")
-                pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
-
-                for ep in self.wg.anchor_data['subdomains']:
-                    if ep['status'] == 'ok':
-                        if(f'{patp}.{pub_url}' == ep['url']):
-                            svc_url = ep['url']
-                            http_port = ep['port']
-                        elif(f'ames.{patp}.{pub_url}' == ep['url']):
-                            ames_port = ep['port']
-                        elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
-                            s3_port = ep['port']
-                        elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
-                            console_port = ep['port']
-                    else:
-                        t = tries * 2
-                        Log.log(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
-                        time.sleep(t)
-                        if tries <= 15:
-                            tries = tries + 1
-                        break
-
-            return self.set_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port)
-        return True
 
     def set_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
         Log.log(f"{patp}: Setting wireguard information")

@@ -1,12 +1,17 @@
 <script>
   import { blur } from 'svelte/transition'
-  import { api, isPatp, startram } from '$lib/api'
+  import { api, isPatp } from '$lib/api'
+  import { structure } from '$lib/stores/websocket'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import LinkButton from '$lib/LinkButton.svelte'
 
   export let name = ''
   export let key = ''
   export let remoteCheck
+
+  $: startram = ($structure?.system?.startram) || {}
+  $: container = (startram?.container) || "stopped"
+  $: register = (startram?.register) || "no"
 
   let buttonStatus = 'standard'
   let prefix = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"

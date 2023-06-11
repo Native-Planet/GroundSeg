@@ -97,7 +97,7 @@ class Orchestrator:
             if self.urbit.urb_docker.delete(patp):
                 # Add to system.json
                 if self.urbit.add_urbit(patp):
-                    # Register the service
+                    # Register the service (register_urbit)
                     try:
                         self.api.create_service(patp, 'urbit', 10)
                         self.api.create_service(f"s3.{patp}", 'minio', 10)
@@ -140,11 +140,13 @@ class Orchestrator:
                         # Create the docker container
                         if self.ws_urbits.start(patp,'boot',key) == "succeeded":
                             if remote:
-                                self.ws_urbits.access_toggle(patp,"remote")
+                                Thread(target=self.urbit.new_pier_remote_toggle,
+                                       args=(self.ws_urbits.access_toggle,patp),
+                                       daemon=True).start()
                             return 200
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
+            Log.log(f"orchestrator:boot_new{patp}: Failed to boot new urbit ship: {e}")
         return 400
 
 #
@@ -754,7 +756,7 @@ class Orchestrator:
             else:
                 Log.log(f"{patp}: Upload complete")
                 #TODO: move the entire endpoint to ws
-                res = self.urbit.boot_existing(filename, remote, fix)
+                res = self.urbit.boot_existing(filename, remote, fix, self.ws_urbits.access_toggle,self.api)
                 if self.config['updateMode'] == 'temp':
                     self.config['updateMode'] = 'auto'
                     self.config_object.save_config()

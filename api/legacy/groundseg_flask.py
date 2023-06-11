@@ -142,10 +142,10 @@ class GroundSegFlask:
 
     # Check if user is authenticated
     def verify(self, req):
+        self.orchestrator = self.state['orchestrator']
         if self.orchestrator:
             return True, None
         else:
-            self.orchestrator = self.state['orchestrator']
             return False, jsonify("NOT_READY")
         # User hasn't setup GroundSeg
         if self.config['firstBoot']:
