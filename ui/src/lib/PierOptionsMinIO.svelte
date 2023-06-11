@@ -1,6 +1,6 @@
 <script>
   import { api } from '$lib/api'
-  import { send, socket, socketInfo } from '$lib/stores/websocket.js'
+  import { structure } from '$lib/stores/websocket'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
 
   import PierAdvancedMinIOSetup from '$lib/PierAdvancedMinIOSetup.svelte'
@@ -14,9 +14,9 @@
 
   let showSetup = false
 
-  $: linkInfo = ($socketInfo?.urbits?.[name]?.minio?.link) || ""
-  $: unlinkInfo = ($socketInfo?.urbits?.[name]?.minio?.unlink) || ""
-  $: clickExist = ($socketInfo?.urbits?.[name]?.click?.exist) || false
+  $: linkInfo = ($structure?.urbits?.[name]?.minio?.link) || ""
+  $: unlinkInfo = ($structure?.urbits?.[name]?.minio?.unlink) || ""
+  $: clickExist = ($structure?.urbits?.[name]?.click?.exist) || false
 
   // Button status
   let linkButtonStatus = 'standard'
@@ -25,19 +25,25 @@
 
 	// Update Urbit S3 endpoint
 	const updateMinIO = () => {
+    console.log("update MinIO")
+    /*
     let payload = {
       "category": "urbits",
       "payload": {"patp": name, "module": "minio", "action": "link"}
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    send($socket, $structure, document.cookie, payload)
+    */
   }
 
 	const unlinkMinIO = () => {
+    console.log("update MinIO")
+    /*
     let payload = {
       "category": "urbits",
       "payload": {"patp": name, "module": "minio", "action": "unlink"}
     }
-    send($socket, $socketInfo, document.cookie, payload)
+    send($socket, $structure, document.cookie, payload)
+    */
   }
 
   const exportBucket = () => {

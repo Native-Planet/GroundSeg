@@ -36,7 +36,7 @@
   import PierAdvancedInformation from '$lib/PierAdvancedInformation.svelte'
 
   // Right Advanced
-  //import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
+  import PierOptionsMinIO from '$lib/PierOptionsMinIO.svelte'
   import PierOptionsDomain from '$lib/PierOptionsDomain.svelte'
 
 	// default values
@@ -281,7 +281,6 @@
               wgRunning={urbit.wgRunning}
             />
           {/if}
-          <!--
           <PierOptionsMinIO 
             minIOUrl={urbit.minIOUrl} 
             minIOReg={urbit.minIOReg}
@@ -289,7 +288,6 @@
             name={urbit.name}
             disabled={urbit.click ? false : urbit.devMode}
           />
-          -->
           <PierOptionsDomain
             name={urbit.name}
             disabled={!urbit.wgReg}
