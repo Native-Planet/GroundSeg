@@ -17,7 +17,9 @@ from lib.minios import WSMinIOs
 # Legacy API
 from werkzeug.utils import secure_filename
 from legacy.system_post import SysPost
+
 # Util
+from config.utils import Utils
 from log import Log
 
 class Orchestrator:
@@ -71,6 +73,83 @@ class Orchestrator:
     #
     # Combo functions
     #
+
+############## Ship Import/Creation #################
+
+    # Boot new pier from key
+    def boot_new(self, patp, key, remote):
+        Log.log(f"{patp}: Attempting to boot new urbit ship")
+        try:
+            if not Utils.check_patp(patp):
+                raise Exception("Invalid @p")
+
+            # TODO: Add check if exists, return prompt to user for further action
+
+            # Get open ports
+            http_port, ames_port = self.urbit.get_open_urbit_ports()
+
+            # Generate config file for pier
+            cfg = self.urbit.build_config(patp, http_port, ames_port)
+            self.urbit._urbits[patp] = cfg
+            self.urbit.save_config(patp)
+
+            # Delete existing ship if exists
+            if self.urbit.urb_docker.delete(patp):
+                # Add to system.json
+                if self.urbit.add_urbit(patp):
+                    # Register the service
+                    try:
+                        self.api.create_service(patp, 'urbit', 10)
+                        self.api.create_service(f"s3.{patp}", 'minio', 10)
+                    except Exception as e:
+                        Log.log(f"orchestrator:boot_new:{patp} failed to create service: {e}")
+
+                    svc_url = None
+                    http_port = None
+                    ames_port = None
+                    s3_port = None
+                    console_port = None
+                    tries = 1
+                    while None in [svc_url,http_port,ames_port,s3_port,console_port]:
+                        Log.log(f"{patp}: Checking anchor config if services are ready")
+                        if self.api.retrieve_status():
+                            self.wireguard.update_wg_config(self.wireguard.anchor_data['conf'])
+                        Log.log(f"Anchor: {self.wireguard.anchor_data['subdomains']}")
+
+                        pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
+                        for ep in self.wireguard.anchor_data['subdomains']:
+                            if ep['status'] == 'ok':
+                                if(f'{patp}.{pub_url}' == ep['url']):
+                                    svc_url = ep['url']
+                                    http_port = ep['port']
+                                elif(f'ames.{patp}.{pub_url}' == ep['url']):
+                                    ames_port = ep['port']
+                                elif(f'bucket.s3.{patp}.{pub_url}' == ep['url']):
+                                    s3_port = ep['port']
+                                elif(f'console.s3.{patp}.{pub_url}' == ep['url']):
+                                    console_port = ep['port']
+                            else:
+                                t = tries * 2
+                                Log.log(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
+                                sleep(t)
+                                if tries <= 15:
+                                    tries = tries + 1
+                                break
+
+                    if self.urbit.set_wireguard_network(patp, svc_url, http_port, ames_port, s3_port, console_port):
+                        # Create the docker container
+                        if self.ws_urbits.start(patp,'boot',key) == "succeeded":
+                            if remote:
+                                self.ws_urbits.access_toggle(patp,"remote")
+                            return 200
+
+        except Exception as e:
+            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
+        return 400
+
+#
+#   STARTRAM
+#
 
     def startram_stop(self):
         # mc
@@ -233,10 +312,14 @@ class Orchestrator:
 
                                     # One or more of the urbit services is not registered
                                     if not (uw and ua):
-                                        Thread(target=self.api.create_service(patp, 'urbit', 10))
+                                        Thread(target=self.api.create_service,
+                                               args=(patp, 'urbit', 10)
+                                               ).start()
                                     # One or more of the minio services is not registered
                                     if not (m and mc and mb):
-                                        Thread(target=self.api.create_service(f"s3.{patp}", 'minio', 10))
+                                        Thread(target=self.api.create_service,
+                                               args=(f"s3.{patp}", 'minio', 10)
+                                               ).start()
                                 except Exception as e:
                                     Log.log(f"orchestrator:startram_register:{patp} failed to create service: {e}")
 
@@ -381,8 +464,8 @@ class Orchestrator:
         try:
             # Boot new Urbit
             if data['app'] == 'boot-new':
-                #TODO: move the entire endpoint to ws
-                return self.urbit.create(urbit_id, data.get('key'), data.get('remote'))
+                # Pass to ws
+                return self.boot_new(urbit_id, data.get('key'), data.get('remote'))
 
             # Check if Urbit Pier exists
             if not self.urbit.urb_docker.get_container(urbit_id):
@@ -686,3 +769,46 @@ class Orchestrator:
             self.config_object.save_config()
 
         return 400
+
+    #
+    #   System Settings
+    #
+
+    # Get all system information
+    def get_system_settings(self):
+        is_vm = "vm" == self.config_object.device_mode
+
+        ver = str(self.config_object.version)
+        if self.config['updateBranch'] != 'latest':
+            ver = f"{ver}-{self.config['updateBranch']}"
+
+        ui_branch = ""
+        if self.webui.data['webui_version'] != 'latest':
+            ui_branch = f"-{self.webui.data['webui_version']}"
+
+        required = {
+                "vm": is_vm,
+                "updateMode": self.config['updateMode'],
+                "minio": self.minio.minios_on,
+                "containers" : SysGet.get_containers(),
+                "sessions": len(self.config['sessions']),
+                "gsVersion": ver,
+                "uiBranch": ui_branch,
+                "ram": self.config_object._ram,
+                "cpu": self.config_object._cpu,
+                "temp": self.config_object._core_temp,
+                "disk": self.config_object._disk,
+                "netdata": f"http://{socket.gethostname()}.local:{self.netdata.data['port']}",
+                "swapVal": self.config['swapVal'],
+                "maxSwap": Utils.max_swap(self.config['swapFile'], self.config['swapVal'])
+                }
+
+        optional = {} 
+        if not is_vm:
+            optional = {
+                    "connected": SysGet.get_connection_status(),
+                    "ethOnly": SysGet.get_ethernet_status()
+                    }
+
+        settings = {**optional, **required}
+        return {'system': settings}

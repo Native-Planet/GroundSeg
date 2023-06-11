@@ -46,12 +46,11 @@ class WSUrbits:
     #   interactions with the Urbit Docker container
     #
 
-    def start(self, patp, act):
+    def start(self, patp, act, key=''):
         self.urb = self.state['dockers']['urbit']
         ship = self.urb._urbits[patp]
         arch = self.config_object._arch
         vol = self.urb._volume_directory
-        key = ''
         res = self.urb.urb_docker.start(ship, arch, vol, key, act)
         return res
 

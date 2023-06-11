@@ -1,7 +1,10 @@
 <script>
   import { scale } from 'svelte/transition'
+  import { page } from '$app/stores'
   import { onMount } from 'svelte'
-	import { updateState, startram } from '$lib/api'
+
+  import { api } from '$lib/api'
+  import { structure } from '$lib/stores/websocket'
 
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
@@ -12,18 +15,17 @@
 	import Card from '$lib/Card.svelte'
   import KeyDropper from '$lib/KeyDropper.svelte'
 
-	export let data
-
   let remoteCheck = true
+  let name = ''
+  let key = ''
+  let inView = false
 
-	updateState(data)
-
-  let name = '', key = '', inView = false
+  $: startram = ($structure?.system?.startram) || {}
+  $: container = (startram?.container) || "stopped"
+  $: register = (startram?.register) || "no"
 
   onMount(()=> {
-    if (data['status'] == 404) {
-      window.location.href = "/login"
-    }
+    api.set("http://" + $page.url.hostname + ":27016")
     inView = !inView
   })
 
@@ -44,7 +46,7 @@
 	  </div>
 
     <!-- Remote Autoset -->
-    {#if $startram.wgReg && $startram.wgRunning}
+    {#if register == "yes" && container == "running"}
       <div class="remote-check">
         <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
           {#if remoteCheck}

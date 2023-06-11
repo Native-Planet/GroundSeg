@@ -221,6 +221,7 @@ class Urbit:
 
         return {'urbits': urbits}
 
+    '''
     # Boot new pier from key
     def create(self, patp, key, remote):
         Log.log(f"{patp}: Attempting to boot new urbit ship")
@@ -257,6 +258,7 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
         return 400
+    '''
 
     def new_pier_remote_toggle(self, patp):
         Log.log(f"{patp}: New pier remote toggle thread started")
