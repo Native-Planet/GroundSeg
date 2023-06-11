@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
-  import { api, isPatp, startram } from '$lib/api'
+  import { structure } from '$lib/stores/websocket'
+  import { api, isPatp } from '$lib/api'
   import Fa from 'svelte-fa'
   import { faCheck, faRotate } from '@fortawesome/free-solid-svg-icons'
 
@@ -151,6 +152,10 @@
     }
   }
 
+  $: startram = ($structure?.system?.startram) || {}
+  $: container = (startram?.container) || "stopped"
+  $: register = (startram?.register) || "no"
+
   // Dropzone params
   onMount(()=> {
     let myDropzone = new Dropzone("#dropper", {
@@ -180,7 +185,7 @@
     if (fixCheck) {
       fixer = "yes"
     }
-    if ($startram.wgReg && $startram.wgRunning) {
+    if (register == "yes" && container == "running") {
       return "file-" + remote + "-" + fixer
     } else {
       return "file-local-" + fixer
@@ -191,7 +196,7 @@
 
 <div class="checker-wrapper">
   <!-- Remote Autoset -->
-  {#if $startram.wgReg && $startram.wgRunning}
+  {#if register == "yes" && container == "running"}
     <div class="checker remote" class:freeze={working}>
       <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
         {#if remoteCheck}

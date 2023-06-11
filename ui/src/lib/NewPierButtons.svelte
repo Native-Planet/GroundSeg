@@ -29,7 +29,7 @@
     if (isPatp(n)) {
       let nr = n.replace(/~/g,'')
       let checked = false
-      if ($startram.wgReg && $startram.wgRunning) {
+      if (register == "yes" && container == "running") {
         checked = remoteCheck
       }
       const query = {"app":"boot-new", "key": k, "remote": checked}
