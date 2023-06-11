@@ -25,19 +25,21 @@ class WSUrbits:
 
     def get_config(self, patp, key):
         try:
-            return self._urbits[patp][key]
+            self.urb = self.state['dockers']['urbit']
+            return self.urb._urbits[patp][key]
         except:
             return None
 
     def set_config(self, patp, key, value):
         try:
-            old_value = self._urbits[patp][key]
+            self.urb = self.state['dockers']['urbit']
+            old_value = self.urb._urbits[patp][key]
             self._urbits[patp][key] = value
-            Log.log(f"WS: {patp}: '{key}':{old_value} -> '{key}':{value}")
+            Log.log(f"lib:urbits:{patp}: '{key}':{old_value} -> '{key}':{value}")
             self.urb.save_config(patp)
             return True
         except Exception as e:
-            Log.log(f"WS: {patp} set config failed: {e}")
+            Log.log(f"lib:urbits:{patp} set config failed: {e}")
         return False
 
     #
@@ -45,7 +47,8 @@ class WSUrbits:
     #
 
     def start(self, patp, act):
-        ship = self._urbits[patp]
+        self.urb = self.state['dockers']['urbit']
+        ship = self.urb._urbits[patp]
         arch = self.config_object._arch
         vol = self.urb._volume_directory
         key = ''
@@ -53,10 +56,12 @@ class WSUrbits:
         return res
 
     def remove_container(self, patp):
+        self.urb = self.state['dockers']['urbit']
         return self.urb.urb_docker.remove_container(patp)
 
     def create_container(self, patp):
-        ship = self._urbits[patp]
+        self.urb = self.state['dockers']['urbit']
+        ship = self.urb._urbits[patp]
         image = self.temp_image(patp)
         vol = self.urb._volume_directory
         key = ''

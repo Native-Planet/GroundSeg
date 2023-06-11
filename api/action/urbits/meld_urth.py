@@ -6,6 +6,7 @@ from log import Log
 class MeldUrth:
     def __init__(self, parent, patp, state):# urb, ws_util):
         self.state = state
+        self.broadcaster = self.state['broadcaster']
         self.start = parent.start # start function
         self.get_config = parent.get_config # retrieves value from <patp>.json
         self.set_config = parent.set_config # modify <patp>.json
@@ -27,27 +28,30 @@ class MeldUrth:
                     if self.revert_running(patp, running, start):
                         Log.log(f"{patp}: Urth Pack and Meld action completed")
                         self.set_meld_status(patp)
-                        ##self.broadcast("success")
+                        self.broadcast("success")
                     else:
+                        print("1")
                         raise Exception()
                 else:
+                    print("2")
                     raise Exception()
             else:
+                print("3")
                 raise Exception()
-        except Exception:
-            Log.log(f"{patp}: Urth Pack and Meld action did not complete")
-            ##self.broadcast("failure")
+        except Exception as e:
+            Log.log(f"{patp}: Urth Pack and Meld action did not complete. {e}")
+            self.broadcast("failure")
         sleep(3)
-        ##self.broadcast("")
+        self.broadcast("")
 
     def broadcast(self, info):
-        return self.ws_util.urbit_broadcast(self.patp, 'meld','urth', info)
+        return self.broadcaster.urbit_broadcast(self.patp, 'meld','urth', info)
 
     def stop_running(self, patp):
         # stop pier if running and returns
         # previous run state
         if self.urb_docker.is_running(patp):
-            ##self.broadcast("stopping")
+            self.broadcast("stopping")
             return self.urb.stop(patp)
         return False
 
@@ -78,7 +82,7 @@ class MeldUrth:
         # act is either pack or meld
         if start(patp, act) == act:
             Log.log(f"{patp}: Successfully started container for Urth {act}ing")
-            #self.broadcast(f"{act}ing")
+            self.broadcast(f"{act}ing")
             while self.urb_docker.is_running(patp):
                 sleep(0.5)
             Log.log(f"{patp}: Done Urth {act}ing")
