@@ -8,6 +8,9 @@ from flask_cors import CORS
 from log import Log
 from config.utils import Utils
 
+# Legacy modules
+from legacy.bug_report import BugReport
+
 # Create flask app
 class GroundSegFlask:
     def __init__(self,state):#, config, orchestrator, ws_util):
@@ -34,19 +37,6 @@ class GroundSegFlask:
                 return jsonify(200)
 
             return message
-
-        # List of Urbit Ships in Home Page
-        '''
-        @self.app.route("/urbits", methods=['GET'])
-        def all_urbits():
-            approved, message = self.verify(request)
-
-            if approved:
-                urbs = self.orchestrator.get_urbits()
-                return make_response(jsonify(urbs))
-
-            return message
-        '''
 
         # Handle urbit ID related requests
         @self.app.route('/urbit', methods=['GET','POST'])
@@ -91,10 +81,10 @@ class GroundSegFlask:
             approved, message = self.verify(request)
 
             if approved:
-                blob = request.get_json()
-                res = self.orchestrator.handle_report(blob)
+                data = request.get_json()
+                bp = self.config_object.base_path
+                res = BugReport.submit_report(data, bp, self.config['wgRegistered'])
                 return jsonify(res)
-
             return message
         
         # Pier upload

@@ -1,14 +1,15 @@
 <script>
+  import { page } from '$app/stores'
   import { onMount } from 'svelte'
-	import { updateState, api, urbits } from '$lib/api'
+	import { updateState, api } from '$lib/api'
+	import { structure } from '$lib/stores/websocket'
 
   import Logo from '$lib/Logo.svelte'
 	import Card from '$lib/Card.svelte'
   import PrimaryButton from '$lib/PrimaryButton.svelte'
   import BugPier from '$lib/BugPier.svelte'
 
-	export let data
-	updateState(data)
+  $: urbits = ($structure?.urbits) || {}
 
   let description = ''
   let buttonStatus = 'standard'
@@ -18,11 +19,7 @@
   let selectAll
 
   onMount(()=> {
-    if (data['status'] == 404) {
-      window.location.href = "/login"
-    } else {
-      getUrbits()
-    }
+    api.set("http://" + $page.url.hostname + ":27016")
   })
 
   const forceSet = b => {
@@ -46,7 +43,9 @@
         setTimeout(()=> person = '', 3000)
         setTimeout(()=> description = '', 3000)
         setTimeout(()=> forceSet(false), 3000)
-        setTimeout(()=> selectAll.forceSet(false), 3000)
+        if (Object.entries(urbits).length > 1) {
+          setTimeout(()=> selectAll.forceSet(false), 3000)
+        }
       } else {
         buttonStatus = 'failure'
       }
@@ -60,23 +59,6 @@
 	}
 
   let succeeded = false
-  const getUrbits = () => {
-    if (!succeeded) {
-      fetch($api + '/urbits', {credentials:"include"})
-      .then(raw => raw.json())
-      .then(res => {
-        updateState(res)
-        succeeded = true
-      })
-      .catch(err => {
-        console.log(err)
-        if ((typeof err) == 'object') {
-          updateState({status:'noconn'})
-        }
-      })
-      setTimeout(getUrbits, 3000)
-    }
-  }
 
   const addPier = e => {
     const { name, check } = e.detail
@@ -108,19 +90,21 @@
       <li>List of docker containers on your device</li>
       <li>GroundSeg and docker container configs (removed private information)</li>
     </ul>
-    {#if $urbits.length > 0}
+
+    {#if Object.entries(urbits).length > 0}
       <div class="title">Send Pier Logs (Optional):</div>
       <div class="check-wrapper">
-        {#each $urbits as u, i}
-          <BugPier bind:this={bugChecker[i]} name={u.name} on:update={addPier} submitting={!(buttonStatus == 'standard')}/>
+        {#each Object.entries(urbits) as u, i}
+          <BugPier bind:this={bugChecker[i]} name={u[0]} on:update={addPier} submitting={!(buttonStatus == 'standard')}/>
         {/each}
-        {#if $urbits.length > 1}
+        {#if Object.entries(urbits).length > 1}
           <BugPier bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={!(buttonStatus == 'standard')}/>
         {/if}
       </div>
     {/if}
 
   </div>
+
   <div class="input-title">How should we contact you?</div>
   <input type="text" bind:value={person} placeholder="~sampel-palnet or example@email.com" />
   <div class="input-title">Describe your issue. Include as much information as you can:</div>
@@ -137,7 +121,6 @@
     />
   </div>
 </Card>
-
 <style>
   .title {
     font-size: 14px; 
