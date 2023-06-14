@@ -209,7 +209,8 @@ class Config:
 
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
-        if cfg['updateBranch'] != 'edge' or cfg['updateBranch'] != 'canary':
+        branch = cfg.get('updateBranch')
+        if branch != 'edge' and cfg['updateBranch'] != 'canary':
             min_allowed = 3600
             if "updateInterval" not in cfg:
                 cfg['updateInterval'] = min_allowed
@@ -219,7 +220,8 @@ class Config:
                 cfg['updateInterval'] = min_allowed
                 Log.log(f"Config: updateInterval is set below allowed minimum! Setting to: {min_allowed}")
         else:
-            cfg['updateInterval'] = 90
+            if "updateInterval" not in cfg:
+                cfg['updateInterval'] = 90
 
         return cfg
 

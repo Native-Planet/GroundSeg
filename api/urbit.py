@@ -85,16 +85,19 @@ class Urbit:
         self.start_all(self.config['piers'])
 
     # Start container
-    def start(self, patp, key=''):
-        if self.load_config(patp):
+    def start(self, patp, key='', skip=False):
+        if not skip:
+            skip = self.load_config(patp)
+
+        if skip:
             if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
                 return self.urb_docker.start(self._urbits[patp],
                                              self.config_object._arch,
                                              self._volume_directory,
                                              key
                                              )
-        else:
-            return "failed"
+            else:
+                return "failed"
 
     def stop(self, patp):
         self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
@@ -1257,9 +1260,11 @@ class Urbit:
             Log.log(f"{patp}: Failed to load config: {e}")
             return False
 
-    def save_config(self, patp):
+    def save_config(self, patp, dupe=None): # dupe is a temporary fix for the updater loop
         try:
             with open(f"{self.config_object.base_path}/settings/pier/{patp}.json", "w") as f:
+                if dupe:
+                    self._urbits[patp] = dupe
                 json.dump(self._urbits[patp], f, indent = 4)
                 Log.log(f"{patp}: Config saved")
                 return True

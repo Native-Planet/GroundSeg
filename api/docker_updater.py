@@ -10,11 +10,11 @@ class DockerUpdater:
         self.config = config.config
         self.arch = config._arch
         self.orchestrator = orchestrator
-        self.wireguard = orchestrator.wireguard
-        self.webui = orchestrator.webui
-        self.minio = orchestrator.minio
-        self.urbit = orchestrator.urbit
-        self.netdata = orchestrator.netdata
+        self.wireguard = self.orchestrator.wireguard
+        self.webui = self.orchestrator.webui
+        self.minio = self.orchestrator.minio
+        self.urbit = self.orchestrator.urbit
+        self.netdata = self.orchestrator.netdata
 
     def check_docker_update(self):
         Log.log("Updater: Docker updater thread started")
@@ -294,10 +294,11 @@ class DockerUpdater:
                 changed = True
 
             if changed:
-                self.urbit.save_config(p)
+                dupe = self.urbit._urbits[p]
+                self.urbit.save_config(p, dupe)
                 Log.log(f"{p}: Urbit update detected. Updating..")
                 if self.urbit.urb_docker.remove_container(p):
-                    if self.urbit.start(p) == "succeeded":
+                    if self.urbit.start(p,skip=True) == "succeeded":
                         Log.log(f"{p}: Urbit update complete")
             else:
                 Log.log(f"{p}: Urbit already on correct version")
