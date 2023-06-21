@@ -99,12 +99,41 @@ class Urbit:
             else:
                 return "failed"
 
+    def prep(self, patp):
+        key = ''
+        return self.urb_docker.start(self._urbits[patp],
+                                     self.config_object._arch,
+                                     self._volume_directory,
+                                     key,
+                                     'prep'
+                                     )
+
     def stop(self, patp):
         self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
         if self.urb_docker.exec(patp, f"kill $(cat {patp}/.vere.lock"):
             self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
-            return self.urb_docker.stop(patp)
+            return self.graceful_exit(patp)
+            #return self.urb_docker.stop(patp)
                 
+    # |exit 
+    def graceful_exit(self, patp):
+        try:
+            Log.log(f"{patp}: Attempting to send |exit")
+            # Naming the hoon file
+            name = "bar_exit"
+            ";<  our=@p  bind:m  get-our"
+            hoon = f"=/  m  (strand ,vase)  ;<  ~  bind:m  (poke [~{patp} %hood] %drum-exit !>(~))  (pure:m !>('success'))"
+            hoon_file = f"{name}.hoon"
+            self.create_hoon(patp, name, hoon)
+            # Executing the hoon file
+            raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
+            res = Click().filter_success(raw)
+            self.delete_hoon(patp, name)
+            Log.log(f"{patp}: |exit sent successfully")
+        except Exception as e:
+            Log.log(f"urbit:graceful_exit:{patp} Error: {e}")
+            return False
+        return True
 
     # Delete Urbit Pier and MiniO
     def delete(self, patp):

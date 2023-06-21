@@ -35,13 +35,15 @@ class UrbitDocker:
                     return "failed"
 
         try:
-            if c.attrs['Config']['Image'] != image:
-                Log.log(f"{patp}: Container and config versions are mismatched")
-                if self.remove_container(patp):
-                    if self.create(config, image, vol_dir, key):
-                        c = self.get_container(patp)
-                        if not c:
-                            return "failed"
+            if act != "prep":
+                if c.attrs['Config']['Image'] != image:
+                    Log.log(f"{patp}: Container and config versions are mismatched")
+                    if self.start(config,arch,vol_dir,key,"prep") == "prep":
+                        if self.remove_container(patp):
+                            if self.create(config, image, vol_dir, key):
+                                c = self.get_container(patp)
+                                if not c:
+                                    return "failed"
         except Exception as e:
             Log.log(f"{patp}: Failed to check for version match: {e}")
             return "failed"
@@ -64,6 +66,9 @@ class UrbitDocker:
         try:
             with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
                 script = Utils.start_script()
+                if act == "prep":
+                    success_message = "prep"
+                    script = Utils.prep_script()
                 if act == "pack":
                     success_message = "pack"
                     script = Utils.pack_script()

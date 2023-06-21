@@ -297,8 +297,14 @@ class DockerUpdater:
                 dupe = self.urbit._urbits[p]
                 self.urbit.save_config(p, dupe)
                 Log.log(f"{p}: Urbit update detected. Updating..")
-                if self.urbit.urb_docker.remove_container(p):
-                    if self.urbit.start(p,skip=True) == "succeeded":
-                        Log.log(f"{p}: Urbit update complete")
+                # stop urbit
+                if self.urbit.stop(p):
+                    # prep_script
+                    if self.urbit.prep(p) == "prep":
+                        # remove container
+                        if self.urbit.urb_docker.remove_container(p):
+                            # start container with new image
+                            if self.urbit.start(p,skip=True) == "succeeded":
+                                Log.log(f"{p}: Urbit update complete")
             else:
                 Log.log(f"{p}: Urbit already on correct version")

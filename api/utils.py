@@ -13,9 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives import serialization
 
 # GroundSeg modules
-import start_script
-import pack_script
-import meld_script
+from scripts import start_script, pack_script, meld_script, prep_script
 from log import Log
 
 class Utils:
@@ -202,31 +200,14 @@ class Utils:
                 Log.log(f"Swap: Failed to get maximum swap: {e}")
         return free
 
-    '''
-    def linux_update_script():
-        return """\
-#!/bin/bash
-
-# Update package index
-sudo apt-get update
-
-# Upgrade packages
-sudo apt-get -y upgrade
-
-# Check if a reboot is required
-if [ -f /var/run/reboot-required ]; then
-  echo "System restart required. Restarting now..."
-  sudo reboot
-else
-  echo "No restart required."
-fi"""
-    '''
-
     def pack_script():
         return pack_script.pack_script()
 
     def meld_script():
         return meld_script.meld_script()
+
+    def prep_script():
+        return prep_script.prep_script()
 
     def start_script():
         return start_script.start_script()
