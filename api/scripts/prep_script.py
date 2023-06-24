@@ -2,7 +2,6 @@ from log import Log
 def prep_script():
     return """\
 #!/bin/bash
-echo "URTH PREP"
 
 set -eu
 # set defaults

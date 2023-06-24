@@ -88,7 +88,6 @@ class Urbit:
     def start(self, patp, key='', skip=False):
         if not skip:
             skip = self.load_config(patp)
-
         if skip:
             if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
                 return self.urb_docker.start(self._urbits[patp],
@@ -99,21 +98,12 @@ class Urbit:
             else:
                 return "failed"
 
-    def prep(self, patp):
-        key = ''
-        return self.urb_docker.start(self._urbits[patp],
-                                     self.config_object._arch,
-                                     self._volume_directory,
-                                     key,
-                                     'prep'
-                                     )
-
     def stop(self, patp):
         self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
         if self.urb_docker.exec(patp, f"kill $(cat {patp}/.vere.lock"):
             self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
-            return self.graceful_exit(patp)
-            #return self.urb_docker.stop(patp)
+            if self.graceful_exit(patp):
+                return self.urb_docker.stop(patp)
                 
     # |exit 
     def graceful_exit(self, patp):
