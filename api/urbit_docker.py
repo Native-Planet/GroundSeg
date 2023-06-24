@@ -9,6 +9,27 @@ client = docker.from_env()
 
 class UrbitDocker:
 
+    def prep_start(self, patp, vol_dir):
+        from time import sleep # temp
+        Log.log(f"{patp}: Attempting to run prep")
+        c = self.get_container(patp)
+        if not c:
+            return c
+
+        # Update script
+        try:
+            with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
+                script = Utils.prep_script()
+                f.write(script)
+                f.close()
+            # Start ship container
+            c.start()
+            return True
+        except Exception as e:
+            Log.log(f"{patp}: Failed to start container: {e}")
+            return False
+
+
     def start(self, config, arch, vol_dir, key='', act='boot'):
         success_message = "succeeded"
         patp = config['pier_name']
@@ -34,25 +55,30 @@ class UrbitDocker:
                 if not c:
                     return "failed"
 
+        # Deal with mismatch image
         try:
             if c.attrs['Config']['Image'] != image:
                 Log.log(f"{patp}: Container and config versions are mismatched")
-                if self.remove_container(patp):
-                    if self.create(config, image, vol_dir, key):
-                        c = self.get_container(patp)
-                        if not c:
-                            return "failed"
+                # Run prep
+                if self.prep_start(patp, vol_dir):
+                    # Remove container
+                    if self.remove_container(patp):
+                        # Recreate container
+                        if self.create(config, image, vol_dir, key):
+                            # Update container variable
+                            c = self.get_container(patp)
+                            if not c:
+                                return "failed"
         except Exception as e:
             Log.log(f"{patp}: Failed to check for version match: {e}")
             return "failed"
 
-        # Get status
+        # Get running status
         if c.status == "running":
             if act == "boot":
                 if self.mode_mismatch(patp, config):
                     if self.remove_container(patp):
                         return self.start(config, arch, vol_dir, key)
-
                 Log.log(f"{patp}: Container already started")
                 return success_message
 
@@ -63,6 +89,7 @@ class UrbitDocker:
         # Start ship container
         try:
             with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
+                #script = Utils.start_script()
                 script = Utils.start_script()
                 if act == "pack":
                     success_message = "pack"
@@ -73,6 +100,7 @@ class UrbitDocker:
                 f.write(script)
                 f.close()
             c.start()
+
             if act == "boot":
                 if self.mode_mismatch(patp, config):
                     if self.remove_container(patp):
