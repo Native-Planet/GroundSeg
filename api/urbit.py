@@ -1259,7 +1259,7 @@ class Urbit:
 
                 # Updater Urbit information
                 try:
-                    if (self.config_object.update_avail) and (self.config['updateMode'] == 'auto'):
+                    if (self.config_object.update_avail) and (self.config['updateMode'] != 'off'):
                         Log.log(f"{patp}: Replacing local data with version server data")
                         self._urbits[patp]['urbit_repo'] = self.updater_info['repo']
                         self._urbits[patp]['urbit_version'] = self.updater_info['tag']
@@ -1270,7 +1270,7 @@ class Urbit:
                         self._urbits[patp]['minio_amd64_sha256'] = self.updater_minio['amd64_sha256']
                         self._urbits[patp]['minio_arm64_sha256'] = self.updater_minio['arm64_sha256']
                         self.save_config(patp)
-                except:
+                except Exception as e:
                     pass
 
                 Log.log(f"{patp}: Config loaded")
