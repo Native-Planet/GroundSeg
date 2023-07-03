@@ -207,11 +207,11 @@ class UrbitDocker:
             return False
         return True
 
-    def full_logs(self, patp):
+    def full_logs(self, patp,timestamps=False):
         c = self.get_container(patp)
         if not c:
             return False
-        return c.logs()
+        return c.logs(timestamps=timestamps)
 
     def exec(self, patp, command):
         c = self.get_container(patp)

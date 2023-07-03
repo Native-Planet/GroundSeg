@@ -535,11 +535,11 @@ class Orchestrator:
                 return self.get_log_lines(data['container'], data['haveLine'])
 
             if data['action'] == 'export':
-                return '\n'.join(self.get_log_lines(data['container'], 0))
+                return '\n'.join(self.get_log_lines(data['container'], 0, timestamps=True))
 
         return module
 
-    def get_log_lines(self, container, line):
+    def get_log_lines(self, container, line, timestamps=False):
         blob = ''
 
         try:
@@ -556,7 +556,7 @@ class Orchestrator:
                 blob = self.minio.minio_logs(container)
 
             if container in self.urbit._urbits:
-                blob = self.urbit.logs(container)
+                blob = self.urbit.logs(container,timestamps)
 
             blob = blob.decode('utf-8').split('\n')[line:]
 

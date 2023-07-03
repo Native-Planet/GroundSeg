@@ -1248,8 +1248,8 @@ class Urbit:
 
 
     # Container logs
-    def logs(self, patp):
-        return self.urb_docker.full_logs(patp)
+    def logs(self, patp,timestamps=False):
+        return self.urb_docker.full_logs(patp,timestamps)
 
     def load_config(self, patp):
         try:
