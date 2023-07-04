@@ -1,91 +1,57 @@
 <script>
-  // WebSocket Store
+  // Svelte
+  import { onMount } from 'svelte'
   import { get } from 'svelte/store'
   import { page } from '$app/stores'
+  import { goto } from '$app/navigation';
 
-  import { power, api, isPortrait, noconn } from '$lib/api'
+  // Websocket
+  import { connect, structure, connected } from '$lib/stores/websocket'
+  import { wide } from '$lib/stores/display'
 
-  import Router from '$lib/Router.svelte'
+  // Style
+  import "../theme.css"
 
-  import SettingsButton from '$lib/SettingsButton.svelte'
-  import AnchorButton from '$lib/AnchorButton.svelte'
-  import HomeButton from '$lib/HomeButton.svelte'
-  import LinuxButton from '$lib/LinuxButton.svelte'
-  import BugButton from '$lib/BugButton.svelte'
+  onMount(()=> {
+    const hostname = $page.url.hostname
+    connect("ws://" + hostname + ":8000")
+    redirector()
+  })
 
-  import PowerScreen from '$lib/PowerScreen.svelte'
-  import NoConnection from '$lib/NoConnection.svelte'
+  $: access = ($structure?.system?.login?.access) || "unauthorized"
 
-	let innerWidth = 0
-  let innerHeight = 0
+  let count = 0
+  const redirector = () => {
+    if ($connected) {
+      const auth = (access === "authorized")
+      if (auth) {
+        if ($page.route.id === "/login") {
+          goto("/")
+        }
+      } else {
+        if (access === "unauthorized") {
+          if ($page.route.id !== "/login") {
+            if (count > 2) {
+              count = 0
+              goto("/login")
+            } else {
+              count += 1 
+            }
+          }
+        }
+      }
+    }
+    setTimeout(redirector,500)
+  }
 
 	const vert = (h,w) => {
 	  let r = h / w
     let d = false
 		if ( r > 1) { d = true }
-		isPortrait.set(d)	
+		wide.set(!d)	
 	}
 
-  /*
-  const checkStatus = () => {
-    if ($noconn) {
-      fetch($api + "/cookies",{credentials:"include"})
-        .then(() => {
-          noconn.set(false)
-          setTimeout(checkStatus, 15000)
-        })
-        .catch(err => {
-          setTimeout(checkStatus, 2000)
-        })
-    } else {
-      setTimeout(checkStatus, 15000)
-    }
-  }
-*/
 </script>
-<svelte:window bind:innerWidth bind:innerHeight />
 
-<PowerScreen />
-
-<div class="bg">
-  <Router />
-  <slot />
-  {#if $noconn}
-    <NoConnection />
-  {:else}
-    <div class:frozen={($page.route.id === "/settings") 
-      && (($power === 'shutdown') || ($power === 'restart'))}>
-      {#if !($page.route.id == '/setup')}
-        <SettingsButton />
-        <AnchorButton />
-        <HomeButton />
-        <LinuxButton />
-      {/if}
-      <slot/>
-      <BugButton />
-    </div>
-  {/if}
-</div>
-
-<style>
-  @font-face {
-    font-family: Inter;
-    src: url("/Inter-SemiBold.otf");
-  }
-  div {
-    font-family:Inter;
-    background: url("/background") no-repeat center center fixed;
-    -webkit-background-size: auto;
-    -moz-background-size: auto;
-    -o-background-size: auto;
-    background-size: auto;
-    background-color: #040404;
-    height: 100vh;
-    width: 100vw;
-    --action-color: #008eff;
-  }
-  .frozen {
-    opacity: 0;
-    pointer-events: none;
-  }
-</style>
+<!--svelte:window bind:innerWidth bind:innerHeight /-->
+<slot/>

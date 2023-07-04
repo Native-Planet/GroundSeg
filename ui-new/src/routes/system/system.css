@@ -1,0 +1,10 @@
+.container {
+ background-color: var(--bg-base);
+ color: var(--text-color);
+ margin: auto;
+ border-radius: 16px;
+}
+.title {
+  font-size: 16px;
+  margin-bottom: 56px;
+}
