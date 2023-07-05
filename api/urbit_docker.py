@@ -134,8 +134,8 @@ class UrbitDocker:
         if c:
             try:
                 c.stop()
-            except Exception:
-                Log.log(f"{patp}: Failed to stop container")
+            except Exception as e:
+                Log.log(f"{patp}: Failed to stop container: {e}")
                 return False
 
         Log.log(f"{patp}: Container stopped")
