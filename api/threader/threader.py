@@ -72,21 +72,32 @@ class Threader:
                 print(e)
             await asyncio.sleep(0.5)
 
+    async def broadcast_setup(self):
+        while True:
+            if self.state['ready']['config']:
+                if self.state['config'].config['firstBoot']:
+                    print("setup")
+            await asyncio.sleep(0.5)  # Send the message twice a second
+
     async def broadcast_unauthorized(self):
         while True:
             try:
                 clients = self.state['clients']['unauthorized'].copy()
+
                 for s in clients:
                     if s.open:
                         login = self.state.get('broadcast').get('system').get('login')
                         message = {"system": {"login":login}}
                         message['system']['login']['access'] = "unauthorized"
+                        if self.state['config'].config['firstBoot']:
+                            message['system']['login']['access'] = "setup"
+                            message['system']['login']['stage'] = "profile"
+                            message['system']['login']['page'] = 1
                         await s.send(json.dumps(message))
                     else:
                         self.state['clients']['unauthorized'].pop(s)
             except Exception as e:
                 print(f"threader:broadcast_unauthorized Broadcast fail: {e}")
-
             await asyncio.sleep(0.5)  # Send the message twice a second
 
     async def broadcast_authorized(self):
@@ -105,29 +116,27 @@ class Threader:
 
             except Exception as e:
                 print(f"threader:broadcast_authorized Broadcast fail: {e}")
-
             await asyncio.sleep(0.5)  # Send the message twice a second
 
     async def session_cleanup(self):
         while True:
             try:
                 if self.state['ready']['config']:
-                    # check if past 5 minutes
-                    sessions = self.state['config'].config['sessions']['unauthorized'].copy()
-                    for token in sessions:
-                        created = sessions[token]['created']
-                        expire = datetime.strptime(created, "%Y-%m-%d_%H:%M:%S") + timedelta(minutes=5)
-                        now = datetime.now()
-                        if now >= expire:
-                            # remove from config
-                            print(f"threader:session_cleanup Removing unauthorized token {token}")
-                            self.state['config'].config['sessions']['unauthorized'].pop(token)
-                            # close the user's connection
-                            for websocket in self.state['clients']['unauthorized']:
-                                if self.state['clients']['unauthorized'][websocket]['id'] == token:
-                                    await websocket.close()
-
+                    if not self.state['config'].config['firstBoot']:
+                        # check if past 5 minutes
+                        sessions = self.state['config'].config['sessions']['unauthorized'].copy()
+                        for token in sessions:
+                            created = sessions[token]['created']
+                            expire = datetime.strptime(created, "%Y-%m-%d_%H:%M:%S") + timedelta(minutes=5)
+                            now = datetime.now()
+                            if now >= expire:
+                                # remove from config
+                                print(f"threader:session_cleanup Removing unauthorized token {token}")
+                                self.state['config'].config['sessions']['unauthorized'].pop(token)
+                                # close the user's connection
+                                for websocket in self.state['clients']['unauthorized']:
+                                    if self.state['clients']['unauthorized'][websocket]['id'] == token:
+                                        await websocket.close()
             except Exception as e:
                 print(e)
-
             await asyncio.sleep(1)

@@ -19,6 +19,7 @@
   })
 
   $: access = ($structure?.system?.login?.access) || "unauthorized"
+  $: stage = ($structure?.system?.login?.stage) || null
 
   let count = 0
   const redirector = () => {
@@ -39,6 +40,16 @@
             }
           }
         }
+        if (access === "setup") {
+          if (count > 2) {
+            count = 0
+            if (stage) {
+              goto("/setup/" + stage)
+            }
+          } else {
+            count += 1 
+          }
+        }
       }
     }
     setTimeout(redirector,500)
@@ -54,4 +65,5 @@
 </script>
 
 <!--svelte:window bind:innerWidth bind:innerHeight /-->
+{JSON.stringify($structure)}
 <slot/>

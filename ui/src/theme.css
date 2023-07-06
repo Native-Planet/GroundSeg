@@ -1,6 +1,6 @@
 @font-face {
   font-family: BPdotsUnicase;
-  src: url(BPdotsUnicaseBold.otf);
+  src: url('/BPdotsUnicaseBold.otf');
 }
 body {
   margin: 0;
