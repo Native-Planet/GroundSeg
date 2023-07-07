@@ -19,7 +19,7 @@
   })
 
   $: access = ($structure?.system?.login?.access) || "unauthorized"
-  $: stage = ($structure?.system?.login?.stage) || null
+  $: stage = ($structure?.system?.setup?.stage) || null
 
   let count = 0
   const redirector = () => {

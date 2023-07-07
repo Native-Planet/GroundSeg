@@ -91,8 +91,7 @@ class Threader:
                         message['system']['login']['access'] = "unauthorized"
                         if self.state['config'].config['firstBoot']:
                             message['system']['login']['access'] = "setup"
-                            message['system']['login']['stage'] = "profile"
-                            message['system']['login']['page'] = 1
+                            message['system']['setup'] = {"stage":"profile","page":1}
                         await s.send(json.dumps(message))
                     else:
                         self.state['clients']['unauthorized'].pop(s)

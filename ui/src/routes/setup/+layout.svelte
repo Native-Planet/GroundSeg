@@ -3,14 +3,14 @@
   import { connect, structure, connected } from '$lib/stores/websocket'
 
   let steps = [0,1,2]
-  $: page = ($structure?.system?.login?.page) || 0
+  $: page = ($structure?.system?.setup?.page) || 0
 </script>
 <div class="container {$wide ? "wide" : "slim"}">
   <slot />
 </div>
 <div class="steps">
   {#each steps as step}
-    <div class="step" class:highlight={step == page}></div>
+    <div class="step" class:highlight={step <= page}></div>
   {/each}
 </div>
 
@@ -21,6 +21,7 @@
     color: var(--text-color);
     margin: auto;
     border-radius: 16px;
+    position: relative;
     display: flex;
     flex-direction: column;
     justify-content: center;
