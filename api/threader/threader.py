@@ -15,6 +15,16 @@ class Threader:
         self.state['ready']['threader'] = True 
         self.broadcaster = self.state['broadcaster']
 
+    async def setup_information(self):
+        print("threader:setup_information Starting")
+        try:
+            loop = SetupInformation(self.state)
+        except Exception as e:
+            print(e)
+        while True:
+            loop.run()
+            await asyncio.sleep(1)
+
     async def anchor_information(self):
         print("threader:anchor_information Starting")
         try:
@@ -72,13 +82,6 @@ class Threader:
                 print(e)
             await asyncio.sleep(0.5)
 
-    async def broadcast_setup(self):
-        while True:
-            if self.state['ready']['config']:
-                if self.state['config'].config['firstBoot']:
-                    print("setup")
-            await asyncio.sleep(0.5)  # Send the message twice a second
-
     async def broadcast_unauthorized(self):
         while True:
             try:
@@ -89,10 +92,13 @@ class Threader:
                         login = self.state.get('broadcast').get('system').get('login')
                         message = {"system": {"login":login}}
                         message['system']['login']['access'] = "unauthorized"
+
                         if self.state['config'].config['firstBoot']:
                             message['system']['login']['access'] = "setup"
-                            message['system']['setup'] = {"stage":"profile","page":1}
+                            message['system']['setup'] = {"stage":"start","page":0}
+
                         await s.send(json.dumps(message))
+
                     else:
                         self.state['clients']['unauthorized'].pop(s)
             except Exception as e:

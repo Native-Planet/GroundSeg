@@ -140,6 +140,7 @@ class WSGroundSeg:
         whitelist = [
                 'login',
                 'startram',
+                'setup',
                 ]
         payload = action.get('payload')
         id = action.get('id')
@@ -152,6 +153,10 @@ class WSGroundSeg:
         else:
             if module == "login":
                 status_code, msg, token = Auth(self.state).handle_login(action,websocket,status_code,msg)
+            elif module == "setup" and self.state['config'].config['firstBoot']:
+                    self.orchestrator = self.state['orchestrator']
+                    if act == "start":
+                        print(act)
             elif websocket in self.state['clients']['authorized']:
                 if module == "startram":
                     self.orchestrator = self.state['orchestrator']

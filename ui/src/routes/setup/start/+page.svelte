@@ -1,11 +1,12 @@
 <script>
+  import { beginSetup } from '$lib/stores/websocket'
 </script>
 
 <div class="wrapper">
   <img src="/groundseg.svg" alt="groundseg" />
   <div class="title">GROUNDSEG</div>
   <div class="subtitle">Click "Begin" to begin to start your device setup</div>
-  <button>Begin</button>
+  <button on:click={beginSetup} >Begin</button>
 </div>
 
 <style>

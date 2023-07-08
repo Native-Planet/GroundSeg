@@ -152,7 +152,6 @@ class GroundSeg:
                 # broadcast
                 this['a_broadcast'] = asyncio.create_task(t.broadcast_authorized())
                 this['u_broadcast'] = asyncio.create_task(t.broadcast_unauthorized())
-                this['s_broadcast'] = asyncio.create_task(t.broadcast_setup())
 
                 # sessions cleanup
                 this['s_cleanup'] = asyncio.create_task(t.session_cleanup())

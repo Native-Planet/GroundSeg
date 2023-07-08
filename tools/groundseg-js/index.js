@@ -51,6 +51,16 @@ export default class GroundSegJS {
   }
 
   //
+  //  Setup
+  //
+
+  beginSetup(id,token=null) {
+    let data = {"id":id,"payload":{"category":"system","module":"setup","action":"start"}}
+    console.log(id + " starting setup" )
+    this.silentSend(data,token)
+  }
+
+  //
   //  StarTram
   //
 

@@ -98,6 +98,16 @@ export const login = async password => {
 }
 
 //
+//  Setup
+//
+export const beginSetup = async () => {
+  let id = await generateRandom(16)
+  let token = await loadSession()
+  PENDING.add(id)
+  SESSION.beginSetup(id,token)
+}
+
+//
 //  Urbits
 //
 
