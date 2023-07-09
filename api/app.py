@@ -49,7 +49,7 @@ async def main():
 
     # Run tasks
     await asyncio.gather(
-            cfg.netcheck(),
+            cfg.net_check(),
             binary.run(),
             linux.run(),
             mon.ram(),
