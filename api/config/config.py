@@ -80,19 +80,17 @@ class Config:
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base
 
-        '''
         try:
             with open("/etc/docker/daemon.json") as f:
             docker_cfg = json.load(f)
             cfg['dockerData'] = docker_cfg['data-root']
         except:
             pass
-        '''
 
         cfg = {**self.default_system_config, **cfg}
-        '''
-        cfg = self.check_update_interval(cfg)
+        #cfg = self.check_update_interval(cfg)
 
+        '''
         try:
             if type(cfg['sessions']) != dict:
             cfg['sessions'] = {}
