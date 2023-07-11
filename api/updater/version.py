@@ -18,8 +18,8 @@ class VersionServer:
                     self.cfg.version_info = r.json()
                 else:
                     raise ValueError(f"Status code {r.status_code}")
-
+                await asyncio.sleep(self.cfg.system['updateInterval'])
             except Exception as e:
                 self.cfg.version_server_ready = False
                 print(f"updater:version:check Unable to retrieve update information: {e}")
-            await asyncio.sleep(60)
+                await asyncio.sleep(60)

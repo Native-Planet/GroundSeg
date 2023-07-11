@@ -91,7 +91,7 @@ class BinUpdate:
 
             except Exception as e:
                 print(f"updater:binary:run: Binary updater failed: {e}")
-            await asyncio.sleep(10)
+            await asyncio.sleep(90)
 
 
     # Remove file

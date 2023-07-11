@@ -16,6 +16,12 @@ class Config:
     version_server_ready = False
     version_info = {}
 
+    # System Monitor
+    _ram = None
+    _cpu = None
+    _core_temp = None
+    _disk = None
+
     # default content of system.json
     default_system_config = {
             "setup": True,
@@ -99,25 +105,10 @@ class Config:
             pass
 
         cfg = {**self.default_system_config, **cfg}
-        #cfg = self.check_update_interval(cfg)
+        cfg = self.check_update_interval(cfg)
+        cfg = self.fix_sessions(cfg)
+        cfg = self.check_linux_update_format(cfg)
 
-        '''
-        try:
-            if type(cfg['sessions']) != dict:
-            cfg['sessions'] = {}
-
-            if type(cfg['linuxUpdates']) != dict:
-                cfg['linuxUpdates'] = self.default_system_config['linuxUpdates']
-            else:
-                if 'previous' not in cfg['linuxUpdates']:
-                    cfg['linuxUpdates']['previous'] = self.default_system_config['linuxUpdates']['previous']
-                if cfg['linuxUpdates']['value'] < 1:
-                    print("config:config linuxUpdates value '{cfg['linuxUpdates']['value']}' is invalid. Defaulting to 1")
-                    cfg['linuxUpdates']['value'] = 1
-        except Exception as e:
-            print(f"config:config Failed to set Linux Update settings: {e}")
-
-        '''
         bin_hash = '000'
 
         '''
@@ -142,6 +133,48 @@ class Config:
         print("config:config Loaded system.json")
         return cfg
 
+    # Makes sure update interval setting isn't below 1 hour
+    def check_update_interval(self, cfg):
+        branch = cfg.get('updateBranch')
+        if branch != 'edge' and cfg['updateBranch'] != 'canary':
+            min_allowed = 3600
+            if "updateInterval" not in cfg:
+                cfg['updateInterval'] = min_allowed
+                print(f"Config: updateInterval doesn't exist! Creating with default value: {min_allowed}")
+
+            elif cfg['updateInterval'] < min_allowed:
+                cfg['updateInterval'] = min_allowed
+                print(f"Config: updateInterval is set below allowed minimum! Setting to: {min_allowed}")
+            else:
+                if "updateInterval" not in cfg:
+                    cfg['updateInterval'] = 90
+
+        return cfg
+
+    # Make sure sessions is dict
+    def fix_sessions(self,cfg):
+        try:
+            if type(cfg['sessions']) != dict:
+                cfg['sessions'] = {}
+        except Exception as e:
+            print(f"config:config Failed to set Linux Update settings: {e}")
+        return cfg
+
+    # Make sure linux updates has correct structure
+    def check_linux_update_format(self,cfg): 
+        try:
+            if type(cfg['linuxUpdates']) != dict:
+                cfg['linuxUpdates'] = self.default_system_config['linuxUpdates']
+            else:
+                if 'previous' not in cfg['linuxUpdates']:
+                    cfg['linuxUpdates']['previous'] = self.default_system_config['linuxUpdates']['previous']
+                if cfg['linuxUpdates']['value'] < 1:
+                    print("config:config linuxUpdates value '{cfg['linuxUpdates']['value']}' is invalid. Defaulting to 1")
+                    cfg['linuxUpdates']['value'] = 1
+        except Exception as e:
+            print(f"config:config Failed to set Linux Update settings: {e}")
+        return cfg
+
     # Save config
     def save_config(self):
         with open(self.system_file, 'w') as f:
@@ -160,6 +193,6 @@ class Config:
             print("config:config Internet connection is available!")
             return
         except Exception as e:
-            Log.log(f"config:config Check internet access error: {e}")
+            print(f"config:config Check internet access error: {e}")
         self.internet = False
         return

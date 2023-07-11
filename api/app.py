@@ -21,11 +21,17 @@ from api.websocket_api import WS
 from api.lick_ipc import Lick
 
 async def main():
-    # Check Dev Mode
+    # Check Dev Mode and Announce
     try:
         dev = sys.argv[1] == "dev"
+        if dev:
+            print("---------- Starting GroundSeg in debug mode ----------")
+        else:
+            raise Exception()
     except:
-        pass
+        print("----------------- Starting GroundSeg -----------------")
+    print("------------------ Urbit is love <3 ------------------")
+
     # Load Config
     base_path = "/opt/nativeplanet/groundseg"
     cfg = Config(base_path,dev)
@@ -48,7 +54,7 @@ async def main():
     # APIs
     host = '0.0.0.0'
     port = 8000
-    ws = WS(groundseg, host, port, dev)
+    ws = WS(cfg, groundseg, host, port, dev)
     ur = Lick(groundseg, dev)
 
     # Run tasks
@@ -67,6 +73,7 @@ async def main():
             groundseg.wg_refresher(),
             groundseg.docker_updater(),
             ws.run(),
+            ws.broadcast(),
             ur.run()
             )
 
