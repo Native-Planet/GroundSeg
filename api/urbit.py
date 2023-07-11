@@ -99,11 +99,13 @@ class Urbit:
                 return "failed"
 
     def stop(self, patp):
+        '''
         self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
         if self.urb_docker.exec(patp, f"kill $(cat {patp}/.vere.lock"):
             self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
-            if self.graceful_exit(patp):
-                return self.urb_docker.stop(patp)
+        '''
+        if self.graceful_exit(patp):
+            return self.urb_docker.stop(patp)
                 
     # |exit 
     def graceful_exit(self, patp):

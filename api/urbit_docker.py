@@ -1,3 +1,5 @@
+import os
+
 # Modules
 import docker
 
@@ -88,6 +90,22 @@ class UrbitDocker:
 
         # Start ship container
         try:
+            # Check if the .vere.lock exists
+            vere_lock = f"{vol_dir}/{patp}/_data/{patp}/.vere.lock"
+            if os.path.isfile(vere_lock):
+                # Open the file
+                with open(vere_lock, 'r') as f:
+                    content = f.read().strip()
+                    # Try to convert the content to an integer
+                    try:
+                        number = int(content)
+                        Log.log(f"{patp}: .vere.lock exists with PID {number}")
+                    except ValueError:
+                        # If the content is not an integer, print it and delete the file
+                        Log.log(f"{patp}: .vere.lock exists with contents '{content}'. Removing...")
+                        # Delete the file
+                        os.remove(vere_lock)
+
             with open(f'{vol_dir}/{patp}/_data/start_urbit.sh', 'w') as f:
                 #script = Utils.start_script()
                 script = Utils.start_script()
