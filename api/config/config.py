@@ -12,13 +12,24 @@ class Config:
     # Class is ready
     ready = False
 
+    # Version Server
+    version_server_ready = False
+    version_info = {}
+
     # default content of system.json
     default_system_config = {
             "setup": True,
             "netCheck": "1.1.1.1:53",
             "updateMode": "auto",
+            "updateUrl": "https://version.groundseg.app",
+            "updateBranch": "latest",
             "swapVal": 16,
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
+            "linuxUpdates": {
+                "value": 1,         # Int
+                "interval": "week", # day hour minute
+                "previous": False   # completed update and reboot
+                }
             }
 
     def __init__(self, base, dev):
@@ -74,16 +85,16 @@ class Config:
             with open(config_file) as f:
                 cfg = json.load(f)
         except Exception as e:
-            print(f"config:config Failed to open system.json: {e}")
-            print("config:config New system.json will be created")
+            print(f"config:config:load_config Failed to open system.json: {e}")
+            print("config:config:load_config New system.json will be created")
 
         cfg['gsVersion'] = self.version
         cfg['CFG_DIR'] = self.base
 
         try:
             with open("/etc/docker/daemon.json") as f:
-            docker_cfg = json.load(f)
-            cfg['dockerData'] = docker_cfg['data-root']
+                docker_cfg = json.load(f)
+                cfg['dockerData'] = docker_cfg['data-root']
         except:
             pass
 
@@ -106,8 +117,10 @@ class Config:
         except Exception as e:
             print(f"config:config Failed to set Linux Update settings: {e}")
 
+        '''
         bin_hash = '000'
 
+        '''
         try:
             bin_hash = Utils.make_hash(f"{self.base_path}/groundseg")
             print(f"config:config Binary hash: {bin_hash}")
@@ -125,9 +138,8 @@ class Config:
         if 'autostart' in cfg:
             cfg.pop('autostart')
 
-        print("config:config Loaded system.json")
         '''
-
+        print("config:config Loaded system.json")
         return cfg
 
     # Save config

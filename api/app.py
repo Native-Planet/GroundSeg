@@ -6,6 +6,7 @@ import asyncio
 from config.config import Config
 
 # Updater
+from updater.version import VersionServer
 from updater.linux import LinUpdate
 from updater.binary import BinUpdate
 
@@ -29,17 +30,20 @@ async def main():
     base_path = "/opt/nativeplanet/groundseg"
     cfg = Config(base_path,dev)
 
-    # Update Binary
-    binary = BinUpdate(cfg,dev)
+    # Version Server
+    version_server = VersionServer(cfg,dev)
 
-    # Update Linux
-    linux = LinUpdate(cfg, dev)
+    # Binary Updater
+    binary = BinUpdate(cfg,base_path,dev)
 
-    # Monitor System
-    mon = SysMonitor(cfg, dev)
+    # Linux Updater
+    linux = LinUpdate(cfg,dev)
+
+    # System Monitor
+    mon = SysMonitor(cfg,dev)
 
     # Start GroundSeg
-    groundseg = GroundSeg(cfg, dev)
+    groundseg = GroundSeg(cfg,dev)
 
     # APIs
     host = '0.0.0.0'
@@ -50,6 +54,7 @@ async def main():
     # Run tasks
     await asyncio.gather(
             cfg.net_check(),
+            version_server.check(),
             binary.run(),
             linux.run(),
             mon.ram(),
