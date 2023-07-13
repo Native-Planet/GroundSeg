@@ -4,6 +4,8 @@ class Broadcaster:
 
     def broadcast(self):
         broadcast = {
+                "type": "structure",
+                "auth-level": "authorized",
                 "system": {
                     "usage": {
                         "ram": self.cfg._ram,
@@ -15,5 +17,11 @@ class Broadcaster:
                 }
         print(broadcast)
 
-    def unready(self):
-        print("NOT_READY")
+    def setup(self):
+        broadcast = {
+                "type": "structure",
+                "auth_level": "setup",
+                "stage": "start",
+                "page": 0
+               }
+        #print(broadcast)

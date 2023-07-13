@@ -1,78 +1,84 @@
 import { writable } from 'svelte/store'
-import GroundSegJS from "../../../../tools/groundseg-js"
+//import GroundSegJS from "../../../../tools/groundseg-js"
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
 
-// The websocket connection
-export let SESSION;
-export let PENDING = new Set();
-export const structure = writable({});
-export const connected = writable(undefined)
-export const loginStatus = writable(null)
+export const structure = writable({})
+export const ready = writable(false)
+export const connected = writable(false)
 
-// Handle messages from API
-let count = 0;
-const listen = async () => {
-  // Make sure session is connected
-  if (!SESSION.connected) { 
-    if (count % 10 == 0) {
-      connect(SESSION.url)
-      count = 0;
-    }
-  }
+let PENDING = new Set();
+let SESSION;
 
-  // Update the main structure
-  structure.set(SESSION.structure)
-  connected.set(SESSION.connected)
-
-  // Activity Checker
-  let act,cid;
-  for (let id of PENDING) {
-    if (SESSION.activity.activity.hasOwnProperty(id)) {
-      act = await SESSION.activity.activity[id]
-      cid = await id
-      break
-    }
-  }
-
-  let message = (act?.message) || null
-  let newToken = (message === "NEW_TOKEN")
-  let authorized = (message === "AUTHORIZED")
-  if (newToken || authorized) {
-    loginStatus.set("success")
-    saveSession(act.token.token)
-    verify()
-  }
-
-  let orchNotReady = (message === "ORCHESTRATOR_NOT_READY")
-  let cfgNotReady = (message === "CONFIG_NOT_READY")
-  if (orchNotReady || cfgNotReady) {
-    console.log(cid, message)
-    verify()
-  }
-
-  let authFailed = (message === "AUTH_FAILED")
-  if (authFailed) {
-    loginStatus.set(message)
-  }
-  if (cid) {
-    console.log(cid, message)
-    SESSION.deleteActivity(cid)
-    PENDING.delete(cid)
-  }
-  count += 1
-  setTimeout(()=>loginStatus.set(null),3000)
-  setTimeout(listen, 500)
+// Initialize connection
+export const connect = async url => {
+  SESSION = new WebSocket(url);
+  SESSION.onopen = () => handleOpen();
+  SESSION.onmessage = (message) => handleMessage(JSON.parse(message.data));
+  SESSION.onerror = (error) => console.log(error);
+  SESSION.onclose = () => reconnect(url);
 }
 
-// Connect to API
-export const connect = async url => {
-  SESSION = new GroundSegJS(url)
-  const connected = await SESSION.connect()
-  if (connected) {
-    verify()
-    listen()
-  } else {
-    connect(url)
+// WebSocket send wrapper
+export const send = async payload => {
+  // generate an ID
+  let id = await generateRandom(16)
+  // add the ID to pending
+  PENDING.add(id)
+  // Grab token if exists
+  let token = await loadSession()
+  // Create the request
+  let data = {"id":id,"payload":payload}
+  // Add token to request if available
+  if (token) {
+    data['token'] = token
+  }
+  // Send the request
+  console.log(id + ":" + payload.type + " sent")
+  SESSION.send(JSON.stringify(data));
+}
+
+// Reconnection
+export const reconnect = url => {
+  // Set connected store to false
+  connected.set(false)
+  console.log("reconnecting to api")
+  // Attempt to reconnect
+  setTimeout(()=>connect(url),1000)
+}
+
+// Handle connection
+export const handleOpen = () => {
+  // Set connected store to true
+  connected.set(true)
+  // Verify session
+  verify()
+}
+
+// Message Handler
+export const handleMessage = data => {
+  // Log the activity response and remove 
+  // it from pending
+  if (data.type === "activity") {
+    // ack
+    let res = data.id + " " + data.response
+    // nack
+    if (data.response === "nack") {
+      res = res + ": " + data.error  
+    }
+    // GroundSeg hasn't fully started
+    if (data.error === "NOT_READY") {
+      ready.set(false)
+    } else {
+      ready.set(true)
+    }
+    // Set token
+    if (data.hasOwnProperty('token')) {
+      saveSession(data.token)
+    }
+    // display result
+    console.log(res)
+    // remove from pending
+    PENDING.delete(data.id)
   }
 }
 
@@ -80,22 +86,19 @@ export const connect = async url => {
 //  Auth
 //
 
-// Verify (token category)
+// Verify session
 export const verify = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.verify(id,token)
+  let payload = {"type":"verify"}
+  send(payload)
 }
 
-// Send Login
+// Verify session
 export const login = async password => {
-  loginStatus.set("loading")
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.login(id,password,token)
+  let payload = {"type":"login"}
+  send(payload)
 }
+
+/*
 
 //
 //  Setup
@@ -181,3 +184,4 @@ export const starTramCancel = async () => {
   PENDING.add(id)
   SESSION.starTramCancel(id,token)
 }
+*/

@@ -10,7 +10,8 @@ class Lick:
         while True:
             try:
                 if self.app.ready:
-                    print("updating ships via lick")
+                    #print("updating ships via lick")
+                    pass
                 else:
                     print("gs not ready")
             except Exception as e:

@@ -20,8 +20,10 @@ from groundseg.groundseg import GroundSeg
 from api.websocket_api import WS
 from api.lick_ipc import Lick
 
+# Start Here
 async def main():
-    # Check Dev Mode and Announce
+    # We check if the dev argument is given, then
+    # print the appropriate announcment
     try:
         dev = sys.argv[1] == "dev"
         if dev:
@@ -31,6 +33,26 @@ async def main():
     except:
         print("----------------- Starting GroundSeg -----------------")
     print("------------------ Urbit is love <3 ------------------")
+
+    # Next, we initialize all the relevant classes
+    #
+    # Config         - handles config files and some system related state
+    #
+    # Version Server - in charge of getting updated information
+    #                  from the specified version server
+    # Binary Updater - Checks if the groundseg binary needs updating
+    #
+    # Linux Updater  - Checks if the underlying linux installation
+    #                  needs updating
+    #
+    # System Monitor - Gets latest system vitals
+    #
+    # GroundSeg      - The main class for processing requests and interacting
+    #                  with docker
+    #
+    # WS             - The websocket API
+    #
+    # Lick           - Martian API
 
     # Load Config
     base_path = "/opt/nativeplanet/groundseg"
@@ -51,15 +73,19 @@ async def main():
     # Start GroundSeg
     groundseg = GroundSeg(cfg,dev)
 
-    # APIs
+    # Websocket API
     host = '0.0.0.0'
     port = 8000
     ws = WS(cfg, groundseg, host, port, dev)
+
+    # Lick API
     ur = Lick(groundseg, dev)
 
-    # Run tasks
+    # Now, we run all the services asynchronusly
+    # They're all infinite loops except for those
+    # specified
     await asyncio.gather(
-            cfg.net_check(),
+            cfg.net_check(), # not loop
             version_server.check(),
             binary.run(),
             linux.run(),
@@ -67,7 +93,7 @@ async def main():
             mon.cpu(),
             mon.temp(),
             mon.disk(),
-            groundseg.loader(),
+            groundseg.loader(), # not loop, initializes the docker classes
             groundseg.startram(),
             groundseg.melder(),
             groundseg.wg_refresher(),

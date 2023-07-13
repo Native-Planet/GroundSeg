@@ -65,5 +65,4 @@
 </script>
 
 <!--svelte:window bind:innerWidth bind:innerHeight /-->
-{JSON.stringify($structure)}
 <slot/>
