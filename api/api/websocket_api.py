@@ -37,7 +37,7 @@ class WS:
                     if auth_status:
                         self.app.active_sessions['authorized'].add(websocket)
                     else:
-                        self.app.active_sessions['authorized'].add(websocket)
+                        self.app.active_sessions['unauthorized'].add(websocket)
                     # And finally, we send the payload and auth result
                     # to GroundSeg for processing
                     payload = message.get('payload')
@@ -61,7 +61,7 @@ class WS:
         b = Broadcaster(self.cfg,self.app)
         while True:
             if self.app.ready:
-                if self.cfg.system.get('setup'):
+                if not self.cfg.system.get('setup'):
                     await b.setup()
                 else:
                     await b.broadcast()

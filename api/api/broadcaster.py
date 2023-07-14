@@ -6,7 +6,7 @@ class Broadcaster:
         self.app = groundseg
 
     async def broadcast(self):
-        broadcast = {
+        a_broadcast = {
                 "type": "structure",
                 "auth-level": "authorized",
                 "system": {
@@ -18,23 +18,38 @@ class Broadcaster:
                         }
                     }
                 }
-        print(broadcast)
+        u_broadcast = {
+                "type": "structure",
+                "auth-level": "unauthorized",
+                "login": {
+                    "info": "temp"
+                    }
+                }
+        await self.authed(a_broadcast)
+        await self.unauth(u_broadcast)
 
     async def setup(self):
-        sesh = self.app.active_sessions
-        a = sesh.get('authorized').copy()
-        u = sesh.get('unauthorized').copy()
         broadcast = {
                 "type": "structure",
                 "auth_level": "setup",
                 "stage": self.app.setup.stage,
                 "page": self.app.setup.page
                }
+        await self.authed(broadcast)
+        await self.unauth(broadcast)
+
+    async def authed(self, broadcast):
+        sesh = self.app.active_sessions
+        a = sesh.get('authorized').copy()
         for s in a:
             try:
                 await s.send(json.dumps(broadcast))
             except:
                 self.app.active_sessions['authorized'].remove(s)
+
+    async def unauth(self, broadcast):
+        sesh = self.app.active_sessions
+        u = sesh.get('unauthorized').copy()
         for s in u:
             try:
                 await s.send(json.dumps(broadcast))
