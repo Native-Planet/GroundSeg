@@ -18,19 +18,19 @@
     redirector()
   })
 
-  $: access = ($structure?.system?.login?.access) || "unauthorized"
-  $: stage = ($structure?.system?.setup?.stage) || null
+  $: authLevel = ($structure?.auth_level) || "unauthorized"
+  $: stage = ($structure?.stage) || null
 
   let count = 0
   const redirector = () => {
     if ($connected) {
-      const auth = (access === "authorized")
+      const auth = (authLevel === "authorized")
       if (auth) {
         if ($page.route.id === "/login") {
           goto("/")
         }
       } else {
-        if (access === "unauthorized") {
+        if (authLevel === "unauthorized") {
           if ($page.route.id !== "/login") {
             if (count > 2) {
               count = 0
@@ -40,7 +40,7 @@
             }
           }
         }
-        if (access === "setup") {
+        if (authLevel === "setup") {
           if (count > 2) {
             count = 0
             if (stage) {

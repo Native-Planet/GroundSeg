@@ -31,6 +31,8 @@ class Config:
             "updateBranch": "latest",
             "swapVal": 16,
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
+            "keyFile": "/opt/nativeplanet/groundseg/settings/session.key",
+            "sessions": {},
             "linuxUpdates": {
                 "value": 1,         # Int
                 "interval": "week", # day hour minute
@@ -151,13 +153,25 @@ class Config:
 
         return cfg
 
-    # Make sure sessions is dict
+    # Make sure sessions is correctly formatted
     def fix_sessions(self,cfg):
         try:
+            # Create sessions dict
             if type(cfg['sessions']) != dict:
                 cfg['sessions'] = {}
+
+            # Create authorized sessions dict
+            a = cfg['sessions'].get('authorized')
+            if (not a) or (type(a) != dict):
+                cfg['sessions']['authorized'] = {}
+
+            # Create unauthorized sessions dict
+            u = cfg['sessions'].get('unauthorized')
+            if (not a) or (type(a) != dict):
+                cfg['sessions']['unauthorized'] = {}
+
         except Exception as e:
-            print(f"config:config Failed to set Linux Update settings: {e}")
+            print(f"config:config Failed to fix sessions: {e}")
         return cfg
 
     # Make sure linux updates has correct structure

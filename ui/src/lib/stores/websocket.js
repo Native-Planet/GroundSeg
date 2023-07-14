@@ -59,6 +59,14 @@ export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
   if (data.type === "activity") {
+    handleActivity(data)
+  } else {
+    structure.set(data)
+  }
+}
+
+// Activity Handler
+export const handleActivity = data => {
     // ack
     let res = data.id + " " + data.response
     // nack
@@ -79,7 +87,6 @@ export const handleMessage = data => {
     console.log(res)
     // remove from pending
     PENDING.delete(data.id)
-  }
 }
 
 //
@@ -98,18 +105,16 @@ export const login = async password => {
   send(payload)
 }
 
-/*
 
 //
 //  Setup
 //
 export const beginSetup = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.beginSetup(id,token)
+  let payload = {"type":"setup","action":"begin"}
+  send(payload)
 }
 
+/*
 //
 //  Urbits
 //

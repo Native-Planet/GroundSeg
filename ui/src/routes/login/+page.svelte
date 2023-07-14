@@ -1,5 +1,6 @@
 <script>
-  import { login, structure, loginStatus } from '$lib/stores/websocket'
+  //import { login, structure, loginStatus } from '$lib/stores/websocket'
+  import { login, structure } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
@@ -49,16 +50,16 @@
         }}
       />
 
-      <!-- Success -->
+      <!-- Success --
       {#if $loginStatus == "success"}
         <div class="info" style="color:lime;">Success!</div>
-      <!-- Loading -->
+      <!-- Loading --
       {:else if $loginStatus == "loading"}
         <div class="info">Attempting to login..</div>
-      <!-- Failed -->
+      <!-- Failed --
       {:else if $loginStatus == "AUTH_FAILED"}
         <div class="info" style="color:red;">Incorrect credentials</div>
-      <!-- Submit Button -->
+      <!-- Submit Button --
       {:else}
         <button
           disabled={!unlocked || (loginPassword.length < 1)}
@@ -66,6 +67,7 @@
           Submit
         </button>
       {/if}
+      -->
 
     <!-- Locked -->
     {:else}

@@ -3,7 +3,7 @@
   import { connect, structure, connected } from '$lib/stores/websocket'
 
   let steps = [0,1,2]
-  $: page = ($structure?.system?.setup?.page) || 0
+  $: page = ($structure?.page) || 0
 </script>
 <div class="container {$wide ? "wide" : "slim"}">
   <slot />

@@ -1,8 +1,11 @@
-class Broadcaster:
-    def __init__(self,cfg):
-        self.cfg = cfg
+import json
 
-    def broadcast(self):
+class Broadcaster:
+    def __init__(self,cfg,groundseg):
+        self.cfg = cfg
+        self.app = groundseg
+
+    async def broadcast(self):
         broadcast = {
                 "type": "structure",
                 "auth-level": "authorized",
@@ -17,11 +20,23 @@ class Broadcaster:
                 }
         print(broadcast)
 
-    def setup(self):
+    async def setup(self):
+        sesh = self.app.active_sessions
+        a = sesh.get('authorized').copy()
+        u = sesh.get('unauthorized').copy()
         broadcast = {
                 "type": "structure",
                 "auth_level": "setup",
-                "stage": "start",
-                "page": 0
+                "stage": self.app.setup.stage,
+                "page": self.app.setup.page
                }
-        #print(broadcast)
+        for s in a:
+            try:
+                await s.send(json.dumps(broadcast))
+            except:
+                self.app.active_sessions['authorized'].remove(s)
+        for s in u:
+            try:
+                await s.send(json.dumps(broadcast))
+            except:
+                self.app.active_sessions['unauthorized'].remove(s)
