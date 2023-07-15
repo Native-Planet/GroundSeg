@@ -1,8 +1,10 @@
 <script>
+  import { setupPassword } from '$lib/stores/websocket'
   let pwd = ''
   let cfm = ''
 
 </script>
+
 <div class="title">PASSWORD</div>
 <div class="wrapper">
   <div class="pw-wrapper">
@@ -13,7 +15,11 @@
     <div class="name">Confirm Password</div>
     <input type="password" placeholder="Password" bind:value={cfm} />
   </div>
-  <button disabled={(pwd.length == 0) || (pwd !== cfm)}>Continue</button>
+  <button
+    on:click={()=>setupPassword(cfm)}
+    disabled={(pwd.length == 0) || (pwd !== cfm)}
+    >Continue
+  </button>
 </div>
 
 <style>

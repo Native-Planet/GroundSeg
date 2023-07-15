@@ -1,4 +1,8 @@
 <script>
+  import { setupSkip, setupStarTram } from '$lib/stores/websocket'
+  let key = ''
+  let region = 'us-east'
+  let endpoint = 'api.startram.io'
 </script>
 <div class="title">STARTRAM SERVICE</div>
 <div class="wrapper">
@@ -9,12 +13,16 @@
   </div>
   <div class="activate">
     <div class="name">Activation Key</div>
-    <input placeholder="NativePlanet-some-word-another-word" type="password" />
-    <button>Activate</button>
+    <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
+    <button
+      disabled={key.length < 1} 
+      on:click={()=>setupStarTram(key,region,endpoint)}
+      >Activate
+    </button>
   </div>
   <div class="get">Don't have a key? <a href="https://www.nativeplanet.io/startram" target="_blank">Get one here</a></div>
 </div>
-<div class="skip">Skip for now</div>
+<div on:click={setupSkip} class="skip">Skip for now</div>
 
 <style>
   .wrapper {

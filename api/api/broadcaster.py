@@ -40,18 +40,20 @@ class Broadcaster:
 
     async def authed(self, broadcast):
         sesh = self.app.active_sessions
-        a = sesh.get('authorized').copy()
+        a = sesh.get('authorized').copy().keys()
         for s in a:
             try:
                 await s.send(json.dumps(broadcast))
             except:
-                self.app.active_sessions['authorized'].remove(s)
+                print(f"removing {s}")
+                self.app.active_sessions['authorized'].pop(s)
 
     async def unauth(self, broadcast):
         sesh = self.app.active_sessions
-        u = sesh.get('unauthorized').copy()
+        u = sesh.get('unauthorized').copy().keys()
         for s in u:
             try:
                 await s.send(json.dumps(broadcast))
             except:
-                self.app.active_sessions['unauthorized'].remove(s)
+                print(f"removing {s}")
+                self.app.active_sessions['unauthorized'].pop(s)

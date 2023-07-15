@@ -110,8 +110,34 @@ export const login = async password => {
 //
 //  Setup
 //
+
 export const beginSetup = async () => {
   let payload = {"type":"setup","action":"begin"}
+  send(payload)
+}
+
+export const setupPassword = async pwd => {
+  let payload = {
+    "type":"setup",
+    "action":"password",
+    "password":pwd
+  }
+  send(payload)
+}
+
+export const setupSkip = async () => {
+  let payload = {"type":"setup","action":"skip"}
+  send(payload)
+}
+
+export const setupStarTram = async (key,region,endpoint) => {
+  let payload = {
+    "type":"setup",
+    "action":"startram",
+    "key":key,
+    "region":region,
+    "endpoint":endpoint
+  }
   send(payload)
 }
 

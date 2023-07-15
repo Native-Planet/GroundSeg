@@ -1,6 +1,9 @@
 import os
 import json
 import socket
+import string
+import secrets
+import hashlib
 import platform
 
 from config.swap import Swap
@@ -24,7 +27,9 @@ class Config:
 
     # default content of system.json
     default_system_config = {
-            "setup": True,
+            # The setup stages are
+            # start -> profile -> startram -> complete
+            "setup": "start",
             "netCheck": "1.1.1.1:53",
             "updateMode": "auto",
             "updateUrl": "https://version.groundseg.app",
@@ -210,3 +215,25 @@ class Config:
             print(f"config:config Check internet access error: {e}")
         self.internet = False
         return
+
+    # Create new password
+    def create_password(self, pwd):
+        print("config:config:create_password: Attempting to create password")
+        try:
+            # create salt
+            salt = ''.join(secrets.choice(
+                string.ascii_uppercase +
+                string.ascii_lowercase +
+                string.digits) for i in range(16))
+            # make hash
+            encoded_str = (salt + pwd).encode('utf-8')
+            hashed = hashlib.sha512(encoded_str).hexdigest()
+            # add to config
+            self.system['salt'] = salt
+            self.system['pwHash'] = hashed
+            self.save_config()
+            print("config:config:create_password: Password set!")
+        except Exception:
+            print("config:config:create_password: Create password failed: {e}")
+            return False
+        return True

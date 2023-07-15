@@ -12,11 +12,14 @@ class Auth:
         self.cfg = cfg
 
     # Check validity of token
-    def check_token(self,token,websocket):
+    def check_token(self,token,websocket,setup=False):
         if not token:
             # No token was provided, create
             auth_status = False
-            token = self.create_token(websocket)
+            # Special case for setup
+            if setup:
+                auth_status = True
+            token = self.create_token(websocket,setup)
         else:
             # Token was provided verify
             valid, auth_status = self.verify_token(token)
@@ -24,10 +27,10 @@ class Auth:
             if not valid:
                 # Invalid token provided, create
                 print("auth:check_token invalid token")
-                token = self.create_token(websocket)
+                token = self.create_token(websocket,setup)
         return auth_status, token
 
-    def create_token(self,websocket=None):
+    def create_token(self,websocket=None,setup=False):
         print(f"auth:create_token creating new session token")
         # Default for lick
         ip = 'localhost'
@@ -52,7 +55,7 @@ class Auth:
             "user_agent":user_agent,
             "secret":secret,
             "padding":padding,
-            "authorized":False,
+            "authorized":setup,
             "created":now
             }
         # Keyfile location
@@ -60,10 +63,16 @@ class Auth:
         # Encrypted token
         text = self.keyfile_encrypt(contents,k)
         # Update sessions
-        self.cfg.system['sessions']['unauthorized'][id] = {
-            "hash": self.hash_string(text),
-            "created": now
-            }
+        if setup:
+            self.cfg.system['sessions']['authorized'][id] = {
+                "hash": self.hash_string(text),
+                "created": now
+                }
+        else:
+            self.cfg.system['sessions']['unauthorized'][id] = {
+                "hash": self.hash_string(text),
+                "created": now
+                }
         # Save config
         self.cfg.save_config()
         # Return token
