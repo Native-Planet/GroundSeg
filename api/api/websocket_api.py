@@ -46,14 +46,16 @@ class WS:
                     # Now, we check if the user provided a token
                     auth_status, token = Auth(self.cfg).check_token(token,websocket,setup)
                     # Next, we will add the websocket connection to our active sessions
+                    tid = token.get('id')
                     if auth_status:
-                        tid = token.get('id')
                         self.app.active_sessions['authorized'][websocket] = tid
+                        print(f"websocket_api:handle Adding {websocket} with id:{tid} to authorized active sessions")
                     else:
                         self.app.active_sessions['unauthorized'][websocket] = tid
+                        print(f"websocket_api:handle Adding {websocket} with id:{tid} to unauthorized active sessions")
                     # And finally, we send the payload and auth result
                     # to GroundSeg for processing
-                    asyncio.create_task(self.app.process(websocket, auth_status, payload))
+                    asyncio.create_task(self.app.process(websocket, auth_status, setup, payload))
                     # Everything ran without errors, return an ack
                     res = {"response":"ack","error":None}
                 else:
@@ -72,15 +74,17 @@ class WS:
     async def broadcast(self):
         b = Broadcaster(self.cfg,self.app)
         while True:
-            if self.app.ready:
-                if self.cfg.system.get('setup') != "complete":
-                    await b.setup()
-                else:
-                    await b.broadcast()
+            try:
+                if self.app.ready:
+                    if self.cfg.system.get('setup') != "complete":
+                        await b.setup()
+                    else:
+                        await b.broadcast()
+            except Exception as e:
+                print(f"websocket_api:broadcast: {e}")
             await asyncio.sleep(0.5)
 
     # We start the websocket server, using handler() to handle requests
     async def run(self):
         server = await websockets.serve(self.handler, self.host, self.port)
         await server.wait_closed()
-

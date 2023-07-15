@@ -39,21 +39,27 @@ class Broadcaster:
         await self.unauth(broadcast)
 
     async def authed(self, broadcast):
-        sesh = self.app.active_sessions
-        a = sesh.get('authorized').copy().keys()
-        for s in a:
-            try:
-                await s.send(json.dumps(broadcast))
-            except:
-                print(f"removing {s}")
-                self.app.active_sessions['authorized'].pop(s)
+        try:
+            sesh = self.app.active_sessions
+            a = sesh.get('authorized').copy().keys()
+            for s in a:
+                try:
+                    await s.send(json.dumps(broadcast))
+                except:
+                    print(f"removing {s}")
+                    self.app.active_sessions['authorized'].pop(s)
+        except Exception as e:
+            print(f"api:broadcaster:authed: {e}")
 
     async def unauth(self, broadcast):
-        sesh = self.app.active_sessions
-        u = sesh.get('unauthorized').copy().keys()
-        for s in u:
-            try:
-                await s.send(json.dumps(broadcast))
-            except:
-                print(f"removing {s}")
-                self.app.active_sessions['unauthorized'].pop(s)
+        try:
+            sesh = self.app.active_sessions
+            u = sesh.get('unauthorized').copy().keys()
+            for s in u:
+                try:
+                    await s.send(json.dumps(broadcast))
+                except:
+                    print(f"removing {s}")
+                    self.app.active_sessions['unauthorized'].pop(s)
+        except Exception as e:
+            print(f"api:broadcaster:unauth: {e}")

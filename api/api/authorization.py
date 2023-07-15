@@ -23,7 +23,6 @@ class Auth:
         else:
             # Token was provided verify
             valid, auth_status = self.verify_token(token)
-            token = None
             if not valid:
                 # Invalid token provided, create
                 print("auth:check_token invalid token")
