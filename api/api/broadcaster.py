@@ -8,7 +8,7 @@ class Broadcaster:
     async def broadcast(self):
         a_broadcast = {
                 "type": "structure",
-                "auth-level": "authorized",
+                "auth_level": "authorized",
                 "system": {
                     "usage": {
                         "ram": self.cfg._ram,
@@ -20,7 +20,7 @@ class Broadcaster:
                 }
         u_broadcast = {
                 "type": "structure",
-                "auth-level": "unauthorized",
+                "auth_level": "unauthorized",
                 "login": {
                     "info": "temp"
                     }

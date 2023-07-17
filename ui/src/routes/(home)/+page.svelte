@@ -1,67 +1,48 @@
 <script>
-	import { onMount, onDestroy } from 'svelte'
-  import { page } from '$app/stores'
-  import { structure } from '$lib/stores/websocket'
-  import { scale } from 'svelte/transition'
+  import ShipCard from "$lib/ShipCard.svelte"
 
-  import Logo from '$lib/Logo.svelte'
-	import Card from '$lib/Card.svelte'
-	import PierList from '$lib/PierList.svelte'
-	import BootButtons from '$lib/BootButtons.svelte'
+  let ships = [
+    "donwer-donlut",
+    "famnyx-walsur",
+    "padnym-fodsub",
+    "morpub-fotdul",
+    "pasnep-norful",
+    "lomwes-nodfer",
+    "ramtec-ladnus"
+  ]
 
-	let inView = false
-	onMount(()=> inView = true)
-	onDestroy(()=> inView = false)
-
-  $: urbits = ($structure?.urbits) || {}
-  $: listUrbs = (Object.entries(urbits)) || []
+  let wide = true
 
 </script>
 
-{#if inView}
-  <Card width="520px" padding={false} home={true}>
-		<div style="margin: 20px 0 0 20px;">
-  		<Logo />
-		</div>
-    <div class="wrapper">
-      {#if listUrbs.length == 0}
-        <div class="welcome" in:scale={{duration:120, delay: 300}}>
-          Welcome to GroundSeg.
-        </div>
-        <div class="welcome" in:scale={{duration:120, delay: 300}}>
-          From here you can boot and manage multiple Urbit IDs.
-        </div>
-        <div class="welcome" in:scale={{duration:120, delay: 300}}>
-          Select one of the options below to get started.
-        </div>
-      {:else} 
-        {#each listUrbs as u}
-          <PierList name={u[0]} u={u[1]}/>
-        {/each}
-      {/if}
+<div class="card-wrapper {wide ? "wide" : "slim"}">
+  {#each ships as p}
+    <div class="ship">
+      <ShipCard patp={p} />
     </div>
-		<BootButtons />
-	</Card>
-{/if}
+  {/each}
+</div>
+
 <style>
-  .welcome {
-    padding: 0 24px 0 24px;
-    line-height: 24px;
-    font-size: 14px;
+  .wide {
+    width: calc((288px * 3) + (80px * 2));
+    max-width: 100vw;
   }
-
-  .wrapper {
-    margin-bottom: 28px;
-    margin-top: 8px;
+  .slim {
+    width: calc(100vw - 40px);
+  }
+  .card-wrapper {
+    background: var(--bg-base);
+    border-radius: 16px;
+    margin: auto;
+    max-height: calc(90vh - 60px);
     display: flex;
-    flex-direction: column;
-    max-height: 264px;
+    flex-wrap: wrap;
+    padding: 40px;
+    gap: 80px;
     overflow: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
-
-  .wrapper::-webkit-scrollbar {
-    display: none;
+  .ship {
+    flex-basis: 288px;
   }
 </style>

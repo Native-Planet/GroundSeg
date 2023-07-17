@@ -42,7 +42,8 @@ class Config:
                 "value": 1,         # Int
                 "interval": "week", # day hour minute
                 "previous": False   # completed update and reboot
-                }
+                },
+            "dockerData": "/var/lib/docker"
             }
 
     def __init__(self, base, dev):

@@ -26,7 +26,7 @@
     if ($connected) {
       const auth = (authLevel === "authorized")
       if (auth) {
-        if ($page.route.id === "/login") {
+        if (($page.route.id === "/login") || ($page.route.id.includes("setup"))) {
           goto("/")
         }
       } else {
