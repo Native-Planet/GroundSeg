@@ -30,6 +30,7 @@ class Config:
             # The setup stages are
             # start -> profile -> startram -> complete
             "setup": "start",
+            "piers": [],
             "netCheck": "1.1.1.1:53",
             "updateMode": "auto",
             "updateUrl": "https://version.groundseg.app",
@@ -44,6 +45,8 @@ class Config:
                 "previous": False   # completed update and reboot
                 },
             "dockerData": "/var/lib/docker"
+            "wgOn": False,
+            "wgRegisterd": False
             }
 
     def __init__(self, base, dev):

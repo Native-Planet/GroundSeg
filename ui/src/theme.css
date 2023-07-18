@@ -10,11 +10,13 @@ body {
   --title-font: BPdotsUnicase;
   --bg-base: #E8E8E3;
   --bg-card: #161D17;
+  --bg-warning: #EDF02C;
   --fg-card: #2C3A2E;
   --btn-special: #08A317;
   --btn-primary: #047710;
   --btn-secondary: #5C7060;
   --text-color: #313933;
   --text-card-color: #F8F8F6;
+  --boot-selector-color: #F1F2EE;
   --locked-color: #A31708;
 }

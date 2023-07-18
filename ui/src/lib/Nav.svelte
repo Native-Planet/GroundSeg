@@ -1,17 +1,39 @@
 <script>
-  let wide = true
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores'
+  import { wide, version } from '$lib/stores/display'
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
-  <div class="version">V2.0.0</div>
+  <div class="version">{$version}</div>
   <div class="app">GROUNDSEG</div>
   <div class="nav">
     <div class="ships">
-      <div class="text">SHIPS</div>
-      <div class="add"></div>
+      <div
+        class:highlight={$page.route.id != "/(home)"}
+        on:click={()=>goto("/")}
+        class="btn text"
+        >SHIPS
+      </div>
+      <div
+        on:click={()=>goto("/boot")}
+        class="btn add"
+        >
+       +
+      </div>
     </div>
-    <div class="option">PROFILE</div>
-    <div class="option">SYSTEM</div>
+    <div
+      class:highlight={$page.route.id != "/profile"}
+      on:click={()=>goto("/profile")}
+      class="btn option"
+      >PROFILE
+    </div>
+    <div
+      class:highlight={$page.route.id != "/system"}
+      on:click={()=>goto("/system")}
+      class="btn option"
+      >SYSTEM
+    </div>
   </div>
 </div>
 
@@ -29,9 +51,11 @@
     margin-top: 10px;
   }
   .version {
-    font-size: 12px;
+    font-family: var(--title-font);
+    font-size: 14px;
   }
   .app {
+    font-family: var(--title-font);
     font-size: 16px;
     margin-bottom: 16px;
   }
@@ -43,19 +67,28 @@
   .ships {
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: end;
     gap: 10px;
   }
   .text {
-    font-size: 24px;
+    font-family: var(--title-font);
+    font-size: 28px;
   }
   .add {
     background: #06A315;
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
+    margin-bottom:4px;
     border-radius: 100%;
   }
   .option {
-    font-size: 24px;
+    font-family: var(--title-font);
+    font-size: 28px;
+  }
+  .btn:hover {
+    cursor: pointer;
+  }
+  .highlight {
+    opacity: .8;
   }
 </style>

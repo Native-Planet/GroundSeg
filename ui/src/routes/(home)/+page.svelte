@@ -1,5 +1,6 @@
 <script>
   import ShipCard from "$lib/ShipCard.svelte"
+  import { wide } from '$lib/stores/display'
 
   let ships = [
     "donwer-donlut",
@@ -10,8 +11,6 @@
     "lomwes-nodfer",
     "ramtec-ladnus"
   ]
-
-  let wide = true
 
 </script>
 

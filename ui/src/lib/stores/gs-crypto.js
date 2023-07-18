@@ -17,6 +17,14 @@ export const loadSession = () => {
   return {'id':id,'token':token}
 }
 
+export const toBase64 = arrayBuffer => {
+  let binaryString = '';
+  for (let i = 0; i < arrayBuffer.length; i++) {
+        binaryString += String.fromCharCode(arrayBuffer[i]);
+      }
+  return btoa(binaryString);
+}
+
 //
 //  Misc
 //

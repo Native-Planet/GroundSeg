@@ -1,5 +1,4 @@
 import { writable } from 'svelte/store'
-//import GroundSegJS from "../../../../tools/groundseg-js"
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
 
 export const structure = writable({})
@@ -139,6 +138,13 @@ export const setupStarTram = async (key,region,endpoint) => {
     "endpoint":endpoint
   }
   send(payload)
+}
+
+//
+//  Upload Pier
+//
+export const uploadManifest = () => {
+  console.log("fake manifest")
 }
 
 /*

@@ -7,6 +7,7 @@
 		"preview": "vite preview"
 	},
 	"devDependencies": {
+		"@aws-crypto/sha256-browser": "^5.0.0",
 		"@fortawesome/free-brands-svg-icons": "^6.3.0",
 		"@fortawesome/free-regular-svg-icons": "^6.3.0",
 		"@fortawesome/free-solid-svg-icons": "^6.3.0",
@@ -18,12 +19,10 @@
 		"dropzone": "^6.0.0-beta.2",
 		"svelte": "^3.56.0",
 		"svelte-fa": "^3.0.3",
-		"vite": "^4.1.4",
 		"tweetnacl": "^1.0.3",
 		"tweetnacl-util": "^0.15.1",
+		"vite": "^4.1.4",
 		"ws": "^8.13.0"
 	},
-	"type": "module",
-	"dependencies": {
-	}
+	"type": "module"
 }
