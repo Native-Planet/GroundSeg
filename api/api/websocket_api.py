@@ -49,10 +49,10 @@ class WS:
                     tid = token.get('id')
                     if auth_status:
                         self.app.active_sessions['authorized'][websocket] = tid
-                        print(f"websocket_api:handle Adding {websocket} with id:{tid} to authorized active sessions")
+                        #print(f"websocket_api:handle Adding {websocket} with id:{tid} to authorized active sessions")
                     else:
                         self.app.active_sessions['unauthorized'][websocket] = tid
-                        print(f"websocket_api:handle Adding {websocket} with id:{tid} to unauthorized active sessions")
+                        #print(f"websocket_api:handle Adding {websocket} with id:{tid} to unauthorized active sessions")
                     # And finally, we send the payload and auth result
                     # to GroundSeg for processing
                     asyncio.create_task(self.app.process(websocket, auth_status, setup, payload))

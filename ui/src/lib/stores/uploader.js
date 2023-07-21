@@ -17,13 +17,37 @@ export const processFile = async file => {
     file = undefined
     return
   }
+
   // Here we get the required information to keep
   // track of the progress
   const chunkSize = 25 * 1024 * 1024; // 25MB
   const totalChunks = Math.ceil(file.size / chunkSize);
   let currentChunk = 0;
-  let metadata = false
 
+  // Read the size
+  // save size in indexeddb
+  // Send the size
+  // Read the first 25MB
+  // Hash it
+  // Save hash in indexeddb
+  // Send it
+  // Send the hash
+  // wait for hash response
+  // delete hash
+
+  // Update the manifest
+  /*
+  manifest.update(s => {
+    s[patp] = {
+      size: file.size,
+      totalChunks: totalChunks,
+      chunks: {}
+    } //hash:hash
+    return s
+  })
+  */
+
+  /*
   // Then, we open a new transaction to IndexedDB with 
   // the @p of the pier
   const dbReq = indexedDB.open(patp, 1);
@@ -34,16 +58,14 @@ export const processFile = async file => {
     db = event.target.result;
     // Create the chunks store
     db.createObjectStore('chunks', { autoIncrement: true });
-    // Create the metadata store
-    db.createObjectStore('metadata', { autoIncrement: true });
   };
+
+  /*
+
 
   // Sucessful storing the chunk in IndexDB
   dbReq.onsuccess = function(event) {
     db = event.target.result;
-    if (!metadata) {
-      processMetadata()
-    }
     processNextChunk();
   };
 
@@ -55,6 +77,7 @@ export const processFile = async file => {
   const processNextChunk = async () => {
     console.log(currentChunk + " / " + totalChunks)
     if (currentChunk >= totalChunks) {
+      // createManifest()
       console.log("Done processing file");
       return;
     }
@@ -68,6 +91,7 @@ export const processFile = async file => {
       const hash = toBase64(res)
       let transaction = db.transaction(['chunks'], 'readwrite');
       let store = transaction.objectStore('chunks');
+
       let request = store.add({
         chunk: currentChunk,
         hash: hash,
@@ -86,35 +110,5 @@ export const processFile = async file => {
     };
     reader.readAsArrayBuffer(blob);
   };
-
-  const processMetadata = async () => {
-    console.log("size:",file.size)
-    let blob = file
-    const reader = new FileReader();
-    reader.onload = async function(event) {
-      let arrayBuffer = event.target.result;
-      let sha = new Sha256()
-      sha.update(arrayBuffer)
-      const res = await sha.digest()
-      const hash = toBase64(res)
-      let transaction = db.transaction(['metadata'], 'readwrite');
-      let store = transaction.objectStore('metadata');
-      let request = store.add({
-        hash: hash,
-        size: file.size,
-        chunks: totalChunks
-      });
-      request.onsuccess = function() {
-        metadata = true
-        processNextChunk();
-      };
-      request.onerror = function() {
-        console.error("Error adding metadata to IndexedDB", request.error);
-      };
-    };
-    reader.onerror = function() {
-      console.error("Error reading file", reader.error);
-    };
-    reader.readAsArrayBuffer(blob);
-  };
+  */
 }

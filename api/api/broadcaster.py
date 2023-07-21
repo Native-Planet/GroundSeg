@@ -1,5 +1,7 @@
 import json
 
+from api.upload_broadcast import UploadBroadcast
+
 class Broadcaster:
     def __init__(self,cfg,groundseg):
         self.cfg = cfg
@@ -16,7 +18,8 @@ class Broadcaster:
                         "cpu_temp": self.cfg._core_temp,
                         "disk": self.cfg._disk
                         }
-                    }
+                    },
+                "upload": UploadBroadcast(self.app).display()
                 }
         u_broadcast = {
                 "type": "structure",

@@ -17,6 +17,7 @@ from system.monitor import SysMonitor
 from groundseg.groundseg import GroundSeg
 
 # APIs
+from api.uploader_http import UploaderHTTP
 from api.websocket_api import WS
 from api.lick_ipc import Lick
 
@@ -73,6 +74,12 @@ async def main():
     # Start GroundSeg
     groundseg = GroundSeg(cfg,dev)
 
+    # Uploader
+    host = '0.0.0.0'
+    port = 27016
+    from threading import Thread
+    Thread(target=UploaderHTTP(cfg, groundseg, host, port, dev).run, daemon=True).start()
+
     # Websocket API
     host = '0.0.0.0'
     port = 8000
@@ -93,6 +100,7 @@ async def main():
             mon.cpu(),
             mon.temp(),
             mon.disk(),
+            #http.run(),
             groundseg.loader(), # not loop, initializes the docker classes
             groundseg.startram(),
             groundseg.melder(),

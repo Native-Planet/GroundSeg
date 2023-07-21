@@ -25,6 +25,12 @@ class Config:
     _core_temp = None
     _disk = None
 
+    # Http Upload open
+    http_open = False
+
+    # Uploader secret
+    upload_secret = ''
+
     # default content of system.json
     default_system_config = {
             # The setup stages are
@@ -44,7 +50,7 @@ class Config:
                 "interval": "week", # day hour minute
                 "previous": False   # completed update and reboot
                 },
-            "dockerData": "/var/lib/docker"
+            "dockerData": "/var/lib/docker",
             "wgOn": False,
             "wgRegisterd": False
             }

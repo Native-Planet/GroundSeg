@@ -143,8 +143,24 @@ export const setupStarTram = async (key,region,endpoint) => {
 //
 //  Upload Pier
 //
-export const uploadManifest = () => {
-  console.log("fake manifest")
+
+export const freeUpload = () => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"free"
+  }
+  send(payload)
+}
+
+export const uploadMetadata = (patp,size,secret) => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"metadata",
+    "patp":patp,
+    "size":size,
+    "secret":secret
+  }
+  send(payload)
 }
 
 /*
@@ -223,3 +239,13 @@ export const starTramCancel = async () => {
   SESSION.starTramCancel(id,token)
 }
 */
+
+export const renderPy = (patp,svg) => {
+  let payload = {
+    "type":"render",
+    "action":"svg",
+    "patp":patp,
+    "svg":svg
+  }
+  send(payload)
+}

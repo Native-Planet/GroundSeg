@@ -2,14 +2,20 @@
   font-family: BPdotsUnicase;
   src: url('/BPdotsUnicaseBold.otf');
 }
+@font-face {
+  font-family: Inter;
+  src: url('/Inter-SemiBold.otf');
+}
 body {
   margin: 0;
 }
 
 :root {
+  --regular-font: Inter;
   --title-font: BPdotsUnicase;
   --bg-base: #E8E8E3;
   --bg-card: #161D17;
+  --bg-modal: #DDE3DF;
   --bg-warning: #EDF02C;
   --fg-card: #2C3A2E;
   --btn-special: #08A317;
@@ -19,4 +25,5 @@ body {
   --text-card-color: #F8F8F6;
   --boot-selector-color: #F1F2EE;
   --locked-color: #A31708;
+  font-family: var(--regular-font);
 }
