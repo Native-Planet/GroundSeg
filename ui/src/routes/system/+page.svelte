@@ -1,14 +1,24 @@
 <script>
+  import { wide } from '$lib/stores/display'
   import './system.css'
   import Connection from './Connection.svelte'
-  let wide = true
+  import SystemDetails from './SystemDetails.svelte'
+  import Power from './Power.svelte'
 </script>
 
 <Connection {wide} />
-<!--
-<SystemDetails />
-<Power />
-<Logs />
+<div class="spacer"></div>
+<SystemDetails {wide} />
+<div class="spacer"></div>
+<Power {wide} />
+<div class="spacer"></div>
 <Netdata />
+<!--
+<Logs />
 <Support />
 -->
+<style>
+  .spacer {
+    height: 40px;
+  }
+</style>

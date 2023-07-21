@@ -4,12 +4,6 @@
 
   let ships = [
     "donwer-donlut",
-    "famnyx-walsur",
-    "padnym-fodsub",
-    "morpub-fotdul",
-    "pasnep-norful",
-    "lomwes-nodfer",
-    "ramtec-ladnus"
   ]
 
 </script>

@@ -130,8 +130,9 @@
   }
   .patp {
     flex: 1;
-    font-size: 12px;
+    font-size: 16px;
     margin-left: 20px;
+    font-family: var(--title-font);
   }
   .ext {
     background: var(--text-color);
