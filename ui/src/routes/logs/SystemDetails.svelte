@@ -44,7 +44,6 @@
         </div>
       </div>
 
-      <div class="btn-label">Commands</div>
       <div class="buttons">
         <button class="btn">Restart GroundSeg</button>
         <button class="btn">Update Linux</button>
@@ -122,7 +121,6 @@
     top: 0;
     background: var(--btn-secondary);
     height: 100%;
-    transition: width 500ms;
   }
   .ram-percent {
     position: absolute;
@@ -148,6 +146,7 @@
     color: var(--text-color);
   }
   .buttons {
+    margin-top: 40px;
     display: flex;
     gap: 40px;
   }
@@ -159,11 +158,5 @@
     padding: 12px;
     font-family: var(--regular-font);
     font-size: 12px;
-  }
-  .btn-label {
-    font-family: var(--regular-font);
-    font-size: 12px;
-    padding-left: 10px;
-    margin-bottom: 12px;
   }
 </style>

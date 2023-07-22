@@ -30,6 +30,9 @@
 </div>
 
 <style>
+  .container {
+    margin: auto;
+  }
   .wrapper {
     display: flex;
     align-items: end;

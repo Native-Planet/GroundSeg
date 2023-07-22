@@ -14,7 +14,7 @@ class SysMonitor:
         error_time = 15
         while True:
             try:
-                self.cfg._ram = psutil.virtual_memory().percent
+                self.cfg._ram = [psutil.virtual_memory().total, psutil.virtual_memory().used]
                 await asyncio.sleep(1)
                 error_time = 15
             except Exception as e:
@@ -30,6 +30,7 @@ class SysMonitor:
         error_time = 15
         while True:
             try:
+                #self.cfg._cpu = psutil.cpu_percent(1)
                 self.cfg._cpu = psutil.cpu_percent(1)
                 await asyncio.sleep(1)
                 error_time = 15

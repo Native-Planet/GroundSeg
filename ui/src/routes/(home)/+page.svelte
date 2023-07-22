@@ -1,5 +1,6 @@
 <script>
-  import ShipCard from "$lib/ShipCard.svelte"
+  import ShipCard from "./ShipCard.svelte"
+  import NewShipCard from "./NewShipCard.svelte"
   import { wide } from '$lib/stores/display'
 
   let ships = [
@@ -9,6 +10,7 @@
 </script>
 
 <div class="card-wrapper {wide ? "wide" : "slim"}">
+  <NewShipCard />
   {#each ships as p}
     <div class="ship">
       <ShipCard patp={p} />

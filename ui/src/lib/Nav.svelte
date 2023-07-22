@@ -19,14 +19,18 @@
           class="btn text"
           >SHIPS
         </div>
-        {#if ($page.route.id != "/system") && ($page.route.id != "/profile")}
-          <div
-            on:click={()=>goto("/boot")}
-            class="btn add"
-            >
-            +
-          </div>
-        {/if}
+      </div>
+      <div
+        class:highlight={$page.route.id != "/support"}
+        on:click={()=>goto("/support")}
+        class="btn option"
+        >SUPPORT
+      </div>
+      <div
+        class:highlight={$page.route.id != "/logs"}
+        on:click={()=>goto("/logs")}
+        class="btn option"
+        >LOGS
       </div>
       <div
         class:highlight={$page.route.id != "/profile"}
@@ -95,17 +99,6 @@
   .text {
     font-family: var(--title-font);
     font-size: 28px;
-  }
-  .add {
-    margin-top: 6px;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
-    font-size: 16px;
-    border-radius: 100%;
-    background-color: var(--btn-special);
-    color: var(--text-card-color);
-    text-align: center;
   }
   .option {
     font-size: 28px;
