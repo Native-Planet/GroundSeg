@@ -16,7 +16,7 @@
 <style>
   .wrapper {
     position: relative;
-    height: 793px;
+    height: 743px;
     width: 1173px;
     margin: auto;
   }

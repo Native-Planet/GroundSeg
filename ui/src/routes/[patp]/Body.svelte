@@ -13,7 +13,7 @@
     background-color: var(--bg-card);
     position: absolute;
     bottom: 0;
-    height: calc(793px - 150px);
+    height: calc(743px - 150px);
     width: 100%;
     max-width: 100vw;
     border-radius: 16px 0 120px 16px;

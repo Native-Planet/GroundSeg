@@ -41,18 +41,21 @@
     border-radius: 16px;
   }
   .ship-class {
-    margin: 20px;
+    font-family: var(--title-font);
+    margin: 20px 0 0 20px;
   }
   .patp {
-    margin: 20px;
+    font-family: var(--title-font);
+    margin-left: 20px;
     font-size: 32px;
   }
   .settings-wrapper {
     background: var(--fg-card);
+    font-family: var(--title-font);
     position: absolute;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 8px;
     width: 320px;
     padding: 24px 32px;
     right: 0;
@@ -60,7 +63,7 @@
   }
   .settings {
     display: flex;
-    font-size: 18px;
+    font-size: 24px;
   }
   .settings-text {
     flex: 1;

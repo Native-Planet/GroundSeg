@@ -11,18 +11,19 @@
   export let moon = false
   export let padding = "0px"
 
+  let bg = '#000000';
 
   const parser = new DOMParser();
   const n = Math.floor(Math.random() * Math.pow(2, 32))
 
-  const buildSVG = p => {
+  const buildSVG = (p,bg) => {
     let svg;
     if (patp.length < 14) {
       return sigil({
         patp: p,
         margin: false,
         renderer: myRenderer,
-        colors: ['#000000','white'],
+        colors: [bg,'white'],
       })
     }
     if (patp.length < 28) {
@@ -32,7 +33,7 @@
         patp: parent,
         margin: false,
         renderer: myRenderer,
-        colors: ['#000000','white']
+        colors: [bg,'white']
     })}
     return "comet"
   }
@@ -52,13 +53,28 @@
   }
 
   onMount(()=> {
-    renderSVG('sig', buildSVG(patp))
+    let root = getComputedStyle(document.documentElement);
+    bg = root.getPropertyValue('--bg-card');
+    renderSVG('sig', buildSVG(patp,bg))
   })
 
 </script>
 
-<div class="wrapper" style="height:{size};width:{size};border-radius:{rad};padding:{padding};">
-  <div class="bg"></div>
+<div 
+  class="wrapper"
+  style="
+    height:{size};
+    width:{size};
+    border-radius:{rad};
+    padding: {padding};
+    background: {
+      percent == 0 
+      ? "transparent"
+      : "linear-gradient(to top, " + bg + " " + percent + "%, transparent " + (100 - percent) + "%;"
+    }
+    padding:{padding};">
+  <!--background: linear-gradient(to top, {bg} {percent}%, transparent {100 - percent}%);-->
+
   <div
     class="sigil"
     id='sig-{patp}-{n}'
@@ -83,16 +99,6 @@
     background-image: url("/comet.svg");
     background-size: contain;
   }
-  /*
-  .bg {
-    position:absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 80%;
-    background: red;
-  }
-  */
 
   /*
   .moon {

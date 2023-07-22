@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte'
   import { wide } from '$lib/stores/display';
   import { goto } from '$app/navigation';
   import { uploadMetadata, structure } from '$lib/stores/websocket';
@@ -29,7 +30,7 @@
 
 </script>
 
-<div class="card-wrapper {wide ? "wide" : "slim"}">
+<div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
   <div class="title">IMPORT PIER</div>
   <div class="warning">
     <div class="text">Warning</div>

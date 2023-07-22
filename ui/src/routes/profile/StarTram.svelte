@@ -1,6 +1,8 @@
 <script>
   import { structure } from '$lib/stores/websocket'
   export let wide
+  import Fa from 'svelte-fa'
+  import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
@@ -11,7 +13,7 @@
         <div class="sub">Active region: (region)</div>
         <div class="sub">Connection Status: (status)</div>
       </div>
-      <button class="edit-btn">Edit (icon)</button>
+      <button class="edit-btn">Edit <Fa icon={faArrowRight} size="0.8x" /></button>
     </div>
 </div>
 
@@ -42,6 +44,7 @@
     font-size: 14px;
   }
   .edit-btn {
+    font-family: var(--regular-font);
     background: var(--btn-secondary);
     color: var(--text-card-color);
     height: 42px;
@@ -49,5 +52,9 @@
     width: 120px;
     border-radius: 16px;
     cursor: pointer;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
   }
 </style>

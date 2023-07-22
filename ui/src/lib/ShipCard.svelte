@@ -1,4 +1,6 @@
 <script>
+  import Fa from 'svelte-fa'
+  import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
   export let patp
 </script>
 
@@ -22,7 +24,11 @@
   <div class="body">
     <div class="info">
       <div class="patp">{patp.toUpperCase()}</div>
-      <div class="ext"></div>
+      <div class="ext">
+        <div class="icon">
+          <Fa icon={faArrowRight} size="1x"/>
+        </div>
+      </div>
     </div>
     <div class="settings-wrapper">
       <div class="settings-info">
@@ -135,10 +141,17 @@
     font-family: var(--title-font);
   }
   .ext {
+    position: relative;
     background: var(--text-color);
     height: 32px;
     width: 48px;
     border-radius: 160px 0 0 160px;
+  }
+  .icon {
+    position: absolute;
+    top: 6px;
+    right: 16px;
+    transform: rotate(-45deg);
   }
   /* Settings */
   .settings-wrapper {
@@ -150,16 +163,23 @@
     flex: 1;
   }
   .settings {
+    font-family: var(--title-font);
     flex: 1;
     display: flex;
-    gap: 16px;
-    font-size: 10px;
+    gap: 30px;
+    font-size: 14px;
+    line-height: 14px;
   }
   .settings-text {
     width: 20px;
   }
   .settings-button {
-    background: var(--btn-secondary);
+    background-color: var(--btn-secondary);
+    background-image: url('/settings.svg');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 50% 50%;
+    background-color: var(--btn-secondary);
     height: 32px;
     width: 48px;
     border-radius: 24px 0;
