@@ -41,10 +41,15 @@ class WS:
                     if not id:
                         raise Exception("NO_ID")
                     # Check custom case for setup
-                    setups = ['start','profile','startram','complete']
+                    setups = ['start','profile','startram']
                     setup =  self.cfg.system.get('setup') in setups
                     # Now, we check if the user provided a token
-                    auth_status, token = Auth(self.cfg).check_token(token,websocket,setup)
+                    auth = Auth(self.cfg)
+                    auth_status, token = auth.check_token(token,websocket,setup)
+                    if not auth_status:
+                        if payload.get('type') == "login":
+                            auth_status, token = auth.handle_login(token, payload.get('password'))
+
                     # Next, we will add the websocket connection to our active sessions
                     tid = token.get('id')
                     if auth_status:

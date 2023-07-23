@@ -3,7 +3,7 @@
 </script>
 
 <div class="container">
-    <div class="title">SUPPORT</div>
+    <div class="title">CONTACT</div>
     <div class="spacer"></div>
     <div class="links">
       <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Twitter</a>

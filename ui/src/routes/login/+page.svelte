@@ -13,8 +13,8 @@
   let loginPassword = ''
   let buttonStatus = 'standard'
 
-  $: loginModule = ($structure.system?.login) || null
-  $: remainder = (loginModule?.cooldown) || 0
+  $: loginModule = ($structure?.login) || null
+  $: remainder = (loginModule?.remainder) || 0
   $: unlocked = (remainder <= 0)
 
   $: hours = Math.floor(remainder / 3600)
@@ -49,27 +49,7 @@
           if (e.key === 'Enter') { handleLogin() }
         }}
       />
-
-      <!-- Success --
-      {#if $loginStatus == "success"}
-        <div class="info" style="color:lime;">Success!</div>
-      <!-- Loading --
-      {:else if $loginStatus == "loading"}
-        <div class="info">Attempting to login..</div>
-      <!-- Failed --
-      {:else if $loginStatus == "AUTH_FAILED"}
-        <div class="info" style="color:red;">Incorrect credentials</div>
-      <!-- Submit Button --
-      {:else}
-        <button
-          disabled={!unlocked || (loginPassword.length < 1)}
-          on:click={handleLogin}>
-          Submit
-        </button>
-      {/if}
-      -->
-
-    <!-- Locked -->
+      <button on:click={handleLogin} login>Submit</button>
     {:else}
       <div class="locked-icon"><Fa icon={faLock} size="8x" /></div>
       <div class="locked-text">{hours > 0 ? hours + " HOURS" : ""} {minutes > 0 ? minutes + " MINUTES" : ""} {seconds} SECONDS</div>

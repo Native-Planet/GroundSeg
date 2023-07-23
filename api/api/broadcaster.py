@@ -27,7 +27,7 @@ class Broadcaster:
                 "type": "structure",
                 "auth_level": "unauthorized",
                 "login": {
-                    "info": "temp"
+                    "remainder": 0,
                     }
                 }
         await self.authed(a_broadcast)

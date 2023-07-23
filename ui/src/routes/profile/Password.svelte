@@ -19,6 +19,10 @@
           <div class="label">New Password</div>
           <input class="pwd" type="password" />
         </div>
+        <div class="input-wrapper">
+          <div class="label">Confirm Password</div>
+          <input class="pwd" type="password" />
+        </div>
         <button class="btn" on:click={modifyPassword}>Modify Password</button>
       </div>
       <div class="spacer"></div>

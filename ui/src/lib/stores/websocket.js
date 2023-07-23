@@ -101,7 +101,10 @@ export const verify = async () => {
 
 // Verify session
 export const login = async password => {
-  let payload = {"type":"login"}
+  let payload = {
+    "type":"login",
+    "password":password
+  }
   send(payload)
 }
 

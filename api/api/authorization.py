@@ -104,6 +104,12 @@ class Auth:
                 auth_status = False
         return valid, auth_status
 
+    def handle_login(self,token,password):
+        auth_status = False
+        # check if password is correct
+        # modify token content
+        return auth_status, token
+
     # Randomized string of n length
     def new_secret_string(self,length):
         return ''.join(secrets.choice(

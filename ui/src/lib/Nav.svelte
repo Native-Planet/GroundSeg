@@ -2,11 +2,14 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores'
   import { wide, version } from '$lib/stores/display'
+  import { structure } from '$lib/stores/websocket'
+
+  $: registered = ($structure?.startram?.registered) || false
+
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
-  <div class="version">{$version}</div>
-  <div class="app">GROUNDSEG</div>
+  <div class="app">GROUNDSEG {$version}{registered ? " - STARTRAM" : ""}</div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
     <div class="back" on:click={()=>goto("/")}>
     </div>
