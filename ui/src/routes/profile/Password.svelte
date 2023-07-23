@@ -88,9 +88,6 @@
     background: var(--bg-card);
   }
 
-
-
-
   .wide {
     width: 992px;
     max-width: 98vw;

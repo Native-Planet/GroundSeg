@@ -8,7 +8,7 @@
 <div class="container">
     <div class="title">NETDATA</div>
     <a href="http://{$page.url.hostname}:19999" target="_blank" class="netdata">
-      <Fa icon={faArrowUpRightFromSquare} size="2x" />
+      <Fa icon={faArrowUpRightFromSquare} size="1.6x" />
     </a>
 </div>
 
@@ -20,6 +20,7 @@
   .container {
     display: flex;
     margin: 0;
+    align-items: center;
   }
   a {
     color: var(--text-color);

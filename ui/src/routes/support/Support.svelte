@@ -18,13 +18,14 @@
     display: flex;
     align-items: center;
     padding: 20px 40px;
+    margin-bottom: 20px;
   }
   .title {
     margin-bottom: 0;
   }
   .links {
     display: flex;
-    gap: 20px;
+    gap: 24px;
   }
   .spacer {
     flex: 1;
@@ -32,7 +33,7 @@
   .link {
     text-decoration: none;
     color: var(--text-color);
-    font-size: 12px;
+    font-size: 16px;
   }
   .power-btn {
     background: var(--btn-secondary);

@@ -2,9 +2,11 @@ import os
 import json
 import socket
 import string
+import base64
 import secrets
 import hashlib
 import platform
+from pywgkey.key import WgKey
 
 from config.swap import Swap
 
@@ -36,6 +38,8 @@ class Config:
             # The setup stages are
             # start -> profile -> startram -> complete
             "setup": "start",
+            "endpointUrl": "api.startram.io",
+            "apiVersion": "v1",
             "piers": [],
             "netCheck": "1.1.1.1:53",
             "updateMode": "auto",
@@ -52,7 +56,8 @@ class Config:
                 },
             "dockerData": "/var/lib/docker",
             "wgOn": False,
-            "wgRegisterd": False
+            "wgRegistered": False,
+            "pwHash": "",
             }
 
     def __init__(self, base, dev):
@@ -75,9 +80,11 @@ class Config:
             self.system['updateMode'] = 'auto'
 
         # if first boot, set up keys
-        if self.system.get('setup'):
+        if self.system.get('setup') != "complete":
             print("config:config GroundSeg is in setup mode")
-            #self.reset_pubkey()
+            self.reset_pubkey()
+
+        # TODO: Fixer script
 
         # Save latest config to system.json
         self.save_config()
@@ -245,5 +252,23 @@ class Config:
             print("config:config:create_password: Password set!")
         except Exception:
             print("config:config:create_password: Create password failed: {e}")
+            return False
+        return True
+
+    # Reset Public and Private Keys for Wireguard
+    def reset_pubkey(self):
+        print("config:config:reset_pubkey: Resetting public key")
+        try:
+            x = WgKey()
+
+            b64pub = x.pubkey + '\n' 
+            b64pub = b64pub.encode('utf-8')
+            b64pub = base64.b64encode(b64pub).decode('utf-8')
+
+            # Load priv and pub key
+            self.system['pubkey'] = b64pub
+            self.system['privkey'] = x.privkey
+        except Exception as e:
+            print(f"config:config:reset_pubkey: {e}")
             return False
         return True

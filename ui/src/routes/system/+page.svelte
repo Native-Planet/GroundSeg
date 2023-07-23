@@ -26,23 +26,11 @@
     border-radius: 16px;
     display :flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 20px;
   }
   .wrapper {
     display: flex;
     gap: 40px;
     margin-bottom: 40px;
-  }
-  .left {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 40px;
-  }
-  .right {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 40px;
   }
 </style>

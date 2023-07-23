@@ -2,15 +2,16 @@
   import { structure } from '$lib/stores/websocket'
 </script>
 
-<div class="container wrapper">
-    <div class="title">Power</div>
-    <button class="power-btn">Shut Down</button>
-    <button class="power-btn">Restart</button>
+<div class="container">
+    <div class="wrapper">
+      <div class="title">POWER</div>
+      <button class="power btn">Shut Down</button>
+      <button class="restart btn">Restart</button>
+    </div>
 </div>
 
 <style>
   .title {
-    flex: 1;
     margin: 0;
   }
   .wrapper {
@@ -18,17 +19,22 @@
     gap: 20px;
     margin: 0;
   }
-  .power-btn {
+  .btn {
+    flex: 1;
     font-family: var(--regular-font);
-    background: var(--btn-secondary);
     color: var(--text-card-color);
-    height: 42px;
+    height: 36px;
     font-size: 12px;
     border-radius: 16px;
     cursor: pointer;
-    width: 140px;
   }
-  .power-btn:hover {
+  .btn:hover {
     background: var(--bg-card);
+  }
+  .restart {
+    background: var(--btn-secondary);
+  }
+  .power {
+    background: var(--btn-secondary);
   }
 </style>

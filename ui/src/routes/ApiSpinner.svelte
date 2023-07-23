@@ -7,16 +7,35 @@
 <style>
   .text {
     position: absolute;
-    bottom: 20px;
+    top: 20px;
     right: 20px;
     font-family: var(--title-font);
-    color: var(--text-color);
+    color: var(--text-card-color);
     font-size: 20px;
-    animation: breathe 3s infinite;
+    animation: breathe 5s infinite;
+    background: var(--bg-card);
+    padding: 2px 20px 6px 20px;
+    border-radius: 8px;
   }
   @keyframes breathe {
-    0% {opacity: .2}
-    50% {opacity: 1}
-    100% {opacity: .2}
+    0% {
+      background-color: #FFFFFF00;
+      color: var(--text-color);
+    }
+    50% {
+      background-color: var(--bg-card);
+      color: var(--text-card-color);
+    }
+    100% {
+      background-color: #FFFFFF00;
+      color: var(--text-color);
+    }
   }
+  /*
+  @keyframes breathe {
+    0% {opacity: 0}
+    50% {opacity: 1}
+    100% {opacity: 0}
+  }
+  */
 </style>

@@ -1,8 +1,14 @@
 <script>
-  import { setupSkip, setupStarTram } from '$lib/stores/websocket'
+  import { structure, setupSkip, setupStarTram } from '$lib/stores/websocket'
   let key = ''
-  let region = 'us-east'
-  let endpoint = 'api.startram.io'
+  let activeRegion = "us-east";
+
+  $: regions = ($structure?.startram?.regions) || {}
+  $: regionKeys = Object.keys(regions)
+
+  const setRegion = r => {
+    activeRegion = r
+  }
 </script>
 <div class="title">STARTRAM SERVICE</div>
 <div class="wrapper">
@@ -11,12 +17,24 @@
     <div class="promo">Billed annually or $5 month-to-month</div>
     <div class="why">Access your urbit from anywhere / Run multiple urbits from one device / Hassle-free image hosting</div>
   </div>
+  {#if regionKeys.length > 0}
+    <div class="activate">
+      <div class="name">Select Region</div>
+      <div class="regions">
+        {#each regionKeys as r }
+          <div on:click={()=>setRegion(r)} class="region" class:highlight={r == activeRegion}>
+            {regions[r].desc}
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
   <div class="activate">
     <div class="name">Activation Key</div>
     <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
     <button
       disabled={key.length < 1} 
-      on:click={()=>setupStarTram(key,region,endpoint)}
+      on:click={()=>setupStarTram(key,activeRegion)}
       >Activate
     </button>
   </div>
@@ -58,6 +76,7 @@
   }
   .activate {
     margin-top: 24px;
+    width: 100%;
   }
   .name {
     font-size: 16px;
@@ -100,5 +119,25 @@
   .skip {
     text-decoration: underline;
     margin-bottom: 20px;
+  }
+  .regions {
+    margin-top: 12px;
+    display: flex;
+    gap: 20px;
+  }
+  .region {
+    flex: 1;
+    border-radius: 16px;
+    border: solid 2px var(--btn-secondary);
+    padding: 12px;
+    font-size: 12px;
+    text-align: center;
+  }
+  .region:hover {
+    cursor: pointer;
+  }
+  .highlight {
+    background-color: var(--btn-secondary);
+    color: var(--text-card-color);
   }
 </style>

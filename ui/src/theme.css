@@ -8,12 +8,17 @@
 }
 body {
   margin: 0;
+  /*
+  background-image: url('https://r4.wallpaperflare.com/wallpaper/289/250/397/windows-xp-bliss-hd-wallpaper-e291b2c0dd269edbaa7802b51088d942.jpg');
+  background-image: url('https://images.hdqwalls.com/download/best-nature-image-1920x1080.jpg');
+  background-image: url('https://wallpaper-mania.com/wp-content/uploads/2018/09/High_resolution_wallpaper_background_ID_77701302686.jpg');
+  */
 }
 
 :root {
   --regular-font: Inter;
   --title-font: BPdotsUnicase;
-  --bg-base: #E8E8E3;
+  --bg-base: #E8E8E3CD;
   --bg-card: #161D17;
   --bg-modal: #DDE3DF;
   --bg-warning: #EDF02C;

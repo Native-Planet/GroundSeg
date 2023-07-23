@@ -1,128 +1,121 @@
 <script>
-  import { scale } from 'svelte/transition'
-  import { page } from '$app/stores'
-  import { onMount } from 'svelte'
-
-  import { api } from '$lib/api'
-  import { structure } from '$lib/stores/websocket'
-
-  import Fa from 'svelte-fa'
-  import { faCheck } from '@fortawesome/free-solid-svg-icons'
-
-  import Logo from '$lib/Logo.svelte'
-	import NewPierButtons from '$lib/NewPierButtons.svelte'
-
-	import Card from '$lib/Card.svelte'
-  import KeyDropper from '$lib/KeyDropper.svelte'
-
-  let remoteCheck = true
-  let name = ''
-  let key = ''
-  let inView = false
-
-  $: startram = ($structure?.system?.startram) || {}
-  $: container = (startram?.container) || "stopped"
-  $: register = (startram?.register) || "no"
-
-  onMount(()=> {
-    api.set("http://" + $page.url.hostname + ":27016")
-    inView = !inView
-  })
-
+  import { wide } from '$lib/stores/display';
 </script>
 
-{#if inView}
-<Card width="480px">
-  <Logo t="Boot a new Urbit ID"/>
-	<div class="key" in:scale={{duration:160, delay: 360}}>
-  	<div class="info">
-    	<div class="title">Urbit ID</div>
-	    <input spellcheck="false" placeholder="sampel-palnet" bind:value={name}/>
-  	</div>
-
-	  <div class="info">
-  	  <div class="title">Keyfile</div>
-      <KeyDropper on:change={e=> key = e.detail} />
-	  </div>
-
-    <!-- Remote Autoset -->
-    {#if register == "yes" && container == "running"}
-      <div class="remote-check">
-        <div class="box" class:highlight={remoteCheck} on:click={()=> remoteCheck = !remoteCheck}>
-          {#if remoteCheck}
-            <Fa icon={faCheck} size="1x"/>
-          {/if}
-        </div>
-        <span on:click={()=> remoteCheck = !remoteCheck}>Automatically enable remote access</span>
-      </div>
-    {/if}
-
-	</div>
-
-  <NewPierButtons {name} {key} {remoteCheck} />
-
-</Card>
-{/if}
+<div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
+  <div class="title">NEW SHIP</div>
+  <div class="sigil"></div>
+  <div class="input-wrapper">
+    <div class="label">Urbit ID</div>
+    <input type="text" placeholder="Ship Name" />
+  </div>
+  <div class="input-wrapper">
+    <div class="label">Bootfile</div>
+    <input type="text" placeholder="Select.." />
+  </div>
+  <div class="buttons">
+    <button class="back">Back</button>
+    <button class="boot">Boot</button>
+    <div class="spacer"></div>
+  </div>
+</div>
 
 <style>
-  input {
-    flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    color: inherit;
-    font-weight: 700;
-    background: #ffffff4d;
-    outline: none;
-    border: none;
-    border-radius: 6px;
+  .wide {
+    width: 1104px;
+    max-width: 100vw;
   }
-  ::-moz-placeholder {
-    color: white;
+  .slim {
+    width: calc(100vw - 40px);
   }
-  ::-webkit-input-placeholder {
-    color: white;
-  }
-  .key {
-    display: flex;
+  .card-wrapper {
+    background: var(--bg-base);
+    border-radius: 16px;
+    margin: auto;
+    height: 70vh;
+    display:flex;
     flex-direction: column;
-    gap: 12px;
-    color: inherit;
-    padding: 20px;
-    max-width: calc(100vw - 40px);
+    align-items: center;
   }
-  .info {
-    display: flex;
+  .slim .card-wrapper {
+    background: var(--bg-base);
+    border-radius: 16px;
+    margin: auto;
+    height: 70vh;
+    display:flex;
+    gap: 40px;
     flex-direction: column;
+    align-items: center;
   }
   .title {
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-align: left;
+    font-family: var(--title-font);
+    font-size: 48px;
+    padding-top: 40px;
+    padding-bottom: 40px;
   }
-  .remote-check {
-    flex: 1;
+  .sigil {
+    height: 160px;
+    width: 160px;
+    border: solid 4px var(--text-color);
+    border-radius: 24px;
+    background: var(--bg-modal);
+    margin-bottom: 20px;
+  }
+  .input-wrapper {
+    width: 60%;
     display: flex;
-    gap: 6px;
-    align-items: center;
-    text-align: center;
-    font-size: 11px;
-    margin-top: 16px;
+    flex-direction: column;
   }
-  .box {
-    width: 14px;
-    height: 14px;
-    background: #ffffff4d;
-    border-radius: 4px;
+  .label {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  input {
+    font-family: var(--regular-font);
+    color: var(--text-color);
+    padding-left: 20px;
+    border: 2px solid var(--btn-secondary);
+    background-color: var(--bg-modal);
+    border-radius: 12px;
+    font-size: 16px;
+    line-height: 36px;
+    margin-bottom: 20px;
+  }
+  input:focus {
+    outline: none;
+  }
+  .buttons {
+    width: 60%;
+    display: flex;
+    gap: 20px;
+  }
+  .spacer {
+    flex: 2;
+  }
+  .back {
+    font-family: var(--regular-font);
+    color: var(--text-card-color);
     cursor: pointer;
-    user-select: none;
+    line-height: 38px;
+    flex: 1;
+    border-radius: 12px;
+    background-color: var(--btn-secondary);
   }
-  span {
+  .boot {
+    font-family: var(--regular-font);
+    color: var(--text-card-color);
     cursor: pointer;
-    user-select: none;
+    line-height: 38px;
+    flex: 1;
+    border-radius: 12px;
+    background-color: var(--btn-primary);
   }
-  .highlight {
-    background: #028AFB;
+  .back:hover {
+    background-color: var(--bg-card);
   }
+
+  .boot:hover {
+    background-color: var(--bg-card);
+  }
+
 </style>

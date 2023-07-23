@@ -54,7 +54,6 @@
 <style>
   .container {
     margin: 0;
-    margin-bottom: 40px;
   }
   .title {
     margin-bottom: 12px;
@@ -94,7 +93,7 @@
     opacity: .6;
   }
   .description-input {
-    height: 300px;
+    height: 200px;
   }
   .info {
     padding: 10px 20px;
@@ -105,6 +104,7 @@
   }
   .logs {
     padding: 20px;
+    padding-top: 0;
     border-radius: 8px;
     border: solid 2px var(--btn-secondary);
     background: var(--bg-modal);
@@ -113,6 +113,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    margin-top: 10px;
   }
   .check-wrapper {
     flex: 1 0 calc(50% - 12px);
@@ -144,7 +145,7 @@
     line-height: 36px;
     font-size: 12px;
     font-family: var(--regular-font);
-    background: var(--btn-secondary);
+    background: var(--btn-primary);
     color: var(--text-card-color);
     margin-top: 20px;
     width: 240px;

@@ -1,6 +1,7 @@
 import json
 
 from api.upload_broadcast import UploadBroadcast
+from api.startram_broadcast import StarTramBroadcast
 
 class Broadcaster:
     def __init__(self,cfg,groundseg):
@@ -19,7 +20,8 @@ class Broadcaster:
                         "disk": self.cfg._disk
                         }
                     },
-                "upload": UploadBroadcast(self.app).display()
+                "upload": UploadBroadcast(self.app).display(),
+                "startram": StarTramBroadcast(self.app).display()
                 }
         u_broadcast = {
                 "type": "structure",
@@ -36,7 +38,8 @@ class Broadcaster:
                 "type": "structure",
                 "auth_level": "setup",
                 "stage": self.app.setup.stage,
-                "page": self.app.setup.page
+                "page": self.app.setup.page,
+                "regions":self.app.wireguard.region_data
                }
         await self.authed(broadcast)
         await self.unauth(broadcast)

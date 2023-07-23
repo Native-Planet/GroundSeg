@@ -1,8 +1,12 @@
 .container {
- background-color: var(--bg-base);
- color: var(--text-color);
- margin: auto;
- border-radius: 16px;
+  background-color: var(--bg-base);
+  color: var(--text-color);
+  margin: auto;
+  border-radius: 16px;
+  backdrop-filter: blur(2px);
+  -moz-backdrop-filter: blur(2px);
+  -o-backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .title {
   font-size: 24px;

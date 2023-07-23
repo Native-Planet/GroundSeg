@@ -129,17 +129,37 @@ export const setupSkip = async () => {
   send(payload)
 }
 
-export const setupStarTram = async (key,region,endpoint) => {
+export const setupStarTram = async (key,region) => {
   let payload = {
     "type":"setup",
     "action":"startram",
     "key":key,
-    "region":region,
-    "endpoint":endpoint
+    "region":region
   }
   send(payload)
 }
 
+//
+//  StarTram
+//
+
+export const startramGetRegions = async () => {
+  let payload = {
+    "type":"startram",
+    "action":"regions"
+  }
+  send(payload)
+}
+
+export const startramRegister = async (key,region) => {
+  let payload = {
+    "type":"startram",
+    "action":"register",
+    "key":key,
+    "region":region
+  }
+  send(payload)
+}
 //
 //  Upload Pier
 //
@@ -196,14 +216,6 @@ export const updateForm = async (template,item,value) => {
 //
 //  StarTram
 //
-
-// Register StarTram
-export const starTramRegister = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.starTramRegister(id,token)
-}
 
 // Toggle StarTram
 export const starTramToggle = async c => {

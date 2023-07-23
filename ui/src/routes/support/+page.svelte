@@ -3,11 +3,13 @@
   import './system.css'
   import Interactive from './Interactive.svelte'
   import BugReport from './BugReport.svelte'
+  import Support from './Support.svelte'
 </script>
 
 <div class="panel">
   <Interactive />
   <BugReport />
+  <Support />
 </div>
 
 <style>
@@ -19,6 +21,6 @@
     border-radius: 16px;
     display :flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 20px;
   }
 </style>

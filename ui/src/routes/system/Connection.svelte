@@ -2,7 +2,7 @@
 </script>
 
 <div class="container">
-  <div class="title">Connection</div>
+  <div class="title">CONNECTION</div>
   <div class="wifi">
     <div class="wifi-text">Wi-Fi</div>
     <div class="btn-wifi"></div>
