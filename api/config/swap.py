@@ -1,5 +1,6 @@
 import os
 import subprocess
+from time import sleep
 
 class Swap:
     # Configure Swap
@@ -54,12 +55,15 @@ class Swap:
             try:
                 res = subprocess.run(["swapon", "--show"], capture_output=True)
                 swap_arr = [x for x in res.stdout.decode("utf-8").split('\n') if loc in x]
-                return int("".join(filter(str.isdigit, [x for x in swap_arr[0].split(" ") if x != ""][2])))
+                value = [x for x in swap_arr[0].split(" ") if x != ""][2]
+                num = int("".join(filter(str.isdigit, value)))
+                if 'M' in value:
+                    return num / 1024
+                return num
             except Exception as e:
-                print(f"config:swap:active_swap Failed to get active swap: {e}")
                 count += 1
                 sleep(count * 2)
-            # Returns None if failed
+                return 0
 
     def max_swap(self, loc, val):
         cap = 32 # arbitrary cap for the webui

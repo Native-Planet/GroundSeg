@@ -90,7 +90,8 @@ class Config:
         self.save_config()
 
         # Configure Swap
-        Swap().configure(self.system.get('swapFile'), self.system.get('swapVal'))
+        self.swap = Swap()
+        self.swap.configure(self.system.get('swapFile'), self.system.get('swapVal'))
 
         # Complete Initialization
         self.ready = True
@@ -297,6 +298,24 @@ class Config:
         self.system['wgRegistered'] = registered
         self.save_config()
 
+    def set_linux_update_info(self,state,upgrade,new,remove,ignore):
+        self.linux_update_info = {
+                "state":state,
+                "upgrade":upgrade,
+                "new":new,
+                "remove":remove,
+                "ignore":ignore
+                }
+
     def set_endpoint(self, endpoint):
         self.system['endpointUrl'] = str(endpoint)
         self.save_config()
+
+    def set_swap(self, val):
+        file = self.system.get('swapFile')
+        if val == 0:
+            self.swap.stop_swap(file)
+        else:
+            self.system['swapVal'] = val
+            self.save_config()
+            self.swap.configure(file,val)

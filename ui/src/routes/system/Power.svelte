@@ -1,12 +1,13 @@
 <script>
   import { structure } from '$lib/stores/websocket'
+  import { shutdownModal, restartModal } from './store'
 </script>
 
 <div class="container">
     <div class="wrapper">
       <div class="title">POWER</div>
-      <button class="power btn">Shut Down</button>
-      <button class="restart btn">Restart</button>
+      <button class="power btn" on:click={()=>shutdownModal.set(true)}>Shut Down</button>
+      <button class="restart btn" on:click={()=>restartModal.set(true)}>Restart</button>
     </div>
 </div>
 

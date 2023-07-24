@@ -1,5 +1,5 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
+  import { updateLinux, restartGroundSeg, setSwap, structure } from '$lib/stores/websocket'
   $: usage = ($structure?.system?.usage) || {}
   $: ram = (usage?.ram) || [0,0]
   $: ramPercent = (ram[1]/ram[0] * 100).toFixed(2)
@@ -7,6 +7,45 @@
   $: cpuTemp = (usage?.cpu_temp) || 0
   $: disk = (usage?.disk) || [0,0,0]
   $: diskPercent = (disk[1]/disk[0] * 100).toFixed(2)
+
+  $: state = ($structure?.system?.updates?.linux?.state) || "updated"
+
+  $: swap = (usage?.swap) || 0
+
+  let modified = false
+  let newSwap = 0;
+
+  const dec = () => {
+    if (modified) {
+      --newSwap
+    } else {
+      modified = true
+      newSwap = swap - 1
+    }
+    if (newSwap <= 0) {
+      newSwap = 0
+    }
+  }
+
+  const inc = () => {
+    if (modified) {
+      ++newSwap
+    } else {
+      modified = true
+      newSwap = swap + 1
+    }
+    const free = parseInt(disk[2] / (1024 * 1024 * 1024) / 2)
+    if (newSwap > free) {
+      newSwap = free
+    }
+  }
+
+  const setModify = () => {
+    if (!modified) {
+      modified = true
+      newSwap = swap
+    }
+  }
 </script>
 
 
@@ -46,8 +85,12 @@
 
       <div class="btn-label">Commands</div>
       <div class="buttons">
-        <button class="btn">Restart GroundSeg</button>
-        <button class="btn">Update Linux</button>
+        <button on:click={restartGroundSeg} class="btn">Restart GroundSeg</button>
+        {#if state == "pending"}
+          <button on:click={updateLinux} class="btn">Update Linux</button>
+        {:else}
+          <div class="spacer"></div>
+        {/if}
       </div>
     </div>
 
@@ -66,6 +109,27 @@
           <div class="ram-percent">{cpu}%</div>
         </div>
       </div>
+      <div class="row">
+        <div class="label">Swap Memory</div>
+        <div class="swap-wrapper">
+          <div class="spacer"></div>
+          <div class="btn-swap" on:click={dec}>-</div>
+          <div class="custom" on:click={setModify}>
+            {#if modified}
+              <input style="width:calc(24px * {JSON.stringify(newSwap).length});" type="number" bind:value={newSwap} />
+            {:else}
+              <input style="width:calc(24px * {JSON.stringify(swap).length});" type="number" bind:value={swap} />
+            {/if}
+            <div class="details">GB</div>
+          </div>
+          <div on:click={inc} class="btn-swap">+</div>
+          <div class="spacer"></div>
+        </div>
+        <div class="buttons">
+          <button on:click={()=>modified = false} disabled={!modified || (swap == newSwap)} class="btn">Reset Change</button>
+          <button on:click={()=>setSwap(newSwap)} disabled={(swap == newSwap) || !modified} class="btn">Modify Swap</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -75,6 +139,9 @@
   .wrapper {
     display: flex;
     gap: 80px;
+  }
+  .title {
+    margin-bottom: 24px;
   }
   .left {
     flex: 1;
@@ -112,15 +179,17 @@
   .ram-wrapper {
     position: relative;
     background-color: var(--bg-modal);
-    border-radius: 12px;
-    border: solid 4px var(--btn-secondary);
+    border-radius: 8px;
+    /*border: solid 4px var(--btn-secondary);*/
+    border: solid 4px var(--btn-primary);
     height: 24px;
   }
   .ram-bg {
     position: absolute;
     left: 0;
     top: 0;
-    background: var(--btn-secondary);
+    background: var(--btn-primary);
+    /*background: var(--btn-secondary);*/
     height: 100%;
     transition: width 500ms;
   }
@@ -152,7 +221,7 @@
     gap: 40px;
   }
   .btn {
-    border-radius: 16px;
+    border-radius: 12px;
     flex: 1;
     background-color: var(--btn-secondary);
     color: var(--text-card-color);
@@ -160,10 +229,65 @@
     font-family: var(--regular-font);
     font-size: 12px;
   }
+  .btn:disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
   .btn-label {
     font-family: var(--regular-font);
     font-size: 12px;
     padding-left: 10px;
     margin-bottom: 12px;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .swap-wrapper {
+    display: flex;
+    align-items: end;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .custom {
+    display: flex;
+    align-items: center;
+  }
+  input[type=number] {
+    min-width: 48px;
+    font-family: var(--title-font);
+    font-size: 32px;
+    line-height: 32px;
+    background: none;
+    border:none;
+  }
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+        margin: 0;
+  }
+  input[type=number] {
+      -moz-appearance: textfield;
+  }
+  input:focus {
+    outline: none;
+  }
+  .details {
+    font-family: var(--title-font);
+    font-size: 32px;
+    line-height: 32px;
+    color: var(--text-color);
+  }
+  .btn-swap {
+    user-select: none;
+    width: 62px;
+    height: 32px;
+    padding-left: 2px;
+    border-radius: 8px;
+    background: var(--btn-primary);
+    line-height: 26px;
+    font-family: var(--title-font);
+    font-size: 24px;
+    text-align: center;
+    color: var(--text-card-color);
   }
 </style>

@@ -17,7 +17,11 @@ class Broadcaster:
                         "ram": self.cfg._ram,
                         "cpu": self.cfg._cpu,
                         "cpu_temp": self.cfg._core_temp,
-                        "disk": self.cfg._disk
+                        "disk": self.cfg._disk,
+                        "swap": self.cfg.swap.active_swap(self.cfg.system.get('swapFile'))
+                        },
+                    "updates": {
+                        "linux":self.cfg.linux_update_info
                         }
                     },
                 "upload": UploadBroadcast(self.app).display(),

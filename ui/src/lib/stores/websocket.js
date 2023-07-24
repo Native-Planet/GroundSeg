@@ -167,6 +167,54 @@ export const setupStarTram = async (key,region) => {
 }
 
 //
+//  System
+//
+
+export const restartGroundSeg = () => {
+  let payload = {
+    "type":"system",
+    "action":"groundseg",
+    "command":"restart"
+  }
+  send(payload)
+}
+
+export const restartDevice = () => {
+  let payload = {
+    "type":"system",
+    "action":"power",
+    "command":"restart"
+  }
+  send(payload)
+}
+
+export const shutdownDevice = () => {
+  let payload = {
+    "type":"system",
+    "action":"power",
+    "command":"shutdown"
+  }
+  send(payload)
+}
+
+export const updateLinux = () => {
+  let payload = {
+    "type":"system",
+    "action":"update",
+    "update":"linux"
+  }
+  send(payload)
+}
+
+export const setSwap = val => {
+  let payload = {
+    "type":"system",
+    "action":"modify-swap",
+    "value": val
+  }
+  send(payload)
+}
+//
 //  StarTram
 //
 
@@ -263,63 +311,4 @@ export const urbitsMeldUrth = async ship => {
   PENDING.add(id)
   SESSION.urbitsMeldUrth(id,ship,token)
 }
-
-// 
-// Update Form
-//
-
-export const updateForm = async (template,item,value) => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.updateForm(id,template,item,value,token)
-}
-
-//
-//  StarTram
-//
-
-// Toggle StarTram
-export const starTramToggle = async c => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  c == "running"
-    ? SESSION.starTramStop(id,token)
-    : SESSION.starTramStart(id,token)
-}
-
-// Restart StarTram
-export const starTramRestart = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.starTramRestart(id,token)
-}
-
-// Modify endpoint
-export const starTramEndpoint = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.starTramEndpoint(id,token)
-}
-
-// Cancel StarTram Subscription
-export const starTramCancel = async () => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.starTramCancel(id,token)
-}
 */
-
-export const renderPy = (patp,svg) => {
-  let payload = {
-    "type":"render",
-    "action":"svg",
-    "patp":patp,
-    "svg":svg
-  }
-  send(payload)
-}

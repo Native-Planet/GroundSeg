@@ -1,9 +1,11 @@
 <script>
   import { wide } from '$lib/stores/display'
   import './system.css'
+  import { shutdownModal, restartModal } from './store'
   import Connection from './Connection.svelte'
   import SystemDetails from './SystemDetails.svelte'
   import Power from './Power.svelte'
+  import PowerModal from './PowerModal.svelte'
   import Netdata from './Netdata.svelte'
   import Logs from './Logs.svelte'
 </script>
@@ -16,6 +18,11 @@
     <Netdata />
   </div>
 </div>
+{#if $shutdownModal}
+  <PowerModal info="shutdown" />
+{:else if $restartModal}
+  <PowerModal info="restart" />
+{/if}
 
 <style>
   .panel {

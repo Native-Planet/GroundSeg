@@ -72,13 +72,7 @@ class LinUpdate:
                 if (upgrade + new + remove) > 0:
                     state = 'pending'
 
-                '''
-                self.ws_util.system_broadcast('updates', 'linux', 'update', state)
-                self.ws_util.system_broadcast('updates', 'linux', 'upgrade', upgrade)
-                self.ws_util.system_broadcast('updates', 'linux', 'new', new)
-                self.ws_util.system_broadcast('updates', 'linux', 'remove', remove)
-                self.ws_util.system_broadcast('updates', 'linux', 'ignore', ignore)
-                '''
+                self.cfg.set_linux_update_info(state,upgrade,new,remove,ignore)
 
                 print(f"updater:linux:loop: Linux updates: {upgrade} to upgrade, {new} to install, {remove} to remove, {ignore} to ignore")
             except Exception as e:
