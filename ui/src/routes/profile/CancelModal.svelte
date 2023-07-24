@@ -1,68 +1,41 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { structure, startramGetRegions, startramRegister } from '$lib/stores/websocket'
-  import { showRegisterModal } from './store'
+  import { structure, startramCancel } from '$lib/stores/websocket'
+  import { showCancelModal } from './store'
 
   let key = ''
-  let activeRegion = "us-east";
-  let success = false
+  let reset = false
+  //$: startram = ($structure?.startram) || {}
 
-  $: startram = ($structure?.startram) || {}
-  $: registered = (startram?.registered) || false
-  $: registerStatus = (startram?.registerStatus) || null
-  $: regions = (startram?.regions) || {}
-  $: regionKeys = Object.keys(regions)
 
-  const setRegion = r => {
-    activeRegion = r
-  }
-  onMount(()=>startramGetRegions())
-  afterUpdate(()=>{
-    showRegisterModal.set(registerStatus != "done")
-    success = registerStatus == "success"
-  })
 </script>
 
 <div class="wrapper">
-  <div class="modal">
-    {#if success}
-      sucess!
-    {:else}
-      <div class="header">Register a{registered ? "nother":""} key</div>
-      {#if regionKeys.length > 0}
-        <div class="name">Select Region</div>
-        <div class="regions">
-          {#each regionKeys as r }
-            <div on:click={()=>setRegion(r)} class="region" class:highlight={r == activeRegion}>
-              {regions[r].desc}
-            </div>
-          {/each}
-        </div>
-      {/if}
+  <div class="modal"> 
+    <div class="header">Cancel StarTram Subscription</div>
+    <div class="name">Activation Key</div>
+    <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
 
-      <div class="name">Activation Key</div>
-      <div class="activate">
-        <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
-      </div>
-      <div class="buttons">
-        <button
-          class="btn-cancel"
-          on:click={()=>showRegisterModal.set(false)}
-          >Back
-        </button>
-        <button
-          class="btn-activate"
-          disabled={key.length < 1} 
-          on:click={()=>startramRegister(key,activeRegion)}
-          >Activate
-        </button>
-        <div class="spacer"></div>
-      </div>
+    <div class="name">Additional Options</div>
+    <div class="check-wrapper" on:click={()=>reset = !reset}>
+      <div class="check" class:highlight={reset} ></div>
+      <div class="check-text">Remove StarTram configuration</div>
+    </div>
 
-      <a class="get" href="https://www.nativeplanet.io/startram" target="_blank">
-        GET A STARTRAM KEY
-      </a>
-    {/if}
+    <div class="buttons">
+      <button
+        class="btn-cancel"
+        on:click={()=>showCancelModal.set(false)}
+        >Back
+      </button>
+      <button
+        class="btn-activate"
+        disabled={key.length < 1}
+        on:click={()=>startramCancel(key,reset)}
+        >Confirm
+      </button>
+      <div class="spacer"></div>
+    </div>
 
   </div>
 </div>
@@ -79,6 +52,25 @@
     width: 100vw;
     height: 100vh;
     background: #FFFFFF3D;
+  }
+  .check-wrapper {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    align-items: center;
+    user-select: none;
+    cursor: pointer;
+  }
+  .check {
+    width: 18px;
+    height: 18px; 
+    border: solid 1px var(--btn-secondary);
+    border-radius: 6px;
+  }
+  .check-text {
+    flex: 1;
+    font-family: var(--regular-font);
+    font-size: 12px;
   }
   .modal {
     display: flex;
@@ -113,7 +105,6 @@
     cursor: pointer;
   }
   .highlight {
-    color: var(--text-card-color);
     background-color: var(--btn-secondary);
   }
   .name {
@@ -155,6 +146,16 @@
     font-family: var(--regular-font);
     flex: 1;
   }
+  .endpoint {
+    font-family: var(--regular-font);
+    font-size: 12px;
+    width: calc(100% - 24px);
+    line-height: 36px;
+    border: solid 2px var(--btn-secondary);
+    border-radius: 12px;
+    background: none;
+    padding-left: 20px;
+  }
   input {
     width: calc(100% - 24px);
     line-height: 36px;
@@ -176,5 +177,12 @@
   }
   .spacer {
     flex: 1;
+  }
+  .warning {
+    font-size: 14px;
+    text-align: center;
+    background-color: var(--bg-warning);
+    padding: 20px;
+    border-radius: 12px;
   }
 </style>

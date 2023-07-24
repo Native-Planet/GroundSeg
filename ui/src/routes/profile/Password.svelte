@@ -1,10 +1,10 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
+  import { structure, logout, logoutAll, modifyPassword } from '$lib/stores/websocket'
   export let wide
+  let old = '';
+  let pwd = '';
+  let cfm = '';
 
-  const modifyPassword = () => {
-    console.log("modify")
-  }
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
@@ -13,22 +13,25 @@
       <div class="modify">
         <div class="input-wrapper">
           <div class="label">Current Password</div>
-          <input class="pwd" type="password" />
+          <input class="pwd" type="password" bind:value={old} />
         </div>
         <div class="input-wrapper">
           <div class="label">New Password</div>
-          <input class="pwd" type="password" />
+          <input class="pwd" type="password" bind:value={pwd}/>
         </div>
         <div class="input-wrapper">
           <div class="label">Confirm Password</div>
-          <input class="pwd" type="password" />
+          <input class="pwd" type="password" bind:value={cfm}/>
         </div>
-        <button class="btn" on:click={modifyPassword}>Modify Password</button>
+        <button
+          class="btn"
+          on:click={()=>modifyPassword(old,cfm)}
+          disabled={(pwd != cfm) || (cfm.length == 0)}>Modify Password</button>
       </div>
       <div class="spacer"></div>
       <div class="buttons">
-        <button class="btn" on:click={modifyPassword}>Log Out Everywhere</button>
-        <button class="btn" on:click={modifyPassword}>Log Out</button>
+        <button class="btn" on:click={logoutAll}>Log Out Everywhere</button>
+        <button class="btn" on:click={logout}>Log Out</button>
       </div>
     </div>
 </div>
@@ -91,7 +94,10 @@
   .btn:hover {
     background: var(--bg-card);
   }
-
+  .btn:disabled {
+    pointer-events: none;
+    opacity: .6;
+  }
   .wide {
     width: 992px;
     max-width: 98vw;

@@ -104,11 +104,51 @@ class Auth:
                 auth_status = False
         return valid, auth_status
 
-    def handle_login(self,token,password):
+    # Check if content of token is valid
+    def check_token_content(self, websocket, token):
+        if websocket.remote_address[0] != token['ip']:
+            return False
+
+        if websocket.request_headers.get('User-Agent') != token['user_agent']:
+            return False
+
+        expire = datetime.strptime(token['created'], "%Y-%m-%d_%H:%M:%S") + timedelta(days=30)
+        now = datetime.now()
+        if expire <= now:
+            return False
+        return True
+
+    def handle_logout(self,token,websocket,action=None):
+        id = token.get('id')
+        # remove from cfg
+        self.cfg.system['sessions']['authorized'].pop(id)
+        # save config
+        self.cfg.save_config()
+        remove_from = "authorized"
         auth_status = False
+        if action == "everywhere":
+            auth_status = True
+
+        return remove_from, auth_status, token
+
+    def handle_login(self,token,password,websocket):
         # check if password is correct
-        # modify token content
-        return auth_status, token
+        remove_from = "none"
+        auth_status = self.cfg.check_password(password)
+        if auth_status:
+            k = self.cfg.system.get('keyFile')
+            # decrypt the token provided by the user
+            x = self.keyfile_decrypt(token.get('token'),k)
+            # check if content matches the session
+            valid = self.check_token_content(websocket, x)
+            if valid:
+                # modify token content
+                token = self.authorize_token(x,token.get('id'))
+                remove_from = "unauthorized"
+            else:
+                auth_status = False
+
+        return remove_from, auth_status, token
 
     # Randomized string of n length
     def new_secret_string(self,length):
@@ -126,6 +166,29 @@ class Auth:
         # Get the hexadecimal representation of the hash
         hex_dig = hash_object.hexdigest()
         return hex_dig
+
+    # Set token authorization to True
+    def authorize_token(self, decrypted, id):
+        # authorize token
+        decrypted['authorized'] = True
+        encrypted = self.keyfile_encrypt(decrypted,self.cfg.system.get('keyFile'))
+        token = {"id":id,"token":encrypted}
+
+        # modify the token hash
+        unauth = self.cfg.system['sessions']['unauthorized'][id]
+        unauth['hash'] = self.hash_string(token['token'])
+
+        # move token to authorized
+        self.cfg.system['sessions']['authorized'][id] = unauth
+
+        # remove token from unauthorized
+        self.cfg.system['sessions']['unauthorized'].pop(id)
+
+        # save changes
+        self.cfg.save_config()
+
+        return token
+
 
     # Encrypt with keyfile
     def keyfile_encrypt(self, contents, key):
@@ -151,16 +214,14 @@ class Auth:
         # Return decoded text
         return text.decode('utf-8')
 
-    '''
-# Decrypt with keyfile
-def keyfile_decrypt(self, text, key):
-if not os.path.isfile(key):
-print(f"auth:keyfile_decrypt {key} does not exist. Returning None")
-return None
-else:
-with open(key,"rb") as f:
-k = f.read()
-cipher_suite = Fernet(k)
-data = cipher_suite.decrypt(text.encode('utf-8'))
-return json.loads(data)
-'''
+    # Decrypt with keyfile
+    def keyfile_decrypt(self, text, key):
+        if not os.path.isfile(key):
+            print(f"auth:keyfile_decrypt {key} does not exist. Returning None")
+            return None
+        else:
+            with open(key,"rb") as f:
+                k = f.read()
+                cipher_suite = Fernet(k)
+                data = cipher_suite.decrypt(text.encode('utf-8'))
+                return json.loads(data)

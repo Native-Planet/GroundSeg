@@ -99,7 +99,7 @@ export const verify = async () => {
   send(payload)
 }
 
-// Verify session
+// Login
 export const login = async password => {
   let payload = {
     "type":"login",
@@ -108,6 +108,30 @@ export const login = async password => {
   send(payload)
 }
 
+// Logout
+export const logout = () => {
+  let payload = {"type":"logout"}
+  send(payload)
+}
+
+// Logout everywhere
+export const logoutAll = () => {
+  let payload = {
+    "type":"logout",
+    "action":"everywhere"
+  }
+  send(payload)
+}
+
+export const modifyPassword = (old,pwd) => {
+  let payload = {
+    "type":"password",
+    "action":"modify",
+    "old":old,
+    "password":pwd
+  }
+  send(payload)
+}
 
 //
 //  Setup
@@ -160,6 +184,41 @@ export const startramRegister = async (key,region) => {
     "action":"register",
     "key":key,
     "region":region
+  }
+  send(payload)
+}
+
+export const startramToggle = async () => {
+  let payload = {
+    "type":"startram",
+    "action":"toggle"
+  }
+  send(payload)
+}
+
+export const startramRestart = async () => {
+  let payload = {
+    "type":"startram",
+    "action":"restart"
+  }
+  send(payload)
+}
+
+export const startramEndpoint = async endpoint => {
+  let payload = {
+    "type":"startram",
+    "action":"endpoint",
+    "endpoint":endpoint
+  }
+  send(payload)
+}
+
+export const startramCancel = async (key,reset) => {
+  let payload = {
+    "type":"startram",
+    "action":"cancel",
+    "key":key,
+    "reset":reset
   }
   send(payload)
 }

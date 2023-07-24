@@ -175,6 +175,10 @@ class Config:
 
         return cfg
 
+    def reset_sessions(self):
+        self.system['sessions'] = {}
+        self.system = self.fix_sessions(self.system)
+        self.save_config()
     # Make sure sessions is correctly formatted
     def fix_sessions(self,cfg):
         try:
@@ -250,10 +254,22 @@ class Config:
             self.system['pwHash'] = hashed
             self.save_config()
             print("config:config:create_password: Password set!")
-        except Exception:
-            print("config:config:create_password: Create password failed: {e}")
+        except Exception as e:
+            print(f"config:config:create_password: Create password failed: {e}")
             return False
-        return True
+
+    # Check if provided password is correct
+    def check_password(self, pwd):
+        if self.system.get('setup') != "complete":
+            return False
+
+        salt = self.system.get('salt')
+        encoded_str = (salt + pwd).encode('utf-8')
+        hashed = hashlib.sha512(encoded_str).hexdigest()
+        correct_hash = self.system.get('pwHash')
+
+        return hashed == correct_hash
+        
 
     # Reset Public and Private Keys for Wireguard
     def reset_pubkey(self):
@@ -272,3 +288,15 @@ class Config:
             print(f"config:config:reset_pubkey: {e}")
             return False
         return True
+
+    def set_wg_on(self, wg_on):
+        self.system['wgOn'] = wg_on
+        self.save_config()
+
+    def set_wg_registered(self,registered):
+        self.system['wgRegistered'] = registered
+        self.save_config()
+
+    def set_endpoint(self, endpoint):
+        self.system['endpointUrl'] = str(endpoint)
+        self.save_config()

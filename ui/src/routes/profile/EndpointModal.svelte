@@ -1,68 +1,38 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { structure, startramGetRegions, startramRegister } from '$lib/stores/websocket'
-  import { showRegisterModal } from './store'
+  import { structure, startramEndpoint } from '$lib/stores/websocket'
+  import { showEndpointModal } from './store'
 
-  let key = ''
-  let activeRegion = "us-east";
   let success = false
+  let newEndpoint = ''
 
   $: startram = ($structure?.startram) || {}
-  $: registered = (startram?.registered) || false
-  $: registerStatus = (startram?.registerStatus) || null
-  $: regions = (startram?.regions) || {}
-  $: regionKeys = Object.keys(regions)
+  $: endpoint = (startram?.endpoint) || "api.startram.io"
 
-  const setRegion = r => {
-    activeRegion = r
-  }
-  onMount(()=>startramGetRegions())
-  afterUpdate(()=>{
-    showRegisterModal.set(registerStatus != "done")
-    success = registerStatus == "success"
-  })
+
 </script>
 
 <div class="wrapper">
   <div class="modal">
-    {#if success}
-      sucess!
-    {:else}
-      <div class="header">Register a{registered ? "nother":""} key</div>
-      {#if regionKeys.length > 0}
-        <div class="name">Select Region</div>
-        <div class="regions">
-          {#each regionKeys as r }
-            <div on:click={()=>setRegion(r)} class="region" class:highlight={r == activeRegion}>
-              {regions[r].desc}
-            </div>
-          {/each}
-        </div>
-      {/if}
+    <div class="warning">Modifying your endpoint removes previous StarTram configuration</div>
+    <div class="name">Current Endpoint</div>
+    <div class="endpoint">{endpoint}</div>
+    <div class="name">New Endpoint</div>
+    <input placeholder="example.endpoint.com" type="text" bind:value={newEndpoint} />
 
-      <div class="name">Activation Key</div>
-      <div class="activate">
-        <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
-      </div>
-      <div class="buttons">
-        <button
-          class="btn-cancel"
-          on:click={()=>showRegisterModal.set(false)}
-          >Back
-        </button>
-        <button
-          class="btn-activate"
-          disabled={key.length < 1} 
-          on:click={()=>startramRegister(key,activeRegion)}
-          >Activate
-        </button>
-        <div class="spacer"></div>
-      </div>
-
-      <a class="get" href="https://www.nativeplanet.io/startram" target="_blank">
-        GET A STARTRAM KEY
-      </a>
-    {/if}
+    <div class="buttons">
+      <button
+        class="btn-cancel"
+        on:click={()=>showEndpointModal.set(false)}
+        >Back
+      </button>
+      <button
+        class="btn-activate"
+        disabled={(newEndpoint.length < 1) || (newEndpoint == endpoint)} 
+        on:click={()=>startramEndpoint(newEndpoint)}
+        >Set New Endpoint
+      </button>
+    </div>
 
   </div>
 </div>
@@ -155,6 +125,16 @@
     font-family: var(--regular-font);
     flex: 1;
   }
+  .endpoint {
+    font-family: var(--regular-font);
+    font-size: 12px;
+    width: calc(100% - 24px);
+    line-height: 36px;
+    border: solid 2px var(--btn-secondary);
+    border-radius: 12px;
+    background: none;
+    padding-left: 20px;
+  }
   input {
     width: calc(100% - 24px);
     line-height: 36px;
@@ -176,5 +156,12 @@
   }
   .spacer {
     flex: 1;
+  }
+  .warning {
+    font-size: 14px;
+    text-align: center;
+    background-color: var(--bg-warning);
+    padding: 20px;
+    border-radius: 12px;
   }
 </style>

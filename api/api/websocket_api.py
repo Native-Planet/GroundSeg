@@ -46,18 +46,40 @@ class WS:
                     # Now, we check if the user provided a token
                     auth = Auth(self.cfg)
                     auth_status, token = auth.check_token(token,websocket,setup)
-                    if not auth_status:
-                        if payload.get('type') == "login":
-                            auth_status, token = auth.handle_login(token, payload.get('password'))
 
-                    # Next, we will add the websocket connection to our active sessions
+                    # Next, we will decide what to do with the websocket connection
+                    remove_from = "none"
                     tid = token.get('id')
+                    req_type = payload.get('type')
+
+                    # If authorized token
                     if auth_status:
-                        self.app.active_sessions['authorized'][websocket] = tid
-                        #print(f"websocket_api:handle Adding {websocket} with id:{tid} to authorized active sessions")
+                        # Special case for logout
+                        if req_type == "logout":
+                            remove_from, auth_status, token = auth.handle_logout(token,websocket,payload.get('action'))
+                        else:
+                            # Add the session to active sessions (does nothing if already added)
+                            self.app.active_sessions['authorized'][websocket] = tid
+                    # Not authorized
                     else:
-                        self.app.active_sessions['unauthorized'][websocket] = tid
-                        #print(f"websocket_api:handle Adding {websocket} with id:{tid} to unauthorized active sessions")
+                        # Special case for login
+                        if req_type == "login":
+                            remove_from, auth_status, token = auth.handle_login(token, payload.get('password'),websocket)
+                            self.app.active_sessions['authorized'][websocket] = tid
+                        else:
+                            # Add the session to active sessions (does nothing if already added)
+                            self.app.active_sessions['unauthorized'][websocket] = tid
+
+                    # Removing from active sessions upon request
+                    try:
+                        if remove_from == "unauthorized":
+                            self.app.active_sessions['unauthorized'].pop(websocket)
+                        elif remove_from == "authorized":
+                            self.app.active_sessions['authorized'].pop(websocket)
+                            await websocket.close()
+                    except:
+                        pass
+
                     # And finally, we send the payload and auth result
                     # to GroundSeg for processing
                     asyncio.create_task(self.app.process(websocket, auth_status, setup, payload))

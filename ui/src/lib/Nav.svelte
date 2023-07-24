@@ -5,11 +5,17 @@
   import { structure } from '$lib/stores/websocket'
 
   $: registered = ($structure?.startram?.registered) || false
+  $: running = ($structure?.startram?.running) || false
 
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
-  <div class="app">GROUNDSEG {$version}{registered ? " - STARTRAM" : ""}</div>
+  <div class="app">
+    GROUNDSEG {$version} - STARTRAM {
+      !registered ? "UNREGISTERED" :
+      running ? "ONLINE" : "OFFLINE"
+      }
+  </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
     <div class="back" on:click={()=>goto("/")}>
     </div>

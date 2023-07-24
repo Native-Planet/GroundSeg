@@ -1,66 +1,66 @@
 <script>
-  //import { goto } from '$app/navigation';
-  import { createEventDispatcher } from 'svelte';
-  import { structure } from '$lib/stores/websocket'
-  import { showRegisterModal } from './store'
+  import { structure, startramToggle, startramRestart } from '$lib/stores/websocket'
+  import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
 
   $: startram = ($structure?.startram) || {}
   $: registered = (startram?.registered) || false
   $: region = (startram?.region) || ""
+  $: running = (startram?.running) || ""
   $: expiry = (startram?.expiry) || ""
   $: renew = (startram?.renew) || ""
   $: endpoint = (startram?.endpoint) || ""
 
-  const dispatch = createEventDispatcher()
-
 </script>
-    <div class="body">
-      <div class="panel left">
-        <div class="header">Subscription Information</div>
-        <table>
-          {#if registered}
-            <tr class="top">
-              <td>Active Region</td>
-              <td>{renew ? "Renewal" : "Expiry"} Date</td>
-              <td>Auto Renewal</td>
-            </tr>
-            <tr class="bottom">
-              <td>{region.toUpperCase()}</td>
-              <td>{expiry}</td>
-              <td>{renew ? "Yes":"No"}</td>
-            </tr>
-          {:else}
-            <tr class="top">
-              <td></td>
-              <td>Not Registered</td>
-              <td></td>
-            </tr>
-          {/if}
-        </table>
-        <div class="header">Current Endpoint</div>
-        <div class="endpoint">{endpoint}</div>
-      </div>
-      <div class="spacer"></div>
+<div class="body">
+  <div class="panel left">
+    <div class="header">Subscription Information</div>
+    <table>
       {#if registered}
-        <div class="panel right">
-          <div class="header">Troubleshoot</div>
-          <button class="btn-troubleshoot">Restart StarTram</button>
-          <div class="header">Account</div>
-          <div class="account">
-            <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Another Key</button>
-            <button class="btn-account">Modify Endpoint</button>
-            <button class="btn-account">Cancel Subscription</button>
-          </div>
-        </div>
+        <tr class="top">
+          <td>Active Region</td>
+          <td>{renew ? "Renewal" : "Expiry"} Date</td>
+          <td>Auto Renewal</td>
+        </tr>
+        <tr class="bottom">
+          <td>{region.toUpperCase()}</td>
+          <td>{expiry}</td>
+          <td>{renew ? "Yes":"No"}</td>
+        </tr>
       {:else}
-        <div class="unregistered-panel right">
-          <div class="account">
-            <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Key</button>
-            <button class="btn-account">Modify Endpoint</button>
-          </div>
-        </div>
+        <tr class="top">
+          <td></td>
+          <td>Not Registered</td>
+          <td></td>
+        </tr>
       {/if}
+    </table>
+    <div class="header">Current Endpoint</div>
+    <div class="endpoint">{endpoint}</div>
+  </div>
+  <div class="spacer"></div>
+  {#if registered}
+    <div class="panel right">
+      <div class="header">Troubleshoot</div>
+      <button on:click={startramToggle} class="btn-troubleshoot">Turn {running ? "Off" : "On"}</button>
+      <button on:click={startramRestart} class="btn-troubleshoot">Restart StarTram</button>
+      <div class="header">Account</div>
+      <div class="account">
+        <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Another Key</button>
+        <button on:click={()=>showEndpointModal.set(true)} class="btn-account">Modify Endpoint</button>
+        {#if renew == "yes"}
+          <button on:click={()=>showCancelModal.set(true)} class="btn-account">Cancel Subscription</button>
+        {/if}
+      </div>
     </div>
+  {:else}
+    <div class="unregistered-panel right">
+      <div class="account">
+        <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Key</button>
+        <button on:click={()=>showEndpointModal.set(true)} class="btn-account">Modify Endpoint</button>
+      </div>
+    </div>
+  {/if}
+</div>
 
 <style>
   .body {
