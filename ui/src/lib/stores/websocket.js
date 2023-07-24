@@ -312,3 +312,18 @@ export const urbitsMeldUrth = async ship => {
   SESSION.urbitsMeldUrth(id,ship,token)
 }
 */
+
+//
+//  Support
+//
+
+export const submitReport = (contact,description,ships) => {
+  let payload = {
+    "type":"support",
+    "action":"bug-report",
+    "contact":contact,
+    "description":description,
+    "ships":ships
+  }
+  send(payload)
+}

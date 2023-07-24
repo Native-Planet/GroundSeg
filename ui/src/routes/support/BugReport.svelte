@@ -1,4 +1,8 @@
 <script>
+  import { submitReport } from '$lib/stores/websocket'
+  let contact = ''
+  let description = ''
+  let ships = []
 </script>
 
 <div class="container">
@@ -8,11 +12,11 @@
     <div class="left">
       <div class="contact">
         <div class="header">How should we contact you?</div>
-        <input class="contact-input" placeholder="~sampel-palnet or example@email.com"/>
+        <input class="contact-input" bind:value={contact} placeholder="~sampel-palnet or example@email.com"/>
       </div>
       <div class="description">
         <div class="header">Describe your issue in detail</div>
-        <input class="description-input" placeholder="eg. ~zod doesn't turn after update"/>
+        <textarea class="description-input" bind:value={description} placeholder="eg. ~zod doesn't turn after update"/>
       </div>
     </div>
 
@@ -45,7 +49,11 @@
       </div>
       <div class="buttons">
         <div class="spacer"></div>
-        <button class="submit">Submit Report</button>
+        <button
+          class="submit"
+          on:click={()=>submitReport(contact,description,ships)}
+          disabled={(contact.length < 1) || (description.length < 1)}>
+          Submit Report</button>
       </div>
     </div>
   </div>
@@ -93,7 +101,19 @@
     opacity: .6;
   }
   .description-input {
+    width: 100%;
+    font-family: var(--regular-font);
+    font-size: 12px;
+    padding: 8px;
+    border-radius: 8px;
+    border: solid 2px var(--btn-secondary);
+    background: var(--bg-modal);
+    color: var(--text-color);
     height: 200px;
+    resize: none;
+  }
+  .description-input:focus {
+    outline: none;
   }
   .info {
     padding: 10px 20px;
@@ -154,5 +174,9 @@
   .submit:hover {
     cursor: pointer;
     background: var(--bg-card);
+  }
+  .submit:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>
