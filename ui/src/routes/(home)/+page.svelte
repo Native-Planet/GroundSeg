@@ -2,10 +2,10 @@
   import ShipCard from "./ShipCard.svelte"
   import NewShipCard from "./NewShipCard.svelte"
   import { wide } from '$lib/stores/display'
+  import { structure } from '$lib/stores/websocket'
 
-  let ships = [
-    "donwer-donlut",
-  ]
+  $: urbits = ($structure?.urbits) || {}
+  $: ships = Object.keys(urbits)
 
 </script>
 

@@ -1,5 +1,12 @@
 <script>
   import { wide } from '$lib/stores/display';
+  import { bootShip } from '$lib/stores/websocket';
+  import { goto } from '$app/navigation';
+  import KeyDropper from './KeyDropper.svelte';
+
+  let key = '';
+  let name = '';
+  let remote = true;
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
@@ -7,15 +14,15 @@
   <div class="sigil"></div>
   <div class="input-wrapper">
     <div class="label">Urbit ID</div>
-    <input type="text" placeholder="Ship Name" />
+    <input type="text" bind:value={name} placeholder="Ship Name" />
   </div>
   <div class="input-wrapper">
     <div class="label">Bootfile</div>
-    <input type="text" placeholder="Select.." />
+    <KeyDropper on:change={e=> key = e.detail} />
   </div>
   <div class="buttons">
-    <button class="back">Back</button>
-    <button class="boot">Boot</button>
+    <button class="back" on:click={()=>goto('/boot')}>Back</button>
+    <button class="boot" on:click={()=>bootShip(name,key,remote)} disabled={(key.length < 1) && (name.length < 1)}>Boot</button>
     <div class="spacer"></div>
   </div>
 </div>
@@ -116,6 +123,10 @@
 
   .boot:hover {
     background-color: var(--bg-card);
+  }
+  .boot:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 
 </style>

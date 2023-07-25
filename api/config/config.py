@@ -319,3 +319,54 @@ class Config:
             self.system['swapVal'] = val
             self.save_config()
             self.swap.configure(file,val)
+
+    def check_patp(self, patp):
+        # Make sure patp is string
+        if type(patp) != str:
+            return False
+
+        # Remove sig from patp
+        if patp.startswith("~"):
+            patp = patp[1:]
+
+        # patps cannot start with doz
+        if patp.startswith("doz"):
+            return False
+
+        # valid
+        pre = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+        suf = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+
+        # convert to array
+        pre = [pre[i:i+3] for i in range(0, len(pre), 3)]
+        suf = [suf[i:i+3] for i in range(0, len(suf), 3)]
+
+        # Galaxy check
+        if len(patp) == 3:
+            return patp in suf
+
+        # Split patp
+        patp = patp.split("-")
+
+        # Check if valid
+        for p in patp:
+            if len(p) == 6:
+                if p[:3] not in pre:
+                    return False
+                if p[3:] not in suf:
+                    return False
+            else:
+                return False
+        return True
+
+    # Add urbit ship to GroundSeg
+    def add_system_patp(self, patp):
+        print(f"config:system_add_patp:{patp}: Adding to system.json")
+        try:
+            self.system['piers'] = [i for i in self.system['piers'] if i != patp]
+            self.system['piers'].append(patp)
+            self.save_config()
+            return True
+        except Exception:
+            print(f"config:system_add_patp:{patp}: Failed to add @p to system.json")
+        return False

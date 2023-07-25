@@ -293,11 +293,31 @@ export const uploadMetadata = (patp,size,secret) => {
   send(payload)
 }
 
-/*
 //
 //  Urbits
 //
 
+export const bootShip = (patp,key,remote) => {
+  let payload = {
+    "type":"new_ship",
+    "action":"boot",
+    "patp":patp,
+    "key":key,
+    "remote":remote
+  }
+  send(payload)
+}
+
+export const registerServiceAgain = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"register-service-again",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+/*
 export const urbitsAccessToggle = async ship => {
   let id = await generateRandom(16)
   let token = await loadSession()

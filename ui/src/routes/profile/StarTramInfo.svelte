@@ -2,7 +2,7 @@
   import { structure, startramToggle, startramRestart } from '$lib/stores/websocket'
   import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
 
-  $: startram = ($structure?.startram) || {}
+  $: startram = ($structure?.profile?.startram) || {}
   $: registered = (startram?.registered) || false
   $: region = (startram?.region) || ""
   $: running = (startram?.running) || ""

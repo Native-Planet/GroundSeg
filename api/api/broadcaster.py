@@ -2,6 +2,7 @@ import json
 
 from api.upload_broadcast import UploadBroadcast
 from api.startram_broadcast import StarTramBroadcast
+from api.urbits_broadcast import UrbitsBroadcast
 
 class Broadcaster:
     def __init__(self,cfg,groundseg):
@@ -12,6 +13,7 @@ class Broadcaster:
         a_broadcast = {
                 "type": "structure",
                 "auth_level": "authorized",
+                "upload": UploadBroadcast(self.app).display(),
                 "system": {
                     "usage": {
                         "ram": self.cfg._ram,
@@ -24,8 +26,10 @@ class Broadcaster:
                         "linux":self.cfg.linux_update_info
                         }
                     },
-                "upload": UploadBroadcast(self.app).display(),
-                "startram": StarTramBroadcast(self.app).display()
+                "profile":{
+                    "startram": StarTramBroadcast(self.app).display()
+                    },
+                "urbits": UrbitsBroadcast(self.app).display()
                 }
         u_broadcast = {
                 "type": "structure",

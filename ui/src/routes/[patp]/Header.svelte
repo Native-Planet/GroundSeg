@@ -1,20 +1,40 @@
 <script>
+  import { structure, registerServiceAgain } from '$lib/stores/websocket';
   export let patp
+
+  $: ship = ($structure?.urbits?.[patp]) || {}
+  $: memUsage = (ship?.memUsage) || 0
+  $: diskUsage = (ship?.diskUsage) || 0
+  $: loom = (ship?.loomSize) || 0
+  $: svcRegStatus = (ship?.serviceRegistrationStatus) || "ok"
+
+  $: chars = (patp.replace(/-/g,"").length) || 0
+  $: shipClass = (chars == 3 ? "GALAXY" : chars == 6 ? "STAR" : chars == 12 ? "PLANET" : chars > 12 ? "MOON" : "UNKNOWN") || "ERROR"
+
+
 </script>
 
 <div class="header">
   <div class="patp-wrapper">
-    <div class="ship-class">Planet</div>
+    <div class="ship-class">{shipClass}</div>
     <div class="patp">{patp.toUpperCase()}</div>
+    <div class="quick-panel">
+      <button
+        disabled={svcRegStatus != "ok"}
+        on:click={()=>registerServiceAgain(patp)}
+        class="btn svc-register">{svcRegStatus == "creating" ? "Registering" : "Reregister Services"}
+      </button>
+      <button class="btn rebuild-container">Rebuild Container</button>
+    </div>
   </div>
   <div class="settings-wrapper">
     <div class="settings">
       <div class="settings-text">RAM</div>
-      <div class="settings-val">1012 / 2048 MB</div>
+      <div class="settings-val">{parseInt(memUsage/(1024*1024))} MB / {loom} MB</div>
     </div>
     <div class="settings">
       <div class="settings-text">DISK</div>
-      <div class="settings-val">3.2 GB</div>
+      <div class="settings-val">{(diskUsage/(1024*1024)).toFixed(2)} MB</div>
     </div>
   </div>
 </div>
@@ -67,5 +87,27 @@
   }
   .settings-text {
     flex: 1;
+  }
+  .quick-panel {
+    display: flex;
+    margin: 12px 20px;
+    gap: 20px;
+  }
+  .btn {
+    width: 30%;
+    font-family: var(--regular-font);
+    font-size: 12px;
+    line-height: 32px;
+    background-color: var(--btn-secondary);
+    color: var(--text-card-color);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .btn:hover {
+    background: var(--bg-card);
+  }
+  .btn:disabled {
+    pointer-events: none;
+    opacity: .6;
   }
 </style>

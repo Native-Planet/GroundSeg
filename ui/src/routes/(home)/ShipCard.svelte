@@ -1,9 +1,19 @@
 <script>
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
+  import { structure } from '$lib/stores/websocket';
   export let patp
-</script>
+  let loom = 8192
 
+  $: ship = ($structure?.urbits?.[patp]) || {}
+  $: running = (ship?.running) || false
+  $: network = (ship?.network) || "none"
+  $: url = (ship?.url) || "#"
+  $: memUsage = (ship?.memUsage) || 0
+  $: diskUsage = (ship?.diskUsage) || 0
+  $: loom = (ship?.loomSize) || 0
+
+</script>
 
 <div class="main-wrapper">
   <!-- Masks -->
@@ -16,8 +26,9 @@
 
   <!-- Upper -->
   <div class="status">
-    <div class="text">ONLINE</div>
-    <div class="light on"></div>
+    <div class="access">{network == "none" ? "LOCAL MODE" : network == "wireguard" ? "STARTRAM" : ""}</div>
+    <div class="text">{running ? "ON" : "OFF"}LINE</div>
+    <div class="light {running ? "on" : "off"}"></div>
   </div>
 
   <!-- Lower -->
@@ -25,20 +36,18 @@
     <div class="info">
       <div class="patp">{patp.toUpperCase()}</div>
       <div class="ext">
-        <div class="icon">
-          <Fa icon={faArrowRight} size="1x"/>
-        </div>
+        <a href={url} target="_blank" class="icon"><Fa icon={faArrowRight} size="1x"/></a>
       </div>
     </div>
     <div class="settings-wrapper">
       <div class="settings-info">
         <div class="settings">
           <div class="settings-text">RAM</div>
-          <div class="settings-val">1011 / 8192 MB</div>
+          <div class="settings-val">{parseInt(memUsage / (1024 * 1024))} MB / {loom} MB</div>
         </div>
         <div class="settings">
           <div class="settings-text">DISK</div>
-          <div class="settings-val">3.2 GB</div>
+          <div class="settings-val">{(diskUsage / (1024 * 1024)).toFixed(2)} MB</div>
         </div>
       </div>
       <a href={patp} class="settings-button"></a>
@@ -69,6 +78,11 @@
     height: 50px;
     width: 228px;
     border-radius: 8px 8px 0 0;
+  }
+  .status > .access {
+    font-family: var(--title-font);
+    font-size: 14px;
+    padding-left: 20px;
   }
   .status > .light {
     height: 14px;
@@ -149,9 +163,13 @@
   }
   .icon {
     position: absolute;
+    color: var(--text-card-color);
     top: 6px;
     right: 16px;
     transform: rotate(-45deg);
+  }
+  .icon:hover {
+    cursor: pointer;
   }
   /* Settings */
   .settings-wrapper {
