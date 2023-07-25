@@ -10,12 +10,15 @@ class UrbitsBroadcast:
         for p in self.cfg.system.get('piers').copy():
             try:
                 svc_reg_status = "ok"
-                services = self.app.wireguard.anchor_services.get(p)
-                for svc in services:
-                    service = services.get(svc,{"status":"failed"})['status']
-                    if service != "ok":
-                        svc_reg_status = "creating"
-                        break
+                try:
+                    services = self.app.wireguard.anchor_services.get(p)
+                    for svc in services:
+                        service = services.get(svc,{"status":"failed"})['status']
+                        if service != "ok":
+                            svc_reg_status = "creating"
+                            break
+                except:
+                    pass
 
                 cfg = self.app.urbit._urbits[p]
                 urb_alias = False

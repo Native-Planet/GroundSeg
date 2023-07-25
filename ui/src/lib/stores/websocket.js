@@ -60,7 +60,7 @@ export const handleMessage = data => {
   if (data.type === "activity") {
     handleActivity(data)
   } else {
-    console.log(data)
+    //console.log(data)
     structure.set(data)
   }
 }

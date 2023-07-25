@@ -20,6 +20,10 @@
     <div class="label">Bootfile</div>
     <KeyDropper on:change={e=> key = e.detail} />
   </div>
+  <div class="check-wrapper" on:click={()=>remote = !remote}>
+    <div class="checkbox" class:highlight={remote} ></div>
+    <div class="check-label">Set to remote</div>
+  </div>
   <div class="buttons">
     <button class="back" on:click={()=>goto('/boot')}>Back</button>
     <button class="boot" on:click={()=>bootShip(name,key,remote)} disabled={(key.length < 1) && (name.length < 1)}>Boot</button>
@@ -72,6 +76,28 @@
     width: 60%;
     display: flex;
     flex-direction: column;
+  }
+  .check-wrapper {
+    cursor: pointer;
+    user-select: none;
+    width: 60%;
+    display: flex;
+    gap: 12px;
+    align-items: start;
+  }
+  .checkbox {
+    width: 20px;
+    height: 20px;
+    border: solid 1px var(--btn-secondary);
+    border-radius: 6px;
+  }
+  .highlight {
+    background-color: var(--btn-secondary);
+  }
+  .check-label {
+    line-height: 20px;
+    font-size: 12px;
+    margin-bottom: 24px;
   }
   .label {
     font-size: 12px;

@@ -65,7 +65,7 @@
 <style>
   .pass-wrapper {
     display: flex;
-    margin-bottom: 40px;
+    margin-bottom: 20px;
   }
   input {
     flex: 1;

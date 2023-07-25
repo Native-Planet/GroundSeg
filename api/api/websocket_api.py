@@ -95,8 +95,8 @@ class WS:
                 if token:
                     res['token'] = token
                     await websocket.send(json.dumps(res))
-            except Exception as e:
-                print(f"websocket_api:handler:send Failed: {e}")
+            except websockets.ConnectionClosed:
+                print(f"websocket_api:handler:send connection closed")
 
     async def broadcast(self):
         b = Broadcaster(self.cfg,self.app)
