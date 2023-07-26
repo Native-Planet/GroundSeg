@@ -6,7 +6,7 @@
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
-  $: svcRegStatus = (ship?.serviceRegistrationStatus) || "ok"
+  $: svcRegStatus = "ok" //(ship?.serviceRegistrationStatus) || "ok"
 
   $: chars = (patp.replace(/-/g,"").length) || 0
   $: shipClass = (chars == 3 ? "GALAXY" : chars == 6 ? "STAR" : chars == 12 ? "PLANET" : chars > 12 ? "MOON" : "UNKNOWN") || "ERROR"

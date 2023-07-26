@@ -74,10 +74,12 @@ async def main():
     # Start GroundSeg
     groundseg = GroundSeg(cfg,dev)
 
+    from threading import Thread
+    Thread(target=groundseg.urbit_docker_stats,daemon=True).start()
+
     # Uploader
     host = '0.0.0.0'
     port = 27016
-    from threading import Thread
     Thread(target=UploaderHTTP(cfg, groundseg, host, port, dev).run, daemon=True).start()
 
     # Websocket API
@@ -103,12 +105,12 @@ async def main():
             #http.run(),
             groundseg.loader(), # not loop, initializes the docker classes
             groundseg.startram(),
-            groundseg.melder(),
-            groundseg.wg_refresher(),
-            groundseg.docker_updater(),
+            #groundseg.melder(),
+            #groundseg.wg_refresher(),
+            #groundseg.docker_updater(),
             ws.run(),
             ws.broadcast(),
-            ur.run()
+            #ur.run()
             )
 
 # Start

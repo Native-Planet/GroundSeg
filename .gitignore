@@ -15,7 +15,7 @@ __pycache__/
 groundseg.dist/
 groundseg.build/
 groundseg.onefile-build/
-groundseg
+#groundseg
 binary/
 
 # Distribution / packaging

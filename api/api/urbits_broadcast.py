@@ -1,3 +1,4 @@
+import time
 import socket
 
 class UrbitsBroadcast:
@@ -8,6 +9,7 @@ class UrbitsBroadcast:
     def display(self):
         urbits = {}
         for p in self.cfg.system.get('piers').copy():
+            #start = time.time()
             try:
                 svc_reg_status = "ok"
                 try:
@@ -31,12 +33,16 @@ class UrbitsBroadcast:
                         "running": self.app.urbit.urb_docker.is_running(p),
                         "url": url,
                         "urbAlias": urb_alias,
-                        "memUsage": self.app.urbit.urb_docker.get_memory_usage(p),
+                        "memUsage": self.app.urbit.system_info.get(p),
                         "diskUsage": self.app.urbit.urb_docker.get_disk_usage(p),
                         "loomSize": 2 ** (int(cfg.get('loom_size')) - 20),
                         "serviceRegistrationStatus":svc_reg_status
                         }
-
             except: 
                 pass
+            '''
+            end = time.time()
+            elapsed = end - start
+            print(elapsed)
+            '''
         return urbits
