@@ -1,8 +1,13 @@
 <script>
-  import { submitReport } from '$lib/stores/websocket'
+  import { structure, submitReport } from '$lib/stores/websocket'
+
   let contact = ''
   let description = ''
   let ships = []
+
+  $: urbits = ($structure?.urbits) || {}
+  $: urbitKeys = Object.keys(urbits)
+
 </script>
 
 <div class="container">
@@ -33,18 +38,12 @@
       <div class="logs">
         <div class="header">Send Pier Logs (optional)</div>
         <div class="check-flex">
-          <div class="check-wrapper">
-            <div class="checkbox"></div>
-            <div class="patp">nattev-palnet</div>
-          </div>
-          <div class="check-wrapper">
-            <div class="checkbox"></div>
-            <div class="patp">nattev-palnet</div>
-          </div>
-          <div class="check-wrapper">
-            <div class="checkbox"></div>
-            <div class="patp">nattev-palnet</div>
-          </div>
+          {#each urbitKeys as p}
+            <div class="check-wrapper">
+              <div class="checkbox"></div>
+              <div class="patp">{p}</div>
+            </div>
+          {/each}
         </div>
       </div>
       <div class="buttons">

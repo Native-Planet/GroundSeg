@@ -124,6 +124,8 @@ class Wireguard:
 
     # Takes list of subdomains from startram and returns a dict
     def get_subdomains(self):
+        import time
+        start = time.time()
         res = {}
         patp = ''
         subs = self.anchor_data.get('subdomains')
@@ -143,7 +145,10 @@ class Wireguard:
                     "alias":sub.get('alias'),
                     }
             self.anchor_services = res
-
+        end = time.time()
+        elapsed = end - start
+        print(elapsed)
+        return True
     '''
 def restart(self, urb, minio):
 try:

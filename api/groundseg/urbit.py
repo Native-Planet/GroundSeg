@@ -23,8 +23,8 @@ from flask import send_file
 # GroundSeg Modules
 from log import Log
 from utils import Utils
-from click_wrapper import Click
 '''
+from lib.click_wrapper import Click
 
 from groundseg.docker.urbit import UrbitDocker
 
@@ -270,20 +270,21 @@ class Urbit:
                     # Boot ship
                     if self.start(patp, key) == "succeeded":
                         # toggle to remote if required
-                        return True
+                        if remote:
+                            Thread(target=self.new_pier_remote_toggle,args=(patp,)).start()
+            return True
         except Exception as e:
             print(f"groundseg:urbit:{patp}:create: Failed to boot new urbit ship: {e}")
         return False
 
-    '''
     def new_pier_remote_toggle(self, patp):
-        Log.log(f"{patp}: New pier remote toggle thread started")
+        print(f"groundseg:urbit:{patp}:new_pier_remote_toggle: New pier remote toggle thread started")
         try:
             running = self.urb_docker.is_running(patp)
             booted = len(self.get_code(patp)) == 27
             count = 0
             while not (running and booted):
-                Log.log(f"{patp}: Ship not ready for remote toggle yet")
+                print(f"groundseg:urbit:{patp}:new_pier_remote_toggle: Ship not ready for remote toggle yet")
                 time.sleep(count * 2)
                 if count < 5:
                     count += 1
@@ -291,8 +292,9 @@ class Urbit:
                 booted = len(self.get_code(patp)) == 27
             self.toggle_network(patp)
         except Exception as e:
-            Log.log(f"{patp}: Failed to start new pier remote toggle thread: {e}")
+            print(f"groundseg:urbit:{patp}:new_pier_remote_toggle: Failed to start new pier remote toggle thread: {e}")
 
+    '''
     def fix_pokes(self, patp):
         Log.log(f"{patp}: Pier upload fix pokes thread started")
         try:
@@ -593,6 +595,7 @@ class Urbit:
                         return 200
 
         return 400
+    '''
 
     # Create .hoon for pokes
     def create_hoon(self, patp, name, hoon):
@@ -601,7 +604,7 @@ class Urbit:
                 f.write(hoon)
                 f.close()
         except Exception:
-            Log.log(f"{patp}: Creating {name}.hoon failed")
+            print(f"{patp}: Creating {name}.hoon failed")
             return False
         return True
 
@@ -612,7 +615,7 @@ class Urbit:
             if os.path.exists(hoon_file):
                 os.remove(hoon_file)
         except Exception:
-            Log.log(f"{patp}: Deleting {name}.hoon failed")
+            print(f"{patp}: Deleting {name}.hoon failed")
             return False
         return True
 
@@ -627,6 +630,7 @@ class Urbit:
         self._urbits[patp]['click'] = True
         self.delete_hoon(patp, name)
 
+        '''
         if not code:
             self._urbits[patp]['click'] = False
             code = ''
@@ -643,12 +647,15 @@ class Urbit:
                     code = res.output.decode('utf-8').strip().split('\\')[0][1:]
                     os.remove(f'{self._volume_directory}/{patp}/_data/code.json')
             except Exception as e:
-                Log.log(f"{patp}: Failed to get +code {e}")
+                print(f"groundseg:urbit:{patp}:get_code Failed to get +code {e}")
 
         elif code == 'not-yet':
             code = ''
         self.save_config(patp)
+        '''
+        code = ""
         return code
+    '''
 
     # Toggle Autostart
     def toggle_autostart(self, patp):
@@ -698,14 +705,14 @@ class Urbit:
             Log.log(f"{patp}: Failed to toggle dev mode: {e}")
 
         return 400
+    '''
 
     def toggle_network(self, patp):
-        Log.log(f"{patp}: Attempting to toggle network")
+        print(f"{patp}: Attempting to toggle network")
 
-        wg_reg = self.config['wgRegistered']
+        wg_reg = self.cfg.system.get('wgRegistered')
         wg_is_running = self.wg.is_running()
         c = self.urb_docker.get_container(patp)
-
         if c:
             try:
                 running = False
@@ -721,22 +728,23 @@ class Urbit:
                 else:
                     self._urbits[patp]['network'] = "none"
 
-                Log.log(f"{patp}: Network changed: {old_network} -> {self._urbits[patp]['network']}")
+                print(f"groundseg:urbit:{patp}:toggle_network: {old_network} -> {self._urbits[patp]['network']}")
                 self.save_config(patp)
 
                 created = self.urb_docker.start(self._urbits[patp],
-                                                self.config_object._arch,
+                                                self.cfg.arch,
                                                 self._volume_directory
                                                 )
                 if (created == "succeeded") and running:
                     self.start(patp)
 
-                return 200
+                return True
 
             except Exception as e:
-                Log.log(f"{patp}: Unable to change network: {e}")
+                print(f"groundseg:urbit:{patp}:toggle_network: Unable to change network: {e}")
 
-        return 400
+        return False
+    '''
 
     def set_loom(self, patp, size):
         Log.log(f"{patp}: Attempting to set loom size")
@@ -932,6 +940,7 @@ class Urbit:
             self.save_config(patp)
             return True
         return False
+    '''
 
     # Get looback address of Urbit Pier
     def get_loopback_addr(self, patp):
@@ -942,6 +951,7 @@ class Urbit:
             for ln in log_arr:
                 if substr in ln:
                     return str(ln.split(' ')[-1])
+    '''
 
     # Register Wireguard for Urbit
     def register_urbit(self, patp, url):
@@ -1077,69 +1087,82 @@ class Urbit:
         except Exception as e:
             Log.log(f"{patp}: Failed to clear acme: {e}")
 
-    def update_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port, alias):
-        Log.log(f"{patp}: Attempting to update wireguard network")
-        changed = False
-        try:
-            cfg = self._urbits[patp]
-            if not cfg['wg_url'] == url:
-                Log.log(f"{patp}: Wireguard URL changed from {cfg['wg_url']} to {url}")
-                changed = True
-                cfg['wg_url'] = url
+    '''
+    def update_wireguard_network(self):
+        # get new
+        new = self.wg.anchor_services.copy()
+        # get pier configs
+        piers = self._urbits.copy()
+        for patp in piers:
+            print(f"{patp}: Attempting to update wireguard network")
+            changed = False
+            cfg = piers[patp]
+            services = new.get(patp)
+            for svc_type in services.keys():
+                service = services.get(svc_type)
+                url = service.get('url')
+                port = service.get('port')
+                alias = service.get('alias')
 
-            if not cfg['wg_http_port'] == http_port:
-                Log.log(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {http_port}")
-                changed = True
-                cfg['wg_http_port'] = http_port
+                if svc_type == 'urbit-web':
+                    if alias == "null":
+                        alias = ""
+                    if cfg['wg_url'] != url:
+                        print(f"{patp}: Wireguard URL changed from {cfg['wg_url']} to {url}")
+                        cfg['wg_url'] = url
+                        changed = True
+                    if cfg['wg_http_port'] != port:
+                        print(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {port}")
+                        cfg['wg_http_port'] = port
+                        changed = True
+                    if cfg['custom_urbit_web'] != alias:
+                        print(f"{patp}: Urbit Web Custom URL changed from {cfg['custom_urbit_web']} to {alias}")
+                        cfg['custom_urbit_web'] = alias
+                        changed = True
 
-            if alias == "null":
-                alias = ""
-            if not cfg['custom_urbit_web'] == alias:
-                Log.log(f"{patp}: Urbit Web Custom URL changed from {cfg['custom_urbit_web']} to {alias}")
-                changed = True
-                cfg['custom_urbit_web'] = alias
+                if svc_type == 'urbit-ames':
+                    if cfg['wg_ames_port'] != port:
+                        print(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {port}")
+                        cfg['wg_ames_port'] = port
+                        changed = True
 
-            if not cfg['wg_ames_port'] == ames_port:
-                Log.log(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {ames_port}")
-                changed = True
-                cfg['wg_ames_port'] = ames_port
+                if svc_type == 'minio-bucket':
+                    if cfg['wg_s3_port'] != port:
+                        print(f"{patp}: Wireguard S3 Port changed from {cfg['wg_s3_port']} to {port}")
+                        cfg['wg_s3_port'] = port
+                        changed = True
 
-            if not cfg['wg_s3_port'] == s3_port:
-                Log.log(f"{patp}: Wireguard S3 Port changed from {cfg['wg_s3_port']} to {s3_port}")
-                changed = True
-                cfg['wg_s3_port'] = s3_port
+                if svc_type == 'minio-console':
+                    if cfg['wg_console_port'] != port:
+                        print(f"{patp}: Wireguard Console Port changed from {cfg['wg_console_port']} to {port}")
+                        cfg['wg_console_port'] = port
+                        changed = True
 
-            if not cfg['wg_console_port'] == console_port:
-                Log.log(f"{patp}: Wireguard Console Port changed from {cfg['wg_console_port']} to {console_port}")
-                changed = True
-                cfg['wg_console_port'] = console_port
+            try:
+                if changed:
+                    self._urbits[patp] = cfg
+                    self.save_config(patp)
 
-            if changed:
-                self.save_config(patp)
+                    if cfg['network'] == "wireguard" and self.urb_docker.is_running(patp):
+                            # remove minio container
+                            self.minio.minio_docker.remove_container(f"minio_{patp}")
+                            # remove urbit container
+                            if self.urb_docker.remove_container(patp):
+                                # start minio
+                                # start urbit
+                                created = self.urb_docker.start(self._urbits[patp],
+                                                                self.cfg.arch,
+                                                                self._volume_directory
+                                                                )
+                                if created == "succeeded":
+                                    self.start(patp)
+                                print(f"{patp}: Wireguard network settings updated!")
+                else:
+                    print(f"{patp}: Nothing to change!")
+            except Exception as e:
+                print(f"{patp}: Unable to update Wireguard network: {e}")
 
-                if cfg['network'] != "none":
-                    Log.log(f"{patp}: Rebuilding container")
-                    running = False
-                    self.minio.minio_docker.remove_container(f"minio_{patp}")
-                    c = self.urb_docker.get_container(patp)
-                    if c:
-                        running = c.status == "running"
-                        if self.urb_docker.remove_container(patp):
-                            created = self.urb_docker.start(self._urbits[patp],
-                                                            self.config_object._arch,
-                                                            self._volume_directory
-                                                            )
-                            if (created == "succeeded") and running:
-                                self.start(patp)
-
-                    Log.log(f"{patp}: Wireguard network settings updated!")
-            else:
-                Log.log(f"{patp}: Nothing to change!")
-        except Exception as e:
-            Log.log(f"{patp}: Unable to update Wireguard network: {e}")
-            return False
-        return True
-
+    '''
     # Custom Domain
     def custom_domain(self, patp, data):
         cfg = self._urbits[patp]

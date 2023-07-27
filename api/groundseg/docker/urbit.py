@@ -33,7 +33,7 @@ class UrbitDocker:
             c.start()
             return True
         except Exception as e:
-            print(f"{patp}: Failed to start container: {e}")
+            print(f"{patp}: Failed to prep_start container: {e}")
             return False
 
 
@@ -324,10 +324,14 @@ class UrbitDocker:
             return False
 
     def get_memory_usage(self,patp):
+        mem_usage = 0
         c = self.get_container(patp)
         if not c:
-            return 0
-        mem_usage = c.stats(stream=False)['memory_stats']['usage']
+            raise Exception()
+        try:
+            mem_usage = c.stats(stream=False)['memory_stats']['usage']
+        except:
+            pass
         return mem_usage
 
     def get_disk_usage(self,patp):

@@ -46,13 +46,13 @@ class GroundSeg:
             # And then we load wireguard. This is a prerequisite for any startram
             # related functionality.
             self.wireguard = Wireguard(self.cfg)
-            # StarTram API
-            self.startram = StarTramAPI(self.cfg,self.wireguard)
             # Lastly, we load ship specific classes.
             # MinIO - s3 bucket for individual ships
             # Urbit - Urbit ship. Also handles Lick side permissions (See authorization)
             self.minio = MinIO(self.cfg, self.wireguard)
             self.urbit = Urbit(self.cfg, self.wireguard, self.minio)
+            # StarTram API
+            self.startram = StarTramAPI(self.cfg,self.wireguard,self.urbit)
 
             # This will be deprecated eventually in preference of
             # static html/js
@@ -171,23 +171,32 @@ class GroundSeg:
                     if action == "toggle":
                         # if running
                         if self.wireguard.is_running():
-                            # swap ships back to local
-                            # turn off minio
+                            for p in self.urbit._urbits.copy():
+                                if self.urbit._urbits[p]['network'] == "wireguard":
+                                    # swap ship back to local
+                                    self.urbit.toggle_network(p)
+                                    # turn off minio
                             # turn off wireguard
                             self.wireguard.stop()
                         else:
-                            # start wireguard
+                            # turn on wireguard
                             self.wireguard.start()
-                                # start minio
-                                # select ships that should be in remote
-                                # start ships
+                            # start minio
                         return
 
                     if action == "restart":
                         payload['action'] = "toggle"
+                        ships = []
                         if self.wireguard.is_running():
+                            for p in self.urbit._urbits.copy():
+                                if self.urbit._urbits[p]['network'] == "wireguard":
+                                    ships.append(p)
                             await self.process(websocket, auth_status, setup, payload)
                         await self.process(websocket, auth_status, setup, payload)
+                        # select ships that should be in remote
+                        for p in ships:
+                            self.urbit.toggle_network(p)
+                        return
 
                     if action == "regions":
                         self.startram.get_regions(3)

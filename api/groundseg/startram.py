@@ -7,9 +7,10 @@ from time import sleep
 class StarTramAPI:
     _f = "groundseg:startram"
     _headers = {"Content-Type": "application/json"}
-    def __init__(self,cfg,wg):
+    def __init__(self,cfg,wg,urbit):
         self.cfg = cfg
         self.wg = wg
+        self.urbit = urbit
 
     async def main_loop(self):
         retrieve_sleep = 60 * 60 #seconds
@@ -76,7 +77,8 @@ class StarTramAPI:
 
                 if status and status['conf']:
                     self.wg.anchor_data = status
-                    self.wg.get_subdomains()
+                    if self.wg.get_subdomains():
+                        self.urbit.update_wireguard_network()
                     return True
                 else:
                     raise Exception()

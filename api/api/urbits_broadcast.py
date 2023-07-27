@@ -1,4 +1,3 @@
-import time
 import socket
 
 class UrbitsBroadcast:
@@ -9,7 +8,6 @@ class UrbitsBroadcast:
     def display(self):
         urbits = {}
         for p in self.cfg.system.get('piers').copy():
-            #start = time.time()
             try:
                 svc_reg_status = "ok"
                 try:
@@ -40,9 +38,4 @@ class UrbitsBroadcast:
                         }
             except: 
                 pass
-            '''
-            end = time.time()
-            elapsed = end - start
-            print(elapsed)
-            '''
         return urbits
