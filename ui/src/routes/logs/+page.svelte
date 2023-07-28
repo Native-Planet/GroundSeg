@@ -1,11 +1,13 @@
 <script>
   import { wide } from '$lib/stores/display'
   import './system.css'
-  import Logs from './Logs.svelte'
+  import SystemLogs from './SystemLogs.svelte'
+  import Wireguard from './SystemLogs.svelte'
 </script>
 
 <div class="panel">
-  <Logs {wide} />
+  <!--SystemLogs {wide} /-->
+  <Wireguard {wide} />
 </div>
 
 <style>

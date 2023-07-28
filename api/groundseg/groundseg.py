@@ -39,18 +39,23 @@ class GroundSeg:
 
             # We load the setup class first
             self.setup = Setup(self,self.cfg)
+
             # Uploader
             self.uploader = Uploader(self,self.cfg)
+
             # After that, we load netdata
             self.netdata = Netdata(self.cfg)
+
             # And then we load wireguard. This is a prerequisite for any startram
             # related functionality.
             self.wireguard = Wireguard(self.cfg)
+
             # Lastly, we load ship specific classes.
             # MinIO - s3 bucket for individual ships
             # Urbit - Urbit ship. Also handles Lick side permissions (See authorization)
             self.minio = MinIO(self.cfg, self.wireguard)
             self.urbit = Urbit(self.cfg, self.wireguard, self.minio)
+
             # StarTram API
             self.startram = StarTramAPI(self.cfg,self.wireguard,self.urbit)
 

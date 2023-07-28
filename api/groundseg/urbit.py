@@ -99,23 +99,13 @@ class Urbit:
         if not skip:
             skip = self.load_config(patp)
         if skip:
-            return self.urb_docker.start(self._urbits[patp],
-                                         self.cfg.arch,
-                                         self._volume_directory,
-                                         key
-                                         )
-        return "failed"
-        '''
             if self.minio.start_minio(f"minio_{patp}", self._urbits[patp]):
-                print("calllllleeeeeeddddd")
-                print("calllllleeeeeeddddd")
-                print("calllllleeeeeeddddd")
-                print("calllllleeeeeeddddd")
-                print("calllllleeeeeeddddd")
-                return "failed" # temp
-            else:
-                return "failed"
-            '''
+                return self.urb_docker.start(self._urbits[patp],
+                                             self.cfg.arch,
+                                             self._volume_directory,
+                                             key
+                                             )
+        return "failed"
 
     def ram(self):
         for p in self.cfg.system.get('piers').copy():

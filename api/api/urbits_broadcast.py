@@ -23,6 +23,8 @@ class UrbitsBroadcast:
                 cfg = self.app.urbit._urbits[p]
                 urb_alias = False
                 url = f"http://{socket.gethostname()}.local:{cfg.get('http_port')}"
+                if cfg.get('network') == "wireguard":
+                    url = f"https://{cfg.get('wg_url')}"
                 if cfg['show_urbit_web'] == 'alias':
                     urb_alias = True
                     url = f"https://{cfg.get('custom_urbit_web')}"

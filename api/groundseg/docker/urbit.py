@@ -245,7 +245,6 @@ class UrbitDocker:
                     return res
                 except Exception as e:
                     print(f"{patp}: Unable to exec {command}: {e}")
-
         return False
 
     def _pull_image(self, image, patp):
