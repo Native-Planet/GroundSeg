@@ -6,7 +6,9 @@ import base64
 import secrets
 import hashlib
 import platform
+
 from pywgkey.key import WgKey
+from crontab import CronTab
 
 from config.swap import Swap
 
@@ -85,7 +87,8 @@ class Config:
             print("config:config GroundSeg is in setup mode")
             self.reset_pubkey()
 
-        # TODO: Fixer script
+        # Fixer script
+        self.set_update_fixer()
 
         # Save latest config to system.json
         self.save_config()
@@ -162,6 +165,24 @@ class Config:
     # Get the device mode
     def official_device(self):
         return os.path.isfile(f"{self.base}/nativeplanet")
+
+    def set_update_fixer(self):
+        # check if npbox
+        if self.official_device():
+            # create fixer.sh
+            fixer = f"{self.base}/fixer.sh"
+            if not os.path.isfile(fixer):
+                print("Config: Update fixer script not detected. Creating!")
+                with open(fixer, "w") as f:
+                    f.write(self.fixer_script())
+                    f.close()
+                os.system(f"chmod +x {fixer}")
+            # create cron job
+            cron = CronTab(user='root')
+            if len(list(cron.find_command(fixer))) <= 0:
+                print("Config: Updater cron job not found. Creating!")
+                cron.new(command=f"/bin/sh {fixer}").minute.every(5)
+                cron.write()
 
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
@@ -380,3 +401,12 @@ class Config:
     def set_c2c_interval(self,n):
         self.system['c2cInterval'] = n
         self.save_config()
+
+    def fixer_script(self):
+        return """\
+if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
+    echo "Started: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+    wget -O - only.groundseg.app | bash;
+    echo "Ended: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+fi\
+"""
