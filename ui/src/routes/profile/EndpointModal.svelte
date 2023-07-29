@@ -6,7 +6,7 @@
   let success = false
   let newEndpoint = ''
 
-  $: startram = ($structure?.startram) || {}
+  $: startram = ($structure?.profile?.startram) || {}
   $: endpoint = (startram?.endpoint) || "api.startram.io"
 
 
