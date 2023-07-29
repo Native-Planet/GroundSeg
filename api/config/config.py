@@ -58,6 +58,7 @@ class Config:
             "wgOn": False,
             "wgRegistered": False,
             "pwHash": "",
+            "c2cInterval":0
             }
 
     def __init__(self, base, dev):
@@ -374,3 +375,8 @@ class Config:
         except Exception:
             print(f"config:system_add_patp:{patp}: Failed to add @p to system.json")
         return False
+
+    # Modify C2C interval
+    def set_c2c_interval(self,n):
+        self.system['c2cInterval'] = n
+        self.save_config()

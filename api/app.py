@@ -5,6 +5,9 @@ import asyncio
 # Configs
 from config.config import Config
 
+# C2C
+from c2c import C2C
+
 # Updater
 from updater.version import VersionServer
 from updater.linux import LinUpdate
@@ -76,8 +79,9 @@ async def main():
                     break
         else:
             # C2C here
-            print("c2c mode")
-            exit()
+            #Thread(target=cfg.c2c_killswitch, daemon=True).start()
+            C2C(cfg,dev).run()
+            sys.exit()
 
     # Version Server
     version_server = VersionServer(cfg,dev)

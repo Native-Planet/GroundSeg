@@ -1,0 +1,19 @@
+import nmcli
+
+def get_wifi_device():
+    for d in nmcli.device():
+        if d.device_type == 'wifi':
+            return d.device
+    return "none"
+
+def list_wifi_ssids():
+    return [x.ssid for x in nmcli.device.wifi() if len(x.ssid) > 0]
+
+def wifi_connect(ssid, pwd):
+    try:
+        nmcli.device.wifi_connect(ssid, pwd)
+        print(f"WiFi: Connected to: {ssid}")
+        return True
+    except Exception as e:
+        print(f"WiFi: Failed to connect to network: {e}")
+        return False
