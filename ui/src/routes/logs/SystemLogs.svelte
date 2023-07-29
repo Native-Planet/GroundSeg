@@ -2,13 +2,16 @@
   import { structure } from '$lib/stores/websocket'
   export let wide
 
-  $: logData = ($structure?.logs?.system) || ["empty"]
+  //$: logData = ($structure?.logs?.system) || ["empty"]
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
+  <pre>yeetus</pre>
+  <!--
   {#each logData as ln}
     <pre>{ln}</pre>
   {/each}
+  -->
 </div>
 
 <style>

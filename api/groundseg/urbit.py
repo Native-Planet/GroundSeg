@@ -68,7 +68,8 @@ class Urbit:
     ready = False
     system_info = {}
 
-    def __init__(self, cfg, wg, minio):
+    def __init__(self, parent, cfg, wg, minio):
+        self.app = parent
         self.cfg = cfg
         self.wg = wg
         self.minio = minio
@@ -123,7 +124,7 @@ class Urbit:
     # |exit 
     def graceful_exit(self, patp):
         try:
-            Log.log(f"{patp}: Attempting to send |exit")
+            print(f"{patp}: Attempting to send |exit")
             # Naming the hoon file
             name = "bar_exit"
             ";<  our=@p  bind:m  get-our"
@@ -134,16 +135,16 @@ class Urbit:
             raw = Click().click_exec(patp, self.urb_docker.exec, hoon_file)
             res = Click().filter_success(raw)
             self.delete_hoon(patp, name)
-            Log.log(f"{patp}: |exit sent successfully")
+            print(f"{patp}: |exit sent successfully")
         except Exception as e:
-            Log.log(f"urbit:graceful_exit:{patp} Error: {e}")
+            print(f"urbit:graceful_exit:{patp} Error: {e}")
             return False
         return True
     '''
     '''
     # Delete Urbit Pier and MiniO
     def delete(self, patp):
-        Log.log(f"{patp}: Attempting to delete all data")
+        print(f"{patp}: Attempting to delete all data")
         try:
             if self.urb_docker.delete(patp):
 
@@ -157,27 +158,27 @@ class Urbit:
 
                 self.minio.delete(f"minio_{patp}")
 
-                Log.log(f"{patp}: Deleting from system.json")
+                print(f"{patp}: Deleting from system.json")
                 self.config['piers'] = [i for i in self.config['piers'] if i != patp]
                 self.config_object.save_config()
 
-                Log.log(f"{patp}: Removing {patp}.json")
+                print(f"{patp}: Removing {patp}.json")
                 os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
 
                 self._urbits.pop(patp)
-                Log.log(f"{patp}: Data removed from GroundSeg")
+                print(f"{patp}: Data removed from GroundSeg")
 
                 return 200
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to delete data: {e}")
+            print(f"{patp}: Failed to delete data: {e}")
 
         return 400
     '''
     '''
 
     def export(self, patp):
-        Log.log(f"{patp}: Attempting to export pier")
+        print(f"{patp}: Attempting to export pier")
         c = self.urb_docker.get_container(patp)
         if c:
             if c.status == "running":
@@ -187,7 +188,7 @@ class Urbit:
             memory_file = BytesIO()
             file_path=f"{self._volume_directory}/{patp}/_data/"
 
-            Log.log(f"{patp}: Compressing pier")
+            print(f"{patp}: Compressing pier")
 
             with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, dirs, files in os.walk(file_path):
@@ -196,11 +197,11 @@ class Urbit:
                         if file != 'conn.sock':
                             zipf.write(os.path.join(root, file), arcname=os.path.join(arc_dir,file))
                         else:
-                            Log.log(f"{patp}: Skipping {file} while compressing")
+                            print(f"{patp}: Skipping {file} while compressing")
 
             memory_file.seek(0)
 
-            Log.log(f"{patp}: Pier successfully exported")
+            print(f"{patp}: Pier successfully exported")
             return send_file(memory_file, download_name=file_name, as_attachment=True)
 
     '''
@@ -273,26 +274,45 @@ class Urbit:
             running = self.urb_docker.is_running(patp)
             booted = len(self.get_code(patp)) == 27
             count = 0
-            while not (running and booted):
+            registered = self.check_services_registered(patp)
+
+            while not (running and booted and registered):
                 print(f"groundseg:urbit:{patp}:new_pier_remote_toggle: Ship not ready for remote toggle yet")
                 time.sleep(count * 2)
                 if count < 5:
                     count += 1
                 running = self.urb_docker.is_running(patp)
                 booted = len(self.get_code(patp)) == 27
+                registered = self.check_services_registered(patp)
             self.toggle_network(patp)
         except Exception as e:
             print(f"groundseg:urbit:{patp}:new_pier_remote_toggle: Failed to start new pier remote toggle thread: {e}")
 
-    '''
+    def check_services_registered(self, patp):
+        registered = False
+        try:
+            if self.app.startram.retrieve_status(1):
+                registered = True
+                service_status = self.wg.anchor_services.get(patp)
+                for svc in service_status.keys():
+                    try:
+                        if service_status[svc]['status'] != "ok":
+                            raise Exception(f"{svc} not ready")
+                    except Exception as e:
+                        raise Exception(e)
+        except Exception as e:
+            registered = False
+            print("groundseg:urbit:{patp}:check_services_registered: Error {e}")
+        return registered
+
     def fix_pokes(self, patp):
-        Log.log(f"{patp}: Pier upload fix pokes thread started")
+        print(f"{patp}: Pier upload fix pokes thread started")
         try:
             running = self.urb_docker.is_running(patp)
             booted = len(self.get_code(patp)) == 27
             count = 0
             while not (running and booted):
-                Log.log(f"{patp}: Ship not ready for pokes yet")
+                print(f"{patp}: Ship not ready for pokes yet")
                 time.sleep(count * 2)
                 if count < 5:
                     count += 1
@@ -300,77 +320,70 @@ class Urbit:
                 booted = len(self.get_code(patp)) == 27
             self.fix_acme(patp)
         except Exception as e:
-            Log.log(f"{patp}: Failed to start fix pokes thread: {e}")
-            '''
+            print(f"{patp}: Failed to start fix pokes thread: {e}")
 
-    # TODO
-    def boot_existing(self, filename, remote, fix):
+    def boot_existing(self, filename, remote, fix, create_service):
         print(f"groundseg:urbit:boot_existing Configuration - remote: {remote} - fix: {fix}")
         patp = filename.split('.')[0]
-        if True: # check patp
-        #if Utils.check_patp(patp):
-            print(patp,remote,fix)
-            print(patp,remote,fix)
-            print(patp,remote,fix)
-            print(patp,remote,fix)
-            #created = self.create_existing(patp)
-            #if created != "succeeded":
-            #    self.config_object.upload_status.pop(patp)
-            #    return created
-            #if remote:
-            #    Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
-            #if fix:
-            #    Thread(target=self.fix_pokes, args=(patp,), daemon=True).start()
-            #self.config_object.upload_status[patp] = {'status':'done'}
-            return 200
+ 
+        # Make sure patp is valid
+        if not self.cfg.check_patp(patp):
+            return "Invalid @p"
 
-        return "File is invalid"
-        '''
+        # Extract the pier
+        extracted = self.extract_pier(filename)
+        if extracted != "to-create":
+            return extracted
+
+        # Create the groundseg ship
+        created = self.create_existing(patp)
+        if created != "succeeded":
+            return created
+
+        # register services
+        if self.cfg.system.get('wgRegistered'):
+            create_service(patp, 'urbit')
+            create_service(f"s3.{patp}", 'minio')
+
+        # Au70 70ggL3z
+        if remote:
+            Thread(target=self.new_pier_remote_toggle, args=(patp,), daemon=True).start()
+
+        # f!x0rZ
+        if fix:
+            Thread(target=self.fix_pokes, args=(patp,), daemon=True).start()
+
+        return 200
 
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
         vol_dir = f'{self._volume_directory}/{patp}'
-        compressed_dir = f"{self.config_object.base_path}/uploaded/{patp}/{filename}"
+        compressed_dir = f"{self.cfg.base}/uploaded/{patp}/{filename}"
 
         try:
             # Remove directory and make new empty one
-            self.config_object.upload_status[patp] = {'status':'setup'}
-            Log.log(f"{patp}: Removing existing volume")
+            print(f"{patp}: Removing existing volume")
             shutil.rmtree(f"{vol_dir}", ignore_errors=True)
-            Log.log(f"{patp}: Creating volume directory")
+            print(f"{patp}: Creating volume directory")
             os.system(f'mkdir -p {vol_dir}/_data')
 
             # Begin extraction
-            Log.log(f"{patp}: Extracting {filename}")
+            print(f"{patp}: Extracting {filename}")
 
             # Zipfile
             if filename.endswith("zip"):
                 with zipfile.ZipFile(compressed_dir) as zip_ref:
                     total_size = sum((file.file_size for file in zip_ref.infolist()))
-                    self.config_object.upload_status[patp] = {
-                            'status':'extracting',
-                            'progress':{
-                                'current':0,
-                                'total': total_size
-                                }
-                            }
                     zip_ref.extractall(f"{vol_dir}/_data")
 
             # Tarball
             elif filename.endswith("tar.gz") or filename.endswith("tgz") or filename.endswith("tar"):
                 with tarfile.open(compressed_dir, "r") as tar_ref:
                     total_size = sum((member.size for member in tar_ref.getmembers()))
-                    self.config_object.upload_status[patp] = {
-                            'status':'extracting',
-                            'progress':{
-                                'current':0,
-                                'total': total_size
-                                }
-                            }
                     tar_ref.extractall(f"{vol_dir}/_data")
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to extract {filename}: {e}")
+            print(f"{patp}: Failed to extract {filename}: {e}")
             return "File extraction failed"
 
         # Restructure directory
@@ -385,13 +398,13 @@ class Urbit:
             # Fail if more than one .urb exists
             if len(urb_loc) > 1:
                 text = f"Multiple ships ({len(urb_loc)}) detected in pier directory"
-                Log.log(f"{patp}: {text}")
+                print(f"{patp}: {text}")
                 return text
             if len(urb_loc) < 1:
-                Log.log(f"{patp}: No ships detected in pier directory")
+                print(f"{patp}: No ships detected in pier directory")
                 return "No Urbit ship found in pier directory"
 
-            Log.log(f"{patp}: .urb subdirectory in {urb_loc[0]}")
+            print(f"{patp}: .urb subdirectory in {urb_loc[0]}")
 
             pier_dir = os.path.join(data_dir, patp)
             temp_dir = os.path.join(data_dir, 'temp_dir')
@@ -399,18 +412,18 @@ class Urbit:
 
             # check if .urb is in the correct location 
             if os.path.join(pier_dir, '.urb') != os.path.join(urb_loc[0], '.urb'):
-                Log.log(f"{patp}: .urb location incorrect!")
-                Log.log(f"{patp}: Restructuring directory structure")
+                print(f"{patp}: .urb location incorrect!")
+                print(f"{patp}: Restructuring directory structure")
 
                 # move to temp dir
-                Log.log(f"{patp}: .urb found in {urb_loc[0]}")
-                Log.log(f"{patp}: Moving to {temp_dir}")
+                print(f"{patp}: .urb found in {urb_loc[0]}")
+                print(f"{patp}: Moving to {temp_dir}")
                 if data_dir == urb_loc[0]: # .urb in root
                     # Create directory
                     os.makedirs(temp_dir, exist_ok=True)
                     # select everything in root except for pier_dir
                     items = [x for x in list(Path(urb_loc[0]).iterdir()) if str(x) != pier_dir]
-                    Log.log(f"{patp}: Items to move: {items}")
+                    print(f"{patp}: Items to move: {items}")
                     for item in items:
                         shutil.move(str(item), temp_dir)
                 else:
@@ -421,40 +434,35 @@ class Urbit:
                 if len(unused) > 0:
                     # Create directory
                     os.makedirs(unused_dir, exist_ok=True)
-                    Log.log(f"{patp}: Moving unused items to {unused_dir}")
+                    print(f"{patp}: Moving unused items to {unused_dir}")
                     for u in unused:
-                        Log.log(f"{patp}: Unused items to move: {unused}")
+                        print(f"{patp}: Unused items to move: {unused}")
                         shutil.move(u, unused_dir)
 
                 shutil.move(temp_dir, pier_dir)
 
-                Log.log(f"{patp}: Restructuring done!")
+                print(f"{patp}: Restructuring done!")
             else:
-                Log.log(f"{patp}: No restructuring needed!")
+                print(f"{patp}: No restructuring needed!")
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to restructure directory: {e}")
+            print(f"{patp}: Failed to restructure directory: {e}")
             return f"Failed to restructure {patp}"
 
         try:
-            self.config_object.upload_status[patp] = {'status':'cleaning'}
-            shutil.rmtree(f"{self.config_object.base_path}/uploaded/{patp}", ignore_errors=True)
-            Log.log(f"{patp}: Deleted {filename}")
+            shutil.rmtree(f"{self.cfg.base}/uploaded/{patp}", ignore_errors=True)
+            print(f"{patp}: Deleted {filename}")
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to remove {filename}: {e}")
+            print(f"{patp}: Failed to remove {filename}: {e}")
             return f"Failed to remove {filename}"
 
         return "to-create"
 
     # Boot the newly uploaded pier
     def create_existing(self, patp):
-        Log.log(f"{patp}: Attempting to boot new urbit ship")
+        print(f"groundseg:urbit:{patp}:create_existing Attempting to boot uploaded urbit ship")
         try:
-            if not Utils.check_patp(patp):
-                raise Exception("Invalid @p")
-
-            self.config_object.upload_status[patp] = {'status':'booting'}
             # Get open ports
             http_port, ames_port = self.get_open_urbit_ports()
 
@@ -464,19 +472,16 @@ class Urbit:
             self.save_config(patp)
 
             # Add to system.json
-            if self.add_urbit(patp):
-                # Register the service
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f"https://{endpoint}/{api_version}"
-                if self.register_urbit(patp, url):
-                    # Create the docker container
-                    return self.start(patp)
+            if self.cfg.add_system_patp(patp):
+                # Boot ship
+                return self.start(patp)
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to boot new urbit ship: {e}")
+            print(f"{patp}: Failed to boot uploaded urbit ship: {e}")
 
         return f"Failed to boot {patp}"
+
+    '''
 
    # Return all details of Urbit ID
     def get_info(self, patp):
@@ -564,7 +569,7 @@ class Urbit:
 
     # Toggle Pier on or off
     def toggle_power(self, patp):
-        Log.log(f"{patp}: Attempting to toggle container")
+        print(f"{patp}: Attempting to toggle container")
         c = self.urb_docker.get_container(patp)
         if c:
             cfg = self._urbits[patp]
@@ -573,13 +578,13 @@ class Urbit:
                 if self.stop(patp):
                     if cfg['boot_status'] != 'off':
                         self._urbits[patp]['boot_status'] = 'noboot'
-                        Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                        print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                         self.save_config(patp)
                         return 200
             else:
                 if cfg['boot_status'] != 'off':
                     self._urbits[patp]['boot_status'] = 'boot'
-                    Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                    print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                     self.save_config(patp)
                     if self.start(patp) == "succeeded":
                         return 200
@@ -643,13 +648,14 @@ class Urbit:
             code = ''
         self.save_config(patp)
         '''
-        code = ""
+        if not code:
+            code = ""
         return code
     '''
 
     # Toggle Autostart
     def toggle_autostart(self, patp):
-        Log.log(f"{patp}: Attempting to toggle autostart")
+        print(f"{patp}: Attempting to toggle autostart")
         c = self.urb_docker.get_container(patp)
         if c:
             try:
@@ -664,18 +670,18 @@ class Urbit:
                     self._urbits[patp]['boot_status'] = 'off'
 
                 self.save_config(patp)
-                Log.log(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
+                print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                 self.save_config(patp)
                 return 200
 
             except Exception as e:
-                Log.log(f"{patp}: Unable to toggle autostart: {e}")
+                print(f"{patp}: Unable to toggle autostart: {e}")
 
         return 400
 
     def toggle_devmode(self, on, patp):
-        Log.log(f"{patp}: Attempting to toggle developer mode")
-        Log.log(f"{patp}: Dev mode: {self._urbits[patp]['dev_mode']} -> {on}")
+        print(f"{patp}: Attempting to toggle developer mode")
+        print(f"{patp}: Dev mode: {self._urbits[patp]['dev_mode']} -> {on}")
         try:
             self._urbits[patp]['dev_mode'] = on
             if self.urb_docker.remove_container(patp):
@@ -692,7 +698,7 @@ class Urbit:
                         raise Exception("start returned {x}")
                 raise Exception(f"created: {created}")
         except Exception as e:
-            Log.log(f"{patp}: Failed to toggle dev mode: {e}")
+            print(f"{patp}: Failed to toggle dev mode: {e}")
 
         return 400
     '''
@@ -737,7 +743,7 @@ class Urbit:
     '''
 
     def set_loom(self, patp, size):
-        Log.log(f"{patp}: Attempting to set loom size")
+        print(f"{patp}: Attempting to set loom size")
         c = self.urb_docker.get_container(patp)
         if c:
             try:
@@ -749,7 +755,7 @@ class Urbit:
                 self.urb_docker.remove_container(patp)
                 self._urbits[patp]['loom_size'] = size
                 self.save_config(patp)
-                Log.log(f"{patp}: Loom size changed: {old_loom} -> {self._urbits[patp]['loom_size']}")
+                print(f"{patp}: Loom size changed: {old_loom} -> {self._urbits[patp]['loom_size']}")
 
                 created = self.urb_docker.start(self._urbits[patp],
                                                 self.config_object._arch,
@@ -761,12 +767,12 @@ class Urbit:
                 return 200
 
             except Exception as e:
-                Log.log(f"{patp}: Unable to set loom size: {e}")
+                print(f"{patp}: Unable to set loom size: {e}")
 
         return 400
 
     def schedule_meld(self, patp, freq, hour, minute):
-        Log.log(f"{patp}: Attempting to schedule meld frequency")
+        print(f"{patp}: Attempting to schedule meld frequency")
         try:
             old_sched = self._urbits[patp]['meld_frequency']
             current_meld_next = datetime.fromtimestamp(int(self._urbits[patp]['meld_next']))
@@ -795,21 +801,21 @@ class Urbit:
             else:
                 days = "day"
 
-            Log.log(f"{patp}: Meld frequency changed: {old_sched} Days -> {self._urbits[patp]['meld_frequency']} {days}")
+            print(f"{patp}: Meld frequency changed: {old_sched} Days -> {self._urbits[patp]['meld_frequency']} {days}")
             self.save_config(patp)
 
             return 200
 
         except Exception as e:
-            Log.log(f"{patp}: Unable to schedule meld: {e}")
+            print(f"{patp}: Unable to schedule meld: {e}")
 
         return 400
 
     def toggle_meld(self, patp):
-        Log.log(f"{patp}: Attempting to toggle automatic meld")
+        print(f"{patp}: Attempting to toggle automatic meld")
         try:
             self._urbits[patp]['meld_schedule'] = not self._urbits[patp]['meld_schedule']
-            Log.log(f"{patp}: Automatic meld changed: {not self._urbits[patp]['meld_schedule']} -> {self._urbits[patp]['meld_schedule']}")
+            print(f"{patp}: Automatic meld changed: {not self._urbits[patp]['meld_schedule']} -> {self._urbits[patp]['meld_schedule']}")
             self.save_config(patp)
 
             try:
@@ -821,7 +827,7 @@ class Urbit:
                 pass
 
         except Exception as e:
-            Log.log(f"{patp}: Unable to toggle automatic meld: {e}")
+            print(f"{patp}: Unable to toggle automatic meld: {e}")
 
         return 200
 
@@ -835,7 +841,7 @@ class Urbit:
         return 400
 
     def send_pack(self, patp, hoon, lens_addr):
-        Log.log(f"{patp}: Attempting to send |pack")
+        print(f"{patp}: Attempting to send |pack")
         # Naming the hoon file
         name = "pack"
         hoon_file = f"{name}.hoon"
@@ -857,7 +863,7 @@ class Urbit:
                 command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
                 pack = self.urb_docker.exec(patp, command)
             except Exception as e:
-                Log.log(f"{patp}: Failed to send |pack: {e}")
+                print(f"{patp}: Failed to send |pack: {e}")
                 # Set pack to false when error
                 pack = False
 
@@ -869,7 +875,7 @@ class Urbit:
             except:
                 pass
 
-            Log.log(f"{patp}: |pack sent successfully")
+            print(f"{patp}: |pack sent successfully")
             self.save_config(patp)
             return True
 
@@ -877,7 +883,7 @@ class Urbit:
 
 
     def send_meld(self, patp, hoon, lens_addr):
-        Log.log(f"{patp}: Attempting to send |meld")
+        print(f"{patp}: Attempting to send |meld")
         # Naming the hoon file
         name = "meld"
         hoon_file = f"{name}.hoon"
@@ -899,7 +905,7 @@ class Urbit:
                 command = f'curl -s -X POST -H "Content-Type: application/json" -d @pack.json {lens_addr}'
                 meld = self.urb_docker.exec(patp, command)
             except Exception:
-                Log.log(f"{patp}: Failed to send |meld")
+                print(f"{patp}: Failed to send |meld")
                 # Set meld to false when error
                 meld = False
 
@@ -925,8 +931,8 @@ class Urbit:
             else:
                 days = "day"
 
-            Log.log(f"{patp}: |meld sent successfully")
-            Log.log(f"{patp}: Next meld in {self._urbits[patp]['meld_frequency']} {days}")
+            print(f"{patp}: |meld sent successfully")
+            print(f"{patp}: Next meld in {self._urbits[patp]['meld_frequency']} {days}")
             self.save_config(patp)
             return True
         return False
@@ -946,7 +952,7 @@ class Urbit:
     # Register Wireguard for Urbit
     def register_urbit(self, patp, url):
         if self.config['wgRegistered']:
-            Log.log(f"{patp}: Attempting to register anchor services")
+            print(f"{patp}: Attempting to register anchor services")
             if self.wg.get_status(url):
                 self.wg.update_wg_config(self.wg.anchor_data['conf'])
 
@@ -975,12 +981,12 @@ class Urbit:
  
                 # One or more of the urbit services is not registered
                 if not (urbit_web and urbit_ames):
-                    Log.log(f"{patp}: Registering ship")
+                    print(f"{patp}: Registering ship")
                     self.wg.register_service(f'{patp}', 'urbit', url)
  
                 # One or more of the minio services is not registered
                 if not (minio_svc and minio_console and minio_bucket):
-                    Log.log(f"{patp}: Registering MinIO")
+                    print(f"{patp}: Registering MinIO")
                     self.wg.register_service(f's3.{patp}', 'minio', url)
 
             svc_url = None
@@ -991,11 +997,11 @@ class Urbit:
             tries = 1
 
             while None in [svc_url,http_port,ames_port,s3_port,console_port]:
-                Log.log(f"{patp}: Checking anchor config if services are ready")
+                print(f"{patp}: Checking anchor config if services are ready")
                 if self.wg.get_status(url):
                     self.wg.update_wg_config(self.wg.anchor_data['conf'])
 
-                Log.log(f"Anchor: {self.wg.anchor_data['subdomains']}")
+                print(f"Anchor: {self.wg.anchor_data['subdomains']}")
                 pub_url = '.'.join(self.config['endpointUrl'].split('.')[1:])
 
                 for ep in self.wg.anchor_data['subdomains']:
@@ -1011,7 +1017,7 @@ class Urbit:
                             console_port = ep['port']
                     else:
                         t = tries * 2
-                        Log.log(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
+                        print(f"Anchor: {ep['svc_type']} not ready. Trying again in {t} seconds.")
                         time.sleep(t)
                         if tries <= 15:
                             tries = tries + 1
@@ -1021,7 +1027,7 @@ class Urbit:
         return True
 
     def set_wireguard_network(self, patp, url, http_port, ames_port, s3_port, console_port):
-        Log.log(f"{patp}: Setting wireguard information")
+        print(f"{patp}: Setting wireguard information")
         try:
             self._urbits[patp]['wg_url'] = url
             self._urbits[patp]['wg_http_port'] = http_port
@@ -1030,7 +1036,7 @@ class Urbit:
             self._urbits[patp]['wg_console_port'] = console_port
             return self.save_config(patp)
         except Exception:
-            Log.log(f"{patp}: Failed to set wireguard information")
+            print(f"{patp}: Failed to set wireguard information")
             return False
 
     # Update/Set Urbit S3 Endpoint
@@ -1040,9 +1046,10 @@ class Urbit:
                 return self.set_minio_endpoint(patp, endpoint, acc, secret, bucket, lens_port)
 
             except Exception as e:
-                Log.log(f"{patp}: Failed to set MinIO endpoint: {e}")
+                print(f"{patp}: Failed to set MinIO endpoint: {e}")
 
         return 400
+    '''
 
     def fix_acme(self, patp):
         lens_addr = self.get_loopback_addr(patp)
@@ -1057,7 +1064,7 @@ class Urbit:
             os.remove(f'{self._volume_directory}/{patp}/_data/acmepass.json')
 
             if res.output.decode('utf-8').strip() == '">="':
-                Log.log(f"{patp}: acme pass command sent successfully")
+                print(f"{patp}: acme pass command sent successfully")
                 i_data = {"source": {"dojo": "%init"}, "sink": {"app": "acme"}}
                 with open(f'{self._volume_directory}/{patp}/_data/acmeinit.json','w') as f :
                     json.dump(i_data, f)
@@ -1068,16 +1075,15 @@ class Urbit:
                 os.remove(f'{self._volume_directory}/{patp}/_data/acmeinit.json')
 
                 if res.output.decode('utf-8').strip() == '">="':
-                    Log.log(f"{patp}: acme init command sent successfully")
+                    print(f"{patp}: acme init command sent successfully")
                 else:
-                    Log.log(f"{patp}: Failed to send acme init command")
+                    print(f"{patp}: Failed to send acme init command")
             else:
-                Log.log(f"{patp}: Failed to send acme pass command")
+                print(f"{patp}: Failed to send acme pass command")
 
         except Exception as e:
-            Log.log(f"{patp}: Failed to clear acme: {e}")
+            print(f"{patp}: Failed to clear acme: {e}")
 
-    '''
     def update_wireguard_network(self):
         # get new
         new = self.wg.anchor_services.copy()
@@ -1088,69 +1094,72 @@ class Urbit:
             changed = False
             cfg = piers[patp]
             services = new.get(patp)
-            for svc_type in services.keys():
-                service = services.get(svc_type)
-                url = service.get('url')
-                port = service.get('port')
-                alias = service.get('alias')
+            if services:
+                for svc_type in services.keys():
+                    service = services.get(svc_type)
+                    url = service.get('url')
+                    port = service.get('port')
+                    alias = service.get('alias')
 
-                if svc_type == 'urbit-web':
-                    if alias == "null":
-                        alias = ""
-                    if cfg['wg_url'] != url:
-                        print(f"{patp}: Wireguard URL changed from {cfg['wg_url']} to {url}")
-                        cfg['wg_url'] = url
-                        changed = True
-                    if cfg['wg_http_port'] != port:
-                        print(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {port}")
-                        cfg['wg_http_port'] = port
-                        changed = True
-                    if cfg['custom_urbit_web'] != alias:
-                        print(f"{patp}: Urbit Web Custom URL changed from {cfg['custom_urbit_web']} to {alias}")
-                        cfg['custom_urbit_web'] = alias
-                        changed = True
+                    if svc_type == 'urbit-web':
+                        if alias == "null":
+                            alias = ""
+                        if cfg['wg_url'] != url:
+                            print(f"{patp}: Wireguard URL changed from {cfg['wg_url']} to {url}")
+                            cfg['wg_url'] = url
+                            changed = True
+                        if cfg['wg_http_port'] != port:
+                            print(f"{patp}: Wireguard HTTP Port changed from {cfg['wg_http_port']} to {port}")
+                            cfg['wg_http_port'] = port
+                            changed = True
+                        if cfg['custom_urbit_web'] != alias:
+                            print(f"{patp}: Urbit Web Custom URL changed from {cfg['custom_urbit_web']} to {alias}")
+                            cfg['custom_urbit_web'] = alias
+                            changed = True
 
-                if svc_type == 'urbit-ames':
-                    if cfg['wg_ames_port'] != port:
-                        print(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {port}")
-                        cfg['wg_ames_port'] = port
-                        changed = True
+                    if svc_type == 'urbit-ames':
+                        if cfg['wg_ames_port'] != port:
+                            print(f"{patp}: Wireguard Ames Port changed from {cfg['wg_ames_port']} to {port}")
+                            cfg['wg_ames_port'] = port
+                            changed = True
 
-                if svc_type == 'minio-bucket':
-                    if cfg['wg_s3_port'] != port:
-                        print(f"{patp}: Wireguard S3 Port changed from {cfg['wg_s3_port']} to {port}")
-                        cfg['wg_s3_port'] = port
-                        changed = True
+                    if svc_type == 'minio-bucket':
+                        if cfg['wg_s3_port'] != port:
+                            print(f"{patp}: Wireguard S3 Port changed from {cfg['wg_s3_port']} to {port}")
+                            cfg['wg_s3_port'] = port
+                            changed = True
 
-                if svc_type == 'minio-console':
-                    if cfg['wg_console_port'] != port:
-                        print(f"{patp}: Wireguard Console Port changed from {cfg['wg_console_port']} to {port}")
-                        cfg['wg_console_port'] = port
-                        changed = True
+                    if svc_type == 'minio-console':
+                        if cfg['wg_console_port'] != port:
+                            print(f"{patp}: Wireguard Console Port changed from {cfg['wg_console_port']} to {port}")
+                            cfg['wg_console_port'] = port
+                            changed = True
 
-            try:
-                if changed:
-                    self._urbits[patp] = cfg
-                    self.save_config(patp)
+                try:
+                    if changed:
+                        self._urbits[patp] = cfg
+                        self.save_config(patp)
 
-                    if cfg['network'] == "wireguard" and self.urb_docker.is_running(patp):
-                            # remove minio container
-                            self.minio.minio_docker.remove_container(f"minio_{patp}")
-                            # remove urbit container
-                            if self.urb_docker.remove_container(patp):
-                                # start minio
-                                # start urbit
-                                created = self.urb_docker.start(self._urbits[patp],
-                                                                self.cfg.arch,
-                                                                self._volume_directory
-                                                                )
-                                if created == "succeeded":
-                                    self.start(patp)
-                                print(f"{patp}: Wireguard network settings updated!")
-                else:
-                    print(f"{patp}: Nothing to change!")
-            except Exception as e:
-                print(f"{patp}: Unable to update Wireguard network: {e}")
+                        if cfg['network'] == "wireguard" and self.urb_docker.is_running(patp):
+                                # remove minio container
+                                self.minio.minio_docker.remove_container(f"minio_{patp}")
+                                # remove urbit container
+                                if self.urb_docker.remove_container(patp):
+                                    # start minio
+                                    # start urbit
+                                    created = self.urb_docker.start(self._urbits[patp],
+                                                                    self.cfg.arch,
+                                                                    self._volume_directory
+                                                                    )
+                                    if created == "succeeded":
+                                        self.start(patp)
+                                    print(f"{patp}: Wireguard network settings updated!")
+                    else:
+                        print(f"{patp}: Nothing to change!")
+                except Exception as e:
+                    print(f"{patp}: Unable to update Wireguard network: {e}")
+            else:
+                print(f"{patp}: No services found")
 
     '''
     # Custom Domain
@@ -1163,7 +1172,7 @@ class Urbit:
         # Urbit URL
         if svc == 'urbit-web':
             if op == 'create':
-                Log.log(f"{patp}: Attempting to register custom domain for {svc}")
+                print(f"{patp}: Attempting to register custom domain for {svc}")
                 if self.dns_record(patp, cfg['wg_url'], alias):
                     if self.wg.handle_alias(patp, alias, 'post'):
                         self._urbits[patp]['custom_urbit_web'] = alias
@@ -1171,7 +1180,7 @@ class Urbit:
                         if self.save_config(patp):
                             return 200
             elif op == 'delete':
-                Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
+                print(f"{patp}: Attempting to delete custom domain for {svc}")
                 if self.wg.handle_alias(patp, alias, 'delete'):
                     self._urbits[patp]['custom_urbit_web'] = ''
                     self._urbits[patp]['show_urbit_web'] = 'default'
@@ -1181,7 +1190,7 @@ class Urbit:
         # MinIO URL
         if svc == 'minio':
             if op == 'create':
-                Log.log(f"{patp}: Attempting to register custom domain for {svc}")
+                print(f"{patp}: Attempting to register custom domain for {svc}")
                 if self.dns_record(patp, f"s3.{cfg['wg_url']}", alias):
                     if self.wg.handle_alias(f"s3.{patp}", alias, 'post'):
                         self._urbits[patp]['custom_s3_web'] = alias
@@ -1189,7 +1198,7 @@ class Urbit:
                             return 200
 
             elif op == 'delete':
-                Log.log(f"{patp}: Attempting to delete custom domain for {svc}")
+                print(f"{patp}: Attempting to delete custom domain for {svc}")
                 if self.wg.handle_alias(f"s3.{patp}", alias, 'delete'):
                     self._urbits[patp]['custom_s3_web'] = ''
                     if self.save_config(patp):
@@ -1199,32 +1208,32 @@ class Urbit:
     def dns_record(self, patp, real, mask):
         count = 0
         while count < 3:
-            Log.log(f"{patp}: Checking DNS records")
+            print(f"{patp}: Checking DNS records")
             ori = False
             alias = False
             try:
                 ori = socket.getaddrinfo(real, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
-                Log.log(f"{patp}: {real} is {ori}")
+                print(f"{patp}: {real} is {ori}")
             except:
-                Log.log(f"{patp}: {real} has no record")
+                print(f"{patp}: {real} has no record")
 
             try:
                 alias = socket.getaddrinfo(mask, None, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
-                Log.log(f"{patp}: {mask} is {alias}")
+                print(f"{patp}: {mask} is {alias}")
             except:
-                Log.log(f"{patp}: {mask} has no record")
+                print(f"{patp}: {mask} has no record")
 
             if ori and alias:
                 if ori == alias:
-                    Log.log(f"{patp}: DNS records match")
+                    print(f"{patp}: DNS records match")
                     return True
 
             count += 1
             time = count * 2
-            Log.log(f"{patp}: Checking DNS record again in {time} seconds")
+            print(f"{patp}: Checking DNS record again in {time} seconds")
             sleep(time)
 
-        Log.log(f"{patp}: DNS records do not match or does not exist")
+        print(f"{patp}: DNS records do not match or does not exist")
         return False
 
     # Swap Display Url
@@ -1237,11 +1246,11 @@ class Urbit:
             else:
                 self._urbits[patp]['show_urbit_web'] = 'alias'
 
-            Log.log(f"{patp}: Urbit web display URL changed: {old} -> {self._urbits[patp]['show_urbit_web']}")
+            print(f"{patp}: Urbit web display URL changed: {old} -> {self._urbits[patp]['show_urbit_web']}")
             self.save_config(patp)
             return 200
         except Exception as e:
-            Log.log(f"{patp}: Failed to change urbit web display URL: {e}")
+            print(f"{patp}: Failed to change urbit web display URL: {e}")
         return 400
 
 

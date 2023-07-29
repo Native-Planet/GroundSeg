@@ -347,3 +347,17 @@ export const submitReport = (contact,description,ships) => {
   }
   send(payload)
 }
+
+//
+// Logs
+//
+
+// Stream the result of `wg show`
+export const openWireguardLog = () => {
+  let payload = {
+    "type":"container-logs",
+    "action":"open",
+    "container":"wireguard"
+  }
+  send(payload)
+}

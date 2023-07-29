@@ -59,6 +59,26 @@ async def main():
     base_path = "/opt/nativeplanet/groundseg"
     cfg = Config(base_path,dev)
 
+    net = cfg.net_check()
+    print(net)
+    # No internet
+    if not net:
+        # not npbox
+        if not cfg.official_device():
+            # Forever loop:
+            from time import sleep
+            while True:
+                print("in loop",net)
+                if not net:
+                    sleep(3)
+                    net = cfg.net_check()
+                else:
+                    break
+        else:
+            # C2C here
+            print("c2c mode")
+            exit()
+
     # Version Server
     version_server = VersionServer(cfg,dev)
 
@@ -94,7 +114,6 @@ async def main():
     # They're all infinite loops except for those
     # specified
     await asyncio.gather(
-            cfg.net_check(), # not loop
             version_server.check(),
             binary.run(),
             linux.run(),

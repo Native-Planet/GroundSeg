@@ -54,7 +54,7 @@ class GroundSeg:
             # MinIO - s3 bucket for individual ships
             # Urbit - Urbit ship. Also handles Lick side permissions (See authorization)
             self.minio = MinIO(self.cfg, self.wireguard)
-            self.urbit = Urbit(self.cfg, self.wireguard, self.minio)
+            self.urbit = Urbit(self, self.cfg, self.wireguard, self.minio)
 
             # StarTram API
             self.startram = StarTramAPI(self.cfg,self.wireguard,self.urbit)
@@ -170,6 +170,13 @@ class GroundSeg:
                                 print("groundseg:process:system:power:shutdown: Dev mode, skipping shutdown")
                             else:
                                 os.system("shutdown -h now")
+                        return
+
+                if req_type == "container-logs":
+                    if action == "open":
+                        status = self.wireguard.is_stream_allowed()
+                        if status == "closed":
+                            self.wireguard.toggle_log_stream()
                         return
 
                 if req_type == "startram":

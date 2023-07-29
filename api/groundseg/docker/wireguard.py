@@ -191,3 +191,14 @@ class WireguardDocker:
         if not c:
             return False
         return c.logs()
+
+    def wg_show(self, name):
+        c = self.get_container(name)
+        if c:
+            if c.status == "running":
+                try:
+                    res = c.exec_run("wg show")
+                    return res
+                except Exception as e:
+                    print(f"{name}: Unable to exec {command}: {e}")
+        return False

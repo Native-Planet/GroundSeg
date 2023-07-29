@@ -136,7 +136,10 @@ class UrbitDocker:
 
     def mode_mismatch(self, patp, config):
         print(f"{patp}: Checking Dev Mode")
-        res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+        try:
+            res = self.exec(patp, "tmux list-panes").output.decode("utf-8").strip()
+        except:
+            res = ''
         print(f"{patp}: Developer Mode in settings: {config['dev_mode']}")
         print(f"{patp}: Developer Mode in container: {'active' in res}")
         return config['dev_mode'] != ('active' in res)

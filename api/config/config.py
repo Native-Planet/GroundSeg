@@ -158,6 +158,10 @@ class Config:
         print("config:config Loaded system.json")
         return cfg
 
+    # Get the device mode
+    def official_device(self):
+        return os.path.isfile(f"{self.base}/nativeplanet")
+
     # Makes sure update interval setting isn't below 1 hour
     def check_update_interval(self, cfg):
         branch = cfg.get('updateBranch')
@@ -180,6 +184,7 @@ class Config:
         self.system['sessions'] = {}
         self.system = self.fix_sessions(self.system)
         self.save_config()
+
     # Make sure sessions is correctly formatted
     def fix_sessions(self,cfg):
         try:
@@ -224,19 +229,18 @@ class Config:
             return True
 
     # Check internet access
-    async def net_check(self):
+    def net_check(self):
         print("config:config Checking internet access")
+        self.internet = False
         try:
             socket.setdefaulttimeout(3)
             host, port = self.system.get('netCheck').split(":")
             socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, int(port)))
             self.internet = True
             print("config:config Internet connection is available!")
-            return
         except Exception as e:
             print(f"config:config Check internet access error: {e}")
-        self.internet = False
-        return
+        return self.internet
 
     # Create new password
     def create_password(self, pwd):

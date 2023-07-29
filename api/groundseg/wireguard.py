@@ -9,6 +9,9 @@ from groundseg.docker.wireguard import WireguardDocker
 
 class Wireguard:
 
+    # Logs are allowed to be streamed?
+    allow_logs_stream = False
+    #
     # StarTram API headers, to be moved to its own class
     _headers = {"Content-Type": "application/json"}
     # The data in wireguard.json
@@ -124,8 +127,6 @@ class Wireguard:
 
     # Takes list of subdomains from startram and returns a dict
     def get_subdomains(self):
-        import time
-        start = time.time()
         res = {}
         patp = ''
         subs = self.anchor_data.get('subdomains')
@@ -145,10 +146,8 @@ class Wireguard:
                     "alias":sub.get('alias'),
                     }
             self.anchor_services = res
-        end = time.time()
-        elapsed = end - start
-        print(elapsed)
         return True
+
     '''
 def restart(self, urb, minio):
 try:
@@ -218,11 +217,28 @@ self.anchor_data = {}
 self.get_regions(f"https://{url}/{api_version}")
 return 200
 return 400
-
-# Container logs
-def logs(self, name):
-return self.wg_docker.full_logs(name)
     '''
+
+    # Get log stream status
+    def is_stream_allowed(self):
+        if self.allow_logs_stream:
+            return "open"
+        else:
+            return "closed"
+
+    def toggle_log_stream(self):
+        self.allow_logs_stream = not self.allow_logs_stream
+
+    # Container logs
+    def logs(self):
+        logs = []
+        if self.allow_logs_stream:
+            name = self.data.get('wireguard_name')
+            try:
+                logs = self.wg_docker.wg_show(name).output.decode("utf-8").split("\n")
+            except Exception as e:
+                print(e)
+        return logs
 
     # Load wireguard.json
     def load_config(self):

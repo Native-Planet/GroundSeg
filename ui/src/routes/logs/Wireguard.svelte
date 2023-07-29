@@ -1,12 +1,27 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
+  import { onMount, onDestroy } from 'svelte'
+  import { connected, structure, openWireguardLog } from '$lib/stores/websocket'
   export let wide
 
-  $: logData = ($structure?.logs?.wireguard) || ["empty"]
+  $: wgLogs =($structure?.logs?.containers?.wireguard) || {}
+  $: stream = (wgLogs?.stream) || "open"
+  $: logs = (wgLogs?.logs) || []
+
+  const openLog = () => {
+    if ($connected && (stream == "closed")) {
+      openWireguardLog()
+      }
+    setTimeout(()=>openLog(),1000)
+  }
+  onMount(()=>openLog())
+
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
-  {#each logData as ln}
+  {#if logs.length < 1}
+    <pre>empty</pre>
+  {/if}
+  {#each logs as ln}
     <pre>{ln}</pre>
   {/each}
 </div>

@@ -56,11 +56,13 @@
       error: onError,
   })})
 
+  $: registered = ($structure?.profile?.startram?.registered) || false
+  $: running = ($structure?.profile?.startram?.running) || false
+
   const setName = () => {
     let remote = remoteCheck ? "remote" :"local"
     let fixer = fixCheck ? "yes" : "no"
-    if (false) {
-    //if (register == "yes" && container == "running") {
+    if (registered && running) {
       return "pier-" + remote + "-" + fixer + "-" + secret
     } else {
     return "pier-local-" + fixer + "-" + secret

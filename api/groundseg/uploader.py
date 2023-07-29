@@ -67,24 +67,15 @@ class Uploader:
 
         if current_chunk + 1 == total_chunks:
             # This was the last chunk, the file should be complete and the size we expect
-            if self.last_chunk(patp, on_disk, total_size):
-                return self.app.urbit.boot_existing(filename, remote, fix)
+            if on_disk != total_size:
+                print(f"{patp}: File size mismatched")
+                return "File size mismatched"
+            else:
+                return self.app.urbit.boot_existing(filename, remote, fix, self.app.startram.create_service)
         else:
             # Not final chunk yet
             return 200
-
         return 400
-
-    def last_chunk(self,patp, on_disk, total_size):
-        if on_disk != total_size:
-            print(f"uploader:last_chunk:{patp}: File size mismatched")
-            self.status = "failed"
-            return "File size mismatched"
-        else:
-            print(f"uploader:last_chunk:{patp}: Upload complete")
-            print("to booooootttttttt")
-            self.status = "process"
-            return True
 
     def handle_configuration(self,req):
         error = True
