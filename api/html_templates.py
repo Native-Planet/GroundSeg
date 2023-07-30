@@ -13,12 +13,14 @@ head = """\n
           margin: 0;
           width: 100vw;
           height: 100vh;
+          /*
           background: url("/static/background.png") no-repeat center center fixed;
           -webkit-background-size: contain;
           -moz-background-size: contain;
           -o-background-size: contain;
           background-size: contain;
           background-color: #040404;
+          */
         }
         .card::-webkit-scrollbar {display: none;}
         .card {
@@ -163,25 +165,18 @@ head = """\n
   """
 
 def home_page(ssids):
-    formatted_ssids = ''.join(list(map(lambda z: f'<a class="ssid" href="/connect/{z}">{z}</a><div class="sep"></div>', ssids)))
+    formatted_ssids = ''.join(list(map(lambda z: f'<div><a href="/connect/{z}">{z}</a></div>', ssids)))
 
     body = f"""\n
 {head}
 <body>
-<div class="card">
-  <!-- Header -->
-  <div class="logo">
-    <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
-    <span class="text">Select a Wireless Network</span>
-    <form action="/" method="post">
-      <button class="rescan" type="submit">Restart</button>
-    </form>
-  </div>
+  <form action="/" method="post">
+    <button type="submit">Restart</button>
+  </form>
+  <div>CONNECT TO NETWORK</div>
+  <div>Choose a Wi-Fi network</div>
   <!-- List of SSIDs -->
-  <div class="title">Available Networks</div>
-  <div class="sep"></div>
   {formatted_ssids}
-</div>
 </body>
 """
 
@@ -192,21 +187,16 @@ def connect_page(ssid):
     body = f"""\n
 {head}
 <body>
-<div class="card">
   <!-- Header -->
-  <div class="logo" >
-    <a href="/"><img src="/static/nplogo.svg" alt="Native Planet Logo" /></a>
-    <span class="text">{ssid}</span>
-    <form action="/" method="post">
-      <button class="rescan" type="submit">Restart</button>
-    </form>
-  </div>
+  <form action="/" method="post">
+    <button type="submit">Restart</button>
+  </form>
+  <div>{ssid}</div>
   <form method="post">
     <input type="text" placeholder="Password for {ssid}" name="password" />
-    <a class="back" href="/">Back</a>
-    <button class="connect" type="submit">Connect</button>
+    <a href="/">Back</a>
+    <button type="submit">Connect</button>
   </form>
-</div>
 </body>
 """
     
