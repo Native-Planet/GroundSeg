@@ -13,7 +13,19 @@ def wifi_connect(ssid, pwd):
     try:
         nmcli.device.wifi_connect(ssid, pwd)
         print(f"WiFi: Connected to: {ssid}")
-        return True
     except Exception as e:
         print(f"WiFi: Failed to connect to network: {e}")
-        return False
+
+def toggle_wifi():
+    try:
+        if nmcli.radio.wifi():
+            nmcli.radio.wifi_off()
+            print(f"Wifi: Turned WiFi Off")
+        else:
+            nmcli.radio.wifi_on()
+            print(f"Wifi: Turned WiFi On")
+            return "on"
+    except Exception as e:
+        print(f"Wifi: Can't toggle WiFi status: {e}")
+    return "off"
+

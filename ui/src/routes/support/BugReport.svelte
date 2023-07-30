@@ -1,12 +1,41 @@
 <script>
   import { structure, submitReport } from '$lib/stores/websocket'
+  import PierCheck from './PierCheck.svelte'
 
   let contact = ''
   let description = ''
-  let ships = []
+
+  let bugChecker = []
+  let selectAll
+  let pierLogs = []
 
   $: urbits = ($structure?.urbits) || {}
   $: urbitKeys = Object.keys(urbits)
+
+  const forceSet = b => {
+    for (let i = 0; i < bugChecker.length; i++) {
+      bugChecker[i].forceSet(b)
+    }
+  }
+
+  const addPier = e => {
+    const { name, check } = e.detail
+    if (check) {
+      if (!pierLogs.includes(name)) {
+        pierLogs.push(name)
+      }
+    } else {
+      const index = pierLogs.indexOf(name);
+      if (index > -1) {
+        pierLogs.splice(index, 1);
+      }
+    }
+  }
+
+  const handleCheckAll = e => {
+    forceSet(e.detail.check)
+  }
+
 
 </script>
 
@@ -38,19 +67,19 @@
       <div class="logs">
         <div class="header">Send Pier Logs (optional)</div>
         <div class="check-flex">
-          {#each urbitKeys as p}
-            <div class="check-wrapper">
-              <div class="checkbox"></div>
-              <div class="patp">{p}</div>
-            </div>
+          {#each urbitKeys as p, i}
+            <PierCheck bind:this={bugChecker[i]} name={p} on:update={addPier} submitting={false}/>
           {/each}
+          {#if urbitKeys.length > 1}
+            <PierCheck bind:this={selectAll} on:update={handleCheckAll} checkAll={true} submitting={false} />
+          {/if}
         </div>
       </div>
       <div class="buttons">
         <div class="spacer"></div>
         <button
           class="submit"
-          on:click={()=>submitReport(contact,description,ships)}
+          on:click={()=>submitReport(contact,description,pierLogs)}
           disabled={(contact.length < 1) || (description.length < 1)}>
           Submit Report</button>
       </div>
@@ -133,19 +162,6 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 10px;
-  }
-  .check-wrapper {
-    flex: 1 0 calc(50% - 12px);
-    font-family: var(--title-font);
-    font-size: 12px;
-    display: flex;
-    gap: 8px;
-  }
-  .checkbox {
-    height: 16px;
-    width: 16px;
-    border: 1px solid var(--btn-secondary);
-    border-radius: 6px;
   }
   ul {
     font-size: 12px;

@@ -15,6 +15,7 @@ from updater.binary import BinUpdate
 
 # System
 from system.monitor import SysMonitor
+from system.wifi import WifiNetwork
 
 # GroundSeg
 from groundseg.groundseg import GroundSeg
@@ -95,6 +96,9 @@ async def main():
     # System Monitor
     mon = SysMonitor(cfg,dev)
 
+    # Wifi Network Information
+    wifi = WifiNetwork(cfg)
+
     # Start GroundSeg
     groundseg = GroundSeg(cfg,dev)
 
@@ -125,7 +129,9 @@ async def main():
             mon.cpu(),
             mon.temp(),
             mon.disk(),
-            #http.run(),
+            wifi.get_wifi_status(),
+            wifi.get_active_wifi(),
+            wifi.get_wifi_list(),
             groundseg.loader(), # not loop, initializes the docker classes
             groundseg.startram(),
             #groundseg.melder(),

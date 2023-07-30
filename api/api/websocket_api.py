@@ -109,7 +109,7 @@ class WS:
                         await b.broadcast()
             except Exception as e:
                 print(f"websocket_api:broadcast: {e}")
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.25)
 
     # We start the websocket server, using handler() to handle requests
     async def run(self):

@@ -10,6 +10,9 @@ from groundseg.linux import UpdateLinux
 from groundseg.wireguard import Wireguard
 from groundseg.minio import MinIO
 from groundseg.urbit import Urbit
+from groundseg.bug_report import BugReport
+
+from lib.wifi import toggle_wifi, wifi_connect
 
 class GroundSeg:
     def __init__(self, cfg, dev):
@@ -172,6 +175,17 @@ class GroundSeg:
                                 os.system("shutdown -h now")
                         return
 
+                    if action == "wifi-toggle":
+                        res = toggle_wifi()
+                        self.cfg.set_wifi_status(res == "on")
+                        return
+
+                    if action == "wifi-connect":
+                        ssid = payload.get('ssid')
+                        password = payload.get('password')
+                        wifi_connect(ssid,password)
+                        return
+
                 if req_type == "container-logs":
                     if action == "open":
                         status = self.wireguard.is_stream_allowed()
@@ -283,12 +297,13 @@ class GroundSeg:
                         contact = payload.get('contact')
                         description = payload.get('description')
                         ships = payload.get('ships')
-                        print("DO SOMETHING")
-                        print("BUG REPORT")
-                        print(f"CONTACT: {contact}")
-                        print(f"DESC: {description}")
-                        print(f"SHIPS: {ships}")
-                        print("DO SOMETHING")
+                        BugReport.submit_report(
+                                contact,
+                                description,
+                                ships,
+                                self.cfg.base,
+                                self.cfg.system.get('wgRegistered')
+                                )
                         return
 
             # Execute request

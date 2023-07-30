@@ -26,6 +26,11 @@ class Broadcaster:
                         },
                     "updates": {
                         "linux":self.cfg.linux_update_info
+                        },
+                    "wifi": {
+                        "status": self.cfg._wifi_enabled,
+                        "active": self.cfg._active_network,
+                        "networks": self.cfg._wifi_networks
                         }
                     },
                 "profile":{

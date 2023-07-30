@@ -60,6 +60,8 @@ export const handleMessage = data => {
   if (data.type === "activity") {
     handleActivity(data)
   } else {
+    let now = new Date()
+    console.log(now)
     console.log(data)
     structure.set(data)
   }
@@ -214,6 +216,25 @@ export const setSwap = val => {
   }
   send(payload)
 }
+
+export const toggleWifi = () => {
+  let payload = {
+    "type":"system",
+    "action":"wifi-toggle"
+  }
+  send(payload)
+}
+
+export const connectWifi = (ssid,pwd) => {
+  let payload = {
+    "type":"system",
+    "action":"wifi-connect",
+    "ssid":ssid,
+    "password":pwd
+  }
+  send(payload)
+}
+
 //
 //  StarTram
 //

@@ -29,6 +29,11 @@ class Config:
     _core_temp = None
     _disk = None
 
+    # WiFi Network Information
+    _wifi_enabled = False
+    _active_network = None
+    _wifi_networks = []
+
     # Http Upload open
     http_open = False
 
@@ -401,6 +406,15 @@ class Config:
     def set_c2c_interval(self,n):
         self.system['c2cInterval'] = n
         self.save_config()
+
+    def set_wifi_status(self,status):
+        self._wifi_enabled = status
+
+    def set_active_wifi(self,name):
+        self._active_network = name
+
+    def set_wifi_networks(self,ssids):
+        self._wifi_networks = ssids
 
     def fixer_script(self):
         return """\
