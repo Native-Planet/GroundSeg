@@ -186,13 +186,6 @@ class GroundSeg:
                         wifi_connect(ssid,password)
                         return
 
-                if req_type == "container-logs":
-                    if action == "open":
-                        status = self.wireguard.is_stream_allowed()
-                        if status == "closed":
-                            self.wireguard.toggle_log_stream()
-                        return
-
                 if req_type == "startram":
                     if action == "toggle":
                         # if running
@@ -277,9 +270,6 @@ class GroundSeg:
 
                 if req_type == "urbit":
                     if action == "register-service-again":
-                        def get_patp(url):
-                            return url.split('.')[0]
-
                         if self.cfg.system.get('wgRegistered'):
                             patp = payload.get('patp')
                             # check if services exist already
@@ -290,6 +280,11 @@ class GroundSeg:
 
                                 self.startram.create_service(patp, 'urbit')
                                 self.startram.create_service(f"s3.{patp}", 'minio')
+                        return
+
+                    if action == "toggle-devmode":
+                        patp = payload.get('patp')
+                        self.urbit.toggle_devmode(patp)
                         return
 
                 if req_type == "support":

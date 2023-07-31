@@ -29,14 +29,21 @@ class UrbitsBroadcast:
                     urb_alias = True
                     url = f"https://{cfg.get('custom_urbit_web')}"
                 urbits[str(p)] = {
-                        "network": cfg.get('network'),
-                        "running": self.app.urbit.urb_docker.is_running(p),
-                        "url": url,
-                        "urbAlias": urb_alias,
-                        "memUsage": self.app.urbit.system_info.get(p),
-                        "diskUsage": self.app.urbit.urb_docker.get_disk_usage(p),
-                        "loomSize": 2 ** (int(cfg.get('loom_size')) - 20),
-                        "serviceRegistrationStatus":svc_reg_status
+                        "info":{
+                            "network": cfg.get('network'),
+                            "running": self.app.urbit.urb_docker.is_running(p),
+                            "url": url,
+                            "urbAlias": urb_alias,
+                            "memUsage": self.app.urbit.system_info.get(p),
+                            "diskUsage": self.app.urbit.urb_docker.get_disk_usage(p),
+                            "loomSize": 2 ** (int(cfg.get('loom_size')) - 20),
+                            "devMode": cfg.get('dev_mode'),
+                            "detectBootStatus": cfg.get('boot_status') != "off"
+                            },
+                        "tranisitions":{
+                            "meld":None,
+                            "serviceRegistrationStatus":svc_reg_status,
+                            }
                         }
             except: 
                 pass

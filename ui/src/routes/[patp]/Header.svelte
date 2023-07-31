@@ -2,7 +2,7 @@
   import { structure, registerServiceAgain } from '$lib/stores/websocket';
   export let patp
 
-  $: ship = ($structure?.urbits?.[patp]) || {}
+  $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
@@ -25,6 +25,7 @@
         class="btn svc-register">{svcRegStatus == "creating" ? "Registering" : "Reregister Services"}
       </button>
       <button class="btn rebuild-container">Rebuild Container</button>
+      <div>+code</div>
     </div>
   </div>
   <div class="settings-wrapper">

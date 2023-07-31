@@ -9,8 +9,8 @@
   <div class="mask"></div>
   <div class="sigil"></div>
 
-  <Header patp={$page.params.patp}/>
-  <Body />
+  <Header patp={$page.params.patp} />
+  <Body patp={$page.params.patp} />
 </div>
 
 <style>

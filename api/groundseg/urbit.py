@@ -651,7 +651,6 @@ class Urbit:
         if not code:
             code = ""
         return code
-    '''
 
     # Toggle Autostart
     def toggle_autostart(self, patp):
@@ -672,36 +671,31 @@ class Urbit:
                 self.save_config(patp)
                 print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                 self.save_config(patp)
-                return 200
 
             except Exception as e:
                 print(f"{patp}: Unable to toggle autostart: {e}")
 
-        return 400
-
-    def toggle_devmode(self, on, patp):
+    def toggle_devmode(self, patp):
         print(f"{patp}: Attempting to toggle developer mode")
-        print(f"{patp}: Dev mode: {self._urbits[patp]['dev_mode']} -> {on}")
+        old = self._urbits.get(patp,{}).get('dev_mode')
+        new = not old
+        print(f"{patp}: Dev mode: {old} -> {new}")
         try:
-            self._urbits[patp]['dev_mode'] = on
+            self._urbits[patp]['dev_mode'] = new
             if self.urb_docker.remove_container(patp):
                 created = self.urb_docker.start(self._urbits[patp],
-                                                self.config_object._arch,
+                                                self.cfg.arch,
                                                 self._volume_directory
                                                 )
                 if created == "succeeded":
                     self.save_config(patp)
                     x = self.start(patp)
-                    if x:
-                        return 200
-                    else:
+                    if not x:
                         raise Exception("start returned {x}")
-                raise Exception(f"created: {created}")
+                else:
+                    raise Exception(f"created: {created}")
         except Exception as e:
             print(f"{patp}: Failed to toggle dev mode: {e}")
-
-        return 400
-    '''
 
     def toggle_network(self, patp):
         print(f"{patp}: Attempting to toggle network")

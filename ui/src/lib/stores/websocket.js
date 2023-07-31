@@ -61,7 +61,6 @@ export const handleMessage = data => {
     handleActivity(data)
   } else {
     let now = new Date()
-    console.log(now)
     console.log(data)
     structure.set(data)
   }
@@ -338,6 +337,15 @@ export const registerServiceAgain = patp => {
   send(payload)
 }
 
+export const toggleDevMode = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-devmode",
+    "patp":patp
+  }
+  send(payload)
+}
+
 /*
 export const urbitsAccessToggle = async ship => {
   let id = await generateRandom(16)
@@ -365,20 +373,6 @@ export const submitReport = (contact,description,ships) => {
     "contact":contact,
     "description":description,
     "ships":ships
-  }
-  send(payload)
-}
-
-//
-// Logs
-//
-
-// Stream the result of `wg show`
-export const openWireguardLog = () => {
-  let payload = {
-    "type":"container-logs",
-    "action":"open",
-    "container":"wireguard"
   }
   send(payload)
 }

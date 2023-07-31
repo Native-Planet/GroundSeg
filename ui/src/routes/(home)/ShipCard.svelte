@@ -5,7 +5,7 @@
   export let patp
   let loom = 8192
 
-  $: ship = ($structure?.urbits?.[patp]) || {}
+  $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: running = (ship?.running) || false
   $: network = (ship?.network) || "none"
   $: url = (ship?.url) || "#"

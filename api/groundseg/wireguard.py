@@ -9,8 +9,6 @@ from groundseg.docker.wireguard import WireguardDocker
 
 class Wireguard:
 
-    # Logs are allowed to be streamed?
-    allow_logs_stream = False
     #
     # StarTram API headers, to be moved to its own class
     _headers = {"Content-Type": "application/json"}
@@ -197,6 +195,7 @@ return False
 def change_url(self, url, urb, minio):
 print(f"Wireguard: Attempting to change endopint url to {url}")
 endpoint = self.config['endpointUrl']
+
 api_version = self.config['apiVersion']
 old_url = f'https://{endpoint}/{api_version}'
 self.config['endpointUrl'] = url
@@ -219,25 +218,14 @@ return 200
 return 400
     '''
 
-    # Get log stream status
-    def is_stream_allowed(self):
-        if self.allow_logs_stream:
-            return "open"
-        else:
-            return "closed"
-
-    def toggle_log_stream(self):
-        self.allow_logs_stream = not self.allow_logs_stream
-
     # Container logs
     def logs(self):
         logs = []
-        if self.allow_logs_stream:
-            name = self.data.get('wireguard_name')
-            try:
-                logs = self.wg_docker.wg_show(name).output.decode("utf-8").split("\n")
-            except Exception as e:
-                print(e)
+        name = self.data.get('wireguard_name')
+        try:
+            logs = self.wg_docker.wg_show(name).output.decode("utf-8").split("\n")
+        except Exception as e:
+            print(e)
         return logs
 
     # Load wireguard.json
