@@ -346,6 +346,24 @@ export const toggleDevMode = patp => {
   send(payload)
 }
 
+export const toggleAutoBoot = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-autoboot",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const toggleNetwork = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-network",
+    "patp":patp
+  }
+  send(payload)
+}
+
 /*
 export const urbitsAccessToggle = async ship => {
   let id = await generateRandom(16)

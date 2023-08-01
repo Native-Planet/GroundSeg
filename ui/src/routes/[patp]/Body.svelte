@@ -1,9 +1,14 @@
 <script>
-  import { structure, toggleDevMode } from '$lib/stores/websocket'
+  import Fa from 'svelte-fa'
+  import { faCheck } from '@fortawesome/free-solid-svg-icons'
+  import { structure, toggleDevMode, toggleAutoBoot, toggleNetwork } from '$lib/stores/websocket'
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info)
   $: devMode = (ship?.devMode) || false
+  $: detectBootStatus = (ship?.detectBootStatus) || false
+  $: remote = (ship?.remote) || false
+  $: vere = (ship?.vere) || ""
 
 </script>
 <div class="body">
@@ -26,7 +31,11 @@
       <div class="description">This enables your ship to autoboot after a device restart</div>
     </div>
     <div class="section-right">
-      checkbox
+      <div class="checkbox" class:highlight={detectBootStatus} on:click={()=>toggleAutoBoot(patp)}>
+        {#if detectBootStatus}
+          <div class="icon"><Fa icon={faCheck} size="1x"/></div>
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -55,17 +64,24 @@
   <!-- Startram Connectivity -->
   <div class="section">
     <div class="section-left">
-      <div class="title">StarTram</div>
-      <div class="description">Allow toggling StarTram</div>
+      <div class="title">Remote Access</div>
+      <div class="description">Access your ship via a StarTram connection</div>
     </div>
-    <div class="section-right">
-      on/off
+    <div class="section-right" on:click={()=>toggleNetwork(patp)}>
+      {remote ? "on" : "off"}
+    </div>
+  </div>
+
+  <!-- Vere Version -->
+  <div class="section">
+    <div class="section-left">
+      <div class="title">Vere Version</div>
+      <div class="description">{vere}</div>
     </div>
   </div>
 
   <div>url</div>
   <div>MinIO</div>
-  <div>vere version</div>
   <div>minio custom domain</div>
   <div>urbit custom domain</div>
 
@@ -100,6 +116,7 @@
   }
   .section {
     display: flex;
+    align-items: center;
   }
   .section-left {
     flex: 1;
@@ -120,5 +137,20 @@
   }
   .description {
     font-size: 12px;
+  }
+  .checkbox {
+    float: right;
+    height: 24px;
+    width: 24px;
+    border: 1px solid var(--btn-secondary);
+    border-radius: 6px;
+    color: var(--text-card-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+  }
+  .highlight {
+    background: var(--btn-secondary);
   }
 </style>

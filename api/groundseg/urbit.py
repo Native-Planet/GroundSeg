@@ -67,6 +67,7 @@ class Urbit:
     _volume_directory = '/var/lib/docker/volumes'
     ready = False
     system_info = {}
+    vere_version = {}
 
     def __init__(self, parent, cfg, wg, minio):
         self.app = parent
@@ -111,6 +112,10 @@ class Urbit:
     def ram(self):
         for p in self.cfg.system.get('piers').copy():
             self.system_info[p] = self.urb_docker.get_memory_usage(p)
+
+
+    def set_vere_version(self,patp,version):
+        self.vere_version[patp] = version
 
     '''
     def stop(self, patp):
@@ -501,7 +506,7 @@ class Urbit:
                 "running": c.status == "running",
                 "wgReg": self.config['wgRegistered'],
                 "wgRunning": self.wg.is_running(),
-                "autostart": cfg['boot_status'] != 'off',
+                "autoboot": cfg['boot_status'] != 'off',
                 "meldOn": cfg['meld_schedule'],
                 "timeNow": datetime.utcnow(),
                 "frequency": cfg['meld_frequency'],
@@ -652,9 +657,9 @@ class Urbit:
             code = ""
         return code
 
-    # Toggle Autostart
-    def toggle_autostart(self, patp):
-        print(f"{patp}: Attempting to toggle autostart")
+    # Toggle Autoboot
+    def toggle_autoboot(self, patp):
+        print(f"{patp}: Attempting to toggle autoboot")
         c = self.urb_docker.get_container(patp)
         if c:
             try:
@@ -673,7 +678,7 @@ class Urbit:
                 self.save_config(patp)
 
             except Exception as e:
-                print(f"{patp}: Unable to toggle autostart: {e}")
+                print(f"{patp}: Unable to toggle autoboot: {e}")
 
     def toggle_devmode(self, patp):
         print(f"{patp}: Attempting to toggle developer mode")

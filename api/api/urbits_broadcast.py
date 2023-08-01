@@ -38,7 +38,9 @@ class UrbitsBroadcast:
                             "diskUsage": self.app.urbit.urb_docker.get_disk_usage(p),
                             "loomSize": 2 ** (int(cfg.get('loom_size')) - 20),
                             "devMode": cfg.get('dev_mode'),
-                            "detectBootStatus": cfg.get('boot_status') != "off"
+                            "detectBootStatus": cfg.get('boot_status') != "off",
+                            "remote": cfg.get('network') == "wireguard",
+                            "vere":self.app.urbit.vere_version.get(p)
                             },
                         "tranisitions":{
                             "meld":None,

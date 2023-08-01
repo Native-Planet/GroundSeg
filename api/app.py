@@ -104,6 +104,7 @@ async def main():
 
     from threading import Thread
     Thread(target=groundseg.urbit_docker_stats,daemon=True).start()
+    Thread(target=groundseg.vere_version_info,daemon=True).start()
 
     # Uploader
     host = '0.0.0.0'

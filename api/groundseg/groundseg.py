@@ -269,6 +269,7 @@ class GroundSeg:
                         return
 
                 if req_type == "urbit":
+                    patp = payload.get('patp')
                     if action == "register-service-again":
                         if self.cfg.system.get('wgRegistered'):
                             patp = payload.get('patp')
@@ -283,8 +284,15 @@ class GroundSeg:
                         return
 
                     if action == "toggle-devmode":
-                        patp = payload.get('patp')
                         self.urbit.toggle_devmode(patp)
+                        return
+
+                    if action == "toggle-autoboot":
+                        self.urbit.toggle_autoboot(patp)
+                        return
+
+                    if action == "toggle-network":
+                        self.urbit.toggle_network(patp)
                         return
 
                 if req_type == "support":
@@ -318,6 +326,24 @@ class GroundSeg:
             if self.ready:
                 self.urbit.ram()
             sleep(1)
+
+    def vere_version_info(self):
+        print(f"groundseg:vere_version Thread started")
+        while True:
+            if self.ready:
+                try:
+                    urbits = self.urbit._urbits.keys()
+                    for patp in urbits:
+                        try:
+                            res = self.urbit.urb_docker.exec(patp, 'urbit --version').output.decode("utf-8").strip().split("\n")[0]
+                            self.urbit.set_vere_version(patp, str(res))
+                        except Exception as e:
+                            print(f"groundseg:vere_version:{patp} {e}")
+                except Exception as e:
+                    print(f"groundseg:vere_version {e}")
+                sleep(30)
+            else:
+                sleep(2)
 
     async def melder(self):
         while True:
