@@ -22,6 +22,7 @@ from groundseg.groundseg import GroundSeg
 
 # APIs
 from api.uploader_http import UploaderHTTP
+from api.broadcaster import Broadcaster
 from api.websocket_api import WS
 from api.lick_ipc import Lick
 
@@ -111,10 +112,13 @@ async def main():
     port = 27016
     Thread(target=UploaderHTTP(cfg, groundseg, host, port, dev).run, daemon=True).start()
 
+    # Broadcaster
+    broadcaster = Broadcaster(cfg, groundseg)
+
     # Websocket API
     host = '0.0.0.0'
     port = 8000
-    ws = WS(cfg, groundseg, host, port, dev)
+    ws = WS(cfg, groundseg, broadcaster, host, port, dev)
 
     # Lick API
     ur = Lick(groundseg, dev)

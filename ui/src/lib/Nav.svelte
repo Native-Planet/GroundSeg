@@ -4,8 +4,8 @@
   import { wide, version } from '$lib/stores/display'
   import { structure } from '$lib/stores/websocket'
 
-  $: registered = ($structure?.profile?.startram?.registered) || false
-  $: running = ($structure?.profile?.startram?.running) || false
+  $: registered = ($structure?.profile?.startram?.info?.registered) || false
+  $: running = ($structure?.profile?.startram?.info?.running) || false
 
 </script>
 

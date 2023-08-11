@@ -1,6 +1,7 @@
 import os
 import asyncio
 from time import sleep
+from threading import Thread
 
 from groundseg.netdata import Netdata
 from groundseg.setup import Setup
@@ -72,7 +73,7 @@ class GroundSeg:
         except Exception as e:
             print(f"groundseg:groundseg:loader error {e}")
 
-    async def process(self, websocket, auth_status, setup, payload):
+    async def process(self, broadcaster, websocket, auth_status, setup, payload):
         try:
             req_type = payload.get('type')
             action = payload.get('action')
@@ -188,19 +189,7 @@ class GroundSeg:
 
                 if req_type == "startram":
                     if action == "toggle":
-                        # if running
-                        if self.wireguard.is_running():
-                            for p in self.urbit._urbits.copy():
-                                if self.urbit._urbits[p]['network'] == "wireguard":
-                                    # swap ship back to local
-                                    self.urbit.toggle_network(p)
-                                    # turn off minio
-                            # turn off wireguard
-                            self.wireguard.stop()
-                        else:
-                            # turn on wireguard
-                            self.wireguard.start()
-                            # start minio
+                        Thread(target=self.startram_toggle,args=(broadcaster,)).start()
                         return
 
                     if action == "restart":
@@ -241,31 +230,7 @@ class GroundSeg:
                     if action == "register":
                         key = payload.get('key')
                         region = payload.get('region')
-                        # reset the pubkey
-                        if self.cfg.reset_pubkey():
-                            # TODO: turn urbits and minios to local
-                            # set wgRegistered and wgOn false
-                            self.cfg.system['wgRegistered'] = False
-                            self.cfg.system['wgOn'] = False
-                            self.cfg.save_config()
-                            # remove wireguard container
-                            if self.wireguard.remove():
-                                # register device
-                                if self.startram.register_device(key,region):
-                                    # retrieve latest status from startram
-                                    if self.startram.retrieve_status():
-                                        for p in self.cfg.system.get('piers'):
-                                            self.startram.create_service(p, 'urbit')
-                                            self.startram.create_service(f"s3.{p}", 'minio')
-                                        # start wg
-                                        if self.wireguard.start():
-                                            # write wg0.conf
-                                            self.wireguard.write_wg_conf()
-                                            self.wireguard.register_broadcast_status = "success"
-                                            sleep(3)
-                                            self.wireguard.register_broadcast_status = "done"
-                                            sleep(3)
-                                            self.wireguard.register_broadcast_status = None
+                        Thread(target=self.startram_register,args=(key,region,broadcaster)).start()
                         return
 
                 if req_type == "urbit":
@@ -313,6 +278,51 @@ class GroundSeg:
             print(f"groundseg process temporary: auth_status {auth_status}, payload {payload}")
         except Exception as e:
             print(f"groundseg:process: {e}")
+
+    def startram_toggle(self,broadcaster):
+        broadcaster.startram.set_transition("toggle","loading")
+        # if running
+        if self.wireguard.is_running():
+            for p in self.urbit._urbits.copy():
+                if self.urbit._urbits[p]['network'] == "wireguard":
+                    # swap ship back to local
+                    self.urbit.toggle_network(p)
+                    # turn off minio
+            # turn off wireguard
+            self.wireguard.stop()
+        else:
+            # turn on wireguard
+            self.wireguard.start()
+            # start minio
+        broadcaster.startram.clear_transition("toggle")
+
+    def startram_register(self,key,region,broadcaster):
+        broadcaster.startram.set_transition("register","loading")
+        # reset the pubkey
+        if self.cfg.reset_pubkey():
+            # TODO: turn urbits and minios to local
+            # set wgRegistered and wgOn false
+            self.cfg.system['wgRegistered'] = False
+            self.cfg.system['wgOn'] = False
+            self.cfg.save_config()
+            # remove wireguard container
+            if self.wireguard.remove():
+                # register device
+                if self.startram.register_device(key,region):
+                    # retrieve latest status from startram
+                    if self.startram.retrieve_status():
+                        for p in self.cfg.system.get('piers'):
+                            self.startram.create_service(p, 'urbit')
+                            self.startram.create_service(f"s3.{p}", 'minio')
+                        # start wg
+                        if self.wireguard.start():
+                            # write wg0.conf
+                            self.wireguard.write_wg_conf()
+                            broadcaster.startram.set_transition("register","success")
+                            sleep(3)
+                            broadcaster.startram.set_transition("register","done")
+                            sleep(3)
+        broadcaster.startram.clear_transition("register")
 
     def handle_upload(self,req):
         return self.uploader.handle_chunk(req)

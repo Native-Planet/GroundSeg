@@ -6,10 +6,8 @@
   let success = false
   let newEndpoint = ''
 
-  $: startram = ($structure?.profile?.startram) || {}
-  $: endpoint = (startram?.endpoint) || "api.startram.io"
-
-
+  $: info = ($structure?.profile?.startram?.info) || {}
+  $: endpoint = (info?.endpoint) || "api.startram.io"
 </script>
 
 <div class="wrapper">

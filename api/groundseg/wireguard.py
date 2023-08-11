@@ -17,7 +17,6 @@ class Wireguard:
     # Information for Wireguard from the version server
     version_info = {}
     # 
-    register_broadcast_status = None
     anchor_services = {}
     anchor_data = {}
     region_data = {}
@@ -224,8 +223,8 @@ return 400
         name = self.data.get('wireguard_name')
         try:
             logs = self.wg_docker.wg_show(name).output.decode("utf-8").split("\n")
-        except Exception as e:
-            print(e)
+        except:
+            pass
         return logs
 
     # Load wireguard.json

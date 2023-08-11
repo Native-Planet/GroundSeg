@@ -2,14 +2,16 @@
   import { structure, startramToggle, startramRestart } from '$lib/stores/websocket'
   import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
 
-  $: startram = ($structure?.profile?.startram) || {}
-  $: registered = (startram?.registered) || false
-  $: region = (startram?.region) || ""
-  $: running = (startram?.running) || ""
-  $: expiry = (startram?.expiry) || ""
-  $: renew = (startram?.renew) || ""
-  $: endpoint = (startram?.endpoint) || ""
+  $: info = ($structure?.profile?.startram?.info) || {}
+  $: registered = (info?.registered) || false
+  $: region = (info?.region) || ""
+  $: running = (info?.running) || ""
+  $: expiry = (info?.expiry) || ""
+  $: renew = (info?.renew) || ""
+  $: endpoint = (info?.endpoint) || ""
 
+  $: transition = ($structure?.profile?.startram?.transition) || {}
+  $: tToggle = (transition?.toggle) || null
 </script>
 <div class="body">
   <div class="panel left">
@@ -41,7 +43,13 @@
   {#if registered}
     <div class="panel right">
       <div class="header">Troubleshoot</div>
-      <button on:click={startramToggle} class="btn-troubleshoot">Turn {running ? "Off" : "On"}</button>
+      <button on:click={startramToggle} class="btn-troubleshoot">
+        {#if tToggle == "loading"}
+          Loading..
+        {:else}
+          Turn {running ? "Off" : "On"}
+        {/if}
+      </button>
       <button on:click={startramRestart} class="btn-troubleshoot">Restart StarTram</button>
       <div class="header">Account</div>
       <div class="account">

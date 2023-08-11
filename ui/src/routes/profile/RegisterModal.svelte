@@ -6,63 +6,73 @@
   let key = ''
   let activeRegion = "us-east";
   let success = false
+  let spinner = false
 
-  $: startram = ($structure?.startram) || {}
-  $: registered = (startram?.registered) || false
-  $: registerStatus = (startram?.registerStatus) || null
-  $: regions = (startram?.regions) || {}
+  $: info = ($structure?.startram?.info) || {}
+  $: registered = (info?.registered) || false
+  $: regions = (info?.regions) || {}
   $: regionKeys = Object.keys(regions)
+
+  $: transition = ($structure?.profile?.startram?.transition) || {}
+  $: tRegister = (transition?.register) || null
 
   const setRegion = r => {
     activeRegion = r
   }
   onMount(()=>startramGetRegions())
   afterUpdate(()=>{
-    showRegisterModal.set(registerStatus != "done")
-    success = registerStatus == "success"
+    spinner = tRegister == "loading"
+    success = tRegister == "success"
+    if (tRegister == "done") {
+      showRegisterModal.set(false)
+    }
   })
 </script>
 
 <div class="wrapper">
   <div class="modal">
-    {#if success}
-      sucess!
-    {:else}
-      <div class="header">Register a{registered ? "nother":""} key</div>
-      {#if regionKeys.length > 0}
-        <div class="name">Select Region</div>
-        <div class="regions">
-          {#each regionKeys as r }
-            <div on:click={()=>setRegion(r)} class="region" class:highlight={r == activeRegion}>
-              {regions[r].desc}
-            </div>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="name">Activation Key</div>
-      <div class="activate">
-        <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
+    {tRegister}
+    <div class="header">Register a{registered ? "nother":""} key</div>
+    {#if regionKeys.length > 0}
+      <div class="name">Select Region</div>
+      <div class="regions">
+        {#each regionKeys as r }
+          <div on:click={()=>setRegion(r)} class="region" class:highlight={r == activeRegion}>
+            {regions[r].desc}
+          </div>
+        {/each}
       </div>
-      <div class="buttons">
-        <button
-          class="btn-cancel"
-          on:click={()=>showRegisterModal.set(false)}
-          >Back
-        </button>
-        <button
-          class="btn-activate"
-          disabled={key.length < 1} 
-          on:click={()=>startramRegister(key,activeRegion)}
-          >Activate
-        </button>
-        <div class="spacer"></div>
-      </div>
-
-      <a class="get" href="https://www.nativeplanet.io/startram" target="_blank">
-        GET A STARTRAM KEY
-      </a>
     {/if}
+
+    <div class="name">Activation Key</div>
+    <div class="activate">
+      <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
+    </div>
+    <div class="buttons">
+      <button
+        class="btn-cancel"
+        on:click={()=>showRegisterModal.set(false)}
+        >Back
+      </button>
+      <button
+        class="btn-activate"
+        disabled={key.length < 1} 
+        on:click={()=>startramRegister(key,activeRegion)}
+        >
+        {#if spinner}
+          Loading
+        {:else if success}
+          Success!
+        {:else}
+          Activate
+        {/if}
+      </button>
+      <div class="spacer"></div>
+    </div>
+
+    <a class="get" href="https://www.nativeplanet.io/startram" target="_blank">
+      GET A STARTRAM KEY
+    </a>
 
   </div>
 </div>

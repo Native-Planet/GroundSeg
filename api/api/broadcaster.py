@@ -1,4 +1,5 @@
 import json
+from threading import Thread
 
 from api.upload_broadcast import UploadBroadcast
 from api.startram_broadcast import StarTramBroadcast
@@ -9,13 +10,24 @@ class Broadcaster:
     def __init__(self,cfg,groundseg):
         self.cfg = cfg
         self.app = groundseg
+        Thread(target=self.threaded_init,daemon=True).start()
+
+    def threaded_init(self):
+        from time import sleep
+        while not self.app.ready:
+            sleep(1)
+        self.upload = UploadBroadcast(self.app)
+        self.logs = LogsBroadcast(self.app)
+        self.startram = StarTramBroadcast(self.app)
+        self.urbits = UrbitsBroadcast(self.app)
 
     async def broadcast(self):
         a_broadcast = {
                 "type": "structure",
                 "auth_level": "authorized",
-                "upload": UploadBroadcast(self.app).display(),
-                "logs": LogsBroadcast(self.app).display(),
+                "upload": self.upload.display(),
+                "logs": self.logs.display(),
+                #"system": self.system.display(),
                 "system": {
                     "usage": {
                         "ram": self.cfg._ram,
@@ -34,9 +46,9 @@ class Broadcaster:
                         }
                     },
                 "profile":{
-                    "startram": StarTramBroadcast(self.app).display()
+                    "startram": self.startram.display()
                     },
-                "urbits": UrbitsBroadcast(self.app).display()
+                "urbits": self.urbits.display()
                 }
         u_broadcast = {
                 "type": "structure",

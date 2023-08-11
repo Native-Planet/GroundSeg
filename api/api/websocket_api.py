@@ -2,17 +2,17 @@ import json
 import asyncio
 import websockets
 
-from api.broadcaster import Broadcaster
 from api.authorization import Auth
 
 class WS:
-    def __init__(self, cfg, groundseg, host, port, dev):
+    def __init__(self, cfg, groundseg, broadcaster, host, port, dev):
         super().__init__()
         self.cfg = cfg
         self.app = groundseg
         self.dev = dev
         self.host = host
         self.port = port
+        self.broadcaster = broadcaster
 
     async def handler(self, websocket, path):
         while True:
@@ -82,7 +82,7 @@ class WS:
 
                     # And finally, we send the payload and auth result
                     # to GroundSeg for processing
-                    asyncio.create_task(self.app.process(websocket, auth_status, setup, payload))
+                    asyncio.create_task(self.app.process(self.broadcaster, websocket, auth_status, setup, payload))
                     # Everything ran without errors, return an ack
                     res = {"response":"ack","error":None}
                 else:
@@ -99,14 +99,13 @@ class WS:
                 print(f"websocket_api:handler:send connection closed")
 
     async def broadcast(self):
-        b = Broadcaster(self.cfg,self.app)
         while True:
             try:
                 if self.app.ready:
                     if self.cfg.system.get('setup') != "complete":
-                        await b.setup()
+                        await self.broadcaster.setup()
                     else:
-                        await b.broadcast()
+                        await self.broadcaster.broadcast()
             except Exception as e:
                 print(f"websocket_api:broadcast: {e}")
             await asyncio.sleep(0.25)
