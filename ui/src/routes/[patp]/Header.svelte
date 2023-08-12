@@ -1,5 +1,6 @@
 <script>
   import { structure, registerServiceAgain } from '$lib/stores/websocket';
+  import { devShipClass } from '$lib/stores/devclass'
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
@@ -17,7 +18,16 @@
 <div class="header">
   <div class="patp-wrapper">
     <div class="ship-class">{shipClass}</div>
-    <div class="patp">{patp.toUpperCase()}</div>
+    <div class="patp">
+      <!-- dev modification -->
+      {#if $devShipClass == "star"}
+        {patp.slice(0,6).toUpperCase()}
+      {:else if $devShipClass == "planet"}
+        {patp.slice(0,13).toUpperCase()}
+      {:else}
+        {patp.toUpperCase()}
+      {/if}
+    </div>
     <div class="quick-panel">
       <button
         disabled={svcRegStatus != "ok"}

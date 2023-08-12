@@ -68,7 +68,6 @@ class StarTramAPI:
             try:
                 print(f"{self._f}:retrieve_status Attempting to retrieve information")
                 status = requests.get(url, headers=self._headers).json()
-                #print(f"{self._f}:retrieve_status Response: {status}")
 
                 if status.get('status') == "No record":
                     self.cfg.system['wgRegistered'] = False

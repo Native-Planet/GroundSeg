@@ -4,6 +4,9 @@
   import { wide, version } from '$lib/stores/display'
   import { structure } from '$lib/stores/websocket'
 
+  // Temp dev mode
+  import DevToggle from '$lib/DevToggle.svelte'
+
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
@@ -15,6 +18,7 @@
       !registered ? "UNREGISTERED" :
       running ? "ONLINE" : "OFFLINE"
       }
+    <DevToggle />
   </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
     <div class="back" on:click={()=>goto("/")}>

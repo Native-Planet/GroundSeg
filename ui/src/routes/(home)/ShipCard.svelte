@@ -2,6 +2,9 @@
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
   import { structure } from '$lib/stores/websocket';
+
+  import { devShipClass } from '$lib/stores/devclass'
+
   export let patp
   let loom = 8192
 
@@ -34,7 +37,16 @@
   <!-- Lower -->
   <div class="body">
     <div class="info">
-      <div class="patp">{patp.toUpperCase()}</div>
+      <div class="patp">
+        <!-- dev modification -->
+        {#if $devShipClass == "star"}
+          {patp.slice(0,6).toUpperCase()}
+        {:else if $devShipClass == "planet"}
+          {patp.slice(0,13).toUpperCase()}
+        {:else}
+          {patp.toUpperCase()}
+        {/if}
+      </div>
       <div class="ext">
         <a href={url} target="_blank" class="icon"><Fa icon={faArrowRight} size="1x"/></a>
       </div>
