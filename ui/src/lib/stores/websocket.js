@@ -364,14 +364,16 @@ export const toggleNetwork = patp => {
   send(payload)
 }
 
-/*
-export const urbitsAccessToggle = async ship => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.urbitsAccessToggle(id,ship,token)
+export const toggleUrbitPower = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-power",
+    "patp":patp
+  }
+  send(payload)
 }
 
+/*
 export const urbitsMeldUrth = async ship => {
   let id = await generateRandom(16)
   let token = await loadSession()

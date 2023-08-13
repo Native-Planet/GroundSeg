@@ -260,6 +260,10 @@ class GroundSeg:
                         self.urbit.toggle_network(patp)
                         return
 
+                    if action == "toggle-power":
+                        Thread(target=self.urbit.toggle_power, args=(patp,broadcaster)).start()
+                        return
+
                 if req_type == "support":
                     if action == "bug-report":
                         contact = payload.get('contact')
@@ -347,8 +351,9 @@ class GroundSeg:
                         try:
                             res = self.urbit.urb_docker.exec(patp, 'urbit --version').output.decode("utf-8").strip().split("\n")[0]
                             self.urbit.set_vere_version(patp, str(res))
-                        except Exception as e:
-                            print(f"groundseg:vere_version:{patp} {e}")
+                        except:# Exception as e:
+                            #print(f"groundseg:vere_version:{patp} {e}")
+                            pass
                 except Exception as e:
                     print(f"groundseg:vere_version {e}")
                 sleep(30)

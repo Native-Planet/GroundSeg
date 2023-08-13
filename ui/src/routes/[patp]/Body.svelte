@@ -1,7 +1,13 @@
 <script>
+  import { structure,
+    toggleDevMode,
+    toggleAutoBoot,
+    toggleNetwork,
+    toggleUrbitPower
+  } from '$lib/stores/websocket'
+
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
-  import { structure, toggleDevMode, toggleAutoBoot, toggleNetwork } from '$lib/stores/websocket'
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info)
@@ -9,6 +15,9 @@
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
   $: vere = (ship?.vere) || ""
+  $: running = (ship?.running) || false
+  $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
+  $: tTogglePower = (tShip?.togglePower) || null
 
 </script>
 <div class="body">
@@ -87,7 +96,13 @@
 
   <div class="bottom-panel">
     <div class="btn">Logs</div>
-    <div class="btn">Shutdown</div>
+    <div class="btn" on:click={()=>toggleUrbitPower(patp)}>
+      {#if tTogglePower}
+        {tTogglePower}
+      {:else}
+        {running ? "Shutdown" : "Boot"}
+      {/if}
+    </div>
     <div class="btn">Export/Delete</div>
   </div>
 </div>
@@ -127,10 +142,10 @@
   }
   .btn {
     color: var(--text-card-color);
-    font-size: 16px;
+    font-size: 12px;
     background-color: var(--fg-card);
     border-radius: 16px 16px 0 0;
-    padding: 16px 32px;
+    padding: 12px 42px;
   }
   .title {
     font-size: 16px;

@@ -5,7 +5,6 @@ class Uploader:
     def __init__(self,parent,cfg):
         self.app = parent
         self.cfg = cfg
-        # TODO: check if upload being paused
         self.make_free()
 
     def make_free(self):

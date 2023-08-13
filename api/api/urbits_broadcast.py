@@ -4,6 +4,7 @@ class UrbitsBroadcast:
     def __init__(self, groundseg):
         self.app = groundseg
         self.cfg = self.app.cfg
+        self.transition = {}
 
     def display(self):
         urbits = {}
@@ -42,11 +43,26 @@ class UrbitsBroadcast:
                             "remote": cfg.get('network') == "wireguard",
                             "vere":self.app.urbit.vere_version.get(p)
                             },
-                        "tranisitions":{
-                            "meld":None,
+                        "transition":{
+                            "meld": self.get_transition(str(p),"meld"),
                             "serviceRegistrationStatus":svc_reg_status,
+                            "togglePower":self.get_transition(str(p),"togglePower")
                             }
                         }
             except: 
                 pass
         return urbits
+
+    def get_transition(self, patp, transition):
+        try:
+            return self.transition.get(patp, {}).get(transition)
+        except:
+            return None
+
+    def set_transition(self, patp, transition, value):
+        if not self.transition.get(patp):
+            self.transition[patp] = {}
+        self.transition[patp][transition] = value
+
+    def clear_transition(self, patp, transition):
+        self.set_transition(patp, transition, None)

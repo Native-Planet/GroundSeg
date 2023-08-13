@@ -117,15 +117,13 @@ class Urbit:
     def set_vere_version(self,patp,version):
         self.vere_version[patp] = version
 
-    '''
     def stop(self, patp):
         self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
         if self.urb_docker.exec(patp, f"kill $(cat {patp}/.vere.lock"):
             self.urb_docker.exec(patp, f"cat {patp}/.vere.lock")
         if self.graceful_exit(patp):
             return self.urb_docker.stop(patp)
-    '''
-    '''
+
     # |exit 
     def graceful_exit(self, patp):
         try:
@@ -145,7 +143,7 @@ class Urbit:
             print(f"urbit:graceful_exit:{patp} Error: {e}")
             return False
         return True
-    '''
+
     '''
     # Delete Urbit Pier and MiniO
     def delete(self, patp):
@@ -570,32 +568,33 @@ class Urbit:
         urb['ames_port'] = ames_port
 
         return urb
-    '''
 
     # Toggle Pier on or off
-    def toggle_power(self, patp):
+    def toggle_power(self, patp, broadcaster):
         print(f"{patp}: Attempting to toggle container")
         c = self.urb_docker.get_container(patp)
         if c:
             cfg = self._urbits[patp]
             old_status = cfg['boot_status']
             if c.status == "running":
+                broadcaster.urbits.set_transition(patp,"togglePower","stopping")
                 if self.stop(patp):
                     if cfg['boot_status'] != 'off':
                         self._urbits[patp]['boot_status'] = 'noboot'
                         print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                         self.save_config(patp)
-                        return 200
+                        broadcaster.urbits.set_transition(patp,"togglePower","success")
+                        sleep(3)
             else:
+                broadcaster.urbits.set_transition(patp,"togglePower","booting")
                 if cfg['boot_status'] != 'off':
                     self._urbits[patp]['boot_status'] = 'boot'
                     print(f"{patp}: Boot status changed: {old_status} -> {self._urbits[patp]['boot_status']}")
                     self.save_config(patp)
                     if self.start(patp) == "succeeded":
-                        return 200
-
-        return 400
-    '''
+                        broadcaster.urbits.set_transition(patp,"togglePower","success")
+                        sleep(3)
+        broadcaster.urbits.clear_transition(patp,"togglePower")
 
     # Create .hoon for pokes
     def create_hoon(self, patp, name, hoon):

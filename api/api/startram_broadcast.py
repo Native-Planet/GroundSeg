@@ -2,7 +2,6 @@ class StarTramBroadcast:
     def __init__(self, groundseg):
         self.app = groundseg
         self.cfg = self.app.cfg
-        self.data = self.app.wireguard.anchor_data
         self.transition = {
                 "register": None,
                 "toggle": None
@@ -13,9 +12,9 @@ class StarTramBroadcast:
                 "info": {
                     "registered":self.cfg.system.get('wgRegistered'),
                     "running":self.cfg.system.get('wgOn'),
-                    "region":self.data.get('region'),
-                    "expiry":self.data.get('lease'),
-                    "renew":self.data.get('ongoing') != 0,
+                    "region":self.app.wireguard.anchor_data.get('region'),
+                    "expiry":self.app.wireguard.anchor_data.get('lease'),
+                    "renew":self.app.wireguard.anchor_data.get('ongoing') != 0,
                     "endpoint":self.cfg.system.get('endpointUrl'),
                     "regions":self.app.wireguard.region_data,
                     },

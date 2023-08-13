@@ -31,7 +31,6 @@
 
 <div class="wrapper">
   <div class="modal">
-    {tRegister}
     <div class="header">Register a{registered ? "nother":""} key</div>
     {#if regionKeys.length > 0}
       <div class="name">Select Region</div>
