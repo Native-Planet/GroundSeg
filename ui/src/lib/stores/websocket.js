@@ -373,6 +373,15 @@ export const toggleUrbitPower = patp => {
   send(payload)
 }
 
+export const deleteUrbitShip = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"delete-ship",
+    "patp":patp
+  }
+  send(payload)
+}
+
 /*
 export const urbitsMeldUrth = async ship => {
   let id = await generateRandom(16)

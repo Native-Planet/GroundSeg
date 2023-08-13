@@ -46,7 +46,8 @@ class UrbitsBroadcast:
                         "transition":{
                             "meld": self.get_transition(str(p),"meld"),
                             "serviceRegistrationStatus":svc_reg_status,
-                            "togglePower":self.get_transition(str(p),"togglePower")
+                            "togglePower":self.get_transition(str(p),"togglePower"),
+                            "deleteShip":self.get_transition(str(p),"deleteShip")
                             }
                         }
             except: 

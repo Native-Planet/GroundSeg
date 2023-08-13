@@ -264,6 +264,10 @@ class GroundSeg:
                         Thread(target=self.urbit.toggle_power, args=(patp,broadcaster)).start()
                         return
 
+                    if action == "delete-ship":
+                        Thread(target=self.urbit.delete, args=(patp,self.startram,broadcaster)).start()
+                        return
+
                 if req_type == "support":
                     if action == "bug-report":
                         contact = payload.get('contact')

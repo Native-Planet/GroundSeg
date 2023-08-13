@@ -6,6 +6,8 @@
     toggleUrbitPower
   } from '$lib/stores/websocket'
 
+  import { showDeleteModal } from './store'
+
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   export let patp
@@ -103,7 +105,8 @@
         {running ? "Shutdown" : "Boot"}
       {/if}
     </div>
-    <div class="btn">Export/Delete</div>
+    <div class="btn">Export</div>
+    <div class="btn" on:click={()=>showDeleteModal.set(true)}>Delete</div>
   </div>
 </div>
 

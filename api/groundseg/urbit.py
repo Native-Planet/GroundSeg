@@ -144,26 +144,28 @@ class Urbit:
             return False
         return True
 
-    '''
     # Delete Urbit Pier and MiniO
-    def delete(self, patp):
+    def delete(self, patp, startram_api, broadcaster):
+        broadcaster.urbits.set_transition(patp,"deleteShip","loading")
         print(f"{patp}: Attempting to delete all data")
+
+        # Remove service
         try:
+            if self.cfg.system.get('wgRegistered'):
+                broadcaster.urbits.set_transition(patp,"deleteShip","services")
+                startram_api.delete_service(f'{patp}','urbit')
+                startram_api.delete_service(f's3.{patp}','minio')
+
+
+            minio_exists = False
+            if minio_exists:
+                broadcaster.urbits.set_transition(patp,"deleteShip","minio")
+                #self.minio.delete(f"minio_{patp}"):
+
             if self.urb_docker.delete(patp):
-
-                endpoint = self.config['endpointUrl']
-                api_version = self.config['apiVersion']
-                url = f'https://{endpoint}/{api_version}'
-
-                if self.config['wgRegistered']:
-                    self.wg.delete_service(f'{patp}','urbit',url)
-                    self.wg.delete_service(f's3.{patp}','minio',url)
-
-                self.minio.delete(f"minio_{patp}")
-
+                broadcaster.urbits.set_transition(patp,"deleteShip","deleting")
                 print(f"{patp}: Deleting from system.json")
-                self.config['piers'] = [i for i in self.config['piers'] if i != patp]
-                self.config_object.save_config()
+                self.cfg.remove_pier(patp)
 
                 print(f"{patp}: Removing {patp}.json")
                 os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
@@ -171,15 +173,16 @@ class Urbit:
                 self._urbits.pop(patp)
                 print(f"{patp}: Data removed from GroundSeg")
 
-                return 200
+                broadcaster.urbits.set_transition(patp,"deleteShip","success")
 
         except Exception as e:
+            broadcaster.urbits.set_transition(patp,"deleteShip","failure: {e}")
             print(f"{patp}: Failed to delete data: {e}")
 
-        return 400
-    '''
-    '''
+        sleep(3)
+        broadcaster.urbits.clear_transition(patp,"deleteShip")
 
+    '''
     def export(self, patp):
         print(f"{patp}: Attempting to export pier")
         c = self.urb_docker.get_container(patp)

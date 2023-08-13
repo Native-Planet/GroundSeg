@@ -52,7 +52,7 @@ class Config:
             "updateMode": "auto",
             "updateUrl": "https://version.groundseg.app",
             "updateBranch": "latest",
-            "swapVal": 16,
+            "swapVal": 2,
             "swapFile": "/opt/nativeplanet/groundseg/swapfile",
             "keyFile": "/opt/nativeplanet/groundseg/settings/session.key",
             "sessions": {},
@@ -337,6 +337,10 @@ class Config:
                 "remove":remove,
                 "ignore":ignore
                 }
+
+    def remove_pier(self,patp):
+        self.system['piers'] = [i for i in self.system.get('piers') if i != patp]
+        self.save_config()
 
     def set_endpoint(self, endpoint):
         self.system['endpointUrl'] = str(endpoint)

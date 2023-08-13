@@ -116,7 +116,7 @@ class WireguardDocker:
             c = client.containers.get(name)
             return c
         except:
-            print("Wireguard: Container not found")
+            #print("Wireguard: Container not found")
             return False
 
     def _create_container(self, name, image, config):
@@ -127,7 +127,6 @@ class WireguardDocker:
                 print("Wireguard: Creating Mount object")
                 mount = docker.types.Mount(target='/config', source=name)
                 return self._build_container(name, image, mount, config)
-
 
     def _pull_image(self, image):
         try:

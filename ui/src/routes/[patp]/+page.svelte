@@ -2,6 +2,10 @@
 	import { page } from '$app/stores'
   import Header from './Header.svelte'
   import Body from './Body.svelte'
+  import DeleteModal from './DeleteModal.svelte'
+  import { showDeleteModal } from './store'
+
+  $: patp = $page.params.patp
 </script>
 
 <div class="wrapper">
@@ -9,9 +13,13 @@
   <div class="mask"></div>
   <div class="sigil"></div>
 
-  <Header patp={$page.params.patp} />
-  <Body patp={$page.params.patp} />
+  <Header {patp} />
+  <Body {patp} />
 </div>
+
+{#if $showDeleteModal}
+  <DeleteModal {patp} />
+{/if}
 
 <style>
   .wrapper {
