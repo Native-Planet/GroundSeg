@@ -282,6 +282,11 @@ class GroundSeg:
                                 )
                         return
 
+                if req_type == "dev":
+                    if action == "reset-setup":
+                        self.setup.reset_setup()
+                        return
+
             # Execute request
             print(f"groundseg process temporary: auth_status {auth_status}, payload {payload}")
         except Exception as e:

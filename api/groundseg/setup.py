@@ -55,3 +55,9 @@ class Setup:
             self.cfg.system['setup'] = self.stage
             # save config
             self.cfg.save_config()
+
+    def reset_setup(self):
+        self.page = 0
+        self.stage = "start"
+        self.cfg.system['setup'] = self.stage
+        self.cfg.save_config()

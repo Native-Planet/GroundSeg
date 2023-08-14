@@ -405,3 +405,15 @@ export const submitReport = (contact,description,ships) => {
   }
   send(payload)
 }
+
+//
+//  Dev
+//   
+
+export const resetSetup = () => {
+  let payload = {
+    "type":"dev",
+    "action":"reset-setup",
+  }
+  send(payload)
+}
