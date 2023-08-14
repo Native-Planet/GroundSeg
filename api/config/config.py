@@ -289,6 +289,7 @@ class Config:
         except Exception as e:
             print(f"config:config:create_password: Create password failed: {e}")
             return False
+        return True
 
     # Check if provided password is correct
     def check_password(self, pwd):
