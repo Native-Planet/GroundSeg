@@ -4,7 +4,6 @@
   import Body from './Body.svelte'
   import DeleteModal from './DeleteModal.svelte'
   import { showDeleteModal } from './store'
-
   $: patp = $page.params.patp
 </script>
 

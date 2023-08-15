@@ -68,6 +68,7 @@ class Urbit:
     ready = False
     system_info = {}
     vere_version = {}
+    new_ship_ready = None
 
     def __init__(self, parent, cfg, wg, minio):
         self.app = parent
@@ -111,7 +112,11 @@ class Urbit:
 
     def ram(self):
         for p in self.cfg.system.get('piers').copy():
-            self.system_info[p] = self.urb_docker.get_memory_usage(p)
+            try:
+                r = self.urb_docker.get_memory_usage(p)
+            except:
+                r = 0
+            self.system_info[p] = r
 
 
     def set_vere_version(self,patp,version):
@@ -151,6 +156,7 @@ class Urbit:
 
         # Remove service
         try:
+            print("wgreg",self.cfg.system.get('wgRegistered'))
             if self.cfg.system.get('wgRegistered'):
                 broadcaster.urbits.set_transition(patp,"deleteShip","services")
                 startram_api.delete_service(f'{patp}','urbit')
@@ -166,19 +172,13 @@ class Urbit:
                 broadcaster.urbits.set_transition(patp,"deleteShip","deleting")
                 print(f"{patp}: Deleting from system.json")
                 self.cfg.remove_pier(patp)
-
                 print(f"{patp}: Removing {patp}.json")
                 os.remove(f"/opt/nativeplanet/groundseg/settings/pier/{patp}.json")
-
                 self._urbits.pop(patp)
                 print(f"{patp}: Data removed from GroundSeg")
-
-                broadcaster.urbits.set_transition(patp,"deleteShip","success")
-
         except Exception as e:
             broadcaster.urbits.set_transition(patp,"deleteShip","failure: {e}")
             print(f"{patp}: Failed to delete data: {e}")
-
         sleep(3)
         broadcaster.urbits.clear_transition(patp,"deleteShip")
 
@@ -328,7 +328,7 @@ class Urbit:
         except Exception as e:
             print(f"{patp}: Failed to start fix pokes thread: {e}")
 
-    def boot_existing(self, filename, remote, fix, create_service):
+    def boot_existing(self, filename, remote, fix, create_service, set_status, make_free):
         print(f"groundseg:urbit:boot_existing Configuration - remote: {remote} - fix: {fix}")
         patp = filename.split('.')[0]
  
@@ -337,17 +337,20 @@ class Urbit:
             return "Invalid @p"
 
         # Extract the pier
+        set_status("extracting")
         extracted = self.extract_pier(filename)
         if extracted != "to-create":
             return extracted
 
         # Create the groundseg ship
+        set_status("creating")
         created = self.create_existing(patp)
         if created != "succeeded":
             return created
 
         # register services
         if self.cfg.system.get('wgRegistered'):
+            set_status("registering")
             create_service(patp, 'urbit')
             create_service(f"s3.{patp}", 'minio')
 
@@ -359,7 +362,10 @@ class Urbit:
         if fix:
             Thread(target=self.fix_pokes, args=(patp,), daemon=True).start()
 
-        return 200
+        set_status("done")
+        sleep(3)
+        make_free()
+        return True
 
     def extract_pier(self, filename):
         patp = filename.split('.')[0]
@@ -484,7 +490,6 @@ class Urbit:
 
         except Exception as e:
             print(f"{patp}: Failed to boot uploaded urbit ship: {e}")
-
         return f"Failed to boot {patp}"
 
     '''

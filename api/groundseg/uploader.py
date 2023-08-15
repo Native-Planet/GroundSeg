@@ -20,6 +20,9 @@ class Uploader:
         self.size = size
         self.status = "uploading"
 
+    def set_status(self,status):
+        self.status = status
+
     def open_http(self,secret):
         self.cfg.http_open = True
         self.cfg.upload_secret = secret
@@ -70,7 +73,13 @@ class Uploader:
                 print(f"{patp}: File size mismatched")
                 return "File size mismatched"
             else:
-                return self.app.urbit.boot_existing(filename, remote, fix, self.app.startram.create_service)
+                return self.app.urbit.boot_existing(filename,
+                                                    remote,
+                                                    fix,
+                                                    self.app.startram.create_service,
+                                                    self.set_status,
+                                                    self.make_free
+                                                    )
         else:
             # Not final chunk yet
             return 200

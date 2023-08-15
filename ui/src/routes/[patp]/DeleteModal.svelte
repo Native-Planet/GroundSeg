@@ -1,4 +1,5 @@
 <script>
+  import { goto } from '$app/navigation';
   import { onMount, afterUpdate } from 'svelte'
   import { structure, deleteUrbitShip } from '$lib/stores/websocket'
   import { showDeleteModal } from './store'
@@ -7,6 +8,19 @@
 
   $: transition = ($structure?.urbits?.[patp]?.transition) || {}
   $: tDeleteShip = (transition?.deleteShip) || null
+
+  let deleteInProgress = false
+
+  afterUpdate(()=>{
+    if (tDeleteShip == "loading") {
+      deleteInProgress = true
+    }
+    if (deleteInProgress && (tDeleteShip == null)) {
+      deleteInProgress = false
+      showDeleteModal.set(false)
+      goto("/")
+    }
+  })
 </script>
 
 <div class="wrapper">

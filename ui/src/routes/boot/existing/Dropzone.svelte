@@ -56,8 +56,8 @@
       error: onError,
   })})
 
-  $: registered = ($structure?.profile?.startram?.registered) || false
-  $: running = ($structure?.profile?.startram?.running) || false
+  $: registered = ($structure?.profile?.startram?.info?.registered) || false
+  $: running = ($structure?.profile?.startram?.info?.running) || false
 
   const setName = () => {
     let remote = remoteCheck ? "remote" :"local"
@@ -104,6 +104,18 @@
 </script>
 
 <div id="dropper"></div>
+<div class="checkboxes">
+  {#if registered && running}
+    <div class="check-wrapper" on:click={()=>remoteCheck = !remoteCheck}>
+      <div class="checkbox" class:highlight={remoteCheck}></div>
+      <div class="check-label">Set to remote</div>
+    </div>
+  {/if}
+  <div class="check-wrapper" on:click={()=>fixCheck = !fixCheck}>
+    <div class="checkbox" class:highlight={fixCheck}></div>
+    <div class="check-label">Fix common issues</div>
+  </div>
+</div>
 <div class="upload">
   <div on:click={selectDropper} class="select">{patp}</div>
   <button on:click={selectDropper} class="choose-btn">Choose</button>
@@ -168,5 +180,30 @@
   }
   .item {
     font-size: 24px;
+  }
+  .checkboxes {
+    display: flex;
+    gap: 48px;
+  }
+  .check-wrapper {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    gap: 12px;
+    align-items: start;
+  }
+  .checkbox {
+    width: 20px;
+    height: 20px;
+    border: solid 1px var(--btn-secondary);
+    border-radius: 6px;
+  }
+  .highlight {
+    background-color: var(--btn-secondary);
+  }
+  .check-label {
+    line-height: 20px;
+    font-size: 12px;
+    margin-bottom: 24px;
   }
 </style>

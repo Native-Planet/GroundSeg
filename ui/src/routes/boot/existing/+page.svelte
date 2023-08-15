@@ -1,8 +1,8 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, afterUpdate } from 'svelte'
   import { wide } from '$lib/stores/display';
   import { goto } from '$app/navigation';
-  import { uploadMetadata, structure } from '$lib/stores/websocket';
+  import { freeUpload, uploadMetadata, structure } from '$lib/stores/websocket';
 
   import Dropzone from './Dropzone.svelte';
   import WarningPrompt from './WarningPrompt.svelte';
@@ -28,6 +28,18 @@
   $: status = (upload?.status) || "free"
   $: uploaded = (upload?.uploaded) || 0
 
+  onMount(()=> {
+    if (status == "uploading") {
+      freeUpload()
+    }
+  })
+
+  afterUpdate(()=> {
+    if (status == "done") {
+      goto("/" + patp)
+    }
+  })
+
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
@@ -36,13 +48,21 @@
     <div class="text">Warning</div>
     <div class="text">Make sure your pier is not running anywhere else or your <strong>pier will be corrupted</strong></div>
   </div>
-  <Dropzone
-    {size}
-    {patp}
-    {status}
-    {confirmed}
-    on:drop={setPrompt}
-    />
+  {#if status == "extracting"}
+    extracting
+  {:else if status == "creating"}
+    creating container
+  {:else if status == "registering"}
+    registering startram
+  {:else}
+    <Dropzone
+      {size}
+      {patp}
+      {status}
+      {confirmed}
+      on:drop={setPrompt}
+      />
+  {/if}
 </div>
 {#if showPrompt}
   <WarningPrompt

@@ -1,14 +1,17 @@
 <script>
   import { wide } from '$lib/stores/display';
-  import { bootShip } from '$lib/stores/websocket';
+  import { bootShip, structure } from '$lib/stores/websocket';
   import { goto } from '$app/navigation';
   import KeyDropper from './KeyDropper.svelte';
 
   let key = '';
   let name = '';
   let remote = true;
+
+  $: shipReady = ($structure?.newShip) || null
 </script>
 
+{JSON.stringify($structure?.newShip)}
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
   <div class="title">NEW SHIP</div>
   <div class="sigil"></div>

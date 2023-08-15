@@ -114,10 +114,14 @@ class GroundSeg:
                         key = payload.get('key')
                         remote = payload.get('remote')
                         res = await self.urbit.create(patp,key,remote)
+                        if res:
+                            self.urbit.new_ship_ready = "ready"
                         # register services
                         if res and self.cfg.system.get('wgRegistered'):
                             self.startram.create_service(patp, 'urbit')
                             self.startram.create_service(f"s3.{patp}", 'minio')
+                        sleep(3)
+                        self.urbit.new_ship_ready = None
                         return
                 #
                 if req_type == "pier_upload":

@@ -26,8 +26,8 @@ class Broadcaster:
                 "type": "structure",
                 "auth_level": "authorized",
                 "upload": self.upload.display(),
+                "newShip": self.app.urbit.new_ship_ready,
                 "logs": self.logs.display(),
-                #"system": self.system.display(),
                 "system": {
                     "usage": {
                         "ram": self.cfg._ram,
