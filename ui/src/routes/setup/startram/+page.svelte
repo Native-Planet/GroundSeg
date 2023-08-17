@@ -3,7 +3,7 @@
   let key = ''
   let activeRegion = "us-east";
 
-  $: regions = ($structure?.startram?.regions) || {}
+  $: regions = ($structure?.regions) || {}
   $: regionKeys = Object.keys(regions)
 
   const setRegion = r => {

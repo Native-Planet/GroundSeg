@@ -8,7 +8,7 @@
   let success = false
   let spinner = false
 
-  $: info = ($structure?.startram?.info) || {}
+  $: info = ($structure?.profile?.startram?.info) || {}
   $: registered = (info?.registered) || false
   $: regions = (info?.regions) || {}
   $: regionKeys = Object.keys(regions)
@@ -32,6 +32,11 @@
 <div class="wrapper">
   <div class="modal">
     <div class="header">Register a{registered ? "nother":""} key</div>
+
+    <div class="name">Activation Key</div>
+    <div class="activate">
+      <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
+    </div>
     {#if regionKeys.length > 0}
       <div class="name">Select Region</div>
       <div class="regions">
@@ -42,11 +47,6 @@
         {/each}
       </div>
     {/if}
-
-    <div class="name">Activation Key</div>
-    <div class="activate">
-      <input placeholder="NativePlanet-some-word-another-word" type="password" bind:value={key}/>
-    </div>
     <div class="buttons">
       <button
         class="btn-cancel"

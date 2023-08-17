@@ -34,18 +34,6 @@
         </div>
       </div>
       <div
-        class:highlight={$page.route.id != "/support"}
-        on:click={()=>goto("/support")}
-        class="btn option"
-        >SUPPORT
-      </div>
-      <div
-        class:highlight={$page.route.id != "/logs"}
-        on:click={()=>goto("/logs")}
-        class="btn option"
-        >LOGS
-      </div>
-      <div
         class:highlight={$page.route.id != "/profile"}
         on:click={()=>goto("/profile")}
         class="btn option"
