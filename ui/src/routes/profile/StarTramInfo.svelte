@@ -7,7 +7,7 @@
   $: region = (info?.region) || ""
   $: running = (info?.running) || ""
   $: expiry = (info?.expiry) || ""
-  $: renew = (info?.renew) || ""
+  $: renew = (info?.renew) || false
   $: endpoint = (info?.endpoint) || ""
 
   $: transition = ($structure?.profile?.startram?.transition) || {}
@@ -55,9 +55,7 @@
       <div class="account">
         <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Another Key</button>
         <button on:click={()=>showEndpointModal.set(true)} class="btn-account">Modify Endpoint</button>
-        {#if renew == "yes"}
-          <button on:click={()=>showCancelModal.set(true)} class="btn-account">Cancel Subscription</button>
-        {/if}
+        <button on:click={()=>showCancelModal.set(true)} class="btn-account">Cancel Subscription</button>
       </div>
     </div>
   {:else}
