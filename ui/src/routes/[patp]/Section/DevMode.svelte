@@ -11,8 +11,8 @@
 
 <div class="section">
   <div class="section-left">
-    <div class="title">Developer Mode</div>
-    <div class="description">This enables your ship to be able to debug from another computer</div>
+    <div class="section-title">Developer Mode</div>
+    <div class="section-description">This enables your ship to be able to debug from another computer</div>
   </div>
   <div class="section-right">
     <ToggleButton

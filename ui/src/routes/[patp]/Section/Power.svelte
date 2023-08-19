@@ -12,7 +12,7 @@
 
 <div class="section">
   <div class="section-left">
-    <div class="title">Power</div>
+    <div class="section-title">Power</div>
     <div class="check-wrapper">
       <div class="checkbox"></div>
       <div class="check-text">Autoboot after restart</div>
@@ -29,8 +29,8 @@
   <!-- Urbit Ship Status 
   <div class="section">
     <div class="section-left">
-      <div class="title">Remember Urbit Boot Status</div>
-      <div class="description">This enables your ship to autoboot after a device restart</div>
+      <div class="section-title">Remember Urbit Boot Status</div>
+      <div class="section-description">This enables your ship to autoboot after a device restart</div>
     </div>
     <div class="section-right">
       <div class="checkbox" class:highlight={detectBootStatus} on:click={()=>toggleAutoBoot(patp)}>

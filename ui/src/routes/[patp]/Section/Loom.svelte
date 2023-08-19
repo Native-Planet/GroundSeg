@@ -3,8 +3,8 @@
 
 <div class="section">
   <div class="section-left">
-    <div class="title">Loom Size</div>
-    <div class="description">
+    <div class="section-title">Loom Size</div>
+    <div class="section-description">
       This function will refragment your ship’s memory capacity, optimizing its performance. We recommend scheduling these once a week
     </div>
   </div>

@@ -11,8 +11,8 @@
 
 <div class="section">
   <div class="section-left">
-    <div class="title">Remote Access</div>
-    <div class="description">Access your ship via a StarTram connection</div>
+    <div class="section-title">Remote Access</div>
+    <div class="section-description">Access your ship via a StarTram connection</div>
   </div>
   <div class="section-right">
     <ToggleButton

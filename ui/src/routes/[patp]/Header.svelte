@@ -18,7 +18,9 @@
 
 <div class="header">
   <div class="patp-wrapper">
-    <div class="ship-class">{shipClass}</div>
+    <div class="ship-class">{shipClass}
+      <sup>{vere.toUpperCase()}</sup>
+    </div>
     <div class="patp">
       <!-- dev modification -->
       {#if $devShipClass == "star"}
@@ -28,7 +30,6 @@
       {:else}
         {patp.toUpperCase()}
       {/if}
-      {vere}
     </div>
   </div>
   <div class="settings-wrapper">

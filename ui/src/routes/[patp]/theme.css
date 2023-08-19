@@ -9,12 +9,12 @@
   flex: 1;
   text-align: right;
 }
-.title {
+.section-title {
   font-family: var(--regular-font);
   font-size: 16px;
   margin-bottom: 4px;
 }
-.description {
+.section-description {
   font-family: var(--regular-font);
   font-size: 12px;
 }
