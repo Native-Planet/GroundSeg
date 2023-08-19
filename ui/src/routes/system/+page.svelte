@@ -11,8 +11,8 @@
 </script>
 
 <div class="panel">
-  <SystemDetails />
   <Connection />
+  <SystemDetails />
   <div class="wrapper">
     <Power />
     <Netdata />
