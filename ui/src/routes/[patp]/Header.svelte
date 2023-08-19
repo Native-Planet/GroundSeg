@@ -8,6 +8,7 @@
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
   $: svcRegStatus = (ship?.serviceRegistrationStatus) || "ok"
+  $: vere = (ship?.vere) || ""
 
   $: chars = (patp.replace(/-/g,"").length) || 0
   $: shipClass = (chars == 3 ? "GALAXY" : chars == 6 ? "STAR" : chars == 12 ? "PLANET" : chars > 12 ? "MOON" : "UNKNOWN") || "ERROR"
@@ -27,15 +28,7 @@
       {:else}
         {patp.toUpperCase()}
       {/if}
-    </div>
-    <div class="quick-panel">
-      <button
-        disabled={svcRegStatus != "ok"}
-        on:click={()=>registerServiceAgain(patp)}
-        class="btn svc-register">{svcRegStatus == "creating" ? "Registering" : "Reregister Services"}
-      </button>
-      <button class="btn rebuild-container">Rebuild Container</button>
-      <div>+code</div>
+      {vere}
     </div>
   </div>
   <div class="settings-wrapper">
@@ -49,6 +42,7 @@
     </div>
   </div>
 </div>
+    <button class="btn rebuild-container">Rebuild Container</button>
 
 <style>
   .header {
@@ -73,7 +67,8 @@
   }
   .ship-class {
     font-family: var(--title-font);
-    margin: 20px 0 0 20px;
+    margin: 28px 0 12px 20px;
+    font-size: 18px;
   }
   .patp {
     font-family: var(--title-font);
@@ -98,11 +93,6 @@
   }
   .settings-text {
     flex: 1;
-  }
-  .quick-panel {
-    display: flex;
-    margin: 12px 20px;
-    gap: 20px;
   }
   .btn {
     width: 30%;

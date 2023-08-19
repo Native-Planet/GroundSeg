@@ -7,6 +7,10 @@
   } from '$lib/stores/websocket'
 
   import { showDeleteModal } from './store'
+  import Power from './Section/Power.svelte'
+  import Loom from './Section/Loom.svelte'
+  import DevMode from './Section/DevMode.svelte'
+  import RemoteAccess from './Section/RemoteAccess.svelte'
 
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
@@ -16,7 +20,6 @@
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
-  $: vere = (ship?.vere) || ""
   $: running = (ship?.running) || false
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || null
@@ -24,77 +27,50 @@
 </script>
 <div class="body">
 
-  <!-- Dev Mode -->
-  <div class="section">
-    <div class="section-left">
-      <div class="title">Developer Mode</div>
-      <div class="description">This enables your ship to be able to debug from another computer</div>
-    </div>
-    <div class="section-right">
-      <div on:click={()=>toggleDevMode(patp)}>{devMode ? "on" : "off"}</div>
-    </div>
-  </div>
+  <!-- Power -->
+  <Power
+    {running}
+    {tTogglePower}
+    on:click={()=>toggleUrbitPower(patp)}
+    />
 
-  <!-- Urbit Ship Status -->
-  <div class="section">
-    <div class="section-left">
-      <div class="title">Remember Urbit Boot Status</div>
-      <div class="description">This enables your ship to autoboot after a device restart</div>
-    </div>
-    <div class="section-right">
-      <div class="checkbox" class:highlight={detectBootStatus} on:click={()=>toggleAutoBoot(patp)}>
-        {#if detectBootStatus}
-          <div class="icon"><Fa icon={faCheck} size="1x"/></div>
-        {/if}
-      </div>
-    </div>
-  </div>
+  <!-- Custom Urbit Domain -->
+  <div>minio custom domain</div>
+
+  <!-- Custom MinIO Domain -->
+  <div>urbit custom domain</div>
 
   <!-- Loom -->
-  <div class="section">
-    <div class="section-left">
-      <div class="title">Loom Size</div>
-      <div class="description">Loom description</div>
-    </div>
-    <div class="section-right">
-      slider
-    </div>
-  </div>
+  <Loom 
+    />
 
   <!-- Pack & Meld -->
   <div class="section">
     <div class="section-left">
       <div class="title">Pack & Meld</div>
-      <div class="description">This function will refragement your ship's memory capacity, optimizing its performance. We recommend scheduling these once a week</div>
+      <div class="description">
+        This function will refragement your ship's memory capacity, optimizing its performance. We recommend scheduling these once a week
+      </div>
     </div>
     <div class="section-right">
       Start Button, calendar
     </div>
   </div>
 
-  <!-- Startram Connectivity -->
-  <div class="section">
-    <div class="section-left">
-      <div class="title">Remote Access</div>
-      <div class="description">Access your ship via a StarTram connection</div>
-    </div>
-    <div class="section-right" on:click={()=>toggleNetwork(patp)}>
-      {remote ? "on" : "off"}
-    </div>
-  </div>
+  <!-- Dev Mode -->
+  <DevMode
+    {devMode}
+    on:click={()=>toggleDevMode(patp)}
+    />
 
-  <!-- Vere Version -->
-  <div class="section">
-    <div class="section-left">
-      <div class="title">Vere Version</div>
-      <div class="description">{vere}</div>
-    </div>
-  </div>
+  <!-- Remote Access -->
+  <RemoteAccess
+    {remote}
+    on:click={()=>toggleNetwork(patp)}
+    />
 
-  <div>url</div>
+
   <div>MinIO</div>
-  <div>minio custom domain</div>
-  <div>urbit custom domain</div>
 
   <div class="bottom-panel">
     <div class="btn">Logs</div>
@@ -115,9 +91,9 @@
     background-color: var(--bg-card);
     position: absolute;
     bottom: 0;
-    height: calc(743px - 150px);
+    height: calc(743px - 150px - 40px);
     width: calc(100% - 40px);
-    padding: 0 20px;
+    padding: 20px;
     max-width: 100vw;
     border-radius: 16px 0 120px 16px;
     color: var(--text-card-color);
@@ -152,23 +128,6 @@
   }
   .title {
     font-size: 16px;
-  }
-  .description {
-    font-size: 12px;
-  }
-  .checkbox {
-    float: right;
-    height: 24px;
-    width: 24px;
-    border: 1px solid var(--btn-secondary);
-    border-radius: 6px;
-    color: var(--text-card-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-  }
-  .highlight {
-    background: var(--btn-secondary);
+    font-family: var(--regular-font);
   }
 </style>

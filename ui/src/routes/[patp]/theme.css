@@ -1,0 +1,20 @@
+.section {
+  display: flex;
+  align-items: center;
+}
+.section-left {
+  flex: 1;
+}
+.section-right {
+  flex: 1;
+  text-align: right;
+}
+.title {
+  font-family: var(--regular-font);
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.description {
+  font-family: var(--regular-font);
+  font-size: 12px;
+}

@@ -4,20 +4,20 @@
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
 
-  export let devMode
+  export let remote
 
   const dispatch = createEventDispatcher()
 </script>
 
 <div class="section">
   <div class="section-left">
-    <div class="title">Developer Mode</div>
-    <div class="description">This enables your ship to be able to debug from another computer</div>
+    <div class="title">Remote Access</div>
+    <div class="description">Access your ship via a StarTram connection</div>
   </div>
   <div class="section-right">
     <ToggleButton
       on:click={()=>dispatch("click")}
-      on={devMode}
+      on={remote}
       />
   </div>
 </div>

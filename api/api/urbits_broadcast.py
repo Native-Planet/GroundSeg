@@ -61,7 +61,7 @@ class UrbitsBroadcast:
             return None
 
     def set_transition(self, patp, transition, value):
-        if not self.transition.get(patp):
+        if self.transition.get(patp) != dict:
             self.transition[patp] = {}
         self.transition[patp][transition] = value
 
