@@ -62,22 +62,6 @@
     width: 228px;
     border-radius: 8px 8px 0 0;
   }
-  .status > .light {
-    height: 14px;
-    width: 21px;
-    border-radius: 4px 0 0 4px;
-  }
-  .status > .on {
-    background: lime;
-  }
-  .status > .off {
-    background: var(--btn-secondary);
-  }
-  .status > .text {
-    font-size: 9px;
-    flex: 1;
-    text-align: right;
-  }
 
   /* Lower */
   .body {
@@ -126,54 +110,10 @@
     align-items: center;
     height: 67px;
   }
-  .patp {
-    flex: 1;
-    font-size: 16px;
-    margin-left: 20px;
-    font-family: var(--title-font);
-  }
-  .ext {
-    position: relative;
-    background: var(--text-color);
-    height: 32px;
-    width: 48px;
-    border-radius: 160px 0 0 160px;
-  }
-  .icon {
-    position: absolute;
-    top: 6px;
-    right: 16px;
-    transform: rotate(-45deg);
-  }
   /* Settings */
   .settings-wrapper {
     display: flex;
     margin-left: 20px;
     height: 32px;
-  }
-  .settings-info {
-    flex: 1;
-  }
-  .settings {
-    font-family: var(--title-font);
-    flex: 1;
-    display: flex;
-    gap: 30px;
-    font-size: 14px;
-    line-height: 14px;
-  }
-  .settings-text {
-    width: 20px;
-  }
-  .settings-button {
-    background-color: var(--btn-secondary);
-    background-image: url('/settings.svg');
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 50% 50%;
-    background-color: var(--btn-secondary);
-    height: 32px;
-    width: 48px;
-    border-radius: 24px 0;
   }
 </style>
