@@ -15,7 +15,6 @@
   $: cpuTemp = (usage?.cpu_temp) || 0
 </script>
 
-
 <div class="container">
   <div class="title">SYSTEM DETAILS</div>
   <Swap {swap}/>

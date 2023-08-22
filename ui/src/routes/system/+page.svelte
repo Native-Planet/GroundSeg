@@ -6,17 +6,17 @@
   import SystemDetails from './SystemDetails.svelte'
   import Power from './Power.svelte'
   import PowerModal from './PowerModal.svelte'
-  import Netdata from './Netdata.svelte'
   import Logs from './Logs.svelte'
+  import Support from './Support.svelte'
   //$: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>
 
 <div class="panel">
   <Connection />
   <SystemDetails />
-  <div class="wrapper">
-    <Power />
-  </div>
+  <Power />
+  <Logs />
+  <Support />
 </div>
 {#if $shutdownModal}
   <PowerModal info="shutdown" />

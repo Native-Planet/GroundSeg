@@ -4,38 +4,34 @@
 </script>
 
 <div class="container">
-    <div class="wrapper">
-      <div class="title">POWER</div>
-      <button class="power btn" on:click={()=>shutdownModal.set(true)}>Shut Down</button>
-      <button class="restart btn" on:click={()=>restartModal.set(true)}>Restart</button>
-    </div>
+  <div class="title">POWER</div>
+  <div class="spacer"></div>
+  <button class="btn" on:click={()=>shutdownModal.set(true)}>Shut Down</button>
+  <button class="btn" on:click={()=>restartModal.set(true)}>Restart</button>
 </div>
 
 <style>
+  .container {
+    margin: 0;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
   .title {
     margin: 0;
   }
-  .wrapper {
-    display: flex;
-    gap: 20px;
-    margin: 0;
+  .spacer {
+    flex: 1;
   }
   .btn {
-    flex: 1;
     font-family: var(--regular-font);
     color: var(--text-card-color);
-    height: 36px;
+    height: 42px;
     font-size: 12px;
-    border-radius: 16px;
+    font-weight: 600;
+    border-radius: 12px;
     cursor: pointer;
-  }
-  .btn:hover {
-    background: var(--bg-card);
-  }
-  .restart {
-    background: var(--btn-secondary);
-  }
-  .power {
+    padding: 0 36px;
     background: var(--btn-secondary);
   }
 </style>
