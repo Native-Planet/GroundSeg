@@ -39,7 +39,7 @@
   <div class="title">CONNECTION</div>
 
   <div class="wifi-toggle">
-    <div class="wifi-text">Wi-Fi</div>
+    <div class="wifi-text">Wireless Network</div>
     <ToggleButton
       on:click={toggleWifi}
       on={status}
@@ -101,7 +101,6 @@
   .wifi-toggle {
     display: flex;
     align-items: center;
-    margin-bottom: 12px;
   }
   .wifi-options {
     display: flex;
@@ -110,11 +109,10 @@
   .wifi-text {
     flex: 1;
     font-size: 16px;
-    font-weight: 500;
   }
   .active-title {
     font-size: 13px;
-    margin-bottom: 12px;
+    margin: 12px 0;
   }
   .active-selector {
     display: flex;

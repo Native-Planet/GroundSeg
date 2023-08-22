@@ -1,0 +1,22 @@
+.info-wrapper {
+  margin-top: 20px;
+  display: flex;
+  font-size: 16px;
+}
+.info-title {
+  flex: 1;
+}
+.bar-bg {
+  margin-top: 8px;
+  width: 100%;
+  height: 36px;
+  background-color: var(--bg-modal);
+  border-radius: 12px;
+  border: 4px solid var(--bg-modal);
+}
+.bar-fg {
+  background-color: var(--btn-primary);
+  height: 36px;
+  border-radius: 8px;
+  transition: width 500ms;
+}

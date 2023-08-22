@@ -8,6 +8,7 @@
   import PowerModal from './PowerModal.svelte'
   import Netdata from './Netdata.svelte'
   import Logs from './Logs.svelte'
+  //$: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>
 
 <div class="panel">
@@ -15,7 +16,6 @@
   <SystemDetails />
   <div class="wrapper">
     <Power />
-    <Netdata />
   </div>
 </div>
 {#if $shutdownModal}
