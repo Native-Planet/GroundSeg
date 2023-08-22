@@ -30,6 +30,7 @@ from api.lick_ipc import Lick
 async def main():
     # We check if the dev argument is given, then
     # print the appropriate announcment
+    dev = False
     try:
         dev = sys.argv[1] == "dev"
         if dev:
