@@ -1,5 +1,5 @@
 <script>
-  import ToggleButton from '../ToggleButton.svelte'
+  import ToggleButton from '$lib/ToggleButton.svelte'
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'

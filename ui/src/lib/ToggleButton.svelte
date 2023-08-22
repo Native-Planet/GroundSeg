@@ -25,6 +25,7 @@
     float: right;
     border-radius: 8px;
     background-color: var(--btn-secondary);
+    color: var(--text-card-color);
     cursor: pointer;
   }
   .hightlight {
