@@ -1,18 +1,56 @@
 <script>
-  import { structure, startramToggle, startramRestart } from '$lib/stores/websocket'
+  import { structure,  startramRestart } from '$lib/stores/websocket'
   import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
+  export let expiry
 
-  $: info = ($structure?.profile?.startram?.info) || {}
+  /*
   $: registered = (info?.registered) || false
   $: region = (info?.region) || ""
-  $: running = (info?.running) || ""
-  $: expiry = (info?.expiry) || ""
+  */
+  /*
   $: renew = (info?.renew) || false
   $: endpoint = (info?.endpoint) || ""
 
-  $: transition = ($structure?.profile?.startram?.transition) || {}
-  $: tToggle = (transition?.toggle) || null
+  */
 </script>
+
+<div class="wrapper">
+  <div class="title">STARTRAM</div>
+  <div class="info-wrapper">
+    <div class="info">
+      <div class="item">Plan</div>
+      <div class="item">{expiry}</div>
+    </div>
+    <div class="info">
+      <div class="item">Expiration Date</div>
+      <div class="item">{expiry}</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wrapper {
+    width: 30%;
+  }
+  .title {
+    margin-bottom: 12px;
+  }
+  .info-wrapper {
+    display: flex;
+    margin-bottom: 12px;
+  }
+  .info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .item {
+    font-size: 14px;
+  }
+</style>
+
+<!--
 <div class="body">
   <div class="panel left">
     <div class="header">Subscription Information</div>
@@ -69,92 +107,4 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .body {
-    display: flex;
-    gap: 40px;
-  }
-  .left {
-    flex: 8;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .right {
-    flex: 5
-  }
-  .header {
-    font-size: 12px;
-    margin-bottom: 12px;
-  }
-  table {
-    text-align: center;
-    border: 2px solid var(--btn-secondary);
-    padding: 20px;
-    background-color: var(--bg-modal);
-    border-radius: 12px;
-    margin-bottom: 24px;
-  }
-  .top {
-    font-size: 12px;
-    line-height: 12px;
-    padding-bottom: 4px;
-  }
-  .bottom {
-    font-size: 24px;
-    font-family: var(--title-font);
-    line-height: 36px;
-  }
-  td {
-    width: 200px;
-  }
-  .endpoint {
-    padding: 12px;
-    font-size: 12px;
-    text-align: center;
-    background-color: var(--bg-modal);
-    border-radius: 12px;
-    border: 2px solid var(--btn-secondary);
-  }
-  .btn-troubleshoot {
-    width: calc(100% - 24px);
-    padding: 12px;
-    font-family: var(--regular-font);
-    color: var(--text-card-color);
-    font-size: 12px;
-    border-radius: 12px;
-    background: var(--btn-secondary);
-    margin-bottom: 24px;
-  }
-  .unregistered-panel {
-    margin-top: auto;
-  }
-  .btn-account {
-    display: block;
-    padding: 12px;
-    width: calc(100% - 24px);
-    font-family: var(--regular-font);
-    color: var(--text-card-color);
-    font-size: 12px;
-    border-radius: 12px;
-    background: var(--btn-secondary);
-    margin-top: 8px;
-  }
-  /*
-  input {
-    width: calc(100% - 20px);
-    font-family: var(--regular-font);
-    color: var(--text-color);
-    padding-left: 20px;
-    border: 2px solid var(--btn-secondary);
-    background-color: var(--bg-modal);
-    border-radius: 12px;
-    font-size: 12px;
-    line-height: 36px;
-  }
-  input:focus {
-    outline: none;
-  }
-  */
-</style>
+-->

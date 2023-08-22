@@ -8,8 +8,13 @@
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
-    <div class="title">PASSWORD</div>
-    <div class="wrapper">
+  <div class="title">COMPUTER</div>
+  <div class="label">Password</div>
+  <div class="wrapper">
+    <input class="pwd" type="password" value="randomvalue12345" />
+    <button>Edit</button>
+  </div>
+      <!--
       <div class="modify">
         <div class="input-wrapper">
           <div class="label">Current Password</div>
@@ -33,7 +38,7 @@
         <button class="btn" on:click={logoutAll}>Log Out Everywhere</button>
         <button class="btn" on:click={logout}>Log Out</button>
       </div>
-    </div>
+      -->
 </div>
 
 <style>

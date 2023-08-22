@@ -11,10 +11,11 @@
   import CancelModal from './CancelModal.svelte'
 </script>
 
-<StarTram />
-<div class="spacer"></div>
 <Password {wide} />
 <div class="spacer"></div>
+<StarTram />
+<div class="spacer"></div>
+
 {#if $showRegisterModal}
   <RegisterModal />
 {/if}

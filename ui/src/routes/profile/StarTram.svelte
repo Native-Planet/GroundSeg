@@ -1,16 +1,25 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
-
-  import NewRegistration from './NewRegistration.svelte'
+  import { startramToggle, structure } from '$lib/stores/websocket'
+  import ToggleButton from '$lib/ToggleButton.svelte'
   import StarTramInfo from './StarTramInfo.svelte'
+
+  $: info = ($structure?.profile?.startram?.info) || {}
+  $: expiry = (info?.expiry) || ""
+  $: running = (info?.running) || false
+  $: transition = ($structure?.profile?.startram?.transition) || {}
+  $: tToggle = (transition?.toggle) || null
 
 </script>
 
 <div class="container">
-  <div class="title">STARTRAM</div>
-  <StarTramInfo />
+  <div class="top">
+    <StarTramInfo {expiry} />
+    <div class="spacer"></div>
+    <button class="new-key">New Key</button>
+    <ToggleButton on:click={startramToggle} loading={tToggle} on={running} />
+  </div>
 </div>
 
 <style>
@@ -20,66 +29,21 @@
     max-width: 98vw;
     padding: 40px;
   }
-  .title {
-    margin-bottom: 24px;
+  .top {
+    display: flex;
+    gap: 24px;
   }
-  .header {
-    font-size: 12px;
-    margin-bottom: 12px;
-  }
-  input {
-    width: calc(100% - 20px);
-    font-family: var(--regular-font);
-    color: var(--text-color);
-    padding-left: 20px;
-    border: 2px solid var(--btn-secondary);
-    background-color: var(--bg-modal);
+  .new-key {
+    background-color: var(--btn-secondary);
     border-radius: 12px;
+    color: var(--text-card-color);
+    height: 42px;
+    padding: 0 48px;
+    font-family: var(--regular-font);
     font-size: 12px;
-    line-height: 36px;
-  }
-  input:focus {
-    outline: none;
+    cursor: pointer;
   }
   .spacer {
     flex: 1;
-  }
-  .region-wrapper {
-    flex: 8;
-  }
-  .body {
-    display: flex;
-    gap: 40px;
-  }
-  .reg-wrapper {
-    flex: 9;
-  }
-  .reg {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-  }
-  .reg-btn {
-    background-color: var(--btn-primary);
-    color: var(--text-card-color);
-    padding: 0 40px;
-    border-radius: 16px;
-  }
-  .regions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-  }
-  .region {
-    flex: 1 0 calc(50% - 20px);
-    color: var(--text-card-color);
-    border-radius: 8px;
-    background: var(--btn-secondary);
-    font-size: 12px;
-    line-height: 64px;
-    text-align: center;
-  }
-  .highlight {
-    background: var(--btn-primary);
   }
 </style>
