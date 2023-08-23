@@ -1,25 +1,16 @@
 <script>
   import { structure,  startramRestart } from '$lib/stores/websocket'
   import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
+  export let renew
   export let expiry
-
-  /*
-  $: registered = (info?.registered) || false
-  $: region = (info?.region) || ""
-  */
-  /*
-  $: renew = (info?.renew) || false
-  $: endpoint = (info?.endpoint) || ""
-
-  */
 </script>
 
 <div class="wrapper">
   <div class="title">STARTRAM</div>
   <div class="info-wrapper">
     <div class="info">
-      <div class="item">Plan</div>
-      <div class="item">{expiry}</div>
+      <div class="item">Autorenew</div>
+      <div class="item">{renew ? "Yes" : "No"}</div>
     </div>
     <div class="info">
       <div class="item">Expiration Date</div>

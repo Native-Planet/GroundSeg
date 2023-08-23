@@ -1,44 +1,19 @@
 <script>
-  import { structure, logout, logoutAll, modifyPassword } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/websocket'
+  import PasswordModal from './PasswordModal.svelte'
   export let wide
-  let old = '';
-  let pwd = '';
-  let cfm = '';
-
+  let showModal = false
 </script>
+
+<PasswordModal bind:showModal />
 
 <div class="container {wide ? "wide" : "slim"}">
   <div class="title">COMPUTER</div>
   <div class="label">Password</div>
   <div class="wrapper">
-    <input class="pwd" type="password" value="randomvalue12345" />
-    <button>Edit</button>
+    <div class="pwd">**************************</div>
+    <button class="edit" on:click={()=>showModal=!showModal}>Edit</button>
   </div>
-      <!--
-      <div class="modify">
-        <div class="input-wrapper">
-          <div class="label">Current Password</div>
-          <input class="pwd" type="password" bind:value={old} />
-        </div>
-        <div class="input-wrapper">
-          <div class="label">New Password</div>
-          <input class="pwd" type="password" bind:value={pwd}/>
-        </div>
-        <div class="input-wrapper">
-          <div class="label">Confirm Password</div>
-          <input class="pwd" type="password" bind:value={cfm}/>
-        </div>
-        <button
-          class="btn"
-          on:click={()=>modifyPassword(old,cfm)}
-          disabled={(pwd != cfm) || (cfm.length == 0)}>Modify Password</button>
-      </div>
-      <div class="spacer"></div>
-      <div class="buttons">
-        <button class="btn" on:click={logoutAll}>Log Out Everywhere</button>
-        <button class="btn" on:click={logout}>Log Out</button>
-      </div>
-      -->
 </div>
 
 <style>
@@ -48,14 +23,6 @@
   .wrapper {
     display: flex;
     align-items: end;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .modify {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
     gap: 24px;
   }
   .pwd {
@@ -77,31 +44,17 @@
     color: var(--text-color);
     margin-bottom: 8px;
   }
-  .buttons {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .btn {
+  .edit {
     font-family: var(--regular-font);
     background: var(--btn-secondary);
     color: var(--text-card-color);
     height: 42px;
     font-size: 12px;
-    border-radius: 16px;
+    border-radius: 12px;
     cursor: pointer;
-    display: flex;
-    gap: 6px;
     justify-content: center;
     align-items: center;
-  }
-  .btn:hover {
-    background: var(--bg-card);
-  }
-  .btn:disabled {
-    pointer-events: none;
-    opacity: .6;
+    padding: 0 48px;
   }
   .wide {
     width: 992px;
@@ -113,23 +66,5 @@
   }
   .title {
     margin-bottom: 24px;
-  }
-  .links {
-    display: flex;
-    gap: 20px;
-  }
-  .link {
-    text-decoration: none;
-    color: var(--text-color);
-    font-size: 12px;
-  }
-  .power-btn {
-    background: var(--btn-secondary);
-    color: var(--text-card-color);
-    height: 42px;
-    font-size: 14px;
-    width: 200px;
-    border-radius: 16px;
-    cursor: pointer;
   }
 </style>

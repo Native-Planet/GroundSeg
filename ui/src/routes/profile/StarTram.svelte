@@ -6,16 +6,26 @@
   import StarTramInfo from './StarTramInfo.svelte'
 
   $: info = ($structure?.profile?.startram?.info) || {}
+  $: renew = (info?.renew) || false
   $: expiry = (info?.expiry) || ""
   $: running = (info?.running) || false
   $: transition = ($structure?.profile?.startram?.transition) || {}
   $: tToggle = (transition?.toggle) || null
 
+
+  /*
+  $: registered = (info?.registered) || false
+  $: region = (info?.region) || ""
+  */
+  /*
+  $: endpoint = (info?.endpoint) || ""
+
+  */
 </script>
 
 <div class="container">
   <div class="top">
-    <StarTramInfo {expiry} />
+    <StarTramInfo {renew} {expiry} />
     <div class="spacer"></div>
     <button class="new-key">New Key</button>
     <ToggleButton on:click={startramToggle} loading={tToggle} on={running} />
