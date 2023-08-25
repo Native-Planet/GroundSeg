@@ -1,22 +1,26 @@
 <script>
   import { structure,  startramRestart } from '$lib/stores/websocket'
-  import { showCancelModal, showRegisterModal, showEndpointModal } from './store'
   export let renew
   export let expiry
+  export let registered
 </script>
 
 <div class="wrapper">
   <div class="title">STARTRAM</div>
-  <div class="info-wrapper">
-    <div class="info">
-      <div class="item">Autorenew</div>
-      <div class="item">{renew ? "Yes" : "No"}</div>
+  {#if registered}
+    <div class="info-wrapper">
+      <div class="info">
+        <div class="item">Autorenew</div>
+        <div class="item">{renew ? "Yes" : "No"}</div>
+      </div>
+      <div class="info">
+        <div class="item">Expiration Date</div>
+        <div class="item">{expiry}</div>
+      </div>
     </div>
-    <div class="info">
-      <div class="item">Expiration Date</div>
-      <div class="item">{expiry}</div>
-    </div>
-  </div>
+  {:else}
+    <div class="info-box">Not Registered</div>
+  {/if}
 </div>
 
 <style>
@@ -35,6 +39,15 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .info-box {
+    border: solid 1px var(--text-color);
+    width: 120px;
+    padding: 8px 0;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 12px;
+    opacity: .6;
   }
   .item {
     font-size: 14px;

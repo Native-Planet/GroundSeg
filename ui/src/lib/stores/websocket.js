@@ -238,7 +238,7 @@ export const connectWifi = (ssid,pwd) => {
 //  StarTram
 //
 
-export const startramGetRegions = async () => {
+export const startramGetRegions = () => {
   let payload = {
     "type":"startram",
     "action":"regions"
@@ -246,7 +246,8 @@ export const startramGetRegions = async () => {
   send(payload)
 }
 
-export const startramRegister = async (key,region) => {
+export const startramRegister = (key,region) => {
+  console.log("starst")
   let payload = {
     "type":"startram",
     "action":"register",
@@ -256,7 +257,7 @@ export const startramRegister = async (key,region) => {
   send(payload)
 }
 
-export const startramToggle = async () => {
+export const startramToggle = () => {
   let payload = {
     "type":"startram",
     "action":"toggle"

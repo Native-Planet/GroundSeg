@@ -1,34 +1,42 @@
 <script>
+  // Modals
+  import { openModal } from 'svelte-modals'
+  import RegisterModal from './RegisterModal.svelte'
+  // Icons
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
+  // Websocket
   import { startramToggle, structure } from '$lib/stores/websocket'
+  // Components
   import ToggleButton from '$lib/ToggleButton.svelte'
   import StarTramInfo from './StarTramInfo.svelte'
 
+  // Info
   $: info = ($structure?.profile?.startram?.info) || {}
   $: renew = (info?.renew) || false
   $: expiry = (info?.expiry) || ""
   $: running = (info?.running) || false
+  $: registered = (info?.registered) || false
+
+  // Transition
   $: transition = ($structure?.profile?.startram?.transition) || {}
   $: tToggle = (transition?.toggle) || null
-
-
-  /*
-  $: registered = (info?.registered) || false
-  $: region = (info?.region) || ""
-  */
-  /*
-  $: endpoint = (info?.endpoint) || ""
-
-  */
+  //$: region = (info?.region) || "us-east"
+  //$: endpoint = (info?.endpoint) || ""
 </script>
 
 <div class="container">
   <div class="top">
-    <StarTramInfo {renew} {expiry} />
+    <StarTramInfo {renew} {expiry} {registered} />
     <div class="spacer"></div>
-    <button class="new-key">New Key</button>
-    <ToggleButton on:click={startramToggle} loading={tToggle} on={running} />
+    <button
+      on:click={()=>openModal(RegisterModal)}
+      class="new-key">
+      New Key
+    </button>
+    {#if registered}
+      <ToggleButton on:click={startramToggle} loading={tToggle} on={running} />
+    {/if}
   </div>
 </div>
 

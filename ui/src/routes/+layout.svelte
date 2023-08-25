@@ -7,9 +7,8 @@
 
   // Websocket
   import { connect, structure, connected } from '$lib/stores/websocket'
-  import { wide, setLimbo } from '$lib/stores/display'
+  import { wide } from '$lib/stores/display'
 
-  import Limbo from '$lib/Limbo.svelte'
   import ApiSpinner from './ApiSpinner.svelte'
 
   // Style
@@ -69,5 +68,4 @@
 
 <!--svelte:window bind:innerWidth bind:innerHeight /-->
 <slot/>
-<Limbo />
 <ApiSpinner />

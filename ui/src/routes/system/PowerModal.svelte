@@ -43,15 +43,15 @@
 
 <style>
   .wrapper {
-    position:absolute;
+    position:fixed;
     left: 0;
     top: 0;
+    right: 0;
+    bottom: 0;
     backdrop-filter: blur(4px);
     -moz-backdrop-filter: blur(4px);
     -o-backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(4px);
-    width: 100vw;
-    height: 100vh;
     background: #FFFFFF3D;
   }
   .modal {
