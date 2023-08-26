@@ -1,13 +1,16 @@
 <script>
+  // Modals
+  import { openModal } from 'svelte-modals'
+  import PowerModal from './PowerModal.svelte'
+  // Websocket
   import { structure } from '$lib/stores/websocket'
-  import { shutdownModal, restartModal } from './store'
 </script>
 
 <div class="container">
   <div class="title">POWER</div>
   <div class="spacer"></div>
-  <button class="btn" on:click={()=>shutdownModal.set(true)}>Shut Down</button>
-  <button class="btn" on:click={()=>restartModal.set(true)}>Restart</button>
+  <button class="btn" on:click={()=>openModal(PowerModal,{"info":"shutdown"})}>Shut Down</button>
+  <button class="btn" on:click={()=>openModal(PowerModal,{"info":"restart"})}>Restart</button>
 </div>
 
 <style>

@@ -86,6 +86,7 @@ class Broadcaster:
 
     async def unauth(self, broadcast):
         try:
+            raise Exception("skip")
             sesh = self.app.active_sessions
             u = sesh.get('unauthorized').copy().keys()
             for s in u:
@@ -95,4 +96,5 @@ class Broadcaster:
                     print(f"removing {s}")
                     self.app.active_sessions['unauthorized'].pop(s)
         except Exception as e:
-            print(f"api:broadcaster:unauth: {e}")
+            if f"{e}" != "skip":
+                print(f"api:broadcaster:unauth: {e}")

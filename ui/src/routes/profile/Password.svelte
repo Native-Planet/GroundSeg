@@ -1,18 +1,19 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
+  // Modals
+  import { openModal } from 'svelte-modals'
   import PasswordModal from './PasswordModal.svelte'
+  // Styling
   export let wide
-  let showModal = false
+  // Websocket
+  import { structure } from '$lib/stores/websocket'
 </script>
-
-<PasswordModal bind:showModal />
 
 <div class="container {wide ? "wide" : "slim"}">
   <div class="title">COMPUTER</div>
   <div class="label">Password</div>
   <div class="wrapper">
     <div class="pwd">**************************</div>
-    <button class="edit" on:click={()=>showModal=!showModal}>Edit</button>
+    <button class="edit" on:click={()=>openModal(PasswordModal)}>Edit</button>
   </div>
 </div>
 

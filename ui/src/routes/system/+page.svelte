@@ -1,7 +1,6 @@
 <script>
   import './system.css'
 
-  import { shutdownModal, restartModal } from './store'
   import { structure } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
 
@@ -9,7 +8,6 @@
   import Connection from './Connection.svelte'
   import SystemDetails from './SystemDetails.svelte'
   import Power from './Power.svelte'
-  import PowerModal from './PowerModal.svelte'
   import Logs from './Logs.svelte'
   import Support from './Support.svelte'
 
@@ -26,12 +24,6 @@
   <Logs />
   <Support />
 </div>
-
-{#if $shutdownModal}
-  <PowerModal info="shutdown" />
-{:else if $restartModal}
-  <PowerModal info="restart" />
-{/if}
 
 <style>
   .panel {

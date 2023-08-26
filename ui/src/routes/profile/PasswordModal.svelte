@@ -1,74 +1,55 @@
 <script>
-	export let showModal
+  import { afterUpdate } from 'svelte'
   import { modifyPassword } from '$lib/stores/websocket'
-  import { createEventDispatcher } from 'svelte'
-  import Fa from 'svelte-fa'
-  import { faXmark } from '@fortawesome/free-solid-svg-icons';
-  let dialog
-	$: if (dialog && showModal) dialog.showModal();
+  import { closeModal } from 'svelte-modals'
+  import Modal from '$lib/Modal.svelte'
+
+  export let isOpen
+
   let cur = ''
   let pwd = ''
   let cfm = ''
-  const dispatch = createEventDispatcher()
+
+  /*
+  afterUpdate(()=>{
+    if (tRegister == "done") {
+      closeModal()
+    }
+  })
+  */
 </script>
 
-<dialog
-	bind:this={dialog}
-	on:close={() => (showModal = false)}
-	on:click|self={() => dialog.close()}>
-  <div class="x" on:click={()=>dispatch("close")}>
-    <Fa icon={faXmark} size="1x"/>
-  </div>
-	<div on:click|stopPropagation>
-    <div class="pwds">
-      <div class="edit-title">Edit Password</div>
-      <div class="pw-wrapper">
-        <div class="label">Current Password</div>
-        <input type="password" bind:value={cur} />
+{#if isOpen}
+  <Modal>
+    <div class="wrapper">
+      <div class="pwds">
+        <div class="edit-title">Edit Password</div>
+        <div class="pw-wrapper">
+          <div class="label">Current Password</div>
+          <input type="password" bind:value={cur} />
+        </div>
+        <div class="pw-wrapper">
+          <div class="label">New Password</div>
+          <input type="password" bind:value={pwd} />
+        </div>
+        <div class="pw-wrapper">
+          <div class="label">Confirm Password</div>
+          <input type="password" bind:value={cfm} />
+        </div>
       </div>
-      <div class="pw-wrapper">
-        <div class="label">New Password</div>
-        <input type="password" bind:value={pwd} />
-      </div>
-      <div class="pw-wrapper">
-        <div class="label">Confirm Password</div>
-        <input type="password" bind:value={cfm} />
-      </div>
+      <button
+        disabled={(cfm.length < 1) || (pwd != cfm)}
+        on:click={()=>modifyPassword(cur,cfm)}
+        >Save
+      </button>
     </div>
-    <button
-      disabled={(cfm.length < 1) || (pwd != cfm)}
-      on:click={()=>modifyPassword(cur,cfm)}
-      >Save
-    </button>
-	</div>
-</dialog>
+  </Modal>
+{/if}
 
 <style>
-	dialog {
-    position: relative;
-		border: none;
-    border-radius: 16px;
-		padding: 20px;
-    background: var(--bg-base);
-	}
-	dialog::backdrop {
-    background: rgba(92, 112, 96, 0.5);
-	}
-	dialog > div {
-    width: calc(572px - 120px);
+  .wrapper {
+    margin: 20px;
     font-family: var(--regular-font);
-	}
-  .x {
-    position: absolute;
-    background: var(--btn-secondary);
-    background: var(--bg-modal);
-    top: 0;
-    right: 0;
-    padding: 12px;
-    border-radius: 0 16px 0 16px;
-    width: 20px;
-    text-align: center;
-    cursor: pointer;
   }
   .pwds {
     display: flex;
@@ -117,4 +98,3 @@
     pointer-events: none;
   }
 </style>
-

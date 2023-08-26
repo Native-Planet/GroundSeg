@@ -59,19 +59,23 @@
     font-family: var(--regular-font);
   }
   h1 {
-    font-size: 24px;
+    font-size: 14px;
     font-weight: 500;
-    margin: 0;
   }
   p {
     margin-top: 10px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 300;
+    margin-bottom: 20px;
+    opacity: .8;
   }
   h2 {
+    padding-left: 8px;
     font-size: 14px;
     font-weight: 300;
     margin: 0;
+    color: var(--btn-secondary);
+    font-weight: 500;
   }
   input {
     margin: 8px 0 20px 0;
@@ -99,9 +103,10 @@
     text-align: center;
     padding: 12px 0;
     background: var(--bg-modal);
+    color: var(--btn-secondary);
     border-radius: 12px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
   }
   .highlight {
