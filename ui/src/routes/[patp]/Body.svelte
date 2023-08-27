@@ -28,10 +28,10 @@
   $: running = (ship?.running) || false
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || null
+  $: loomSize = (ship?.loomSize)
 
 </script>
 <div class="body">
-
   <!-- Power -->
   <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
 
@@ -45,7 +45,7 @@
   <MinIO />
 
   <!-- Loom -->
-  <Loom />
+  <Loom {loomSize} />
 
   <!-- Pack & Meld -->
   <PackMeld />
