@@ -126,16 +126,16 @@ class Click:
   get-our
 ;<    ~
     bind:m
-  (poke [our %storage] %s3-action !>([%set-endpoint '{payload['endpoint']}']))
+  (poke [our %storage] %storage-action !>([%set-endpoint '{payload['endpoint']}']))
 ;<    ~
     bind:m
-  (poke [our %storage] %s3-action !>([%set-access-key-id '{payload['acc']}']))
+  (poke [our %storage] %storage-action !>([%set-access-key-id '{payload['acc']}']))
 ;<    ~
     bind:m
-  (poke [our %storage] %s3-action !>([%set-secret-access-key '{payload['secret']}']))
+  (poke [our %storage] %storage-action !>([%set-secret-access-key '{payload['secret']}']))
 ;<    ~
     bind:m
-  (poke [our %storage] %s3-action !>([%set-current-bucket '{payload['bucket']}']))
+  (poke [our %storage] %storage-action !>([%set-current-bucket '{payload['bucket']}']))
 (pure:m !>('success'))
 """
         if name == "s3-legacy":
