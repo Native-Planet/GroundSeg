@@ -24,7 +24,8 @@ var (
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
-	BasePath = os.Getenv("GS_BASE_PATH")
+	// BasePath = os.Getenv("GS_BASE_PATH")
+	BasePath = "/opt/nativeplanet/groundseg"
 	// only amd64 or arm64
 	Architecture = getArchitecture()
 	// struct of /retrieve blob

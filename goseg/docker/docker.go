@@ -16,6 +16,7 @@ import (
 
 var (
 	EventBus = make(chan structs.Event, 100)
+	UTransBus = make(chan structs.UrbitTransition, 100)
 )
 
 // return the container status of a slice of ships

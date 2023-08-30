@@ -25,6 +25,8 @@ var (
 	shipInfoInterval = 3 * time.Second // how often we refresh ship info
 	broadcastState   structs.AuthBroadcast
 	unauthState      structs.UnauthBroadcast
+	UrbitTransitions = make(map[string]structs.UrbitTransitionBroadcast)
+	UrbTransMu		 sync.RWMutex
 	mu               sync.RWMutex // synchronize access to broadcastState
 )
 
@@ -162,6 +164,7 @@ func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
+		urbit.Transition = UrbitTransitions[pier]
 		// and insert the struct into the map we will use as input for the broadcast struct
 		updates[pier] = urbit
 	}

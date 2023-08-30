@@ -9,6 +9,7 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/structs"
 
 	"github.com/docker/docker/api/types/events"
 )
@@ -62,6 +63,26 @@ func DockerSubscriptionHandler() {
 			if config.DebugMode == true {
 				config.Logger.Info(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 			}
+		}
+	}
+}
+
+func UrbitTransitionHandler() {
+	for {
+		event := <-docker.UTransBus
+		broadcast.UrbTransMu.Lock()
+		switch event.Type {
+		case "togglePower":
+            if _, exists := broadcast.UrbitTransitions[event.Patp]; !exists {
+                broadcast.UrbitTransitions[event.Patp] = structs.UrbitTransitionBroadcast{}
+            }
+            currentStatus := broadcast.UrbitTransitions[event.Patp]
+            currentStatus.TogglePower = event.Event
+            broadcast.UrbitTransitions[event.Patp] = currentStatus
+            broadcast.UrbTransMu.Unlock()
+            broadcast.BroadcastToClients()
+		default:
+			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v",event.Type))
 		}
 	}
 }

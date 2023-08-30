@@ -148,7 +148,3 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	return containerConfig, hostConfig, nil
 }
-
-func UrbitTransition(patp string, trans string, action string) error {
-	return nil
-}

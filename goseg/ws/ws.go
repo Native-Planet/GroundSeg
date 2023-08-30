@@ -299,17 +299,24 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
 			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 			docker.StartContainer(patp, "vere")
 			if err := broadcast.BroadcastToClients(); err != nil {
 				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		} else if shipConf.BootStatus == "boot" {
 			shipConf.BootStatus = "noboot"
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
 			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 			docker.StopContainerByName(patp)
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
 		return nil
 	default:
