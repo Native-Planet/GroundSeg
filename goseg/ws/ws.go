@@ -188,7 +188,7 @@ func loginHandler(conn *websocket.Conn, msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
-	isAuthenticated := auth.AuthenticateLogin(loginPayload.Password)
+	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
