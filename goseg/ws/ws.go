@@ -260,7 +260,6 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
 			}
-			return nil
 		} else if currentNetwork == "bridge" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
 			update := make(map[string]structs.UrbitDocker)
@@ -271,11 +270,13 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 			if err := broadcast.BroadcastToClients(); err != nil {
 				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 			}
-			return nil
 		} else {
 			return fmt.Errorf("No remote registration")
 		}
-		docker.StartContainer(patp, "vere")
+		if shipConf.BootStatus == "boot" {
+			docker.StartContainer(patp, "vere")
+		}
+		return nil
 	case "toggle-devmode":
 		if shipConf.DevMode == true {
 			shipConf.DevMode = false
