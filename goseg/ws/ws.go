@@ -76,8 +76,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
 		}
-		authed, tokenContent := auth.CheckToken(token, conn, r, conf.FirstBoot)
-		token := map[string]string{
+		tokenContent, authed := auth.CheckToken(token, conn, r, conf.FirstBoot)
+		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
 		}
