@@ -1,0 +1,129 @@
+{
+    "type": "structure",
+    "auth_level": "authorized",
+    "upload": {
+        "status": "free",
+        "size": 0,
+        "uploaded": 0,
+        "patp": null
+    },
+    "logs": {
+        "containers": {
+            "wireguard": {
+                "logs": []
+            }
+        },
+        "system": {
+            "stream": false,
+            "logs": []
+        }
+    },
+    "system": {
+        "usage": {
+            "ram": [
+                1003937792,
+                465555456
+            ],
+            "cpu": 3,
+            "cpu_temp": 0,
+            "disk": [
+                25821052928,
+                9873883136,
+                15930392576
+            ],
+            "swap": 1
+        },
+        "updates": {
+            "linux": {
+                "state": "pending",
+                "upgrade": 5,
+                "new": 0,
+                "remove": 0,
+                "ignore": 0
+            }
+        },
+        "wifi": {
+            "status": false,
+            "active": null,
+            "networks": []
+        }
+    },
+    "profile": {
+        "startram": {
+            "info": {
+                "registered": false,
+                "running": false,
+                "region": null,
+                "expiry": null,
+                "renew": true,
+                "endpoint": "api.startram.io",
+                "regions": {
+                    "asia": {
+                        "country": "SG",
+                        "desc": "Asia"
+                    },
+                    "europe": {
+                        "country": "NL",
+                        "desc": "Europe"
+                    },
+                    "us-east": {
+                        "country": "US",
+                        "desc": "US (East)"
+                    },
+                    "us-west": {
+                        "country": "US",
+                        "desc": "US (West)"
+                    }
+                }
+            },
+            "transition": {
+                "register": null,
+                "toggle": null
+            }
+        }
+    },
+    "urbits": {
+        "diflep-binbex-nallux-dozryl": {
+            "info": {
+                "network": "none",
+                "running": false,
+                "url": "http://ubuntu-gs-ny.local:8081",
+                "urbAlias": false,
+                "memUsage": 0,
+                "diskUsage": 1035707322,
+                "loomSize": 2048,
+                "devMode": false,
+                "detectBootStatus": true,
+                "remote": false,
+                "vere": null
+            },
+            "transition": {
+                "meld": null,
+                "serviceRegistrationStatus": "ok",
+                "togglePower": null,
+                "deleteShip": null
+            }
+        },
+        "roldef-tanref-sarnyr-nolned": {
+            "info": {
+                "network": "none",
+                "running": false,
+                "url": "http://ubuntu-gs-ny.local:8082",
+                "urbAlias": false,
+                "memUsage": 0,
+                "diskUsage": 1001214952,
+                "loomSize": 2048,
+                "devMode": false,
+                "detectBootStatus": true,
+                "remote": false,
+                "vere": null
+            },
+            "transition": {
+                "meld": null,
+                "serviceRegistrationStatus": "ok",
+                "togglePower": null,
+                "deleteShip": null
+            }
+        }
+    }
+}
