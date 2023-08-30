@@ -32,9 +32,15 @@ type WsTokenStruct struct {
 }
 
 type WsLoginPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsLoginAction  `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsLoginAction struct {
 	Type     string        `json:"type"`
 	Password string        `json:"password"`
-	Token    WsTokenStruct `json:"token"`
 }
 
 type WsResponsePayload struct {
