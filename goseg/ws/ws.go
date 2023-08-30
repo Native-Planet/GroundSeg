@@ -34,7 +34,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	// keepalive for ws
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
+		return fmt.Errorf("WS timed out")
 	})
 	pingInterval := 15 * time.Second
 	go func() {
@@ -95,6 +95,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				config.Logger.Info("StarTram")
 			case "urbit":
 				config.Logger.Info("Urbit")
+				if err = urbitHandler(msg, conn); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+				}
 			case "support":
 				if err = supportHandler(msg, payload, r, conn); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
@@ -104,6 +107,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 			case "login":
+				// already authed so lets get you on the map
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 				}
@@ -142,7 +146,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
-				if err = loginHandler(conn, msg, payload); err != nil {
+				if err = loginHandler(conn, msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 				}
 			case "setup":
@@ -153,11 +157,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				// auth.CreateToken also adds to unauth map
 				newToken, err := auth.CreateToken(conn, r, false)
 				if err != nil {
-					config.Logger.Error("Unable to create token")
+					config.Logger.Error(fmt.Sprintf("Unable to create token: %v",err))
 				}
 				result := map[string]interface{}{
 					"type":     "activity",
-					"id":       payload.ID, // this is like the action id
+					"id":       payload.ID,
 					"error":    "null",
 					"response": "ack",
 					"token":    newToken,
@@ -178,32 +182,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // validate password and add to auth session map
-func loginHandler(conn *websocket.Conn, msg []byte, payload structs.WsPayload) error {
-	config.Logger.Info("Login")
-	// lets do this ugly shit to get the password out
-	var msgMap map[string]interface{}
-	err := json.Unmarshal(msg, &msgMap)
-	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal login bytes: %v", err)
-	}
-	payloadData, ok := msgMap["payload"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("Couldn't extract payload: %v", err)
-	}
-	payloadBytes, err := json.Marshal(payloadData)
-	if err != nil {
-		return fmt.Errorf("Couldn't remarshal login data: %v", err)
-	}
+func loginHandler(conn *websocket.Conn, msg []byte) error {
 	var loginPayload structs.WsLoginPayload
-	err = json.Unmarshal(payloadBytes, &loginPayload)
+	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Password)
 	if isAuthenticated {
 		token := map[string]string{
-			"id":    payload.Token.ID,
-			"token": payload.Token.Token,
+			"id":    loginPayload.Token.ID,
+			"token": loginPayload.Token.Token,
 		}
 		if err := auth.AddToAuthMap(conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
@@ -215,6 +204,7 @@ func loginHandler(conn *websocket.Conn, msg []byte, payload structs.WsPayload) e
 	if err := broadcast.BroadcastToClients(); err != nil {
 		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 	}
+	config.Logger.Info("Session %s logged in",loginPayload.Token.ID)
 	return nil
 }
 
@@ -241,35 +231,46 @@ func unauthHandler(conn *websocket.Conn, r *http.Request) {
 	}
 }
 
-// client send:
-// {
-// 	"type": "verify",
-// 	"id": "jsgeneratedid",
-// 	"token<optional>": {
-// 	  "id": "servergeneratedid",
-// 	  "token": "encryptedtext"
-// 	}
-// }
-
-// 1. we decrypt the token
-// 2. we modify token['authorized'] to true
-// 3. remove it from 'unauthorized' in system.json
-// 4. hash and add to 'authozired' in system.json
-// 5. encrypt that, and send it back to the user
-
-// server respond:
-// {
-// 	"type": "activity",
-// 	"response": "ack/nack",
-// 	"error": "null/<some_error>",
-// 	"id": "jsgeneratedid",
-// 	"token": { (either new token or the token the user sent us)
-// 	  "id": "relevant_token_id",
-// 	  "token": "encrypted_text"
-// 	}
-// }
-
+// handle bug report stuff
 func supportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
 	config.Logger.Info("Support")
 	return nil
+}
+
+// handle urbit-type events
+func urbitHandler(msg []byte, conn *websocket.Conn) error {
+	config.Logger.Info("Urbit")
+	var urbitPayload structs.WsUrbitPayload
+	err := json.Unmarshal(msg, &urbitPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal urbit payload: %v", err)
+	}
+	patp := urbitPayload.Payload.Patp
+	switch urbitPayload.Payload.Type {
+	case "toggle-network":
+		shipConf := config.UrbitConf(patp)
+		currentNetwork := shipConf.Network
+		conf := config.Conf()
+		if currentNetwork == "wireguard" {
+			shipConf.Network = "bridge"
+			var update map[string]structs.UrbitDocker
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v",err)
+			}
+			return nil
+		} else if currentNetwork == "bridge" && conf.WgRegistered == true {
+			shipConf.Network = "wireguard"
+			var update map[string]structs.UrbitDocker
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v",err)
+			}
+			return nil
+		} else {
+			return fmt.Errorf("No remote registration")
+		}
+	default:
+		return fmt.Errorf("Unrecognized urbit action: %v",urbitPayload.Payload.Type)
+	}
 }

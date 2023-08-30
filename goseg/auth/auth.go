@@ -8,6 +8,34 @@ package auth
 
 // todo: purge old sessions from both maps
 
+// client send:
+// {
+// 	"type": "verify",
+// 	"id": "jsgeneratedid",
+// 	"token<optional>": {
+// 	  "id": "servergeneratedid",
+// 	  "token": "encryptedtext"
+// 	}
+// }
+
+// 1. we decrypt the token
+// 2. we modify token['authorized'] to true
+// 3. remove it from 'unauthorized' in system.json
+// 4. hash and add to 'authozired' in system.json
+// 5. encrypt that, and send it back to the user
+
+// server respond:
+// {
+// 	"type": "activity",
+// 	"response": "ack/nack",
+// 	"error": "null/<some_error>",
+// 	"id": "jsgeneratedid",
+// 	"token": { (either new token or the token the user sent us)
+// 	  "id": "relevant_token_id",
+// 	  "token": "encrypted_text"
+// 	}
+// }
+
 import (
 	"crypto/sha512"
 	"encoding/hex"
