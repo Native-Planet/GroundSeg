@@ -247,9 +247,9 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		return fmt.Errorf("Couldn't unmarshal urbit payload: %v", err)
 	}
 	patp := urbitPayload.Payload.Patp
+	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "toggle-network":
-		shipConf := config.UrbitConf(patp)
 		currentNetwork := shipConf.Network
 		conf := config.Conf()
 		if currentNetwork == "wireguard" {
@@ -271,6 +271,18 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		} else {
 			return fmt.Errorf("No remote registration")
 		}
+	case "toggle-devmode":
+		if shipConf.DevMode == true {
+			shipConf.DevMode = false
+		} else {
+			shipConf.DevMode = true
+		}
+		var update map[string]structs.UrbitDocker
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v",err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v",urbitPayload.Payload.Type)
 	}
