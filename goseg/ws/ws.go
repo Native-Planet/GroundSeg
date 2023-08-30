@@ -200,7 +200,7 @@ func loginHandler(conn *websocket.Conn, msg []byte) error {
 			return fmt.Errorf("Unable to process login: %v", err)
 		}
 	} else {
-		return fmt.Errorf("Failed auth: %v",loginPayload.Password)
+		return fmt.Errorf("Failed auth: %v",loginPayload.Payload.Password)
 	}
 	if err := broadcast.BroadcastToClients(); err != nil {
 		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
