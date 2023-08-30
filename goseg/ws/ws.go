@@ -99,6 +99,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					errmsg := fmt.Sprintf("Unable to broadcast to clients: %v", err)
 					config.Logger.Error(errmsg)
 				}
+			case "login":
+				broadcast.BroadcastToClients()
 			case "verify":
 				result := map[string]interface{}{
 					"type":     "activity",
@@ -118,6 +120,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				config.Logger.Warn(errmsg)
+				broadcast.BroadcastToClients()
 			}
 		} else {
 			switch msgType.Payload.Type {
