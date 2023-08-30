@@ -335,7 +335,7 @@ func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 60*time.Second, []*fernet.Key{key})
+	decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 0, []*fernet.Key{key})
 	if decrypted == nil {
 		return nil, fmt.Errorf("verification or decryption failed")
 	}
