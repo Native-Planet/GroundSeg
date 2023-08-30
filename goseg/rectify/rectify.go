@@ -2,6 +2,7 @@ package rectify
 
 // this package is for watching the event bus and rectifying mismatches
 // between the desired and actual state
+// also for digesting events from docker into broadcasts
 
 import (
 	"fmt"
