@@ -267,6 +267,9 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
 			}
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
 			return nil
 		} else {
 			return fmt.Errorf("No remote registration")
@@ -281,6 +284,9 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v",err)
+		}
+		if err := broadcast.BroadcastToClients(); err != nil {
+			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
 		return nil
 	default:
