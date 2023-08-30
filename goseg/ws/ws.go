@@ -96,11 +96,27 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "broadcast":
 				if err := broadcast.BroadcastToClients(); err != nil {
-					errmsg := fmt.Sprintf("Unable to broadcast to peer(s): %v", err)
+					errmsg := fmt.Sprintf("Unable to broadcast to clients: %v", err)
 					config.Logger.Error(errmsg)
 				}
+			case "verify":
+				result := map[string]interface{}{
+					"type":     "activity",
+					"id":       payload.ID, // this is like the action id
+					"error":    "null",
+					"response": "ack",
+					"token":    token,
+				}
+				respJson, err := json.Marshal(result)
+				if err != nil {
+					errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
+					config.Logger.Error(errmsg)
+				}
+				if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
+					continue
+				}
 			default:
-				errmsg := fmt.Sprintf("Unknown auth request type: %s", payload.Type)
+				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				config.Logger.Warn(errmsg)
 			}
 		} else {
