@@ -194,12 +194,12 @@ func loginHandler(conn *websocket.Conn, msg []byte) error {
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
 		}
+		fmt.Printf(string(token))
 		if err := auth.AddToAuthMap(conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
 		}
 	} else {
-		config.Logger.Info("Login failed")
-		return fmt.Errorf("Failed auth")
+		return fmt.Errorf("Failed auth: %v",loginPayload.Password)
 	}
 	if err := broadcast.BroadcastToClients(); err != nil {
 		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
