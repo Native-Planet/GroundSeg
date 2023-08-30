@@ -6,6 +6,7 @@ import (
 	"goseg/auth"
 	"goseg/broadcast"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/structs"
 	"net/http"
 	"time"
@@ -274,6 +275,7 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		} else {
 			return fmt.Errorf("No remote registration")
 		}
+		docker.StartContainer(patp, "vere")
 	case "toggle-devmode":
 		if shipConf.DevMode == true {
 			shipConf.DevMode = false
@@ -288,8 +290,31 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		if err := broadcast.BroadcastToClients(); err != nil {
 			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
+		docker.StartContainer(patp, "vere")
+		return nil
+	case "toggle-power":
+		update := make(map[string]structs.UrbitDocker)
+		if shipConf.BootStatus == "noboot" {
+			shipConf.BootStatus = "boot"
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v",err)
+			}
+			docker.StartContainer(patp, "vere")
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
+		} else if shipConf.BootStatus == "boot" {
+			shipConf.BootStatus = "noboot"
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v",err)
+			}
+			docker.StopContainerByName(patp)
+		}
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v",urbitPayload.Payload.Type)
 	}
+	return nil
 }
