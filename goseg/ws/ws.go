@@ -117,6 +117,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
 					continue
 				}
+				broadcast.BroadcastToClients()
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				config.Logger.Warn(errmsg)
