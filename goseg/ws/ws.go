@@ -105,7 +105,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "login":
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
-					return fmt.Errorf("Unable to reauth: %v", err)
+					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
@@ -127,7 +127,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
-					return fmt.Errorf("Unable to reauth: %v", err)
+					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
