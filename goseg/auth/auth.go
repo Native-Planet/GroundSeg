@@ -155,7 +155,7 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	return nil
 }
 
-// the same but the other way
+// the same but the other wayInvalid token provided
 func RemoveFromAuthMap(tokenId string, fromAuthorized bool) error {
 	if fromAuthorized {
 		AuthenticatedClients.Lock()
@@ -184,7 +184,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
 	if err != nil {
-		config.Logger.Warn("Invalid token provided")
+		config.Logger.Warn(fmt.Sprintf("Invalid token provided: %v",err))
 		return token["token"], false
 	} else {
 		// so you decrypt. now we see the useragent and ip.
