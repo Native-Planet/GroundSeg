@@ -254,7 +254,7 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		conf := config.Conf()
 		if currentNetwork == "wireguard" {
 			shipConf.Network = "bridge"
-			var update map[string]structs.UrbitDocker
+			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
@@ -262,7 +262,7 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 			return nil
 		} else if currentNetwork == "bridge" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
-			var update map[string]structs.UrbitDocker
+			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v",err)
@@ -277,7 +277,7 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		} else {
 			shipConf.DevMode = true
 		}
-		var update map[string]structs.UrbitDocker
+		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v",err)
