@@ -157,12 +157,16 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				if res["authorized"] == "true" { 
 					config.Logger.Info("Token authenticated")
-					return res, true
+					return token["token"], true
 				} else {
-					res["authorized"] = true
+					res["authorized"] = "true"
 					conf := config.Conf()
 					key := conf.KeyFile
 					encryptedText, err := KeyfileEncrypt(res, key)
+					if err != nil {
+						config.Logger.Error("Error encrypting token")
+						return token["token"], false
+					}
 					return encryptedText, true
 				}
 			} else {
@@ -174,7 +178,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 			return token["token"], false
 		}
 	}
-	return false
+	return token["token"], false
 }
 
 // create a new session token
