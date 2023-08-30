@@ -16,7 +16,8 @@
 
   onMount(()=> {
     const hostname = $page.url.hostname
-    connect("ws://" + hostname + ":8000")
+    const port = "3000"
+    connect("ws://" + hostname + ":" + port + "/ws")
     redirector()
   })
 
