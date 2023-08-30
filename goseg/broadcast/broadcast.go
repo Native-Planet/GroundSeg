@@ -164,7 +164,9 @@ func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
+		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
+		UrbTransMu.RUnlock()
 		// and insert the struct into the map we will use as input for the broadcast struct
 		updates[pier] = urbit
 	}

@@ -80,6 +80,7 @@ func UrbitTransitionHandler() {
             currentStatus.TogglePower = event.Event
             broadcast.UrbitTransitions[event.Patp] = currentStatus
             broadcast.UrbTransMu.Unlock()
+			config.Logger.Info(fmt.Sprintf("Adding %v transition to \"%v\" for %v",event.Type, event.Event, event.Patp))
             broadcast.BroadcastToClients()
 		default:
 			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v",event.Type))
