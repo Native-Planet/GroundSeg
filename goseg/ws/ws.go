@@ -72,6 +72,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			config.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
 			continue
 		}
+		token := map[string]string{
+			"id":    payload.Token.ID,
+			"token": payload.Token.Token,
+		}
 		authed, tokenContent := auth.CheckToken(token, conn, r, conf.FirstBoot)
 		token := map[string]string{
 			"id":    payload.Token.ID,
