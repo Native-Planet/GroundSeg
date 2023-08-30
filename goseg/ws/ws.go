@@ -247,7 +247,7 @@ func urbitHandler(msg []byte, conn *websocket.Conn) error {
 		return fmt.Errorf("Couldn't unmarshal urbit payload: %v", err)
 	}
 	patp := urbitPayload.Payload.Patp
-	switch urbitPayload.Payload.Type {
+	switch urbitPayload.Payload.Action {
 	case "toggle-network":
 		shipConf := config.UrbitConf(patp)
 		currentNetwork := shipConf.Network
