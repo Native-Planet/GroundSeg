@@ -101,11 +101,15 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "broadcast":
 				if err := broadcast.BroadcastToClients(); err != nil {
-					errmsg := fmt.Sprintf("Unable to broadcast to clients: %v", err)
-					config.Logger.Error(errmsg)
+					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 			case "login":
-				broadcast.BroadcastToClients()
+				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+					return fmt.Errorf("Unable to reauth: %v", err)
+				}
+				if err := broadcast.BroadcastToClients(); err != nil {
+					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				}
 			case "verify":
 				result := map[string]interface{}{
 					"type":     "activity",
@@ -122,11 +126,18 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
 					continue
 				}
-				broadcast.BroadcastToClients()
+				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+					return fmt.Errorf("Unable to reauth: %v", err)
+				}
+				if err := broadcast.BroadcastToClients(); err != nil {
+					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				}
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				config.Logger.Warn(errmsg)
-				broadcast.BroadcastToClients()
+				if err := broadcast.BroadcastToClients(); err != nil {
+					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				}
 			}
 		} else {
 			switch msgType.Payload.Type {
@@ -201,7 +212,9 @@ func loginHandler(conn *websocket.Conn, msg []byte, payload structs.WsPayload) e
 		config.Logger.Info("Login failed")
 		return fmt.Errorf("Failed auth")
 	}
-	broadcast.BroadcastToClients()
+	if err := broadcast.BroadcastToClients(); err != nil {
+		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+	}
 	return nil
 }
 
