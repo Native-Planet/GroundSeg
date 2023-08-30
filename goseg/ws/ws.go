@@ -151,13 +151,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			default:
-				errmsg := fmt.Sprintf("Unknown unauth request type: %s", payload.Type)
-				config.Logger.Warn(errmsg)
+				unauthHandler(conn, r)
 			}
-		}
-		// default to unauth
-		if !auth.WsAuthCheck(conn) {
-			unauthHandler(conn, r)
 		}
 	}
 }
