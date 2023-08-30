@@ -194,7 +194,8 @@ func loginHandler(conn *websocket.Conn, msg []byte) error {
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
 		}
-		fmt.Printf(string(token))
+		tokenDebug, _ := json.Marshal(token)
+		fmt.Printf(string(tokenDebug))
 		if err := auth.AddToAuthMap(conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
 		}
