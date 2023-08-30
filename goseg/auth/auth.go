@@ -110,7 +110,9 @@ func TokenIdAuthed(token string) bool {
 	return false
 }
 
-// this takes a bool for auth/unauth -- also persists to config
+// this takes a bool for auth/unauth
+// purge token/conn from opposite map
+// persists to config
 func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
 	tokenStr := token["token"]
 	tokenId := token["id"]
@@ -123,6 +125,11 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 		UnauthClients.Lock()
 		if _, ok := UnauthClients.Conns[tokenId]; ok {
 			delete(UnauthClients.Conns, tokenId)
+			for tokenID, con := range UnauthClients.Conns {
+				if con == conn {
+					delete(UnauthClients.Conns, tokenID)
+				}
+			}
 		}
 		UnauthClients.Unlock()
 	} else {
@@ -132,6 +139,11 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 		AuthenticatedClients.Lock()
 		if _, ok := AuthenticatedClients.Conns[tokenId]; ok {
 			delete(AuthenticatedClients.Conns, tokenId)
+			for tokenID, con := range AuthenticatedClients.Conns {
+				if con == conn {
+					delete(AuthenticatedClients.Conns, tokenID)
+				}
+			}
 		}
 		AuthenticatedClients.Unlock()
 	}
