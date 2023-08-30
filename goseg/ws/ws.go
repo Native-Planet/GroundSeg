@@ -72,11 +72,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			config.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
 			continue
 		}
+		authed, tokenContent := auth.CheckToken(token, conn, r, conf.FirstBoot)
 		token := map[string]string{
 			"id":    payload.Token.ID,
-			"token": payload.Token.Token,
+			"token": tokenContent,
 		}
-		if auth.CheckToken(token, conn, r, conf.FirstBoot) {
+		if authed {
 			switch msgType.Payload.Type {
 			case "new_ship":
 				config.Logger.Info("New ship")
