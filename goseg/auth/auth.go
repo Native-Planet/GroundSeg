@@ -131,18 +131,18 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) error {
 
 
 // check the validity of the token
-func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) bool {
+func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
-		return false
+		return "", false
 	}
-	config.Logger.Info(fmt.Sprintf("Checking token %s",token["id"]))
+	config.Logger.Info(fmt.Sprintf("Checking tokenId %s",token["id"]))
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
 	if err != nil {
 		config.Logger.Warn("Invalid token provided")
-		return false
+		return token["token"], false
 	} else {
 		// so you decrypt. now we see the useragent and ip.
 		var ip string
@@ -152,23 +152,33 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
 		}
 		userAgent := r.Header.Get("User-Agent")
-		// hashed := sha512.Sum512([]byte(token["token"]))
-		// hash := hex.EncodeToString(hashed[:])
 		// you in auth map?
 		if TokenIdAuthed(token["id"]) {
-			if ip == res["ip"] && userAgent == res["user_agent"] {
-				config.Logger.Info("Token authenticated")
-				return true
+			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
+				if res["authorized"] == "true" { 
+					config.Logger.Info("Token authenticated")
+					return token["token"], true
+				} else {
+					res["authorized"] = "true"
+					conf := config.Conf()
+					key := conf.KeyFile
+					encryptedText, err := KeyfileEncrypt(res, key)
+					if err != nil {
+						config.Logger.Error("Error encrypting token")
+						return token["token"], false
+					}
+					return encryptedText, true
+				}
 			} else {
-				config.Logger.Warn("Token doesn't match session!")
-				return false
+				config.Logger.Warn("TokenId doesn't match session!")
+				return token["token"], false
 			}
 		} else {
-			config.Logger.Warn("Token isn't an authenticated session")
-			return false
+			config.Logger.Warn("TokenId isn't an authenticated session")
+			return token["token"], false
 		}
 	}
-	return false
+	return token["token"], false
 }
 
 // create a new session token
