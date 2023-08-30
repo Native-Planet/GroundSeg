@@ -205,7 +205,7 @@ func loginHandler(conn *websocket.Conn, msg []byte) error {
 	if err := broadcast.BroadcastToClients(); err != nil {
 		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 	}
-	config.Logger.Info("Session %s logged in",loginPayload.Token.ID)
+	config.Logger.Info(fmt.Sprintf("Session %s logged in",loginPayload.Token.ID))
 	return nil
 }
 
