@@ -8,12 +8,11 @@ subscription, users can also access their Urbit ship remotely.
 ## Dependencies
 
 - docker
-- glibc ^2.31
 - systemd
 
 ## Installation
 
-**Disclaimer:** GroundSeg runs with `sudo` privileges on your device. This is required for controlling various aspects of the device.
+**Disclaimer:** GroundSeg runs with `sudo` privileges on your device. This is required for controlling various aspects of the device. For this reason, we recommend a dedicated device.
 
 ### Docker + GroundSeg (Recommended)
 This installs `docker` and the GroundSeg binary. Use this if you do not know what you're doing.
@@ -30,7 +29,7 @@ This downloads the appropriate service file for you init system and the groundse
 sudo wget -O - only.groundseg.app | bash
 ```
 
-### Switching to the Edge branch (Unstable)
+### Switching to the `edge` release channel (Unstable)
 
 1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch"` to `"edge"`
 2. `sudo systemctl restart groundseg`

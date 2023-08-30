@@ -2,8 +2,11 @@ package auth
 
 // package for authenticating websockets
 // we use a homespun jwt knock-off because no tls on lan
+// tokens contain client metadata for authentication
 // authentication adds you to the AuthenticatedClients map
 // broadcasts get sent to members of this map
+
+// todo: purge old sessions from both maps
 
 import (
 	"crypto/sha512"
@@ -19,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	fernet "github.com/fernet/fernet-go"
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -57,7 +60,7 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	defer AuthenticatedClients.RUnlock()
 	for tokenID, con := range AuthenticatedClients.Conns {
 		if con == conn {
-			config.Logger.Info(fmt.Sprintf("%s is in auth map",tokenID))
+			config.Logger.Info(fmt.Sprintf("%s is in auth map", tokenID))
 			return true
 		}
 	}
@@ -65,12 +68,13 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	return false
 }
 
+// is this tokenid in the auth map?
 func TokenIdAuthed(token string) bool {
 	AuthenticatedClients.RLock()
 	defer AuthenticatedClients.RUnlock()
 	for tokenID, _ := range AuthenticatedClients.Conns {
 		if token == tokenID {
-			config.Logger.Info(fmt.Sprintf("%s is in auth map",token))
+			config.Logger.Info(fmt.Sprintf("%s is in auth map", token))
 			return true
 		}
 	}
@@ -129,14 +133,13 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) error {
 	return nil
 }
 
-
 // check the validity of the token
 func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
 		return "", false
 	}
-	config.Logger.Info(fmt.Sprintf("Checking tokenId %s",token["id"]))
+	config.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
@@ -154,8 +157,10 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
 		if TokenIdAuthed(token["id"]) {
+			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
-				if res["authorized"] == "true" { 
+				// already marked authorized? yes
+				if res["authorized"] == "true" {
 					config.Logger.Info("Token authenticated")
 					return token["token"], true
 				} else {
@@ -182,7 +187,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 }
 
 // create a new session token
-func CreateToken(conn *websocket.Conn, r *http.Request, setup bool) (map[string]string, error) {
+func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string]string, error) {
 	// extract conn info
 	var ip string
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -203,7 +208,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, setup bool) (map[string]
 		"user_agent": userAgent,
 		"secret":     secret,
 		"padding":    padding,
-		"authorized": fmt.Sprintf("%v", setup),
+		"authorized": fmt.Sprintf("%v", authed),
 		"created":    now,
 	}
 	// encrypt the contents
@@ -218,7 +223,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, setup bool) (map[string]
 		"token": encryptedText,
 	}
 	// Update sessions in the system's configuration
-	AddToAuthMap(conn, token, setup)
+	AddToAuthMap(conn, token, authed)
 	return token, nil
 }
 
@@ -242,14 +247,14 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		if err := RemoveFromAuthMap(tokenID, false); err != nil {
 			return fmt.Errorf("Error removing session: %v", err)
 		}
-		} else {
-			update := map[string]interface{}{
-				"Sessions": map[string]interface{}{
-					"Unauthorized": map[string]structs.SessionInfo{
-						tokenID: session,
-					},
+	} else {
+		update := map[string]interface{}{
+			"Sessions": map[string]interface{}{
+				"Unauthorized": map[string]structs.SessionInfo{
+					tokenID: session,
 				},
-			}
+			},
+		}
 		if err := config.UpdateConf(update); err != nil {
 			return fmt.Errorf("Error adding session: %v", err)
 		}
@@ -260,46 +265,46 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 	return nil
 }
 
-// encrypt the contents using stored keyfile val
+// encrypt the token contents using stored keyfile val
 func KeyfileEncrypt(contents map[string]string, keyStr string) (string, error) {
 	fileBytes, err := ioutil.ReadFile(keyStr)
-    if err != nil {
-        return "", err
-    }
-    contentBytes, err := json.Marshal(contents)
-    if err != nil {
-        return "", err
-    }
-    key, err := fernet.DecodeKey(string(fileBytes))
-    if err != nil {
-        return "", err
-    }
-    tok, err := fernet.EncryptAndSign(contentBytes, key)
-    if err != nil {
-        return "", err
-    }
-    return string(tok), nil
+	if err != nil {
+		return "", err
+	}
+	contentBytes, err := json.Marshal(contents)
+	if err != nil {
+		return "", err
+	}
+	key, err := fernet.DecodeKey(string(fileBytes))
+	if err != nil {
+		return "", err
+	}
+	tok, err := fernet.EncryptAndSign(contentBytes, key)
+	if err != nil {
+		return "", err
+	}
+	return string(tok), nil
 }
 
 func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 	fileBytes, err := ioutil.ReadFile(keyStr)
-    if err != nil {
-        return nil, err
-    }
-    key, err := fernet.DecodeKey(string(fileBytes))
-    if err != nil {
-        return nil, err
-    }
-    decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 60*time.Second, []*fernet.Key{key})
-    if decrypted == nil {
-        return nil, fmt.Errorf("verification or decryption failed")
-    }
-    var contents map[string]string
-    err = json.Unmarshal(decrypted, &contents)
-    if err != nil {
-        return nil, err
-    }
-    return contents, nil
+	if err != nil {
+		return nil, err
+	}
+	key, err := fernet.DecodeKey(string(fileBytes))
+	if err != nil {
+		return nil, err
+	}
+	decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 60*time.Second, []*fernet.Key{key})
+	if decrypted == nil {
+		return nil, fmt.Errorf("verification or decryption failed")
+	}
+	var contents map[string]string
+	err = json.Unmarshal(decrypted, &contents)
+	if err != nil {
+		return nil, err
+	}
+	return contents, nil
 }
 
 // salted sha512
@@ -318,7 +323,6 @@ func AuthenticateLogin(password string) bool {
 	if hash == conf.PwHash {
 		return true
 	} else {
-		config.Logger.Warn(fmt.Sprintf("debug: failed pw hash: %v", hash))
 		return false
 	}
 }

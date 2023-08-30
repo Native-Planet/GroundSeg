@@ -184,20 +184,20 @@ func loginHandler(conn *websocket.Conn, msg []byte, payload structs.WsPayload) e
 	var msgMap map[string]interface{}
 	err := json.Unmarshal(msg, &msgMap)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal login bytes: %v",err)
+		return fmt.Errorf("Couldn't unmarshal login bytes: %v", err)
 	}
 	payloadData, ok := msgMap["payload"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("Couldn't extract payload: %v",err)
+		return fmt.Errorf("Couldn't extract payload: %v", err)
 	}
 	payloadBytes, err := json.Marshal(payloadData)
 	if err != nil {
-		return fmt.Errorf("Couldn't remarshal login data: %v",err)
+		return fmt.Errorf("Couldn't remarshal login data: %v", err)
 	}
 	var loginPayload structs.WsLoginPayload
 	err = json.Unmarshal(payloadBytes, &loginPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal login payload: %v",err)
+		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Password)
 	if isAuthenticated {
@@ -218,19 +218,18 @@ func loginHandler(conn *websocket.Conn, msg []byte, payload structs.WsPayload) e
 	return nil
 }
 
-
 // broadcast the unauth payload
 func unauthHandler(conn *websocket.Conn, r *http.Request) {
 	config.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
-        Type:      "structure",
-        AuthLevel: "unauthorized",
-        Login: struct {
-            Remainder int `json:"remainder"`
-        }{
-            Remainder: 0,
-        },
-    }
+		Type:      "structure",
+		AuthLevel: "unauthorized",
+		Login: struct {
+			Remainder int `json:"remainder"`
+		}{
+			Remainder: 0,
+		},
+	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
 		config.Logger.Error(fmt.Sprintf("Error unmarshalling message: %v", err))

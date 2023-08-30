@@ -19,9 +19,9 @@ type WsTokenStruct struct {
 }
 
 type WsLoginPayload struct {
-	Type     string `json:"type"`
-	Password string `json:"password"`
-	Token   WsTokenStruct `json:"token"`
+	Type     string        `json:"type"`
+	Password string        `json:"password"`
+	Token    WsTokenStruct `json:"token"`
 }
 
 type WsResponsePayload struct {
