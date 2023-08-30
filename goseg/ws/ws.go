@@ -34,6 +34,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	// keepalive for ws
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
 	})
 	pingInterval := 15 * time.Second
 	go func() {
