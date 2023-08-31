@@ -103,16 +103,29 @@ func CheckVersionLoop() {
 	for {
 		select {
 		case <-ticker.C:
+			// Get latest version & hash
 			latestVersion, _ := CheckVersion()
-			currentChannelVersion := VersionInfo
-			latestChannelVersion := latestVersion
-			if latestChannelVersion != currentChannelVersion {
-				fmt.Printf("New version available in %s channel! Current: %+v, Latest: %+v\n", releaseChannel, currentChannelVersion, latestChannelVersion)
-				VersionInfo = latestVersion
+			latestHash := latestVersion.Groundseg.Amd64Sha256
+			if Architecture != "amd64" {
+				latestHash = latestVersion.Groundseg.Arm64Sha256
+			}
+			// Branch
+			branch := ""
+			if releaseChannel != "latest" {
+				branch = fmt.Sprintf("-%v", releaseChannel)
+			}
+			// Update message
+			if latestHash != conf.BinHash {
+				Logger.Info(fmt.Sprintf(
+					"New version available in %s channel! Current: %v%v, Latest: v%v.%v.%v%v",
+					conf.UpdateBranch, conf.GsVersion, branch,
+					latestVersion.Groundseg.Major, latestVersion.Groundseg.Minor,
+					latestVersion.Groundseg.Patch, branch,
+				))
 				// download new binary as groundseg_new
 				// delete groundseg
 				// rename groundseg_new to groundseg
-				// restart service
+				// systemctl restart groundseg
 			}
 		}
 	}
