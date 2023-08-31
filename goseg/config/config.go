@@ -112,7 +112,7 @@ func init() {
 	globalConfig.BinHash = hash
 	Logger.Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
 
-	var configMap structs.SysConfig
+	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshaling JSON: %v", err)
@@ -176,37 +176,26 @@ func UpdateConf(values map[string]interface{}) error {
 	for key, value := range values {
 		configMap[key] = value
 	}
-	
-	// Unmarshal configMap to SysConfig
-	var config structs.SysConfig
-	configBytes, err := json.Marshal(configMap)
-	if err != nil {
-		return fmt.Errorf("Error marshaling updated config map: %v", err)
-	}
-	if err := json.Unmarshal(configBytes, &config); err != nil {
-		return fmt.Errorf("Error unmarshaling to SysConfig: %v", err)
-	}
-
-	if err = persistConf(config); err != nil {
+	if err = persistConf(configMap); err != nil {
 		return fmt.Errorf("Unable to persist config update: %v", err)
 	}
 	return nil
 }
 
-
-// write to disk
-func persistConf(config structs.SysConfig) error {
+func persistConf(configMap map[string]interface{}) error {
 	if BasePath == "" {
 		// default base path
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
 	// marshal and persist it
-	updatedJSON, err := json.MarshalIndent(config, "", "    ")
+	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
 		return fmt.Errorf("Error encoding JSON: %v", err)
 	}
 	// update the globalConfig var
-	globalConfig = config
+	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
+		return fmt.Errorf("Error updating global config: %v", err)
+	}
 	// write to disk
 	if err := ioutil.WriteFile(confPath, updatedJSON, 0644); err != nil {
 		return fmt.Errorf("Error writing to file: %v", err)
