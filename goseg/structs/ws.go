@@ -63,3 +63,17 @@ type WsResponsePayload struct {
 	Error    string        `json:"error"`
 	Token    WsTokenStruct `json:"token"`
 }
+
+type WsStartramPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsStartramAction `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsStartramAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Key    string `json:"key"`
+	Region string `json:"region"`
+}

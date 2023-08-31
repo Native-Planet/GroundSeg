@@ -30,6 +30,7 @@ type StartramRegion struct {
 type StartramRegister struct {
 	RegCode string `json:"reg_code"`
 	Pubkey  string `json:"pubkey"`
+	Region  string `json:"region"`
 }
 
 type StartramRegisterResp struct {
@@ -38,6 +39,7 @@ type StartramRegisterResp struct {
 	Error  int    `json:"error"`
 	Pubkey string `json:"pubkey"`
 	Lease  string `json:"lease"`
+	Region  string `json:"region"`
 }
 
 // for create or delete

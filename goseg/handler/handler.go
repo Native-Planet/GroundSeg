@@ -7,6 +7,7 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/startram"
 	"goseg/structs"
 	"net/http"
 	"os"
@@ -182,4 +183,28 @@ func UnauthHandler(conn *websocket.Conn, r *http.Request) {
 		config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
 		return
 	}
+}
+
+// startram action handler
+// gonna get confusing if we have varied startram structs
+func StartramHandler(msg []byte) error {
+	var startramPayload structs.WsStartramPayload
+	err := json.Unmarshal(msg, &startramPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal startram payload: %v", err)
+	}
+	switch startramPayload.Payload.Action {
+	case "register":
+		regCode := startramPayload.Payload.Key
+		region := startramPayload.Payload.Region
+		if err := startram.Register(regCode,region); err != nil {
+			return fmt.Errorf("Failed registration: %v",err)
+		}
+		if err := broadcast.BroadcastToClients(); err != nil {
+			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+		}
+	default:
+		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
+	}
+	return nil
 }

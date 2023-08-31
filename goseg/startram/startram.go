@@ -73,13 +73,14 @@ func Retrieve() (structs.StartramRetrieve, error) {
 }
 
 // register your pubkey
-func Register(regCode string) error {
+func Register(regCode string, region string) error {
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/register"
 	var regObj structs.StartramRegister
 	var respObj structs.StartramRegisterResp
 	regObj.Pubkey = conf.Pubkey
 	regObj.RegCode = regCode
+	regObj.Region = region
 	regJSON, err := json.Marshal(regObj)
 	if err != nil {
 		return fmt.Errorf("Couldn't marshal registration: %v", err)

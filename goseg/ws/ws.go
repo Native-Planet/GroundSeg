@@ -95,7 +95,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 				}
 			case "startram":
-				config.Logger.Info("StarTram")
+				if err = handler.StartramHandler(msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+				}
 			case "urbit":
 				if err = handler.UrbitHandler(msg, conn); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
