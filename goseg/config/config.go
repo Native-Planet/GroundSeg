@@ -3,11 +3,14 @@ package config
 // code for managing groundseg and container configurations
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"goseg/defaults"
 	"goseg/structs"
+	"io"
 	"io/ioutil"
 	"log/slog"
 	"math/rand"
@@ -97,8 +100,18 @@ func init() {
 		Logger.Error(errmsg)
 	}
 	// wipe the sessions on each startup
-	globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
+	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
+
+	// get hash of groundseg binary
+	hash, err := getSHA256(filepath.Join(BasePath, "groundseg"))
+	if err != nil {
+		errmsg := fmt.Sprintf("Error getting binary sha256 hash: %v", err)
+		Logger.Error(errmsg)
+	}
+	globalConfig.BinHash = hash
+	Logger.Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
+
 	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)
 	if err != nil {
@@ -258,4 +271,29 @@ func RandString(length int) string {
 		return ""
 	}
 	return base64.URLEncoding.EncodeToString(randBytes)
+}
+
+func getSHA256(filePath string) (string, error) {
+	// Open the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// Create a new SHA256 hash
+	hasher := sha256.New()
+
+	// Copy the file content to the hasher
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	// Get the final hash value
+	hashValue := hasher.Sum(nil)
+
+	// Convert the hash to a hexadecimal string
+	hashString := hex.EncodeToString(hashValue)
+
+	return hashString, nil
 }

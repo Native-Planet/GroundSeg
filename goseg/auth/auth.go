@@ -71,6 +71,16 @@ var (
 	}
 )
 
+func init() {
+	conf := config.Conf()
+	authed := conf.Sessions.Authorized
+	for key, _ := range authed {
+		AuthenticatedClients.Lock()
+		AuthenticatedClients.Conns[key] = nil
+		AuthenticatedClients.Unlock()
+	}
+}
+
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	AuthenticatedClients.RLock()
@@ -184,7 +194,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
 	if err != nil {
-		config.Logger.Warn(fmt.Sprintf("Invalid token provided: %v",err))
+		config.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
 	} else {
 		// so you decrypt. now we see the useragent and ip.
@@ -275,8 +285,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 	}
 	if authorized {
 		update := map[string]interface{}{
-			"Sessions": map[string]interface{}{
-				"Authorized": map[string]structs.SessionInfo{
+			"sessions": map[string]interface{}{
+				"authorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},
 			},
@@ -289,8 +299,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		}
 	} else {
 		update := map[string]interface{}{
-			"Sessions": map[string]interface{}{
-				"Unauthorized": map[string]structs.SessionInfo{
+			"sessions": map[string]interface{}{
+				"unauthorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},
 			},

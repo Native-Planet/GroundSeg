@@ -1,0 +1,185 @@
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"goseg/auth"
+	"goseg/broadcast"
+	"goseg/config"
+	"goseg/docker"
+	"goseg/structs"
+	"net/http"
+	"os"
+
+	"github.com/gorilla/websocket"
+)
+
+// handle bug report stuff
+func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
+	config.Logger.Info("Support")
+	return nil
+}
+
+// handle system events
+func SystemHandler(msg []byte, conn *websocket.Conn) error {
+	config.Logger.Info("System")
+	var systemPayload structs.WsSystemPayload
+	err := json.Unmarshal(msg, &systemPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal system payload: %v", err)
+	}
+	switch systemPayload.Payload.Action {
+	case "power":
+		switch systemPayload.Payload.Command {
+		case "shutdown":
+			config.Logger.Info(fmt.Sprintf("Device shutdown requested"))
+			os.Exit(0) // todo: shutdown here
+
+		case "restart":
+			config.Logger.Info(fmt.Sprintf("Device restart requested"))
+			os.Exit(0) // todo: restart here
+		default:
+			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
+		}
+	default:
+		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
+	}
+	return nil
+}
+
+// handle urbit-type events
+func UrbitHandler(msg []byte, conn *websocket.Conn) error {
+	config.Logger.Info("Urbit")
+	var urbitPayload structs.WsUrbitPayload
+	err := json.Unmarshal(msg, &urbitPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal urbit payload: %v", err)
+	}
+	patp := urbitPayload.Payload.Patp
+	shipConf := config.UrbitConf(patp)
+	switch urbitPayload.Payload.Action {
+	case "toggle-network":
+		currentNetwork := shipConf.Network
+		conf := config.Conf()
+		if currentNetwork == "wireguard" {
+			shipConf.Network = "bridge"
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+		} else if currentNetwork == "bridge" && conf.WgRegistered == true {
+			shipConf.Network = "wireguard"
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
+		} else {
+			return fmt.Errorf("No remote registration")
+		}
+		if shipConf.BootStatus == "boot" {
+			docker.StartContainer(patp, "vere")
+		}
+		return nil
+	case "toggle-devmode":
+		if shipConf.DevMode == true {
+			shipConf.DevMode = false
+		} else {
+			shipConf.DevMode = true
+		}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		if err := broadcast.BroadcastToClients(); err != nil {
+			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+		}
+		docker.StartContainer(patp, "vere")
+		return nil
+	case "toggle-power":
+		update := make(map[string]structs.UrbitDocker)
+		if shipConf.BootStatus == "noboot" {
+			shipConf.BootStatus = "boot"
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
+			docker.StartContainer(patp, "vere")
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
+		} else if shipConf.BootStatus == "boot" {
+			shipConf.BootStatus = "noboot"
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
+			docker.StopContainerByName(patp)
+			if err := broadcast.BroadcastToClients(); err != nil {
+				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			}
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
+		}
+		return nil
+	default:
+		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Type)
+	}
+	return nil
+}
+
+// validate password and add to auth session map
+func LoginHandler(conn *websocket.Conn, msg []byte) error {
+	var loginPayload structs.WsLoginPayload
+	err := json.Unmarshal(msg, &loginPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+	}
+	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
+	if isAuthenticated {
+		token := map[string]string{
+			"id":    loginPayload.Token.ID,
+			"token": loginPayload.Token.Token,
+		}
+		if err := auth.AddToAuthMap(conn, token, true); err != nil {
+			return fmt.Errorf("Unable to process login: %v", err)
+		}
+	} else {
+		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
+	}
+	if err := broadcast.BroadcastToClients(); err != nil {
+		config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+	}
+	config.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
+	return nil
+}
+
+// broadcast the unauth payload
+func UnauthHandler(conn *websocket.Conn, r *http.Request) {
+	config.Logger.Info("Sending unauth broadcast")
+	blob := structs.UnauthBroadcast{
+		Type:      "structure",
+		AuthLevel: "unauthorized",
+		Login: struct {
+			Remainder int `json:"remainder"`
+		}{
+			Remainder: 0,
+		},
+	}
+	resp, err := json.Marshal(blob)
+	if err != nil {
+		config.Logger.Error(fmt.Sprintf("Error unmarshalling message: %v", err))
+		return
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, resp); err != nil {
+		config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
+		return
+	}
+}

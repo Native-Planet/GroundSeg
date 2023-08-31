@@ -20,14 +20,16 @@ import (
 )
 
 var (
-	clients          = make(map[*websocket.Conn]bool)
-	hostInfoInterval = 3 * time.Second // how often we refresh system info
-	shipInfoInterval = 3 * time.Second // how often we refresh ship info
-	broadcastState   structs.AuthBroadcast
-	unauthState      structs.UnauthBroadcast
-	UrbitTransitions = make(map[string]structs.UrbitTransitionBroadcast)
-	UrbTransMu		 sync.RWMutex
-	mu               sync.RWMutex // synchronize access to broadcastState
+	clients           = make(map[*websocket.Conn]bool)
+	hostInfoInterval  = 3 * time.Second // how often we refresh system info
+	shipInfoInterval  = 3 * time.Second // how often we refresh ship info
+	broadcastState    structs.AuthBroadcast
+	unauthState       structs.UnauthBroadcast
+	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
+	SystemTransitions structs.SystemTransitionBroadcast
+	UrbTransMu        sync.RWMutex
+	SysTransMu        sync.RWMutex
+	mu                sync.RWMutex // synchronize access to broadcastState
 )
 
 func init() {
@@ -187,13 +189,16 @@ func constructSystemInfo() map[string]interface{} {
 	swapVal := system.HasSwap()
 	res = map[string]interface{}{
 		"System": map[string]interface{}{
-			"Usage": map[string]interface{}{
-				"RAM":      ramObj,
-				"CPU":      cpuUsage,
-				"CPUTemp":  cpuTemp,
-				"Disk":     diskObj,
-				"SwapFile": swapVal,
+			"Info": map[string]interface{}{
+				"Usage": map[string]interface{}{
+					"RAM":      ramObj,
+					"CPU":      cpuUsage,
+					"CPUTemp":  cpuTemp,
+					"Disk":     diskObj,
+					"SwapFile": swapVal,
+				},
 			},
+			"Transition": SystemTransitions,
 		},
 	}
 	return res
@@ -331,17 +336,14 @@ func BroadcastToClients() error {
 	auth.AuthenticatedClients.Lock()
 	defer auth.AuthenticatedClients.Unlock()
 	for client := range auth.AuthenticatedClients.Conns {
+		if auth.AuthenticatedClients.Conns[client] == nil {
+			continue
+		}
 		if err := auth.AuthenticatedClients.Conns[client].WriteMessage(websocket.TextMessage, authJson); err != nil {
 			continue
 		}
 	}
-	// for debug, remove me
-	// for client := range clients {
-	// 	if err := client.WriteMessage(websocket.TextMessage, authJson); err != nil {
-	// 		config.Logger.Error(fmt.Sprintf("Error writing response: %v", err))
-	// 		return err
-	// 	}
-	// }
+
 	return nil
 }
 

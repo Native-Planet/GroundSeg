@@ -5,7 +5,7 @@
   // Styling
   export let wide
   // Websocket
-  import { structure } from '$lib/stores/websocket'
+  import { structure, logout } from '$lib/stores/websocket'
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
@@ -15,6 +15,7 @@
     <div class="pwd">**************************</div>
     <button class="edit" on:click={()=>openModal(PasswordModal)}>Edit</button>
   </div>
+  <button class="edit" on:click={logout}>Logout(Temp)</button>
 </div>
 
 <style>
