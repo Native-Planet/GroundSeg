@@ -239,7 +239,7 @@ func PwHandler(msg []byte) error {
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
 			update := map[string]interface{}{
-				"PwHash": pwPayload.Payload.Password,
+				"PwHash": auth.Hasher(pwPayload.Payload.Password),
 			}
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v",err)
