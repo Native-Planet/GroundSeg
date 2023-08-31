@@ -226,3 +226,27 @@ func StartramHandler(msg []byte) error {
 	}
 	return nil
 }
+
+// password reset handler
+func PwHandler(msg []byte) error {
+	var pwPayload structs.WsPwPayload
+	err := json.Unmarshal(msg, &pwPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal password payload: %v", err)
+	}
+	switch pwPayload.Payload.Action {
+	case "modify":
+		conf := config.Conf()
+		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
+			update := map[string]interface{}{
+				"PwHash": pwPayload.Payload.Password,
+			}
+			if err := config.UpdateConf(update); err != nil {
+				return fmt.Errorf("Unable to update password: %v",err)
+			}
+		}
+	default:
+		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)
+	}
+	return nil
+}

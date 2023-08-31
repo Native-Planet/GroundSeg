@@ -83,6 +83,7 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 	return res, nil
 }
 
+// put startram regions into broadcast struct
 func LoadStartramRegions() error {
 	config.Logger.Info("Retrieving StarTram region info")
 	regions, err := startram.GetRegions()
