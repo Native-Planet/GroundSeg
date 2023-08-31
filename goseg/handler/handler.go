@@ -236,10 +236,11 @@ func PwHandler(msg []byte) error {
 	}
 	switch pwPayload.Payload.Action {
 	case "modify":
+		config.Logger.Info("Setting new password")
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
 			update := map[string]interface{}{
-				"PwHash": auth.Hasher(pwPayload.Payload.Password),
+				"pwHash": auth.Hasher(pwPayload.Payload.Password),
 			}
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v",err)
