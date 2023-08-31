@@ -26,7 +26,7 @@ var (
 	broadcastState   structs.AuthBroadcast
 	unauthState      structs.UnauthBroadcast
 	UrbitTransitions = make(map[string]structs.UrbitTransitionBroadcast)
-	UrbTransMu		 sync.RWMutex
+	UrbTransMu       sync.RWMutex
 	mu               sync.RWMutex // synchronize access to broadcastState
 )
 
@@ -331,17 +331,14 @@ func BroadcastToClients() error {
 	auth.AuthenticatedClients.Lock()
 	defer auth.AuthenticatedClients.Unlock()
 	for client := range auth.AuthenticatedClients.Conns {
+		if auth.AuthenticatedClients.Conns[client] == nil {
+			continue
+		}
 		if err := auth.AuthenticatedClients.Conns[client].WriteMessage(websocket.TextMessage, authJson); err != nil {
 			continue
 		}
 	}
-	// for debug, remove me
-	// for client := range clients {
-	// 	if err := client.WriteMessage(websocket.TextMessage, authJson); err != nil {
-	// 		config.Logger.Error(fmt.Sprintf("Error writing response: %v", err))
-	// 		return err
-	// 	}
-	// }
+
 	return nil
 }
 

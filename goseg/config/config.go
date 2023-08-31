@@ -97,7 +97,7 @@ func init() {
 		Logger.Error(errmsg)
 	}
 	// wipe the sessions on each startup
-	globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
+	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
 	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)
