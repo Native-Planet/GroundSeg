@@ -74,6 +74,8 @@ func main() {
 	go rectify.DockerSubscriptionHandler()
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
+	// digest system transition events
+	//go rectify.SystemTransitionHandler()
 	// just making sure we can parse (debug)
 	if len(conf.Piers) > 0 {
 		pierList := strings.Join(conf.Piers, ", ")
