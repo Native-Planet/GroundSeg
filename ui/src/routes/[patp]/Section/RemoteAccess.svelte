@@ -3,13 +3,16 @@
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
+  import { structure } from '$lib/stores/websocket'
+
+  $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
 
   export let remote
 
   const dispatch = createEventDispatcher()
 </script>
 
-<div class="section">
+<div class="section" class:disabled={!wgRunning}>
   <div class="section-left">
     <div class="section-title">Remote Access</div>
     <div class="section-description">Access your ship via a StarTram connection</div>
@@ -21,3 +24,10 @@
       />
   </div>
 </div>
+
+<style>
+  .disabled {
+    opacity: .4;
+    pointer-events: none;
+  }
+</style>
