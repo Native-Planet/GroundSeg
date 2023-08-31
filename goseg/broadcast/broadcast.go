@@ -89,19 +89,10 @@ func LoadStartramRegions() error {
 	if err != nil {
 		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
 	} else {
-		updates := map[string]interface{}{
-			"profile": map[string]interface{}{
-				"startram": map[string]interface{}{
-					"info": map[string]interface{}{
-						"regions": regions,
-					},
-				},
-			},
-		}
-		err := UpdateBroadcastState(updates)
-		if err != nil {
-			return fmt.Errorf("Error updating broadcast state:", err)
-		}
+		mu.Lock()
+		broadcastState.Profile.Startram.Info.Regions = regions
+		mu.Unlock()
+		BroadcastToClients()
 	}
 	return nil
 }
