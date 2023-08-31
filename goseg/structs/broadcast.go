@@ -82,13 +82,16 @@ type Urbit struct {
 		Remote           bool   `json:"remote"`
 		Vere             any    `json:"vere"`
 	} `json:"info"`
-	Transition struct {
-		Meld                      any    `json:"meld"`
-		ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
-		TogglePower               any    `json:"togglePower"`
-		DeleteShip                any    `json:"deleteShip"`
-	} `json:"transition"`
+		Transition 		 UrbitTransitionBroadcast `json:"transition"`
 }
+
+// broadcast payload subobject
+type UrbitTransitionBroadcast struct {
+	Meld                      string    `json:"meld"`
+	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
+	TogglePower               string    `json:"togglePower"`
+	DeleteShip                string    `json:"deleteShip"`
+} 
 
 // used to construct broadcast pier info subobject
 type ContainerStats struct {

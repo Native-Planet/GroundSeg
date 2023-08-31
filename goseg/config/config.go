@@ -24,7 +24,8 @@ var (
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
-	BasePath = os.Getenv("GS_BASE_PATH")
+	// BasePath = os.Getenv("GS_BASE_PATH")
+	BasePath = "/opt/nativeplanet/groundseg"
 	// only amd64 or arm64
 	Architecture = getArchitecture()
 	// struct of /retrieve blob
@@ -96,7 +97,7 @@ func init() {
 		Logger.Error(errmsg)
 	}
 	// wipe the sessions on each startup
-	globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
+	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
 	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)

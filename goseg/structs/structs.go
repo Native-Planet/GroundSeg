@@ -10,6 +10,13 @@ type Event struct {
 	Data interface{}
 }
 
+// urbit transition eventbus payloads
+type UrbitTransition struct {
+	Patp string
+	Type string
+	Event string
+}
+
 // for keeping track of container desired/actual state
 type ContainerState struct {
 	ID             string

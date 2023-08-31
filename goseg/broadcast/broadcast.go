@@ -25,6 +25,8 @@ var (
 	shipInfoInterval = 3 * time.Second // how often we refresh ship info
 	broadcastState   structs.AuthBroadcast
 	unauthState      structs.UnauthBroadcast
+	UrbitTransitions = make(map[string]structs.UrbitTransitionBroadcast)
+	UrbTransMu       sync.RWMutex
 	mu               sync.RWMutex // synchronize access to broadcastState
 )
 
@@ -162,6 +164,9 @@ func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
+		UrbTransMu.RLock()
+		urbit.Transition = UrbitTransitions[pier]
+		UrbTransMu.RUnlock()
 		// and insert the struct into the map we will use as input for the broadcast struct
 		updates[pier] = urbit
 	}
@@ -326,17 +331,14 @@ func BroadcastToClients() error {
 	auth.AuthenticatedClients.Lock()
 	defer auth.AuthenticatedClients.Unlock()
 	for client := range auth.AuthenticatedClients.Conns {
+		if auth.AuthenticatedClients.Conns[client] == nil {
+			continue
+		}
 		if err := auth.AuthenticatedClients.Conns[client].WriteMessage(websocket.TextMessage, authJson); err != nil {
 			continue
 		}
 	}
-	// for debug, remove me
-	// for client := range clients {
-	// 	if err := client.WriteMessage(websocket.TextMessage, authJson); err != nil {
-	// 		config.Logger.Error(fmt.Sprintf("Error writing response: %v", err))
-	// 		return err
-	// 	}
-	// }
+
 	return nil
 }
 

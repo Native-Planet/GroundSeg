@@ -8,6 +8,34 @@ package auth
 
 // todo: purge old sessions from both maps
 
+// client send:
+// {
+// 	"type": "verify",
+// 	"id": "jsgeneratedid",
+// 	"token<optional>": {
+// 	  "id": "servergeneratedid",
+// 	  "token": "encryptedtext"
+// 	}
+// }
+
+// 1. we decrypt the token
+// 2. we modify token['authorized'] to true
+// 3. remove it from 'unauthorized' in system.json
+// 4. hash and add to 'authozired' in system.json
+// 5. encrypt that, and send it back to the user
+
+// server respond:
+// {
+// 	"type": "activity",
+// 	"response": "ack/nack",
+// 	"error": "null/<some_error>",
+// 	"id": "jsgeneratedid",
+// 	"token": { (either new token or the token the user sent us)
+// 	  "id": "relevant_token_id",
+// 	  "token": "encrypted_text"
+// 	}
+// }
+
 import (
 	"crypto/sha512"
 	"encoding/hex"
@@ -42,6 +70,16 @@ var (
 		Conns: make(map[string]*websocket.Conn),
 	}
 )
+
+func init() {
+	conf := config.Conf()
+	authed := conf.Sessions.Authorized
+	for key, _ := range authed {
+		AuthenticatedClients.Lock()
+		AuthenticatedClients.Conns[key] = nil
+		AuthenticatedClients.Unlock()
+	}
+}
 
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
@@ -82,7 +120,9 @@ func TokenIdAuthed(token string) bool {
 	return false
 }
 
-// this takes a bool for auth/unauth -- also persists to config
+// this takes a bool for auth/unauth
+// purge token/conn from opposite map
+// persists to config
 func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
 	tokenStr := token["token"]
 	tokenId := token["id"]
@@ -95,6 +135,11 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 		UnauthClients.Lock()
 		if _, ok := UnauthClients.Conns[tokenId]; ok {
 			delete(UnauthClients.Conns, tokenId)
+			for tokenID, con := range UnauthClients.Conns {
+				if con == conn {
+					delete(UnauthClients.Conns, tokenID)
+				}
+			}
 		}
 		UnauthClients.Unlock()
 	} else {
@@ -104,6 +149,11 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 		AuthenticatedClients.Lock()
 		if _, ok := AuthenticatedClients.Conns[tokenId]; ok {
 			delete(AuthenticatedClients.Conns, tokenId)
+			for tokenID, con := range AuthenticatedClients.Conns {
+				if con == conn {
+					delete(AuthenticatedClients.Conns, tokenID)
+				}
+			}
 		}
 		AuthenticatedClients.Unlock()
 	}
@@ -115,7 +165,7 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	return nil
 }
 
-// the same but the other way
+// the same but the other wayInvalid token provided
 func RemoveFromAuthMap(tokenId string, fromAuthorized bool) error {
 	if fromAuthorized {
 		AuthenticatedClients.Lock()
@@ -144,7 +194,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
 	if err != nil {
-		config.Logger.Warn("Invalid token provided")
+		config.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
 	} else {
 		// so you decrypt. now we see the useragent and ip.
@@ -235,8 +285,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 	}
 	if authorized {
 		update := map[string]interface{}{
-			"Sessions": map[string]interface{}{
-				"Authorized": map[string]structs.SessionInfo{
+			"sessions": map[string]interface{}{
+				"authorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},
 			},
@@ -249,8 +299,8 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		}
 	} else {
 		update := map[string]interface{}{
-			"Sessions": map[string]interface{}{
-				"Unauthorized": map[string]structs.SessionInfo{
+			"sessions": map[string]interface{}{
+				"unauthorized": map[string]structs.SessionInfo{
 					tokenID: session,
 				},
 			},
@@ -295,7 +345,7 @@ func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 60*time.Second, []*fernet.Key{key})
+	decrypted := fernet.VerifyAndDecrypt([]byte(tokenStr), 0, []*fernet.Key{key})
 	if decrypted == nil {
 		return nil, fmt.Errorf("verification or decryption failed")
 	}
