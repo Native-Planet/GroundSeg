@@ -118,6 +118,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
+			case "logout":
+				if err := handler.LogoutHandler(conn, msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("Error logging out client: %v", err))
+				}
 			case "verify":
 				result := map[string]interface{}{
 					"type":     "activity",

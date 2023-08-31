@@ -217,6 +217,10 @@ func StartramHandler(msg []byte) error {
 		if err := broadcast.BroadcastToClients(); err != nil {
 			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
+	case "regions":
+		if err := broadcast.LoadStartramRegions(); err != nil {
+			return fmt.Errorf("%v",err)
+		}
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
 	}

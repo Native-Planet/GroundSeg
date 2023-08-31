@@ -64,28 +64,9 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 		config.Logger.Error(errmsg)
 		return res, err
 	}
-	// wgRegistered := config.WgRegistered
-	// wgOn := config.WgOn
 	// get startram regions
-	config.Logger.Info("Retrieving StarTram region info")
-	regions, err := startram.GetRegions()
-	if err != nil {
-		config.Logger.Warn("Couldn't get StarTram regions")
-	} else {
-		updates := map[string]interface{}{
-			"Profile": map[string]interface{}{
-				"Startram": map[string]interface{}{
-					"Info": map[string]interface{}{
-						"Regions": regions,
-					},
-				},
-			},
-		}
-		err := UpdateBroadcastState(updates)
-		if err != nil {
-			errmsg := fmt.Sprintf("Error updating broadcast state:", err)
-			config.Logger.Error(errmsg)
-		}
+	if err := LoadStartramRegions(); err != nil {
+		config.Logger.Warn("%v",err)
 	}
 	// update with system state
 	sysInfo := constructSystemInfo()
@@ -100,6 +81,29 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 	// return the boostrapped result
 	res = GetState()
 	return res, nil
+}
+
+func LoadStartramRegions() error {
+	config.Logger.Info("Retrieving StarTram region info")
+	regions, err := startram.GetRegions()
+	if err != nil {
+		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
+	} else {
+		updates := map[string]interface{}{
+			"Profile": map[string]interface{}{
+				"Startram": map[string]interface{}{
+					"Info": map[string]interface{}{
+						"Regions": regions,
+					},
+				},
+			},
+		}
+		err := UpdateBroadcastState(updates)
+		if err != nil {
+			return fmt.Errorf("Error updating broadcast state:", err)
+		}
+	}
+	return nil
 }
 
 // this is for building the broadcast objects describing piers
