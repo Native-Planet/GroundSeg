@@ -109,7 +109,10 @@ func CheckVersionLoop() {
 			if latestChannelVersion != currentChannelVersion {
 				fmt.Printf("New version available in %s channel! Current: %+v, Latest: %+v\n", releaseChannel, currentChannelVersion, latestChannelVersion)
 				VersionInfo = latestVersion
-				// Handle the update logic here
+				// download new binary as groundseg_new
+				// delete groundseg
+				// rename groundseg_new to groundseg
+				// restart service
 			}
 		}
 	}
