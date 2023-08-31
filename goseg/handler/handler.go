@@ -228,7 +228,7 @@ func StartramHandler(msg []byte) error {
 }
 
 // password reset handler
-func PwHandler(msg []byte) error {
+func PwHandler(conn *websocket.Conn, msg []byte) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
@@ -245,6 +245,7 @@ func PwHandler(msg []byte) error {
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v",err)
 			}
+			LogoutHandler(conn, msg)
 		}
 	default:
 		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)
