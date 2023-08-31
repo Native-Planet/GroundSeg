@@ -90,10 +90,10 @@ func LoadStartramRegions() error {
 		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
 	} else {
 		updates := map[string]interface{}{
-			"Profile": map[string]interface{}{
-				"Startram": map[string]interface{}{
-					"Info": map[string]interface{}{
-						"Regions": regions,
+			"profile": map[string]interface{}{
+				"startram": map[string]interface{}{
+					"info": map[string]interface{}{
+						"regions": regions,
 					},
 				},
 			},
