@@ -6,7 +6,7 @@
 {/if}
 <style>
   .text {
-    position: absolute;
+    position: fixed;
     top: 20px;
     right: 20px;
     font-family: var(--title-font);
@@ -31,11 +31,4 @@
       color: var(--text-color);
     }
   }
-  /*
-  @keyframes breathe {
-    0% {opacity: 0}
-    50% {opacity: 1}
-    100% {opacity: 0}
-  }
-  */
 </style>

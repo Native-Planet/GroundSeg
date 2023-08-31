@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	EventBus = make(chan structs.Event, 100)
+	EventBus  = make(chan structs.Event, 100)
 	UTransBus = make(chan structs.UrbitTransition, 100)
 )
 

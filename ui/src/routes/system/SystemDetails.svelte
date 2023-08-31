@@ -7,7 +7,7 @@
   import CPULoad from './SysDetails/CPULoad.svelte'
   import CPUTemp from './SysDetails/CPUTemp.svelte'
 
-  $: usage = ($structure?.system?.usage) || {}
+  $: usage = ($structure?.system?.info?.usage) || {}
   $: swap = (usage?.swap) || 0
   $: ram = (usage?.ram) || [0,0]
   $: disk = (usage?.disk) || [0,0,0]

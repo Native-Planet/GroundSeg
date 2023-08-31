@@ -12,8 +12,8 @@ type Event struct {
 
 // urbit transition eventbus payloads
 type UrbitTransition struct {
-	Patp string
-	Type string
+	Patp  string
+	Type  string
 	Event string
 }
 

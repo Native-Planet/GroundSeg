@@ -6,9 +6,23 @@ type AuthBroadcast struct {
 	AuthLevel string           `json:"auth_level"`
 	Upload    Upload           `json:"upload"`
 	Logs      Logs             `json:"logs"`
-	System    SystemInfo       `json:"system"`
+	System    System           `json:"system"`
 	Profile   Profile          `json:"profile"`
 	Urbits    map[string]Urbit `json:"urbits"`
+}
+
+// broadcast payload subobject
+type System struct {
+	Info struct {
+		Usage   SystemUsage   `json:"usage"`
+		Updates SystemUpdates `json:"updates"`
+		Wifi    SystemWifi    `json:"wifi"`
+	} `json:"info"`
+	Transition SystemTransitionBroadcast `json:"transition"`
+}
+
+type SystemTransitionBroadcast struct {
+	Swap int `json:"swap"`
 }
 
 // broadcast payload subobject
@@ -36,13 +50,6 @@ type SystemWifi struct {
 	Status   string   `json:"status"`
 	Active   string   `json:"active"`
 	Networks []string `json:"networks"`
-}
-
-// broadcast payload subobject
-type SystemInfo struct {
-	Usage   SystemUsage   `json:"usage"`
-	Updates SystemUpdates `json:"updates"`
-	Wifi    SystemWifi    `json:"wifi"`
 }
 
 // broadcast payload subobject
@@ -82,16 +89,16 @@ type Urbit struct {
 		Remote           bool   `json:"remote"`
 		Vere             any    `json:"vere"`
 	} `json:"info"`
-		Transition 		 UrbitTransitionBroadcast `json:"transition"`
+	Transition UrbitTransitionBroadcast `json:"transition"`
 }
 
 // broadcast payload subobject
 type UrbitTransitionBroadcast struct {
-	Meld                      string    `json:"meld"`
+	Meld                      string `json:"meld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
-	TogglePower               string    `json:"togglePower"`
-	DeleteShip                string    `json:"deleteShip"`
-} 
+	TogglePower               string `json:"togglePower"`
+	DeleteShip                string `json:"deleteShip"`
+}
 
 // used to construct broadcast pier info subobject
 type ContainerStats struct {
