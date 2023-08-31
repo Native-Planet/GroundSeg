@@ -162,8 +162,22 @@ func LoginHandler(conn *websocket.Conn, msg []byte) error {
 	return nil
 }
 
+// take a guess
+func LogoutHandler(conn *websocket.Conn, msg []byte) error {
+	var logoutPayload structs.WsLogoutPayload
+	err := json.Unmarshal(msg, &logoutPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+	}
+	if err := auth.RemoveFromAuthMap(logoutPayload.Token.ID, true); err != nil {
+		return fmt.Errorf("Unable to logout: %v",err)
+	}
+	UnauthHandler(conn)
+	return nil
+}
+
 // broadcast the unauth payload
-func UnauthHandler(conn *websocket.Conn, r *http.Request) {
+func UnauthHandler(conn *websocket.Conn) {
 	config.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",

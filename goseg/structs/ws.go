@@ -56,6 +56,11 @@ type WsLoginAction struct {
 	Password string `json:"password"`
 }
 
+type WsLogoutPayload struct {
+	ID      string        `json:"id"`
+	Token   WsTokenStruct `json:"token"`
+}
+
 type WsResponsePayload struct {
 	ID       string        `json:"id"`
 	Type     string        `json:"type"`

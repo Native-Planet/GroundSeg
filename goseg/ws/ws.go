@@ -179,7 +179,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			default:
-				handler.UnauthHandler(conn, r)
+				handler.UnauthHandler(conn)
 			}
 		}
 	}
