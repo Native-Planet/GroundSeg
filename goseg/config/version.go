@@ -103,19 +103,50 @@ func CheckVersionLoop() {
 	for {
 		select {
 		case <-ticker.C:
+			// Get latest information
 			latestVersion, _ := CheckVersion()
-			currentChannelVersion := VersionInfo
-			latestChannelVersion := latestVersion
-			if latestChannelVersion != currentChannelVersion {
-				fmt.Printf("New version available in %s channel! Current: %+v, Latest: %+v\n", releaseChannel, currentChannelVersion, latestChannelVersion)
-				VersionInfo = latestVersion
-				// download new binary as groundseg_new
-				// delete groundseg
-				// rename groundseg_new to groundseg
-				// restart service
+
+			// Check for gs binary updates based on hash
+			currentHash := conf.BinHash
+			latestHash := latestVersion.Groundseg.Amd64Sha256
+			if Architecture != "amd64" {
+				latestHash = latestVersion.Groundseg.Arm64Sha256
+			}
+			if currentHash != latestHash {
+				Logger.Info("GroundSeg Binary update!")
+				// updateBinary will likely restart the program, so
+				// we don't have to care about the docker updates.
+				updateBinary(latestVersion)
+			} else {
+				// check docker updates
+				currentChannelVersion := VersionInfo
+				latestChannelVersion := latestVersion
+				if latestChannelVersion != currentChannelVersion {
+					VersionInfo = latestVersion
+					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+				}
 			}
 		}
 	}
+}
+
+func updateBinary(versionInfo structs.Channel) {
+	Logger.Info(fmt.Sprintf("update binary called: %v", versionInfo))
+	// download new binary, name it groundseg_new
+	// delete groundseg binary
+	// rename groundseg_new to groundseg
+	// systemctl restart groundseg
+}
+
+func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
+	Logger.Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
+	Logger.Info(fmt.Sprintf(
+		"New version available in %s channel! Current: %+v, Latest: %+v\n",
+		release, currentVersion, latestVersion,
+	))
+	// check individual images
+	// update persistent
+	// restart affected containers
 }
 
 // write the defaults.VersionInfo value to disk
