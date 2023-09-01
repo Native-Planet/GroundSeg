@@ -11,6 +11,7 @@ import (
 	"goseg/structs"
 	"net/http"
 	"os"
+	"os/exec"
 
 	"github.com/gorilla/websocket"
 )
@@ -34,11 +35,20 @@ func SystemHandler(msg []byte, conn *websocket.Conn) error {
 		switch systemPayload.Payload.Command {
 		case "shutdown":
 			config.Logger.Info(fmt.Sprintf("Device shutdown requested"))
-			os.Exit(0) // todo: shutdown here
-
+			if config.DebugMode {
+				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+				os.Exit(0)
+			} else {
+				exec.Command("shutdown", "-h", "now")
+			}
 		case "restart":
 			config.Logger.Info(fmt.Sprintf("Device restart requested"))
-			os.Exit(0) // todo: restart here
+			if config.DebugMode {
+				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
+				os.Exit(0)
+			} else {
+				exec.Command("reboot")
+			}
 		default:
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
 		}
@@ -170,7 +180,7 @@ func LogoutHandler(conn *websocket.Conn, msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	if err := auth.RemoveFromAuthMap(logoutPayload.Token.ID, true); err != nil {
-		return fmt.Errorf("Unable to logout: %v",err)
+		return fmt.Errorf("Unable to logout: %v", err)
 	}
 	UnauthHandler(conn)
 	return nil
@@ -211,15 +221,15 @@ func StartramHandler(msg []byte) error {
 	case "register":
 		regCode := startramPayload.Payload.Key
 		region := startramPayload.Payload.Region
-		if err := startram.Register(regCode,region); err != nil {
-			return fmt.Errorf("Failed registration: %v",err)
+		if err := startram.Register(regCode, region); err != nil {
+			return fmt.Errorf("Failed registration: %v", err)
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
 			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
 	case "regions":
 		if err := broadcast.LoadStartramRegions(); err != nil {
-			return fmt.Errorf("%v",err)
+			return fmt.Errorf("%v", err)
 		}
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
@@ -243,12 +253,12 @@ func PwHandler(conn *websocket.Conn, msg []byte) error {
 				"pwHash": auth.Hasher(pwPayload.Payload.Password),
 			}
 			if err := config.UpdateConf(update); err != nil {
-				return fmt.Errorf("Unable to update password: %v",err)
+				return fmt.Errorf("Unable to update password: %v", err)
 			}
 			LogoutHandler(conn, msg)
 		}
 	default:
-		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)
+		return fmt.Errorf("Unrecognized password action: %v", pwPayload.Payload.Action)
 	}
 	return nil
 }
