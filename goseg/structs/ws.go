@@ -32,7 +32,7 @@ type ClientManager struct {
 
 // register a new connection
 func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *MuConn {
-	muConn := &MuConn{Conn: conn, Mu: sync.Mutex{}}
+	muConn := &MuConn{Conn: conn, Mu: sync.RWMutex{}}
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
 	cm.UnauthClients[tokenId] = muConn
