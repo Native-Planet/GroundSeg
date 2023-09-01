@@ -56,10 +56,42 @@ type WsLoginAction struct {
 	Password string `json:"password"`
 }
 
+type WsPwPayload struct {
+	ID      string `json:"id"`
+	Payload WsPwAction `json:"payload"`
+	Token    WsTokenStruct `json:"token"`
+}
+
+type WsPwAction struct {
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Old      string `json:"old"`
+	Password string `json:"password"`
+}
+
+type WsLogoutPayload struct {
+	ID      string        `json:"id"`
+	Token   WsTokenStruct `json:"token"`
+}
+
 type WsResponsePayload struct {
 	ID       string        `json:"id"`
 	Type     string        `json:"type"`
 	Response string        `json:"response"`
 	Error    string        `json:"error"`
 	Token    WsTokenStruct `json:"token"`
+}
+
+type WsStartramPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsStartramAction `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsStartramAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Key    string `json:"key"`
+	Region string `json:"region"`
 }

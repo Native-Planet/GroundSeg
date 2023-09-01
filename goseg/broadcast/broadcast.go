@@ -64,28 +64,9 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 		config.Logger.Error(errmsg)
 		return res, err
 	}
-	// wgRegistered := config.WgRegistered
-	// wgOn := config.WgOn
 	// get startram regions
-	config.Logger.Info("Retrieving StarTram region info")
-	regions, err := startram.GetRegions()
-	if err != nil {
-		config.Logger.Warn("Couldn't get StarTram regions")
-	} else {
-		updates := map[string]interface{}{
-			"Profile": map[string]interface{}{
-				"Startram": map[string]interface{}{
-					"Info": map[string]interface{}{
-						"Regions": regions,
-					},
-				},
-			},
-		}
-		err := UpdateBroadcastState(updates)
-		if err != nil {
-			errmsg := fmt.Sprintf("Error updating broadcast state:", err)
-			config.Logger.Error(errmsg)
-		}
+	if err := LoadStartramRegions(); err != nil {
+		config.Logger.Warn("%v",err)
 	}
 	// update with system state
 	sysInfo := constructSystemInfo()
@@ -100,6 +81,21 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 	// return the boostrapped result
 	res = GetState()
 	return res, nil
+}
+
+// put startram regions into broadcast struct
+func LoadStartramRegions() error {
+	config.Logger.Info("Retrieving StarTram region info")
+	regions, err := startram.GetRegions()
+	if err != nil {
+		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
+	} else {
+		mu.Lock()
+		broadcastState.Profile.Startram.Info.Regions = regions
+		mu.Unlock()
+		BroadcastToClients()
+	}
+	return nil
 }
 
 // this is for building the broadcast objects describing piers
@@ -247,61 +243,71 @@ func UpdateBroadcastState(values map[string]interface{}) error {
 
 // this allows us to insert stuff into nested structs/keys and not overwrite the existing contents
 func recursiveUpdate(dst, src reflect.Value) error {
-	if !dst.CanSet() {
-		return fmt.Errorf("field (type: %s, kind: %s) is not settable", dst.Type(), dst.Kind())
-	}
-	// If dst is a struct and src is a map, handle them field by field
-	if dst.Kind() == reflect.Struct && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			dstField := dst.FieldByName(key.String())
-			if !dstField.IsValid() {
-				return fmt.Errorf("field %s does not exist in the struct", key.String())
-			}
-			// Initialize the map if it's nil and we're trying to set a map
-			if dstField.Kind() == reflect.Map && dstField.IsNil() && src.MapIndex(key).Kind() == reflect.Map {
-				dstField.Set(reflect.MakeMap(dstField.Type()))
-			}
-			if !dstField.CanSet() {
-				return fmt.Errorf("field %s is not settable in the struct", key.String())
-			}
-			srcVal := src.MapIndex(key)
-			if srcVal.Kind() == reflect.Interface {
-				srcVal = srcVal.Elem()
-			}
-			if err := recursiveUpdate(dstField, srcVal); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	// If both dst and src are maps, handle them recursively
-	if dst.Kind() == reflect.Map && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			srcVal := src.MapIndex(key)
-			// If the key doesn't exist in dst, initialize it
-			dstVal := dst.MapIndex(key)
-			if !dstVal.IsValid() {
-				dstVal = reflect.New(dst.Type().Elem()).Elem()
-			}
-			// Recursive call to handle potential nested maps or structs
-			if err := recursiveUpdate(dstVal, srcVal); err != nil {
-				return err
-			}
-			// Initialize the map if it's nil
-			if dst.IsNil() {
-				dst.Set(reflect.MakeMap(dst.Type()))
-			}
-			dst.SetMapIndex(key, dstVal)
-		}
-		return nil
-	}
-	// For non-map or non-struct fields, or for direct updates
-	if dst.Type() != src.Type() {
-		return fmt.Errorf("type mismatch: expected %s, got %s", dst.Type(), src.Type())
-	}
-	dst.Set(src)
-	return nil
+    if !dst.CanSet() {
+        return fmt.Errorf("field (type: %s, kind: %s) is not settable", dst.Type(), dst.Kind())
+    }
+
+    // If both dst and src are structs, overwrite dst with src
+    if dst.Kind() == reflect.Struct && src.Kind() == reflect.Struct {
+        dst.Set(src)
+        return nil
+    }
+
+    // If dst is a struct and src is a map, handle them field by field
+    if dst.Kind() == reflect.Struct && src.Kind() == reflect.Map {
+        for _, key := range src.MapKeys() {
+            dstField := dst.FieldByName(key.String())
+            if !dstField.IsValid() {
+                return fmt.Errorf("field %s does not exist in the struct", key.String())
+            }
+            // Initialize the map if it's nil and we're trying to set a map
+            if dstField.Kind() == reflect.Map && dstField.IsNil() && src.MapIndex(key).Kind() == reflect.Map {
+                dstField.Set(reflect.MakeMap(dstField.Type()))
+            }
+            if !dstField.CanSet() {
+                return fmt.Errorf("field %s is not settable in the struct", key.String())
+            }
+            srcVal := src.MapIndex(key)
+            if srcVal.Kind() == reflect.Interface {
+                srcVal = srcVal.Elem()
+            }
+            if err := recursiveUpdate(dstField, srcVal); err != nil {
+                return err
+            }
+        }
+        return nil
+    }
+
+    // If both dst and src are maps, handle them recursively
+    if dst.Kind() == reflect.Map && src.Kind() == reflect.Map {
+        for _, key := range src.MapKeys() {
+            srcVal := src.MapIndex(key)
+            // If the key doesn't exist in dst, initialize it
+            dstVal := dst.MapIndex(key)
+            if !dstVal.IsValid() {
+                dstVal = reflect.New(dst.Type().Elem()).Elem()
+            }
+            // Recursive call to handle potential nested maps or structs
+            if err := recursiveUpdate(dstVal, srcVal); err != nil {
+                return err
+            }
+            // Initialize the map if it's nil
+            if dst.IsNil() {
+                dst.Set(reflect.MakeMap(dst.Type()))
+            }
+            dst.SetMapIndex(key, dstVal)
+        }
+        return nil
+    }
+
+    // For non-map or non-struct fields, or for direct updates
+    if dst.Type() != src.Type() {
+        return fmt.Errorf("type mismatch: expected %s, got %s", dst.Type(), src.Type())
+    }
+    dst.Set(src)
+    return nil
 }
+
 
 // return broadcast state
 func GetState() structs.AuthBroadcast {

@@ -7,6 +7,7 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/startram"
 	"goseg/structs"
 	"net/http"
 	"os"
@@ -161,8 +162,22 @@ func LoginHandler(conn *websocket.Conn, msg []byte) error {
 	return nil
 }
 
+// take a guess
+func LogoutHandler(conn *websocket.Conn, msg []byte) error {
+	var logoutPayload structs.WsLogoutPayload
+	err := json.Unmarshal(msg, &logoutPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+	}
+	if err := auth.RemoveFromAuthMap(logoutPayload.Token.ID, true); err != nil {
+		return fmt.Errorf("Unable to logout: %v",err)
+	}
+	UnauthHandler(conn)
+	return nil
+}
+
 // broadcast the unauth payload
-func UnauthHandler(conn *websocket.Conn, r *http.Request) {
+func UnauthHandler(conn *websocket.Conn) {
 	config.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",
@@ -182,4 +197,58 @@ func UnauthHandler(conn *websocket.Conn, r *http.Request) {
 		config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
 		return
 	}
+}
+
+// startram action handler
+// gonna get confusing if we have varied startram structs
+func StartramHandler(msg []byte) error {
+	var startramPayload structs.WsStartramPayload
+	err := json.Unmarshal(msg, &startramPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal startram payload: %v", err)
+	}
+	switch startramPayload.Payload.Action {
+	case "register":
+		regCode := startramPayload.Payload.Key
+		region := startramPayload.Payload.Region
+		if err := startram.Register(regCode,region); err != nil {
+			return fmt.Errorf("Failed registration: %v",err)
+		}
+		if err := broadcast.BroadcastToClients(); err != nil {
+			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+		}
+	case "regions":
+		if err := broadcast.LoadStartramRegions(); err != nil {
+			return fmt.Errorf("%v",err)
+		}
+	default:
+		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
+	}
+	return nil
+}
+
+// password reset handler
+func PwHandler(conn *websocket.Conn, msg []byte) error {
+	var pwPayload structs.WsPwPayload
+	err := json.Unmarshal(msg, &pwPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal password payload: %v", err)
+	}
+	switch pwPayload.Payload.Action {
+	case "modify":
+		config.Logger.Info("Setting new password")
+		conf := config.Conf()
+		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
+			update := map[string]interface{}{
+				"pwHash": auth.Hasher(pwPayload.Payload.Password),
+			}
+			if err := config.UpdateConf(update); err != nil {
+				return fmt.Errorf("Unable to update password: %v",err)
+			}
+			LogoutHandler(conn, msg)
+		}
+	default:
+		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)
+	}
+	return nil
 }

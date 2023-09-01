@@ -83,57 +83,62 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": tokenContent,
 		}
 		if authed {
+			ack := "ack"
+		// authenticated action handlers
 			switch msgType.Payload.Type {
 			case "new_ship":
 				config.Logger.Info("New ship")
 			case "pier_upload":
 				config.Logger.Info("Pier upload")
 			case "password":
-				config.Logger.Info("Password")
+				if err = handler.PwHandler(conn,msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "system":
 				if err = handler.SystemHandler(msg, conn); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
 				}
 			case "startram":
-				config.Logger.Info("StarTram")
+				if err = handler.StartramHandler(msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "urbit":
 				if err = handler.UrbitHandler(msg, conn); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
 				}
 			case "support":
 				if err = handler.SupportHandler(msg, payload, r, conn); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
 				}
 			case "broadcast":
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					ack = "nack"
 				}
 			case "login":
 				// already authed so lets get you on the map
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
+					ack = "nack"
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					ack = "nack"
+				}
+			case "logout":
+				if err := handler.LogoutHandler(conn, msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("Error logging out client: %v", err))
+					ack = "nack"
 				}
 			case "verify":
-				result := map[string]interface{}{
-					"type":     "activity",
-					"id":       payload.ID, // this is like the action id
-					"error":    "null",
-					"response": "ack",
-					"token":    token,
-				}
-				respJson, err := json.Marshal(result)
-				if err != nil {
-					errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
-					config.Logger.Error(errmsg)
-				}
-				if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
-					continue
-				}
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
+					ack = "nack"
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
@@ -144,7 +149,25 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := broadcast.BroadcastToClients(); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
+				ack = "nack"
 			}
+			// ack or nack
+			result := map[string]interface{}{
+				"type":     "activity",
+				"id":       payload.ID,
+				"error":    "null",
+				"response": ack,
+				"token":    token,
+			}
+			respJson, err := json.Marshal(result)
+			if err != nil {
+				errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
+				config.Logger.Error(errmsg)
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
+				continue
+			}
+		// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
@@ -177,7 +200,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			default:
-				handler.UnauthHandler(conn, r)
+				handler.UnauthHandler(conn)
 			}
 		}
 	}
