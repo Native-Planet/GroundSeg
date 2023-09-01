@@ -4,9 +4,14 @@ package structs
 // actual writing is done via broadcast package
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/gorilla/websocket"
+)
+
+var (
+	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil)) // for debug
 )
 
 // wrapped ws+mutex
@@ -73,17 +78,23 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
+	logger.Info("Locking")
 	for _, client := range cm.UnauthClients {
+		logger.Info("auth broadcasting")
 		client.Write(data)
 	}
+	logger.Info("Unlocking")
 }
 
 func (cm *ClientManager) BroadcastAuth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
+	logger.Info("Locking")
 	for _, client := range cm.AuthClients {
+		logger.Info("unauth broadcasting")
 		client.Write(data)
 	}
+	logger.Info("Unlocking")
 }
 
 type WsType struct {
