@@ -4,6 +4,7 @@ package structs
 // actual writing is done via broadcast package
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -80,7 +81,7 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
-	logger.Info("Locking")
+	logger.Info(fmt.Sprintf("Locking for %v unauth clients",len(cm.UnauthClients)))
 	for _, client := range cm.UnauthClients {
 		logger.Info("auth broadcasting")
 		client.Write(data)
@@ -91,7 +92,7 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 func (cm *ClientManager) BroadcastAuth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
-	logger.Info("Locking")
+	logger.Info(fmt.Sprintf("Locking for %v auth clients",len(cm.AuthClients)))
 	for _, client := range cm.AuthClients {
 		logger.Info("unauth broadcasting")
 		client.Write(data)

@@ -15,20 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// for passing mutexes between packages
-// not being used for now
-type HandlerMuConn struct {
-    *structs.MuConn
-}
-
-func (mc *HandlerMuConn) Write(messageType int, data []byte) error {
-	mc.Mu.Lock()
-	defer mc.Mu.Unlock()
-	return mc.Conn.WriteMessage(messageType, data)
-}
-// 
-
-
+// todo
 // handle bug report stuff
 func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
 	config.Logger.Info("Support")
