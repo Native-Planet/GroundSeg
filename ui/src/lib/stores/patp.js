@@ -1,33 +1,43 @@
-export const checkPatp = p => {
-  // prefixes and suffixes into arrays
-  let pre = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
-  let suf = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
-  pre = pre.match(/.{1,3}/g)
-  suf = suf.match(/.{1,3}/g)
-  
-  // patp into array
-  p = p.replace(/~/g,'').split('-')
- 
-  // check every syllable
-  let checked = []
-  for (let i = 0; i < p.length; i++) {
-    if (p[i].length == 3) {
-      checked.push(suf.includes(p[i]))
-    } else if (p[i].length == 6) {
-      let s = p[i].match(/.{1,3}/g)
-      checked.push(pre.includes(s[0]) && (suf.includes(s[1])))
-    } else {return false}
+// removes ~ from patp
+export const sigRemove = patp => {
+  if (patp != undefined) {
+    if (patp.startsWith("~")) {
+      patp = patp.substring(1);
+    }
   }
-
-  // returns true if no falses in checked
-  return !checked.includes(false)
+  return patp
 }
 
-export const getPatpArray = () => {
+// checks if patp is correct -- use sigRemove() first!
+export const checkPatp = patp => {
+  if (patp == undefined) {
+    return false
+  }
   // prefixes and suffixes into arrays
+  // Split the string by hyphen
+  const wordlist = patp.split("-");
+  // Define the regular expression pattern
+  const pattern = /(^[a-z]{6}$|^[a-z]{3}$)/;
+  // Define pre and suf (truncated for brevity)
   let pre = "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
   let suf = "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
-  pre = pre.match(/.{1,3}/g)
-  suf = suf.match(/.{1,3}/g)
-  return {"pre":pre,"suf":suf}
+
+  for (const word of wordlist) {
+    // Check regular expression match
+    if (!pattern.test(word)) {
+      return false;
+    }
+
+    // Check prefixes and suffixes
+    if (word.length > 3) {
+      if (!pre.includes(word.substring(0, 3)) || !suf.includes(word.substring(3, 6))) {
+        return false;
+      }
+    } else {
+      if (!suf.includes(word)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }

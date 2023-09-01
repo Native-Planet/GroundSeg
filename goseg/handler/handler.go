@@ -11,6 +11,9 @@ import (
 	"goseg/structs"
 	"net/http"
 	"os"
+	"os/exec"
+	"regexp"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -21,8 +24,26 @@ func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn
 	return nil
 }
 
+func NewShipHandler(msg []byte) error {
+	config.Logger.Info("New ship")
+	// Unmarshal JSON
+	var shipPayload structs.WsNewShipPayload
+	err := json.Unmarshal(msg, &shipPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
+	}
+	// Check if patp is valid
+	patp := sigRemove(shipPayload.Payload.Patp)
+	isValid := checkPatp(patp)
+	if !isValid {
+		return fmt.Errorf("Invalid @p provided: %v", patp)
+	}
+	go createUrbitShip(patp, shipPayload)
+	return nil
+}
+
 // handle system events
-func SystemHandler(msg []byte, conn *websocket.Conn) error {
+func SystemHandler(msg []byte) error {
 	config.Logger.Info("System")
 	var systemPayload structs.WsSystemPayload
 	err := json.Unmarshal(msg, &systemPayload)
@@ -34,11 +55,24 @@ func SystemHandler(msg []byte, conn *websocket.Conn) error {
 		switch systemPayload.Payload.Command {
 		case "shutdown":
 			config.Logger.Info(fmt.Sprintf("Device shutdown requested"))
-			os.Exit(0) // todo: shutdown here
-
+			if config.DebugMode {
+				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+				os.Exit(0)
+			} else {
+				config.Logger.Info(fmt.Sprintf("Turning off device.."))
+				cmd := exec.Command("shutdown", "-h", "now")
+				cmd.Run()
+			}
 		case "restart":
 			config.Logger.Info(fmt.Sprintf("Device restart requested"))
-			os.Exit(0) // todo: restart here
+			if config.DebugMode {
+				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
+				os.Exit(0)
+			} else {
+				config.Logger.Info(fmt.Sprintf("Restarting device.."))
+				cmd := exec.Command("reboot")
+				cmd.Run()
+			}
 		default:
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
 		}
@@ -170,7 +204,7 @@ func LogoutHandler(conn *websocket.Conn, msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	if err := auth.RemoveFromAuthMap(logoutPayload.Token.ID, true); err != nil {
-		return fmt.Errorf("Unable to logout: %v",err)
+		return fmt.Errorf("Unable to logout: %v", err)
 	}
 	UnauthHandler(conn)
 	return nil
@@ -211,15 +245,15 @@ func StartramHandler(msg []byte) error {
 	case "register":
 		regCode := startramPayload.Payload.Key
 		region := startramPayload.Payload.Region
-		if err := startram.Register(regCode,region); err != nil {
-			return fmt.Errorf("Failed registration: %v",err)
+		if err := startram.Register(regCode, region); err != nil {
+			return fmt.Errorf("Failed registration: %v", err)
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
 			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
 	case "regions":
 		if err := broadcast.LoadStartramRegions(); err != nil {
-			return fmt.Errorf("%v",err)
+			return fmt.Errorf("%v", err)
 		}
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
@@ -243,12 +277,59 @@ func PwHandler(conn *websocket.Conn, msg []byte) error {
 				"pwHash": auth.Hasher(pwPayload.Payload.Password),
 			}
 			if err := config.UpdateConf(update); err != nil {
-				return fmt.Errorf("Unable to update password: %v",err)
+				return fmt.Errorf("Unable to update password: %v", err)
 			}
 			LogoutHandler(conn, msg)
 		}
 	default:
-		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)
+		return fmt.Errorf("Unrecognized password action: %v", pwPayload.Payload.Action)
 	}
 	return nil
+}
+
+// SigRemove removes the '~' prefix from patp if it exists
+func sigRemove(patp string) string {
+	if patp != "" {
+		if strings.HasPrefix(patp, "~") {
+			patp = patp[1:]
+		}
+	}
+	return patp
+}
+
+// CheckPatp checks if patp is correct
+func checkPatp(patp string) bool {
+	// Handle undefined patp
+	if patp == "" {
+		return false
+	}
+
+	// Split the string by hyphen
+	wordlist := strings.Split(patp, "-")
+
+	// Define the regular expression pattern
+	pattern := regexp.MustCompile("^[a-z]{6}$|^[a-z]{3}$")
+
+	// Define pre and suf (truncated for brevity)
+	pre := "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+	suf := "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+
+	for _, word := range wordlist {
+		// Check regular expression match
+		if !pattern.MatchString(word) {
+			return false
+		}
+
+		// Check prefixes and suffixes
+		if len(word) > 3 {
+			if !strings.Contains(pre, word[0:3]) || !strings.Contains(suf, word[3:6]) {
+				return false
+			}
+		} else {
+			if !strings.Contains(suf, word) {
+				return false
+			}
+		}
+	}
+	return true
 }

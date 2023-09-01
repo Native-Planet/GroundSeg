@@ -88,6 +88,43 @@ func UrbitTransitionHandler() {
 	}
 }
 
+func NewShipTransitionHandler() {
+	for {
+		event := <-docker.NewShipTransBus
+		switch event.Type {
+		case "bootStage":
+			var res map[string]interface{}
+			res = map[string]interface{}{
+				"NewShip": map[string]interface{}{
+					"Transition": map[string]interface{}{
+						"BootStage": event.Event,
+					},
+				},
+			}
+			err := broadcast.UpdateBroadcastState(res)
+			if err != nil {
+				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'bootStage': %v", err))
+			}
+			broadcast.BroadcastToClients()
+		case "patp":
+			var res map[string]interface{}
+			res = map[string]interface{}{
+				"NewShip": map[string]interface{}{
+					"Transition": map[string]interface{}{
+						"Patp": event.Event,
+					},
+				},
+			}
+			err := broadcast.UpdateBroadcastState(res)
+			if err != nil {
+				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'bootStage': %v", err))
+			}
+		default:
+			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+		}
+	}
+}
+
 /*
 func SystemTransitionHandler() {
 	for {

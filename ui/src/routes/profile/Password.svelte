@@ -6,6 +6,12 @@
   export let wide
   // Websocket
   import { structure, logout } from '$lib/stores/websocket'
+
+  let clicked = false
+  const handleLogout = () => {
+    clicked = true
+    logout()
+  }
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
@@ -15,7 +21,7 @@
     <div class="pwd">**************************</div>
     <button class="edit" on:click={()=>openModal(PasswordModal)}>Edit</button>
   </div>
-  <button class="edit" on:click={logout}>Logout(Temp)</button>
+  <button class="edit" on:click={handleLogout}>{clicked ? "Logging out..." : "Logout(Temp)"}</button>
 </div>
 
 <style>

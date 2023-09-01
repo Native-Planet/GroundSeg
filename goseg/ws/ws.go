@@ -84,19 +84,22 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if authed {
 			ack := "ack"
-		// authenticated action handlers
+			// authenticated action handlers
 			switch msgType.Payload.Type {
 			case "new_ship":
-				config.Logger.Info("New ship")
+				if err = handler.NewShipHandler(msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "pier_upload":
 				config.Logger.Info("Pier upload")
 			case "password":
-				if err = handler.PwHandler(conn,msg); err != nil {
+				if err = handler.PwHandler(conn, msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "system":
-				if err = handler.SystemHandler(msg, conn); err != nil {
+				if err = handler.SystemHandler(msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -167,7 +170,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
 				continue
 			}
-		// unauthenticated action handlers
+			// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
