@@ -24,6 +24,7 @@ type MuConn struct {
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
 	ws.Mu.Lock()
+	logger.Info("conn mu lock")
 	defer ws.Mu.Unlock()
 	return ws.Conn.WriteMessage(websocket.TextMessage, data)
 }
