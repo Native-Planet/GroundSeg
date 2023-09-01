@@ -1,9 +1,9 @@
 <script>
-  import Sigil from '$lib/Sigil.svelte'
   import KeyDropper from './KeyDropper.svelte';
   import { bootShip } from '$lib/stores/websocket';
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { goto } from '$app/navigation';
+  import Sigil from './Sigil.svelte'
 
   let key = '';
   let name = '';
