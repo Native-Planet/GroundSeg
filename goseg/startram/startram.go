@@ -109,6 +109,12 @@ func Register(regCode string, region string) error {
 			return fmt.Errorf("Error retrieving post-registration: %v", err)
 		}
 	} else {
+		err = config.UpdateConf(map[string]interface{}{
+			"wgRegistered": false,
+		})
+		if err != nil {
+			return fmt.Errorf("Error updating registration status: %v", err)
+		}
 		return fmt.Errorf("Error registering: %v", respObj.Debug)
 	}
 	return nil

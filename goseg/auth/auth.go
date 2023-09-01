@@ -181,9 +181,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 				config.Logger.Warn("TokenId doesn't match session!")
 				return token["token"], false
 			}
-		} else {
-			config.Logger.Warn("TokenId isn't an authenticated session")
-			return token["token"], false
 		}
 	}
 	return token["token"], false
