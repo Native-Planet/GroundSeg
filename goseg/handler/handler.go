@@ -39,7 +39,9 @@ func SystemHandler(msg []byte, conn *websocket.Conn) error {
 				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 				os.Exit(0)
 			} else {
-				exec.Command("shutdown", "-h", "now")
+				config.Logger.Info(fmt.Sprintf("Turning off device.."))
+				cmd := exec.Command("shutdown", "-h", "now")
+				cmd.Run()
 			}
 		case "restart":
 			config.Logger.Info(fmt.Sprintf("Device restart requested"))
@@ -47,7 +49,9 @@ func SystemHandler(msg []byte, conn *websocket.Conn) error {
 				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
 				os.Exit(0)
 			} else {
-				exec.Command("reboot")
+				config.Logger.Info(fmt.Sprintf("Restarting device.."))
+				cmd := exec.Command("reboot")
+				cmd.Run()
 			}
 		default:
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
