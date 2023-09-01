@@ -5,6 +5,7 @@ package structs
 
 import (
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
