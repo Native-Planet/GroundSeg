@@ -1,4 +1,109 @@
 package structs
+// contained herein: structs for managing mutexed maps of
+// mutexed websocket connections to avoid panics;
+// actual writing is done via broadcast package
+
+import (
+	"encoding/base64"
+	"math/rand"
+	"sync"
+
+	"github.com/gorilla/websocket"
+)
+
+// for tokenid's
+func randString(length int) string {
+	randBytes := make([]byte, length)
+	_, _ = rand.Read(randBytes)
+	return base64.URLEncoding.EncodeToString(randBytes)
+}
+
+// wrapped ws+mutex
+type MuConn struct {
+	Conn *websocket.Conn
+	Mu   sync.Mutex
+}
+
+// mutexed ws write
+func (ws *MuConn) Write(data []byte) error {
+	ws.Mu.Lock()
+	defer ws.Mu.Unlock()
+	return ws.Conn.WriteMessage(websocket.TextMessage, data)
+}
+
+// wrappers for mutexed token:websocket maps
+// the maps are also mutexed as wholes
+type ClientManager struct {
+	AuthClients 		 map[string]*MuConn
+	UnauthClients        map[string]*MuConn
+	Mu                   sync.RWMutex
+}
+
+// register a new connection
+func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *MuConn {
+	muConn := &MuConn{Conn: conn, Mu: sync.Mutex{}}
+	cm.Mu.Lock()
+	defer cm.Mu.Unlock()
+	cm.UnauthClients[tokenId] = muConn
+	return muConn
+}
+
+func (cm *ClientManager) GetMuConn(conn *websocket.Conn) (*MuConn, bool) {
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	muConn, ok := cm.UnauthClients[randString(32)]
+	if !ok {
+		muConn, ok = cm.AuthClients[randString(32)]
+	}
+	return muConn, ok
+}
+
+func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
+	cm.Mu.Lock()
+	defer cm.Mu.Unlock()
+	// also remove from other map
+	// delete by value rather than key
+	if _, ok := cm.UnauthClients[id]; ok {
+		delete(cm.UnauthClients, id)
+		cm.AuthClients[id] = client
+		for token, con := range cm.UnauthClients {
+			if con.Conn == client.Conn {
+				delete(cm.UnauthClients, token)
+			}
+		}
+	}
+}
+
+func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
+	cm.Mu.Lock()
+	defer cm.Mu.Unlock()
+	cm.UnauthClients[id] = client
+	// also remove from other map
+	if _, ok := cm.AuthClients[id]; ok {
+		delete(cm.AuthClients, id)
+		for token, con := range cm.AuthClients {
+			if con.Conn == client.Conn {
+				delete(cm.AuthClients, token)
+			}
+		}
+	}
+}
+
+func (cm *ClientManager) BroadcastUnauth(data []byte) {
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, client := range cm.UnauthClients {
+		client.Write(data)
+	}
+}
+
+func (cm *ClientManager) BroadcastAuth(data []byte) {
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, client := range cm.AuthClients {
+		client.Write(data)
+	}
+}
 
 type WsType struct {
 	Payload struct {

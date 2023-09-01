@@ -47,45 +47,34 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	fernet "github.com/fernet/fernet-go"
 	"github.com/gorilla/websocket"
 )
 
-var (
-	// maps a websocket conn to a tokenid
-	// tokenid's can be referenced from the global conf
-	AuthenticatedClients = struct {
-		Conns map[string]*websocket.Conn
-		sync.RWMutex
-	}{
-		Conns: make(map[string]*websocket.Conn),
+func NewClientManager() *structs.ClientManager {
+	return &structs.ClientManager{
+		AuthClients:   make(map[string]*structs.MuConn),
+		UnauthClients: make(map[string]*structs.MuConn),
 	}
-	UnauthClients = struct {
-		Conns map[string]*websocket.Conn
-		sync.RWMutex
-	}{
-		Conns: make(map[string]*websocket.Conn),
-	}
-)
+}
+
+var ClientManager = NewClientManager()
 
 func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
-	for key, _ := range authed {
-		AuthenticatedClients.Lock()
-		AuthenticatedClients.Conns[key] = nil
-		AuthenticatedClients.Unlock()
+	for key := range authed {
+		ClientManager.AddAuthClient(key, nil)
 	}
 }
 
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
-	AuthenticatedClients.RLock()
-	defer AuthenticatedClients.RUnlock()
-	if AuthenticatedClients.Conns[token] == conn {
+	ClientManager.Mu.RLock()
+	defer ClientManager.Mu.RUnlock()
+	if ClientManager.AuthClients[token].Conn == conn {
 		return true
 	} else {
 		return false
@@ -94,11 +83,12 @@ func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 
 // quick check if websocket is authed at all for unauth broadcast (not for auth on its own)
 func WsAuthCheck(conn *websocket.Conn) bool {
-	AuthenticatedClients.RLock()
-	defer AuthenticatedClients.RUnlock()
-	for tokenID, con := range AuthenticatedClients.Conns {
-		if con == conn {
-			config.Logger.Info(fmt.Sprintf("%s is in auth map", tokenID))
+	ClientManager.Mu.RLock()
+	defer ClientManager.Mu.RUnlock()
+
+	for _, client := range ClientManager.AuthClients {
+		if client.Conn == conn {
+			config.Logger.Info("Client is in auth map")
 			return true
 		}
 	}
@@ -107,17 +97,16 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 }
 
 // is this tokenid in the auth map?
-func TokenIdAuthed(token string) bool {
-	AuthenticatedClients.RLock()
-	defer AuthenticatedClients.RUnlock()
-	for tokenID, _ := range AuthenticatedClients.Conns {
-		if token == tokenID {
-			config.Logger.Info(fmt.Sprintf("%s is in auth map", token))
-			return true
-		}
+func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
+	ClientManager.Mu.RLock()
+	defer ClientManager.Mu.RUnlock()
+	_, exists := ClientManager.AuthClients[token]
+	if exists {
+		config.Logger.Info(fmt.Sprintf("%s is in auth map", token))
+	} else {
+		config.Logger.Info("Token not in auth map")
 	}
-	config.Logger.Info("Token not in auth map")
-	return false
+	return exists
 }
 
 // this takes a bool for auth/unauth
@@ -128,59 +117,28 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	tokenId := token["id"]
 	hashed := sha512.Sum512([]byte(tokenStr))
 	hash := hex.EncodeToString(hashed[:])
+	muConn := &structs.MuConn{Conn: conn}
 	if authed {
-		AuthenticatedClients.Lock()
-		AuthenticatedClients.Conns[tokenId] = conn
-		AuthenticatedClients.Unlock()
-		UnauthClients.Lock()
-		if _, ok := UnauthClients.Conns[tokenId]; ok {
-			delete(UnauthClients.Conns, tokenId)
-			for tokenID, con := range UnauthClients.Conns {
-				if con == conn {
-					delete(UnauthClients.Conns, tokenID)
-				}
-			}
-		}
-		UnauthClients.Unlock()
+		ClientManager.AddAuthClient(tokenId, muConn)
 	} else {
-		UnauthClients.Lock()
-		UnauthClients.Conns[tokenId] = conn
-		UnauthClients.Unlock()
-		AuthenticatedClients.Lock()
-		if _, ok := AuthenticatedClients.Conns[tokenId]; ok {
-			delete(AuthenticatedClients.Conns, tokenId)
-			for tokenID, con := range AuthenticatedClients.Conns {
-				if con == conn {
-					delete(AuthenticatedClients.Conns, tokenID)
-				}
-			}
-		}
-		AuthenticatedClients.Unlock()
+		ClientManager.AddUnauthClient(tokenId, muConn)
 	}
 	now := time.Now().Format("2006-01-02_15:04:05")
-	err := AddSession(tokenId, hash, now, authed)
-	if err != nil {
-		return err
-	}
-	return nil
+	return AddSession(tokenId, hash, now, authed)
 }
 
-// the same but the other wayInvalid token provided
-func RemoveFromAuthMap(tokenId string, fromAuthorized bool) error {
+
+// the same but the other way
+func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 	if fromAuthorized {
-		AuthenticatedClients.Lock()
-		if _, ok := AuthenticatedClients.Conns[tokenId]; ok {
-			delete(AuthenticatedClients.Conns, tokenId)
-		}
-		AuthenticatedClients.Unlock()
+		ClientManager.Mu.Lock()
+		delete(ClientManager.AuthClients, tokenId)
+		ClientManager.Mu.Unlock()
 	} else {
-		UnauthClients.Lock()
-		if _, ok := UnauthClients.Conns[tokenId]; ok {
-			delete(UnauthClients.Conns, tokenId)
-		}
-		UnauthClients.Unlock()
+		ClientManager.Mu.Lock()
+		delete(ClientManager.UnauthClients, tokenId)
+		ClientManager.Mu.Unlock()
 	}
-	return nil
 }
 
 // check the validity of the token
@@ -206,7 +164,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(token["id"]) {
+		if TokenIdAuthed(ClientManager,token["id"]) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
@@ -294,9 +252,7 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		if err := config.UpdateConf(update); err != nil {
 			return fmt.Errorf("Error adding session: %v", err)
 		}
-		if err := RemoveFromAuthMap(tokenID, false); err != nil {
-			return fmt.Errorf("Error removing session: %v", err)
-		}
+		RemoveFromAuthMap(tokenID, false)
 	} else {
 		update := map[string]interface{}{
 			"sessions": map[string]interface{}{
@@ -308,9 +264,7 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		if err := config.UpdateConf(update); err != nil {
 			return fmt.Errorf("Error adding session: %v", err)
 		}
-		if err := RemoveFromAuthMap(tokenID, true); err != nil {
-			return fmt.Errorf("Error removing session: %v", err)
-		}
+		RemoveFromAuthMap(tokenID, true)
 	}
 	return nil
 }

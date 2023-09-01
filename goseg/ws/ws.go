@@ -1,4 +1,8 @@
 package ws
+// you can pass websockets to other packages for reads, but please
+// try to do all writes from here
+// otherwise you have to deal with passing mutexes which is annoying
+// and hard to think about
 
 import (
 	"encoding/json"
@@ -32,9 +36,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		config.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
+	tokenId := config.RandString(32)
+	MuCon := auth.ClientManager.NewConnection(conn,tokenId)
 	// keepalive for ws
-	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	MuCon.Conn.SetPongHandler(func(string) error {
+		MuCon.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
 	pingInterval := 15 * time.Second
@@ -44,7 +50,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				if err := MuCon.Write(nil); err != nil {
 					return
 				}
 			}
@@ -91,12 +97,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "pier_upload":
 				config.Logger.Info("Pier upload")
 			case "password":
-				if err = handler.PwHandler(conn,msg); err != nil {
+				if err = handler.PwHandler(msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "system":
-				if err = handler.SystemHandler(msg, conn); err != nil {
+				if err = handler.SystemHandler(msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -106,7 +112,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "urbit":
-				if err = handler.UrbitHandler(msg, conn); err != nil {
+				if err = handler.UrbitHandler(msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -122,7 +128,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "login":
 				// already authed so lets get you on the map
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				if err := auth.AddToAuthMap(MuCon.Conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -131,12 +137,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "logout":
-				if err := handler.LogoutHandler(conn, msg); err != nil {
+				if err := handler.LogoutHandler(msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("Error logging out client: %v", err))
 					ack = "nack"
 				}
+				resp, err := handler.UnauthHandler()
+				if err != nil {
+					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:",err))
+				}
+				if err := MuCon.Write(resp); err != nil {
+					config.Logger.Warn("Unable to broadcast to unauth client")
+				}
 			case "verify":
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				if err := auth.AddToAuthMap(MuCon.Conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -164,14 +177,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
 				config.Logger.Error(errmsg)
 			}
-			if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
+			if err := MuCon.Write(respJson); err != nil {
 				continue
 			}
 		// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
-				if err = handler.LoginHandler(conn, msg); err != nil {
+				if err = handler.LoginHandler(MuCon, msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 				}
 			case "setup":
@@ -180,7 +193,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "verify":
 				config.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
-				newToken, err := auth.CreateToken(conn, r, false)
+				newToken, err := auth.CreateToken(MuCon.Conn, r, false)
 				if err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 				}
@@ -196,11 +209,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
 					config.Logger.Error(errmsg)
 				}
-				if err := conn.WriteMessage(websocket.TextMessage, respJson); err != nil {
+				if err := MuCon.Write(respJson); err != nil {
 					continue
 				}
 			default:
-				handler.UnauthHandler(conn)
+				resp, err := handler.UnauthHandler()
+				if err != nil {
+					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:",err))
+				}
+				if err := MuCon.Write(resp); err != nil {
+					config.Logger.Warn("Unable to broadcast to unauth client")
+				}
 			}
 		}
 	}

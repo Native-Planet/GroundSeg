@@ -15,6 +15,20 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// for passing mutexes between packages
+// not being used for now
+type HandlerMuConn struct {
+    *structs.MuConn
+}
+
+func (mc *HandlerMuConn) Write(messageType int, data []byte) error {
+	mc.Mu.Lock()
+	defer mc.Mu.Unlock()
+	return mc.Conn.WriteMessage(messageType, data)
+}
+// 
+
+
 // handle bug report stuff
 func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
 	config.Logger.Info("Support")
@@ -22,7 +36,7 @@ func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn
 }
 
 // handle system events
-func SystemHandler(msg []byte, conn *websocket.Conn) error {
+func SystemHandler(msg []byte) error {
 	config.Logger.Info("System")
 	var systemPayload structs.WsSystemPayload
 	err := json.Unmarshal(msg, &systemPayload)
@@ -49,7 +63,7 @@ func SystemHandler(msg []byte, conn *websocket.Conn) error {
 }
 
 // handle urbit-type events
-func UrbitHandler(msg []byte, conn *websocket.Conn) error {
+func UrbitHandler(msg []byte) error {
 	config.Logger.Info("Urbit")
 	var urbitPayload structs.WsUrbitPayload
 	err := json.Unmarshal(msg, &urbitPayload)
@@ -137,7 +151,9 @@ func UrbitHandler(msg []byte, conn *websocket.Conn) error {
 }
 
 // validate password and add to auth session map
-func LoginHandler(conn *websocket.Conn, msg []byte) error {
+func LoginHandler(conn *structs.MuConn, msg []byte) error {
+	// no real mutex here
+    // connHandler := &structs.MuConn{Conn: conn}
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -149,7 +165,7 @@ func LoginHandler(conn *websocket.Conn, msg []byte) error {
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
 		}
-		if err := auth.AddToAuthMap(conn, token, true); err != nil {
+		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
 		}
 	} else {
@@ -163,21 +179,18 @@ func LoginHandler(conn *websocket.Conn, msg []byte) error {
 }
 
 // take a guess
-func LogoutHandler(conn *websocket.Conn, msg []byte) error {
+func LogoutHandler(msg []byte) error {
 	var logoutPayload structs.WsLogoutPayload
 	err := json.Unmarshal(msg, &logoutPayload)
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
-	if err := auth.RemoveFromAuthMap(logoutPayload.Token.ID, true); err != nil {
-		return fmt.Errorf("Unable to logout: %v",err)
-	}
-	UnauthHandler(conn)
+	auth.RemoveFromAuthMap(logoutPayload.Token.ID, true)
 	return nil
 }
 
-// broadcast the unauth payload
-func UnauthHandler(conn *websocket.Conn) {
+// return the unauth payload
+func UnauthHandler() ([]byte, error) {
 	config.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",
@@ -190,13 +203,13 @@ func UnauthHandler(conn *websocket.Conn) {
 	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error unmarshalling message: %v", err))
-		return
+		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
 	}
-	if err := conn.WriteMessage(websocket.TextMessage, resp); err != nil {
-		config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
-		return
-	}
+	// if err := conn.Write(websocket.TextMessage, resp); err != nil {
+	// 	config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
+	// 	return
+	// }
+	return resp, nil
 }
 
 // startram action handler
@@ -228,7 +241,7 @@ func StartramHandler(msg []byte) error {
 }
 
 // password reset handler
-func PwHandler(conn *websocket.Conn, msg []byte) error {
+func PwHandler(msg []byte) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
@@ -245,7 +258,7 @@ func PwHandler(conn *websocket.Conn, msg []byte) error {
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v",err)
 			}
-			LogoutHandler(conn, msg)
+			LogoutHandler(msg)
 		}
 	default:
 		return fmt.Errorf("Unrecognized password action: %v",pwPayload.Payload.Action)

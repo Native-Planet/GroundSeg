@@ -336,20 +336,9 @@ func GetStateJson() ([]byte, error) {
 func BroadcastToClients() error {
 	authJson, err := GetStateJson()
 	if err != nil {
-		errmsg := fmt.Errorf("Error marshalling auth broadcast:", err)
-		return errmsg
+		return err
 	}
-	auth.AuthenticatedClients.Lock()
-	defer auth.AuthenticatedClients.Unlock()
-	for client := range auth.AuthenticatedClients.Conns {
-		if auth.AuthenticatedClients.Conns[client] == nil {
-			continue
-		}
-		if err := auth.AuthenticatedClients.Conns[client].WriteMessage(websocket.TextMessage, authJson); err != nil {
-			continue
-		}
-	}
-
+    auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
 
