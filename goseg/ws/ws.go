@@ -50,7 +50,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := MuCon.Write(nil); err != nil {
+				if err := MuCon.Write([]byte("ping")); err != nil {
 					return
 				}
 			}
@@ -88,8 +88,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"id":    payload.Token.ID,
 			"token": tokenContent,
 		}
+		ack := "ack"
 		if authed {
-			ack := "ack"
 		// authenticated action handlers
 			switch msgType.Payload.Type {
 			case "new_ship":
@@ -164,7 +164,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				ack = "nack"
 			}
-			// ack or nack
+			// ack/nack for auth
 			result := map[string]interface{}{
 				"type":     "activity",
 				"id":       payload.ID,
@@ -186,6 +186,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "login":
 				if err = handler.LoginHandler(MuCon, msg); err != nil {
 					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
 				}
 			case "setup":
 				config.Logger.Info("Setup")
@@ -196,18 +197,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				newToken, err := auth.CreateToken(MuCon.Conn, r, false)
 				if err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
+					ack = "nack"
 				}
 				result := map[string]interface{}{
 					"type":     "activity",
 					"id":       payload.ID,
 					"error":    "null",
-					"response": "ack",
+					"response": ack,
 					"token":    newToken,
 				}
 				respJson, err := json.Marshal(result)
 				if err != nil {
-					errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
-					config.Logger.Error(errmsg)
+					config.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+					ack = "nack"
 				}
 				if err := MuCon.Write(respJson); err != nil {
 					continue
@@ -220,7 +222,23 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := MuCon.Write(resp); err != nil {
 					config.Logger.Warn("Unable to broadcast to unauth client")
 				}
+				ack = "nack"
 			}
+		}
+		// ack/nack for unauth
+		result := map[string]interface{}{
+			"type":     "activity",
+			"id":       payload.ID,
+			"error":    "null",
+			"response": ack,
+			"token":    token,
+		}
+		respJson, err := json.Marshal(result)
+		if err != nil {
+			config.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+		}
+		if err := MuCon.Write(respJson); err != nil {
+			continue
 		}
 	}
 }

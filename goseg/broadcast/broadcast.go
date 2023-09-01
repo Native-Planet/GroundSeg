@@ -21,8 +21,8 @@ import (
 
 var (
 	clients           = make(map[*websocket.Conn]bool)
-	hostInfoInterval  = 3 * time.Second // how often we refresh system info
-	shipInfoInterval  = 3 * time.Second // how often we refresh ship info
+	hostInfoInterval  = 1 * time.Second // how often we refresh system info
+	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
 	unauthState       structs.UnauthBroadcast
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)

@@ -27,6 +27,7 @@ func RectifyUrbit(patp string) (bool, error) {
 				local.WgHTTPPort = remote.Port
 				modified = true
 			}
+			// update remote url
 			if remote.URL != local.WgURL {
 				local.WgURL = remote.URL
 				modified = true
