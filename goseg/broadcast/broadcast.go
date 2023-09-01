@@ -342,6 +342,12 @@ func BroadcastToClients() error {
 	return nil
 }
 
+// broadcast to unauth clients
+func UnauthBroadcast(input []byte) error {
+    auth.ClientManager.BroadcastUnauth(input)
+	return nil
+}
+
 // refresh loop for host info
 func hostStatusLoop() {
 	ticker := time.NewTicker(hostInfoInterval)

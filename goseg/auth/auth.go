@@ -101,11 +101,6 @@ func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
 	_, exists := ClientManager.AuthClients[token]
-	if exists {
-		config.Logger.Info(fmt.Sprintf("%s is in auth map", token))
-	} else {
-		config.Logger.Info("Token not in auth map")
-	}
 	return exists
 }
 

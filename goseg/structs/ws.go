@@ -4,19 +4,10 @@ package structs
 // actual writing is done via broadcast package
 
 import (
-	"encoding/base64"
-	"math/rand"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
-
-// for tokenid's
-func randString(length int) string {
-	randBytes := make([]byte, length)
-	_, _ = rand.Read(randBytes)
-	return base64.URLEncoding.EncodeToString(randBytes)
-}
 
 // wrapped ws+mutex
 type MuConn struct {
@@ -46,16 +37,6 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 	defer cm.Mu.Unlock()
 	cm.UnauthClients[tokenId] = muConn
 	return muConn
-}
-
-func (cm *ClientManager) GetMuConn(conn *websocket.Conn) (*MuConn, bool) {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
-	muConn, ok := cm.UnauthClients[randString(32)]
-	if !ok {
-		muConn, ok = cm.AuthClients[randString(32)]
-	}
-	return muConn, ok
 }
 
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
