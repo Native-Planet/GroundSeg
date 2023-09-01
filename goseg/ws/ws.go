@@ -128,7 +128,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "login":
 				// already authed so lets get you on the map
-				if err := auth.AddToAuthMap(MuCon.Conn, token, true); err != nil {
+				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -149,7 +149,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					config.Logger.Warn("Unable to broadcast to unauth client")
 				}
 			case "verify":
-				if err := auth.AddToAuthMap(MuCon.Conn, token, true); err != nil {
+				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -188,13 +188,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					config.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
+				broadcast.BroadcastToClients()
 			case "setup":
 				config.Logger.Info("Setup")
 				// setup.Setup(payload)
 			case "verify":
 				config.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
-				newToken, err := auth.CreateToken(MuCon.Conn, r, false)
+				newToken, err := auth.CreateToken(conn, r, false)
 				if err != nil {
 					config.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 					ack = "nack"

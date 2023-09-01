@@ -12,7 +12,7 @@ import (
 // wrapped ws+mutex
 type MuConn struct {
 	Conn *websocket.Conn
-	Mu   sync.Mutex
+	Mu   sync.RWMutex
 }
 
 // mutexed ws write
