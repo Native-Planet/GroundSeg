@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,8 +24,26 @@ func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn
 	return nil
 }
 
+func NewShipHandler(msg []byte) error {
+	config.Logger.Info("New ship")
+	// Unmarshal JSON
+	var shipPayload structs.WsNewShipPayload
+	err := json.Unmarshal(msg, &shipPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
+	}
+	// Check if patp is valid
+	patp := sigRemove(shipPayload.Payload.Patp)
+	isValid := checkPatp(patp)
+	if !isValid {
+		return fmt.Errorf("Invalid @p provided: %v", patp)
+	}
+	go createUrbitShip(patp, shipPayload)
+	return nil
+}
+
 // handle system events
-func SystemHandler(msg []byte, conn *websocket.Conn) error {
+func SystemHandler(msg []byte) error {
 	config.Logger.Info("System")
 	var systemPayload structs.WsSystemPayload
 	err := json.Unmarshal(msg, &systemPayload)
@@ -265,4 +285,51 @@ func PwHandler(conn *websocket.Conn, msg []byte) error {
 		return fmt.Errorf("Unrecognized password action: %v", pwPayload.Payload.Action)
 	}
 	return nil
+}
+
+// SigRemove removes the '~' prefix from patp if it exists
+func sigRemove(patp string) string {
+	if patp != "" {
+		if strings.HasPrefix(patp, "~") {
+			patp = patp[1:]
+		}
+	}
+	return patp
+}
+
+// CheckPatp checks if patp is correct
+func checkPatp(patp string) bool {
+	// Handle undefined patp
+	if patp == "" {
+		return false
+	}
+
+	// Split the string by hyphen
+	wordlist := strings.Split(patp, "-")
+
+	// Define the regular expression pattern
+	pattern := regexp.MustCompile("^[a-z]{6}$|^[a-z]{3}$")
+
+	// Define pre and suf (truncated for brevity)
+	pre := "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+	suf := "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+
+	for _, word := range wordlist {
+		// Check regular expression match
+		if !pattern.MatchString(word) {
+			return false
+		}
+
+		// Check prefixes and suffixes
+		if len(word) > 3 {
+			if !strings.Contains(pre, word[0:3]) || !strings.Contains(suf, word[3:6]) {
+				return false
+			}
+		} else {
+			if !strings.Contains(suf, word) {
+				return false
+			}
+		}
+	}
+	return true
 }
