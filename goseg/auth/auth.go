@@ -115,8 +115,10 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	muConn := &structs.MuConn{Conn: conn}
 	if authed {
 		ClientManager.AddAuthClient(tokenId, muConn)
+		config.Logger.Info("%s added to authmap",tokenId)
 	} else {
 		ClientManager.AddUnauthClient(tokenId, muConn)
+		config.Logger.Info("%s added to unauthmap",tokenId)
 	}
 	now := time.Now().Format("2006-01-02_15:04:05")
 	return AddSession(tokenId, hash, now, authed)
