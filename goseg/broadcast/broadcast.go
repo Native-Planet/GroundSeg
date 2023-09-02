@@ -237,7 +237,7 @@ func UpdateBroadcastState(values map[string]interface{}) error {
 		}
 	}
 	mu.Unlock()
-	BroadcastToClients()
+	// BroadcastToClients()
 	return nil
 }
 
