@@ -50,19 +50,20 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
+	// Add to AuthClients
 	cm.AuthClients[id] = client
-	// also remove from other map
-	// delete by value rather than key
+	// Remove from UnauthClients if present
 	if _, ok := cm.UnauthClients[id]; ok {
 		delete(cm.UnauthClients, id)
-		for token, con := range cm.UnauthClients {
-			if con.Conn == client.Conn {
-				delete(cm.UnauthClients, token)
-				logger.Info(fmt.Sprintf("removing unauth: %v",token))
-			}
+	}
+	// Remove any other instances of the same client from UnauthClients
+	for token, con := range cm.UnauthClients {
+		if con.Conn == client.Conn {
+			delete(cm.UnauthClients, token)
+			logger.Info(fmt.Sprintf("removing unauth: %v", token))
 		}
 	}
-	logger.Info(fmt.Sprintf("auth map: %v",cm.AuthClients))
+	logger.Info(fmt.Sprintf("auth map: %v", cm.AuthClients))
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
