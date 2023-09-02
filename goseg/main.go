@@ -76,6 +76,8 @@ func main() {
 	go rectify.UrbitTransitionHandler()
 	// digest system transition events
 	//go rectify.SystemTransitionHandler()
+	// digest new ship transition events
+	go rectify.NewShipTransitionHandler()
 	// just making sure we can parse (debug)
 	if len(conf.Piers) > 0 {
 		pierList := strings.Join(conf.Piers, ", ")

@@ -90,10 +90,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		ack := "ack"
 		if authed {
-		// authenticated action handlers
 			switch msgType.Payload.Type {
 			case "new_ship":
-				config.Logger.Info("New ship")
+				if err = handler.NewShipHandler(msg); err != nil {
+					config.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "pier_upload":
 				config.Logger.Info("Pier upload")
 			case "password":
@@ -180,7 +182,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			if err := MuCon.Write(respJson); err != nil {
 				continue
 			}
-		// unauthenticated action handlers
+			// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
