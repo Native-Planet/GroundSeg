@@ -92,12 +92,27 @@ func NewShipTransitionHandler() {
 	for {
 		event := <-docker.NewShipTransBus
 		switch event.Type {
+		case "error":
+			var res map[string]interface{}
+			res = map[string]interface{}{
+				"NewShip": map[string]interface{}{
+					"Transition": map[string]interface{}{
+						"Error": event.Event,
+					},
+				},
+			}
+			err := broadcast.UpdateBroadcastState(res)
+			if err != nil {
+				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'error': %v", err))
+			}
+			broadcast.BroadcastToClients()
 		case "bootStage":
 			// Events
 			// starting: setting up docker and config
 			// creating: actually create and start the container
 			// booting: waiting until +code shows up
 			// completed: ready to reset
+			// aborted: something went wrong and we ran the cleanup routine
 			// <empty>: free for new ship
 			var res map[string]interface{}
 			res = map[string]interface{}{
@@ -125,6 +140,7 @@ func NewShipTransitionHandler() {
 			if err != nil {
 				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'bootStage': %v", err))
 			}
+			broadcast.BroadcastToClients()
 		default:
 			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}

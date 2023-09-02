@@ -24,6 +24,13 @@ func UrbitConf(pier string) structs.UrbitDocker {
 	return UrbitsConfig[pier]
 }
 
+// retrieve map of urbit config structs
+func UrbitConfAll() map[string]structs.UrbitDocker {
+	urbitMutex.Lock()
+	defer urbitMutex.Unlock()
+	return UrbitsConfig
+}
+
 // load urbit conf json into memory
 func LoadUrbitConfig(pier string) error {
 	urbitMutex.Lock()
@@ -45,6 +52,17 @@ func LoadUrbitConfig(pier string) error {
 	// Store in var
 	UrbitsConfig[pier] = targetStruct
 	return nil
+}
+
+// Delete urbit config entry
+func RemoveUrbitConfig(pier string) error {
+	// remove from memory
+	urbitMutex.Lock()
+	defer urbitMutex.Unlock()
+	delete(UrbitsConfig, pier)
+	// remove from disk
+	err := os.Remove(filepath.Join(BasePath, "settings", "pier", pier+".json"))
+	return err
 }
 
 // update the in-memory struct and save it to json
