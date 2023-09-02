@@ -1,19 +1,14 @@
 package structs
 // contained herein: structs for managing mutexed maps of
 // mutexed websocket connections to avoid panics;
-// actual writing is done via broadcast package
+// actual writing is done via broadcast package;
+// auth map management is done via auth package
+// 🐝 Careful! ❤️
 
 import (
-	"fmt"
-	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
-)
-
-var (
-	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil)) // for debug
 )
 
 // wrapped ws+mutex
@@ -25,7 +20,6 @@ type MuConn struct {
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
 	ws.Mu.Lock()
-	logger.Info("conn mu lock")
 	defer ws.Mu.Unlock()
 	return ws.Conn.WriteMessage(websocket.TextMessage, data)
 }
@@ -60,10 +54,8 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	for token, con := range cm.UnauthClients {
 		if con.Conn == client.Conn {
 			delete(cm.UnauthClients, token)
-			logger.Info(fmt.Sprintf("removing unauth: %v", token))
 		}
 	}
-	logger.Info(fmt.Sprintf("auth map: %v", cm.AuthClients))
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
@@ -75,40 +67,32 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 		delete(cm.AuthClients, id)
 		for token, con := range cm.AuthClients {
 			if con.Conn == client.Conn {
-				logger.Info(fmt.Sprintf("removing auth: %v",token))
 				delete(cm.AuthClients, token)
 			}
 		}
 	}
-	logger.Info(fmt.Sprintf("unauth map: %v",cm.AuthClients))
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
-	logger.Info(fmt.Sprintf("Locking for %v unauth clients",len(cm.UnauthClients)))
 	for _, client := range cm.UnauthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
-			logger.Info("auth broadcasting")
 			client.Write(data)
 		}
 	}
-	logger.Info("Unlocking")
 }
 
 func (cm *ClientManager) BroadcastAuth(data []byte) {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
-	logger.Info(fmt.Sprintf("Locking for %v auth clients",len(cm.AuthClients)))
 	for _, client := range cm.AuthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
-			logger.Info("unauth broadcasting")
 			client.Write(data)
 		}
 	}
-	logger.Info("Unlocking")
 }
 
 type WsType struct {
