@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/structs"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -109,7 +111,7 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 	}, nil
 }
 
-// creates a volume with name
+// creates a volume by name
 func CreateVolume(name string) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -125,6 +127,68 @@ func CreateVolume(name string) error {
 	}
 	// Output created volume information
 	config.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
+	return nil
+}
+
+// deletes a volume by its name
+func DeleteVolume(name string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+		return errmsg
+	}
+	defer cli.Close()
+	// Remove the volume
+	err = cli.VolumeRemove(context.Background(), name, true)
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to remove docker volume: %v : %v", name, err)
+		return errmsg
+	}
+	config.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
+	return nil
+}
+
+// deletes a container by its name
+func DeleteContainer(name string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+		return errmsg
+	}
+	defer cli.Close()
+	// Force-remove the container
+	err = cli.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{Force: true})
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to delete docker container: %v : %v", name, err)
+		return errmsg
+	}
+	// Output created volume information
+	config.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
+	return nil
+}
+
+// Write a file to a specific location in a volume
+func WriteFileToVolume(name string, file string, content string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+		return errmsg
+	}
+	// Inspect volume
+	vol, err := cli.VolumeInspect(context.Background(), name)
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to inspect volume: %v : %v", name, err)
+		return errmsg
+	}
+	// Get volume directory path
+	fullPath := filepath.Join(vol.Mountpoint, file)
+	// Write to file
+	err = ioutil.WriteFile(fullPath, []byte(content), 0644)
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
+		return errmsg
+	}
+	config.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
 }
 

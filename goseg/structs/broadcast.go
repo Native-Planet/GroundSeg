@@ -17,6 +17,7 @@ type NewShip struct {
 	Transition struct {
 		BootStage string `json:"bootStage"`
 		Patp      string `json:"patp"`
+		Error     string `json:"error"`
 	} `json:"transition"`
 }
 

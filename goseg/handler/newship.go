@@ -3,55 +3,132 @@ package handler
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/defaults"
 	"goseg/docker"
 	"goseg/structs"
+	"time"
 )
 
+func resetNewShip() error {
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: ""}
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "patp", Event: ""}
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "error", Event: ""}
+	return nil
+}
+
 func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
-	// transition: starting
-	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "starting"}
 	// transition: patp
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "patp", Event: patp}
-	// get unused http and ames ports
-	//httpPort, amesPort := getOpenUrbitPorts()
+	// transition: starting
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "starting"}
+	// create pier config
+	err := createUrbitConfig(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+		errorCleanup(patp, errmsg)
+		return
+	}
 	// update system.json
-	err := updateSystemConfig(patp)
+	err = appendSysConfigPier(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+		errorCleanup(patp, errmsg)
+		return
+	}
+	// Prepare environment for pier
+	config.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+	// delete container if exists
+	err = docker.DeleteContainer(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		config.Logger.Error(errmsg)
 	}
-	// create pier config
-
-	// delete container if exists
-
 	// delete volume if exists
-
+	err = docker.DeleteVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+	}
 	// create new docker volume
 	err = docker.CreateVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		config.Logger.Error(errmsg)
+		errorCleanup(patp, errmsg)
+		return
 	}
-
 	// write key to volume
-
-	// persist config
-
+	key := shipPayload.Payload.Key
+	err = docker.WriteFileToVolume(patp, patp+".key", key)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+		errorCleanup(patp, errmsg)
+		return
+	}
 	// transition: creating
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "creating"}
+	config.Logger.Info(fmt.Sprintf("Creating Pier: %v", patp))
+	// todo: create docker container
+	time.Sleep(time.Second * time.Duration(5)) // temp
 
-	// create docker container
+	// debug, force error
+	//errmsg := "Self induced error, for debugging purposes"
+	//errorCleanup(patp, errmsg)
+	//return
 
-	// register startram service (goroutine)
+	// todo: Conditional Goroutines
+	// register startram
+	// - condition: wgRegistered
+	// toggle to remote
+	// - condition: wgRegistered, remote set to true, service has been registered
 
-	// transition: registering
+	// check for +code
+	go waitForShipReady(patp)
+}
 
-	// if remote is true, wait until fully booted to toggle to remote (goroutine)
+func waitForShipReady(patp string) {
+	// transition: booting
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "booting"}
+	config.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
+	ticker := time.NewTicker(1 * time.Second)
+	count := 1 // temp
+	for {
+		select {
+		case <-ticker.C:
+			//code = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
+			// todo: request +code
+			config.Logger.Info("fake +code request")
+			if count > 15 {
+				//if len(code) == 27 {
+				// transition: completed
+				docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
+				return
+			} else {
+				count = count + 1
+			}
+		}
+	}
+}
 
-	// once +code is successful
-
-	// transition: completed
-
-	//config.Logger.Info(fmt.Sprintf("%+v", shipPayload.Payload))
+func createUrbitConfig(patp string) error {
+	// get unused http and ames ports
+	httpPort, amesPort := getOpenUrbitPorts()
+	// get default urbit config
+	conf := defaults.UrbitConfig
+	// replace values
+	conf.PierName = patp
+	conf.HTTPPort = httpPort
+	conf.AmesPort = amesPort
+	// get urbit config map
+	urbConf := config.UrbitConfAll()
+	// add to map
+	urbConf[patp] = conf
+	// persist config
+	err := config.UpdateUrbitConfig(urbConf)
+	return err
 }
 
 func getOpenUrbitPorts() (int, int) {
@@ -76,7 +153,52 @@ func getOpenUrbitPorts() (int, int) {
 	return httpPort, amesPort
 }
 
-func updateSystemConfig(patp string) error {
+func errorCleanup(patp string, errmsg string) {
+	// send aborted transition
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "aborted"}
+	// send error transition
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)}
+	// notify that we are cleaning up
+	config.Logger.Info(fmt.Sprintf("New ship creation failed: %v", patp))
+	config.Logger.Info(fmt.Sprintf("Running cleanup routine"))
+	// remove <patp>.json
+	config.Logger.Info(fmt.Sprintf("Removing Urbit Config: %v", patp))
+	if err := config.RemoveUrbitConfig(patp); err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+	}
+	// remove patp from system.json
+	config.Logger.Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
+	err := removeSysConfigPier(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+	}
+	// remove docker volume
+	err = docker.DeleteVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		config.Logger.Error(errmsg)
+	}
+}
+
+// Remove all instances of patp from system config Piers
+func removeSysConfigPier(patp string) error {
+	conf := config.Conf()
+	piers := conf.Piers
+	var updated []string
+	for _, memShip := range piers {
+		if memShip != patp {
+			updated = append(updated, memShip)
+		}
+	}
+	err := config.UpdateConf(map[string]interface{}{
+		"Piers": updated,
+	})
+	return err
+}
+
+func appendSysConfigPier(patp string) error {
 	conf := config.Conf()
 	piers := conf.Piers
 	// Check if value already exists in slice

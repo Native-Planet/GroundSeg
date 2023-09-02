@@ -329,6 +329,14 @@ export const bootShip = (patp,key,remote) => {
   send(payload)
 }
 
+export const resetNewShip = () => {
+  let payload = {
+    "type":"new_ship",
+    "action":"reset",
+  }
+  send(payload)
+}
+
 export const registerServiceAgain = patp => {
   let payload = {
     "type":"urbit",
