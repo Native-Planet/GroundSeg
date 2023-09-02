@@ -72,7 +72,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			config.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
-		config.Logger.Info(fmt.Sprintf("Received message: %s", string(msg)))
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
