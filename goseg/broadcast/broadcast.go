@@ -21,8 +21,8 @@ import (
 
 var (
 	clients           = make(map[*websocket.Conn]bool)
-	hostInfoInterval  = 3 * time.Second // how often we refresh system info
-	shipInfoInterval  = 3 * time.Second // how often we refresh ship info
+	hostInfoInterval  = 1 * time.Second // how often we refresh system info
+	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
 	unauthState       structs.UnauthBroadcast
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
@@ -336,20 +336,15 @@ func GetStateJson() ([]byte, error) {
 func BroadcastToClients() error {
 	authJson, err := GetStateJson()
 	if err != nil {
-		errmsg := fmt.Errorf("Error marshalling auth broadcast:", err)
-		return errmsg
+		return err
 	}
-	auth.AuthenticatedClients.Lock()
-	defer auth.AuthenticatedClients.Unlock()
-	for client := range auth.AuthenticatedClients.Conns {
-		if auth.AuthenticatedClients.Conns[client] == nil {
-			continue
-		}
-		if err := auth.AuthenticatedClients.Conns[client].WriteMessage(websocket.TextMessage, authJson); err != nil {
-			continue
-		}
-	}
+    auth.ClientManager.BroadcastAuth(authJson)
+	return nil
+}
 
+// broadcast to unauth clients
+func UnauthBroadcast(input []byte) error {
+    auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
 
