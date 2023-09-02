@@ -24,6 +24,7 @@
   <button class="btn" on:click={handleClick}>Settings</button>
   <a class="btn" href="#" on:click={handleReset} target="_blank">Visit URL</a>
 </div>
+<div class="reset" on:click={handleReset}>Boot Another Ship</div>
 
 <style>
   .text {
@@ -53,6 +54,13 @@
     text-decoration: none;
     flex: 1;
     border-radius: 12px;
+    cursor: pointer;
+  }
+  .reset {
+    margin-top: 40px;
+    font-size: 14px;
+    font-weight: 300;
+    text-decoration: underline;
     cursor: pointer;
   }
 </style>

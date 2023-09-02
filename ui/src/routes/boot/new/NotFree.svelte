@@ -9,15 +9,17 @@
   import CreatePier from './CreatePier.svelte'
   import BootingShip from './BootingShip.svelte'
   import Completed from './Completed.svelte'
+  import Aborted from './Aborted.svelte'
 
   export let tBootStage
   let coverage = 0
   $: name = ($structure?.newShip?.transition?.patp) || ""
+  $: error = ($structure?.newShip?.transition?.error) || ""
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
 </script>
 
-<div class="outer">
+<div class="outer" class:error={tBootStage == "aborted"}>
   <div class="back">
     <Sigil {name} swap={true} reverse={true} />
   </div>
@@ -35,6 +37,8 @@
   <BootingShip {name} on:emit={()=>coverage = 65} /> 
 {:else if tBootStage == "completed"}
   <Completed {name} on:emit={()=>coverage = 100} /> 
+{:else if tBootStage == "aborted"}
+  <Aborted {name} on:emit={()=>coverage = 0} {error} /> 
 {/if}
 
 <style>
@@ -45,6 +49,9 @@
     border: solid 4px var(--text-color);
     border-radius: 24px;
     overflow: hidden;
+  }
+  .error {
+    border-color: red;
   }
   .back {
     position: absolute;
