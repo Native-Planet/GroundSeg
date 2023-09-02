@@ -50,11 +50,11 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
+	cm.AuthClients[id] = client
 	// also remove from other map
 	// delete by value rather than key
 	if _, ok := cm.UnauthClients[id]; ok {
 		delete(cm.UnauthClients, id)
-		cm.AuthClients[id] = client
 		for token, con := range cm.UnauthClients {
 			if con.Conn == client.Conn {
 				delete(cm.UnauthClients, token)
