@@ -88,8 +88,11 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 	defer cm.Mu.RUnlock()
 	logger.Info(fmt.Sprintf("Locking for %v unauth clients",len(cm.UnauthClients)))
 	for _, client := range cm.UnauthClients {
-		logger.Info("auth broadcasting")
-		client.Write(data)
+		// imported sessions will be nil until auth
+		if client != nil {
+			logger.Info("auth broadcasting")
+			client.Write(data)
+		}
 	}
 	logger.Info("Unlocking")
 }
@@ -99,8 +102,11 @@ func (cm *ClientManager) BroadcastAuth(data []byte) {
 	defer cm.Mu.RUnlock()
 	logger.Info(fmt.Sprintf("Locking for %v auth clients",len(cm.AuthClients)))
 	for _, client := range cm.AuthClients {
-		logger.Info("unauth broadcasting")
-		client.Write(data)
+		// imported sessions will be nil until auth
+		if client != nil {
+			logger.Info("unauth broadcasting")
+			client.Write(data)
+		}
 	}
 	logger.Info("Unlocking")
 }
