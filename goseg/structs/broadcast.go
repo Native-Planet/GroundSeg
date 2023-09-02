@@ -6,9 +6,18 @@ type AuthBroadcast struct {
 	AuthLevel string           `json:"auth_level"`
 	Upload    Upload           `json:"upload"`
 	Logs      Logs             `json:"logs"`
+	NewShip   NewShip          `json:"newShip"`
 	System    System           `json:"system"`
 	Profile   Profile          `json:"profile"`
 	Urbits    map[string]Urbit `json:"urbits"`
+}
+
+// new ship
+type NewShip struct {
+	Transition struct {
+		BootStage string `json:"bootStage"`
+		Patp      string `json:"patp"`
+	} `json:"transition"`
 }
 
 // broadcast payload subobject

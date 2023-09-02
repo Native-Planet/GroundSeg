@@ -115,11 +115,27 @@ type WsUrbitPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type WsNewShipPayload struct {
+	ID      string          `json:"id"`
+	Type    string          `json:"type"`
+	Payload WsNewShipAction `json:"payload"`
+	Token   WsTokenStruct   `json:"token"`
+}
+
 type WsSystemPayload struct {
 	ID      string         `json:"id"`
 	Type    string         `json:"type"`
 	Payload WsSystemAction `json:"payload"`
 	Token   WsTokenStruct  `json:"token"`
+}
+
+type WsNewShipAction struct {
+	Type    string `json:"type"`
+	Action  string `json:"action"`
+	Patp    string `json:"patp"`
+	Key     string `json:"key"`
+	Remote  bool   `json:"remote"`
+	Command string `json:"command"`
 }
 
 type WsUrbitAction struct {
@@ -152,9 +168,9 @@ type WsLoginAction struct {
 }
 
 type WsPwPayload struct {
-	ID      string `json:"id"`
-	Payload WsPwAction `json:"payload"`
-	Token    WsTokenStruct `json:"token"`
+	ID      string        `json:"id"`
+	Payload WsPwAction    `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
 }
 
 type WsPwAction struct {
@@ -165,8 +181,8 @@ type WsPwAction struct {
 }
 
 type WsLogoutPayload struct {
-	ID      string        `json:"id"`
-	Token   WsTokenStruct `json:"token"`
+	ID    string        `json:"id"`
+	Token WsTokenStruct `json:"token"`
 }
 
 type WsResponsePayload struct {
@@ -178,10 +194,10 @@ type WsResponsePayload struct {
 }
 
 type WsStartramPayload struct {
-	ID      string        `json:"id"`
-	Type    string        `json:"type"`
+	ID      string           `json:"id"`
+	Type    string           `json:"type"`
 	Payload WsStartramAction `json:"payload"`
-	Token   WsTokenStruct `json:"token"`
+	Token   WsTokenStruct    `json:"token"`
 }
 
 type WsStartramAction struct {

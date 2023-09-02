@@ -11,12 +11,14 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 )
 
 var (
-	EventBus  = make(chan structs.Event, 100)
-	UTransBus = make(chan structs.UrbitTransition, 100)
+	EventBus        = make(chan structs.Event, 100)
+	UTransBus       = make(chan structs.UrbitTransition, 100)
+	NewShipTransBus = make(chan structs.NewShipTransition, 100)
 )
 
 // return the container status of a slice of ships
@@ -105,6 +107,25 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 		MemoryUsage: memUsage,
 		DiskUsage:   diskUsage,
 	}, nil
+}
+
+// creates a volume with name
+func CreateVolume(name string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+		return errmsg
+	}
+
+	// Create volume
+	vol, err := cli.VolumeCreate(context.Background(), volume.CreateOptions{Name: name})
+	if err != nil {
+		errmsg := fmt.Errorf("Failed to create docker volume: %v : %v", name, err)
+		return errmsg
+	}
+	// Output created volume information
+	config.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
+	return nil
 }
 
 // start a container by name + type

@@ -17,6 +17,12 @@ type UrbitTransition struct {
 	Event string
 }
 
+// new ship transition eventbus payloads
+type NewShipTransition struct {
+	Type  string
+	Event string
+}
+
 // for keeping track of container desired/actual state
 type ContainerState struct {
 	ID             string
