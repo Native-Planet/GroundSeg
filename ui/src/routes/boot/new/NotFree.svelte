@@ -3,22 +3,18 @@
   import { bootShip, structure } from '$lib/stores/websocket';
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { goto } from '$app/navigation';
-  import EnvSetup from './EnvSetup.svelte'
   import Sigil from './Sigil.svelte'
+
+  import EnvSetup from './EnvSetup.svelte'
+  import CreatePier from './CreatePier.svelte'
+  import BootingShip from './BootingShip.svelte'
+  import Completed from './Completed.svelte'
 
   export let tBootStage
   let coverage = 0
-
   $: name = ($structure?.newShip?.transition?.patp) || ""
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
-
-  import { onMount } from 'svelte'
-  onMount(()=>timerCount())
-  const timerCount = () => {
-    coverage = coverage + 10
-    setTimeout(timerCount,1000)
-  }
 </script>
 
 <div class="outer">
@@ -33,6 +29,12 @@
 {#if tBootStage == "starting"}
   <!-- 10% completion -->
   <EnvSetup {name} on:emit={()=>coverage = 0} /> 
+{:else if tBootStage == "creating"}
+  <CreatePier {name} on:emit={()=>coverage = 20} /> 
+{:else if tBootStage == "booting"}
+  <BootingShip {name} on:emit={()=>coverage = 65} /> 
+{:else if tBootStage == "completed"}
+  <Completed {name} on:emit={()=>coverage = 100} /> 
 {/if}
 
 <style>

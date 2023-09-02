@@ -32,13 +32,23 @@ func NewShipHandler(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
 	}
-	// Check if patp is valid
-	patp := sigRemove(shipPayload.Payload.Patp)
-	isValid := checkPatp(patp)
-	if !isValid {
-		return fmt.Errorf("Invalid @p provided: %v", patp)
+	switch shipPayload.Payload.Action {
+	case "boot":
+		// Check if patp is valid
+		patp := sigRemove(shipPayload.Payload.Patp)
+		isValid := checkPatp(patp)
+		if !isValid {
+			return fmt.Errorf("Invalid @p provided: %v", patp)
+		}
+		go createUrbitShip(patp, shipPayload)
+	case "reset":
+		err := resetNewShip()
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("Unknown NewShip action: %v", shipPayload.Payload.Action)
 	}
-	go createUrbitShip(patp, shipPayload)
 	return nil
 }
 

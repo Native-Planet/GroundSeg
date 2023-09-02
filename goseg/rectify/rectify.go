@@ -93,6 +93,12 @@ func NewShipTransitionHandler() {
 		event := <-docker.NewShipTransBus
 		switch event.Type {
 		case "bootStage":
+			// Events
+			// starting: setting up docker and config
+			// creating: actually create and start the container
+			// booting: waiting until +code shows up
+			// completed: ready to reset
+			// <empty>: free for new ship
 			var res map[string]interface{}
 			res = map[string]interface{}{
 				"NewShip": map[string]interface{}{
