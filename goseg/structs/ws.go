@@ -58,9 +58,11 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 		for token, con := range cm.UnauthClients {
 			if con.Conn == client.Conn {
 				delete(cm.UnauthClients, token)
+				logger.Info(fmt.Sprintf("removing unauth: %v",token))
 			}
 		}
 	}
+	logger.Info(fmt.Sprintf("auth map: %v",cm.AuthClients))
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
@@ -72,10 +74,12 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 		delete(cm.AuthClients, id)
 		for token, con := range cm.AuthClients {
 			if con.Conn == client.Conn {
+				logger.Info(fmt.Sprintf("removing auth: %v",token))
 				delete(cm.AuthClients, token)
 			}
 		}
 	}
+	logger.Info(fmt.Sprintf("unauth map: %v",cm.AuthClients))
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
