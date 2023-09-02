@@ -62,17 +62,15 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
 				config.Logger.Info("WS closed")
 				conn.Close()
-				break
 			}
 			config.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
-			continue
+			break
 		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			config.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
-		config.Logger.Info(fmt.Sprintf("Received message: %s", string(msg)))
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
