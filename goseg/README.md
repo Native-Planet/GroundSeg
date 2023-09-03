@@ -18,7 +18,7 @@
 - If invalid, sends nack.
 - If valid, sends ack and pass request to Handler.
 
-### Urbit Auth and Lick
+### Urbit Auth and Lick (API)
 - Import Handler
 - Receives lick %spits
 - Puts it through auth
