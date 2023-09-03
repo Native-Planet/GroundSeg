@@ -115,15 +115,14 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	muConn := &structs.MuConn{Conn: conn}
 	if authed {
 		ClientManager.AddAuthClient(tokenId, muConn)
-		config.Logger.Info(fmt.Sprintf("%s added to auth",tokenId))
+		config.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
 	} else {
 		ClientManager.AddUnauthClient(tokenId, muConn)
-		config.Logger.Info(fmt.Sprintf("%s added to unauth",tokenId))
+		config.Logger.Info(fmt.Sprintf("%s added to unauth", tokenId))
 	}
 	now := time.Now().Format("2006-01-02_15:04:05")
 	return AddSession(tokenId, hash, now, authed)
 }
-
 
 // the same but the other way
 func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
@@ -161,7 +160,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(ClientManager,token["id"]) {
+		if TokenIdAuthed(ClientManager, token["id"]) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes

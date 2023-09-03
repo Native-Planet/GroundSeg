@@ -184,7 +184,7 @@ func UrbitHandler(msg []byte) error {
 // validate password and add to auth session map
 func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	// no real mutex here
-    // connHandler := &structs.MuConn{Conn: conn}
+	// connHandler := &structs.MuConn{Conn: conn}
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -254,6 +254,9 @@ func StartramHandler(msg []byte) error {
 		region := startramPayload.Payload.Region
 		if err := startram.Register(regCode, region); err != nil {
 			return fmt.Errorf("Failed registration: %v", err)
+		}
+		if err := startram.RegisterExistingShips(); err != nil {
+			config.Logger.Error(fmt.Sprintf("Unable to register ships: %v", err))
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
 			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))

@@ -82,9 +82,9 @@ func init() {
 			Logger.Error(fmt.Sprintf("%v", err))
 		} else {
 			err = UpdateConf(map[string]interface{}{
-				"Pubkey":  wgPub,
-				"Privkey": wgPriv,
-				"Salt":    salt,
+				"pubkey":  wgPub,
+				"privkey": wgPriv,
+				"salt":    salt,
 			})
 			if err != nil {
 				Logger.Error(fmt.Sprintf("%v", err))

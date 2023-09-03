@@ -338,13 +338,13 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
-    auth.ClientManager.BroadcastAuth(authJson)
+	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
-    auth.ClientManager.BroadcastUnauth(input)
+	auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
 
