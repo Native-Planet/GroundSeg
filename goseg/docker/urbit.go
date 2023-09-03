@@ -97,7 +97,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	// gather boot option values
 	shipName := shipConf.PierName
-	loomValue := string(shipConf.LoomSize)
+	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
 	dirnameValue := shipConf.PierName
 	var devMode string
 	if shipConf.DevMode == true {
@@ -111,12 +111,12 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
-		httpPort = string(shipConf.WgHTTPPort)
-		amesPort = string(shipConf.WgAmesPort)
+		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
+		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
 	} else {
-		httpPort = string(shipConf.HTTPPort)
-		amesPort = string(shipConf.AmesPort)
+		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
+		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
 		network = "default"
 		httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
 		amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))

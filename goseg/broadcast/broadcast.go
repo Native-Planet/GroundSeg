@@ -78,7 +78,6 @@ func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, err
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	//go newShipStatusLoop()
 	// return the boostrapped result
 	res = GetState()
 	return res, nil
@@ -133,8 +132,8 @@ func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
 		var dockerStats structs.ContainerStats
 		dockerStats, err = docker.GetContainerStats(pier)
 		if err != nil {
-			errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err)
-			config.Logger.Error(errmsg)
+			//errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err) // temporary supress
+			//config.Logger.Error(errmsg)
 			continue
 		}
 		urbit := structs.Urbit{}
@@ -207,8 +206,8 @@ func GetContainerNetworks(containers []string) map[string]string {
 	for _, container := range containers {
 		network, err := docker.GetContainerNetwork(container)
 		if err != nil {
-			errmsg := fmt.Sprintf("Error getting container network: %v", err)
-			config.Logger.Error(errmsg)
+			//errmsg := fmt.Sprintf("Error getting container network: %v", err) // temporary supress
+			//config.Logger.Error(errmsg)
 			continue
 		} else {
 			res[container] = network
@@ -338,13 +337,13 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
-    auth.ClientManager.BroadcastAuth(authJson)
+	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
-    auth.ClientManager.BroadcastUnauth(input)
+	auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
 
@@ -380,7 +379,9 @@ func shipStatusLoop() {
 			}
 			mu.Lock() // Locking the mutex
 			for key, urbit := range updates {
-				broadcastState.Urbits[key] = urbit
+				//broadcastState.Urbits[key] = urbit
+				config.Logger.Warn(fmt.Sprintf("%+v %+v", key, urbit))
+				config.Logger.Warn(fmt.Sprintf("%+v", broadcastState.Urbits))
 			}
 			mu.Unlock() // Unlocking the mutex
 			BroadcastToClients()
