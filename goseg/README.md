@@ -2,7 +2,7 @@
 
 ### A guide to goseg packages
 
-[]("./GroundSegFlow.png")
+![flow diagram]("./GroundSegFlow.png")
 
 ## Main
 - Goroutines and packages get initialized here
