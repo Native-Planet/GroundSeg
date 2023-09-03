@@ -37,6 +37,10 @@
 - Imports BroadcastEventBus and the APIs
 - Listens to BroadcastEventBus and sends a broadcast out to the APIs
 
+## Routine Packages
+- Rectifiers, fetch loops, and correction loops
+- Imports Operation Packages
+
 ## Operation Packages
 - Receives operation calls from routines or process handler
 - Sends broadcast calls to BroadcastEventBus
@@ -63,8 +67,3 @@
 ### Transition
 - Maintains state
 - Sends transitions to BroadcastEvenBus
-
-
-## Routine Packages
-- Rectifiers, fetch loops, and correction loops
-- Imports Operation Packages
