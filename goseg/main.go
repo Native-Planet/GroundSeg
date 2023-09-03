@@ -22,7 +22,6 @@ import (
 	"goseg/startram"
 	"goseg/ws"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -78,11 +77,8 @@ func main() {
 	//go rectify.SystemTransitionHandler()
 	// digest new ship transition events
 	go rectify.NewShipTransitionHandler()
-	// just making sure we can parse (debug)
-	if len(conf.Piers) > 0 {
-		pierList := strings.Join(conf.Piers, ", ")
-		config.Logger.Info(fmt.Sprintf("Loaded piers: %s", pierList))
-	}
+	// digest retrieve data
+	go rectify.RectifyUrbit()
 	// get the startram config from server
 	if conf.WgRegistered == true {
 		_, err := startram.Retrieve()

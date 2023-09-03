@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+var (
+	EventBus = make(chan structs.Event, 100)
+)
+
 // get available regions from endpoint
 func GetRegions() (map[string]structs.StartramRegion, error) {
 	var regions map[string]structs.StartramRegion
@@ -89,6 +93,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	if regStatus {
 		return retrieve, nil
 	} else {
+		EventBus <- structs.Event{Type: "retrieve", Data: nil}
 		return retrieve, fmt.Errorf("No registration")
 	}
 }
