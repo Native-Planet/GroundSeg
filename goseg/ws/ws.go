@@ -1,4 +1,5 @@
 package ws
+
 // you can pass websockets to other packages for reads, but please
 // try to do all writes from here
 // otherwise you have to deal with passing mutexes which is annoying
@@ -37,7 +38,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tokenId := config.RandString(32)
-	MuCon := auth.ClientManager.NewConnection(conn,tokenId)
+	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	// keepalive for ws
 	MuCon.Conn.SetPongHandler(func(string) error {
 		MuCon.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -143,7 +144,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:",err))
+					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
 				if err := MuCon.Write(resp); err != nil {
 					config.Logger.Warn("Unable to broadcast to unauth client")
@@ -218,7 +219,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:",err))
+					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
 				if err := MuCon.Write(resp); err != nil {
 					config.Logger.Warn("Unable to broadcast to unauth client")

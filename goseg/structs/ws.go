@@ -1,4 +1,5 @@
 package structs
+
 // contained herein: structs for managing mutexed maps of
 // mutexed websocket connections to avoid panics;
 // actual writing is done via broadcast package;
@@ -27,9 +28,9 @@ func (ws *MuConn) Write(data []byte) error {
 // wrappers for mutexed token:websocket maps
 // the maps are also mutexed as wholes
 type ClientManager struct {
-	AuthClients 		 map[string]*MuConn
-	UnauthClients        map[string]*MuConn
-	Mu                   sync.RWMutex
+	AuthClients   map[string]*MuConn
+	UnauthClients map[string]*MuConn
+	Mu            sync.RWMutex
 }
 
 // register a new connection
