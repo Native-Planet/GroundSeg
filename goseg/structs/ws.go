@@ -21,8 +21,12 @@ type MuConn struct {
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
 	ws.Mu.Lock()
-	defer ws.Mu.Unlock()
-	return ws.Conn.WriteMessage(websocket.TextMessage, data)
+	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		ws.Mu.Unlock()
+		return err
+	}
+	ws.Mu.Unlock()
+	return nil
 }
 
 // wrappers for mutexed token:websocket maps
@@ -75,8 +79,6 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
 	for _, client := range cm.UnauthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
@@ -86,8 +88,6 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 }
 
 func (cm *ClientManager) BroadcastAuth(data []byte) {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
 	for _, client := range cm.AuthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
