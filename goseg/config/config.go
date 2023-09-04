@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"goseg/broadcastbus"
 	"goseg/defaults"
 	"goseg/structs"
 	"io"
@@ -207,7 +208,6 @@ func persistConf(configMap map[string]interface{}) error {
 // modify the desired/actual state of containers
 func UpdateContainerState(name string, containerState structs.ContainerState) {
 	contMutex.Lock()
-	defer contMutex.Unlock()
 	GSContainers[name] = containerState
 	logMsg := "<hidden>"
 	if DebugMode {
@@ -215,6 +215,8 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 		logMsg = string(res)
 	}
 	Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
+	contMutex.Unlock()
+	broadcastbus.BroadcastBus <- structs.Event{Type: "container", Data: "placeholder"} //containerState}
 }
 
 // get the current container state
