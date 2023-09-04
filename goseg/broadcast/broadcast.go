@@ -40,7 +40,7 @@ func init() {
 }
 
 // take in config file and addt'l info to initialize broadcast
-func bootstrapBroadcastState() (error) {
+func bootstrapBroadcastState() error {
 	config.Logger.Info("Bootstrapping state")
 	// this returns a map of ship:running status
 	config.Logger.Info("Resolving pier status")
@@ -283,7 +283,7 @@ func recursiveUpdate(dst, src reflect.Value) error {
 	}
 	dst.Set(src)
 	return nil
-} 
+}
 */
 
 // stupid update method instead of psychotic recursion

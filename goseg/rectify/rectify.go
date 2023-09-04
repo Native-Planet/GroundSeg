@@ -1,4 +1,5 @@
 package rectify
+
 // this package is for watching event channels and rectifying mismatches
 // between the desired and actual state, creating broadcast transitions,
 // and anything else that needs to be done asyncronously
