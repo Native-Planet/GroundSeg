@@ -18,7 +18,6 @@ import (
 )
 
 var (
-	EventBus        = make(chan structs.Event, 100)
 	UTransBus       = make(chan structs.UrbitTransition, 100)
 	NewShipTransBus = make(chan structs.NewShipTransition, 100)
 )
@@ -441,26 +440,6 @@ func FindContainer(containerName string) (*types.Container, error) {
 		}
 	}
 	return nil, nil
-}
-
-// subscribe to docker events and feed them into eventbus
-func DockerListener() {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
-		return
-	}
-	messages, errs := cli.Events(ctx, types.EventsOptions{})
-	for {
-		select {
-		case event := <-messages:
-			// Convert the Docker event to our custom event and send it to the EventBus
-			EventBus <- structs.Event{Type: event.Action, Data: event}
-		case err := <-errs:
-			config.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
-		}
-	}
 }
 
 // periodically poll docker in case we miss something

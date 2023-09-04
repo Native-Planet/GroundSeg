@@ -51,7 +51,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := MuCon.Write([]byte("ping")); err != nil {
+				if err := MuCon.Write([]byte("{\"type\":\"ping\"}")); err != nil {
 					return
 				}
 			}

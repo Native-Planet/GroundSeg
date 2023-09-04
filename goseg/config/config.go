@@ -39,12 +39,10 @@ var (
 	// representation of desired/actual container states
 	GSContainers = make(map[string]structs.ContainerState)
 	DockerDir    = "/var/lib/docker/volumes/"
-	// version server check
-	checkInterval = 5 * time.Minute
-	confPath      = filepath.Join(BasePath, "settings", "system.json")
-	confMutex     sync.Mutex
-	contMutex     sync.Mutex
-	versMutex     sync.Mutex
+	confPath     = filepath.Join(BasePath, "settings", "system.json")
+	confMutex    sync.Mutex
+	contMutex    sync.Mutex
+	versMutex    sync.Mutex
 )
 
 // try initializing from system.json on disk

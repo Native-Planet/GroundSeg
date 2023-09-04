@@ -371,19 +371,22 @@ func shipStatusLoop() {
 		case <-ticker.C:
 			conf := config.Conf()
 			piers := conf.Piers
-			updates, err := constructPierInfo(piers)
+			//updates, err := constructPierInfo(piers)
+			_, err := constructPierInfo(piers)
 			if err != nil {
 				errmsg := fmt.Sprintf("Unable to build pier info: %v", err)
 				config.Logger.Warn(errmsg)
 				continue
 			}
-			mu.Lock() // Locking the mutex
-			for key, urbit := range updates {
-				//broadcastState.Urbits[key] = urbit
-				config.Logger.Warn(fmt.Sprintf("%+v %+v", key, urbit))
-				config.Logger.Warn(fmt.Sprintf("%+v", broadcastState.Urbits))
-			}
-			mu.Unlock() // Unlocking the mutex
+			/*
+				mu.Lock() // Locking the mutex
+				for key, urbit := range updates {
+					//broadcastState.Urbits[key] = urbit
+					//config.Logger.Warn(fmt.Sprintf("%+v %+v", key, urbit))
+					//config.Logger.Warn(fmt.Sprintf("%+v", broadcastState.Urbits))
+				}
+				mu.Unlock() // Unlocking the mutex
+			*/
 			BroadcastToClients()
 		}
 	}

@@ -17,8 +17,8 @@ package main
 import (
 	"fmt"
 	"goseg/config"
-	"goseg/docker"
 	"goseg/rectify"
+	"goseg/routines"
 	"goseg/startram"
 	"goseg/ws"
 	"net/http"
@@ -31,6 +31,7 @@ var (
 	DevMode = false
 )
 
+/*
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
 		if err := loadFunc(); err != nil {
@@ -38,6 +39,7 @@ func loadService(loadFunc func() error, errMsg string) {
 		}
 	}()
 }
+*/
 
 func main() {
 	// global SysConfig var is managed through config package
@@ -66,11 +68,11 @@ func main() {
 		config.VersionInfo = targetChan
 	}
 	// infinite version check loop
-	go config.CheckVersionLoop()
+	go routines.CheckVersionLoop()
 	// listen to docker daemon
-	go docker.DockerListener()
+	go routines.DockerListener()
 	// digest docker events from eventbus
-	go rectify.DockerSubscriptionHandler()
+	go routines.DockerSubscriptionHandler()
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
 	// digest system transition events
@@ -99,18 +101,20 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
-	if conf.WgRegistered == true {
-		// Load Wireguard
-		loadService(docker.LoadWireguard, "Unable to load Wireguard!")
-		// Load MC
-		loadService(docker.LoadMC, "Unable to load MinIO Client!")
-		// Load MinIOs
-		loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
-	}
-	// Load Netdata
-	loadService(docker.LoadNetdata, "Unable to load Netdata!")
-	// Load Urbits
-	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	/*
+		if conf.WgRegistered == true {
+			// Load Wireguard
+			loadService(docker.LoadWireguard, "Unable to load Wireguard!")
+			// Load MC
+			loadService(docker.LoadMC, "Unable to load MinIO Client!")
+			// Load MinIOs
+			loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
+		}
+		// Load Netdata
+		loadService(docker.LoadNetdata, "Unable to load Netdata!")
+		// Load Urbits
+		loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	*/
 
 	// Websocket
 	r := mux.NewRouter()
