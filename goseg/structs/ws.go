@@ -1,4 +1,5 @@
 package structs
+
 // contained herein: structs for managing mutexed maps of
 // mutexed websocket connections to avoid panics;
 // actual writing is done via broadcast package;
@@ -20,16 +21,20 @@ type MuConn struct {
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
 	ws.Mu.Lock()
-	defer ws.Mu.Unlock()
-	return ws.Conn.WriteMessage(websocket.TextMessage, data)
+	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		ws.Mu.Unlock()
+		return err
+	}
+	ws.Mu.Unlock()
+	return nil
 }
 
 // wrappers for mutexed token:websocket maps
 // the maps are also mutexed as wholes
 type ClientManager struct {
-	AuthClients 		 map[string]*MuConn
-	UnauthClients        map[string]*MuConn
-	Mu                   sync.RWMutex
+	AuthClients   map[string]*MuConn
+	UnauthClients map[string]*MuConn
+	Mu            sync.RWMutex
 }
 
 // register a new connection
@@ -74,8 +79,6 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
 	for _, client := range cm.UnauthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
@@ -85,8 +88,6 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 }
 
 func (cm *ClientManager) BroadcastAuth(data []byte) {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
 	for _, client := range cm.AuthClients {
 		// imported sessions will be nil until auth
 		if client != nil {

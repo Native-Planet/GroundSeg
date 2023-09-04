@@ -7,7 +7,13 @@ import (
 	"goseg/config"
 	"goseg/structs"
 	"io/ioutil"
+	"math"
 	"net/http"
+	"time"
+)
+
+var (
+	EventBus = make(chan structs.Event, 100)
 )
 
 // get available regions from endpoint
@@ -66,14 +72,35 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		config.Logger.Warn(errmsg)
 		return retrieve, err
 	}
-	// pin that ho to the global vars
-	config.StartramConfig = retrieve
-	config.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
-	return retrieve, nil
+	regStatus := true
+	if retrieve.Status != "No record" {
+		// pin that ho to the global vars
+		config.StartramConfig = retrieve
+		config.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
+	} else {
+		regStatus = false
+		return retrieve, fmt.Errorf("No registration record")
+	}
+	if conf.WgRegistered != regStatus {
+		config.Logger.Info("Updating registration status")
+		err = config.UpdateConf(map[string]interface{}{
+			"wgRegistered": regStatus,
+		})
+		if err != nil {
+			config.Logger.Error(fmt.Sprintf("%v", err))
+		}
+	}
+	if regStatus {
+		return retrieve, nil
+	} else {
+		EventBus <- structs.Event{Type: "retrieve", Data: nil}
+		return retrieve, fmt.Errorf("No registration")
+	}
 }
 
 // register your pubkey
 func Register(regCode string, region string) error {
+	config.Logger.Info(fmt.Sprintf("Submitting registration in %s", region))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/register"
 	var regObj structs.StartramRegister
@@ -122,6 +149,7 @@ func Register(regCode string, region string) error {
 
 // create a service
 func SvcCreate(subdomain string, svcType string) error {
+	config.Logger.Info(fmt.Sprintf("Creating new %s registrations: %s", svcType, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create"
 	var createObj structs.StartramSvc
@@ -158,6 +186,7 @@ func SvcCreate(subdomain string, svcType string) error {
 
 // delete a service
 func SvcDelete(subdomain string, svcType string) error {
+	config.Logger.Info(fmt.Sprintf("Deleting %s registration: %s", svcType, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create"
 	var delObj structs.StartramSvc
@@ -200,6 +229,7 @@ func SvcDelete(subdomain string, svcType string) error {
 
 // create a custom domain
 func AliasCreate(subdomain string, alias string) error {
+	config.Logger.Info(fmt.Sprintf("Registering alias %s for %s", alias, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create/alias"
 	var aliasObj structs.StartramAlias
@@ -236,6 +266,7 @@ func AliasCreate(subdomain string, alias string) error {
 
 // delete a custom domain
 func AliasDelete(subdomain string, alias string) error {
+	config.Logger.Info(fmt.Sprintf("Deleting alias %s for %s", alias, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create/alias"
 	var delAliasObj structs.StartramAlias
@@ -272,6 +303,52 @@ func AliasDelete(subdomain string, alias string) error {
 		}
 	} else {
 		return fmt.Errorf("Error deleting alias %s: %v", alias, respObj.Debug)
+	}
+	return nil
+}
+
+// call registration endpoint for 5 minutes after registration
+// call as goroutine
+func backoffRetrieve() error {
+	startTime := time.Now()
+	duration := 5 * time.Second
+	for {
+		_, err := Retrieve()
+		if err == nil {
+			config.Logger.Info("Registration retrieved")
+			return nil
+		}
+		// timeout after 5min
+		if time.Since(startTime) > 5*time.Minute {
+			errmsg := fmt.Errorf("Registration retrieval timed out")
+			config.Logger.Error(fmt.Sprintf("%v", errmsg))
+			return errmsg
+		}
+		// linear cooldown
+		time.Sleep(duration)
+		if duration.Seconds() < 60 {
+			duration = time.Duration(math.Min(duration.Seconds()*2, 60)) * time.Second
+		} else {
+			duration += 60 * time.Second
+		}
+	}
+}
+
+// submit existing ships on registration
+func RegisterExistingShips() error {
+	conf := config.Conf()
+	if conf.WgRegistered {
+		for ship, _ := range config.UrbitConfAll() {
+			if err := SvcCreate(ship, "urbit"); err != nil {
+				config.Logger.Error("Couldn't register pier: ", ship)
+			}
+			if err := SvcCreate("s3."+ship, "minio"); err != nil {
+				config.Logger.Error("Couldn't register S3: ", ship)
+			}
+		}
+		go backoffRetrieve()
+	} else {
+		return fmt.Errorf("Instance is not registered")
 	}
 	return nil
 }
