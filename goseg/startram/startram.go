@@ -318,11 +318,13 @@ func backoffRetrieve() error {
 			config.Logger.Info("Registration retrieved")
 			return nil
 		}
+		// timeout after 5min
 		if time.Since(startTime) > 5*time.Minute {
 			errmsg := fmt.Errorf("Registration retrieval timed out")
 			config.Logger.Error(fmt.Sprintf("%v", errmsg))
 			return errmsg
 		}
+		// linear cooldown
 		time.Sleep(duration)
 		if duration.Seconds() < 60 {
 			duration = time.Duration(math.Min(duration.Seconds()*2, 60)) * time.Second

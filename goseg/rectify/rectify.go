@@ -1,8 +1,8 @@
 package rectify
 
-// this package is for watching the event bus and rectifying mismatches
-// between the desired and actual state
-// also for digesting events from docker into broadcasts
+// this package is for watching event channels and rectifying mismatches
+// between the desired and actual state, creating broadcast transitions,
+// and anything else that needs to be done asyncronously
 
 import (
 	"fmt"
@@ -40,18 +40,9 @@ func NewShipTransitionHandler() {
 		event := <-docker.NewShipTransBus
 		switch event.Type {
 		case "error":
-			var res map[string]interface{}
-			res = map[string]interface{}{
-				"NewShip": map[string]interface{}{
-					"Transition": map[string]interface{}{
-						"Error": event.Event,
-					},
-				},
-			}
-			err := broadcast.UpdateBroadcastState(res)
-			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'error': %v", err))
-			}
+			current := broadcast.GetState()
+			current.NewShip.Transition.Error = event.Event
+			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "bootStage":
 			// Events
@@ -61,32 +52,14 @@ func NewShipTransitionHandler() {
 			// completed: ready to reset
 			// aborted: something went wrong and we ran the cleanup routine
 			// <empty>: free for new ship
-			var res map[string]interface{}
-			res = map[string]interface{}{
-				"NewShip": map[string]interface{}{
-					"Transition": map[string]interface{}{
-						"BootStage": event.Event,
-					},
-				},
-			}
-			err := broadcast.UpdateBroadcastState(res)
-			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'bootStage': %v", err))
-			}
+			current := broadcast.GetState()
+			current.NewShip.Transition.BootStage = event.Event
+			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "patp":
-			var res map[string]interface{}
-			res = map[string]interface{}{
-				"NewShip": map[string]interface{}{
-					"Transition": map[string]interface{}{
-						"Patp": event.Event,
-					},
-				},
-			}
-			err := broadcast.UpdateBroadcastState(res)
-			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Error updating new ship transition 'bootStage': %v", err))
-			}
+			current := broadcast.GetState()
+			current.NewShip.Transition.Patp = event.Event
+			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		default:
 			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))

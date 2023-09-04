@@ -12,7 +12,8 @@ import (
 	"goseg/system"
 	"math"
 	"os"
-	"reflect"
+
+	// "reflect"
 	"strings"
 	"sync"
 	"time"
@@ -35,13 +36,10 @@ var (
 
 func init() {
 	// initialize broadcastState global var
-	conf := config.Conf()
-	broadcast, err := bootstrapBroadcastState(conf)
-	if err != nil {
-		errmsg := fmt.Sprintf("Unable to initialize broadcast: %v", err)
-		panic(errmsg)
+	if err := bootstrapBroadcastState(); err != nil {
+		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
 	}
-	broadcastState = broadcast
+	//broadcastState = broadcast
 	go processBroadcastLoop()
 }
 
@@ -56,43 +54,32 @@ func processBroadcastLoop() {
 }
 
 // take in config file and addt'l info to initialize broadcast
-func bootstrapBroadcastState(conf structs.SysConfig) (structs.AuthBroadcast, error) {
+func bootstrapBroadcastState() error {
 	config.Logger.Info("Bootstrapping state")
-	var res structs.AuthBroadcast
-	// get a list of piers from config
-	piers := conf.Piers
 	// this returns a map of ship:running status
 	config.Logger.Info("Resolving pier status")
-	updates, err := constructPierInfo(piers)
+	urbits, err := constructPierInfo()
 	if err != nil {
-		return res, err
+		return err
 	}
-	// update broadcastState
-	err = UpdateBroadcastState(map[string]interface{}{
-		"Urbits": updates,
-	})
-	if err != nil {
-		errmsg := fmt.Sprintf("Unable to update broadcast state: %v", err)
-		config.Logger.Error(errmsg)
-		return res, err
-	}
+	// update broadcastState with ship info
+	mu.Lock()
+	broadcastState.Urbits = urbits
+	mu.Unlock()
 	// get startram regions
 	if err := LoadStartramRegions(); err != nil {
 		config.Logger.Warn("%v", err)
 	}
 	// update with system state
 	sysInfo := constructSystemInfo()
-	err = UpdateBroadcastState(sysInfo)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error updating broadcast state:", err)
-		config.Logger.Error(errmsg)
-	}
+	mu.Lock()
+	broadcastState.System = sysInfo
+	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	// return the boostrapped result
-	res = GetState()
-	return res, nil
+	//go newShipStatusLoop()
+	return nil
 }
 
 // put startram regions into broadcast struct
@@ -105,13 +92,15 @@ func LoadStartramRegions() error {
 		mu.Lock()
 		broadcastState.Profile.Startram.Info.Regions = regions
 		mu.Unlock()
-		BroadcastToClients()
 	}
 	return nil
 }
 
 // this is for building the broadcast objects describing piers
-func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
+func constructPierInfo() (map[string]structs.Urbit, error) {
+	// get a list of piers
+	conf := config.Conf()
+	piers := conf.Piers
 	updates := make(map[string]structs.Urbit)
 	// load fresh broadcast state
 	currentState := GetState()
@@ -184,32 +173,19 @@ func constructPierInfo(piers []string) (map[string]structs.Urbit, error) {
 }
 
 // put together the system[usage] subobject
-func constructSystemInfo() map[string]interface{} {
-	var res map[string]interface{}
+func constructSystemInfo() structs.System {
 	var ramObj []uint64
 	var diskObj []uint64
+	var sysInfo structs.System
 	usedRam, totalRam := system.GetMemory()
-	ramObj = append(ramObj, usedRam, totalRam)
-	cpuUsage := system.GetCPU()
-	cpuTemp := system.GetTemp()
+	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
+	sysInfo.Info.Usage.CPU = system.GetCPU()
+	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
 	usedDisk, freeDisk := system.GetDisk()
-	diskObj = append(diskObj, usedDisk, freeDisk)
-	swapVal := system.HasSwap()
-	res = map[string]interface{}{
-		"System": map[string]interface{}{
-			"Info": map[string]interface{}{
-				"Usage": map[string]interface{}{
-					"RAM":      ramObj,
-					"CPU":      cpuUsage,
-					"CPUTemp":  cpuTemp,
-					"Disk":     diskObj,
-					"SwapFile": swapVal,
-				},
-			},
-			"Transition": SystemTransitions,
-		},
-	}
-	return res
+	sysInfo.Info.Usage.Disk = append(diskObj, usedDisk, freeDisk)
+	sysInfo.Info.Usage.SwapFile = system.HasSwap()
+	sysInfo.Transition = SystemTransitions
+	return sysInfo
 }
 
 // return a map of ships and their networks
@@ -228,7 +204,9 @@ func GetContainerNetworks(containers []string) map[string]string {
 	return res
 }
 
+/*
 // update broadcastState with a map of items
+// old method that sucks
 func UpdateBroadcastState(values map[string]interface{}) error {
 	mu.Lock()
 	v := reflect.ValueOf(&broadcastState).Elem()
@@ -254,6 +232,7 @@ func UpdateBroadcastState(values map[string]interface{}) error {
 }
 
 // this allows us to insert stuff into nested structs/keys and not overwrite the existing contents
+// do not use this, it can't overwrite nested structs for some reason
 func recursiveUpdate(dst, src reflect.Value) error {
 	if !dst.CanSet() {
 		return fmt.Errorf("field (type: %s, kind: %s) is not settable", dst.Type(), dst.Kind())
@@ -319,11 +298,19 @@ func recursiveUpdate(dst, src reflect.Value) error {
 	dst.Set(src)
 	return nil
 }
+*/
+
+// stupid update method instead of psychotic recursion
+func UpdateBroadcast(broadcast structs.AuthBroadcast) {
+	mu.Lock()
+	defer mu.Unlock()
+	broadcastState = broadcast
+}
 
 // return broadcast state
 func GetState() structs.AuthBroadcast {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	return broadcastState
 }
 
@@ -365,11 +352,12 @@ func hostStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
 			update := constructSystemInfo()
-			err := UpdateBroadcastState(update)
-			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Error updating system status: %v", err))
-			}
+			newState.System = update
+			UpdateBroadcast(newState)
 		}
 	}
 }
@@ -381,24 +369,14 @@ func shipStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			conf := config.Conf()
-			piers := conf.Piers
-			//updates, err := constructPierInfo(piers)
-			_, err := constructPierInfo(piers)
+			updates, err := constructPierInfo()
 			if err != nil {
-				errmsg := fmt.Sprintf("Unable to build pier info: %v", err)
-				config.Logger.Warn(errmsg)
+				config.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
 			}
-			/*
-				mu.Lock() // Locking the mutex
-				for key, urbit := range updates {
-					//broadcastState.Urbits[key] = urbit
-					//config.Logger.Warn(fmt.Sprintf("%+v %+v", key, urbit))
-					//config.Logger.Warn(fmt.Sprintf("%+v", broadcastState.Urbits))
-				}
-				mu.Unlock() // Unlocking the mutex
-			*/
+			mu.Lock()
+			broadcastState.Urbits = updates
+			mu.Unlock()
 			BroadcastToClients()
 		}
 	}
