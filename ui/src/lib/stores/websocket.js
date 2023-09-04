@@ -59,10 +59,11 @@ export const handleMessage = data => {
   // it from pending
   if (data.type === "activity") {
     handleActivity(data)
-  } else {
-    let now = new Date()
+  } else if (data.type == "structure") {
     console.log(data)
     structure.set(data)
+  } else {
+    console.log("server alive")
   }
 }
 
