@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/rectify"
 	"goseg/routines"
 	"goseg/startram"
@@ -31,7 +32,6 @@ var (
 	DevMode = false
 )
 
-/*
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
 		if err := loadFunc(); err != nil {
@@ -39,7 +39,6 @@ func loadService(loadFunc func() error, errMsg string) {
 		}
 	}()
 }
-*/
 
 func main() {
 	// global SysConfig var is managed through config package
@@ -67,12 +66,12 @@ func main() {
 		targetChan := versionStruct.Groundseg[releaseChannel]
 		config.VersionInfo = targetChan
 	}
-	// infinite version check loop
-	go routines.CheckVersionLoop()
-	// listen to docker daemon
-	go routines.DockerListener()
-	// digest docker events from eventbus
-	go routines.DockerSubscriptionHandler()
+	// routines/version.go
+	go routines.CheckVersionLoop() // infinite version check loop
+	// routines/docker.go
+	go routines.DockerListener()            // listen to docker daemon
+	go routines.DockerSubscriptionHandler() // digest docker events from eventbus
+
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
 	// digest system transition events
@@ -110,11 +109,11 @@ func main() {
 			// Load MinIOs
 			loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
 		}
-		// Load Netdata
-		loadService(docker.LoadNetdata, "Unable to load Netdata!")
-		// Load Urbits
-		loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 	*/
+	// Load Netdata
+	loadService(docker.LoadNetdata, "Unable to load Netdata!")
+	// Load Urbits
+	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 
 	// Websocket
 	r := mux.NewRouter()

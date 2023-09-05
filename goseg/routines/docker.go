@@ -66,6 +66,7 @@ func DockerSubscriptionHandler() {
 			config.Logger.Info(fmt.Sprintf("Docker: %s started", contName))
 
 			containerState, exists := config.GetContainerState()[contName]
+			config.Logger.Warn(fmt.Sprintf("%+v", containerState)) // temp
 			if exists {
 				containerState.ActualStatus = "running"
 				config.UpdateContainerState(contName, containerState)

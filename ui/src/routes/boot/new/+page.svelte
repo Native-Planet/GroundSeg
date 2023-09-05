@@ -9,6 +9,7 @@
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
+  {JSON.stringify(tBootStage)}
   <div class="title">NEW SHIP</div>
   {#if tBootStage.length < 1}
     <Free />

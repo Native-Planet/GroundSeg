@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"goseg/broadcastbus"
 	"goseg/defaults"
 	"goseg/structs"
 	"io"
@@ -214,9 +213,8 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 		res, _ := json.Marshal(containerState)
 		logMsg = string(res)
 	}
-	Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
 	contMutex.Unlock()
-	broadcastbus.BroadcastBus <- structs.Event{Type: "container", Data: "placeholder"} //containerState}
+	Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
 }
 
 // get the current container state

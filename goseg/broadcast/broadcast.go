@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/auth"
-	"goseg/broadcastbus"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/startram"
@@ -39,18 +38,6 @@ func init() {
 	if err := bootstrapBroadcastState(); err != nil {
 		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
 	}
-	//broadcastState = broadcast
-	go processBroadcastLoop()
-}
-
-func processBroadcastLoop() {
-	for {
-		event, ok := <-broadcastbus.BroadcastBus
-		if !ok {
-			config.Logger.Error("Failed to assert Docker event data type")
-		}
-		config.Logger.Warn(fmt.Sprintf("processBroadcast Loop Type: %v %v", event.Type, event.Data)) // temp
-	}
 }
 
 // take in config file and addt'l info to initialize broadcast
@@ -78,7 +65,6 @@ func bootstrapBroadcastState() error {
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	//go newShipStatusLoop()
 	return nil
 }
 
