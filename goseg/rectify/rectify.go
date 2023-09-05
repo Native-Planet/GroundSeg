@@ -9,6 +9,7 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 	"strings"
@@ -27,10 +28,10 @@ func UrbitTransitionHandler() {
 			currentStatus.TogglePower = event.Event
 			broadcast.UrbitTransitions[event.Patp] = currentStatus
 			broadcast.UrbTransMu.Unlock()
-			config.Logger.Info(fmt.Sprintf("Adding %v transition to \"%v\" for %v", event.Type, event.Event, event.Patp))
+			logger.Logger.Info(fmt.Sprintf("Adding %v transition to \"%v\" for %v", event.Type, event.Event, event.Patp))
 			broadcast.BroadcastToClients()
 		default:
-			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
 }
@@ -62,7 +63,7 @@ func NewShipTransitionHandler() {
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		default:
-			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
 }
@@ -142,7 +143,7 @@ func SystemTransitionHandler() {
 			broadcast.SystemTransitions.Swap = event.Event
 			broadcast.SysTransMu.Unlock()
 		default:
-			config.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
 }

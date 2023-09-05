@@ -5,6 +5,7 @@ import (
 	"goseg/config"
 	"goseg/defaults"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/structs"
 	"time"
 )
@@ -25,7 +26,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	err := createUrbitConfig(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg)
 		return
 	}
@@ -33,29 +34,29 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	err = appendSysConfigPier(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg)
 		return
 	}
 	// Prepare environment for pier
-	config.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
 	// delete container if exists
 	err = docker.DeleteContainer(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	// delete volume if exists
 	err = docker.DeleteVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	// create new docker volume
 	err = docker.CreateVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg)
 		return
 	}
@@ -64,13 +65,13 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	err = docker.WriteFileToVolume(patp, patp+".key", key)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg)
 		return
 	}
 	// transition: creating
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "creating"}
-	config.Logger.Info(fmt.Sprintf("Creating Pier: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Creating Pier: %v", patp))
 	// todo: create docker container
 	time.Sleep(time.Second * time.Duration(5)) // temp
 
@@ -92,7 +93,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 func waitForShipReady(patp string) {
 	// transition: booting
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "booting"}
-	config.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
 	ticker := time.NewTicker(1 * time.Second)
 	count := 1 // temp
 	for {
@@ -100,7 +101,7 @@ func waitForShipReady(patp string) {
 		case <-ticker.C:
 			//code = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
 			// todo: request +code
-			config.Logger.Info("fake +code request")
+			logger.Logger.Info("fake +code request")
 			if count > 15 {
 				//if len(code) == 27 {
 				// transition: completed
@@ -149,7 +150,7 @@ func getOpenUrbitPorts() (int, int) {
 	}
 	httpPort = httpPort + 1
 	amesPort = amesPort + 1
-	config.Logger.Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
+	logger.Logger.Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
 	return httpPort, amesPort
 }
 
@@ -159,26 +160,26 @@ func errorCleanup(patp string, errmsg string) {
 	// send error transition
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)}
 	// notify that we are cleaning up
-	config.Logger.Info(fmt.Sprintf("New ship creation failed: %v", patp))
-	config.Logger.Info(fmt.Sprintf("Running cleanup routine"))
+	logger.Logger.Info(fmt.Sprintf("New ship creation failed: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Running cleanup routine"))
 	// remove <patp>.json
-	config.Logger.Info(fmt.Sprintf("Removing Urbit Config: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %v", patp))
 	if err := config.RemoveUrbitConfig(patp); err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	// remove patp from system.json
-	config.Logger.Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
 	err := removeSysConfigPier(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	// remove docker volume
 	err = docker.DeleteVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 }
 

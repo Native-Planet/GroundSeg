@@ -4,14 +4,15 @@ package system
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
-	"goseg/config"
+	"goseg/logger"
 	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
 )
 
 // get memory total/used in bytes
@@ -37,14 +38,14 @@ func GetTemp() float64 {
 	data, err := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
 	if err != nil {
 		// errmsg := fmt.Sprintf("Error reading temperature:", err) // ignore for vps testing
-		// config.Logger.Error(errmsg)
+		// logger.Logger.Error(errmsg)
 		return 0
 	}
 	tempStr := strings.TrimSpace(string(data))
 	temp, err := strconv.Atoi(tempStr)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error converting temperature to integer:", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return 0
 	}
 	return float64(temp) / 1000.0
@@ -55,7 +56,7 @@ func HasSwap() int {
 	data, err := ioutil.ReadFile("/proc/swaps")
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading swap status:", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return 0
 	}
 	lines := strings.Split(string(data), "\n")

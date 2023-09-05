@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/rectify"
 	"goseg/routines"
 	"goseg/startram"
@@ -35,7 +36,7 @@ var (
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
 		if err := loadFunc(); err != nil {
-			config.Logger.Error(fmt.Sprintf("%s %v", errMsg, err))
+			logger.Logger.Error(fmt.Sprintf("%s %v", errMsg, err))
 		}
 	}()
 }
@@ -45,7 +46,7 @@ func main() {
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	availMsg := fmt.Sprintf("Internet available: %t", internetAvailable)
-	config.Logger.Info(availMsg)
+	logger.Logger.Info(availMsg)
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
@@ -55,7 +56,7 @@ func main() {
 		go func() {
 			_, versionUpdate := config.CheckVersion()
 			if versionUpdate {
-				config.Logger.Info("Version info retrieved")
+				logger.Logger.Info("Version info retrieved")
 			}
 			versionUpdateChannel <- versionUpdate
 		}()
@@ -84,16 +85,16 @@ func main() {
 	if conf.WgRegistered == true {
 		_, err := startram.Retrieve()
 		if err != nil {
-			config.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
+			logger.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
 	}
 	// block until version info returns
 	if remoteVersion == true {
 		select {
 		case <-versionUpdateChannel:
-			config.Logger.Info("Version info retrieved")
+			logger.Logger.Info("Version info retrieved")
 		case <-time.After(10 * time.Second):
-			config.Logger.Warn("Could not retrieve version info after 10 seconds!")
+			logger.Logger.Warn("Could not retrieve version info after 10 seconds!")
 			versionStruct := config.LocalVersion()
 			releaseChannel := conf.UpdateBranch
 			targetChan := versionStruct.Groundseg[releaseChannel]
