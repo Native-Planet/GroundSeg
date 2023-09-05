@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -28,13 +29,13 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return statuses, err
 	} else {
 		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			return statuses, err
 		} else {
 			for _, pier := range patps {
@@ -125,7 +126,7 @@ func CreateVolume(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	config.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
+	logger.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
 	return nil
 }
 
@@ -143,7 +144,7 @@ func DeleteVolume(name string) error {
 		errmsg := fmt.Errorf("Failed to remove docker volume: %v : %v", name, err)
 		return errmsg
 	}
-	config.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
+	logger.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
 	return nil
 }
 
@@ -162,7 +163,7 @@ func DeleteContainer(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	config.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
+	logger.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
 	return nil
 }
 
@@ -187,7 +188,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
 		return errmsg
 	}
-	config.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
+	logger.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
 }
 
@@ -268,7 +269,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
-		config.Logger.Info(msg)
+		logger.Logger.Info(msg)
 	case existingContainer.State == "exited":
 		// if the container exists but is stopped, start it
 		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
@@ -276,7 +277,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
-		config.Logger.Info(msg)
+		logger.Logger.Info(msg)
 	default:
 		// if container is running, check the image digest
 		currentImage := existingContainer.Image
@@ -302,7 +303,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				return containerState, err
 			}
 			msg := fmt.Sprintf("Restarted %s with image %s", containerName, desiredImage)
-			config.Logger.Info(msg)
+			logger.Logger.Info(msg)
 		}
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
@@ -385,7 +386,7 @@ func StopContainerByName(containerName string) error {
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
 					return fmt.Errorf("failed to stop container %s: %v", containerName, err)
 				}
-				config.Logger.Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
+				logger.Logger.Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
 				return nil
 			}
 		}
@@ -448,7 +449,7 @@ func DockerPoller() {
 	for {
 		select {
 		case <-ticker.C:
-			config.Logger.Info("polling docker")
+			logger.Logger.Info("polling docker")
 			// todo (maybe not necessary?)
 			// fetch the status of all containers and compare with app's state
 			// if there's a change, send an event to the EventBus

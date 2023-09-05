@@ -7,6 +7,7 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 	"net/http"
@@ -21,12 +22,12 @@ import (
 // todo
 // handle bug report stuff
 func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
-	config.Logger.Info("Support")
+	logger.Logger.Info("Support")
 	return nil
 }
 
 func NewShipHandler(msg []byte) error {
-	config.Logger.Info("New ship")
+	logger.Logger.Info("New ship")
 	// Unmarshal JSON
 	var shipPayload structs.WsNewShipPayload
 	err := json.Unmarshal(msg, &shipPayload)
@@ -55,7 +56,7 @@ func NewShipHandler(msg []byte) error {
 
 // handle system events
 func SystemHandler(msg []byte) error {
-	config.Logger.Info("System")
+	logger.Logger.Info("System")
 	var systemPayload structs.WsSystemPayload
 	err := json.Unmarshal(msg, &systemPayload)
 	if err != nil {
@@ -65,22 +66,22 @@ func SystemHandler(msg []byte) error {
 	case "power":
 		switch systemPayload.Payload.Command {
 		case "shutdown":
-			config.Logger.Info(fmt.Sprintf("Device shutdown requested"))
+			logger.Logger.Info(fmt.Sprintf("Device shutdown requested"))
 			if config.DebugMode {
-				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+				logger.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 				os.Exit(0)
 			} else {
-				config.Logger.Info(fmt.Sprintf("Turning off device.."))
+				logger.Logger.Info(fmt.Sprintf("Turning off device.."))
 				cmd := exec.Command("shutdown", "-h", "now")
 				cmd.Run()
 			}
 		case "restart":
-			config.Logger.Info(fmt.Sprintf("Device restart requested"))
+			logger.Logger.Info(fmt.Sprintf("Device restart requested"))
 			if config.DebugMode {
-				config.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
+				logger.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
 				os.Exit(0)
 			} else {
-				config.Logger.Info(fmt.Sprintf("Restarting device.."))
+				logger.Logger.Info(fmt.Sprintf("Restarting device.."))
 				cmd := exec.Command("reboot")
 				cmd.Run()
 			}
@@ -95,7 +96,7 @@ func SystemHandler(msg []byte) error {
 
 // handle urbit-type events
 func UrbitHandler(msg []byte) error {
-	config.Logger.Info("Urbit")
+	logger.Logger.Info("Urbit")
 	var urbitPayload structs.WsUrbitPayload
 	err := json.Unmarshal(msg, &urbitPayload)
 	if err != nil {
@@ -122,7 +123,7 @@ func UrbitHandler(msg []byte) error {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
 			if err := broadcast.BroadcastToClients(); err != nil {
-				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 			}
 		} else {
 			return fmt.Errorf("No remote registration")
@@ -143,7 +144,7 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
-			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
 		docker.StartContainer(patp, "vere")
 		return nil
@@ -158,7 +159,7 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 			docker.StartContainer(patp, "vere")
 			if err := broadcast.BroadcastToClients(); err != nil {
-				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 			}
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		} else if shipConf.BootStatus == "boot" {
@@ -170,7 +171,7 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 			docker.StopContainerByName(patp)
 			if err := broadcast.BroadcastToClients(); err != nil {
-				config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 			}
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
@@ -202,7 +203,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	} else {
 		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
 	}
-	config.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
+	logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 	return nil
 }
 
@@ -219,7 +220,7 @@ func LogoutHandler(msg []byte) error {
 
 // return the unauth payload
 func UnauthHandler() ([]byte, error) {
-	config.Logger.Info("Sending unauth broadcast")
+	logger.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",
 		AuthLevel: "unauthorized",
@@ -234,7 +235,7 @@ func UnauthHandler() ([]byte, error) {
 		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
 	}
 	// if err := conn.Write(websocket.TextMessage, resp); err != nil {
-	// 	config.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
+	// 	logger.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
 	// 	return
 	// }
 	return resp, nil
@@ -256,10 +257,10 @@ func StartramHandler(msg []byte) error {
 			return fmt.Errorf("Failed registration: %v", err)
 		}
 		if err := startram.RegisterExistingShips(); err != nil {
-			config.Logger.Error(fmt.Sprintf("Unable to register ships: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Unable to register ships: %v", err))
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
-			config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 		}
 	case "regions":
 		if err := broadcast.LoadStartramRegions(); err != nil {
@@ -280,7 +281,7 @@ func PwHandler(msg []byte) error {
 	}
 	switch pwPayload.Payload.Action {
 	case "modify":
-		config.Logger.Info("Setting new password")
+		logger.Logger.Info("Setting new password")
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
 			update := map[string]interface{}{

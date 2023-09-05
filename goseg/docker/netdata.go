@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"os"
 	"path/filepath"
 
@@ -11,7 +12,7 @@ import (
 )
 
 func LoadNetdata() error {
-	config.Logger.Info("Loading NetData container")
+	logger.Logger.Info("Loading NetData container")
 	confPath := filepath.Join(config.BasePath, "settings", "netdata.json")
 	_, err := os.Open(confPath)
 	if err != nil {
@@ -20,14 +21,14 @@ func LoadNetdata() error {
 		if err != nil {
 			// panic if we can't create it
 			errmsg := fmt.Sprintf("Unable to create NetData config! %v", err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			panic(errmsg)
 		}
 	}
-	config.Logger.Info("Running NetData")
+	logger.Logger.Info("Running NetData")
 	info, err := StartContainer("netdata", "netdata")
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error starting NetData: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Error starting NetData: %v", err))
 		return err
 	}
 	config.UpdateContainerState("netdata", info)

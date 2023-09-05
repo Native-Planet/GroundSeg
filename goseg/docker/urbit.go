@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/defaults"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -17,15 +18,15 @@ import (
 
 // load existing urbits from config json
 func LoadUrbits() error {
-	config.Logger.Info("Loading Urbit ships")
+	logger.Logger.Info("Loading Urbit ships")
 	// Loop through pier list
 	conf := config.Conf()
 	for _, pier := range conf.Piers {
-		config.Logger.Info(fmt.Sprintf("Loading pier %s", pier))
+		logger.Logger.Info(fmt.Sprintf("Loading pier %s", pier))
 		// load json into struct
 		err := config.LoadUrbitConfig(pier)
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+			logger.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
 			continue
 		}
 		shipConf := config.UrbitConf(pier)
@@ -33,7 +34,7 @@ func LoadUrbits() error {
 		if shipConf.BootStatus != "noboot" {
 			info, err := StartContainer(pier, "vere")
 			if err != nil {
-				config.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				logger.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(pier, info)
@@ -86,7 +87,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			config.Logger.Warn("Unable to reset %s boot script!", containerName)
+			logger.Logger.Warn("Unable to reset %s boot script!", containerName)
 		}
 	}
 	// write the script

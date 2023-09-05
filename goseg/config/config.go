@@ -8,12 +8,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"goseg/broadcastbus"
 	"goseg/defaults"
+	"goseg/logger"
 	"goseg/structs"
 	"io"
 	"io/ioutil"
-	"log/slog"
 	"math/rand"
 	"net"
 	"os"
@@ -24,7 +23,6 @@ import (
 )
 
 var (
-	Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
@@ -48,12 +46,12 @@ var (
 
 // try initializing from system.json on disk
 func init() {
-	Logger.Info("Starting GroundSeg")
-	Logger.Info("Urbit is love <3")
+	logger.Logger.Info("Starting GroundSeg")
+	logger.Logger.Info("Urbit is love <3")
 	for _, arg := range os.Args[1:] {
 		// trigger this with `./groundseg dev`
 		if arg == "dev" {
-			Logger.Info("Starting GroundSeg in debug mode")
+			logger.Logger.Info("Starting GroundSeg in debug mode")
 			DebugMode = true
 		}
 	}
@@ -62,7 +60,7 @@ func init() {
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
 	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
-	Logger.Info(pathMsg)
+	logger.Logger.Info(pathMsg)
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	file, err := os.Open(confPath)
 	if err != nil {
@@ -71,14 +69,14 @@ func init() {
 		if err != nil {
 			// panic if we can't create it
 			errmsg := fmt.Sprintf("Unable to create config! Please elevate permissions. %v", err)
-			Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			panic(errmsg)
 		}
 		// generate and insert wireguard keys
 		wgPriv, wgPub, err := WgKeyGen()
 		salt := RandString(32)
 		if err != nil {
-			Logger.Error(fmt.Sprintf("%v", err))
+			logger.Logger.Error(fmt.Sprintf("%v", err))
 		} else {
 			err = UpdateConf(map[string]interface{}{
 				"pubkey":  wgPub,
@@ -86,7 +84,7 @@ func init() {
 				"salt":    salt,
 			})
 			if err != nil {
-				Logger.Error(fmt.Sprintf("%v", err))
+				logger.Logger.Error(fmt.Sprintf("%v", err))
 			}
 		}
 	}
@@ -96,7 +94,7 @@ func init() {
 	err = decoder.Decode(&globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
@@ -106,37 +104,37 @@ func init() {
 	hash, err := getSHA256(filepath.Join(BasePath, "groundseg"))
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting binary sha256 hash: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	globalConfig.BinHash = hash
-	Logger.Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
+	logger.Logger.Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
 
 	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshaling JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	err = json.Unmarshal(configBytes, &configMap)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error unmarshaling JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	err = persistConf(configMap)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error persisting JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	file, err = os.Open(confPath)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error opening JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 	decoder = json.NewDecoder(file)
 	err = decoder.Decode(&globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	}
 }
 
@@ -214,9 +212,8 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 		res, _ := json.Marshal(containerState)
 		logMsg = string(res)
 	}
-	Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
 	contMutex.Unlock()
-	broadcastbus.BroadcastBus <- structs.Event{Type: "container", Data: "placeholder"} //containerState}
+	logger.Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
 }
 
 // get the current container state
@@ -254,7 +251,7 @@ func NetCheck(netCheck string) bool {
 	conn, err := net.DialTimeout("tcp", netCheck, timeout)
 	if err != nil {
 		errmsg := fmt.Sprintf("Check internet access error: %v", err)
-		Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 	} else {
 		internet = true
 		_ = conn.Close()
@@ -267,7 +264,7 @@ func RandString(length int) string {
 	randBytes := make([]byte, length)
 	_, err := rand.Read(randBytes)
 	if err != nil {
-		Logger.Warn("Random error :s")
+		logger.Logger.Warn("Random error :s")
 		return ""
 	}
 	return base64.URLEncoding.EncodeToString(randBytes)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/structs"
 
 	"github.com/docker/docker/api/types"
@@ -21,7 +22,7 @@ func DockerListener() {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return
 	}
 	messages, errs := cli.Events(ctx, types.EventsOptions{})
@@ -31,7 +32,7 @@ func DockerListener() {
 			// Convert the Docker event to our custom event and send it to the EventBus
 			eventBus <- structs.Event{Type: event.Action, Data: event}
 		case err := <-errs:
-			config.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
 		}
 	}
 }
@@ -43,14 +44,14 @@ func DockerSubscriptionHandler() {
 		event := <-eventBus
 		dockerEvent, ok := event.Data.(events.Message)
 		if !ok {
-			config.Logger.Error("Failed to assert Docker event data type")
+			logger.Logger.Error("Failed to assert Docker event data type")
 			continue
 		}
 		contName := dockerEvent.Actor.Attributes["name"]
 		switch dockerEvent.Action {
 
 		case "stop":
-			config.Logger.Info(fmt.Sprintf("Docker: %s stopped", contName))
+			logger.Logger.Info(fmt.Sprintf("Docker: %s stopped", contName))
 
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "stopped"
@@ -63,9 +64,10 @@ func DockerSubscriptionHandler() {
 			}
 
 		case "start":
-			config.Logger.Info(fmt.Sprintf("Docker: %s started", contName))
+			logger.Logger.Info(fmt.Sprintf("Docker: %s started", contName))
 
 			containerState, exists := config.GetContainerState()[contName]
+			logger.Logger.Warn(fmt.Sprintf("%+v", containerState)) // temp
 			if exists {
 				containerState.ActualStatus = "running"
 				config.UpdateContainerState(contName, containerState)
@@ -73,7 +75,7 @@ func DockerSubscriptionHandler() {
 			}
 
 		case "die":
-			config.Logger.Warn(fmt.Sprintf("Docker: %s died!", contName))
+			logger.Logger.Warn(fmt.Sprintf("Docker: %s died!", contName))
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "died"
 				// we don't want infinite restart loop
@@ -84,7 +86,7 @@ func DockerSubscriptionHandler() {
 
 		default:
 			if config.DebugMode == true {
-				config.Logger.Info(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
+				logger.Logger.Info(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 			}
 		}
 	}

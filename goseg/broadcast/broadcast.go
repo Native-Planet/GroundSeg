@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/auth"
-	"goseg/broadcastbus"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
@@ -39,25 +39,13 @@ func init() {
 	if err := bootstrapBroadcastState(); err != nil {
 		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
 	}
-	//broadcastState = broadcast
-	go processBroadcastLoop()
-}
-
-func processBroadcastLoop() {
-	for {
-		event, ok := <-broadcastbus.BroadcastBus
-		if !ok {
-			config.Logger.Error("Failed to assert Docker event data type")
-		}
-		config.Logger.Warn(fmt.Sprintf("processBroadcast Loop Type: %v %v", event.Type, event.Data)) // temp
-	}
 }
 
 // take in config file and addt'l info to initialize broadcast
 func bootstrapBroadcastState() error {
-	config.Logger.Info("Bootstrapping state")
+	logger.Logger.Info("Bootstrapping state")
 	// this returns a map of ship:running status
-	config.Logger.Info("Resolving pier status")
+	logger.Logger.Info("Resolving pier status")
 	urbits, err := constructPierInfo()
 	if err != nil {
 		return err
@@ -68,7 +56,7 @@ func bootstrapBroadcastState() error {
 	mu.Unlock()
 	// get startram regions
 	if err := LoadStartramRegions(); err != nil {
-		config.Logger.Warn("%v", err)
+		logger.Logger.Warn("%v", err)
 	}
 	// update with system state
 	sysInfo := constructSystemInfo()
@@ -78,13 +66,12 @@ func bootstrapBroadcastState() error {
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	//go newShipStatusLoop()
 	return nil
 }
 
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
-	config.Logger.Info("Retrieving StarTram region info")
+	logger.Logger.Info("Retrieving StarTram region info")
 	regions, err := startram.GetRegions()
 	if err != nil {
 		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
@@ -110,13 +97,13 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 	pierStatus, err := docker.GetShipStatus(piers)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return updates, err
 	}
 	hostName, err := os.Hostname()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting hostname, defaulting to `nativeplanet`: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		hostName = "nativeplanet"
 	}
 	// convert the running status into bools
@@ -125,7 +112,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		err := config.LoadUrbitConfig(pier)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to load %s config: %v", pier, err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			continue
 		}
 		dockerConfig := config.UrbitConf(pier)
@@ -134,7 +121,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		dockerStats, err = docker.GetContainerStats(pier)
 		if err != nil {
 			//errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err) // temporary supress
-			//config.Logger.Error(errmsg)
+			//logger.Logger.Error(errmsg)
 			continue
 		}
 		urbit := structs.Urbit{}
@@ -195,7 +182,7 @@ func GetContainerNetworks(containers []string) map[string]string {
 		network, err := docker.GetContainerNetwork(container)
 		if err != nil {
 			//errmsg := fmt.Sprintf("Error getting container network: %v", err) // temporary supress
-			//config.Logger.Error(errmsg)
+			//logger.Logger.Error(errmsg)
 			continue
 		} else {
 			res[container] = network
@@ -324,7 +311,7 @@ func GetStateJson() ([]byte, error) {
 	broadcastJson, err := json.Marshal(bState)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshalling response: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return nil, err
 	}
 	return broadcastJson, nil
@@ -371,7 +358,7 @@ func shipStatusLoop() {
 		case <-ticker.C:
 			updates, err := constructPierInfo()
 			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
+				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
 			}
 			mu.Lock()

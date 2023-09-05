@@ -4,19 +4,21 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"goseg/config"
+	"goseg/logger"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 func LoadWireguard() error {
-	config.Logger.Info("Loading Startram Wireguard container")
+	logger.Logger.Info("Loading Startram Wireguard container")
 	confPath := filepath.Join(config.BasePath, "settings", "wireguard.json")
 	_, err := os.Open(confPath)
 	if err != nil {
@@ -32,10 +34,10 @@ func LoadWireguard() error {
 	if err != nil {
 		return err
 	}
-	config.Logger.Info("Running Wireguard")
+	logger.Logger.Info("Running Wireguard")
 	info, err := StartContainer("wireguard", "wireguard")
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error starting wireguard: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Error starting wireguard: %v", err))
 		return err
 	}
 	config.UpdateContainerState("wireguard", info)
@@ -89,12 +91,12 @@ func WriteWgConf() error {
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
-		config.Logger.Info("Creating WG config")
+		logger.Logger.Info("Creating WG config")
 		return writeWgConfToFile(filePath, newConf)
 	}
 	if string(existingConf) != newConf {
 		// If they differ, overwrite
-		config.Logger.Info("Updating WG config")
+		logger.Logger.Info("Updating WG config")
 		return writeWgConfToFile(filePath, newConf)
 	}
 	return nil
@@ -167,7 +169,7 @@ func copyFileToVolume(filePath string, targetPath string, volumeName string) err
 	}
 	defer func() {
 		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
-			config.Logger.Error("Failed to remove temporary container: ", removeErr)
+			logger.Logger.Error("Failed to remove temporary container: ", removeErr)
 		}
 	}()
 	return nil

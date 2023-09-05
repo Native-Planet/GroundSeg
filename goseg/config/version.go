@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/defaults"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"net/http"
@@ -36,7 +37,7 @@ func CheckVersion() (structs.Channel, bool) {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to connect to update server: %v", err)
-			Logger.Warn(errmsg)
+			logger.Logger.Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -50,7 +51,7 @@ func CheckVersion() (structs.Channel, bool) {
 		resp.Body.Close()
 		if err != nil {
 			errmsg := fmt.Sprintf("Error reading version info: %v", err)
-			Logger.Warn(errmsg)
+			logger.Logger.Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -63,7 +64,7 @@ func CheckVersion() (structs.Channel, bool) {
 		err = json.Unmarshal(body, &fetchedVersion)
 		if err != nil {
 			errmsg := fmt.Sprintf("Error unmarshalling JSON: %v", err)
-			Logger.Warn(errmsg)
+			logger.Logger.Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -78,7 +79,7 @@ func CheckVersion() (structs.Channel, bool) {
 		file, err := os.Create(confPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to create file: %v", err)
-			Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			VersionServerReady = false
 			return VersionInfo, false
 		}
@@ -87,7 +88,7 @@ func CheckVersion() (structs.Channel, bool) {
 		encoder.SetIndent("", "    ")
 		if err := encoder.Encode(&fetchedVersion); err != nil {
 			errmsg := fmt.Sprintf("Failed to write JSON: %v", err)
-			Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 		}
 		VersionServerReady = true
 		return VersionInfo, true
@@ -125,7 +126,7 @@ func LocalVersion() structs.Version {
 		if err != nil {
 			// panic if we can't create it
 			errmsg := fmt.Sprintf("Unable to write version info! %v", err)
-			Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			panic(errmsg)
 		}
 	}

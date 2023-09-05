@@ -3,6 +3,7 @@ package routines
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/structs"
 	"io"
 	"net/http"
@@ -34,7 +35,7 @@ func CheckVersionLoop() {
 				latestHash = latestVersion.Groundseg.Arm64Sha256
 			}
 			if currentHash != latestHash {
-				config.Logger.Info("GroundSeg Binary update!")
+				logger.Logger.Info("GroundSeg Binary update!")
 				// updateBinary will likely restart the program, so
 				// we don't have to care about the docker updates.
 				updateBinary(releaseChannel, latestVersion)
@@ -64,13 +65,13 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		versionInfo.Groundseg.Major, versionInfo.Groundseg.Minor,
 		versionInfo.Groundseg.Patch, displayedBranch,
 	)
-	config.Logger.Info(msg)
+	logger.Logger.Info(msg)
 	// delete old instance of groundseg_new if it exists
 	if _, err := os.Stat(filepath.Join(config.BasePath, "groundseg_new")); err == nil {
 		// Remove the file
-		config.Logger.Info("Deleting old groundseg_new download")
+		logger.Logger.Info("Deleting old groundseg_new download")
 		if err := os.Remove(filepath.Join(config.BasePath, "groundseg_new")); err != nil {
-			config.Logger.Error(fmt.Sprintf("Failed to remove old instance of groundseg_new: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Failed to remove old instance of groundseg_new: %v", err))
 			return
 		}
 	}
@@ -81,69 +82,69 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// Create a new HTTP GET request
 	resp, err := http.Get(url)
-	config.Logger.Info(fmt.Sprintf("Downloading new GroundSeg binary from %v", url))
+	logger.Logger.Info(fmt.Sprintf("Downloading new GroundSeg binary from %v", url))
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to download new GroundSeg binary: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to download new GroundSeg binary: %v", err))
 		return
 	}
 	defer resp.Body.Close()
 
 	// Create a new file to save the downloaded content
-	config.Logger.Info("Creating groundseg_new")
+	logger.Logger.Info("Creating groundseg_new")
 	file, err := os.Create(filepath.Join(config.BasePath, "groundseg_new"))
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
 		return
 	}
 	defer file.Close()
-	config.Logger.Info("Writing groundseg_new contents")
+	logger.Logger.Info("Writing groundseg_new contents")
 	// Write the contents from the HTTP response to the new file
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to write contents: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
 	// Chmod groundseg_new
-	config.Logger.Info("Modifying groundseg_new permissions")
+	logger.Logger.Info("Modifying groundseg_new permissions")
 	if err := os.Chmod(filepath.Join(config.BasePath, "groundseg_new"), 0755); err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to write contents: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
 	// delete groundseg binary if exists
-	config.Logger.Info("Deleting old groundseg")
+	logger.Logger.Info("Deleting old groundseg")
 	if _, err := os.Stat(filepath.Join(config.BasePath, "groundseg")); err == nil {
 		// Remove the file
 		if err := os.Remove(filepath.Join(config.BasePath, "groundseg")); err != nil {
-			config.Logger.Error(fmt.Sprintf("Failed to remove old instance of groundseg: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Failed to remove old instance of groundseg: %v", err))
 			return
 		}
 	}
 	// rename groundseg_new to groundseg
-	config.Logger.Info("Renaming groundseg_new to groundseg")
+	logger.Logger.Info("Renaming groundseg_new to groundseg")
 	oldPath := filepath.Join(config.BasePath, "groundseg_new")
 	newPath := filepath.Join(config.BasePath, "groundseg")
 	if err := os.Rename(oldPath, newPath); err != nil {
-		config.Logger.Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
 	}
 	// systemctl restart groundseg
 	if config.DebugMode {
-		config.Logger.Info("DebugMode detected. Skipping systemd command. Exiting istead..")
+		logger.Logger.Info("DebugMode detected. Skipping systemd command. Exiting istead..")
 		os.Exit(0)
 	} else {
-		config.Logger.Info("Restarting GroundSeg systemd service")
+		logger.Logger.Info("Restarting GroundSeg systemd service")
 		cmd := exec.Command("systemctl", "restart", "groundseg")
 		err := cmd.Run()
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("Failed to restart systemd service: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Failed to restart systemd service: %v", err))
 			return
 		}
 	}
 }
 
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
-	config.Logger.Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
-	config.Logger.Info(fmt.Sprintf(
+	logger.Logger.Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
+	logger.Logger.Info(fmt.Sprintf(
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
 		release, currentVersion, latestVersion,
 	))
