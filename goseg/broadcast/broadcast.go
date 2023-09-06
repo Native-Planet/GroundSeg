@@ -361,9 +361,11 @@ func shipStatusLoop() {
 				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
 			}
-			mu.Lock()
-			broadcastState.Urbits = updates
-			mu.Unlock()
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
+			newState.Urbits = updates
+			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}
 	}

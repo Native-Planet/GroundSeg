@@ -86,7 +86,6 @@ func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 func WsAuthCheck(conn *websocket.Conn) bool {
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-
 	for _, client := range ClientManager.AuthClients {
 		if client.Conn == conn {
 			logger.Logger.Info("Client is in auth map")
