@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/defaults"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -17,15 +18,15 @@ import (
 
 // load existing urbits from config json
 func LoadUrbits() error {
-	config.Logger.Info("Loading Urbit ships")
+	logger.Logger.Info("Loading Urbit ships")
 	// Loop through pier list
 	conf := config.Conf()
 	for _, pier := range conf.Piers {
-		config.Logger.Info(fmt.Sprintf("Loading pier %s", pier))
+		logger.Logger.Info(fmt.Sprintf("Loading pier %s", pier))
 		// load json into struct
 		err := config.LoadUrbitConfig(pier)
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+			logger.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
 			continue
 		}
 		shipConf := config.UrbitConf(pier)
@@ -33,7 +34,7 @@ func LoadUrbits() error {
 		if shipConf.BootStatus != "noboot" {
 			info, err := StartContainer(pier, "vere")
 			if err != nil {
-				config.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				logger.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(pier, info)
@@ -86,18 +87,18 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			config.Logger.Warn("Unable to reset %s boot script!", containerName)
+			logger.Logger.Warn("Unable to reset %s boot script!", containerName)
 		}
 	}
 	// write the script
-	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", containerName, "start_urbit.sh")
+	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
 	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	// gather boot option values
 	shipName := shipConf.PierName
-	loomValue := string(shipConf.LoomSize)
+	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
 	dirnameValue := shipConf.PierName
 	var devMode string
 	if shipConf.DevMode == true {
@@ -111,29 +112,51 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
-		httpPort = string(shipConf.WgHTTPPort)
-		amesPort = string(shipConf.WgAmesPort)
+		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
+		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
+		containerConfig = container.Config{
+			Image: desiredImage,
+			Cmd: []string{
+				"bash",
+				"/urbit/start_urbit.sh",
+				shipName,
+				"--loom=" + loomValue,
+				"--dirname=" + dirnameValue,
+				"--devmode=" + devMode,
+				"--http-port=" + httpPort,
+				"--port=" + amesPort,
+			},
+		}
 	} else {
-		httpPort = string(shipConf.HTTPPort)
-		amesPort = string(shipConf.AmesPort)
+		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
+		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
 		network = "default"
-		httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
-		amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
+		//httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
+		//amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
+		// Port mapping
 		portMap = nat.PortMap{
-			httpPortStr: []nat.PortBinding{
+			"80/tcp": []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: httpPort},
 			},
-			amesPortStr: []nat.PortBinding{
+			"34343/udp": []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: amesPort},
 			},
 		}
+		// finally construct the container config structs
+		containerConfig = container.Config{
+			Image: desiredImage,
+			Cmd: []string{
+				"bash",
+				"/urbit/start_urbit.sh",
+				shipName,
+				"--loom=" + loomValue,
+				"--dirname=" + dirnameValue,
+				"--devmode=" + devMode,
+			},
+		}
 	}
-	// finally construct the container config structs
-	containerConfig = container.Config{
-		Image:      desiredImage,
-		Entrypoint: []string{scriptPath, shipName, "--loom=" + loomValue, "--dirname=" + dirnameValue, "--dev-mode=" + devMode, "--http-port=" + httpPort, "--port=" + amesPort},
-	}
+
 	mounts := []mount.Mount{
 		{
 			Type:   mount.TypeBind,

@@ -2,16 +2,18 @@ package docker
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"goseg/config"
+	"goseg/logger"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 )
 
 func LoadMC() error {
-	config.Logger.Info("Loading MC container")
+	logger.Logger.Info("Loading MC container")
 	confPath := filepath.Join(config.BasePath, "settings", "mc.json")
 	_, err := os.Open(confPath)
 	if err != nil {
@@ -20,13 +22,13 @@ func LoadMC() error {
 		if err != nil {
 			// error if we can't create it
 			errmsg := fmt.Sprintf("Unable to create MC config! %v", err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 		}
 	}
-	config.Logger.Info("Running MC")
+	logger.Logger.Info("Running MC")
 	info, err := StartContainer("mc", "miniomc")
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error starting MC: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Error starting MC: %v", err))
 		return err
 	}
 	config.UpdateContainerState("mc", info)
@@ -36,14 +38,14 @@ func LoadMC() error {
 // iterate through each ship and create a minio
 // version stuff is offloaded to version server struct
 func LoadMinIOs() error {
-	config.Logger.Info("Loading MinIO containers")
+	logger.Logger.Info("Loading MinIO containers")
 	conf := config.Conf()
 	for _, pier := range conf.Piers {
 		// uConf := config.UrbitConf(pier)
 		label := "minio_" + pier
 		info, err := StartContainer(label, "minio")
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
+			logger.Logger.Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
 			return err
 		}
 		config.UpdateContainerState(label, info)
