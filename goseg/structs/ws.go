@@ -202,8 +202,10 @@ type WsStartramPayload struct {
 }
 
 type WsStartramAction struct {
-	Type   string `json:"type"`
-	Action string `json:"action"`
-	Key    string `json:"key"`
-	Region string `json:"region"`
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Key      string `json:"key"`
+	Region   string `json:"region"`
+	Endpoint string `json:"endpoint"`
+	Reset    bool   `json:"reset"`
 }
