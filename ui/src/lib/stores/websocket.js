@@ -248,7 +248,6 @@ export const startramGetRegions = () => {
 }
 
 export const startramRegister = (key,region) => {
-  console.log("starst")
   let payload = {
     "type":"startram",
     "action":"register",

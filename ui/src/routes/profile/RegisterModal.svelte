@@ -6,50 +6,67 @@
   export let isOpen
   let key = ''
   let selected = 'us-east'
-  $: regions = $structure?.profile?.startram?.info?.regions || {}
+  $: info = ($structure?.profile?.startram?.info) || {}
+  $: transition = ($structure?.profile?.startram?.transition) || {}
+  $: regions = info?.regions || {}
   $: regionKeys = Object.keys(regions)
-  $: tRegister = ($structure?.profile?.startram?.transition?.register) || null
+  $: tRegister = (transition?.register) || null
+  // debug
+  //let tRegister = "key"
+  let completed = false
+
   onMount(()=>startramGetRegions())
   afterUpdate(()=>{
-    if (tRegister == "done") {
-      closeModal()
+    if (completed) {
+      if (tRegister == null) {
+        closeModal()
+      }
+    } else {
+      if (tRegister == "complete") {
+        completed = true
+      }
     }
   })
 </script>
 
 {#if isOpen}
   <Modal>
-    <div class="wrapper">
-      <h1>Register New Key</h1>
-      <p>Entering a new key will replace the current one</p>
-      <h2>New Key</h2>
-      <input disabled={tRegister != null} type="password" placeholder="NativePlanet-something-something" bind:value={key} />
-      {#if regionKeys.length > 0}
-        <h2>Select Region</h2>
-        <div class="regions">
-          {#each regionKeys as r}
-            <div
-              class="region"
-              class:highlight={r == selected}
-              on:click={()=>selected=r}>
-              {regions[r].desc}
-            </div>
-          {/each}
-        </div>
-      {/if}
-      <button
-        disabled={(key.length < 1) || (tRegister != null)}
-        on:click={()=>startramRegister(key,selected)}
-        >
-        {#if tRegister == "loading"}
-          Updating StarTram..
-        {:else if tRegister == "success"}
-          Success!
-        {:else}
-          Save
+    {#if tRegister == null}
+      <div class="wrapper">
+        <h1>Register New Key</h1>
+        <p>Entering a new key will replace the current one</p>
+        <h2>New Key</h2>
+        <input disabled={tRegister != null} type="password" placeholder="NativePlanet-something-something" bind:value={key} />
+        {#if regionKeys.length > 0}
+          <h2>Select Region</h2>
+          <div class="regions">
+            {#each regionKeys as r}
+              <div
+                class="region"
+                class:highlight={r == selected}
+                on:click={()=>selected=r}>
+                {regions[r].desc}
+              </div>
+            {/each}
+          </div>
         {/if}
-      </button>
-    </div>
+        <button
+          disabled={(key.length < 1) || (tRegister != null)}
+          on:click={()=>startramRegister(key,selected)}
+          >Save
+        </button>
+      </div>
+    {:else if tRegister == "key"}
+      <div class="notify">Registering your key</div>
+    {:else if tRegister == "services"}
+      <div class="notify">Pending service registration: [ship list]</div>
+    {:else if tRegister == "starting"}
+      <div class="notify">Configuring your StarTram client</div>
+    {:else if tRegister == "complete"}
+      <div class="success">StarTram Key Registration Successful!</div>
+    {:else}
+      {tRegister}
+    {/if}
   </Modal>
 {/if}
 
@@ -127,5 +144,29 @@
   button:disabled {
     pointer-events: none;
     opacity: .6;
+  }
+  .notify {
+    padding: 120px 0px;
+    font-size: 24px;
+    text-align: center;
+    animation: breathe 5s infinite;
+    color: var(--btn-secondary);
+  }
+  .success {
+    padding: 120px 0px;
+    font-size: 24px;
+    text-align: center;
+    color: var(--btn-primary);
+  }
+  @keyframes breathe {
+    0% {
+      opacity: .2;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: .2;
+    }
   }
 </style>
