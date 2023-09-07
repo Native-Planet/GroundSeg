@@ -91,7 +91,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		}
 	}
 	// write the script
-	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", containerName, "start_urbit.sh")
+	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
 	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
@@ -115,26 +115,48 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
+		containerConfig = container.Config{
+			Image: desiredImage,
+			Cmd: []string{
+				"bash",
+				"/urbit/start_urbit.sh",
+				shipName,
+				"--loom=" + loomValue,
+				"--dirname=" + dirnameValue,
+				"--devmode=" + devMode,
+				"--http-port=" + httpPort,
+				"--port=" + amesPort,
+			},
+		}
 	} else {
 		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
 		network = "default"
-		httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
-		amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
+		//httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
+		//amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
+		// Port mapping
 		portMap = nat.PortMap{
-			httpPortStr: []nat.PortBinding{
+			"80/tcp": []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: httpPort},
 			},
-			amesPortStr: []nat.PortBinding{
+			"34343/udp": []nat.PortBinding{
 				{HostIP: "0.0.0.0", HostPort: amesPort},
 			},
 		}
+		// finally construct the container config structs
+		containerConfig = container.Config{
+			Image: desiredImage,
+			Cmd: []string{
+				"bash",
+				"/urbit/start_urbit.sh",
+				shipName,
+				"--loom=" + loomValue,
+				"--dirname=" + dirnameValue,
+				"--devmode=" + devMode,
+			},
+		}
 	}
-	// finally construct the container config structs
-	containerConfig = container.Config{
-		Image:      desiredImage,
-		Entrypoint: []string{scriptPath, shipName, "--loom=" + loomValue, "--dirname=" + dirnameValue, "--dev-mode=" + devMode, "--http-port=" + httpPort, "--port=" + amesPort},
-	}
+
 	mounts := []mount.Mount{
 		{
 			Type:   mount.TypeBind,
