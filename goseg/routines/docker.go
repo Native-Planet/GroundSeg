@@ -3,6 +3,7 @@ package routines
 import (
 	"context"
 	"fmt"
+	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
@@ -60,18 +61,17 @@ func DockerSubscriptionHandler() {
 				if containerState.DesiredStatus != "stopped" {
 					docker.StartContainer(contName, containerState.Type)
 				}
-				//broadcast.BroadcastToClients()
+				broadcast.BroadcastToClients()
 			}
 
 		case "start":
 			logger.Logger.Info(fmt.Sprintf("Docker: %s started", contName))
 
 			containerState, exists := config.GetContainerState()[contName]
-			logger.Logger.Warn(fmt.Sprintf("%+v", containerState)) // temp
 			if exists {
 				containerState.ActualStatus = "running"
 				config.UpdateContainerState(contName, containerState)
-				//broadcast.BroadcastToClients()
+				broadcast.BroadcastToClients()
 			}
 
 		case "die":
@@ -81,7 +81,7 @@ func DockerSubscriptionHandler() {
 				// we don't want infinite restart loop
 				containerState.DesiredStatus = "died"
 				config.UpdateContainerState(contName, containerState)
-				//broadcast.BroadcastToClients()
+				broadcast.BroadcastToClients()
 			}
 
 		default:
