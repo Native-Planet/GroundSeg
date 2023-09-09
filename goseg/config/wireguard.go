@@ -80,3 +80,18 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 	publicKey := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
 	return privateKey.String(), publicKey, nil
 }
+
+// cycle on re-reg
+func CycleWgKey() error {
+	pub, priv, err := WgKeyGen()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Couldn't reset WG keys: %v",err))
+	}
+	if err := UpdateConf(map[string]interface{}{
+		"pubkey":  pub,
+		"privkey": priv,
+	}); err != nil {
+		return fmt.Errorf(fmt.Sprintf("Couldn't update new WG keys: %v",err))
+	}
+	return nil
+}

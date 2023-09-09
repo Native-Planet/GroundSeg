@@ -339,7 +339,7 @@ func backoffRetrieve() error {
 func RegisterExistingShips() error {
 	conf := config.Conf()
 	if conf.WgRegistered {
-		for ship, _ := range config.UrbitConfAll() {
+		for _, ship := range conf.Piers {
 			if err := SvcCreate(ship, "urbit"); err != nil {
 				logger.Logger.Error("Couldn't register pier: ", ship)
 			}

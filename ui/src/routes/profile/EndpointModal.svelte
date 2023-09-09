@@ -1,165 +1,133 @@
 <script>
-  import { onMount, afterUpdate } from 'svelte'
+  import { afterUpdate } from 'svelte'
   import { structure, startramEndpoint } from '$lib/stores/websocket'
-  import { showEndpointModal } from './store'
+  import { closeModal } from 'svelte-modals'
+  import Modal from '$lib/Modal.svelte'
+  export let isOpen
 
   let success = false
   let newEndpoint = ''
 
-  $: info = ($structure?.profile?.startram?.info) || {}
-  $: endpoint = (info?.endpoint) || "api.startram.io"
+  $: endpoint = ($structure?.profile?.startram?.info?.endpoint) || ""
+  $: transition = ($structure?.profile?.startram?.transition) || {}
+  $: tEndpoint = (transition?.endpoint) || ""
+
+  let completed = false
+
+  afterUpdate(()=>{
+    if (completed) {
+      if (tEndpoint.length < 1) {
+        closeModal()
+      }
+    } else {
+      if (tEndpoint == "complete") {
+        completed = true
+      }
+    }
+  })
 </script>
 
-<div class="wrapper">
-  <div class="modal">
-    <div class="warning">Modifying your endpoint removes previous StarTram configuration</div>
-    <div class="name">Current Endpoint</div>
-    <div class="endpoint">{endpoint}</div>
-    <div class="name">New Endpoint</div>
-    <input placeholder="example.endpoint.com" type="text" bind:value={newEndpoint} />
+{#if isOpen}
+<Modal>
+  {#if tEndpoint.length < 1}
+    <div class="wrapper">
+      <!-- Info -->
+      <h1>Edit Endpoint</h1>
+      <p>Modifying your endpoint removes previous StarTram configuration</p>
 
-    <div class="buttons">
+      <!-- Replacement Endpoint -->
+      <h2>New Endpoint</h2>
+      <input placeholder="example.endpoint.com" type="text" bind:value={newEndpoint} />
+
       <button
-        class="btn-cancel"
-        on:click={()=>showEndpointModal.set(false)}
-        >Back
-      </button>
-      <button
-        class="btn-activate"
         disabled={(newEndpoint.length < 1) || (newEndpoint == endpoint)} 
         on:click={()=>startramEndpoint(newEndpoint)}
         >Set New Endpoint
       </button>
     </div>
-
-  </div>
-</div>
+  {:else if tEndpoint == "init"}
+    <div class="notify">Loading</div>
+  {:else if tEndpoint == "unregistering"}
+    <div class="notify">Removing old configuration</div>
+  {:else if tEndpoint == "stopping"}
+    <div class="notify">Stopping StarTram</div>
+  {:else if tEndpoint == "configuring"}
+    <div class="notify">Applying new configuration</div>
+  {:else if tEndpoint == "finalizing"}
+    <div class="notify">Finishing up</div>
+  {:else if tEndpoint == "complete"}
+    <div class="success">Successfully edited endpoint!</div>
+  {:else}
+    {tEndpoint}
+  {/if}
+</Modal>
+{/if}
 
 <style>
-  .wrapper {
-    position:absolute;
-    left: 0;
-    top: 0;
-    backdrop-filter: blur(4px);
-    -moz-backdrop-filter: blur(4px);
-    -o-backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(4px);
-    width: 100vw;
-    height: 100vh;
-    background: #FFFFFF3D;
-  }
-  .modal {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: calc(50vh - (392px/2));
-    left: calc(50vw - (572px/2));
-    background: var(--bg-modal);
-    width: calc(572px - 80px);
-    height: calc(392px - 80px);
-    border-radius: 16px;
-    padding: 40px;
-    gap: 12px;
-  }
-  .header {
-    font-family: var(--regular-font);
-    font-size: 14px;
-  }
-  .regions {
-    display: flex;
-    gap: 20px;
-  }
-  .region {
-    font-size: 12px;
-    font-family: var(--regular-font);
-    color: var(--text-color);
-    border: solid 2px var(--btn-secondary);
-    border-radius: 12px;
-    padding: 8px 0;
+  .notify {
+    padding: 120px 0px;
+    font-size: 24px;
     text-align: center;
-    flex: 1;
-    cursor: pointer;
+    animation: breathe 5s infinite;
+    color: var(--btn-secondary);
   }
-  .highlight {
-    color: var(--text-card-color);
-    background-color: var(--btn-secondary);
+  .success {
+    padding: 120px 0px;
+    font-size: 24px;
+    text-align: center;
+    color: var(--btn-primary);
   }
-  .name {
+  .wrapper {
+    margin: 20px;
     font-family: var(--regular-font);
-    font-size: 12px;
-    margin-top: 12px;
   }
-  .activate {
-    display: flex;
-    gap: 20px;
+  h1 {
+    font-size: 14px;
+    font-weight: 500;
   }
-  .btn-activate {
-    background: var(--btn-primary);
-    padding: 0 20px;
-    color: var(--text-card-color);
-    border-radius: 12px;
+  p {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 300;
+    margin-bottom: 20px;
+    opacity: .8;
   }
-  .btn-cancel {
-    background: var(--btn-secondary);
-    padding: 8px 20px;
-    color: var(--text-card-color);
-    border-radius: 12px;
-  }
-  .btn-activate:disabled {
-    background: var(--btn-secondary);
-    color: var(--text-color);
-    opacity: .6;
-  }
-  .buttons {
-    margin-top: 30px;
-    display: flex;
-    height: 36px;
-    gap: 20px;
-  }
-  button:hover {
-    cursor: pointer;
-  }
-  button {
-    font-family: var(--regular-font);
-    flex: 1;
-  }
-  .endpoint {
-    font-family: var(--regular-font);
-    font-size: 12px;
-    width: calc(100% - 24px);
-    line-height: 36px;
-    border: solid 2px var(--btn-secondary);
-    border-radius: 12px;
-    background: none;
-    padding-left: 20px;
+  h2 {
+    font-size: 14px;
+    font-weight: 300;
+    margin: 0;
+    color: var(--btn-secondary);
+    font-weight: 500;
   }
   input {
+    font-size: 14px;
+    margin: 8px 0 20px 0;
+    background: var(--bg-modal);
+    border-radius: 12px;
     width: calc(100% - 24px);
-    line-height: 36px;
-    border: solid 2px var(--btn-secondary);
+    border: none;
+    padding: 12px;
+  }
+  input:focus {
+    outline: none;
+  }
+  input:disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
+  button {
+    margin-top: 48px;
+    background-color: var(--btn-secondary);
     border-radius: 12px;
-    background: none;
-    padding-left: 20px;
+    color: var(--text-card-color);
+    height: 42px;
+    padding: 0 64px;
+    font-family: var(--regular-font);
+    font-size: 12px;
+    cursor: pointer;
   }
-  input:active, :focus {
-    outline: none; 
-  }
-  .get {
-    font-family: var(--title-font);
-    position: absolute;
-    bottom: 20px;
-    color: var(--text-color);
-    font-size: 14px;
-    text-decoration: underline;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .warning {
-    font-size: 14px;
-    text-align: center;
-    background-color: var(--bg-warning);
-    padding: 20px;
-    border-radius: 12px;
+  button:disabled {
+    pointer-events: none;
+    opacity: .6;
   }
 </style>

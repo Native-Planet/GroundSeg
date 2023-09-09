@@ -79,8 +79,9 @@ type Startram struct {
 		Regions    map[string]StartramRegion `json:"regions"`
 	} `json:"info"`
 	Transition struct {
-		Register any `json:"register"`
-		Toggle   any `json:"toggle"`
+		Endpoint string `json:"endpoint"`
+		Register any    `json:"register"`
+		Toggle   any    `json:"toggle"`
 	} `json:"transition"`
 }
 

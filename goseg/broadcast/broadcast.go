@@ -54,14 +54,15 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.Urbits = urbits
 	mu.Unlock()
-	// get startram regions
-	if err := LoadStartramRegions(); err != nil {
-		logger.Logger.Warn("%v", err)
-	}
 	// update with system state
 	sysInfo := constructSystemInfo()
 	mu.Lock()
 	broadcastState.System = sysInfo
+	mu.Unlock()
+	// update with profile state
+	profileInfo := constructProfileInfo()
+	mu.Lock()
+	broadcastState.Profile = profileInfo
 	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
@@ -157,6 +158,33 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		updates[pier] = urbit
 	}
 	return updates, nil
+}
+
+func constructProfileInfo() structs.Profile {
+	// Build startram struct
+	var startramInfo structs.Startram
+	// Information from config
+	conf := config.Conf()
+	startramInfo.Info.Registered = conf.WgRegistered
+	startramInfo.Info.Running = conf.WgOn
+	startramInfo.Info.Endpoint = conf.EndpointUrl
+
+	// Information from startram
+	startramInfo.Info.Region = nil // temp
+	startramInfo.Info.Expiry = nil // temp
+	startramInfo.Info.Renew = true // temp
+
+	// Get Regions
+	regions, err := startram.GetRegions()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't get StarTram regions: %v", err))
+	} else {
+		startramInfo.Info.Regions = regions
+	}
+	// Build profile struct
+	var profile structs.Profile
+	profile.Startram = startramInfo
+	return profile
 }
 
 // put together the system[usage] subobject

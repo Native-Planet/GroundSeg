@@ -5,9 +5,9 @@
   export let registered
 </script>
 
-<div class="wrapper">
-  <div class="title">STARTRAM</div>
-  {#if registered}
+{#if registered}
+  <div class="wrapper">
+    <div class="title">STARTRAM</div>
     <div class="info-wrapper">
       <div class="info">
         <div class="item">Autorenew</div>
@@ -18,16 +18,20 @@
         <div class="item">{expiry}</div>
       </div>
     </div>
-  {:else}
+  </div>
+{:else}
+  <div>
+    <div class="title">STARTRAM</div>
     <div class="info-box">Not Registered</div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   .wrapper {
     width: 30%;
   }
   .title {
+    font-size: 32px;
     margin-bottom: 12px;
   }
   .info-wrapper {
@@ -42,12 +46,13 @@
   }
   .info-box {
     border: solid 1px var(--text-color);
-    width: 120px;
-    padding: 8px 0;
-    border-radius: 12px;
-    text-align: center;
-    font-size: 12px;
+    padding: 16px;
+    border-radius: 16px;
     opacity: .6;
+    /* text */
+    text-align: center;
+    font-size: 15px;
+    line-height: 32px;
   }
   .item {
     font-size: 14px;

@@ -1,7 +1,6 @@
 .container {
   background-color: var(--bg-base);
   color: var(--text-color);
-  margin: auto;
   border-radius: 16px;
   backdrop-filter: blur(2px);
   -moz-backdrop-filter: blur(2px);
