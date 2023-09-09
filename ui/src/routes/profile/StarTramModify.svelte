@@ -5,15 +5,15 @@
 
   import { structure } from '$lib/stores/websocket'
 
-  //$: info = ($structure?.profile?.startram?.info) || {}
-  //$: endpoint = (info?.endpoint) || ""
+  $: info = ($structure?.profile?.startram?.info) || {}
+  $: endpoint = (info?.endpoint) || ""
 </script>
 
 <div class="wrapper">
   <div class="item">
     <div class="label">Endpoint</div>
     <div class="data">
-      <div class="data-text">api.startram.io</div>
+      <div class="data-text">{endpoint}</div>
       <button
       on:click={()=>openModal(EndpointModal)}
       >Edit</button>

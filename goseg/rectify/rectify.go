@@ -72,6 +72,23 @@ func RectifyUrbit() {
 	for {
 		event := <-startram.EventBus
 		switch event.Type {
+		case "endpoint":
+			//init - started
+			// unregistering - startram services unregistering
+			// stopping - wireguard stopping
+			// configuring - reset pubkey
+			// finalizing - modifying endpoint
+			// complete - successfully changed endpoint
+			// Error: <text> - Error with info
+			// nil/null - Empty, ready for action
+			current := broadcast.GetState()
+			if event.Data != nil {
+				current.Profile.Startram.Transition.Endpoint = fmt.Sprintf("%v", event.Data)
+			} else {
+				current.Profile.Startram.Transition.Endpoint = ""
+			}
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
 		case "register":
 			// key - registering startram key
 			// services - registering startram services

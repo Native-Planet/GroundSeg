@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/broadcast"
+	"goseg/config"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -85,11 +86,39 @@ func handleStartramRegister(regCode, region string) {
 
 // endpoint action
 func handleStartramEndpoint(endpoint string) {
-	// stop wireguard
-	// unregister startram services
-	// set endpoint
-	// reset pubkey
-	handleNotImplement("endpoint")
+	startram.EventBus <- structs.Event{Type: "endpoint", Data: "init"}
+	conf := config.Conf()
+	// stop wireguard if running
+	if conf.WgOn {
+		startram.EventBus <- structs.Event{Type: "endpoint", Data: "stopping"}
+		// logic here
+	}
+	// Wireguard registered
+	if conf.WgRegistered {
+		// unregister startram services if exists
+		startram.EventBus <- structs.Event{Type: "endpoint", Data: "unregistering"}
+		// logic here
+
+		// reset pubkey
+		startram.EventBus <- structs.Event{Type: "endpoint", Data: "configuring"}
+		// logic here
+	}
+	time.Sleep(1 * time.Second) // temp
+	// set endpoint to config and persist
+	startram.EventBus <- structs.Event{Type: "endpoint", Data: "finalizing"}
+	time.Sleep(1 * time.Second) // temp
+	// logic here
+
+	// Finish
+	startram.EventBus <- structs.Event{Type: "endpoint", Data: "complete"}
+
+	// debug
+	//time.Sleep(2 * time.Second)
+	//handleError("Self inflicted error for debug purposes")
+
+	// Clear
+	time.Sleep(3 * time.Second)
+	startram.EventBus <- structs.Event{Type: "endpoint", Data: nil}
 }
 
 func handleStartramCancel(key string, reset bool) {
