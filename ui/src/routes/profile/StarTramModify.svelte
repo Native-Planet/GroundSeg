@@ -7,6 +7,8 @@
 
   $: info = ($structure?.profile?.startram?.info) || {}
   $: endpoint = (info?.endpoint) || ""
+  $: registered = (info?.registered) || false
+  $: region = (info?.region) || ""
 </script>
 
 <div class="wrapper">
@@ -20,13 +22,15 @@
     </div>
   </div>
 
-  <div class="item">
-    <div class="label">Region</div>
-    <div class="data">
-      <div class="data-text">US East</div>
-      <button>Edit</button>
+  {#if registered && (region.length > 0)}
+    <div class="item">
+      <div class="label">Region</div>
+      <div class="data">
+        <div class="data-text">US East</div>
+        <button>Edit</button>
+      </div>
     </div>
-  </div>
+  {/if}
 </div>
 
 <style>

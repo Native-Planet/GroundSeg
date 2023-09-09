@@ -87,6 +87,10 @@ func RectifyUrbit() {
 			} else {
 				current.Profile.Startram.Transition.Endpoint = ""
 			}
+			if event.Data == "complete" {
+				conf := config.Conf()
+				current.Profile.Startram.Info.Endpoint = conf.EndpointUrl
+			}
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "register":

@@ -50,12 +50,20 @@ func handleStartramRegions() {
 
 func handleStartramRegister(regCode, region string) {
 	// error handling
-	//handleError := func(errmsg string) {
-	//	msg := fmt.Sprintf("Error: %s", errmsg)
-	//	startram.EventBus <- structs.Event{Type: "register", Data: msg}
-	//}
-	// Register key
+	handleError := func(errmsg string) {
+		msg := fmt.Sprintf("Error: %s", errmsg)
+		startram.EventBus <- structs.Event{Type: "register", Data: msg}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "register", Data: nil}
+	}
 	startram.EventBus <- structs.Event{Type: "register", Data: "key"}
+	// Reset Key Pair
+	err := config.CycleWgKey()
+	if err != nil {
+		handleError(fmt.Sprintf("%v", err))
+		return
+	}
+	// Register startram key
 	time.Sleep(2 * time.Second) // temp
 	//if err := startram.Register(regCode, region); err != nil {
 	//	handleError(fmt.Sprintf("Failed registration: %v", err))
@@ -86,6 +94,14 @@ func handleStartramRegister(regCode, region string) {
 
 // endpoint action
 func handleStartramEndpoint(endpoint string) {
+	// error handling
+	handleError := func(errmsg string) {
+		msg := fmt.Sprintf("Error: %s", errmsg)
+		startram.EventBus <- structs.Event{Type: "endpoint", Data: msg}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "endpoint", Data: nil}
+	}
+	// initialize
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "init"}
 	conf := config.Conf()
 	// stop wireguard if running
@@ -98,16 +114,24 @@ func handleStartramEndpoint(endpoint string) {
 		// unregister startram services if exists
 		startram.EventBus <- structs.Event{Type: "endpoint", Data: "unregistering"}
 		// logic here
-
-		// reset pubkey
-		startram.EventBus <- structs.Event{Type: "endpoint", Data: "configuring"}
-		// logic here
 	}
 	time.Sleep(1 * time.Second) // temp
+	// reset pubkey
+	startram.EventBus <- structs.Event{Type: "endpoint", Data: "configuring"}
+	err := config.CycleWgKey()
+	if err != nil {
+		handleError(fmt.Sprintf("%v", err))
+		return
+	}
 	// set endpoint to config and persist
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "finalizing"}
-	time.Sleep(1 * time.Second) // temp
-	// logic here
+	err = config.UpdateConf(map[string]interface{}{
+		"endpointUrl": endpoint,
+	})
+	if err != nil {
+		handleError(fmt.Sprintf("%v", err))
+		return
+	}
 
 	// Finish
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "complete"}
