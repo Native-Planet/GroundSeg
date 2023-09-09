@@ -77,7 +77,8 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 		return "", "", fmt.Errorf("failed to generate private key: %v", err)
 	}
 	// derive pubkey and use startram encoding
-	publicKey := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
+	encoded := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
+	publicKey := base64.StdEncoding.EncodeToString([]byte(encoded))
 	return privateKey.String(), publicKey, nil
 }
 
