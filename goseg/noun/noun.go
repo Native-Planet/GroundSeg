@@ -177,7 +177,6 @@ func jamToStream(n Noun, out *bytes.Buffer) {
 		} else {
 			save(a)
 			zero()
-			fmt.Println(a.(int))
 			mat(a.(int))
 		}
 	}
@@ -214,7 +213,6 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 	rub := func() uint64 {
 		z := 0
 		for !one() {
-			fmt.Println("one z", z)
 			z++
 		}
 		if z == 0 {
@@ -222,15 +220,10 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 		}
 
 		below := z - 1
-		fmt.Println("below", below)
-
-		fmt.Println("cur", cur)
 		lbits := readBits(below)
-		fmt.Println("lbits", lbits)
 
 		bex := uint64(1 << below)
 		val := readBits(int(bex ^ lbits))
-		fmt.Printf("Read value: %d from bits: %d\n", val, z) // <-- Add this line
 		return val
 	}
 
@@ -240,7 +233,6 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 		if one() {
 			if one() {
 				refValue := int(rub())
-				fmt.Printf("Back reference value: %d\n", refValue) // <-- Add this line
 				ret = refs[refValue]
 			} else {
 				head, newCur := r(cur)
@@ -249,7 +241,6 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 				cur = newCur
 			}
 		} else {
-			fmt.Println("Processing atom") // <-- Add this line
 			ret = rub()
 		}
 		refs[start] = ret
@@ -359,11 +350,13 @@ func main() {
 	//fmt.Println(jam(1234567890987654321))
 	//fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
 
-	//fmt.Println(cue(big.NewInt(569056)))
+  i := new(big.Int)
+  i.SetString("1569560238373119425266963811040232206341",10)
+	fmt.Println(pretty(cue(i),false))
 
-	jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
+	//jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
 	//fmt.Println(jam(jtest))
-	fmt.Println(pretty(cue(jam(jtest)), false))
+	//fmt.Println(pretty(cue(jam(jtest)), false))
 
 	// Test pretty
 	/*
