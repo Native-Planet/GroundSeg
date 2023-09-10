@@ -36,10 +36,10 @@
   {#if !isSend}
     <div class="wrapper">
       {#if info == "shutdown"}
-        <div class="header">TURN OFF DEVICE</div>
+        <div class="header">Shutdown</div>
         <div class="name">You are about to turn off your device. Continue?</div>
       {:else if info == "restart"}
-        <div class="header">RESTART DEVICE</div>
+        <div class="header">Restart</div>
         <div class="name">You are about to restart your device. Continue?</div>
       {/if}
       <button on:click={handleButton}>
@@ -59,37 +59,50 @@
 
 <style>
   .wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-radius: 16px;
-    padding: 40px;
-    gap: 24px;
+    padding: 32px;
   }
   .header {
-    font-family: var(--title-font);
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
     font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
   }
   .name {
-    width: 100%;
-    padding: 16px 0;
-    font-family: var(--regular-font);
-    font-size: 12px;
-    background: var(--bg-warning);
-    border-radius: 12px;
-    text-align: center;
-    font-weight: 600;
+    color: var(--text-color, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    max-width: 365px;
+    margin: 64px 0;
   }
   button {
-    background: black;
-    font-family: var(--regular-font);
-    color: var(--text-card-color);
-    flex: 1;
-    padding: 12px 48px;
+    display: inline-flex;
+    padding: 24px 48px;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    background: #000;
     border-radius: 16px;
-  }
-  button:hover {
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
     cursor: pointer;
   }
   .transition-shutdown {

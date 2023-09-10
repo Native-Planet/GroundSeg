@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -18,7 +19,6 @@ import (
 )
 
 var (
-	EventBus        = make(chan structs.Event, 100)
 	UTransBus       = make(chan structs.UrbitTransition, 100)
 	NewShipTransBus = make(chan structs.NewShipTransition, 100)
 )
@@ -29,13 +29,13 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return statuses, err
 	} else {
 		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			return statuses, err
 		} else {
 			for _, pier := range patps {
@@ -126,7 +126,7 @@ func CreateVolume(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	config.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
+	logger.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
 	return nil
 }
 
@@ -144,7 +144,7 @@ func DeleteVolume(name string) error {
 		errmsg := fmt.Errorf("Failed to remove docker volume: %v : %v", name, err)
 		return errmsg
 	}
-	config.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
+	logger.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
 	return nil
 }
 
@@ -163,7 +163,7 @@ func DeleteContainer(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	config.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
+	logger.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
 	return nil
 }
 
@@ -188,7 +188,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
 		return errmsg
 	}
-	config.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
+	logger.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
 }
 
@@ -202,11 +202,13 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	var containerConfig container.Config
 	// host config for container
 	var hostConfig container.HostConfig
+	// init error
+	var err error
 	// switch on containerType to process containerConfig
 	switch containerType {
 	case "vere":
-		// containerConfig, HostConfig, err := urbitContainerConf(containerName)
-		_, _, err := urbitContainerConf(containerName)
+		containerConfig, hostConfig, err = urbitContainerConf(containerName)
+		//_, _, err := urbitContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
@@ -234,56 +236,26 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
 	}
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	// get the desired tag and hash from config
+	imageInfo, err := GetLatestContainerInfo(containerType)
 	if err != nil {
 		return containerState, err
 	}
-	// get the desired tag and hash from config
-	containerInfo, err := GetLatestContainerInfo(containerType)
+	// check if the desired image is available locally
+	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+	_, err = PullImageIfNotExist(desiredImage, imageInfo)
 	if err != nil {
 		return containerState, err
 	}
 	// check if container exists
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	existingContainer, err := FindContainer(containerName)
 	if err != nil {
 		return containerState, err
 	}
-	var existingContainer *types.Container = nil
-	for _, container := range containers {
-		for _, name := range container.Names {
-			if name == "/"+containerName {
-				existingContainer = &container
-				break
-			}
-		}
-		if existingContainer != nil {
-			break
-		}
-	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
-	desiredStatus := "running"
-	// check if the desired image is available locally
-	images, err := cli.ImageList(ctx, types.ImageListOptions{})
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return containerState, err
-	}
-	imageExistsLocally := false
-	for _, img := range images {
-		if img.ID == containerInfo["hash"] {
-			imageExistsLocally = true
-			break
-		}
-		if imageExistsLocally {
-			break
-		}
-	}
-	if !imageExistsLocally {
-		// pull the image if it doesn't exist locally
-		_, err = cli.ImagePull(ctx, desiredImage, types.ImagePullOptions{})
-		if err != nil {
-			return containerState, err
-		}
 	}
 	switch {
 	case existingContainer == nil:
@@ -297,7 +269,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
-		config.Logger.Info(msg)
+		logger.Logger.Info(msg)
 	case existingContainer.State == "exited":
 		// if the container exists but is stopped, start it
 		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
@@ -305,7 +277,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
-		config.Logger.Info(msg)
+		logger.Logger.Info(msg)
 	default:
 		// if container is running, check the image digest
 		currentImage := existingContainer.Image
@@ -314,7 +286,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if len(digestParts) > 1 {
 			currentDigest = digestParts[1]
 		}
-		if currentDigest != containerInfo["hash"] {
+		if currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
 			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
@@ -331,13 +303,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				return containerState, err
 			}
 			msg := fmt.Sprintf("Restarted %s with image %s", containerName, desiredImage)
-			config.Logger.Info(msg)
+			logger.Logger.Info(msg)
 		}
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
 	}
+	desiredStatus := "running"
 	// save the current state of the container in memory for reference
 	containerState = structs.ContainerState{
 		ID:            containerDetails.ID,           // container id hash
@@ -413,7 +386,7 @@ func StopContainerByName(containerName string) error {
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
 					return fmt.Errorf("failed to stop container %s: %v", containerName, err)
 				}
-				config.Logger.Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
+				logger.Logger.Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
 				return nil
 			}
 		}
@@ -421,24 +394,53 @@ func StopContainerByName(containerName string) error {
 	return fmt.Errorf("container with name %s not found", containerName)
 }
 
-// subscribe to docker events and feed them into eventbus
-func DockerListener() {
+// pull the image if it doesn't exist locally
+func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
-		return
+		return false, err
 	}
-	messages, errs := cli.Events(ctx, types.EventsOptions{})
-	for {
-		select {
-		case event := <-messages:
-			// Convert the Docker event to our custom event and send it to the EventBus
-			EventBus <- structs.Event{Type: event.Action, Data: event}
-		case err := <-errs:
-			config.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
+	// check if the desired image is available locally
+	images, err := cli.ImageList(ctx, types.ImageListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, img := range images {
+		if img.ID == imageInfo["hash"] {
+			return true, nil
 		}
 	}
+	_, err = cli.ImagePull(ctx, desiredImage, types.ImagePullOptions{})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// FindContainer looks for a container with the given name and returns it, or nil if not found
+func FindContainer(containerName string) (*types.Container, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// Fetch list of running containers
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+
+	// Search for the container with the given name
+	for _, container := range containers {
+		for _, name := range container.Names {
+			if strings.TrimPrefix(name, "/") == containerName {
+				return &container, nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 // periodically poll docker in case we miss something
@@ -447,7 +449,7 @@ func DockerPoller() {
 	for {
 		select {
 		case <-ticker.C:
-			config.Logger.Info("polling docker")
+			logger.Logger.Info("polling docker")
 			// todo (maybe not necessary?)
 			// fetch the status of all containers and compare with app's state
 			// if there's a change, send an event to the EventBus

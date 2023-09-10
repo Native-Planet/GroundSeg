@@ -6,11 +6,13 @@ import (
 	"goseg/auth"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
 	"math"
 	"os"
+
 	// "reflect"
 	"strings"
 	"sync"
@@ -41,9 +43,9 @@ func init() {
 
 // take in config file and addt'l info to initialize broadcast
 func bootstrapBroadcastState() error {
-	config.Logger.Info("Bootstrapping state")
+	logger.Logger.Info("Bootstrapping state")
 	// this returns a map of ship:running status
-	config.Logger.Info("Resolving pier status")
+	logger.Logger.Info("Resolving pier status")
 	urbits, err := constructPierInfo()
 	if err != nil {
 		return err
@@ -52,25 +54,25 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.Urbits = urbits
 	mu.Unlock()
-	// get startram regions
-	if err := LoadStartramRegions(); err != nil {
-		config.Logger.Warn("%v", err)
-	}
 	// update with system state
 	sysInfo := constructSystemInfo()
 	mu.Lock()
 	broadcastState.System = sysInfo
 	mu.Unlock()
+	// update with profile state
+	profileInfo := constructProfileInfo()
+	mu.Lock()
+	broadcastState.Profile = profileInfo
+	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	//go newShipStatusLoop()
 	return nil
 }
 
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
-	config.Logger.Info("Retrieving StarTram region info")
+	logger.Logger.Info("Retrieving StarTram region info")
 	regions, err := startram.GetRegions()
 	if err != nil {
 		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
@@ -96,13 +98,13 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 	pierStatus, err := docker.GetShipStatus(piers)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return updates, err
 	}
 	hostName, err := os.Hostname()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting hostname, defaulting to `nativeplanet`: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		hostName = "nativeplanet"
 	}
 	// convert the running status into bools
@@ -111,7 +113,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		err := config.LoadUrbitConfig(pier)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to load %s config: %v", pier, err)
-			config.Logger.Error(errmsg)
+			logger.Logger.Error(errmsg)
 			continue
 		}
 		dockerConfig := config.UrbitConf(pier)
@@ -119,8 +121,8 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		var dockerStats structs.ContainerStats
 		dockerStats, err = docker.GetContainerStats(pier)
 		if err != nil {
-			errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err)
-			config.Logger.Error(errmsg)
+			//errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err) // temp surpress
+			//logger.Logger.Error(errmsg)
 			continue
 		}
 		urbit := structs.Urbit{}
@@ -158,6 +160,33 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 	return updates, nil
 }
 
+func constructProfileInfo() structs.Profile {
+	// Build startram struct
+	var startramInfo structs.Startram
+	// Information from config
+	conf := config.Conf()
+	startramInfo.Info.Registered = conf.WgRegistered
+	startramInfo.Info.Running = conf.WgOn
+	startramInfo.Info.Endpoint = conf.EndpointUrl
+
+	// Information from startram
+	startramInfo.Info.Region = nil // temp
+	startramInfo.Info.Expiry = nil // temp
+	startramInfo.Info.Renew = true // temp
+
+	// Get Regions
+	regions, err := startram.GetRegions()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't get StarTram regions: %v", err))
+	} else {
+		startramInfo.Info.Regions = regions
+	}
+	// Build profile struct
+	var profile structs.Profile
+	profile.Startram = startramInfo
+	return profile
+}
+
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
 	var ramObj []uint64
@@ -180,8 +209,8 @@ func GetContainerNetworks(containers []string) map[string]string {
 	for _, container := range containers {
 		network, err := docker.GetContainerNetwork(container)
 		if err != nil {
-			errmsg := fmt.Sprintf("Error getting container network: %v", err)
-			config.Logger.Error(errmsg)
+			//errmsg := fmt.Sprintf("Error getting container network: %v", err)
+			//logger.Logger.Error(errmsg) // temp surpress
 			continue
 		} else {
 			res[container] = network
@@ -310,7 +339,7 @@ func GetStateJson() ([]byte, error) {
 	broadcastJson, err := json.Marshal(bState)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshalling response: %v", err)
-		config.Logger.Error(errmsg)
+		logger.Logger.Error(errmsg)
 		return nil, err
 	}
 	return broadcastJson, nil
@@ -322,6 +351,7 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
+
 	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
@@ -338,12 +368,13 @@ func hostStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
+			update := constructSystemInfo()
 			mu.RLock()
 			newState := broadcastState
 			mu.RUnlock()
-			update := constructSystemInfo()
 			newState.System = update
 			UpdateBroadcast(newState)
+			BroadcastToClients()
 		}
 	}
 }
@@ -357,7 +388,7 @@ func shipStatusLoop() {
 		case <-ticker.C:
 			updates, err := constructPierInfo()
 			if err != nil {
-				config.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
+				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
 			}
 			mu.RLock()

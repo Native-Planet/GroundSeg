@@ -77,22 +77,21 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 		return "", "", fmt.Errorf("failed to generate private key: %v", err)
 	}
 	// derive pubkey and use startram encoding
-	encoded := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
-	publicKey := base64.StdEncoding.EncodeToString([]byte(encoded))
+	publicKey := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
 	return privateKey.String(), publicKey, nil
 }
 
 // cycle on re-reg
 func CycleWgKey() error {
-	pub, priv, err := WgKeyGen()
+	priv, pub, err := WgKeyGen()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Couldn't reset WG keys: %v",err))
+		return fmt.Errorf(fmt.Sprintf("Couldn't reset WG keys: %v", err))
 	}
 	if err := UpdateConf(map[string]interface{}{
 		"pubkey":  pub,
 		"privkey": priv,
 	}); err != nil {
-		return fmt.Errorf(fmt.Sprintf("Couldn't update new WG keys: %v",err))
+		return fmt.Errorf(fmt.Sprintf("Couldn't update new WG keys: %v", err))
 	}
 	return nil
 }

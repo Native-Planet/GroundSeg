@@ -12,8 +12,10 @@ import (
 	"goseg/broadcast"
 	"goseg/config"
 	"goseg/handler"
+	"goseg/logger"
 	"goseg/structs"
 	"net/http"
+
 	// "time"
 
 	"github.com/gorilla/websocket"
@@ -34,7 +36,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conf := config.Conf()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		config.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
 	tokenId := config.RandString(32)
@@ -62,21 +64,21 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
-				config.Logger.Info("WS closed")
+				logger.Logger.Info("WS closed")
 				conn.Close()
 			}
-			config.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
 		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
-			config.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
+			logger.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
-			config.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
+			logger.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
 			continue
 		}
 		token := map[string]string{
@@ -93,76 +95,76 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "pier_upload":
-				config.Logger.Info("Pier upload")
+				logger.Logger.Info("Pier upload")
 			case "password":
 				if err = handler.PwHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "system":
 				if err = handler.SystemHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "startram":
 				if err = handler.StartramHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "urbit":
 				if err = handler.UrbitHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "support":
 				if err = handler.SupportHandler(msg, payload, r, conn); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "broadcast":
 				if err := broadcast.BroadcastToClients(); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 					ack = "nack"
 				}
 			case "login":
 				// already authed so lets get you on the map
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 					ack = "nack"
 				}
 			case "logout":
 				if err := handler.LogoutHandler(msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("Error logging out client: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Error logging out client: %v", err))
 					ack = "nack"
 				}
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
 				if err := MuCon.Write(resp); err != nil {
-					config.Logger.Warn("Unable to broadcast to unauth client")
+					logger.Logger.Warn("Unable to broadcast to unauth client")
 				}
 			case "verify":
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
-				config.Logger.Warn(errmsg)
+				logger.Logger.Warn(errmsg)
 				if err := broadcast.BroadcastToClients(); err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 				ack = "nack"
 			}
@@ -177,7 +179,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			respJson, err := json.Marshal(result)
 			if err != nil {
 				errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
-				config.Logger.Error(errmsg)
+				logger.Logger.Error(errmsg)
 			}
 			if err := MuCon.Write(respJson); err != nil {
 				continue
@@ -187,19 +189,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			switch msgType.Payload.Type {
 			case "login":
 				if err = handler.LoginHandler(MuCon, msg); err != nil {
-					config.Logger.Error(fmt.Sprintf("%v", err))
+					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 				broadcast.BroadcastToClients()
 			case "setup":
-				config.Logger.Info("Setup")
+				logger.Logger.Info("Setup")
 				// setup.Setup(payload)
 			case "verify":
-				config.Logger.Info("New client")
+				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
 				newToken, err := auth.CreateToken(conn, r, false)
 				if err != nil {
-					config.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 					ack = "nack"
 				}
 				result := map[string]interface{}{
@@ -211,7 +213,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				respJson, err := json.Marshal(result)
 				if err != nil {
-					config.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
 					ack = "nack"
 				}
 				if err := MuCon.Write(respJson); err != nil {
@@ -220,10 +222,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					config.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
 				if err := MuCon.Write(resp); err != nil {
-					config.Logger.Warn("Unable to broadcast to unauth client")
+					logger.Logger.Warn("Unable to broadcast to unauth client")
 				}
 				ack = "nack"
 			}
@@ -238,7 +240,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		respJson, err := json.Marshal(result)
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
 		}
 		if err := MuCon.Write(respJson); err != nil {
 			continue

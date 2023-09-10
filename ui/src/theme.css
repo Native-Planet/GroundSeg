@@ -30,6 +30,8 @@ body {
   --text-color: #313933;
   --text-card-color: #F8F8F6;
   --boot-selector-color: #F1F2EE;
+  --bg-boot-arrow: #ABBAAE;
   --locked-color: #A31708;
   font-family: var(--regular-font);
 }
+

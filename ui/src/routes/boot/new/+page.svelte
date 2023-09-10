@@ -5,7 +5,6 @@
   import NotFree from './NotFree.svelte'
 
   $: tBootStage = ($structure?.newShip?.transition?.bootStage) || ""
-
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">

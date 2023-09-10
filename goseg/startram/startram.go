@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
 	"math"
@@ -24,14 +25,14 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 	resp, err := http.Get(regionUrl)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to connect to API server: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return regions, err
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading regions info: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return regions, err
 	}
 	// unmarshal values into struct
@@ -39,7 +40,7 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 	if err != nil {
 		errmsg := fmt.Sprintf("Error unmarshalling regions json: %v", err)
 		fmt.Println(string(body))
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return regions, err
 	}
 	return regions, nil
@@ -53,7 +54,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	resp, err := http.Get(regionUrl)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to connect to API server: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return retrieve, err
 	}
 	// read response body
@@ -61,7 +62,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	resp.Body.Close()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading retrieve info: %v", err)
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return retrieve, err
 	}
 	// unmarshal values into struct
@@ -69,25 +70,25 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	if err != nil {
 		errmsg := fmt.Sprintf("Error unmarshalling retrieve json: %v", err)
 		fmt.Println(string(body))
-		config.Logger.Warn(errmsg)
+		logger.Logger.Warn(errmsg)
 		return retrieve, err
 	}
 	regStatus := true
 	if retrieve.Status != "No record" {
 		// pin that ho to the global vars
 		config.StartramConfig = retrieve
-		config.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
+		logger.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
 	} else {
 		regStatus = false
 		return retrieve, fmt.Errorf("No registration record")
 	}
 	if conf.WgRegistered != regStatus {
-		config.Logger.Info("Updating registration status")
+		logger.Logger.Info("Updating registration status")
 		err = config.UpdateConf(map[string]interface{}{
 			"wgRegistered": regStatus,
 		})
 		if err != nil {
-			config.Logger.Error(fmt.Sprintf("%v", err))
+			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
 	if regStatus {
@@ -100,7 +101,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 
 // register your pubkey
 func Register(regCode string, region string) error {
-	config.Logger.Info(fmt.Sprintf("Submitting registration in %s", region))
+	logger.Logger.Info(fmt.Sprintf("Submitting registration in %s", region))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/register"
 	var regObj structs.StartramRegister
@@ -149,7 +150,7 @@ func Register(regCode string, region string) error {
 
 // create a service
 func SvcCreate(subdomain string, svcType string) error {
-	config.Logger.Info(fmt.Sprintf("Creating new %s registrations: %s", svcType, subdomain))
+	logger.Logger.Info(fmt.Sprintf("Creating new %s registrations: %s", svcType, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create"
 	var createObj structs.StartramSvc
@@ -186,7 +187,7 @@ func SvcCreate(subdomain string, svcType string) error {
 
 // delete a service
 func SvcDelete(subdomain string, svcType string) error {
-	config.Logger.Info(fmt.Sprintf("Deleting %s registration: %s", svcType, subdomain))
+	logger.Logger.Info(fmt.Sprintf("Deleting %s registration: %s", svcType, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create"
 	var delObj structs.StartramSvc
@@ -229,7 +230,7 @@ func SvcDelete(subdomain string, svcType string) error {
 
 // create a custom domain
 func AliasCreate(subdomain string, alias string) error {
-	config.Logger.Info(fmt.Sprintf("Registering alias %s for %s", alias, subdomain))
+	logger.Logger.Info(fmt.Sprintf("Registering alias %s for %s", alias, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create/alias"
 	var aliasObj structs.StartramAlias
@@ -266,7 +267,7 @@ func AliasCreate(subdomain string, alias string) error {
 
 // delete a custom domain
 func AliasDelete(subdomain string, alias string) error {
-	config.Logger.Info(fmt.Sprintf("Deleting alias %s for %s", alias, subdomain))
+	logger.Logger.Info(fmt.Sprintf("Deleting alias %s for %s", alias, subdomain))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/create/alias"
 	var delAliasObj structs.StartramAlias
@@ -315,13 +316,13 @@ func backoffRetrieve() error {
 	for {
 		_, err := Retrieve()
 		if err == nil {
-			config.Logger.Info("Registration retrieved")
+			logger.Logger.Info("Registration retrieved")
 			return nil
 		}
 		// timeout after 5min
 		if time.Since(startTime) > 5*time.Minute {
 			errmsg := fmt.Errorf("Registration retrieval timed out")
-			config.Logger.Error(fmt.Sprintf("%v", errmsg))
+			logger.Logger.Error(fmt.Sprintf("%v", errmsg))
 			return errmsg
 		}
 		// linear cooldown
@@ -338,12 +339,12 @@ func backoffRetrieve() error {
 func RegisterExistingShips() error {
 	conf := config.Conf()
 	if conf.WgRegistered {
-		for ship, _ := range config.UrbitConfAll() {
+		for _, ship := range conf.Piers {
 			if err := SvcCreate(ship, "urbit"); err != nil {
-				config.Logger.Error("Couldn't register pier: ", ship)
+				logger.Logger.Error("Couldn't register pier: ", ship)
 			}
 			if err := SvcCreate("s3."+ship, "minio"); err != nil {
-				config.Logger.Error("Couldn't register S3: ", ship)
+				logger.Logger.Error("Couldn't register S3: ", ship)
 			}
 		}
 		go backoffRetrieve()
