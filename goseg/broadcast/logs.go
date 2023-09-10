@@ -8,6 +8,7 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"io"
+	"io/ioutil"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -89,16 +90,19 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		return
 	}
 	defer dockerClient.Close()
-	// get previous logs
-	options := types.ContainerLogsOptions{ShowStdout: true, Tail: "all"}
+	// get previous logs as one chunk
+	options := types.ContainerLogsOptions{ShowStdout: true, Tail: "1000"}
 	existingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
 		return
 	}
-	sendLogs(MuCon, containerID.Payload.ContainerID, existingLogs)
+	allLogs, err := ioutil.ReadAll(existingLogs)
 	existingLogs.Close()
-	// stream logs (ongoing)
+	if err == nil && len(allLogs) > 0 {
+		sendChunkedLogs(MuCon, containerID.Payload.ContainerID, allLogs)
+	}
+	// stream logs line-by-line (ongoing)
 	options = types.ContainerLogsOptions{ShowStdout: true, Follow: true}
 	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
@@ -107,6 +111,21 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	}
 	defer streamingLogs.Close()
 	sendLogs(MuCon, containerID.Payload.ContainerID, streamingLogs)
+}
+
+func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
+	logString := extractLogMessage(logs)
+	message := structs.WsLogMessage{}
+	message.Log.ContainerID = containerID
+	message.Log.Line = logString
+	logJSON, err := json.Marshal(message)
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+		return
+	}
+	if err := MuCon.Write(logJSON); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+	}
 }
 
 func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader) {
