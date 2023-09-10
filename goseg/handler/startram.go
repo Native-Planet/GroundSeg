@@ -64,22 +64,18 @@ func handleStartramRegister(regCode, region string) {
 		return
 	}
 	// Register startram key
-	time.Sleep(2 * time.Second) // temp
-	//if err := startram.Register(regCode, region); err != nil {
-	//	handleError(fmt.Sprintf("Failed registration: %v", err))
-	//}
+	if err := startram.Register(regCode, region); err != nil {
+		handleError(fmt.Sprintf("Failed registration: %v", err))
+		return
+	}
 	// Register Services
 	startram.EventBus <- structs.Event{Type: "register", Data: "services"}
-	time.Sleep(2 * time.Second) // temp
-	//if err := startram.RegisterExistingShips(); err != nil {
-	//  handleError(fmt.Sprintf("Unable to register ships: %v", err))
-	//}
+	if err := startram.RegisterExistingShips(); err != nil {
+		handleError(fmt.Sprintf("Unable to register ships: %v", err))
+		return
+	}
 	// Start Wireguard
 	startram.EventBus <- structs.Event{Type: "register", Data: "starting"}
-	time.Sleep(2 * time.Second) // temp
-	//if err := broadcast.BroadcastToClients(); err != nil {
-	//	logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
-	//}
 	// Finish
 	startram.EventBus <- structs.Event{Type: "register", Data: "complete"}
 

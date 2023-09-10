@@ -107,10 +107,14 @@ func RectifyUrbit() {
 		case "retrieve":
 			for patp, _ := range config.UrbitConfAll() {
 				modified := false
+				serviceCreated := true
 				startramConfig := config.StartramConfig // a structs.StartramRetrieve
 				config.LoadUrbitConfig(patp)
 				local := config.UrbitConf(patp) // a structs.UrbitDocker
 				for _, remote := range startramConfig.Subdomains {
+					if remote.Status == "creating" {
+						serviceCreated = false
+					}
 					// for urbit web
 					subd := strings.Split(remote.URL, ".")[0]
 					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
@@ -161,6 +165,20 @@ func RectifyUrbit() {
 				if modified {
 					config.UpdateUrbitConfig(map[string]structs.UrbitDocker{patp: local})
 				}
+				current := broadcast.GetState()
+				urbitStruct, ok := current.Urbits[patp]
+				if ok {
+					if serviceCreated {
+						urbitStruct.Transition.ServiceRegistrationStatus = ""
+					} else {
+						urbitStruct.Transition.ServiceRegistrationStatus = "creating"
+					}
+
+					// Put the modified struct back into the map
+					current.Urbits[patp] = urbitStruct
+				}
+				broadcast.UpdateBroadcast(current)
+				broadcast.BroadcastToClients()
 			}
 		default:
 		}
