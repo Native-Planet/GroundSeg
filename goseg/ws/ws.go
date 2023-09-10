@@ -142,7 +142,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 			case "logs":
-				broadcast.StreamLogs(MuCon,msg)
+				broadcast.StreamLogs(MuCon, msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
@@ -203,7 +203,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			case "logs":
-				broadcast.StreamLogs(MuCon,msg)
+				broadcast.StreamLogs(MuCon, msg)
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {

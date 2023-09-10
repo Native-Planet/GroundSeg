@@ -13,9 +13,17 @@ import (
 	"github.com/docker/docker/client"
 )
 
+// log bytestream to string
+func extractLogMessage(data []byte) string {
+	if len(data) <= 8 {
+		return ""
+	}
+	return string(data[8:])
+}
+
 // stream logs for a given container to a ws client
 func StreamLogs(MuCon *structs.MuConn, msg []byte) {
-	var containerID  structs.WsLogsPayload
+	var containerID structs.WsLogsPayload
 	if err := json.Unmarshal(msg, &containerID); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 		return
@@ -41,9 +49,10 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 			break
 		}
 		if len(line) > 0 {
+			logString := extractLogMessage(line)
 			message := structs.WsLogMessage{}
 			message.Log.ContainerID = containerID.Payload.ContainerID
-			message.Log.Line = string(line)
+			message.Log.Line = logString
 			logJSON, err := json.Marshal(message)
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
