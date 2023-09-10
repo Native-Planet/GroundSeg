@@ -9,6 +9,8 @@ import (
 	"goseg/structs"
 	"io"
 	"io/ioutil"
+	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -20,6 +22,21 @@ func extractLogMessage(data []byte) string {
 		return ""
 	}
 	return string(data[8:])
+}
+
+// get the last line so we know when to start streaming
+func getLastLogLine(logs []byte) string {
+	lines := strings.Split(string(logs), "\n")
+	if len(lines) > 0 {
+		return lines[len(lines)-1]
+	}
+	return ""
+}
+
+func extractTimestamp(logLine string) (time.Time, error) {
+	layout := "2006-01-02 15:04:05"
+	timestampStr := logLine[:19]
+	return time.Parse(layout, timestampStr)
 }
 
 // stream logs for a given container to a ws client
@@ -99,6 +116,7 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	}
 	allLogs, err := ioutil.ReadAll(existingLogs)
 	existingLogs.Close()
+	lastTimestamp, _ := extractTimestamp(getLastLogLine(allLogs))
 	if err == nil && len(allLogs) > 0 {
 		sendChunkedLogs(MuCon, containerID.Payload.ContainerID, allLogs)
 	}
@@ -110,7 +128,7 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		return
 	}
 	defer streamingLogs.Close()
-	sendLogs(MuCon, containerID.Payload.ContainerID, streamingLogs)
+	sendLogs(MuCon, containerID.Payload.ContainerID, streamingLogs, lastTimestamp)
 }
 
 func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
@@ -128,7 +146,7 @@ func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
 	}
 }
 
-func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader) {
+func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader, lastTimestamp time.Time) {
 	reader := bufio.NewReader(logs)
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -136,18 +154,21 @@ func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader) {
 			break
 		}
 		if len(line) > 0 {
-			logString := extractLogMessage(line)
-			message := structs.WsLogMessage{}
-			message.Log.ContainerID = containerID
-			message.Log.Line = logString
-			logJSON, err := json.Marshal(message)
-			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-				break
-			}
-			if err := MuCon.Write(logJSON); err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-				break
+			logTimestamp, err := extractTimestamp(string(line))
+			if err == nil && logTimestamp.After(lastTimestamp) {
+				logString := extractLogMessage(line)
+				message := structs.WsLogMessage{}
+				message.Log.ContainerID = containerID
+				message.Log.Line = logString
+				logJSON, err := json.Marshal(message)
+				if err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+					break
+				}
+				if err := MuCon.Write(logJSON); err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+					break
+				}
 			}
 		}
 		if err == io.EOF {
