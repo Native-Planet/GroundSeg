@@ -123,6 +123,17 @@ type WsNewShipPayload struct {
 	Token   WsTokenStruct   `json:"token"`
 }
 
+type WsLogsPayload struct {
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Payload WsLogsAction `json:"payload"`
+	Token   WsTokenStruct  `json:"token"`
+}
+
+type WsLogsAction struct {
+	ContainerID    string `json:"container_id"`
+}
+
 type WsSystemPayload struct {
 	ID      string         `json:"id"`
 	Type    string         `json:"type"`

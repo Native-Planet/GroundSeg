@@ -41,25 +41,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenId := config.RandString(32)
 	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
-	// keepalive for ws
-	// MuCon.Conn.SetPongHandler(func(string) error {
-	// 	MuCon.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	// 	return nil
-	// })
-	// pingInterval := 15 * time.Second
-	// go func() {
-	// 	ticker := time.NewTicker(pingInterval)
-	// 	defer ticker.Stop()
-	// 	for {
-	// 		select {
-	// 		case <-ticker.C:
-	// 			if err := MuCon.Write([]byte("ping")); err != nil {
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// }()
-	// unsafe for mutex?
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -160,6 +141,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
+			case "logs":
+				broadcast.StreamLogs(MuCon,msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
