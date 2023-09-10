@@ -202,6 +202,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := MuCon.Write(respJson); err != nil {
 					continue
 				}
+			case "logs":
+				broadcast.StreamLogs(MuCon,msg)
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
