@@ -2,6 +2,7 @@ package broadcast
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,62 +43,6 @@ func extractTimestamp(logLine string) (time.Time, error) {
 	return time.Parse(layout, timestampStr)
 }
 
-// stream logs for a given container to a ws client
-// func StreamLogs(MuCon *structs.MuConn, msg []byte) {
-// 	var containerID structs.WsLogsPayload
-// 	if err := json.Unmarshal(msg, &containerID); err != nil {
-// 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-// 		return
-// 	}
-// 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-// 	if err != nil {
-// 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-// 		return
-// 	}
-// 	defer dockerClient.Close()
-// 	options := types.ContainerLogsOptions{ShowStdout: true, Tail: "all"}
-// 	existingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID, options)
-// 	if err != nil {
-// 		logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
-// 		return
-// 	}
-// 	sendLogs(conn, containerID, existingLogs)
-// 	existingLogs.Close()
-
-// 	options := types.ContainerLogsOptions{ShowStdout: true, Follow: true}
-// 	logs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
-// 	if err != nil {
-// 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-// 		return
-// 	}
-// 	defer logs.Close()
-// 	reader := bufio.NewReader(logs)
-// 	for {
-// 		line, err := reader.ReadBytes('\n')
-// 		if err != nil && err != io.EOF {
-// 			break
-// 		}
-// 		if len(line) > 0 {
-// 			logString := extractLogMessage(line)
-// 			message := structs.WsLogMessage{}
-// 			message.Log.ContainerID = containerID.Payload.ContainerID
-// 			message.Log.Line = logString
-// 			logJSON, err := json.Marshal(message)
-// 			if err != nil {
-// 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-// 				break
-// 			}
-// 			if err := MuCon.Write(logJSON); err != nil {
-// 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-// 				break
-// 			}
-// 		}
-// 		if err == io.EOF {
-// 			break
-// 		}
-// 	}
-// }
-
 func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	var containerID structs.WsLogsPayload
 	if err := json.Unmarshal(msg, &containerID); err != nil {
@@ -135,10 +80,11 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 }
 
 func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
-	logString := extractLogMessage(logs)
+	cleanedLogs := removeDockerHeaders(logs)
+
 	message := structs.WsLogMessage{}
 	message.Log.ContainerID = containerID
-	message.Log.Line = logString
+	message.Log.Line = cleanedLogs
 	logJSON, err := json.Marshal(message)
 	if err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
@@ -147,6 +93,26 @@ func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
 	if err := MuCon.Write(logJSON); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
 	}
+}
+
+// sanitize chunked logs
+func removeDockerHeaders(logData []byte) string {
+	var cleanedLogs strings.Builder
+	reader := bytes.NewReader(logData)
+	bufReader := bufio.NewReader(reader)  // Wrap the bytes.Reader with bufio.Reader
+	for {
+		header := make([]byte, 8)
+		_, err := bufReader.Read(header)  // Use bufReader here
+		if err == io.EOF {
+			break
+		}
+		line, err := bufReader.ReadBytes('\n')  // And here
+		if err != nil && err != io.EOF {
+			break
+		}
+		cleanedLogs.WriteString(string(line))
+	}
+	return cleanedLogs.String()
 }
 
 func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader, lastTimestamp time.Time) {
