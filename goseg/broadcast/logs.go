@@ -1,6 +1,7 @@
 package broadcast
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -33,19 +34,28 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		return
 	}
 	defer logs.Close()
-
-	buf := make([]byte, 1024)
+	reader := bufio.NewReader(logs)
 	for {
-		n, err := logs.Read(buf)
+		line, err := reader.ReadBytes('\n')
 		if err != nil && err != io.EOF {
 			break
 		}
-		if n > 0 {
-			// conn.WriteMessage(websocket.TextMessage, buf[:n])
-			if err := MuCon.Write(buf[:n]); err != nil {
+		if len(line) > 0 {
+			message := structs.WsLogMessage{}
+			message.Log.ContainerID = containerID.Payload.ContainerID
+			message.Log.Line = string(line)
+			logJSON, err := json.Marshal(message)
+			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
 				break
 			}
+			if err := MuCon.Write(logJSON); err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				break
+			}
+		}
+		if err == io.EOF {
+			break
 		}
 	}
 }

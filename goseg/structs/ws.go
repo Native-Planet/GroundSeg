@@ -220,3 +220,10 @@ type WsStartramAction struct {
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
 }
+
+type WsLogMessage struct {
+	Log struct {
+		ContainerID string `json:"container_id"`
+		Line        string `json:"line"`
+	} `json:"log"`
+}
