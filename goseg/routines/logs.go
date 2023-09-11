@@ -43,6 +43,7 @@ func LogEvent() {
                 delete(logsMap[event.MuCon], event.ContainerID)
             }
         default:
+			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v",event.ContainerID,event.Action))
             continue
         }
     }
@@ -98,58 +99,48 @@ func removeDockerHeaders(logData []byte) string {
 }
 
 func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) {
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-		return
-	}
-	defer dockerClient.Close()
-	// get previous logs as one chunk
-	options := types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Timestamps: true,
-		Tail:       "1000",
-	}
-	existingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID, options)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
-		return
-	}
-	allLogs, err := ioutil.ReadAll(existingLogs)
-	existingLogs.Close()
-	lastTimestamp, _ := extractTimestamp(getLastLogLine(allLogs))
-	skipForward := time.Millisecond
-	adjustedTimestamp := lastTimestamp.Add(skipForward)
-	sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
-	options = types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Timestamps: true,
-		Follow:     true,
-		Since:      sinceTimestamp,
-	}
-	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID, options)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-		return
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			if streamingLogs != nil {
-				streamingLogs.Close()
-			}
-		default:
-			// send chunked log history
-			if err == nil && len(allLogs) > 0 {
-				sendChunkedLogs(ctx, MuCon, containerID, allLogs)
-			}
-			// ongoing log stream
-			defer streamingLogs.Close()
-			sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
-		}
-	}
+    dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+    if err != nil {
+        logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+        return
+    }
+    defer dockerClient.Close()
+    // get previous logs as one chunk
+    options := types.ContainerLogsOptions{
+        ShowStdout: true,
+        ShowStderr: true,
+        Timestamps: true,
+        Tail:       "1000",
+    }
+    existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+    if err != nil {
+        logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
+        return
+    }
+    allLogs, err := ioutil.ReadAll(existingLogs)
+    existingLogs.Close()
+    // send chunked log history
+    if err == nil && len(allLogs) > 0 {
+        sendChunkedLogs(ctx, MuCon, containerID, allLogs)
+    }
+    lastTimestamp, _ := extractTimestamp(getLastLogLine(allLogs))
+    skipForward := time.Millisecond
+    adjustedTimestamp := lastTimestamp.Add(skipForward)
+    sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
+    options = types.ContainerLogsOptions{
+        ShowStdout: true,
+        ShowStderr: true,
+        Timestamps: true,
+        Follow:     true,
+        Since:      sinceTimestamp,
+    }
+    streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+    if err != nil {
+        logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+        return
+    }
+    defer streamingLogs.Close()
+    sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
 }
 
 // send a big chunk of log history
@@ -159,7 +150,6 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 		return
 	default:
 		cleanedLogs := removeDockerHeaders(logs)
-
 		message := structs.WsLogMessage{}
 		message.Log.ContainerID = containerID
 		message.Log.Line = cleanedLogs
@@ -170,6 +160,7 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 		}
 		if err := MuCon.Write(logJSON); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+			return
 		}
 	}
 }
