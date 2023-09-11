@@ -82,6 +82,7 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		Follow: true,
 		Since: sinceTimestamp,
 	 }
+	fmt.Println(fmt.Sprintf("logs since %v:",sinceTimestamp))
 	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
