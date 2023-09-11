@@ -8,6 +8,7 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -87,6 +88,20 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 		return res, err
 	}
 	defer cli.Close()
+	inspect, err := cli.ContainerInspect(context.Background(), containerName)
+	if err != nil {
+		return res, err
+	}
+	var totalSize int64
+	for _, mount := range inspect.Mounts {
+		if mount.Type == "volume" {
+			size, err := getDirSize(mount.Source)
+			if err != nil {
+				return res, err
+			}
+			totalSize += size
+		}
+	}
 	statsResp, err := cli.ContainerStats(context.Background(), containerName, false)
 	if err != nil {
 		return res, err
@@ -97,18 +112,24 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 		return res, err
 	}
 	memUsage := stat.MemoryStats.Usage
-	inspectResp, err := cli.ContainerInspect(context.Background(), containerName)
-	if err != nil {
-		return res, err
-	}
-	diskUsage := int64(0)
-	if inspectResp.SizeRw != nil {
-		diskUsage = *inspectResp.SizeRw
-	}
 	return structs.ContainerStats{
 		MemoryUsage: memUsage,
-		DiskUsage:   diskUsage,
+		DiskUsage:   totalSize,
 	}, nil
+}
+
+func getDirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }
 
 // creates a volume by name
