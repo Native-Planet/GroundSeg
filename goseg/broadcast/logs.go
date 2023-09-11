@@ -78,7 +78,9 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		sendChunkedLogs(MuCon, containerID.Payload.ContainerID, allLogs)
 	}
 	// stream logs line-by-line (ongoing)
-	sinceTimestamp := lastTimestamp.Format(time.RFC3339Nano)
+	skipForward := time.Millisecond
+	adjustedTimestamp := lastTimestamp.Add(skipForward)
+	sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
 	options = types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
