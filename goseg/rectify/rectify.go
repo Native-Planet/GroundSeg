@@ -102,6 +102,20 @@ func RectifyUrbit() {
 			// nil/null - Empty, ready for action
 			current := broadcast.GetState()
 			current.Profile.Startram.Transition.Register = event.Data
+			if event.Data == "complete" {
+				conf := config.Conf()
+				current.Profile.Startram.Info.Running = conf.WgOn
+				containerState, exists := config.GetContainerState()["wireguard"]
+				if exists {
+					running := containerState.ActualStatus == "running"
+					current.Profile.Startram.Info.Running = running
+					if err := config.UpdateConf(map[string]interface{}{"wgOn": running}); err != nil {
+						logger.Logger.Error(fmt.Sprintf("%v", err))
+					}
+				}
+				logger.Logger.Warn(fmt.Sprintf("%+v", containerState))
+				current.Profile.Startram.Info.Registered = conf.WgRegistered
+			}
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "retrieve":

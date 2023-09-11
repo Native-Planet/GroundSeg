@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goseg/broadcast"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -52,6 +53,7 @@ func handleStartramRegister(regCode, region string) {
 	// error handling
 	handleError := func(errmsg string) {
 		msg := fmt.Sprintf("Error: %s", errmsg)
+		logger.Logger.Error(errmsg)
 		startram.EventBus <- structs.Event{Type: "register", Data: msg}
 		time.Sleep(3 * time.Second)
 		startram.EventBus <- structs.Event{Type: "register", Data: nil}
@@ -76,6 +78,10 @@ func handleStartramRegister(regCode, region string) {
 	}
 	// Start Wireguard
 	startram.EventBus <- structs.Event{Type: "register", Data: "starting"}
+	if err := docker.LoadWireguard(); err != nil {
+		handleError(fmt.Sprintf("Unable to start Wireguard: %v", err))
+		return
+	}
 	// Finish
 	startram.EventBus <- structs.Event{Type: "register", Data: "complete"}
 

@@ -67,6 +67,7 @@ func bootstrapBroadcastState() error {
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
+	//go profileStatusLoop()
 	return nil
 }
 
@@ -170,7 +171,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Endpoint = conf.EndpointUrl
 
 	// Information from startram
-	startramInfo.Info.Region = nil // temp
+	startramInfo.Info.Region = config.StartramConfig.Region
 	startramInfo.Info.Expiry = nil // temp
 	startramInfo.Info.Renew = true // temp
 
@@ -395,6 +396,22 @@ func shipStatusLoop() {
 			newState := broadcastState
 			mu.RUnlock()
 			newState.Urbits = updates
+			UpdateBroadcast(newState)
+			BroadcastToClients()
+		}
+	}
+}
+
+func profileStatusLoop() {
+	ticker := time.NewTicker(hostInfoInterval)
+	for {
+		select {
+		case <-ticker.C:
+			updates := constructProfileInfo()
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
+			newState.Profile = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}

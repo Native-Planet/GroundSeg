@@ -87,7 +87,7 @@ func WriteWgConf() error {
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(config.DockerDir, "settings", "wireguard", "_data", "wg0.conf")
+	filePath := filepath.Join(config.DockerDir, "wireguard", "_data", "wg0.conf")
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
