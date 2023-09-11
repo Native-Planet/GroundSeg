@@ -24,9 +24,9 @@ type NewShipTransition struct {
 }
 
 type LogsEvent struct {
-	Action bool // stop or start
-	ContainerID string // name of container
-	MuCon *MuConn // pointer to ws session
+	Action      bool    // stop or start
+	ContainerID string  // name of container
+	MuCon       *MuConn // pointer to ws session
 }
 
 // for keeping track of container desired/actual state

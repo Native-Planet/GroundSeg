@@ -148,11 +148,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				logEvent := structs.LogsEvent{
-					Action: logPayload.Payload.Action,
+					Action:      logPayload.Payload.Action,
 					ContainerID: logPayload.Payload.ContainerID,
-					MuCon: MuCon,
+					MuCon:       MuCon,
 				}
-				config.LogsEventBus<-logEvent
+				config.LogsEventBus <- logEvent
 				// broadcast.StreamLogs(MuCon, msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
@@ -221,11 +221,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				logEvent := structs.LogsEvent{
-					Action: logPayload.Payload.Action,
+					Action:      logPayload.Payload.Action,
 					ContainerID: logPayload.Payload.ContainerID,
-					MuCon: MuCon,
+					MuCon:       MuCon,
 				}
-				config.LogsEventBus<-logEvent
+				config.LogsEventBus <- logEvent
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {

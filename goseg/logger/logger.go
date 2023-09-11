@@ -2,21 +2,20 @@ package logger
 
 import (
 	"bufio"
-	"log/slog"
-	"io"
-	"os"
 	"fmt"
-	"time"
+	"io"
+	"log/slog"
+	"os"
 	"sync"
+	"time"
 )
 
 var (
-	logPath    string
-	logFile    *os.File
+	logPath     string
+	logFile     *os.File
 	multiWriter io.Writer
-	Logger     *slog.Logger
+	Logger      *slog.Logger
 )
-
 
 type MuMultiWriter struct {
 	Writers []io.Writer
@@ -29,10 +28,10 @@ func init() {
 		basePath = "/opt/nativeplanet/groundseg/"
 	}
 	logPath = basePath + "logs/"
-    err := os.MkdirAll(logPath, 0755)
-    if err != nil {
-        panic(fmt.Sprintf("Failed to create log directory: %v", err))
-    }
+	err := os.MkdirAll(logPath, 0755)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create log directory: %v", err))
+	}
 	logFile, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
