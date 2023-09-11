@@ -41,7 +41,7 @@ func extractTimestamp(logLine string) (time.Time, error) {
 	}
 	timestampStr := logLine[:len(layout)]
 	return time.Parse(layout, timestampStr)
-} 
+}
 
 func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	var containerID structs.WsLogsPayload
@@ -60,8 +60,8 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: true,
-		Tail: "1000",
-	 }
+		Tail:       "1000",
+	}
 	existingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
@@ -79,10 +79,10 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: true,
-		Follow: true,
-		Since: sinceTimestamp,
-	 }
-	fmt.Println(fmt.Sprintf("logs since %v:",sinceTimestamp))
+		Follow:     true,
+		Since:      sinceTimestamp,
+	}
+	logger.Logger.Info(fmt.Sprintf("%v -- logs since %v:", lastTimestamp, sinceTimestamp))
 	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
@@ -113,14 +113,14 @@ func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
 func removeDockerHeaders(logData []byte) string {
 	var cleanedLogs strings.Builder
 	reader := bytes.NewReader(logData)
-	bufReader := bufio.NewReader(reader)  // Wrap the bytes.Reader with bufio.Reader
+	bufReader := bufio.NewReader(reader) // Wrap the bytes.Reader with bufio.Reader
 	for {
 		header := make([]byte, 8)
-		_, err := bufReader.Read(header)  // Use bufReader here
+		_, err := bufReader.Read(header) // Use bufReader here
 		if err == io.EOF {
 			break
 		}
-		line, err := bufReader.ReadBytes('\n')  // And here
+		line, err := bufReader.ReadBytes('\n') // And here
 		if err != nil && err != io.EOF {
 			break
 		}
