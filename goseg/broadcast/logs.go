@@ -35,6 +35,7 @@ func getLastLogLine(logs []byte) string {
 }
 
 func extractTimestamp(logLine string) (time.Time, error) {
+	logger.Logger.Info(fmt.Sprintf("Getting timestamp from:",logLine))
 	layout := "2006-01-02T15:04:05.999999999Z"
 	if len(logLine) < len(layout) {
 		return time.Time{}, fmt.Errorf("log line too short")
