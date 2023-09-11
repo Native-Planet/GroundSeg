@@ -26,29 +26,29 @@ var (
 
 // manage log streams
 func LogEvent() {
-    for {
-        event := <-config.LogsEventBus
-		logger.Logger.Info(fmt.Sprintf("New log request for %v",event.ContainerID))
-        switch event.Action {
-        case true:
-            logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
-            ctx, cancel := context.WithCancel(context.Background())
-            if _, exists := logsMap[event.MuCon]; !exists {
-                logsMap[event.MuCon] = make(map[string]context.CancelFunc)
-            }
-            logsMap[event.MuCon][event.ContainerID] = cancel
-            go streamLogs(ctx, event.MuCon, event.ContainerID)
-        case false:
-            logger.Logger.Info(fmt.Sprintf("Stopping logs for %v", event.ContainerID))
-            if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
-                cancel()
-                delete(logsMap[event.MuCon], event.ContainerID)
-            }
-        default:
-			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v",event.ContainerID,event.Action))
-            continue
-        }
-    }
+	for {
+		event := <-config.LogsEventBus
+		logger.Logger.Info(fmt.Sprintf("New log request for %v", event.ContainerID))
+		switch event.Action {
+		case true:
+			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
+			ctx, cancel := context.WithCancel(context.Background())
+			if _, exists := logsMap[event.MuCon]; !exists {
+				logsMap[event.MuCon] = make(map[string]context.CancelFunc)
+			}
+			logsMap[event.MuCon][event.ContainerID] = cancel
+			go streamLogs(ctx, event.MuCon, event.ContainerID)
+		case false:
+			logger.Logger.Info(fmt.Sprintf("Stopping logs for %v", event.ContainerID))
+			if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
+				cancel()
+				delete(logsMap[event.MuCon], event.ContainerID)
+			}
+		default:
+			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v", event.ContainerID, event.Action))
+			continue
+		}
+	}
 }
 
 // log bytestream to string
@@ -115,7 +115,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 			Timestamps: true,
 			Tail:       "1000",
 		}
-		existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+		existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options) // Use ctx instead of context.TODO()
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
 			return
@@ -137,7 +137,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 			Follow:     true,
 			Since:      sinceTimestamp,
 		}
-		streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+		streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options) // Use ctx instead of context.TODO()
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
 			return
