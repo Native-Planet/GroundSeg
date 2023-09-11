@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bufio"
 	"log/slog"
 	"io"
 	"os"
@@ -32,7 +33,7 @@ func init() {
     if err != nil {
         panic(fmt.Sprintf("Failed to create log directory: %v", err))
     }
-	logFile, err := os.OpenFile(sysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}
@@ -41,7 +42,7 @@ func init() {
 	Logger = slog.New(slog.NewJSONHandler(multiWriter, nil))
 }
 
-func sysLogfile() string {
+func SysLogfile() string {
 	currentTime := time.Now()
 	return fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
 }
@@ -66,4 +67,21 @@ func (m *MuMultiWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 	return len(p), firstError
+}
+
+func TailLogs(filename string, n int) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+		if len(lines) > n {
+			lines = lines[1:]
+		}
+	}
+	return lines, scanner.Err()
 }
