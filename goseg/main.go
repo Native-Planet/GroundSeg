@@ -88,6 +88,8 @@ func main() {
 			logger.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
 	}
+	// log manager routine
+	go routines.LogEvent()
 	// block until version info returns
 	if remoteVersion == true {
 		select {

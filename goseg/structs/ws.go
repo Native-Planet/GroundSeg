@@ -123,6 +123,18 @@ type WsNewShipPayload struct {
 	Token   WsTokenStruct   `json:"token"`
 }
 
+type WsLogsPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsLogsAction  `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsLogsAction struct {
+	Action bool `json:"action"`
+	ContainerID string `json:"container_id"`
+}
+
 type WsSystemPayload struct {
 	ID      string         `json:"id"`
 	Type    string         `json:"type"`
@@ -208,4 +220,11 @@ type WsStartramAction struct {
 	Region   string `json:"region"`
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
+}
+
+type WsLogMessage struct {
+	Log struct {
+		ContainerID string `json:"container_id"`
+		Line        string `json:"line"`
+	} `json:"log"`
 }
