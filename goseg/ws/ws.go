@@ -152,7 +152,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ContainerID: logPayload.Payload.ContainerID,
 					MuCon: MuCon,
 				}
-				broadcast.LogsEventBus<-logEvent
+				config.LogsEventBus<-logEvent
 				// broadcast.StreamLogs(MuCon, msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
@@ -225,7 +225,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ContainerID: logPayload.Payload.ContainerID,
 					MuCon: MuCon,
 				}
-				broadcast.LogsEventBus<-logEvent
+				config.LogsEventBus<-logEvent
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
