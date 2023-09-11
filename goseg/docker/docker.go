@@ -228,7 +228,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "wireguard":
-		_, _, err := wgContainerConf()
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}

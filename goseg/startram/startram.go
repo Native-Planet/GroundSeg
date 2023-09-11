@@ -77,7 +77,11 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	if retrieve.Status != "No record" {
 		// pin that ho to the global vars
 		config.StartramConfig = retrieve
-		logger.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
+		s := "<hidden>"
+		if config.DebugMode {
+			s = string(body)
+		}
+		logger.Logger.Info(fmt.Sprintf("StarTram info retrieved: %s", s))
 	} else {
 		regStatus = false
 		return retrieve, fmt.Errorf("No registration record")
@@ -91,12 +95,12 @@ func Retrieve() (structs.StartramRetrieve, error) {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
+	err = fmt.Errorf("No registration")
 	if regStatus {
-		return retrieve, nil
-	} else {
-		EventBus <- structs.Event{Type: "retrieve", Data: nil}
-		return retrieve, fmt.Errorf("No registration")
+		err = nil
 	}
+	EventBus <- structs.Event{Type: "retrieve", Data: nil}
+	return retrieve, err
 }
 
 // register your pubkey
@@ -143,7 +147,7 @@ func Register(regCode string, region string) error {
 		if err != nil {
 			return fmt.Errorf("Error updating registration status: %v", err)
 		}
-		return fmt.Errorf("Error registering: %v", respObj.Debug)
+		return fmt.Errorf("Error registering at %s: %v", url, respObj.Debug)
 	}
 	return nil
 }
@@ -308,15 +312,22 @@ func AliasDelete(subdomain string, alias string) error {
 	return nil
 }
 
-// call registration endpoint for 5 minutes after registration
-// call as goroutine
+// call registration endpoint for 5 minutes or until all services are "ok"
 func backoffRetrieve() error {
 	startTime := time.Now()
 	duration := 5 * time.Second
 	for {
-		_, err := Retrieve()
-		if err == nil {
-			logger.Logger.Info("Registration retrieved")
+		res, err := Retrieve()
+		if err != nil {
+			return err
+		}
+		// return if all services are registered
+		for _, remote := range res.Subdomains {
+			if remote.Status != "ok" {
+				logger.Logger.Warn(fmt.Sprintf("backoff: %v %v", remote.URL, remote.Status))
+				break
+			}
+			// all "ok"
 			return nil
 		}
 		// timeout after 5min
@@ -326,6 +337,7 @@ func backoffRetrieve() error {
 			return errmsg
 		}
 		// linear cooldown
+		logger.Logger.Warn(fmt.Sprintf("%v", duration))
 		time.Sleep(duration)
 		if duration.Seconds() < 60 {
 			duration = time.Duration(math.Min(duration.Seconds()*2, 60)) * time.Second
@@ -341,15 +353,18 @@ func RegisterExistingShips() error {
 	if conf.WgRegistered {
 		for _, ship := range conf.Piers {
 			if err := SvcCreate(ship, "urbit"); err != nil {
-				logger.Logger.Error("Couldn't register pier: ", ship)
+				logger.Logger.Error(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
 			}
 			if err := SvcCreate("s3."+ship, "minio"); err != nil {
-				logger.Logger.Error("Couldn't register S3: ", ship)
+				logger.Logger.Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
 			}
 		}
-		go backoffRetrieve()
+		if err := backoffRetrieve(); err != nil {
+			return err
+		}
 	} else {
 		return fmt.Errorf("Instance is not registered")
 	}
+	logger.Logger.Info("Registration retrieved")
 	return nil
 }

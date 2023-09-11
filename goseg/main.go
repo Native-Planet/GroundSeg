@@ -103,16 +103,14 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
-	/*
-		if conf.WgRegistered == true {
-			// Load Wireguard
-			loadService(docker.LoadWireguard, "Unable to load Wireguard!")
-			// Load MC
-			loadService(docker.LoadMC, "Unable to load MinIO Client!")
-			// Load MinIOs
-			loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
-		}
-	*/
+	if conf.WgRegistered == true {
+		// Load Wireguard
+		loadService(docker.LoadWireguard, "Unable to load Wireguard!")
+		// Load MC
+		loadService(docker.LoadMC, "Unable to load MinIO Client!")
+		// Load MinIOs
+		loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
+	}
 	// Load Netdata
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
