@@ -63,9 +63,10 @@ export const handleMessage = data => {
       let containerID = data.log.container_id
       let containerLine = data.log.line
       if (l.hasOwnProperty(containerID)) {
-        l[containerID] = l[containerID] + containerLine
+        l[containerID] = l[containerID] + "\n" + containerLine
+      } else {
+        l[containerID] = containerLine
       }
-      l[containerID] = containerLine
       return l
     })
   } else if (data.type === "activity") {

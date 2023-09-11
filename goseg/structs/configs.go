@@ -1,5 +1,7 @@
 package structs
 
+import "encoding/json"
+
 // system.json config struct
 type SysConfig struct {
 	Setup        string   `json:"setup"`
@@ -75,6 +77,58 @@ type UrbitDocker struct {
 	ShowUrbitWeb     string `json:"show_urbit_web"`
 	DevMode          bool   `json:"dev_mode"`
 	Click            bool   `json:"click"`
+}
+
+// Define the interface
+type PortSetter interface {
+	SetPort(port interface{})
+}
+
+// Add SetPort methods for relevant fields in the struct
+func (u *UrbitDocker) SetWgHTTPPort(port interface{}) {
+	u.WgHTTPPort = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgAmesPort(port interface{}) {
+	u.WgAmesPort = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgS3Port(port interface{}) {
+	u.WgS3Port = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgConsolePort(port interface{}) {
+	u.WgConsolePort = toInt(port)
+}
+
+// Helper function to convert a value to int, returns 0 if not an int
+func toInt(value interface{}) int {
+	if v, ok := value.(float64); ok { // JSON numbers are float64
+		return int(v)
+	}
+	return 0
+}
+
+// Custom unmarshaler
+func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for k, v := range raw {
+		switch k {
+		case "wg_http_port":
+			u.SetWgHTTPPort(v)
+		case "wg_ames_port":
+			u.SetWgAmesPort(v)
+		case "wg_s3_port":
+			u.SetWgS3Port(v)
+		case "wg_console_port":
+			u.SetWgConsolePort(v)
+			// Handle other fields similarly
+		}
+	}
+	return nil
 }
 
 // wireguard config json
