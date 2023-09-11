@@ -99,48 +99,52 @@ func removeDockerHeaders(logData []byte) string {
 }
 
 func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) {
-    dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-    if err != nil {
-        logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-        return
-    }
-    defer dockerClient.Close()
-    // get previous logs as one chunk
-    options := types.ContainerLogsOptions{
-        ShowStdout: true,
-        ShowStderr: true,
-        Timestamps: true,
-        Tail:       "1000",
-    }
-    existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
-    if err != nil {
-        logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
-        return
-    }
-    allLogs, err := ioutil.ReadAll(existingLogs)
-    existingLogs.Close()
-    // send chunked log history
-    if err == nil && len(allLogs) > 0 {
-        sendChunkedLogs(ctx, MuCon, containerID, allLogs)
-    }
-    lastTimestamp, _ := extractTimestamp(getLastLogLine(allLogs))
-    skipForward := time.Millisecond
-    adjustedTimestamp := lastTimestamp.Add(skipForward)
-    sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
-    options = types.ContainerLogsOptions{
-        ShowStdout: true,
-        ShowStderr: true,
-        Timestamps: true,
-        Follow:     true,
-        Since:      sinceTimestamp,
-    }
-    streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
-    if err != nil {
-        logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-        return
-    }
-    defer streamingLogs.Close()
-    sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
+	if containerID != "system" {
+		dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			return
+		}
+		defer dockerClient.Close()
+		// get previous logs as one chunk
+		options := types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Timestamps: true,
+			Tail:       "1000",
+		}
+		existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
+			return
+		}
+		allLogs, err := ioutil.ReadAll(existingLogs)
+		existingLogs.Close()
+		// send chunked log history
+		if err == nil && len(allLogs) > 0 {
+			sendChunkedLogs(ctx, MuCon, containerID, allLogs)
+		}
+		lastTimestamp, _ := extractTimestamp(getLastLogLine(allLogs))
+		skipForward := time.Millisecond
+		adjustedTimestamp := lastTimestamp.Add(skipForward)
+		sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
+		options = types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Timestamps: true,
+			Follow:     true,
+			Since:      sinceTimestamp,
+		}
+		streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)  // Use ctx instead of context.TODO()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			return
+		}
+		defer streamingLogs.Close()
+		sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
+	} else {
+		
+	}
 }
 
 // send a big chunk of log history
