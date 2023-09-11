@@ -137,21 +137,18 @@ func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader, lastTim
 			break
 		}
 		if len(line) > 0 {
-			logTimestamp, err := extractTimestamp(string(line))
-			if err == nil && logTimestamp.After(lastTimestamp) {
-				logString := extractLogMessage(line)
-				message := structs.WsLogMessage{}
-				message.Log.ContainerID = containerID
-				message.Log.Line = logString
-				logJSON, err := json.Marshal(message)
-				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-					break
-				}
-				if err := MuCon.Write(logJSON); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-					break
-				}
+			logString := extractLogMessage(line)
+			message := structs.WsLogMessage{}
+			message.Log.ContainerID = containerID
+			message.Log.Line = logString
+			logJSON, err := json.Marshal(message)
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				break
+			}
+			if err := MuCon.Write(logJSON); err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				break
 			}
 		}
 		if err == io.EOF {
