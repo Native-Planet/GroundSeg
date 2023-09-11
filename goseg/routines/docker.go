@@ -61,7 +61,7 @@ func DockerSubscriptionHandler() {
 				if containerState.DesiredStatus != "stopped" {
 					docker.StartContainer(contName, containerState.Type)
 				}
-				broadcast.BroadcastToClients()
+				makeBroadcast(contName, dockerEvent.Action)
 			}
 
 		case "start":
@@ -71,7 +71,21 @@ func DockerSubscriptionHandler() {
 			if exists {
 				containerState.ActualStatus = "running"
 				config.UpdateContainerState(contName, containerState)
-				broadcast.BroadcastToClients()
+				switch contName {
+				case "wireguard":
+					// set wgOn to false
+					err := config.UpdateConf(map[string]interface{}{
+						"wgOn": true,
+					})
+					if err != nil {
+						logger.Logger.Error(fmt.Sprintf("%v", err))
+					}
+					// update profile
+					current := broadcast.GetState()
+					current.Profile.Startram.Info.Running = true
+					broadcast.UpdateBroadcast(current)
+				}
+				makeBroadcast(contName, dockerEvent.Action)
 			}
 
 		case "die":
@@ -81,7 +95,7 @@ func DockerSubscriptionHandler() {
 				// we don't want infinite restart loop
 				containerState.DesiredStatus = "died"
 				config.UpdateContainerState(contName, containerState)
-				broadcast.BroadcastToClients()
+				makeBroadcast(contName, dockerEvent.Action)
 			}
 
 		default:
@@ -90,4 +104,27 @@ func DockerSubscriptionHandler() {
 			}
 		}
 	}
+}
+
+func makeBroadcast(contName string, status string) {
+	switch contName {
+	case "wireguard":
+		var wgOn bool
+		// set wgOn to false
+		if status == "die" {
+			wgOn = false
+		}
+		// set wgOn to true
+		if status == "start" {
+			wgOn = true
+		}
+		if err := config.UpdateConf(map[string]interface{}{"wgOn": wgOn}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+		// update profile
+		current := broadcast.GetState()
+		current.Profile.Startram.Info.Running = wgOn
+		broadcast.UpdateBroadcast(current)
+	}
+	broadcast.BroadcastToClients()
 }

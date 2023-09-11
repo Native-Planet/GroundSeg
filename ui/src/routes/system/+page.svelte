@@ -1,5 +1,6 @@
 <script>
   import './system.css'
+  import { showLogs } from './store'
 
   import { structure } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'

@@ -102,15 +102,33 @@ func RectifyUrbit() {
 			// nil/null - Empty, ready for action
 			current := broadcast.GetState()
 			current.Profile.Startram.Transition.Register = event.Data
+			if event.Data == "complete" {
+				conf := config.Conf()
+				current.Profile.Startram.Info.Running = conf.WgOn
+				containerState, exists := config.GetContainerState()["wireguard"]
+				if exists {
+					running := containerState.ActualStatus == "running"
+					current.Profile.Startram.Info.Running = running
+					if err := config.UpdateConf(map[string]interface{}{"wgOn": running}); err != nil {
+						logger.Logger.Error(fmt.Sprintf("%v", err))
+					}
+				}
+				logger.Logger.Warn(fmt.Sprintf("%+v", containerState))
+				current.Profile.Startram.Info.Registered = conf.WgRegistered
+			}
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "retrieve":
 			for patp, _ := range config.UrbitConfAll() {
 				modified := false
+				serviceCreated := true
 				startramConfig := config.StartramConfig // a structs.StartramRetrieve
 				config.LoadUrbitConfig(patp)
 				local := config.UrbitConf(patp) // a structs.UrbitDocker
 				for _, remote := range startramConfig.Subdomains {
+					if remote.Status == "creating" {
+						serviceCreated = false
+					}
 					// for urbit web
 					subd := strings.Split(remote.URL, ".")[0]
 					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
@@ -161,6 +179,20 @@ func RectifyUrbit() {
 				if modified {
 					config.UpdateUrbitConfig(map[string]structs.UrbitDocker{patp: local})
 				}
+				current := broadcast.GetState()
+				urbitStruct, ok := current.Urbits[patp]
+				if ok {
+					if serviceCreated {
+						urbitStruct.Transition.ServiceRegistrationStatus = ""
+					} else {
+						urbitStruct.Transition.ServiceRegistrationStatus = "creating"
+					}
+
+					// Put the modified struct back into the map
+					current.Urbits[patp] = urbitStruct
+				}
+				broadcast.UpdateBroadcast(current)
+				broadcast.BroadcastToClients()
 			}
 		default:
 		}
