@@ -1,10 +1,13 @@
 <script>
+  import { showLogs } from './store'
+  import LogsDrawer from './LogsDrawer.svelte'
+  import { openModal } from 'svelte-modals'
 </script>
 
 <div class="container">
   <div class="title">SYSTEM LOGS</div>
   <div class="spacer"></div>
-  <button class="btn">View</button>
+  <button class="btn" on:click={()=>openModal(LogsDrawer,{"title":"System Logs"})}>View</button>
 </div>
 
 <style>
