@@ -35,13 +35,13 @@ func getLastLogLine(logs []byte) string {
 }
 
 func extractTimestamp(logLine string) (time.Time, error) {
-	if len(logLine) < 19 {
+	layout := "2006-01-02T15:04:05.999999999Z"
+	if len(logLine) < len(layout) {
 		return time.Time{}, fmt.Errorf("log line too short")
 	}
-	layout := "2006-01-02 15:04:05"
-	timestampStr := logLine[:19]
+	timestampStr := logLine[:len(layout)]
 	return time.Parse(layout, timestampStr)
-}
+} 
 
 func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	var containerID structs.WsLogsPayload
@@ -56,7 +56,12 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	}
 	defer dockerClient.Close()
 	// get previous logs as one chunk
-	options := types.ContainerLogsOptions{ShowStdout: true, Tail: "1000"}
+	options := types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Timestamps: true,
+		Tail: "1000",
+	 }
 	existingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
@@ -69,7 +74,14 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		sendChunkedLogs(MuCon, containerID.Payload.ContainerID, allLogs)
 	}
 	// stream logs line-by-line (ongoing)
-	options = types.ContainerLogsOptions{ShowStdout: true, Follow: true}
+	sinceTimestamp := lastTimestamp.Format(time.RFC3339Nano)
+	options = types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Timestamps: true,
+		Follow: true,
+		Since: sinceTimestamp,
+	 }
 	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
@@ -79,6 +91,7 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 	sendLogs(MuCon, containerID.Payload.ContainerID, streamingLogs, lastTimestamp)
 }
 
+// send a big chunk of log history
 func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
 	cleanedLogs := removeDockerHeaders(logs)
 
@@ -95,7 +108,7 @@ func sendChunkedLogs(MuCon *structs.MuConn, containerID string, logs []byte) {
 	}
 }
 
-// sanitize chunked logs
+// sanitize chunked log history
 func removeDockerHeaders(logData []byte) string {
 	var cleanedLogs strings.Builder
 	reader := bytes.NewReader(logData)
@@ -115,6 +128,7 @@ func removeDockerHeaders(logData []byte) string {
 	return cleanedLogs.String()
 }
 
+// send an individual log line
 func sendLogs(MuCon *structs.MuConn, containerID string, logs io.Reader, lastTimestamp time.Time) {
 	reader := bufio.NewReader(logs)
 	for {
