@@ -35,6 +35,7 @@ type ClientManager struct {
 	AuthClients   map[string]*MuConn
 	UnauthClients map[string]*MuConn
 	Mu            sync.RWMutex
+	broadcastMu   sync.Mutex
 }
 
 // register a new connection
@@ -79,6 +80,8 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
+	cm.broadcastMu.Lock()
+	defer cm.broadcastMu.Unlock()
 	for _, client := range cm.UnauthClients {
 		// imported sessions will be nil until auth
 		if client != nil {
@@ -88,13 +91,15 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 }
 
 func (cm *ClientManager) BroadcastAuth(data []byte) {
+	cm.broadcastMu.Lock()
+	defer cm.broadcastMu.Unlock()
 	for _, client := range cm.AuthClients {
-		// imported sessions will be nil until auth
 		if client != nil {
 			client.Write(data)
 		}
 	}
 }
+
 
 type WsType struct {
 	Payload struct {
@@ -121,6 +126,18 @@ type WsNewShipPayload struct {
 	Type    string          `json:"type"`
 	Payload WsNewShipAction `json:"payload"`
 	Token   WsTokenStruct   `json:"token"`
+}
+
+type WsLogsPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsLogsAction  `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsLogsAction struct {
+	Action bool `json:"action"`
+	ContainerID string `json:"container_id"`
 }
 
 type WsSystemPayload struct {
@@ -208,4 +225,11 @@ type WsStartramAction struct {
 	Region   string `json:"region"`
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
+}
+
+type WsLogMessage struct {
+	Log struct {
+		ContainerID string `json:"container_id"`
+		Line        string `json:"line"`
+	} `json:"log"`
 }

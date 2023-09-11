@@ -41,25 +41,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenId := config.RandString(32)
 	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
-	// keepalive for ws
-	// MuCon.Conn.SetPongHandler(func(string) error {
-	// 	MuCon.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	// 	return nil
-	// })
-	// pingInterval := 15 * time.Second
-	// go func() {
-	// 	ticker := time.NewTicker(pingInterval)
-	// 	defer ticker.Stop()
-	// 	for {
-	// 		select {
-	// 		case <-ticker.C:
-	// 			if err := MuCon.Write([]byte("ping")); err != nil {
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// }()
-	// unsafe for mutex?
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -160,6 +141,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
+			case "logs":
+				var logPayload structs.WsLogsPayload
+				if err := json.Unmarshal(msg, &logPayload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+					continue
+				}
+				logEvent := structs.LogsEvent{
+					Action: logPayload.Payload.Action,
+					ContainerID: logPayload.Payload.ContainerID,
+					MuCon: MuCon,
+				}
+				config.LogsEventBus<-logEvent
+				// broadcast.StreamLogs(MuCon, msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
@@ -219,6 +213,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := MuCon.Write(respJson); err != nil {
 					continue
 				}
+			case "logs":
+				// unauth for debugging
+				var logPayload structs.WsLogsPayload
+				if err := json.Unmarshal(msg, &logPayload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+					continue
+				}
+				logEvent := structs.LogsEvent{
+					Action: logPayload.Payload.Action,
+					ContainerID: logPayload.Payload.ContainerID,
+					MuCon: MuCon,
+				}
+				config.LogsEventBus<-logEvent
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
