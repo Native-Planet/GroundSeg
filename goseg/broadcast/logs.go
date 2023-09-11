@@ -38,7 +38,6 @@ func getLastLogLine(logs []byte) string {
 }
 
 func extractTimestamp(logLine string) (time.Time, error) {
-	logger.Logger.Info(fmt.Sprintf("Getting timestamp from: %s",logLine))
 	layout := "2006-01-02T15:04:05.999999999Z"
 	if len(logLine) < len(layout) {
 		return time.Time{}, fmt.Errorf("log line too short")
@@ -88,7 +87,6 @@ func StreamLogs(MuCon *structs.MuConn, msg []byte) {
 		Follow:     true,
 		Since:      sinceTimestamp,
 	}
-	logger.Logger.Info(fmt.Sprintf("%v -- logs since %v:", lastTimestamp, sinceTimestamp))
 	streamingLogs, err := dockerClient.ContainerLogs(context.TODO(), containerID.Payload.ContainerID, options)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
