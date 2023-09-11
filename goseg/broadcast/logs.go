@@ -27,7 +27,8 @@ func extractLogMessage(data []byte) string {
 
 // get the last line so we know when to start streaming
 func getLastLogLine(logs []byte) string {
-	lines := strings.Split(string(logs), "\n")
+	sanitized := removeDockerHeaders(logs)
+	lines := strings.Split(string(sanitized), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		if len(lines[i]) > 0 {
 			return lines[i]
