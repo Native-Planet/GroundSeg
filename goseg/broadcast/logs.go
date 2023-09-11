@@ -28,8 +28,10 @@ func extractLogMessage(data []byte) string {
 // get the last line so we know when to start streaming
 func getLastLogLine(logs []byte) string {
 	lines := strings.Split(string(logs), "\n")
-	if len(lines) > 0 {
-		return lines[len(lines)-1]
+	for i := len(lines) - 1; i >= 0; i-- {
+		if len(lines[i]) > 0 {
+			return lines[i]
+		}
 	}
 	return ""
 }
