@@ -174,31 +174,7 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 	}
 }
 
-func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
-	select {
-	case <-ctx.Done():
-		return
-	default:
-		message := structs.WsLogMessage{}
-		message.Log.ContainerID = "system"
-		logLines, err := logger.TailLogs(logger.SysLogfile(), 500)
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error tailing logs: %v", err))
-			return
-		}
-		message.Log.Line = strings.Join(logLines, "\n")
-		logJSON, err := json.Marshal(message)
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
-			return
-		}
-		if err := MuCon.Write(logJSON); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
-			return
-		}
-	}
-}
-
+// tail the syslog file then stream new changes
 func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error {
 	sendChunkedSysLogs(ctx, MuCon)
 	watcher, err := fsnotify.NewWatcher()
@@ -234,7 +210,33 @@ func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error
 	return nil
 }
 
-// send an individual log line
+// send prev 500 lines of syslogs
+func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		message := structs.WsLogMessage{}
+		message.Log.ContainerID = "system"
+		logLines, err := logger.TailLogs(logger.SysLogfile(), 500)
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Error tailing logs: %v", err))
+			return
+		}
+		message.Log.Line = strings.Join(logLines, "\n")
+		logJSON, err := json.Marshal(message)
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+			return
+		}
+		if err := MuCon.Write(logJSON); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+			return
+		}
+	}
+}
+
+// send an individual container log line
 func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, logs io.Reader, lastTimestamp time.Time) {
 	reader := bufio.NewReader(logs)
 	for {
@@ -268,25 +270,24 @@ func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, lo
 	}
 }
 
+// send individual system log line
 func sendSysLogs(ctx context.Context, MuCon *structs.MuConn, line string) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if len(line) > 0 {
-				message := structs.WsLogMessage{}
-				message.Log.ContainerID = "system"
-				message.Log.Line = line
-				logJSON, err := json.Marshal(message)
-				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-					break
-				}
-				if err := MuCon.Write(logJSON); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-					break
-				}
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		if len(line) > 0 {
+			message := structs.WsLogMessage{}
+			message.Log.ContainerID = "system"
+			message.Log.Line = line
+			logJSON, err := json.Marshal(message)
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				return
+			}
+			if err := MuCon.Write(logJSON); err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				return
 			}
 		}
 	}
