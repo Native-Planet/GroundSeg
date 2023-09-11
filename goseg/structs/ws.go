@@ -131,6 +131,7 @@ type WsLogsPayload struct {
 }
 
 type WsLogsAction struct {
+	Action bool `json:"action"`
 	ContainerID string `json:"container_id"`
 }
 

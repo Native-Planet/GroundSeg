@@ -142,7 +142,18 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 			case "logs":
-				broadcast.StreamLogs(MuCon, msg)
+				var logPayload structs.WsLogsPayload
+				if err := json.Unmarshal(msg, &logPayload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+					continue
+				}
+				logEvent := structs.LogsEvent{
+					Action: logPayload.Payload.Action,
+					ContainerID: logPayload.Payload.ContainerID,
+					MuCon: MuCon,
+				}
+				broadcast.LogsEventBus<-logEvent
+				// broadcast.StreamLogs(MuCon, msg)
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
@@ -203,7 +214,18 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			case "logs":
-				broadcast.StreamLogs(MuCon, msg)
+				// unauth for debugging
+				var logPayload structs.WsLogsPayload
+				if err := json.Unmarshal(msg, &logPayload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+					continue
+				}
+				logEvent := structs.LogsEvent{
+					Action: logPayload.Payload.Action,
+					ContainerID: logPayload.Payload.ContainerID,
+					MuCon: MuCon,
+				}
+				broadcast.LogsEventBus<-logEvent
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
