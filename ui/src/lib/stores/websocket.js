@@ -4,6 +4,7 @@ import { loadSession, saveSession, generateRandom } from './gs-crypto'
 export const structure = writable({})
 export const ready = writable(false)
 export const connected = writable(false)
+export const logs = writable({})
 
 let PENDING = new Set();
 let SESSION;
@@ -57,10 +58,20 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  if (data.type === "activity") {
+  if (data.hasOwnProperty('log')) {
+    logs.update(l=>{
+      let containerID = data.log.container_id
+      let containerLine = data.log.line
+      if (l.hasOwnProperty(containerID)) {
+        l[containerID] = l[containerID] + containerLine
+      }
+      l[containerID] = containerLine
+      return l
+    })
+  } else if (data.type === "activity") {
     handleActivity(data)
   } else if (data.type == "structure") {
-    console.log(data)
+    //console.log(data)
     structure.set(data)
   } else {
     console.log("server alive")
@@ -411,6 +422,20 @@ export const submitReport = (contact,description,ships) => {
     "contact":contact,
     "description":description,
     "ships":ships
+  }
+  send(payload)
+}
+
+//
+//  Logs
+//
+//
+//
+export const toggleLog = (name,action) => {
+  let payload = {
+    "type":"logs",
+    "action":action,
+    "container_id": name,
   }
   send(payload)
 }
