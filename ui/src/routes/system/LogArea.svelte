@@ -38,6 +38,7 @@
 </div>
 
 <style>
+  .logarea::-webkit-scrollbar {display: none;}
   .logarea {
     position: relative;
     background: var(--bg-modal);

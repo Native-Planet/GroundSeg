@@ -2,18 +2,22 @@
   import Fa from 'svelte-fa'
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
   import { showLogs } from './store'
+  import { structure } from '$lib/stores/websocket'
   import Drawer from '$lib/Drawer.svelte'
   import LogArea from './LogArea.svelte'
   export let title
   export let isOpen
   let type = "system"
+  $: registered = ($structure?.profile?.startram?.info?.registered) || false
 </script>
 
 {#if isOpen}
 <Drawer {title}>
   <div class="log-options">
-    <div class="log-option" class:active={type=="groundseg"} on:click={()=>type="groundseg"}>GroundSeg</div>
-    <div class="log-option" class:active={type=="startram"} on:click={()=>type="startram"}>StarTram</div>
+    <div class="log-option" class:active={type=="system"} on:click={()=>type="system"}>GroundSeg</div>
+    {#if registered}
+      <div class="log-option" class:active={type=="startram"} on:click={()=>type="startram"}>StarTram</div>
+    {/if}
   </div>
   {#if type == "startram"}
     <LogArea type="wireguard" />
