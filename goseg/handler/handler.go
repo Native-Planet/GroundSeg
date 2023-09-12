@@ -9,6 +9,7 @@ import (
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
+	"goseg/system"
 	"net/http"
 	"os"
 	"os/exec"
@@ -310,4 +311,17 @@ func checkPatp(patp string) bool {
 		}
 	}
 	return true
+}
+
+func SwapHandler(msg []byte) error {
+	var swapPayload structs.WsSwapPayload
+	if err := json.Unmarshal(msg, &swapPayload); err != nil {
+		return fmt.Errorf("Error unmarshalling payload: %v", err)
+	}
+	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap:swapPayload.Payload.Value,Type:"swap"}
+	swapfile := config.BasePath + "/swapfile"
+	if err := system.ConfigureSwap(swapfile,swapPayload.Payload.Value); err != nil {
+		return fmt.Errorf("Unable to set swap: %v",err)
+	}
+	return nil
 }
