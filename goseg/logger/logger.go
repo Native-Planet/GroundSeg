@@ -30,7 +30,11 @@ func init() {
 	logPath = basePath + "logs/"
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create log directory: %v", err))
+		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
+		fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
+		fmt.Println("Please run GroundSeg as root!  \n    /) /)\n   ( . . )\n   (  >< )\n Love, Native Planet")
+		fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+		panic("")
 	}
 	logFile, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

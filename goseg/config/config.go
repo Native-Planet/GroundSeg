@@ -70,9 +70,12 @@ func init() {
 		err = createDefaultConf()
 		if err != nil {
 			// panic if we can't create it
-			errmsg := fmt.Sprintf("Unable to create config! Please elevate permissions. %v", err)
-			logger.Logger.Error(errmsg)
-			panic(errmsg)
+			logger.Logger.Error(fmt.Sprintf("Unable to create config! %v", err))
+			fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
+			fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
+			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
+			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+			panic("")
 		}
 		// generate and insert wireguard keys
 		wgPriv, wgPub, err := WgKeyGen()

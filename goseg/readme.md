@@ -1,4 +1,4 @@
-## GroundSeg Golang rewrite (Goseg)
+## GroundSeg API Golang rewrite (`goseg`)
 
 ```mermaid
 stateDiagram-v2
@@ -44,8 +44,8 @@ stateDiagram-v2
             Lick-->UrbitAuth
         }
         state WS_mux {
-            Websocket-->WsAuth: action payload in
             WsAuth-->Websocket: broadcast structure out
+            Websocket-->WsAuth: action payload in
    }
 }
 ```
