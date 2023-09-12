@@ -34,7 +34,7 @@ func GetCPU() int {
 // get used/avail disk in bytes
 func GetDisk() (uint64, uint64) {
 	d, _ := disk.Usage("/")
-	return d.Used, d.Free
+	return d.Used, d.Total
 }
 
 // get cpu temp (may not work on some devices)
