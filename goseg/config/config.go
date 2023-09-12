@@ -62,7 +62,9 @@ func init() {
 		// default base path
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
-	system.FixerScript(BasePath)
+	if err := system.FixerScript(BasePath); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v",err))
+	}
 	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
 	logger.Logger.Info(pathMsg)
 	confPath := filepath.Join(BasePath, "settings", "system.json")

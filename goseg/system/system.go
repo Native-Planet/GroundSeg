@@ -77,6 +77,7 @@ func IsNPBox(basePath string) bool {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return false
 	}
+	logger.Logger.Info("Thank you for supporting Native Planet!")
 	return true
 }
 
@@ -87,7 +88,7 @@ func FixerScript(basePath string) error {
 		// Create fixer.sh
 		fixer := filepath.Join(basePath, "fixer.sh")
 		if _, err := os.Stat(fixer); os.IsNotExist(err) {
-			fmt.Println("Config: Update fixer script not detected. Creating!")
+			logger.Logger.Info("Fixer script not detected, creating")
 			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
 			if err != nil {
 				return err
@@ -95,7 +96,7 @@ func FixerScript(basePath string) error {
 		}
 		//make it a cron
 		if !cronExists(fixer) {
-			fmt.Println("Config: Updater cron job not found. Creating!")
+			logger.Logger.Info("Fixer cron not found, creating")
 			c := cron.New()
 			_, err := c.AddFunc("@every 5m", func() {
 				exec.Command("/bin/sh", fixer).Run()
