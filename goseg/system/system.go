@@ -7,12 +7,12 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
-	"strconv"
-	"strings"
-	"time"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -127,4 +127,3 @@ func addCron(job string) error {
 	cmd := exec.Command("crontab", tmpfile.Name())
 	return cmd.Run()
 }
-

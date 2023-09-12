@@ -27,7 +27,7 @@ var (
 	broadcastState    structs.AuthBroadcast
 	unauthState       structs.UnauthBroadcast
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
-	SysTransBus 	  = make(chan structs.SystemTransitionBroadcast, 100)
+	SysTransBus       = make(chan structs.SystemTransitionBroadcast, 100)
 	SystemTransitions structs.SystemTransitionBroadcast
 	UrbTransMu        sync.RWMutex
 	SysTransMu        sync.RWMutex

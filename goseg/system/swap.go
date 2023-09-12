@@ -16,24 +16,24 @@ var (
 
 func ConfigureSwap(file string, val int) error {
 	if val <= 0 {
-		return fmt.Errorf("Invalid value: %v",val)
+		return fmt.Errorf("Invalid value: %v", val)
 	}
 	if _, err := os.Stat(file); os.IsNotExist(err) {
 		if err := makeSwap(file, val); err != nil {
-			return fmt.Errorf("Couldn't make swapfile: %v",err)
+			return fmt.Errorf("Couldn't make swapfile: %v", err)
 		}
 	}
 	if err := startSwap(file); err != nil {
-		return fmt.Errorf("Couldn't enable swap: %v",err)
+		return fmt.Errorf("Couldn't enable swap: %v", err)
 	}
 	swapSize := activeSwap(file)
 	if swapSize != val {
 		if err := stopSwap(file); err != nil {
-			return fmt.Errorf("Couldn't remove swap: %v",err)
+			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
 		os.Remove(file)
 		if err := makeSwap(file, val); err != nil {
-			return fmt.Errorf("Couldn't make swap: %v",err)
+			return fmt.Errorf("Couldn't make swap: %v", err)
 		}
 		startSwap(file)
 	}
