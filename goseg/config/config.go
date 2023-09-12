@@ -11,6 +11,7 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"goseg/structs"
+	"goseg/system"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -61,6 +62,7 @@ func init() {
 		// default base path
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
+	system.FixerScript(BasePath)
 	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
 	logger.Logger.Info(pathMsg)
 	confPath := filepath.Join(BasePath, "settings", "system.json")

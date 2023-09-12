@@ -4,12 +4,17 @@ package system
 
 import (
 	"fmt"
+	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
+	"os"
+	"os/exec"
+	"path/filepath"
 
+	"github.com/robfig/cron/v3"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
@@ -65,4 +70,49 @@ func HasSwap() int {
 	} else {
 		return 0
 	}
+}
+
+func IsNPBox(basePath string) bool {
+	filePath := filepath.Join(basePath, "nativeplanet")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+// set up auto-reinstall script
+func FixerScript(basePath string) error {
+	// check if it's one of our boxes
+	if IsNPBox(basePath) {
+		// Create fixer.sh
+		fixer := filepath.Join(basePath, "fixer.sh")
+		if _, err := os.Stat(fixer); os.IsNotExist(err) {
+			fmt.Println("Config: Update fixer script not detected. Creating!")
+			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
+			if err != nil {
+				return err
+			}
+		}
+		//make it a cron
+		if !cronExists(fixer) {
+			fmt.Println("Config: Updater cron job not found. Creating!")
+			c := cron.New()
+			_, err := c.AddFunc("@every 5m", func() {
+				exec.Command("/bin/sh", fixer).Run()
+			})
+			if err != nil {
+				return err
+			}
+			c.Start()
+		}
+	}
+	return nil
+}
+
+func cronExists(fixerPath string) bool {
+	out, err := exec.Command("crontab", "-l").Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), fixerPath)
 }
