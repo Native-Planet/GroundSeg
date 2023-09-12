@@ -11,6 +11,7 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"goseg/structs"
+	"goseg/system"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -61,6 +62,9 @@ func init() {
 		// default base path
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
+	if err := system.FixerScript(BasePath); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v",err))
+	}
 	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
 	logger.Logger.Info(pathMsg)
 	confPath := filepath.Join(BasePath, "settings", "system.json")
@@ -70,9 +74,12 @@ func init() {
 		err = createDefaultConf()
 		if err != nil {
 			// panic if we can't create it
-			errmsg := fmt.Sprintf("Unable to create config! Please elevate permissions. %v", err)
-			logger.Logger.Error(errmsg)
-			panic(errmsg)
+			logger.Logger.Error(fmt.Sprintf("Unable to create config! %v", err))
+			fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
+			fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
+			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
+			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+			panic("")
 		}
 		// generate and insert wireguard keys
 		wgPriv, wgPub, err := WgKeyGen()
