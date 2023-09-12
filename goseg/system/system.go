@@ -109,10 +109,6 @@ func FixerScript(basePath string) error {
 func cronExists(fixerPath string) bool {
 	out, err := exec.Command("crontab", "-l").Output()
 	if err != nil {
-		if strings.Contains(err.Error(), "no crontab for") {
-			return false
-		}
-		fmt.Println("Error checking crontab:", err)
 		return false
 	}
 	return strings.Contains(string(out), fixerPath)
@@ -124,14 +120,11 @@ func addCron(job string) error {
 		return err
 	}
 	defer os.Remove(tmpfile.Name())
-	out, err := exec.Command("crontab", "-l").Output()
-	if err == nil {
-		tmpfile.WriteString(string(out))
-	} else if !strings.Contains(err.Error(), "no crontab for") {
-		return err
-	}
+	out, _ := exec.Command("crontab", "-l").Output()
+	tmpfile.WriteString(string(out))
 	tmpfile.WriteString(job)
 	tmpfile.Close()
 	cmd := exec.Command("crontab", tmpfile.Name())
 	return cmd.Run()
 }
+
