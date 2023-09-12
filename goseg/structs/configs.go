@@ -117,6 +117,36 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 	}
 	for k, v := range raw {
 		switch k {
+		case "pier_name":
+			u.PierName, _ = v.(string)
+		case "http_port":
+			u.HTTPPort = toInt(v)
+		case "ames_port":
+			u.AmesPort = toInt(v)
+		case "loom_size":
+			u.LoomSize = toInt(v)
+		case "urbit_version":
+			u.UrbitVersion, _ = v.(string)
+		case "minio_version":
+			u.MinioVersion, _ = v.(string)
+		case "urbit_repo":
+			u.UrbitRepo, _ = v.(string)
+		case "minio_repo":
+			u.MinioRepo, _ = v.(string)
+		case "urbit_amd64_sha256":
+			u.UrbitAmd64Sha256, _ = v.(string)
+		case "urbit_arm64_sha256":
+			u.UrbitArm64Sha256, _ = v.(string)
+		case "minio_amd64_sha256":
+			u.MinioAmd64Sha256, _ = v.(string)
+		case "minio_arm64_sha256":
+			u.MinioArm64Sha256, _ = v.(string)
+		case "minio_password":
+			u.MinioPassword, _ = v.(string)
+		case "network":
+			u.Network, _ = v.(string)
+		case "wg_url":
+			u.WgURL, _ = v.(string)
 		case "wg_http_port":
 			u.SetWgHTTPPort(v)
 		case "wg_ames_port":
@@ -125,7 +155,28 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.SetWgS3Port(v)
 		case "wg_console_port":
 			u.SetWgConsolePort(v)
-			// Handle other fields similarly
+		case "meld_schedule":
+			u.MeldSchedule, _ = v.(bool)
+		case "meld_frequency":
+			u.MeldFrequency = toInt(v)
+		case "meld_time":
+			u.MeldTime, _ = v.(string)
+		case "meld_last":
+			u.MeldLast, _ = v.(string)
+		case "meld_next":
+			u.MeldNext, _ = v.(string)
+		case "boot_status":
+			u.BootStatus, _ = v.(string)
+		case "custom_urbit_web":
+			u.CustomUrbitWeb, _ = v.(string)
+		case "custom_s3_web":
+			u.CustomS3Web, _ = v.(string)
+		case "show_urbit_web":
+			u.ShowUrbitWeb, _ = v.(string)
+		case "dev_mode":
+			u.DevMode, _ = v.(bool)
+		case "click":
+			u.Click, _ = v.(bool)
 		}
 	}
 	return nil

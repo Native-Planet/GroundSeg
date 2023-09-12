@@ -112,7 +112,7 @@ func main() {
 		loadService(docker.LoadMinIOs, "Unable to load MinIO containers!")
 	}
 	// Load Netdata
-	loadService(docker.LoadNetdata, "Unable to load Netdata!")
+	//loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 

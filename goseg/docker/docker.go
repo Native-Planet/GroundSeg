@@ -281,7 +281,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
-		_, err := cli.ContainerCreate(ctx, &containerConfig, nil, nil, nil, containerName)
+		_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 		if err != nil {
 			return containerState, err
 		}
