@@ -86,16 +86,13 @@ func activeSwap(loc string) int {
 				if strings.Contains(item, "M") || strings.Contains(item, "G") {
 					num, _ := strconv.Atoi(strings.TrimRight(item, "MG"))
 					if strings.Contains(item, "M") {
-						fmt.Println(num)
 						return num / 1024
 					}
-					fmt.Println(num)
 					return num
 				}
 			}
 		}
 	}
-	fmt.Println(0)
 	return 0
 }
 
