@@ -69,11 +69,17 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		errorCleanup(patp, errmsg)
 		return
 	}
-	// transition: creating
-	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "creating"}
+	// start container
 	logger.Logger.Info(fmt.Sprintf("Creating Pier: %v", patp))
-	// todo: create docker container
-	time.Sleep(time.Second * time.Duration(5)) // temp
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "creating"}
+	info, err := docker.StartContainer(patp, "vere")
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(patp, errmsg)
+		return
+	}
+	config.UpdateContainerState(patp, info)
 
 	// debug, force error
 	//errmsg := "Self induced error, for debugging purposes"
