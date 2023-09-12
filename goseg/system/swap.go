@@ -42,7 +42,7 @@ func ConfigureSwap(file string, val int) error {
 
 func startSwap(loc string) error {
 	if err := exec.Command("swapon", loc).Run(); err != nil {
-		return fmt.Errorf("Failed to run swapon: %v\n", err)
+		return fmt.Errorf("Failed to run swapon at %s: %v\n", loc, err)
 	}
 	return nil
 }
