@@ -178,7 +178,6 @@ func UrbitHandler(msg []byte) error {
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Type)
 	}
-	return nil
 }
 
 // validate password and add to auth session map
@@ -199,11 +198,11 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
 		}
+		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
+		return nil
 	} else {
 		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
 	}
-	logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
-	return nil
 }
 
 // take a guess

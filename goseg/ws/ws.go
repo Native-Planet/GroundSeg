@@ -128,7 +128,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
 				MuCon.Write(resp)
 			case "verify":
@@ -223,7 +223,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
 				MuCon.Write(resp)
 				ack = "nack"

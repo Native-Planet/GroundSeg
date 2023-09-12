@@ -204,7 +204,6 @@ func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error
 			return err
 		}
 	}
-	return nil
 }
 
 // send prev 500 lines of syslogs
