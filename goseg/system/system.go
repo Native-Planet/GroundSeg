@@ -117,12 +117,14 @@ func cronExists(fixerPath string) bool {
 func addCron(job string) error {
 	tmpfile, err := ioutil.TempFile("", "cron")
 	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error writing tempfile: %v",err))
 		return err
 	}
 	defer os.Remove(tmpfile.Name())
 	currentCron, err := exec.Command("crontab", "-l").Output()
 	if err != nil {
 		if !strings.Contains(err.Error(), "no crontab") {
+			logger.Logger.Warn(fmt.Sprintf("Error with crontab output: %v",err))
 			return err
 		}
 	}
