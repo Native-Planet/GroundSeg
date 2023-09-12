@@ -7,12 +7,12 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
-	"strconv"
-	"strings"
-	"time"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -34,7 +34,7 @@ func GetCPU() int {
 // get used/avail disk in bytes
 func GetDisk() (uint64, uint64) {
 	d, _ := disk.Usage("/")
-	return d.Used, d.Free
+	return d.Total, d.Used
 }
 
 // get cpu temp (may not work on some devices)
@@ -127,4 +127,3 @@ func addCron(job string) error {
 	cmd := exec.Command("crontab", tmpfile.Name())
 	return cmd.Run()
 }
-

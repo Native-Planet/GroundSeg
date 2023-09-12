@@ -76,7 +76,7 @@ func main() {
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
 	// digest system transition events
-	//go rectify.SystemTransitionHandler()
+	go rectify.SystemTransitionHandler()
 	// digest new ship transition events
 	go rectify.NewShipTransitionHandler()
 	// digest retrieve data

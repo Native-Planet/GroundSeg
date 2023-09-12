@@ -178,6 +178,7 @@ type WsSystemAction struct {
 	Type    string `json:"type"`
 	Action  string `json:"action"`
 	Command string `json:"command"`
+	Value   int    `json:"value"`
 }
 
 type WsTokenStruct struct {
@@ -208,6 +209,18 @@ type WsPwAction struct {
 	Action   string `json:"action"`
 	Old      string `json:"old"`
 	Password string `json:"password"`
+}
+
+type WsSwapPayload struct {
+	ID      string        `json:"id"`
+	Payload WsSwapAction  `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsSwapAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Value  int    `json:"value"`
 }
 
 type WsLogoutPayload struct {

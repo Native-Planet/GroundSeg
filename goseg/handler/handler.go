@@ -9,6 +9,7 @@ import (
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
+	"goseg/system"
 	"net/http"
 	"os"
 	"os/exec"
@@ -86,6 +87,17 @@ func SystemHandler(msg []byte) error {
 			}
 		default:
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
+		}
+	case "modify-swap":
+		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: systemPayload.Payload.Value, Type: "swap"}
+		swapfile := config.BasePath + "/swapfile"
+		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
+			return fmt.Errorf("Unable to set swap: %v", err)
+		}
+		if err = config.UpdateConf(map[string]interface{}{
+			"swapVal":  systemPayload.Payload.Value,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't update swap value: %v", err))
 		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
