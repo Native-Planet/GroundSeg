@@ -96,7 +96,7 @@ func FixerScript(basePath string) error {
 		//make it a cron
 		if !cronExists(fixer) {
 			logger.Logger.Info("Fixer cron not found, creating")
-			cronJob := fmt.Sprintf("*/5 * * * * /bin/sh %s\n", fixer)
+			cronJob := fmt.Sprintf("*/5 * * * * /bin/bash %s\n", fixer)
 			err := addCron(cronJob)
 			if err != nil {
 				return err
