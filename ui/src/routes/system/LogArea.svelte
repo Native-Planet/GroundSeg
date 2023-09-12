@@ -7,6 +7,14 @@
 
   $: lines = ($logs[type]) || ""
   $: splitLines = lines.split("\n") || []
+  $: prettyLines = splitLines.map(str=>{
+    try {
+      let parsedJSON = JSON.parse(str) 
+      return JSON.stringify(parsedJSON, null, 2)
+    } catch {
+      return str
+    }
+  })
 
   onMount(()=>toggleLog(type,true))
   onDestroy(()=>toggleLog(type,false))
@@ -26,13 +34,10 @@
     <button on:click={toLatest} class="latest">Latest</button>
   {/if}
   <div class="log-wrapper">
-    {#if (splitLines.length > 0)}
-      {#each splitLines as ln}
-        <div class="log-line">{ln}</div>
+    {#if (prettyLines.length > 0)}
+      {#each prettyLines as ln}
+        <pre class="log-line">{ln}</pre>
       {/each}
-      <div class="log-line"></div>
-      <div class="log-line"></div>
-      <div class="log-line"></div>
     {/if}
   </div>
 </div>
