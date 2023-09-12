@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/robfig/cron/v3"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
@@ -97,14 +96,11 @@ func FixerScript(basePath string) error {
 		//make it a cron
 		if !cronExists(fixer) {
 			logger.Logger.Info("Fixer cron not found, creating")
-			c := cron.New()
-			_, err := c.AddFunc("@every 5m", func() {
-				exec.Command("/bin/sh", fixer).Run()
-			})
+			cronJob := fmt.Sprintf("*/5 * * * * /bin/sh %s\n", fixer)
+			err := addCron(cronJob)
 			if err != nil {
 				return err
 			}
-			c.Start()
 		}
 	}
 	return nil
@@ -116,4 +112,23 @@ func cronExists(fixerPath string) bool {
 		return false
 	}
 	return strings.Contains(string(out), fixerPath)
+}
+
+func addCron(job string) error {
+	tmpfile, err := ioutil.TempFile("", "cron")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpfile.Name())
+	currentCron, err := exec.Command("crontab", "-l").Output()
+	if err != nil {
+		if !strings.Contains(err.Error(), "no crontab") {
+			return err
+		}
+	}
+	tmpfile.WriteString(string(currentCron))
+	tmpfile.WriteString(job)
+	tmpfile.Close()
+	cmd := exec.Command("crontab", tmpfile.Name())
+	return cmd.Run()
 }
