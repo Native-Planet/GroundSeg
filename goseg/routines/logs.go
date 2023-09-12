@@ -167,10 +167,7 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
 			return
 		}
-		if err := MuCon.Write(logJSON); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
-			return
-		}
+		MuCon.Write(logJSON)
 	}
 }
 
@@ -207,7 +204,6 @@ func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error
 			return err
 		}
 	}
-	return nil
 }
 
 // send prev 500 lines of syslogs
@@ -229,10 +225,7 @@ func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
 			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
 			return
 		}
-		if err := MuCon.Write(logJSON); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
-			return
-		}
+		MuCon.Write(logJSON)
 	}
 }
 
@@ -258,10 +251,7 @@ func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, lo
 					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
 					break
 				}
-				if err := MuCon.Write(logJSON); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-					break
-				}
+				MuCon.Write(logJSON)
 			}
 			if err == io.EOF {
 				break
@@ -285,10 +275,7 @@ func sendSysLogs(ctx context.Context, MuCon *structs.MuConn, line string) {
 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
 				return
 			}
-			if err := MuCon.Write(logJSON); err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-				return
-			}
+			MuCon.Write(logJSON)
 		}
 	}
 }

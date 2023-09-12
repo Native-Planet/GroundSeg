@@ -12,21 +12,34 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	WsEventBus = make(chan WsChanEvent, 100)
+)
+
 // wrapped ws+mutex
 type MuConn struct {
 	Conn *websocket.Conn
 	Mu   sync.RWMutex
 }
 
+type WsChanEvent struct {
+	Conn *MuConn
+	Data []byte
+}
+
 // mutexed ws write
-func (ws *MuConn) Write(data []byte) error {
-	ws.Mu.Lock()
-	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
-		ws.Mu.Unlock()
-		return err
-	}
-	ws.Mu.Unlock()
-	return nil
+// func (ws *MuConn) Write(data []byte) error {
+// 	ws.Mu.Lock()
+// 	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+// 		ws.Mu.Unlock()
+// 		return err
+// 	}
+// 	ws.Mu.Unlock()
+// 	return nil
+// }
+
+func (ws *MuConn) Write(data []byte) {
+	WsEventBus <- WsChanEvent{Conn: ws, Data: data}
 }
 
 // wrappers for mutexed token:websocket maps

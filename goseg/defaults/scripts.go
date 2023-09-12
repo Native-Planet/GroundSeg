@@ -373,4 +373,10 @@ var (
 	fi
 	
 	urbit meld --loom $loom $dirname`
+
+	Fixer = `if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
+		echo "Started: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+		wget -O - only.groundseg.app | bash;
+		echo "Ended: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+	fi`
 )

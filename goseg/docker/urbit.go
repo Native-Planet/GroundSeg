@@ -87,7 +87,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			logger.Logger.Warn("Unable to reset %s boot script!", containerName)
+			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
 	}
 	// write the script
