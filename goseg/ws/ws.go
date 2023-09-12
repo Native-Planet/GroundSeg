@@ -130,9 +130,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
-				if err := MuCon.Write(resp); err != nil {
-					logger.Logger.Warn("Unable to broadcast to unauth client")
-				}
+				MuCon.Write(resp)
 			case "verify":
 				if err := auth.AddToAuthMap(conn, token, true); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
@@ -175,9 +173,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
 				logger.Logger.Error(errmsg)
 			}
-			if err := MuCon.Write(respJson); err != nil {
-				continue
-			}
+			MuCon.Write(respJson)
 			// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
@@ -210,9 +206,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
 					ack = "nack"
 				}
-				if err := MuCon.Write(respJson); err != nil {
-					continue
-				}
+				MuCon.Write(respJson)
 			case "logs":
 				// unauth for debugging
 				var logPayload structs.WsLogsPayload
@@ -231,9 +225,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
 				}
-				if err := MuCon.Write(resp); err != nil {
-					logger.Logger.Warn("Unable to broadcast to unauth client")
-				}
+				MuCon.Write(resp)
 				ack = "nack"
 			}
 		}
@@ -249,8 +241,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
 		}
-		if err := MuCon.Write(respJson); err != nil {
-			continue
-		}
+		MuCon.Write(respJson)
 	}
 }
