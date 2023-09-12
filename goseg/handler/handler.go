@@ -94,6 +94,11 @@ func SystemHandler(msg []byte) error {
 		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
 			return fmt.Errorf("Unable to set swap: %v", err)
 		}
+		if err = config.UpdateConf(map[string]interface{}{
+			"swapVal":  systemPayload.Payload.Value,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't update swap value: %v", err))
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}
