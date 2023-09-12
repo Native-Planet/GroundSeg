@@ -99,7 +99,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	// gather boot option values
 	shipName := shipConf.PierName
 	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
-	dirnameValue := shipConf.PierName
 	var devMode string
 	if shipConf.DevMode == true {
 		devMode = "True"
@@ -120,9 +119,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			Cmd: []string{
 				"bash",
 				"/urbit/start_urbit.sh",
-				shipName,
 				"--loom=" + loomValue,
-				"--dirname=" + dirnameValue,
+				"--dirname=" + shipName,
 				"--devmode=" + devMode,
 				"--http-port=" + httpPort,
 				"--port=" + amesPort,
@@ -146,12 +144,15 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		// finally construct the container config structs
 		containerConfig = container.Config{
 			Image: desiredImage,
+			ExposedPorts: nat.PortSet{
+				"80/tcp":    struct{}{},
+				"34343/udp": struct{}{},
+			},
 			Cmd: []string{
 				"bash",
 				"/urbit/start_urbit.sh",
-				shipName,
 				"--loom=" + loomValue,
-				"--dirname=" + dirnameValue,
+				"--dirname=" + shipName,
 				"--devmode=" + devMode,
 			},
 		}
@@ -159,7 +160,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 
 	mounts := []mount.Mount{
 		{
-			Type:   mount.TypeBind,
+			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
 			Source: shipName,
 			Target: "/urbit",
 		},
