@@ -58,21 +58,22 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  if (data.hasOwnProperty('log')) {
-    logs.update(l=>{
-      let containerID = data.log.container_id
-      let containerLine = data.log.line
-      if (l.hasOwnProperty(containerID)) {
-        l[containerID] = l[containerID] + containerLine
-      }
-      l[containerID] = containerLine
-      return l
-    })
-  } else if (data.type === "activity") {
+  if (data.type === "activity") {
     handleActivity(data)
   } else if (data.type == "structure") {
     //console.log(data)
     structure.set(data)
+  } else if (data.hasOwnProperty('log')) {
+    logs.update(l=>{
+      let containerID = data.log.container_id
+      let containerLine = data.log.line
+      if (l.hasOwnProperty(containerID)) {
+        l[containerID] = l[containerID] + "\n" + containerLine
+      } else {
+        l[containerID] = containerLine
+      }
+      return l
+    })
   } else {
     console.log("server alive")
   }
