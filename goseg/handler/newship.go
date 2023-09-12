@@ -200,7 +200,7 @@ func removeSysConfigPier(patp string) error {
 		}
 	}
 	err := config.UpdateConf(map[string]interface{}{
-		"Piers": updated,
+		"piers": updated,
 	})
 	return err
 }
@@ -221,7 +221,7 @@ func appendSysConfigPier(patp string) error {
 		piers = append(piers, patp)
 	}
 	err := config.UpdateConf(map[string]interface{}{
-		"Piers": piers,
+		"piers": piers,
 	})
 	if err != nil {
 		return err
