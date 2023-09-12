@@ -41,10 +41,17 @@ func ConfigureSwap(file string, val int) error {
 }
 
 func startSwap(loc string) error {
-	if err := exec.Command("swapon", loc).Run(); err != nil {
-		return fmt.Errorf("Failed to run swapon at %s: %v\n", loc, err)
-	}
-	return nil
+    cmd := exec.Command("swapon", "--show")
+    output, _ := cmd.Output()
+    if strings.Contains(string(output), loc) {
+        return nil
+    }
+    cmd = exec.Command("swapon", loc)
+    err := cmd.Run()
+    if err != nil {
+        return fmt.Errorf("Failed to run swapon: %v", err)
+    }
+    return nil
 }
 
 func stopSwap(loc string) error {
