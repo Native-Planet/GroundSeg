@@ -234,7 +234,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "netdata":
-		_, _, err := netdataContainerConf()
+		containerConfig, hostConfig, err = netdataContainerConf()
 		if err != nil {
 			return containerState, err
 		}
