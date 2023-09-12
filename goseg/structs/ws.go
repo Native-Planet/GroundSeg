@@ -178,6 +178,7 @@ type WsSystemAction struct {
 	Type    string `json:"type"`
 	Action  string `json:"action"`
 	Command string `json:"command"`
+	Value   int    `json:"value"`
 }
 
 type WsTokenStruct struct {

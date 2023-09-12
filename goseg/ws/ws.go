@@ -152,10 +152,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				config.LogsEventBus <- logEvent
 				// broadcast.StreamLogs(MuCon, msg)
-			case "modify-swap":
-				if err := handler.SwapHandler(msg); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Unable to modify swap: %v", err))
-				}
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)

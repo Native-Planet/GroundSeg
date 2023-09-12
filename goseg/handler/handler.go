@@ -88,6 +88,12 @@ func SystemHandler(msg []byte) error {
 		default:
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
 		}
+	case "modify-swap":
+		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: systemPayload.Payload.Value, Type: "swap"}
+		swapfile := config.BasePath + "/swapfile"
+		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
+			return fmt.Errorf("Unable to set swap: %v", err)
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}
@@ -311,17 +317,4 @@ func checkPatp(patp string) bool {
 		}
 	}
 	return true
-}
-
-func SwapHandler(msg []byte) error {
-	var swapPayload structs.WsSwapPayload
-	if err := json.Unmarshal(msg, &swapPayload); err != nil {
-		return fmt.Errorf("Error unmarshalling payload: %v", err)
-	}
-	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: swapPayload.Payload.Value, Type: "swap"}
-	swapfile := config.BasePath + "/swapfile"
-	if err := system.ConfigureSwap(swapfile, swapPayload.Payload.Value); err != nil {
-		return fmt.Errorf("Unable to set swap: %v", err)
-	}
-	return nil
 }
