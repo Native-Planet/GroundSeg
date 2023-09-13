@@ -34,7 +34,6 @@ func ConfigureSwap(file string, val int) error {
 		if err := os.Remove(file); err != nil {
 			return fmt.Errorf("Couldn't remove old swap: %v", err)
 		}
-		fmt.Println("making new swapfile",file)
 		if err := makeSwap(file, val); err != nil {
 			return fmt.Errorf("Couldn't make swap: %v", err)
 		}
