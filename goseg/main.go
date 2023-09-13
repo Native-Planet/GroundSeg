@@ -103,6 +103,15 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
+	// grab wg now cause its huge
+	if wgConf, err := docker.GetLatestContainerInfo("wireguard"); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v",err))
+	} else {
+		logger.Logger.Info("Downloading Wireguard image")
+		if _, err := docker.PullImageIfNotExist("wireguard",wgConf); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v",err))
+		}
+	}
 	if conf.WgRegistered == true {
 		// Load Wireguard
 		loadService(docker.LoadWireguard, "Unable to load Wireguard!")

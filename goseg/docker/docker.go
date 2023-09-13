@@ -7,6 +7,7 @@ import (
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -422,37 +423,38 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 	if err != nil {
 		return false, err
 	}
-	// check if the desired image is available locally
 	images, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, err
 	}
 	for _, img := range images {
-		if img.ID == imageInfo["hash"] {
-			return true, nil
+		for _, digest := range img.RepoDigests {
+			if digest == fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]) {
+				return true, nil
+			}
 		}
 	}
-	_, err = cli.ImagePull(ctx, desiredImage, types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), types.ImagePullOptions{})
 	if err != nil {
 		return false, err
 	}
+	defer resp.Close()
+	io.Copy(ioutil.Discard, resp) // wait until it's done
 	return true, nil
 }
 
-// FindContainer looks for a container with the given name and returns it, or nil if not found
+// looks for a container with the given name and returns it, or nil if not found
 func FindContainer(containerName string) (*types.Container, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
-
 	// Fetch list of running containers
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
-
 	// Search for the container with the given name
 	for _, container := range containers {
 		for _, name := range container.Names {
