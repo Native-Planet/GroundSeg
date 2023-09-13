@@ -14,8 +14,8 @@
 <style>
   .wrapper {
     position: relative;
-    width: 288px;
-    height: 148px;
+    width: 320px;
+    height: 180px;
     flex-shrink: 0;
   }
   .add {
@@ -24,7 +24,7 @@
     color: var(--text-card-color);
     font-size: 64px;
     width: 40px;
-    top: 25px;
+    top: 40px;
     left: calc(50% - 15px);
   }
   .ship {

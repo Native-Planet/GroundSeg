@@ -6,7 +6,7 @@
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
-  $: isMoon = (noSig.length == 27) || (noSig.length == 20)
+  $: isMoon = (noSig.length == 27) || (noSig.length == 20) || false
   $: isPlanet = (noSig.length == 13)
   $: isStar = (noSig.length == 6)
   $: isGalaxy = (noSig.length == 3)
@@ -16,7 +16,7 @@
   afterUpdate(()=> {
     if (validPatp && (isMoon || isPlanet || isStar || isGalaxy)) {
       let root = getComputedStyle(document.documentElement);
-      let bg = root.getPropertyValue('--btn-secondary');
+      let bg = root.getPropertyValue('--fg-card');
       let fg = root.getPropertyValue('--text-card-color');
       let patp = noSig
       if (isMoon) {
@@ -37,11 +37,11 @@
 <div class="sigil">{@html displayed}</div>
 <style>
   .sigil {
-    width: 40px;
-    height: 40px;
+    width: 64px;
+    height: 64px;
     background: var(--btn-secondary);
     overflow: hidden;
-    margin-left: 9px;
-    margin-top: 7px;
+    margin-left: 34px;
+    margin-top: 38px;
   }
 </style>

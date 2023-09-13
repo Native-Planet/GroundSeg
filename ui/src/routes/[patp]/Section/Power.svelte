@@ -25,37 +25,29 @@
       loading={tTogglePower}
       />
   </div>
-
-  <!-- Urbit Ship Status 
-  <div class="section">
-    <div class="section-left">
-      <div class="section-title">Remember Urbit Boot Status</div>
-      <div class="section-description">This enables your ship to autoboot after a device restart</div>
-    </div>
-    <div class="section-right">
-      <div class="checkbox" class:highlight={detectBootStatus} on:click={()=>toggleAutoBoot(patp)}>
-        {#if detectBootStatus}
-          <div class="icon"><Fa icon={faCheck} size="1x"/></div>
-        {/if}
-      </div>
-    </div>
-  </div>
-  -->
 </div>
 
 <style>
   .check-wrapper {
-    margin: 8px 0 0 4px;
+    margin: 12px 0 0 8px;
     display: flex;  
+    align-items: center;
     gap: 8px;
   }
   .checkbox {
-    width: 12px;
-    height: 12px;
+    width: 24px;
+    height: 24px;
     border: solid 1px var(--text-card-color);
     border-radius: 4px;
   }
   .check-text {
     font-size: 12px;
+    color: var(--text-card-color);
+    font-family: Inter;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 24px; /* 150% */
+    letter-spacing: -0.96px;
   }
 </style>

@@ -11,10 +11,17 @@
 }
 .section-title {
   font-family: var(--regular-font);
-  font-size: 16px;
-  margin-bottom: 4px;
+  leading-trim: both;
+  text-edge: cap;
+  font-family: Inter;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: normal;
+  letter-spacing: -1.44px;
 }
 .section-description {
+  margin-top: 16px;
   font-family: var(--regular-font);
-  font-size: 12px;
+  font-size: 16px;
 }

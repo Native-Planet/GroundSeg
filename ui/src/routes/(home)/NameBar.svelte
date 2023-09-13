@@ -28,7 +28,7 @@
     leading-trim: both;
     text-edge: cap;
     font-family: var(--title-font);
-    font-size: 20px;
+    font-size: 24px;
     font-style: normal;
     font-weight: 700;
     line-height: 16px;
