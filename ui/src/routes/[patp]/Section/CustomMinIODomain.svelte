@@ -13,6 +13,16 @@
   </div>
   <div class="wrapper">
     <button class="btn">
+      <img
+        src="/clipboard.svg"
+        width="24px"
+        height="24px" />
+      Copy MinIO Password
+    </button>
+    <button class="btn">
+      Settings
+    </button>
+    <button class="btn">
       Disconnect
     </button>
   </div>
