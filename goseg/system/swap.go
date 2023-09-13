@@ -28,14 +28,20 @@ func ConfigureSwap(file string, val int) error {
 	}
 	swapSize := activeSwap(file)
 	if swapSize != val {
+		fmt.Println("switching swap from",swapVal,"to",val)
 		if err := stopSwap(file); err != nil {
 			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
-		os.Remove(file)
+		if err := os.Remove(file); err != nil {
+			return fmt.Errorf("Couldn't remove old swap: %v", err)
+		}
+		fmt.Println("making new swapfile",file)
 		if err := makeSwap(file, val); err != nil {
 			return fmt.Errorf("Couldn't make swap: %v", err)
 		}
-		startSwap(file)
+		if err := startSwap(file); err != nil {
+			return fmt.Errorf("Couldn't make swap: %v", err)
+		}
 	}
 	return nil
 }

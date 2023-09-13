@@ -212,3 +212,17 @@ func SystemTransitionHandler() {
 		}
 	}
 }
+
+func ErrorTransitionHandler() {
+	for {
+		event := <-broadcast.SysTransBus
+		switch event.Type {
+		case "swap":
+			broadcast.SysTransMu.Lock()
+			broadcast.SystemTransitions.Swap = event.Swap
+			broadcast.SysTransMu.Unlock()
+		default:
+			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+		}
+	}
+}
