@@ -26,16 +26,20 @@ func ConfigureSwap(file string, val int) error {
 	if err := startSwap(file); err != nil {
 		return fmt.Errorf("Couldn't enable swap: %v", err)
 	}
-	swapSize := activeSwap(file)
+	swapSize := ActiveSwap(file)
 	if swapSize != val {
 		if err := stopSwap(file); err != nil {
 			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
-		os.Remove(file)
+		if err := os.Remove(file); err != nil {
+			return fmt.Errorf("Couldn't remove old swap: %v", err)
+		}
 		if err := makeSwap(file, val); err != nil {
 			return fmt.Errorf("Couldn't make swap: %v", err)
 		}
-		startSwap(file)
+		if err := startSwap(file); err != nil {
+			return fmt.Errorf("Couldn't start swap: %v", err)
+		}
 	}
 	return nil
 }
@@ -74,7 +78,7 @@ func makeSwap(loc string, val int) error {
 	return nil
 }
 
-func activeSwap(loc string) int {
+func ActiveSwap(loc string) int {
 	cmd := exec.Command("swapon", "--show")
 	output, err := cmd.Output()
 	if err != nil {
