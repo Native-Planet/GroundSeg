@@ -89,6 +89,7 @@ func SystemHandler(msg []byte) error {
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
 		}
 	case "modify-swap":
+		logger.Logger.Info(fmt.Sprintf("Updating swap with value %v",systemPayload.Payload.Value))
 		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: systemPayload.Payload.Value, Type: "swap"}
 		swapfile := config.BasePath + "/swapfile"
 		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
