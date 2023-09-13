@@ -179,6 +179,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 					return encryptedText, true
 				}
 			} else {
+				fmt.Println("Debug:\nip: %v %v\nagent: %v %v\ntoken: %v %v",ip,res["ip"],userAgent, res["user_agent"],res["id"],token["id"])
 				logger.Logger.Warn("TokenId doesn't match session!")
 				return token["token"], false
 			}
