@@ -93,6 +93,7 @@ func SystemHandler(msg []byte) error {
 		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: systemPayload.Payload.Value, Type: "swap"}
 		swapfile := config.BasePath + "/swapfile"
 		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
 			return fmt.Errorf("Unable to set swap: %v", err)
 		}
 		if err = config.UpdateConf(map[string]interface{}{

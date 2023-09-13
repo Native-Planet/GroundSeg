@@ -20,6 +20,7 @@ func ConfigureSwap(file string, val int) error {
 	}
 	if _, err := os.Stat(file); os.IsNotExist(err) {
 		if err := makeSwap(file, val); err != nil {
+			fmt.Println("Couldn't make swapfile:", err)
 			return fmt.Errorf("Couldn't make swapfile: %v", err)
 		}
 	}
@@ -30,17 +31,21 @@ func ConfigureSwap(file string, val int) error {
 	if swapSize != val {
 		fmt.Println("switching swap from",swapSize,"to",val)
 		if err := stopSwap(file); err != nil {
+			fmt.Println("Couldn't remove swap:", err)
 			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
 		if err := os.Remove(file); err != nil {
+			fmt.Println("Couldn't remove old swap:", err)
 			return fmt.Errorf("Couldn't remove old swap: %v", err)
 		}
 		fmt.Println("making new swapfile",file)
 		if err := makeSwap(file, val); err != nil {
+			fmt.Println("Couldn't make swap:", err)
 			return fmt.Errorf("Couldn't make swap: %v", err)
 		}
 		if err := startSwap(file); err != nil {
-			return fmt.Errorf("Couldn't make swap: %v", err)
+			fmt.Println("Couldn't start swap:", err)
+			return fmt.Errorf("Couldn't start swap: %v", err)
 		}
 	}
 	return nil
