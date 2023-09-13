@@ -109,7 +109,7 @@ func main() {
 	} else {
 		logger.Logger.Info("Downloading Wireguard image")
 		if _, err := docker.PullImageIfNotExist("wireguard",wgConf); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v",err))
+			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v; %v",err,wgConf))
 		}
 	}
 	if conf.WgRegistered == true {

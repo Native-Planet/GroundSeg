@@ -434,7 +434,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 			}
 		}
 	}
-	resp, err := cli.ImagePull(ctx, desiredImage, types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), types.ImagePullOptions{})
 	if err != nil {
 		return false, err
 	}
