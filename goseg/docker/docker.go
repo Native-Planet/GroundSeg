@@ -7,6 +7,7 @@ import (
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
