@@ -1,6 +1,8 @@
 <script>
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
   import { logs, toggleLog } from '$lib/stores/websocket'
+  import Clipboard from 'clipboard'
+
   export let type
   let div
 	let autoscroll
@@ -16,7 +18,9 @@
     }
   })
 
-  onMount(()=>toggleLog(type,true))
+  onMount(()=>{
+    toggleLog(type,true)
+  })
   onDestroy(()=>toggleLog(type,false))
 	beforeUpdate(() => {
 		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 0);
@@ -27,9 +31,20 @@
 
   const toLatest = () => div.scrollTo(0, div.scrollHeight)
 
-
+  let copy = new Clipboard('#logs');
+    copy.on("success", ()=> {
+      //clicked = true;
+      //setTimeout(()=> clicked = false, 1000)
+      console.log("copied")
+    })
 </script>
 <div class="logarea" bind:this={div}>
+  <button
+    id="logs"
+    class="logs"
+    data-clipboard-text={lines}>
+    Copy
+  </button>
   {#if !autoscroll}
     <button on:click={toLatest} class="latest">Latest</button>
   {/if}
@@ -69,7 +84,7 @@
     letter-spacing: -0.96px;
   }
   .latest {
-    position: fixed;
+    position: absolute;
     bottom: 24px;
     background: var(--btn-secondary);
     right: 48px;
@@ -80,5 +95,16 @@
     color: var(--text-card-color);
     border-radius: 16px 0 16px 0;
   }
-
+  .logs {
+    position: fixed;
+    top: 24px;
+    background: var(--btn-secondary);
+    right: 48px;
+    width: 64px;
+    line-height: 48px;
+    height: 48px;
+    font-size: 12px;
+    color: var(--text-card-color);
+    border-radius: 16px 0 16px 0;
+  }
 </style>

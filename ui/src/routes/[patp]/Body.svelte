@@ -9,7 +9,6 @@
   import Power from './Section/Power.svelte'
   import CustomUrbitDomain from './Section/CustomUrbitDomain.svelte'
   import CustomMinIODomain from './Section/CustomMinIODomain.svelte'
-  import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
@@ -41,9 +40,6 @@
   <!-- Custom MinIO Domain -->
   <CustomMinIODomain />
 
-  <!-- MinIO Settings -->
-  <MinIO />
-
   <!-- Loom -->
   <Loom {loomSize} />
 
@@ -62,18 +58,20 @@
 </div>
 
 <style>
+  .body::-webkit-scrollbar {display: none;}
   .body {
     background-color: var(--bg-card);
     position: absolute;
     bottom: 0;
-    height: calc(743px - 150px - 40px);
+    height: calc(743px - 150px - 20px);
     width: calc(100% - 40px);
-    padding: 20px;
+    padding: 20px 20px 0 20px;
     max-width: 100vw;
     border-radius: 16px 0 120px 16px;
     color: var(--text-card-color);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 45px;
+    overflow-y: scroll;
   }
 </style>

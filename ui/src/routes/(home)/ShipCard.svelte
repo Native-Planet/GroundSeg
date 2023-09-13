@@ -8,9 +8,7 @@
   import NameBar from './NameBar.svelte'
   import ContainerInfo from './ContainerInfo.svelte'
   import ShipButtons from './ShipButtons.svelte'
-
   export let patp
-  let loom = 8192
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: running = (ship?.running) || false
@@ -19,6 +17,7 @@
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
+  $: loomActual = 2 ** loom / (1024 * 1024)
 
   // debug
   let on = false
@@ -44,7 +43,7 @@
     <NameBar {patp} {running} />
   </div>
   <div class="container-info">
-    <ContainerInfo {memUsage} {diskUsage} {loom} />
+    <ContainerInfo {memUsage} {diskUsage} {loomActual} />
   </div>
   <div class="buttons">
     <ShipButtons {patp} {url}/>
@@ -54,8 +53,8 @@
 <style>
   .wrapper {
     position: relative;
-    width: 288px;
-    height: 148px;
+    width: 320px;
+    height: 180px;
     flex-shrink: 0;
   }
   .bg {
@@ -84,7 +83,7 @@
   }
   .namebar {
     position: absolute;
-    top: 51px;
+    top: 62px;
     left: 14px;
   }
   .container-info {

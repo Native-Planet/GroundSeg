@@ -53,6 +53,6 @@
     height: 16px;
     border-radius: 4px;
     background: #161D17;
-    transition: margin-left 0.4s ease;
+    transition: margin-left 0.2s ease;
   }
 </style>

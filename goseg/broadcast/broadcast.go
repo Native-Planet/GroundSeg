@@ -10,7 +10,6 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
-	"math"
 	"os"
 
 	"strings"
@@ -155,7 +154,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
 		urbit.Info.URL = fmt.Sprintf("http://%s.local:%d", hostName, dockerConfig.HTTPPort)
-		urbit.Info.LoomSize = int(math.Pow(2, float64(dockerConfig.LoomSize)) / math.Pow(1024, 2))
+		urbit.Info.LoomSize = dockerConfig.LoomSize
 		urbit.Info.DiskUsage = dockerStats.DiskUsage
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
 		urbit.Info.DevMode = dockerConfig.DevMode

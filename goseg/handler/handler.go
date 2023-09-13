@@ -122,14 +122,15 @@ func UrbitHandler(msg []byte) error {
 	case "toggle-network":
 		currentNetwork := shipConf.Network
 		conf := config.Conf()
+		logger.Logger.Warn(fmt.Sprintf("%v", currentNetwork))
 		if currentNetwork == "wireguard" {
-			shipConf.Network = "bridge"
+			shipConf.Network = "none"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
-		} else if currentNetwork == "bridge" && conf.WgRegistered == true {
+		} else if currentNetwork == "none" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf

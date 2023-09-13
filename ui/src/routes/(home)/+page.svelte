@@ -20,12 +20,13 @@
 
 <style>
   .wide {
-    width: calc((288px * 3) + (80px * 2));
+    width: calc((320px * 3) + (80px * 2));
     max-width: 100vw;
   }
   .slim {
     width: calc(100vw - 40px);
   }
+  .card-wrapper::-webkit-scrollbar {display: none;}
   .card-wrapper {
     background: var(--bg-base);
     border-radius: 16px;

@@ -8,6 +8,7 @@
 	},
 	"devDependencies": {
 		"@aws-crypto/sha256-browser": "^5.0.0",
+		"@bulatdashiev/svelte-slider": "^1.0.3",
 		"@fortawesome/free-brands-svg-icons": "^6.3.0",
 		"@fortawesome/free-regular-svg-icons": "^6.3.0",
 		"@fortawesome/free-solid-svg-icons": "^6.4.0",
