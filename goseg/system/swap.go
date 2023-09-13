@@ -15,6 +15,7 @@ var (
 )
 
 func ConfigureSwap(file string, val int) error {
+	fmt.Println("Configuring swap",file,"with",val)
 	if val <= 0 {
 		return fmt.Errorf("Invalid value: %v", val)
 	}
@@ -48,6 +49,7 @@ func ConfigureSwap(file string, val int) error {
 			return fmt.Errorf("Couldn't start swap: %v", err)
 		}
 	}
+	fmt.Println("success")
 	return nil
 }
 
