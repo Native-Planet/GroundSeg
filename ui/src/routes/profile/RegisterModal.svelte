@@ -11,6 +11,8 @@
   $: regions = info?.regions || {}
   $: regionKeys = Object.keys(regions)
   $: tRegister = (transition?.register) || null
+  // debug
+  //let tRegister = "key"
   let completed = false
 
   onMount(()=>startramGetRegions())
@@ -57,7 +59,7 @@
     {:else if tRegister == "key"}
       <div class="notify">Registering your key</div>
     {:else if tRegister == "services"}
-      <div class="notify">Registering services</div>
+      <div class="notify">Pending service registration: [ship list]</div>
     {:else if tRegister == "starting"}
       <div class="notify">Configuring your StarTram client</div>
     {:else if tRegister == "complete"}

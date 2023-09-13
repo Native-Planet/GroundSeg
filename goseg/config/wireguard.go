@@ -6,31 +6,11 @@ import (
 	"fmt"
 	"goseg/defaults"
 	"goseg/structs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
-
-// retrieve struct corresponding with urbit json file
-func GetWgConf() (structs.WgConfig, error) {
-	var wgConf structs.WgConfig
-	path := filepath.Join(BasePath, "settings", "wireguard.json")
-	configFile, err := os.Open(path)
-	if err != nil {
-		return wgConf, err
-	}
-	defer configFile.Close()
-
-	// Read file contents into byte slice
-	byteValue, _ := ioutil.ReadAll(configFile)
-
-	if err := json.Unmarshal(byteValue, &wgConf); err != nil {
-		return wgConf, err
-	}
-	return wgConf, nil
-}
 
 // write a hardcoded default container conf to disk
 func CreateDefaultWGConf() error {

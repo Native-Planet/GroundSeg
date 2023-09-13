@@ -3,57 +3,117 @@
 </script>
 
 
-<div class="wrapper">
-  <div class="ship" on:click={()=>goto("/boot")}>
+<div class="block" on:click={()=>goto("/boot")}>
+  <div class="main-wrapper">
+    <!-- Masks -->
+    <div class="mask"></div>
+    <div class="sigil-mask up"></div>
+    <div class="sigil-mask down"></div>
+    <!-- Sigil -->
     <div class="sigil"></div>
-    <div class="bg"></div>
+    <!-- Upper -->
+    <div class="status"></div>
+    <!-- Lower -->
+    <div class="body">
+      <div class="info"></div>
+      <div class="settings-wrapper"></div>
+    </div>
   </div>
-  <div class="add">+</div>
+  <div class="new">+</div>
 </div>
 
 <style>
-  .wrapper {
+  .block {
     position: relative;
-    width: 288px;
-    height: 148px;
-    flex-shrink: 0;
   }
-  .add {
-    position: absolute;
-    font-family: var(--title-font);
-    color: var(--text-card-color);
-    font-size: 64px;
-    width: 40px;
-    top: 25px;
-    left: calc(50% - 15px);
-  }
-  .ship {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    opacity: .6;
-  }
-  .wrapper:hover > .ship {
-    opacity: 1;
+  .block:hover {
     cursor: pointer;
   }
-  .bg {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background-image: url('/ship.svg');
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
+  .block:hover .main-wrapper {
+    cursor: pointer;
+    opacity: 1;
   }
-  .sigil {
+  .main-wrapper {
+    color: var(--text-card-color);
+    width: 288px;
+    height: 148px;
+    opacity: .6;
+  }
+  .new {
+    font-family: var(--title-font);
     position: absolute;
-    background: var(--btn-secondary);
-    width: 72px;
-    height: 58px;
-    flex-shrink: 0;
-    left: 9px;
-    border-radius: 8px 0;
-    top: 6px;
+    top: 0;
+    left: 0;
+    right: 0;
+    color: var(--text-card-color);
+    font-size: 64px;
+    text-align: center;
+    line-height: 140px;
+  }
+  /* Upper */
+  .status {
+    background-color: var(--bg-card);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: absolute;
+    right: 0;
+    height: 50px;
+    width: 228px;
+    border-radius: 8px 8px 0 0;
+  }
+
+  /* Lower */
+  .body {
+    background-color: var(--bg-card);
+    position: absolute;
+    height: calc(148px - 50);
+    width: 100%;
+    bottom:0;
+    border-radius: 8px 0 24px 8px;
+  }
+  /* Sigil and Masks */
+  .sigil {
+    background-color: var(--btn-secondary);
+    position: absolute;
+    height: 46px;
+    width: 56px;
+    margin: 4px 0 0 4px;
+    border-radius: 8px 0 8px 0;
+  }
+  .mask {
+    background-color: var(--bg-card);
+    position: absolute;
+    height: 30px;
+    width: 30px;
+    top: 30px;
+    left: 50px;
+
+  }
+  .sigil-mask {
+    background-color: var(--btn-secondary);
+    position: absolute;
+    height: 30px;
+    width: 30px;
+  }
+  .up {
+    top: 4px;
+    left: 50px;
+  }
+  .down {
+    top: 50px;
+    left: 4px;
+  }
+  /* Info */
+  .info {
+    display: flex;
+    align-items: center;
+    height: 67px;
+  }
+  /* Settings */
+  .settings-wrapper {
+    display: flex;
+    margin-left: 20px;
+    height: 32px;
   }
 </style>
