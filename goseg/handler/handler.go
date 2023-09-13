@@ -101,6 +101,7 @@ func SystemHandler(msg []byte) error {
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't update swap value: %v", err))
 		}
+		logger.Logger.Info(fmt.Sprintf("Swap successfully set to %v",systemPayload.Payload.Value))
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}

@@ -55,22 +55,6 @@ func GetTemp() float64 {
 	return float64(temp) / 1000.0
 }
 
-// return 0 for no 1 for yes(?)
-func HasSwap() int {
-	data, err := ioutil.ReadFile("/proc/swaps")
-	if err != nil {
-		errmsg := fmt.Sprintf("Error reading swap status:", err)
-		logger.Logger.Error(errmsg)
-		return 0
-	}
-	lines := strings.Split(string(data), "\n")
-	if len(lines) > 1 {
-		return 1
-	} else {
-		return 0
-	}
-}
-
 func IsNPBox(basePath string) bool {
 	filePath := filepath.Join(basePath, "nativeplanet")
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
