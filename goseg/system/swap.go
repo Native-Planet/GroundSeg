@@ -28,7 +28,7 @@ func ConfigureSwap(file string, val int) error {
 	}
 	swapSize := activeSwap(file)
 	if swapSize != val {
-		fmt.Println("switching swap from",swapVal,"to",val)
+		fmt.Println("switching swap from",swapSize,"to",val)
 		if err := stopSwap(file); err != nil {
 			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
