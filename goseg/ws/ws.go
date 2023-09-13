@@ -207,19 +207,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 				MuCon.Write(respJson)
-			case "logs":
-				// unauth for debugging
-				var logPayload structs.WsLogsPayload
-				if err := json.Unmarshal(msg, &logPayload); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-					continue
-				}
-				logEvent := structs.LogsEvent{
-					Action:      logPayload.Payload.Action,
-					ContainerID: logPayload.Payload.ContainerID,
-					MuCon:       MuCon,
-				}
-				config.LogsEventBus <- logEvent
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
