@@ -180,6 +180,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 				}
 			} else {
 				logger.Logger.Warn("TokenId doesn't match session!")
+				logger.Logger.Warn(fmt.Sprintf("Debug:\nip: %v %v\nagent: %v %v\ntoken: %v %v",ip,res["ip"],userAgent, res["user_agent"],res["id"],token["id"]))
 				return token["token"], false
 			}
 		}
