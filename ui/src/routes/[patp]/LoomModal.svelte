@@ -1,20 +1,22 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { shutdownDevice, restartDevice, structure, connected } from '$lib/stores/websocket'
+  import { setUrbitLoom, structure } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let patp
   export let curLoomSize
   export let loomSize
   export let isOpen
+  $: loomMB = (2**loomSize) / (1024*1024)
+  $: curLoomMB = (2**curLoomSize) / (1024*1024)
 </script>
 
 <Modal>
   {#if isOpen}
   <div class="wrapper">
     <div class="header">Modify Urbit Loom</div>
-    <div class="name">You are about to change your loom from {loomSize} to {curLoomSize}</div>
-    <button on:click={()=>{console.log("modify")}}>Modify</button>
+    <div class="name">You are about to change your Urbit loom size from {loomMB} MB to {curLoomMB} MB</div>
+    <button on:click={()=>setUrbitLoom(patp, curLoomSize)}>Modify</button>
   </div>
   {/if}
 </Modal>
