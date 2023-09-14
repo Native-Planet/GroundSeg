@@ -99,6 +99,7 @@
     font-size: 12px;
     color: var(--text-card-color);
     border-radius: 16px 0 16px 0;
+    cursor: pointer;
   }
   .copy {
     position: absolute;
@@ -106,7 +107,8 @@
     top: 0px;
     background: #DDE3DF;
     border-radius: 0 16px 0 16px;
-    padding: 8px;
+    padding: 16px;
     font-size: 14px;
+    cursor: pointer;
   }
 </style>
