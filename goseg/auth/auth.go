@@ -101,23 +101,23 @@ func WsNilSession(conn *websocket.Conn) error {
 	if WsAuthCheck(conn) {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
-		for _, client := range ClientManager.AuthClients {
+		for id, client := range ClientManager.AuthClients {
 			if client.Conn == conn {
-				client = nil
+				client.Active = false
 				return nil
 			}
 		}
 	} else {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
-		for _, client := range ClientManager.UnauthClients {
+		for id, client := range ClientManager.UnauthClients {
 			if client.Conn == conn {
-				client = nil
+				client.Active = false
 				return nil
 			}
 		}
 	}
-	return fmt.Errorf("Session not in in client manager")
+	return fmt.Errorf("Session not in client manager")
 }
 
 // is this tokenid in the auth map?

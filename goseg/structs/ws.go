@@ -20,6 +20,7 @@ var (
 type MuConn struct {
 	Conn *websocket.Conn
 	Mu   sync.RWMutex
+	Active bool
 }
 
 type WsChanEvent struct {
@@ -63,19 +64,18 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	// Add to AuthClients
+	client.Active = true
 	cm.AuthClients[id] = client
-	// Remove from UnauthClients if present
 	if _, ok := cm.UnauthClients[id]; ok {
 		delete(cm.UnauthClients, id)
 	}
-	// Remove any other instances of the same client from UnauthClients
 	for token, con := range cm.UnauthClients {
 		if con.Conn == client.Conn {
 			delete(cm.UnauthClients, token)
 		}
 	}
 }
+
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
@@ -107,7 +107,7 @@ func (cm *ClientManager) BroadcastAuth(data []byte) {
 	cm.broadcastMu.Lock()
 	defer cm.broadcastMu.Unlock()
 	for _, client := range cm.AuthClients {
-		if client != nil {
+		if client != nil && client.Active {
 			client.Write(data)
 		}
 	}
