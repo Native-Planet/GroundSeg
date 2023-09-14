@@ -64,8 +64,8 @@
     width: 100vw;
     border-radius: 16px 16px 0 0;
     position: relative;
-    background: var(--text-card-color);
-    height: calc(95vh - (48px * 2));
+    background: white;
+    height: calc(850px - (48px * 2));
     padding: 48px;
   }
 </style>

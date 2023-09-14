@@ -1,5 +1,5 @@
 <script>
-  import { setSwap } from '$lib/stores/websocket'
+  import { structure, setSwap } from '$lib/stores/websocket'
 
   import Fa from 'svelte-fa'
   import { faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';

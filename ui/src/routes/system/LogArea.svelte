@@ -6,6 +6,7 @@
   export let type
   let div
 	let autoscroll
+  let copied = false
 
   $: lines = ($logs[type]) || ""
   $: splitLines = lines.split("\n") || []
@@ -20,6 +21,7 @@
 
   onMount(()=>{
     toggleLog(type,true)
+    toLatest()
   })
   onDestroy(()=>toggleLog(type,false))
 	beforeUpdate(() => {
@@ -29,26 +31,27 @@
 		if (autoscroll) div.scrollTo(0, div.scrollHeight);
 	})
 
-  const toLatest = () => div.scrollTo(0, div.scrollHeight)
+  const toLatest = () => {
+    div.scrollTo(0, div.scrollHeight)
+  }
 
   let copy = new Clipboard('#logs');
     copy.on("success", ()=> {
-      //clicked = true;
-      //setTimeout(()=> clicked = false, 1000)
-      console.log("copied")
+      copied = true;
+      setTimeout(()=> copied = false, 1000)
     })
 </script>
-<div class="logarea" bind:this={div}>
-  <button
-    id="logs"
-    class="logs"
-    data-clipboard-text={lines}>
-    Copy
-  </button>
+
+<div class="logarea">
+  {#if copied}
+    <div class="copy">copied!</div>
+  {:else}
+    <img id="logs" data-clipboard-text={lines} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
+  {/if}
   {#if !autoscroll}
     <button on:click={toLatest} class="latest">Latest</button>
   {/if}
-  <div class="log-wrapper">
+  <div class="log-wrapper" bind:this={div}>
     {#if (prettyLines.length > 0)}
       {#each prettyLines as ln}
         <pre class="log-line">{ln}</pre>
@@ -58,17 +61,19 @@
 </div>
 
 <style>
-  .logarea::-webkit-scrollbar {display: none;}
   .logarea {
     position: relative;
-    background: var(--bg-modal);
+    background: var(--text-card-color);
     width: calc(100vw - (48px * 2) - (24px * 2) - 15px);
     border-radius: 16px;
     margin-top: 32px;
-    padding: 24px;
-    overflow-y: scroll;
-    margin-bottom: 32px;
     height: 75%;
+    padding: 24px;
+  }
+  .log-wrapper::-webkit-scrollbar {display: none;}
+  .log-wrapper {
+    overflow-y: scroll;
+    height: 100%;
   }
   .log-line {
     display: flex;
@@ -85,26 +90,25 @@
   }
   .latest {
     position: absolute;
-    bottom: 24px;
+    bottom: 0;
+    right: 0;
     background: var(--btn-secondary);
-    right: 48px;
     width: 64px;
     line-height: 48px;
     height: 48px;
     font-size: 12px;
     color: var(--text-card-color);
     border-radius: 16px 0 16px 0;
+    cursor: pointer;
   }
-  .logs {
-    position: fixed;
-    top: 24px;
-    background: var(--btn-secondary);
-    right: 48px;
-    width: 64px;
-    line-height: 48px;
-    height: 48px;
-    font-size: 12px;
-    color: var(--text-card-color);
-    border-radius: 16px 0 16px 0;
+  .copy {
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    background: #DDE3DF;
+    border-radius: 0 16px 0 16px;
+    padding: 16px;
+    font-size: 14px;
+    cursor: pointer;
   }
 </style>
