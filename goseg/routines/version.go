@@ -15,7 +15,7 @@ import (
 
 var (
 	// version server check interval
-	checkInterval = 15 * time.Second
+	checkInterval = 1 * time.Hour
 )
 
 func CheckVersionLoop() {

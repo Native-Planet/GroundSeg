@@ -108,6 +108,12 @@ func SystemHandler(msg []byte) error {
 			broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: false, Type: "swap"}
 		}()
 		logger.Logger.Info(fmt.Sprintf("Swap successfully set to %v", systemPayload.Payload.Value))
+	case "update":
+		if systemPayload.Payload.Update == "linux" {
+			if err := system.RunUpgrade(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error updating host system: %v",err))
+			}
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}

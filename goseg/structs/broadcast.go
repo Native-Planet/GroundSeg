@@ -48,7 +48,6 @@ type SystemUsage struct {
 // broadcast payload subobject
 type SystemUpdates struct {
 	Linux struct {
-		State   string `json:"state"`
 		Upgrade int    `json:"upgrade"`
 		New     int    `json:"new"`
 		Remove  int    `json:"remove"`
