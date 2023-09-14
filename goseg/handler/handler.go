@@ -125,7 +125,7 @@ func SystemHandler(msg []byte) error {
 	case "update":
 		if systemPayload.Payload.Update == "linux" {
 			if err := system.RunUpgrade(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error updating host system: %v",err))
+				logger.Logger.Error(fmt.Sprintf("Error updating host system: %v", err))
 			}
 		}
 	default:
@@ -190,6 +190,7 @@ func UrbitHandler(msg []byte) error {
 		docker.StartContainer(patp, "vere")
 		return nil
 	case "toggle-power":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 		update := make(map[string]structs.UrbitDocker)
 		if shipConf.BootStatus == "noboot" {
 			shipConf.BootStatus = "boot"
@@ -197,7 +198,6 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 			docker.StartContainer(patp, "vere")
 			if err := broadcast.BroadcastToClients(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))

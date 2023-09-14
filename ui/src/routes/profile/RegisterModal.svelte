@@ -11,6 +11,8 @@
   $: regions = info?.regions || {}
   $: regionKeys = Object.keys(regions)
   $: tRegister = (transition?.register) || null
+  $: urbits = ($structure?.urbits)
+  $: urbitKeys = Object.keys(urbits)
   let completed = false
 
   onMount(()=>startramGetRegions())
@@ -29,6 +31,12 @@
 
 {#if isOpen}
   <Modal>
+    {tRegister}
+    <!--
+    {#each urbitKeys as p}
+      <div>{p} {JSON.stringify(urbits[p].transition.serviceRegistrationStatus)}</div>
+    {/each}
+    -->
     {#if tRegister == null}
       <div class="wrapper">
         <h1>Register New Key</h1>

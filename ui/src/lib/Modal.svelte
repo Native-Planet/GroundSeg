@@ -5,7 +5,7 @@
 </script>
 <div role="dialog" class="modal">
   <div class="contents">
-    <div class="x" on:click={closeModal}>
+    <div class="x" on:click={()=>{console.log("astr");closeModal()}}>
       <Fa icon={faXmark} size="1x"/>
     </div>
     <slot />

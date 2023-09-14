@@ -19,11 +19,11 @@
   $: loom = (ship?.loomSize) || 0
   $: loomActual = 2 ** loom / (1024 * 1024)
 
-  // debug
+  /* debug
   let on = false
   const loop = () => {on = !on;setTimeout(loop,3000)}
   loop()
-  // end debug
+  */
 
 </script>
 
@@ -33,11 +33,10 @@
   </div>
   <div class="bg"></div>
   <div class="toggle">
-    <!--
     <StartramToggle on={network == "wireguard"} />
-    -->
-    <!-- Debug -->
+    <!-- Debug
     <StartramToggle on={on} />
+    -->
   </div>
   <div class="namebar">
     <NameBar {patp} {running} />
