@@ -146,13 +146,15 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 			bootStatus = false
 		}
 		setRemote := false
+		urbitURL := fmt.Sprintf("http://%s.local:%d", hostName, dockerConfig.HTTPPort)
 		if dockerConfig.Network == "wireguard" {
+			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
 		// collate all the info from our sources into the struct
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
-		urbit.Info.URL = fmt.Sprintf("http://%s.local:%d", hostName, dockerConfig.HTTPPort)
+		urbit.Info.URL = urbitURL
 		urbit.Info.LoomSize = dockerConfig.LoomSize
 		urbit.Info.DiskUsage = dockerStats.DiskUsage
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
