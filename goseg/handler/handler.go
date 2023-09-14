@@ -10,6 +10,7 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"goseg/system"
+	"goseg/startram"
 	"net/http"
 	"os"
 	"os/exec"
@@ -203,8 +204,36 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
 		return nil
+	case "delete":
+		conf := config.Conf()
+		var res []string
+		for _, pier := range conf.Piers {
+			if pier != patp {
+				res = append(res, pier)
+			}
+		}
+		if err = config.UpdateConf(map[string]interface{}{
+			"piers":  res,
+		}); err != nil {
+			return fmt.Errorf("Couldn't remove pier from config! %v",patp)
+		}
+		if err := docker.DeleteVolume(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v",patp))
+		}
+		if conf.WgRegistered {
+			if err := startram.SvcDelete(patp,"urbit"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v",patp))
+			}
+			if err := startram.SvcDelete("s3."+patp,"s3"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v",patp))
+			}
+		}
+		if err := config.RemoveUrbitConfig(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v",patp))
+		}
+		return nil
 	default:
-		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Type)
+		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
 }
 

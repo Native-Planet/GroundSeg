@@ -47,12 +47,15 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
 				logger.Logger.Info("WS closed")
 				conn.Close()
+				// cancel all log streams for this ws
 				logEvent := structs.LogsEvent{
 					Action:      false,
 					ContainerID: "all",
 					MuCon:       MuCon,
 				}
 				config.LogsEventBus <- logEvent
+				// nil the session
+				auth.WsNilSession(MuCon.Conn)
 			}
 			logger.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
 			break

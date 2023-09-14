@@ -96,6 +96,30 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	return false
 }
 
+// replace ws with nil in auth map
+func WsNilSession(conn *websocket.Conn) error {
+	if WsAuthCheck(conn) {
+		ClientManager.Mu.Lock()
+		defer ClientManager.Mu.Unlock()
+		for _, client := range ClientManager.AuthClients {
+			if client.Conn == conn {
+				client = nil
+				return nil
+			}
+		}
+	} else {
+		ClientManager.Mu.Lock()
+		defer ClientManager.Mu.Unlock()
+		for _, client := range ClientManager.UnauthClients {
+			if client.Conn == conn {
+				client = nil
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("Session not in in client manager")
+}
+
 // is this tokenid in the auth map?
 func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	ClientManager.Mu.RLock()

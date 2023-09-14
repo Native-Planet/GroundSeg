@@ -28,7 +28,6 @@ var (
 func LogEvent() {
 	for {
 		event := <-config.LogsEventBus
-		logger.Logger.Info(fmt.Sprintf("New log request for %v", event.ContainerID))
 		switch event.Action {
 		case true:
 			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
