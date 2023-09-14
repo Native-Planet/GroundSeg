@@ -96,7 +96,7 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	return false
 }
 
-// replace ws with nil in auth map
+// deactivate ws session
 func WsNilSession(conn *websocket.Conn) error {
 	if WsAuthCheck(conn) {
 		ClientManager.Mu.Lock()
