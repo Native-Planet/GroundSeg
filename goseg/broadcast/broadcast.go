@@ -24,7 +24,6 @@ var (
 	hostInfoInterval  = 1 * time.Second // how often we refresh system info
 	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
-	unauthState       structs.UnauthBroadcast
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
 	SysTransBus       = make(chan structs.SystemTransitionBroadcast, 100)
 	SystemTransitions structs.SystemTransitionBroadcast
@@ -232,102 +231,6 @@ func GetContainerNetworks(containers []string) map[string]string {
 	return res
 }
 
-/*
-// update broadcastState with a map of items
-// old method that sucks
-func UpdateBroadcastState(values map[string]interface{}) error {
-	mu.Lock()
-	v := reflect.ValueOf(&broadcastState).Elem()
-	for key, value := range values {
-		field := v.FieldByName(key)
-		if !field.IsValid() || !field.CanSet() {
-			mu.Unlock()
-			return fmt.Errorf("field %s does not exist or is not settable", key)
-		}
-		val := reflect.ValueOf(value)
-		if val.Kind() == reflect.Interface {
-			val = val.Elem() // Extract the underlying value from the interface
-		}
-		if err := recursiveUpdate(field, val); err != nil {
-			mu.Unlock()
-			return fmt.Errorf("error updating field %s: %v", key, err)
-			return err
-		}
-	}
-	mu.Unlock()
-	BroadcastToClients()
-	return nil
-}
-
-// this allows us to insert stuff into nested structs/keys and not overwrite the existing contents
-// do not use this, it can't overwrite nested structs for some reason
-func recursiveUpdate(dst, src reflect.Value) error {
-	if !dst.CanSet() {
-		return fmt.Errorf("field (type: %s, kind: %s) is not settable", dst.Type(), dst.Kind())
-	}
-
-	// If both dst and src are structs, overwrite dst with src
-	if dst.Kind() == reflect.Struct && src.Kind() == reflect.Struct {
-		dst.Set(src)
-		return nil
-	}
-
-	// If dst is a struct and src is a map, handle them field by field
-	if dst.Kind() == reflect.Struct && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			dstField := dst.FieldByName(key.String())
-			if !dstField.IsValid() {
-				return fmt.Errorf("field %s does not exist in the struct", key.String())
-			}
-			// Initialize the map if it's nil and we're trying to set a map
-			if dstField.Kind() == reflect.Map && dstField.IsNil() && src.MapIndex(key).Kind() == reflect.Map {
-				dstField.Set(reflect.MakeMap(dstField.Type()))
-			}
-			if !dstField.CanSet() {
-				return fmt.Errorf("field %s is not settable in the struct", key.String())
-			}
-			srcVal := src.MapIndex(key)
-			if srcVal.Kind() == reflect.Interface {
-				srcVal = srcVal.Elem()
-			}
-			if err := recursiveUpdate(dstField, srcVal); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// If both dst and src are maps, handle them recursively
-	if dst.Kind() == reflect.Map && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			srcVal := src.MapIndex(key)
-			// If the key doesn't exist in dst, initialize it
-			dstVal := dst.MapIndex(key)
-			if !dstVal.IsValid() {
-				dstVal = reflect.New(dst.Type().Elem()).Elem()
-			}
-			// Recursive call to handle potential nested maps or structs
-			if err := recursiveUpdate(dstVal, srcVal); err != nil {
-				return err
-			}
-			// Initialize the map if it's nil
-			if dst.IsNil() {
-				dst.Set(reflect.MakeMap(dst.Type()))
-			}
-			dst.SetMapIndex(key, dstVal)
-		}
-		return nil
-	}
-
-	// For non-map or non-struct fields, or for direct updates
-	if dst.Type() != src.Type() {
-		return fmt.Errorf("type mismatch: expected %s, got %s", dst.Type(), src.Type())
-	}
-	dst.Set(src)
-	return nil
-}
-*/
-
 // stupid update method instead of psychotic recursion
 func UpdateBroadcast(broadcast structs.AuthBroadcast) {
 	mu.Lock()
@@ -364,7 +267,6 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
-
 	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }

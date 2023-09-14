@@ -16,9 +16,22 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+var (
+	failedLogins	int
+	lockoutEnd		int64
+	remainder	    int
+	loginMu			sync.Mutex
+)
+
+const (
+	MaxFailedLogins = 5
+	LockoutDuration = 2 * time.Minute
 )
 
 // todo
@@ -239,8 +252,8 @@ func UrbitHandler(msg []byte) error {
 
 // validate password and add to auth session map
 func LoginHandler(conn *structs.MuConn, msg []byte) error {
-	// no real mutex here
-	// connHandler := &structs.MuConn{Conn: conn}
+	loginMu.Lock()
+	defer loginMu.Unlock()
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -248,6 +261,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
+		failedLogins = 0
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
@@ -258,8 +272,33 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return nil
 	} else {
+		failedLogins++
 		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
+		if failedLogins >= MaxFailedLogins {
+			lockoutEnd = time.Now().Add(LockoutDuration).Unix()
+			go enforceLockout()
+		}
+		return nil
 	}
+}
+
+func enforceLockout() {
+	remainder = 1
+	unauth, err := UnauthHandler()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v",err))
+	} 
+	broadcast.UnauthBroadcast(unauth)
+	<-time.After(LockoutDuration)
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	failedLogins = 0
+	remainder = 0
+	unauth, err = UnauthHandler()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v",err))
+	} 
+	broadcast.UnauthBroadcast(unauth)
 }
 
 // take a guess
@@ -282,17 +321,13 @@ func UnauthHandler() ([]byte, error) {
 		Login: struct {
 			Remainder int `json:"remainder"`
 		}{
-			Remainder: 0,
+			Remainder: remainder,
 		},
 	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
 		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
 	}
-	// if err := conn.Write(websocket.TextMessage, resp); err != nil {
-	// 	logger.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
-	// 	return
-	// }
 	return resp, nil
 }
 
