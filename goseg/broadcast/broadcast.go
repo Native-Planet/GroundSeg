@@ -45,7 +45,7 @@ func WsDigester() {
 	for {
 		event := <-structs.WsEventBus
 		if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
-			// logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
+			logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
 			continue
 		}
 	}

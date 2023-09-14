@@ -38,12 +38,21 @@ func LogEvent() {
 			}
 			logsMap[event.MuCon][event.ContainerID] = cancel
 			go streamLogs(ctx, event.MuCon, event.ContainerID)
+		// cancel all log streams on ws break
 		case false:
-			logger.Logger.Info(fmt.Sprintf("Stopping logs for %v", event.ContainerID))
-			if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
-				cancel()
-				delete(logsMap[event.MuCon], event.ContainerID)
-			}
+			if event.ContainerID == "all" {
+				if conMap, exists := logsMap[event.MuCon]; exists {
+					for container, cancel := range conMap {
+						cancel()
+						delete(logsMap[event.MuCon], container)
+					}
+				}
+			} else {
+				if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
+					cancel()
+					delete(logsMap[event.MuCon], event.ContainerID)
+				}
+			}		
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v", event.ContainerID, event.Action))
 			continue
@@ -84,14 +93,14 @@ func extractTimestamp(logLine string) (time.Time, error) {
 func removeDockerHeaders(logData []byte) string {
 	var cleanedLogs strings.Builder
 	reader := bytes.NewReader(logData)
-	bufReader := bufio.NewReader(reader) // Wrap the bytes.Reader with bufio.Reader
+	bufReader := bufio.NewReader(reader)
 	for {
 		header := make([]byte, 8)
-		_, err := bufReader.Read(header) // Use bufReader here
+		_, err := bufReader.Read(header)
 		if err == io.EOF {
 			break
 		}
-		line, err := bufReader.ReadBytes('\n') // And here
+		line, err := bufReader.ReadBytes('\n')
 		if err != nil && err != io.EOF {
 			break
 		}
