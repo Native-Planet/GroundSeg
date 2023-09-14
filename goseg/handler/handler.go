@@ -283,21 +283,27 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 }
 
 func enforceLockout() {
-	remainder = 1
-	unauth, err := UnauthHandler()
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v",err))
-	} 
-	broadcast.UnauthBroadcast(unauth)
-	<-time.After(LockoutDuration)
+	remainder = 120
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for remainder > 0 {
+		unauth, err := UnauthHandler()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
+		}
+		broadcast.UnauthBroadcast(unauth)
+		<-ticker.C
+		remainder -= 5
+	}
 	loginMu.Lock()
 	defer loginMu.Unlock()
 	failedLogins = 0
 	remainder = 0
-	unauth, err = UnauthHandler()
+
+	unauth, err := UnauthHandler()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v",err))
-	} 
+		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
+	}
 	broadcast.UnauthBroadcast(unauth)
 }
 
