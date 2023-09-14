@@ -284,7 +284,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 
 func enforceLockout() {
 	remainder = 120
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for remainder > 0 {
 		unauth, err := UnauthHandler()
