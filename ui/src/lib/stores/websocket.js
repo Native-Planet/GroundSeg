@@ -61,7 +61,7 @@ export const handleMessage = data => {
   if (data.type === "activity") {
     handleActivity(data)
   } else if (data.type == "structure") {
-    //console.log(data)
+    console.log(data)
     structure.set(data)
   } else if (data.hasOwnProperty('log')) {
     logs.update(l=>{
@@ -327,7 +327,7 @@ export const uploadMetadata = (patp,size,secret) => {
 }
 
 //
-//  Urbits
+//  Boot New Ship
 //
 
 export const bootShip = (patp,key,remote) => {
@@ -348,6 +348,10 @@ export const resetNewShip = () => {
   }
   send(payload)
 }
+
+//
+//  Urbits
+//
 
 export const registerServiceAgain = patp => {
   let payload = {
@@ -399,6 +403,16 @@ export const deleteUrbitShip = patp => {
     "type":"urbit",
     "action":"delete-ship",
     "patp":patp
+  }
+  send(payload)
+}
+
+export const setUrbitLoom = (patp, value) => {
+  let payload = {
+    "type":"urbit",
+    "action":"loom",
+    "patp":patp,
+    "value": value
   }
   send(payload)
 }

@@ -1,5 +1,5 @@
 <script>
-  import { structure } from '$lib/stores/websocket';
+  import { structure, toggleNetwork } from '$lib/stores/websocket';
 
   import { devShipClass } from '$lib/stores/devclass'
 
@@ -12,7 +12,7 @@
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: running = (ship?.running) || false
-  $: network = (ship?.network) || "none"
+  $: remote = (ship?.remote) || false
   $: url = (ship?.url) || "#"
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
@@ -33,7 +33,7 @@
   </div>
   <div class="bg"></div>
   <div class="toggle">
-    <StartramToggle on={network == "wireguard"} />
+    <StartramToggle on={remote} on:click={()=>toggleNetwork(patp)} />
     <!-- Debug
     <StartramToggle on={on} />
     -->

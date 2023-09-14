@@ -1,10 +1,11 @@
 <script>
+  import { createEventDispatcher } from 'svelte'
+  const dispatch = createEventDispatcher()
   export let on
-  const handleToggle = () => console.log("toggle")
 </script>
 <div class="wrapper" class:on={on}>
   <div class="title">StarTram</div>
-  <div on:click={handleToggle} class="outer">
+  <div on:click={()=>dispatch('click')} class="outer">
     <div class="inner" style="margin-left:{on ? 20 : 4}px"></div>
   </div>
 </div>
@@ -44,6 +45,7 @@
     height: 24px;
     align-items: center;
     flex-shrink: 0;
+    cursor: pointer;
 
     border-radius: 4px 0px 0px 4px;
     background: var(--text-color, #313933);
