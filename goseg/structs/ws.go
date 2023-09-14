@@ -18,8 +18,8 @@ var (
 
 // wrapped ws+mutex
 type MuConn struct {
-	Conn *websocket.Conn
-	Mu   sync.RWMutex
+	Conn   *websocket.Conn
+	Mu     sync.RWMutex
 	Active bool
 }
 
@@ -63,8 +63,8 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	if client == nil {
-        return
-    }
+		return
+	}
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
 	client.Active = true
@@ -78,7 +78,6 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 		}
 	}
 }
-
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
@@ -175,6 +174,7 @@ type WsUrbitAction struct {
 	Type   string `json:"type"`
 	Action string `json:"action"`
 	Patp   string `json:"patp"`
+	Value  int    `json:value"`
 }
 
 type WsSystemAction struct {

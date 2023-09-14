@@ -10,28 +10,14 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"goseg/system"
-	"goseg/startram"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-)
-
-var (
-	failedLogins	int
-	lockoutEnd		int64
-	remainder	    int
-	loginMu			sync.Mutex
-)
-
-const (
-	MaxFailedLogins = 5
-	LockoutDuration = 2 * time.Minute
 )
 
 // todo
@@ -145,6 +131,20 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	case "loom":
+		shipConf.LoomSize = urbitPayload.Payload.Value
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+		}
+		if shipConf.BootStatus == "boot" {
+			docker.StartContainer(patp, "vere")
+		}
+		return nil
 	case "toggle-network":
 		currentNetwork := shipConf.Network
 		conf := config.Conf()
@@ -156,12 +156,18 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+			}
 		} else if currentNetwork == "none" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 			}
 			if err := broadcast.BroadcastToClients(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
@@ -183,6 +189,9 @@ func UrbitHandler(msg []byte) error {
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
@@ -217,34 +226,6 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
 		return nil
-	case "delete-ship":
-		conf := config.Conf()
-		var res []string
-		for _, pier := range conf.Piers {
-			if pier != patp {
-				res = append(res, pier)
-			}
-		}
-		if err = config.UpdateConf(map[string]interface{}{
-			"piers":  res,
-		}); err != nil {
-			return fmt.Errorf("Couldn't remove pier from config! %v",patp)
-		}
-		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v",patp))
-		}
-		if conf.WgRegistered {
-			if err := startram.SvcDelete(patp,"urbit"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v",patp))
-			}
-			if err := startram.SvcDelete("s3."+patp,"s3"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v",patp))
-			}
-		}
-		if err := config.RemoveUrbitConfig(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v",patp))
-		}
-		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -252,8 +233,8 @@ func UrbitHandler(msg []byte) error {
 
 // validate password and add to auth session map
 func LoginHandler(conn *structs.MuConn, msg []byte) error {
-	loginMu.Lock()
-	defer loginMu.Unlock()
+	// no real mutex here
+	// connHandler := &structs.MuConn{Conn: conn}
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -261,7 +242,6 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
-		failedLogins = 0
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
@@ -272,39 +252,8 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return nil
 	} else {
-		failedLogins++
-		logger.Logger.Warn(fmt.Sprintf("Failed auth: %v", loginPayload.Payload.Password))
-		if failedLogins >= MaxFailedLogins {
-			lockoutEnd = time.Now().Add(LockoutDuration).Unix()
-			go enforceLockout()
-		}
-		return nil
+		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
 	}
-}
-
-func enforceLockout() {
-	remainder = 120
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for remainder > 0 {
-		unauth, err := UnauthHandler()
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
-		}
-		broadcast.UnauthBroadcast(unauth)
-		<-ticker.C
-		remainder -= 1
-	}
-	loginMu.Lock()
-	defer loginMu.Unlock()
-	failedLogins = 0
-	remainder = 0
-
-	unauth, err := UnauthHandler()
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
-	}
-	broadcast.UnauthBroadcast(unauth)
 }
 
 // take a guess
@@ -327,13 +276,17 @@ func UnauthHandler() ([]byte, error) {
 		Login: struct {
 			Remainder int `json:"remainder"`
 		}{
-			Remainder: remainder,
+			Remainder: 0,
 		},
 	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
 		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
 	}
+	// if err := conn.Write(websocket.TextMessage, resp); err != nil {
+	// 	logger.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
+	// 	return
+	// }
 	return resp, nil
 }
 
