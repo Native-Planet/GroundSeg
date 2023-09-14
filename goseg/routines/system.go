@@ -7,6 +7,7 @@ import (
 )
 
 func AptUpdateLoop() {
+	system.UpdateCheck()
 	conf := config.Conf()
 	val := time.Duration(conf.LinuxUpdates.Value)
 
