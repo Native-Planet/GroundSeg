@@ -209,7 +209,9 @@ func constructSystemInfo() structs.System {
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
 	usedDisk, freeDisk := system.GetDisk()
 	sysInfo.Info.Usage.Disk = append(diskObj, usedDisk, freeDisk)
-	sysInfo.Info.Usage.SwapFile = system.HasSwap()
+	conf := config.Conf()
+	sysInfo.Info.Usage.SwapFile = conf.SwapVal
+	sysInfo.Info.Updates = system.SystemUpdates
 	sysInfo.Transition = SystemTransitions
 	return sysInfo
 }

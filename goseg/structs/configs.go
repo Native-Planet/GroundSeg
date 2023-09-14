@@ -22,7 +22,6 @@ type SysConfig struct {
 	LinuxUpdates struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
-		Previous bool   `json:"previous"`
 	} `json:"linuxUpdates"`
 	DockerData     string `json:"dockerData"`
 	WgOn           bool   `json:"wgOn"`
