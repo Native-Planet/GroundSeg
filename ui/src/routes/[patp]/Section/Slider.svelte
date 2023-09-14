@@ -1,41 +1,55 @@
 <script>
+  // Modals
+  import { openModal } from 'svelte-modals'
+  import { loomChangeActive } from '../store'
+  import LoomModal from '../LoomModal.svelte'
+
+  import { onMount, afterUpdate } from 'svelte'
+
+  export let patp
   export let min = 28
   export let max = 33
-  let x = 0
+  export let loomSize
 
-  $: marginLeft = fixMargin(x)
+  let slide
+  let curLoomSize = loomSize
 
-  const fixMargin = pos => {
-    let m = 38
-    if (pos < m) {
-      return m
-    } else if ((pos > m) && (pos < (m+65))) {
-      // if closer to right
-      if ((m + 65 - pos - 25) >= (m - pos))  {
-        return pos - 25
+  let active = false
+  $: range = max - min + 1
+
+  onMount(()=> {
+    slide.addEventListener("mouseup", handleMouseUp);
+  })
+
+  // todo: handle close
+  let readyToClose = false
+  afterUpdate(()=> {
+    if ($loomChangeActive) {
+      readyToClose = true
+    }
+    if (readyToClose) {
+      if (!$loomChangeActive) {
+         
       }
-    } 
-    // check if pos is closer to 
-    pos = pos - 25
-    return pos
-  }
-    // by default there will always be 38px on the left
+    }
+  })
 
-  const mouseHandler = e => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    x = e.clientX - rect.x
+  const handleMouseUp = () => {
+    if (curLoomSize != loomSize) {
+      openModal(LoomModal,{"patp":patp,"loomSize":loomSize,"curLoomSize":curLoomSize})
+      loomChangeActive.set(true)
+    }
   }
 </script>
 
-<div on:mousemove={mouseHandler}>
+<div class="wrapper">
   <div class="sel-wrapper">
-    {#each Array.from({ length: (max-min+1) }, (_, i) => i) as i}
+    {#each Array.from({ length: range }, (_, i) => i) as i}
       <div class="sel">
         <div class="top-notch"></div>
         <div class="bot-notch"></div>
       </div>
     {/each}
-    <div class="thumb" style="margin-left: {marginLeft}px;"></div>
   </div>
   <div class="num-wrapper">
     {#each Array.from({ length: (max-min+1) }, (_, i) => i) as i}
@@ -44,9 +58,52 @@
       </div>
     {/each}
   </div>
+  <input
+    class="slider"
+    type="range"
+    min={min}
+    max={max}
+    step="1"
+    bind:this={slide}
+    bind:value={curLoomSize}>
 </div>
 
 <style>
+  .wrapper {
+    position: relative;
+    height: 64px;
+  }
+  .slider {
+    padding: 0 38px 0 38px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    -webkit-appearance: none;
+    background: none;
+    width: calc(100% - (38px * 2));
+    height: 64px;
+    outline: none;
+    -webkit-transition: .2s;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 4px;
+    border: solid 1px #000;
+    border-radius: 16px;
+    background: #161D17;
+    cursor: pointer;
+  }
+  .slider::-moz-range-thumb {
+    width: 48px;
+    height: 48px;
+    border: solid 1px #000;
+    border-radius: 16px;
+    background: #161D17;
+    cursor: pointer;
+  }
   .sel-wrapper {
     position: relative;
     height: 64px;
@@ -55,16 +112,6 @@
     background: #313933;
     border-radius: 16px;
     padding: 0 71px 0 55px;
-  }
-  .thumb {
-    position: absolute;
-    width: 48px;
-    height: 48px;
-    background: #161D17;
-    border-radius: 16px;
-    border: 1px solid black;
-    top: 8px;
-    left: 0;
   }
   .sel {
     flex: 1;
