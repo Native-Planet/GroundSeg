@@ -204,7 +204,7 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
 		return nil
-	case "delete":
+	case "delete-ship":
 		conf := config.Conf()
 		var res []string
 		for _, pier := range conf.Piers {
