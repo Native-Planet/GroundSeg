@@ -41,7 +41,7 @@
   <CustomMinIODomain />
 
   <!-- Loom -->
-  <Loom {loomSize} />
+  <Loom {patp} {loomSize} />
 
   <!-- Pack & Meld -->
   <PackMeld />
@@ -54,7 +54,6 @@
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>
-
 </div>
 
 <style>
