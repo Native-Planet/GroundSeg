@@ -101,7 +101,7 @@ func WsNilSession(conn *websocket.Conn) error {
 	if WsAuthCheck(conn) {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
-		for id, client := range ClientManager.AuthClients {
+		for _, client := range ClientManager.AuthClients {
 			if client.Conn == conn {
 				client.Active = false
 				return nil
@@ -110,7 +110,7 @@ func WsNilSession(conn *websocket.Conn) error {
 	} else {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
-		for id, client := range ClientManager.UnauthClients {
+		for _, client := range ClientManager.UnauthClients {
 			if client.Conn == conn {
 				client.Active = false
 				return nil
