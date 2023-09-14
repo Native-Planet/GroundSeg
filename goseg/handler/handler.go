@@ -20,6 +20,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	failedLogins	int
+	remainder	    int
+	loginMu			sync.Mutex
+)
+
+const (
+	MaxFailedLogins = 5
+	LockoutDuration = 2 * time.Minute
+)
+
 // todo
 // handle bug report stuff
 func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
@@ -252,7 +263,36 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return nil
 	} else {
-		return fmt.Errorf("Failed auth: %v", loginPayload.Payload.Password)
+		failedLogins++
+		logger.Logger.Warn(fmt.Sprintf("Failed auth: %v", loginPayload.Payload.Password))
+		if failedLogins >= MaxFailedLogins && remainder == 0 {
+			go enforceLockout()
+		}
+		return nil
+	}
+}
+
+func enforceLockout() {
+	remainder = 120
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for remainder > 0 {
+		unauth, err := UnauthHandler()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
+		}
+		broadcast.UnauthBroadcast(unauth)
+		<-ticker.C
+		remainder -= 1
+	}
+	loginMu.Lock()
+	defer loginMu.Unlock()
+	failedLogins = 0
+	remainder = 0
+
+	unauth, err := UnauthHandler()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
 	}
 }
 
