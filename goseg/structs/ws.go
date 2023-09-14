@@ -62,6 +62,9 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 }
 
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
+	if client == nil {
+        return
+    }
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
 	client.Active = true
