@@ -53,7 +53,7 @@
   <RemoteAccess {remote} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Bottom Panel -->
-  <BottomPanel />
+  <BottomPanel {patp}/>
 
 </div>
 

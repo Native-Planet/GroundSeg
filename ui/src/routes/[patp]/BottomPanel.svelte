@@ -1,8 +1,15 @@
 <script>
   import { showDeleteModal } from './store'
+  import LogsDrawer from './LogsDrawer.svelte'
+  import { openModal } from 'svelte-modals'
+  export let patp
 </script>
 <div class="bottom-panel">
-  <div class="btn">Logs</div>
+  <button 
+    class="btn" 
+    on:click={()=>openModal(LogsDrawer,{"patp":patp})}>
+    Logs
+  </button>
   <div class="spacer"></div>
   <div class="btn rebuild">Rebuild</div>
   <div class="btn">Export</div>
