@@ -1,3 +1,8 @@
+.title {
+  font-size: 24px;
+  margin-bottom: 56px;
+  font-family: var(--title-font);
+}
 .section {
   display: flex;
   align-items: center;

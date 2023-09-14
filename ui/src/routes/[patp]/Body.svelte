@@ -41,7 +41,7 @@
   <CustomMinIODomain />
 
   <!-- Loom -->
-  <Loom {loomSize} />
+  <Loom {patp} {loomSize} />
 
   <!-- Pack & Meld -->
   <PackMeld />
@@ -53,8 +53,7 @@
   <RemoteAccess {remote} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Bottom Panel -->
-  <BottomPanel />
-
+  <BottomPanel {patp}/>
 </div>
 
 <style>

@@ -1,19 +1,19 @@
 <script>
   import { createEventDispatcher } from 'svelte'
   const dispatch = createEventDispatcher()
-  //export let on = false
-  //export let loading = false
+  export let on = false
+  export let loading = false
 
-  // debug
+  /* debug
   let on = false
   const loop = () => {on = !on;setTimeout(loop,3000)}
   loop()
-
-
+  */
 </script>
 
 <div
   class:on={on} 
+  class:loading={loading}
   class="wrapper">
   <div class="text on-text">On</div>
   <div class="text off-text">Off</div>
@@ -76,5 +76,9 @@
     letter-spacing: -1.44px;
     width: 47px;
     height: 47px;
+  }
+  .loading {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

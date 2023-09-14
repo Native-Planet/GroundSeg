@@ -1,5 +1,6 @@
 <script>
   import Slider from './Slider.svelte'
+  export let patp
   export let loomSize
 </script>
 
@@ -13,7 +14,7 @@
   <div class="section-right">
     <div class="slider">
       <div class="spacer"></div>
-      <Slider />
+      <Slider {patp} {loomSize}/>
     </div>
   </div>
 </div>
