@@ -15,6 +15,7 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"net/http"
+	"strings"
 
 	// "time"
 
@@ -44,7 +45,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				logger.Logger.Info("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
