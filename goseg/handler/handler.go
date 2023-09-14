@@ -293,7 +293,7 @@ func enforceLockout() {
 		}
 		broadcast.UnauthBroadcast(unauth)
 		<-ticker.C
-		remainder -= 5
+		remainder -= 1
 	}
 	loginMu.Lock()
 	defer loginMu.Unlock()
