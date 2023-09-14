@@ -111,11 +111,9 @@ func SysConfig(basePath string) structs.SysConfig {
 		LinuxUpdates: struct {
 			Value    int    `json:"value"`
 			Interval string `json:"interval"`
-			Previous bool   `json:"previous"`
 		}{
 			Value:    1,
 			Interval: "week",
-			Previous: false,
 		},
 		DockerData:     "/var/lib/docker",
 		WgOn:           false,

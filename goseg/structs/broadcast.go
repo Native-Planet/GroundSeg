@@ -32,7 +32,7 @@ type System struct {
 }
 
 type SystemTransitionBroadcast struct {
-	Swap int    `json:"swap"`
+	Swap bool   `json:"swap"`
 	Type string `json:"type"`
 }
 
@@ -48,7 +48,6 @@ type SystemUsage struct {
 // broadcast payload subobject
 type SystemUpdates struct {
 	Linux struct {
-		State   string `json:"state"`
 		Upgrade int    `json:"upgrade"`
 		New     int    `json:"new"`
 		Remove  int    `json:"remove"`

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -89,19 +90,30 @@ func SystemHandler(msg []byte) error {
 			return fmt.Errorf("Unrecognized power command: %v", systemPayload.Payload.Command)
 		}
 	case "modify-swap":
-		logger.Logger.Info(fmt.Sprintf("Updating swap with value %v",systemPayload.Payload.Value))
-		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: systemPayload.Payload.Value, Type: "swap"}
+		logger.Logger.Info(fmt.Sprintf("Updating swap with value %v", systemPayload.Payload.Value))
+		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: true, Type: "swap"}
 		swapfile := config.BasePath + "/swapfile"
 		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
+			broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: false, Type: "swap"}
 			return fmt.Errorf("Unable to set swap: %v", err)
 		}
 		if err = config.UpdateConf(map[string]interface{}{
-			"swapVal":  systemPayload.Payload.Value,
+			"swapVal": systemPayload.Payload.Value,
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't update swap value: %v", err))
 		}
-		logger.Logger.Info(fmt.Sprintf("Swap successfully set to %v",systemPayload.Payload.Value))
+		go func() {
+			time.Sleep(2 * time.Second)
+			broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: false, Type: "swap"}
+		}()
+		logger.Logger.Info(fmt.Sprintf("Swap successfully set to %v", systemPayload.Payload.Value))
+	case "update":
+		if systemPayload.Payload.Update == "linux" {
+			if err := system.RunUpgrade(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error updating host system: %v",err))
+			}
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}

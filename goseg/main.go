@@ -69,6 +69,7 @@ func main() {
 	}
 	// routines/version.go
 	go routines.CheckVersionLoop() // infinite version check loop
+	go routines.AptUpdateLoop() // check for base OS updates
 	// routines/docker.go
 	go routines.DockerListener()            // listen to docker daemon
 	go routines.DockerSubscriptionHandler() // digest docker events from eventbus
@@ -105,11 +106,11 @@ func main() {
 	}
 	// grab wg now cause its huge
 	if wgConf, err := docker.GetLatestContainerInfo("wireguard"); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v",err))
+		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
 	} else {
 		logger.Logger.Info("Downloading Wireguard image")
-		if _, err := docker.PullImageIfNotExist("wireguard",wgConf); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v",err))
+		if _, err := docker.PullImageIfNotExist("wireguard", wgConf); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
 		}
 	}
 	if conf.WgRegistered == true {
