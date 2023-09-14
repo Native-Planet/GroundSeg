@@ -24,7 +24,6 @@ import (
 
 var (
 	failedLogins	int
-	lockoutEnd		int64
 	remainder	    int
 	loginMu			sync.Mutex
 )
@@ -274,8 +273,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	} else {
 		failedLogins++
 		logger.Logger.Warn(fmt.Sprintf("Failed auth: %v", loginPayload.Payload.Password))
-		if failedLogins >= MaxFailedLogins {
-			lockoutEnd = time.Now().Add(LockoutDuration).Unix()
+		if failedLogins >= MaxFailedLogins && remainder == 0 {
 			go enforceLockout()
 		}
 		return nil
