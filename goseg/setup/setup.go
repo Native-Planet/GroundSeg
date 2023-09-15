@@ -46,7 +46,7 @@ func Setup(msg []byte,conn *structs.MuConn,token map[string]string) error {
 			hashed := auth.Hasher(password)
 			if err = config.UpdateConf(map[string]interface{}{
 				"setup": "startram",
-				"password": hashed,
+				"pwHash": hashed,
 			}); err != nil {
 				return fmt.Errorf("Unable to set password: %v", err)
 			}
