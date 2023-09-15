@@ -17,7 +17,34 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/grandcat/zeroconf"
 )
+
+func init() {
+	go mDNSServer()
+}
+
+func mDNSServer() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to get hostname: %v", err))
+		return
+	}
+	domain := hostname + ".local"
+	_, err = zeroconf.Register(
+		hostname,
+		"_workstation._tcp",
+		domain,
+		80,
+		[]string{"txtv=0", "lo=1", "la=2"},
+		nil,
+	)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to register service: %v", err))
+		return
+	}
+	select {}
+}
 
 // get memory total/used in bytes
 func GetMemory() (uint64, uint64) {
