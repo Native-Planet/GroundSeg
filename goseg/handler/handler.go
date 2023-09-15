@@ -342,7 +342,6 @@ func LogoutHandler(msg []byte) error {
 
 // return the unauth payload
 func UnauthHandler() ([]byte, error) {
-	logger.Logger.Info("Sending unauth broadcast")
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",
 		AuthLevel: "unauthorized",
