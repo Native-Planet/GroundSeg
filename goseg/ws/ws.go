@@ -233,6 +233,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// send setup broadcast if we're not done setting up
 		if conf.Setup != "complete" {
+			fmt.Println(conf.Setup)
 			conf = config.Conf()
 			resp := structs.SetupBroadcast{
 				Type: "setup",
@@ -247,6 +248,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			MuCon.Write(respJSON)
 		} else {
+			fmt.Println(conf.Setup)
 			// ack/nack for unauth broadcast
 			result := map[string]interface{}{
 				"type":     "activity",
