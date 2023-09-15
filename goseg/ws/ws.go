@@ -201,6 +201,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
+				conf = config.Conf()
 			case "verify":
 				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
@@ -230,10 +231,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				MuCon.Write(resp)
 				ack = "nack"
 			}
-			conf = config.Conf()
 			// send setup broadcast if we're not done setting up
 			if conf.Setup != "complete" {
-				fmt.Println(conf.Setup)
 				resp := structs.SetupBroadcast{
 					Type: "structure",
 					AuthLevel:  "setup",
@@ -247,7 +246,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(respJSON)
 			} else {
-				fmt.Println(conf.Setup)
 				// ack/nack for unauth broadcast
 				result := map[string]interface{}{
 					"type":     "activity",
