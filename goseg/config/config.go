@@ -65,8 +65,7 @@ func init() {
 	if err := system.FixerScript(BasePath); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
 	}
-	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
-	logger.Logger.Info(pathMsg)
+	logger.Logger.Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	file, err := os.Open(confPath)
 	if err != nil {

@@ -105,8 +105,9 @@ func SystemHandler(msg []byte) error {
 	case "modify-swap":
 		logger.Logger.Info(fmt.Sprintf("Updating swap with value %v", systemPayload.Payload.Value))
 		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: true, Type: "swap"}
-		swapfile := config.BasePath + "/swapfile"
-		if err := system.ConfigureSwap(swapfile, systemPayload.Payload.Value); err != nil {
+		conf := config.Conf()
+		file := conf.SwapFile
+		if err := system.ConfigureSwap(file,systemPayload.Payload.Value); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
 			broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Swap: false, Type: "swap"}
 			return fmt.Errorf("Unable to set swap: %v", err)
@@ -295,7 +296,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 		return nil
 	} else {
 		failedLogins++
-		logger.Logger.Warn(fmt.Sprintf("Failed auth: %v", loginPayload.Payload.Password))
+		logger.Logger.Warn(fmt.Sprintf("Failed auth"))
 		if failedLogins >= MaxFailedLogins && remainder == 0 {
 			go enforceLockout()
 		}

@@ -113,7 +113,7 @@ func SysConfig(basePath string) structs.SysConfig {
 			Interval string `json:"interval"`
 		}{
 			Value:    1,
-			Interval: "week",
+			Interval: "month",
 		},
 		DockerData:     "/var/lib/docker",
 		WgOn:           false,
@@ -123,7 +123,7 @@ func SysConfig(basePath string) structs.SysConfig {
 		FirstBoot:      true,
 		GsVersion:      "v2.0.0",
 		CfgDir:         basePath,
-		UpdateInterval: 0,
+		UpdateInterval: 3600,
 		BinHash:        "",
 		Pubkey:         "",
 		Privkey:        "",

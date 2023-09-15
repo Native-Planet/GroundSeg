@@ -262,3 +262,18 @@ type WsLogMessage struct {
 		Line        string `json:"line"`
 	} `json:"log"`
 }
+
+type WsSetupPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsSetupAction `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsSetupAction struct {
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Password string `json:"password"`
+	Key      string `json:"key"`
+	Region   string `json:"region"`
+}

@@ -13,6 +13,8 @@ import (
 	"goseg/config"
 	"goseg/handler"
 	"goseg/logger"
+	"goseg/setup"
+	"goseg/startram"
 	"goseg/structs"
 	"net/http"
 	"strings"
@@ -195,7 +197,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				broadcast.BroadcastToClients()
 			case "setup":
 				logger.Logger.Info("Setup")
-				// setup.Setup(payload)
+				if err = setup.Setup(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "verify":
 				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
@@ -226,18 +231,35 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				ack = "nack"
 			}
 		}
-		// ack/nack for unauth
-		result := map[string]interface{}{
-			"type":     "activity",
-			"id":       payload.ID,
-			"error":    "null",
-			"response": ack,
-			"token":    token,
+		// send setup broadcast if we're not done setting up
+		if conf.Setup != "complete" {
+			conf = config.Conf()
+			resp := structs.SetupBroadcast{
+				Type: "setup",
+				AuthLevel:  "authorized",
+				Stage: conf.Setup,
+				Page: setup.Stages[conf.Setup],
+				Regions: startram.Regions,
+			}
+			respJSON, err := json.Marshal(resp)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
+			}
+			MuCon.Write(respJSON)
+		} else {
+			// ack/nack for unauth broadcast
+			result := map[string]interface{}{
+				"type":     "activity",
+				"id":       payload.ID,
+				"error":    "null",
+				"response": ack,
+				"token":    token,
+			}
+			respJson, err := json.Marshal(result)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+			}
+			MuCon.Write(respJson)
 		}
-		respJson, err := json.Marshal(result)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-		}
-		MuCon.Write(respJson)
 	}
 }
