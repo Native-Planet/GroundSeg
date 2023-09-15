@@ -86,8 +86,20 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		ack := "ack"
 		conf := config.Conf()
 		if authed || conf.FirstBoot {
+			// send setup broadcast if we're not done setting up
 			if conf.FirstBoot {
-				fmt.Println("FirstBoot true")
+				resp := structs.SetupBroadcast{
+					Type: "structure",
+					AuthLevel:  "setup",
+					Stage: conf.Setup,
+					Page: setup.Stages[conf.Setup],
+					Regions: startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
+				}
+				MuCon.Write(respJSON)
 			}
 			switch msgType.Payload.Type {
 			case "new_ship":
@@ -195,21 +207,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Error(errmsg)
 			}
 			MuCon.Write(respJson)
-			// send setup broadcast if we're not done setting up
-			if conf.FirstBoot {
-				resp := structs.SetupBroadcast{
-					Type: "structure",
-					AuthLevel:  "setup",
-					Stage: conf.Setup,
-					Page: setup.Stages[conf.Setup],
-					Regions: startram.Regions,
-				}
-				respJSON, err := json.Marshal(resp)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
-				}
-				MuCon.Write(respJSON)
-			}
 		// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {

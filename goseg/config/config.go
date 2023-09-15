@@ -107,10 +107,8 @@ func init() {
 	defer file.Close()
 	// read the sysconfig to memory
 	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&globalConfig)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		logger.Logger.Error(errmsg)
+	if err = decoder.Decode(&globalConfig); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
 	}
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
