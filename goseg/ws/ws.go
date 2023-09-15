@@ -13,8 +13,11 @@ import (
 	"goseg/config"
 	"goseg/handler"
 	"goseg/logger"
+	"goseg/setup"
+	"goseg/startram"
 	"goseg/structs"
 	"net/http"
+	"strings"
 
 	// "time"
 
@@ -44,7 +47,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				logger.Logger.Info("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
@@ -54,7 +57,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					MuCon:       MuCon,
 				}
 				config.LogsEventBus <- logEvent
-				// nil the session
+				// mute the session
 				auth.WsNilSession(MuCon.Conn)
 			}
 			logger.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
@@ -81,7 +84,23 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": tokenContent,
 		}
 		ack := "ack"
-		if authed {
+		conf := config.Conf()
+		if authed || conf.FirstBoot {
+			// send setup broadcast if we're not done setting up
+			if conf.FirstBoot {
+				resp := structs.SetupBroadcast{
+					Type: "structure",
+					AuthLevel:  "setup",
+					Stage: conf.Setup,
+					Page: setup.Stages[conf.Setup],
+					Regions: startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
+				}
+				MuCon.Write(respJSON)
+			}
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
@@ -141,7 +160,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(resp)
 			case "verify":
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				authed := true
+				if conf.FirstBoot {
+					authed = false
+				}
+				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -160,7 +183,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					MuCon:       MuCon,
 				}
 				config.LogsEventBus <- logEvent
-				// broadcast.StreamLogs(MuCon, msg)
+			case "setup":
+				if err = setup.Setup(msg,MuCon,token); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
+				conf = config.Conf()
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
@@ -183,7 +211,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Error(errmsg)
 			}
 			MuCon.Write(respJson)
-			// unauthenticated action handlers
+		// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
@@ -192,9 +220,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 				broadcast.BroadcastToClients()
-			case "setup":
-				logger.Logger.Info("Setup")
-				// setup.Setup(payload)
 			case "verify":
 				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
@@ -224,19 +249,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				MuCon.Write(resp)
 				ack = "nack"
 			}
+			// ack/nack for unauth broadcast
+			result := map[string]interface{}{
+				"type":     "activity",
+				"id":       payload.ID,
+				"error":    "null",
+				"response": ack,
+				"token":    token,
+			}
+			respJson, err := json.Marshal(result)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+			}
+			MuCon.Write(respJson)
 		}
-		// ack/nack for unauth
-		result := map[string]interface{}{
-			"type":     "activity",
-			"id":       payload.ID,
-			"error":    "null",
-			"response": ack,
-			"token":    token,
-		}
-		respJson, err := json.Marshal(result)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-		}
-		MuCon.Write(respJson)
 	}
 }

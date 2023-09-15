@@ -69,7 +69,7 @@ func main() {
 	}
 	// routines/version.go
 	go routines.CheckVersionLoop() // infinite version check loop
-	go routines.AptUpdateLoop() // check for base OS updates
+	go routines.AptUpdateLoop()    // check for base OS updates
 	// routines/docker.go
 	go routines.DockerListener()            // listen to docker daemon
 	go routines.DockerSubscriptionHandler() // digest docker events from eventbus

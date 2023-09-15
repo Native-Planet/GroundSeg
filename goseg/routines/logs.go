@@ -51,7 +51,7 @@ func LogEvent() {
 					cancel()
 					delete(logsMap[event.MuCon], event.ContainerID)
 				}
-			}		
+			}
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v", event.ContainerID, event.Action))
 			continue

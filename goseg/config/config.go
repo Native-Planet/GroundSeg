@@ -65,8 +65,7 @@ func init() {
 	if err := system.FixerScript(BasePath); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
 	}
-	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
-	logger.Logger.Info(pathMsg)
+	logger.Logger.Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	file, err := os.Open(confPath)
 	if err != nil {
@@ -96,14 +95,20 @@ func init() {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
 			}
 		}
+		keyPath := filepath.Join(BasePath, "settings", "session.key")
+		keyfile, err := os.Stat(keyPath)
+		if err != nil || keyfile.Size() == 0 {
+			keyContent := RandString(32)
+			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v",err))
+			}
+		}
 	}
 	defer file.Close()
 	// read the sysconfig to memory
 	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&globalConfig)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		logger.Logger.Error(errmsg)
+	if err = decoder.Decode(&globalConfig); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
 	}
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
