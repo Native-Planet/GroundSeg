@@ -98,7 +98,7 @@ func init() {
 		keyPath := filepath.Join(BasePath, "settings", "session.key")
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(128)
+			keyContent := RandString(32)
 			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v",err))
 			}
