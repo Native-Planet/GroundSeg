@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	failedLogins	int
-	remainder	    int
-	loginMu			sync.Mutex
+	failedLogins int
+	remainder    int
+	loginMu      sync.Mutex
 )
 
 const (
