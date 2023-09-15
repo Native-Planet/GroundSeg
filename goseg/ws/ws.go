@@ -231,10 +231,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				ack = "nack"
 			}
 		}
+		conf = config.Conf()
 		// send setup broadcast if we're not done setting up
 		if conf.Setup != "complete" {
 			fmt.Println(conf.Setup)
-			conf = config.Conf()
 			resp := structs.SetupBroadcast{
 				Type: "setup",
 				AuthLevel:  "authorized",
