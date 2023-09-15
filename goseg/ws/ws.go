@@ -230,38 +230,39 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				MuCon.Write(resp)
 				ack = "nack"
 			}
-		}
-		conf = config.Conf()
-		// send setup broadcast if we're not done setting up
-		if conf.Setup != "complete" {
+			conf = config.Conf()
 			fmt.Println(conf.Setup)
-			resp := structs.SetupBroadcast{
-				Type: "setup",
-				AuthLevel:  "authorized",
-				Stage: conf.Setup,
-				Page: setup.Stages[conf.Setup],
-				Regions: startram.Regions,
+			// send setup broadcast if we're not done setting up
+			if conf.Setup != "complete" {
+				fmt.Println(conf.Setup)
+				resp := structs.SetupBroadcast{
+					Type: "setup",
+					AuthLevel:  "authorized",
+					Stage: conf.Setup,
+					Page: setup.Stages[conf.Setup],
+					Regions: startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
+				}
+				MuCon.Write(respJSON)
+			} else {
+				fmt.Println(conf.Setup)
+				// ack/nack for unauth broadcast
+				result := map[string]interface{}{
+					"type":     "activity",
+					"id":       payload.ID,
+					"error":    "null",
+					"response": ack,
+					"token":    token,
+				}
+				respJson, err := json.Marshal(result)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+				}
+				MuCon.Write(respJson)
 			}
-			respJSON, err := json.Marshal(resp)
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
-			}
-			MuCon.Write(respJSON)
-		} else {
-			fmt.Println(conf.Setup)
-			// ack/nack for unauth broadcast
-			result := map[string]interface{}{
-				"type":     "activity",
-				"id":       payload.ID,
-				"error":    "null",
-				"response": ack,
-				"token":    token,
-			}
-			respJson, err := json.Marshal(result)
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-			}
-			MuCon.Write(respJson)
 		}
 	}
 }
