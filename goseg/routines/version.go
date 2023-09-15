@@ -146,12 +146,12 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 }
 
 func contains(slice []string, item string) bool {
-    for _, a := range slice {
-        if a == item {
-            return true
-        }
-    }
-    return false
+	for _, a := range slice {
+		if a == item {
+			return true
+		}
+	}
+	return false
 }
 
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
@@ -163,55 +163,55 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 	conf := config.Conf()
 	statuses, err := docker.GetShipStatus(conf.Piers)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't get ship statuses: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't get ship statuses: %v", err))
 		return
 	}
-    valCurrent := reflect.ValueOf(currentVersion)
-    valLatest := reflect.ValueOf(latestVersion)
+	valCurrent := reflect.ValueOf(currentVersion)
+	valLatest := reflect.ValueOf(latestVersion)
 
-    typeOfVersion := valCurrent.Type()
+	typeOfVersion := valCurrent.Type()
 
-    for i := 0; i < valCurrent.NumField(); i++ {
-        sw := typeOfVersion.Field(i).Name
-        if sw != "groundseg" {
-            currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
-            latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
+	for i := 0; i < valCurrent.NumField(); i++ {
+		sw := typeOfVersion.Field(i).Name
+		if sw != "groundseg" {
+			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
+			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 			if config.Architecture == "amd64" {
-                if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
+				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
 					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
-						docker.StartContainer(sw,sw)
+						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer(pier,"vere")
+								docker.StartContainer(pier, "vere")
 							}
 						}
 					} else if sw == "minio" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer("minio_"+pier,"minio")
+								docker.StartContainer("minio_"+pier, "minio")
 							}
 						}
 					}
 				}
 			} else {
-                if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
+				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
 					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
-						docker.StartContainer(sw,sw)
+						docker.StartContainer(sw, sw)
 					} else if sw == "vere" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer(pier,"vere")
+								docker.StartContainer(pier, "vere")
 							}
 						}
 					} else if sw == "minio" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer("minio_"+pier,"minio")
+								docker.StartContainer("minio_"+pier, "minio")
 							}
 						}
 					}

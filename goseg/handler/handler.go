@@ -8,9 +8,9 @@ import (
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
+	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
-	"goseg/startram"
 	"net/http"
 	"os"
 	"os/exec"
@@ -248,23 +248,23 @@ func UrbitHandler(msg []byte) error {
 			}
 		}
 		if err = config.UpdateConf(map[string]interface{}{
-			"piers":  res,
+			"piers": res,
 		}); err != nil {
-			return fmt.Errorf("Couldn't remove pier from config! %v",patp)
+			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
 		}
 		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v",patp))
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v", patp))
 		}
 		if conf.WgRegistered {
-			if err := startram.SvcDelete(patp,"urbit"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v",patp))
+			if err := startram.SvcDelete(patp, "urbit"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", patp))
 			}
-			if err := startram.SvcDelete("s3."+patp,"s3"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v",patp))
+			if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", patp))
 			}
 		}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v",patp))
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v", patp))
 		}
 		return nil
 	default:

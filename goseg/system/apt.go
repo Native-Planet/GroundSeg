@@ -2,10 +2,10 @@ package system
 
 import (
 	"fmt"
-	"regexp"
 	"goseg/logger"
 	"goseg/structs"
 	"os/exec"
+	"regexp"
 )
 
 var (
@@ -45,7 +45,7 @@ func RunUpgrade() error {
 
 func UpdateCheck() {
 	if updates, err := hasUpdates(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to check updates: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Unable to check updates: %v", err))
 	} else {
 		SystemUpdates = updates
 	}
