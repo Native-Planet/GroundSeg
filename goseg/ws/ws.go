@@ -236,7 +236,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(conf.Setup)
 				resp := structs.SetupBroadcast{
 					Type: "structure",
-					AuthLevel:  "unauthorized",
+					AuthLevel:  "authorized",
 					Stage: conf.Setup,
 					Page: setup.Stages[conf.Setup],
 					Regions: startram.Regions,
