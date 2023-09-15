@@ -231,12 +231,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				ack = "nack"
 			}
 			conf = config.Conf()
-			fmt.Println(conf.Setup)
 			// send setup broadcast if we're not done setting up
 			if conf.Setup != "complete" {
 				fmt.Println(conf.Setup)
 				resp := structs.SetupBroadcast{
-					Type: "setup",
+					Type: "structure",
 					AuthLevel:  "authorized",
 					Stage: conf.Setup,
 					Page: setup.Stages[conf.Setup],
