@@ -86,6 +86,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		ack := "ack"
 		conf := config.Conf()
 		if authed || conf.FirstBoot {
+			if conf.FirstBoot {
+				fmt.Println("FirstBoot true")
+			}
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
