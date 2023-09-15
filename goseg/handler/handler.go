@@ -10,11 +10,13 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"goseg/system"
+	"goseg/startram"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -237,6 +239,34 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}
 		return nil
+	case "delete-ship":
+		conf := config.Conf()
+		var res []string
+		for _, pier := range conf.Piers {
+			if pier != patp {
+				res = append(res, pier)
+			}
+		}
+		if err = config.UpdateConf(map[string]interface{}{
+			"piers":  res,
+		}); err != nil {
+			return fmt.Errorf("Couldn't remove pier from config! %v",patp)
+		}
+		if err := docker.DeleteVolume(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v",patp))
+		}
+		if conf.WgRegistered {
+			if err := startram.SvcDelete(patp,"urbit"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v",patp))
+			}
+			if err := startram.SvcDelete("s3."+patp,"s3"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v",patp))
+			}
+		}
+		if err := config.RemoveUrbitConfig(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v",patp))
+		}
+		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -244,8 +274,8 @@ func UrbitHandler(msg []byte) error {
 
 // validate password and add to auth session map
 func LoginHandler(conn *structs.MuConn, msg []byte) error {
-	// no real mutex here
-	// connHandler := &structs.MuConn{Conn: conn}
+	loginMu.Lock()
+	defer loginMu.Unlock()
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -253,6 +283,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
+		failedLogins = 0
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
 			"token": loginPayload.Token.Token,
@@ -294,6 +325,7 @@ func enforceLockout() {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
 	}
+	broadcast.UnauthBroadcast(unauth)
 }
 
 // take a guess
@@ -316,17 +348,13 @@ func UnauthHandler() ([]byte, error) {
 		Login: struct {
 			Remainder int `json:"remainder"`
 		}{
-			Remainder: 0,
+			Remainder: remainder,
 		},
 	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
 		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
 	}
-	// if err := conn.Write(websocket.TextMessage, resp); err != nil {
-	// 	logger.Logger.Error(fmt.Sprintf("Error writing unauth response: %v", err))
-	// 	return
-	// }
 	return resp, nil
 }
 
