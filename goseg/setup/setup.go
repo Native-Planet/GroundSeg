@@ -58,12 +58,14 @@ func Setup(msg []byte) error {
 			}
 			if err = config.UpdateConf(map[string]interface{}{
 				"setup": "complete",
+				"firstBoot": false,
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}
 		case "skip":
 			if err = config.UpdateConf(map[string]interface{}{
 				"setup": "complete",
+				"firstBoot": false,
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}
