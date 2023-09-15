@@ -85,7 +85,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		ack := "ack"
 		conf := config.Conf()
-		if authed {
+		if authed || conf.FirstBoot {
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
@@ -207,7 +207,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(respJSON)
 			}
-			// unauthenticated action handlers
+		// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":

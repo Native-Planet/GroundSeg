@@ -167,67 +167,48 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 	if token["token"] == "" {
 		return "", false
 	}
-	if !setup {
-		logger.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
-		conf := config.Conf()
-		key := conf.KeyFile
-		res, err := KeyfileDecrypt(token["token"], key)
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
-			return token["token"], false
-		} else {
-			// so you decrypt. now we see the useragent and ip.
-			var ip string
-			if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-				ip = strings.Split(forwarded, ",")[0]
-			} else {
-				ip, _, _ = net.SplitHostPort(r.RemoteAddr)
-			}
-			userAgent := r.Header.Get("User-Agent")
-			// you in auth map?
-			if TokenIdAuthed(ClientManager, token["id"]) || setup {
-				// check the decrypted token contents
-				if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
-					// already marked authorized? yes
-					if res["authorized"] == "true" {
-						logger.Logger.Info("Token authenticated")
-						return token["token"], true
-					} else {
-						res["authorized"] = "true"
-						conf := config.Conf()
-						key := conf.KeyFile
-						encryptedText, err := KeyfileEncrypt(res, key)
-						if err != nil {
-							logger.Logger.Error("Error encrypting token")
-							return token["token"], false
-						}
-						return encryptedText, true
-					}
-				} else {
-					logger.Logger.Warn("TokenId doesn't match session!")
-					return token["token"], false
-				}
-			}
-		}
+	logger.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
+	conf := config.Conf()
+	key := conf.KeyFile
+	res, err := KeyfileDecrypt(token["token"], key)
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
 	} else {
-		logger.Logger.Info("Preauthenticating setup client")
-		conf := config.Conf()
-		key := conf.KeyFile
-		res, err := KeyfileDecrypt(token["token"], key)
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
-			return token["token"], false
+		// so you decrypt. now we see the useragent and ip.
+		var ip string
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			ip = strings.Split(forwarded, ",")[0]
 		} else {
-			res["authorized"] = "true"
-			encryptedText, err := KeyfileEncrypt(res, key)
-			if err != nil {
-				logger.Logger.Error("Error encrypting token")
+			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+		}
+		userAgent := r.Header.Get("User-Agent")
+		// you in auth map?
+		if TokenIdAuthed(ClientManager, token["id"]) {
+			// check the decrypted token contents
+			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
+				// already marked authorized? yes
+				if res["authorized"] == "true" {
+					logger.Logger.Info("Token authenticated")
+					return token["token"], true
+				} else {
+					res["authorized"] = "true"
+					conf := config.Conf()
+					key := conf.KeyFile
+					encryptedText, err := KeyfileEncrypt(res, key)
+					if err != nil {
+						logger.Logger.Error("Error encrypting token")
+						return token["token"], false
+					}
+					return encryptedText, true
+				}
+			} else {
+				logger.Logger.Warn("TokenId doesn't match session!")
 				return token["token"], false
 			}
-			return encryptedText, true
 		}
 	}
+	return token["token"], false
 }
 
 // create a new session token
