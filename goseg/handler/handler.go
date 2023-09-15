@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	failedLogins	int
-	remainder	    int
-	loginMu			sync.Mutex
+	failedLogins int
+	remainder    int
+	loginMu      sync.Mutex
 )
 
 const (
@@ -144,6 +144,20 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	case "loom":
+		shipConf.LoomSize = urbitPayload.Payload.Value
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+		}
+		if shipConf.BootStatus == "boot" {
+			docker.StartContainer(patp, "vere")
+		}
+		return nil
 	case "toggle-network":
 		currentNetwork := shipConf.Network
 		conf := config.Conf()
@@ -155,12 +169,18 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+			}
 		} else if currentNetwork == "none" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 			}
 			if err := broadcast.BroadcastToClients(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
@@ -182,6 +202,9 @@ func UrbitHandler(msg []byte) error {
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 		}
 		if err := broadcast.BroadcastToClients(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
