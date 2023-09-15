@@ -160,7 +160,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(resp)
 			case "verify":
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				authed := true
+				if conf.FirstBoot {
+					authed = false
+				}
+				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -180,7 +184,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				config.LogsEventBus <- logEvent
 			case "setup":
-				if err = setup.Setup(msg); err != nil {
+				if err = setup.Setup(msg,MuCon,token); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}

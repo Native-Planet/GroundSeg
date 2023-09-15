@@ -27,7 +27,7 @@ var (
     "region":"also startram"
 */
 
-func Setup(msg []byte) error {
+func Setup(msg []byte,conn *structs.MuConn,token map[string]string) error {
 	var setupPayload structs.WsSetupPayload
 	err := json.Unmarshal(msg, &setupPayload)
 	if err != nil {
@@ -62,12 +62,18 @@ func Setup(msg []byte) error {
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}
+			if err := auth.AddToAuthMap(conn.Conn,token,true); err != nil {
+				return fmt.Errorf("Error moving session to auth: %v", err)
+			}
 		case "skip":
 			if err = config.UpdateConf(map[string]interface{}{
 				"setup": "complete",
 				"firstBoot": false,
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
+			}
+			if err := auth.AddToAuthMap(conn.Conn,token,true); err != nil {
+				return fmt.Errorf("Error moving session to auth: %v", err)
 			}
 		default:
 			return fmt.Errorf("Invalid setup action: %v",setupPayload.Payload.Action)
