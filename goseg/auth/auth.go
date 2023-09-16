@@ -315,6 +315,7 @@ func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	logger.Logger.Info(fmt.Sprintf("Decrypting with keyfile %v (%v)",keyStr,string(fileBytes)))
 	key, err := fernet.DecodeKey(string(fileBytes))
 	if err != nil {
 		return nil, err
