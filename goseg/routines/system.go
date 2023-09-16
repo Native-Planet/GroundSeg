@@ -64,7 +64,7 @@ func mDNSServer() {
 		nil,
 	)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to register service: %v", err))
+		logger.Logger.Error(fmt.Sprintf("Failed to register mDNS server: %v", err))
 		return
 	}
 	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain", LocalDomain))
