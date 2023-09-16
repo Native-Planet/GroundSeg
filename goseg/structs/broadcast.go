@@ -156,7 +156,7 @@ type SetupBroadcast struct {
 	Type      string                    `json:"type"`
 	AuthLevel string                    `json:"auth_level"`
 	Stage     string                    `json:"stage"`
-	Page      int                    `json:"page"`
+	Page      int                       `json:"page"`
 	Regions   map[string]StartramRegion `json:"regions"`
 }
 
