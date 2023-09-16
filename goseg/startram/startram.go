@@ -15,7 +15,7 @@ import (
 
 var (
 	EventBus = make(chan structs.Event, 100)
-	Regions = make(map[string]structs.StartramRegion)
+	Regions  = make(map[string]structs.StartramRegion)
 )
 
 // get available regions from endpoint
