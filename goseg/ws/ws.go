@@ -36,8 +36,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
-	tokenId := config.RandString(32)
-	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
+	// tokenId := config.RandString(32)
+	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -73,6 +73,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": payload.Token.Token,
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
+		if authed {
+			logger.Logger.Info(fmt.Sprintf("Token %v authenticated"payload.Token.ID))
+		} else {
+			logger.Logger.Info(fmt.Sprintf("Token %v not authenticated"payload.Token.ID))
+		}
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
@@ -162,6 +167,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
+				logger.Logger.Info(fmt.Sprintf("Token %v added to %v authmap for verify request",payload.Token.ID,authed))
 				if !authed {
 					resp, err := handler.UnauthHandler()
 					if err != nil {

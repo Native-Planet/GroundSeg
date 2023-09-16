@@ -195,8 +195,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 					return token["token"], true
 				} else {
 					res["authorized"] = "true"
-					conf := config.Conf()
-					key := conf.KeyFile
 					encryptedText, err := KeyfileEncrypt(res, key)
 					if err != nil {
 						logger.Logger.Error("Error encrypting token")
@@ -315,7 +313,6 @@ func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Logger.Info(fmt.Sprintf("Decrypting with keyfile %v (%v)",keyStr,string(fileBytes)))
 	key, err := fernet.DecodeKey(string(fileBytes))
 	if err != nil {
 		return nil, err
