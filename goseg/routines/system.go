@@ -62,8 +62,7 @@ func mDNSServer() {
 		return
 	}
 	// advertise the http server
-	// func Register(instance, service, domain string, port int, text []string, ifaces []net.Interface) (*Server, error) {
-	// func RegisterProxy(instance, service, domain string, port int, host string, ips []string, text []string, ifaces []net.Interface) (*Server, error) {
+	// we use RegisterProxy so we can spoof the hostname
 	_, err = zeroconf.RegisterProxy(
 		strings.Split(LocalDomain, ".")[0],
 		"_http._tcp",
@@ -79,14 +78,14 @@ func mDNSServer() {
 		return
 	}
 	// also spoof the np hostname
-	_, err = zeroconf.Register(
-		strings.Split(LocalDomain, ".")[0],
-		"_workstation._tcp",
-		"local.",
-		42069,
-		nil,
-		nil,
-	)
+	// _, err = zeroconf.Register(
+	// 	strings.Split(LocalDomain, ".")[0],
+	// 	"_workstation._tcp",
+	// 	"local.",
+	// 	1337,
+	// 	nil,
+	// 	nil,
+	// )
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to advertise mDNS host: %v", err))
 	}
