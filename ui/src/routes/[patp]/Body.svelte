@@ -25,19 +25,21 @@
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
   $: running = (ship?.running) || false
+  $: loomSize = (ship?.loomSize)
+  $: lusCode = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
+  $: url = (ship?.url) || "#"
+
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
-  $: loomSize = (ship?.loomSize)
-
 </script>
 <div class="body">
   <!-- Power -->
   <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
 
   <!-- Custom Urbit Domain -->
-  <CustomUrbitDomain />
+  <CustomUrbitDomain {url} />
 
   <!-- Custom MinIO Domain -->
   <CustomMinIODomain />
