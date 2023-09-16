@@ -29,17 +29,6 @@ var (
 	}
 )
 
-func init() {
-	conf := config.Conf()
-	authed := conf.Sessions.Authorized
-	logger.Logger.Info(fmt.Sprintf("Auth config: %v",authed))
-	for key := range authed {
-		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
-		auth.ClientManager.AddAuthClient(key, nil)
-	}
-	logger.Logger.Info(fmt.Sprintf("Loaded auths: %v",auth.ClientManager.AuthClients))
-}
-
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -85,11 +74,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": payload.Token.Token,
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
-		if authed {
-			logger.Logger.Info(fmt.Sprintf("Token %v authenticated",payload.Token.ID))
-		} else {
-			logger.Logger.Info(fmt.Sprintf("Token %v not authenticated",payload.Token.ID))
-		}
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
@@ -179,7 +163,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
-				logger.Logger.Info(fmt.Sprintf("Token %v added to %v authmap for verify request",payload.Token.ID,authed))
 				if !authed {
 					resp, err := handler.UnauthHandler()
 					if err != nil {

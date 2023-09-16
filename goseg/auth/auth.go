@@ -54,14 +54,24 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var (
+	ClientManager = NewClientManager()
+)
+
+func init() {
+	conf := config.Conf()
+	authed := conf.Sessions.Authorized
+	for key := range authed {
+		ClientManager.AddAuthClient(key, nil)
+	}
+}
+
 func NewClientManager() *structs.ClientManager {
 	return &structs.ClientManager{
 		AuthClients:   make(map[string]*structs.MuConn),
 		UnauthClients: make(map[string]*structs.MuConn),
 	}
 }
-
-var ClientManager = NewClientManager()
 
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
@@ -80,11 +90,9 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	defer ClientManager.Mu.RUnlock()
 	for _, client := range ClientManager.AuthClients {
 		if client.Conn == conn {
-			logger.Logger.Info("Client is in auth map")
 			return true
 		}
 	}
-	logger.Logger.Info("Client not in auth map")
 	return false
 }
 
@@ -116,8 +124,6 @@ func WsNilSession(conn *websocket.Conn) error {
 func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	clientManager.Mu.RLock()
 	defer clientManager.Mu.RUnlock()
-	logger.Logger.Info(fmt.Sprintf("Checking token: %v", token))
-	logger.Logger.Info(fmt.Sprintf("AuthClients: %v", clientManager.AuthClients))
 	_, exists := clientManager.AuthClients[token]
 	return exists
 }
@@ -161,7 +167,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 	if token["token"] == "" {
 		return "", false
 	}
-	logger.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
@@ -183,7 +188,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
 				if res["authorized"] == "true" {
-					logger.Logger.Info("Token authenticated")
 					return token["token"], true
 				} else {
 					res["authorized"] = "true"
@@ -196,11 +200,8 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 				}
 			} else {
 				logger.Logger.Warn("TokenId doesn't match session!")
-				logger.Logger.Info(fmt.Sprintf("%v:%v -- %v:%v -- %v:%v -- %v:%v", ip, res["ip"], userAgent, res["user_agent"], res["id"], token["id"]))
 				return token["token"], false
 			}
-		} else {
-			logger.Logger.Info(fmt.Sprintf("Token %v failed TokenIdAuthed",token["id"]))
 		}
 	}
 	return token["token"], false
