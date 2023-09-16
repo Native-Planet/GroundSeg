@@ -6,6 +6,7 @@ import (
 	"goseg/config"
 	"goseg/system"
 	"goseg/logger"
+	"net"
 	"strings"
 	"time"
 
@@ -55,12 +56,21 @@ func mDNSServer() {
 			counter++
 		}
 	}
+	ips, err := getAllIPs()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
 	// advertise the http server
+	// func Register(instance, service, domain string, port int, text []string, ifaces []net.Interface) (*Server, error) {
+	// func RegisterProxy(instance, service, domain string, port int, host string, ips []string, text []string, ifaces []net.Interface) (*Server, error) {
 	_, err = zeroconf.RegisterProxy(
 		strings.Split(LocalDomain, ".")[0],
 		"_http._tcp",
 		"local.",
 		80,
+		strings.Split(LocalDomain, ".")[0],
+		ips,
 		[]string{"txtv=0", "lo=1", "la=2"},
 		nil,
 	)
@@ -105,4 +115,29 @@ func mDNSDiscovery() ([]string, error) {
 		hosts = append(hosts, entry.ServiceInstanceName())
 	}
 	return hosts, nil
+}
+
+func getAllIPs() ([]string, error) {
+	var ips []string
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range interfaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			ips = append(ips, ip.String())
+		}
+	}
+	return ips, nil
 }
