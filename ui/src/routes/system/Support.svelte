@@ -1,13 +1,21 @@
 <script>
   import { structure } from '$lib/stores/websocket'
   import { page } from '$app/stores'
+  import { openModal } from 'svelte-modals'
+  import BugReportModal from './BugReportModal.svelte'
 </script>
 
 <div class="container">
-  <div class="title">SUPPORT</div>
+  <div class="sys-title">SUPPORT</div>
   <div class="spacer"></div>
   <div class="links">
+    <button
+      on:click={()=>openModal(BugReportModal)}
+      class="link">
+      Report Bug
+    </button>
     <a href="http://{$page.url.hostname}:19999" target="_blank" class="link">Netdata</a>
+    <span>|</span>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Twitter</a>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Email</a>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Urbit</a>
@@ -19,15 +27,16 @@
     margin: 0;
     display: flex;
     align-items: center;
-    padding: 20px 40px;
+    padding-top: 32px;
+    padding-bottom: 32px;
     margin-bottom: 20px;
   }
-  .title {
+  .sys-title {
     margin-bottom: 0;
   }
   .links {
     display: flex;
-    gap: 20px;
+    gap: 24px;
     font-weight: 600;
   }
   .spacer {
@@ -35,7 +44,29 @@
   }
   .link {
     text-decoration: none;
-    color: var(--text-color);
-    font-size: 12px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 56px; /* 233.333% */
+    letter-spacing: -1.44px;
+    cursor: pointer;
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+  span {
+    color: var(--Gray-200, #ABBAAE);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 56px; /* 233.333% */
+    letter-spacing: -1.44px;
   }
 </style>

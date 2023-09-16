@@ -15,54 +15,91 @@
 </script>
 
 <div class="container {wide ? "wide" : "slim"}">
-  <div class="title">COMPUTER</div>
+  <div class="prof-title">COMPUTER</div>
   <div class="label">Password</div>
   <div class="wrapper">
-    <div class="pwd">**************************</div>
+    <div class="pwd">****************</div>
     <button class="edit" on:click={()=>openModal(PasswordModal)}>Edit</button>
   </div>
-  <button class="edit" on:click={handleLogout}>{clicked ? "Logging out..." : "Logout(Temp)"}</button>
+  <div class="label">Session</div>
+  <button class="logout" on:click={handleLogout}>{clicked ? "Logging out..." : "Logout"}</button>
 </div>
 
 <style>
+  .prof-title {
+    margin-bottom: 56px;
+  }
   .container {
     margin: auto;
   }
   .wrapper {
     display: flex;
-    align-items: end;
-    gap: 24px;
+    align-items: center;
+    gap: 8px;
+    height: 65px;
+    margin-bottom: 48px;
   }
   .pwd {
-    width: calc(100% - 20px);
-    font-family: var(--regular-font);
-    color: var(--text-color);
-    padding-left: 20px;
-    border: 2px solid var(--btn-secondary);
-    background-color: var(--bg-modal);
-    border-radius: 12px;
-    font-size: 16px;
-    line-height: 36px;
+    flex: 1;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    background: var(--Gray-100, #DDE3DF);
+    padding: 22px 24px 14px 24px;
   }
   .pwd:focus {
     outline: none;
   }
   .label {
-    font-size: 12px;
-    color: var(--text-color);
-    margin-bottom: 8px;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
   }
   .edit {
-    font-family: var(--regular-font);
-    background: var(--btn-secondary);
-    color: var(--text-card-color);
-    height: 42px;
-    font-size: 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    justify-content: center;
-    align-items: center;
+    border-radius: 16px;
+    background: var(--Gray-400, #5C7060);
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    height: 65px;
     padding: 0 48px;
+    cursor: pointer;
+  }
+  .logout {
+    border-radius: 16px;
+    background: black;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    height: 65px;
+    padding: 0 48px;
+    cursor: pointer;
   }
   .wide {
     width: 992px;
@@ -71,8 +108,5 @@
   }
   .slim {
     width: 100vw;
-  }
-  .title {
-    margin-bottom: 24px;
   }
 </style>

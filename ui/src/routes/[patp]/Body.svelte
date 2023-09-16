@@ -64,9 +64,6 @@
   .body::-webkit-scrollbar {display: none;}
   .body {
     background-color: var(--bg-card);
-    position: absolute;
-    bottom: 0;
-    height: calc(743px - 150px - 20px);
     width: calc(100% - 40px);
     padding: 20px 20px 0 20px;
     max-width: 100vw;

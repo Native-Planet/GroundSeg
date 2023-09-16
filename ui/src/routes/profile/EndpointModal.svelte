@@ -33,7 +33,7 @@
     <div class="wrapper">
       <!-- Info -->
       <h1>Edit Endpoint</h1>
-      <p>Modifying your endpoint removes previous StarTram configuration</p>
+      <p>Modifying your endpoint removes previous StarTram configuration.</p>
 
       <!-- Replacement Endpoint -->
       <h2>New Endpoint</h2>
@@ -78,35 +78,57 @@
     color: var(--btn-primary);
   }
   .wrapper {
-    margin: 20px;
+    margin: 32px;
     font-family: var(--regular-font);
   }
   h1 {
-    font-size: 14px;
-    font-weight: 500;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
   }
   p {
-    margin-top: 10px;
-    font-size: 14px;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
     font-weight: 300;
-    margin-bottom: 20px;
-    opacity: .8;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
+    width: 500px;
   }
   h2 {
-    font-size: 14px;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 20px;
+    font-style: normal;
     font-weight: 300;
-    margin: 0;
-    color: var(--btn-secondary);
-    font-weight: 500;
+    letter-spacing: -1.2px;
   }
   input {
-    font-size: 14px;
-    margin: 8px 0 20px 0;
-    background: var(--bg-modal);
-    border-radius: 12px;
-    width: calc(100% - 24px);
+    flex: 1;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    background: var(--Gray-100, #DDE3DF);
+    padding: 16px 24px 18px 24px;
+    width: calc(100% - 48px);
     border: none;
-    padding: 12px;
   }
   input:focus {
     outline: none;
@@ -116,15 +138,22 @@
     pointer-events: none;
   }
   button {
-    margin-top: 48px;
+    margin-top: 56px;
     background-color: var(--btn-secondary);
-    border-radius: 12px;
-    color: var(--text-card-color);
-    height: 42px;
-    padding: 0 64px;
-    font-family: var(--regular-font);
-    font-size: 12px;
+    border-radius: 16px;
     cursor: pointer;
+    padding: 0 48px;
+    height: 65px;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
   }
   button:disabled {
     pointer-events: none;

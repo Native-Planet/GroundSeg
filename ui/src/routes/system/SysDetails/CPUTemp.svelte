@@ -5,7 +5,7 @@
 
 <div class="info-wrapper">
   <div class="info-title">CPU Temperature</div>
-  <div class="info-text">{cpuTemp}%</div>
+  <div class="info-text">{cpuTemp}&#8451;</div>
 </div>
 <div class="bar-bg">
   <div class="bar-fg" style="width:{cpuTemp}%"></div>
