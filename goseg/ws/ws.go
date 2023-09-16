@@ -29,6 +29,16 @@ var (
 	}
 )
 
+func init() {
+	conf := config.Conf()
+	authed := conf.Sessions.Authorized
+	logger.Logger.Info(fmt.Sprintf("Auth config: %v",authed))
+	for key := range authed {
+		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
+		auth.ClientManager.AddAuthClient(key, nil)
+	}
+}
+
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)

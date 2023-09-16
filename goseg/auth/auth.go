@@ -63,16 +63,6 @@ func NewClientManager() *structs.ClientManager {
 
 var ClientManager = NewClientManager()
 
-func init() {
-	conf := config.Conf()
-	authed := conf.Sessions.Authorized
-	logger.Logger.Info(fmt.Sprintf("Auth config: %v",authed))
-	for key := range authed {
-		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
-		ClientManager.AddAuthClient(key, nil)
-	}
-}
-
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	ClientManager.Mu.RLock()
