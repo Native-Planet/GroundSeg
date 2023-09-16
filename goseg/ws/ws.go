@@ -37,6 +37,7 @@ func init() {
 		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
 		auth.ClientManager.AddAuthClient(key, nil)
 	}
+	logger.Logger.Info(fmt.Sprintf("Loaded auths: %v",auth.ClientManager.AuthClients))
 }
 
 // switch on ws event cases
