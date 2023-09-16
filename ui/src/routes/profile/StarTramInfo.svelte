@@ -7,42 +7,33 @@
 
 {#if registered}
   <div class="wrapper">
-    <div class="title">STARTRAM</div>
+    <div class="prof-title">STARTRAM</div>
     <div class="info-wrapper">
       <div class="info">
-        <div class="item">Autorenew</div>
-        <div class="item">{renew ? "Yes" : "No"}</div>
+        <div class="item bold">Plan</div>
+        <div class="item">{!renew ? "Subscription" : "Non-Recurring"}</div>
       </div>
       <div class="info">
-        <div class="item">Expiration Date</div>
+        <div class="item bold">{!renew ? "Renewal Date" : "Expiration Date"}</div>
         <div class="item">{expiry}</div>
       </div>
     </div>
   </div>
 {:else}
   <div>
-    <div class="title">STARTRAM</div>
+    <div class="prof-title">STARTRAM</div>
     <div class="info-box">Not Registered</div>
   </div>
 {/if}
 
 <style>
-  .title {
-    color: #000;
-    leading-trim: both;
-    text-edge: cap;
-    font-family: var(--title-font);
-    font-size: 32px;
-    font-style: normal;
-    font-weight: 700;
-    line-height: normal;
-    letter-spacing: -1.92px;
+  .prof-title {
     margin-bottom: 32px;
   }
   .info-wrapper {
     display: flex;
     margin-bottom: 12px;
-    gap: 56px;
+    gap: calc(56px * 1.5);
   }
   .info {
     display: flex;
@@ -66,7 +57,10 @@
     font-size: 24px;
     font-style: normal;
     font-weight: 300;
-    line-height: 48px; /* 200% */
+    margin-bottom: 12px;
     letter-spacing: -1.44px;
+  }
+  .bold {
+    font-weight: 500;
   }
 </style>

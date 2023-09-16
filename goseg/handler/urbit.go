@@ -94,7 +94,30 @@ func UrbitHandler(msg []byte) error {
 		return nil
 	case "toggle-power":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
-		defer func() { docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""} }()
+		defer func() {
+			/*
+				ticker := time.NewTicker(500 * time.Millisecond)
+				for {
+					select {
+					case <-ticker.C:
+						patps := []string{patp}
+						urbitsMap, err := docker.GetShipStatus(patps)
+						if err != nil {
+							logger.Logger.Error(fmt.Sprintf("%v", err))
+							break
+						}
+						urb, exists := urbitsMap[patp]
+						if !exists {
+							logger.Logger.Error(fmt.Sprintf("%s doesn't exist in map", patp))
+							break
+						}
+						logger.Logger.Warn(fmt.Sprintf("%+v", urb))
+						//isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+					}
+				}
+			*/
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
+		}()
 		update := make(map[string]structs.UrbitDocker)
 		if shipConf.BootStatus == "noboot" {
 			shipConf.BootStatus = "boot"
