@@ -1,10 +1,5 @@
 package ws
 
-// you can pass websockets to other packages for reads, but please
-// try to do all writes from here
-// otherwise you have to deal with passing mutexes which is annoying
-// and hard to think about
-
 import (
 	"encoding/json"
 	"fmt"

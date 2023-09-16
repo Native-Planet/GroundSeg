@@ -103,6 +103,7 @@ func init() {
 				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
+		file, _ = os.Open(confPath)
 	}
 	defer file.Close()
 	// read the sysconfig to memory
