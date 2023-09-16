@@ -45,14 +45,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Info("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
-				logEvent := structs.LogsEvent{
-					Action:      false,
-					ContainerID: "all",
-					MuCon:       MuCon,
-				}
-				config.LogsEventBus <- logEvent
+				// logEvent := structs.LogsEvent{
+				// 	Action:      false,
+				// 	ContainerID: "all",
+				// 	MuCon:       MuCon,
+				// }
+				// config.LogsEventBus <- logEvent
 				// mute the session
-				auth.WsNilSession(MuCon.Conn)
+				auth.WsNilSession(conn)
 			}
 			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
@@ -62,6 +62,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
+		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
@@ -74,9 +75,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
 		if authed {
-			logger.Logger.Info(fmt.Sprintf("Token %v authenticated"payload.Token.ID))
+			logger.Logger.Info(fmt.Sprintf("Token %v authenticated",payload.Token.ID))
 		} else {
-			logger.Logger.Info(fmt.Sprintf("Token %v not authenticated"payload.Token.ID))
+			logger.Logger.Info(fmt.Sprintf("Token %v not authenticated",payload.Token.ID))
 		}
 		token = map[string]string{
 			"id":    payload.Token.ID,
