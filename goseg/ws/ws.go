@@ -167,6 +167,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
+				if !authed {
+					resp, err := handler.UnauthHandler()
+					if err != nil {
+						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+					}
+					MuCon.Write(resp)
+				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
