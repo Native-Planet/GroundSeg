@@ -444,8 +444,7 @@ export const submitReport = (contact,description,ships) => {
 //
 //  Logs
 //
-//
-//
+
 export const toggleLog = (name,action) => {
   let payload = {
     "type":"logs",

@@ -19,7 +19,6 @@
     </div>
   </div>
   <div class="section-right">
-    {JSON.stringify(tTogglePower)}
     <ToggleButton
       on:click={()=>dispatch("click")}
       on={running}
