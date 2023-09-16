@@ -207,6 +207,8 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 				logger.Logger.Info(fmt.Sprintf("%v:%v -- %v:%v -- %v:%v -- %v:%v", ip, res["ip"], userAgent, res["user_agent"], res["id"], token["id"]))
 				return token["token"], false
 			}
+		} else {
+			logger.Logger.Info(fmt.Sprintf("Token %v failed TokenIdAuthed",token["id"]))
 		}
 	}
 	return token["token"], false
