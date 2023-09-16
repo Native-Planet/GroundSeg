@@ -56,7 +56,7 @@ func mDNSServer() {
 		}
 	}
 	// advertise the http server
-	_, err = zeroconf.Register(
+	_, err = zeroconf.RegisterProxy(
 		strings.Split(LocalDomain, ".")[0],
 		"_http._tcp",
 		"local.",
