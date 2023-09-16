@@ -28,7 +28,7 @@ func StartramHandler(msg []byte) error {
 		region := startramPayload.Payload.Region
 		go handleStartramRegister(regCode, region)
 	case "toggle":
-		go handleNotImplement(startramPayload.Payload.Action)
+		go handleStartramToggle()
 	case "restart":
 		go handleNotImplement(startramPayload.Payload.Action)
 	case "cancel":
@@ -47,6 +47,33 @@ func StartramHandler(msg []byte) error {
 
 func handleStartramRegions() {
 	go broadcast.LoadStartramRegions()
+}
+
+func handleStartramToggle() {
+	startram.EventBus <- structs.Event{Type: "toggle", Data: "loading"}
+	conf := config.Conf()
+	if conf.WgOn {
+		if err := config.UpdateConf(map[string]interface{}{
+			"wgOn": false,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+		err := docker.StopContainerByName("wireguard")
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+	} else {
+		if err := config.UpdateConf(map[string]interface{}{
+			"wgOn": true,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+		_, err := docker.StartContainer("wireguard", "wireguard")
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+	}
+	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
 }
 
 func handleStartramRegister(regCode, region string) {
@@ -109,15 +136,24 @@ func handleStartramEndpoint(endpoint string) {
 	// stop wireguard if running
 	if conf.WgOn {
 		startram.EventBus <- structs.Event{Type: "endpoint", Data: "stopping"}
-		// logic here
+		if err := docker.StopContainerByName("wireguard"); err != nil {
+			handleError(fmt.Sprintf("%v", err))
+			return
+		}
 	}
 	// Wireguard registered
 	if conf.WgRegistered {
 		// unregister startram services if exists
 		startram.EventBus <- structs.Event{Type: "endpoint", Data: "unregistering"}
-		// logic here
+		for _, p := range conf.Piers {
+			if err := startram.SvcDelete(p, "urbit"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", p))
+			}
+			if err := startram.SvcDelete("s3."+p, "s3"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", p))
+			}
+		}
 	}
-	time.Sleep(1 * time.Second) // temp
 	// reset pubkey
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "configuring"}
 	err := config.CycleWgKey()
@@ -128,7 +164,8 @@ func handleStartramEndpoint(endpoint string) {
 	// set endpoint to config and persist
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: "finalizing"}
 	err = config.UpdateConf(map[string]interface{}{
-		"endpointUrl": endpoint,
+		"endpointUrl":  endpoint,
+		"wgRegistered": false,
 	})
 	if err != nil {
 		handleError(fmt.Sprintf("%v", err))

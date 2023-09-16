@@ -2,6 +2,7 @@
   // Modals
   import { openModal } from 'svelte-modals'
   import EndpointModal from './EndpointModal.svelte'
+  import RegisterModal from './RegisterModal.svelte'
 
   import { structure } from '$lib/stores/websocket'
 
@@ -9,6 +10,9 @@
   $: endpoint = (info?.endpoint) || ""
   $: registered = (info?.registered) || false
   $: region = (info?.region) || ""
+  $: regionFormatted = capitalizeFirstLetter(region.replace(/-/g, ' '))
+
+  const capitalizeFirstLetter = str => str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 </script>
 
 <div class="wrapper">
@@ -26,8 +30,10 @@
     <div class="item">
       <div class="label">Region</div>
       <div class="data">
-        <div class="data-text">US East</div>
-        <button>Edit</button>
+        <div class="data-text">{regionFormatted}</div>
+      <button
+        on:click={()=>openModal(RegisterModal,{"regionMode":true})}
+      >Edit</button>
       </div>
     </div>
   {/if}
@@ -47,20 +53,39 @@
   .data {
     display: flex;
     gap: 21px;
+    height: 65px;
+    align-items: center;
   }
   .data-text {
     flex: 1; 
-    padding: 24px;
     background: var(--bg-modal);
     border-radius: 16px;
+    padding-left: 24px;
+
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
     font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 65px;
+    letter-spacing: -1.44px;
   }
   button {
     font-size: 24px;
-    padding: 24px 48px;
+    line-height: 65px;
     background: var(--btn-secondary);
-    color: var(--text-card-color);
     border-radius: 16px;
-    font-weight: 400;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding: 0 48px;
   }
 </style>

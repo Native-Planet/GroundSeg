@@ -8,6 +8,7 @@
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
 
   export let remote
+  export let tToggleNetwork = ""
 
   const dispatch = createEventDispatcher()
 </script>
@@ -21,6 +22,7 @@
     <ToggleButton
       on:click={()=>dispatch("click")}
       on={remote}
+      loading={tToggleNetwork.length > 0}
       />
   </div>
 </div>

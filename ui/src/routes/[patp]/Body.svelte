@@ -26,7 +26,9 @@
   $: remote = (ship?.remote) || false
   $: running = (ship?.running) || false
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
-  $: tTogglePower = (tShip?.togglePower) || null
+  $: tTogglePower = (tShip?.togglePower) || ""
+  $: tToggleDevMode = (tShip?.toggleDevMode) || ""
+  $: tToggleNetwork = (tShip?.toggleNetwork) || ""
   $: loomSize = (ship?.loomSize)
 
 </script>
@@ -47,10 +49,10 @@
   <PackMeld />
 
   <!-- Dev Mode -->
-  <DevMode {devMode} on:click={()=>toggleDevMode(patp)} />
+  <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
   <!-- Remote Access -->
-  <RemoteAccess {remote} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>
