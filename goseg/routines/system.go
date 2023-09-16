@@ -73,7 +73,7 @@ func mDNSServer() {
 		strings.Split(LocalDomain, ".")[0],
 		"_workstation._tcp",
 		"local.",
-		0,
+		42069,
 		nil,
 		nil,
 	)
