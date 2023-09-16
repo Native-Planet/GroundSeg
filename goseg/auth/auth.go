@@ -123,10 +123,12 @@ func WsNilSession(conn *websocket.Conn) error {
 }
 
 // is this tokenid in the auth map?
-func TokenIdAuthed(token string) bool {
-	ClientManager.Mu.RLock()  // Use the passed-in clientManager
-	defer ClientManager.Mu.RUnlock()
-	_, exists := ClientManager.AuthClients[token]  // Use the passed-in clientManager
+func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
+	clientManager.Mu.RLock()
+	defer clientManager.Mu.RUnlock()
+	logger.Logger.Info(fmt.Sprintf("Checking token: %s\n", token["id"]))
+	logger.Logger.Info(fmt.Sprintf("AuthClients: %+v\n", ClientManager.AuthClients))
+	_, exists := clientManager.AuthClients[token]
 	return exists
 }
 
@@ -186,7 +188,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(token["id"]) {
+		if TokenIdAuthed(ClientManager, token["id"]) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
