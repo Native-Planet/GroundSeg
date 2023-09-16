@@ -126,8 +126,8 @@ func WsNilSession(conn *websocket.Conn) error {
 func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	clientManager.Mu.RLock()
 	defer clientManager.Mu.RUnlock()
-	logger.Logger.Info(fmt.Sprintf("Checking token: %s\n", token["id"]))
-	logger.Logger.Info(fmt.Sprintf("AuthClients: %+v\n", ClientManager.AuthClients))
+	logger.Logger.Info(fmt.Sprintf("Checking token: %v\n", token["id"]))
+	logger.Logger.Info(fmt.Sprintf("AuthClients: %v\n", ClientManager.AuthClients))
 	_, exists := clientManager.AuthClients[token]
 	return exists
 }
