@@ -162,7 +162,7 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 }
 
 // check the validity of the token
-func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) (string, bool) {
+func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
 		return "", false
