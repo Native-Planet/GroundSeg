@@ -2,12 +2,18 @@
   flex: 1;
   background: var(--bg-base);
   color: var(--text-color);
-  padding: 40px;
+  padding: 56px;
   border-radius: 16px;
   margin: 0;
 }
-.title {
-  font-size: 24px;
-  margin-bottom: 56px;
-  font-family: var(--title-font);
+.sys-title {
+  color: #000;
+  leading-trim: both;
+  text-edge: cap;
+  font-family: BPdotsUnicase;
+  font-size: 32px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -1.92px;
 }

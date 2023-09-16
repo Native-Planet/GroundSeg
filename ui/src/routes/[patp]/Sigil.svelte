@@ -3,6 +3,7 @@
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { sigil, stringRenderer } from '@tlon/sigil-js'
   export let name
+  export let modal = false
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
@@ -16,8 +17,15 @@
   afterUpdate(()=> {
     if (validPatp && (isMoon || isPlanet || isStar || isGalaxy)) {
       let root = getComputedStyle(document.documentElement);
-      let bg = root.getPropertyValue('--fg-card');
-      let fg = root.getPropertyValue('--text-card-color');
+      let bg
+      let fg
+      if (modal) {
+        bg = root.getPropertyValue('--bg-modal');
+        fg = root.getPropertyValue('--text-color');
+      } else {
+        bg = root.getPropertyValue('--fg-card');
+        fg = root.getPropertyValue('--text-card-color');
+      }
       let patp = noSig
       if (isMoon) {
         patp = patp.slice(-13)
@@ -34,7 +42,7 @@
   })
 
 </script>
-<div class="sigil">{@html displayed}</div>
+<div class="{modal ? "modal" : "sigil"}">{@html displayed}</div>
 <style>
   .sigil {
     width: 64px;
@@ -43,5 +51,13 @@
     overflow: hidden;
     margin-left: 34px;
     margin-top: 38px;
+  }
+  .modal {
+    margin-top: 48px;
+    width: 120px;
+    height: 120px;
+    overflow: hidden;
+    border: solid 4px var(--text-color);
+    border-radius: 16px;
   }
 </style>

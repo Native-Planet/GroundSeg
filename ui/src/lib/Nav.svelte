@@ -29,7 +29,7 @@
         <div
           class:highlight={$page.route.id != "/(home)"}
           on:click={()=>goto("/")}
-          class="btn text"
+          class="btn option"
           >SHIPS
         </div>
       </div>
@@ -95,20 +95,17 @@
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 6px;
-  }
-  .text {
-    font-family: var(--title-font);
-    font-size: 28px;
+    margin-left: 8px;
   }
   .option {
-    font-size: 28px;
+    font-size: 32px;
     font-family: var(--title-font);
-  }
-  .btn:hover {
-    cursor: pointer;
+    opacity: .2;
+    pointer-events: none;
   }
   .highlight {
-    opacity: .6;
+    opacity: 1;
+    cursor: pointer;
+    pointer-events: auto;
   }
 </style>

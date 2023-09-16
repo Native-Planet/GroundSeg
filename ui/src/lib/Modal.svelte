@@ -2,9 +2,16 @@
   import Fa from 'svelte-fa'
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
   import { closeModal } from 'svelte-modals'
+
+  import { fade } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
+  export let width = 600
 </script>
 <div role="dialog" class="modal">
-  <div class="contents">
+  <div
+    class="contents" style="width:{width}px"
+    transition:fade={{ duration: 200, easing:quintOut }}
+    >
     <div class="x" on:click={()=>{console.log("astr");closeModal()}}>
       <Fa icon={faXmark} size="1x"/>
     </div>
@@ -40,7 +47,6 @@
     color: var(--text-card-color);
   }
   .contents {
-    width: 600px;
     border-radius: 16px;
     position: relative;
     background: var(--text-card-color);

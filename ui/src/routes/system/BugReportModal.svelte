@@ -1,46 +1,22 @@
 <script>
-  import { afterUpdate } from 'svelte'
-  import { modifyPassword } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
-
   export let isOpen
-
-  let cur = ''
-  let pwd = ''
-  let cfm = ''
-
-  /*
-  afterUpdate(()=>{
-    if (tRegister == "done") {
-      closeModal()
-    }
-  })
-  */
+  let contact = ''
+  let description = ''
 </script>
 
 {#if isOpen}
   <Modal>
     <div class="wrapper">
-      <div class="pwds">
-        <div class="edit-title">Edit Password</div>
-        <div class="pw-wrapper">
-          <div class="label">Current Password</div>
-          <input type="password" bind:value={cur} />
-        </div>
-        <div class="pw-wrapper">
-          <div class="label">New Password</div>
-          <input type="password" bind:value={pwd} />
-        </div>
-        <div class="pw-wrapper">
-          <div class="label">Confirm Password</div>
-          <input type="password" bind:value={cfm} />
-        </div>
-      </div>
+      <h1>Report Bug</h1>
+      <p>Submit a bug with your logs and we will contact you within 48 hours.</p>
+      <h2>Contact Info</h2>
+      <input placeholder="Email or Urbit Ship Name" bind:value={contact} />
+      <h2>Describe Issue</h2>
+      <textarea placeholder="Type here" bind:value={description} />
       <button
-        disabled={(cfm.length < 1) || (pwd != cfm)}
-        on:click={()=>modifyPassword(cur,cfm)}
-        >Save
+        >Send
       </button>
     </div>
   </Modal>
@@ -51,9 +27,7 @@
     margin: 32px;
     font-family: var(--regular-font);
   }
-  .pwds {
-  }
-  .edit-title {
+  h1 {
     color: #000;
     leading-trim: both;
     text-edge: cap;
@@ -61,15 +35,21 @@
     font-size: 24px;
     font-style: normal;
     font-weight: 300;
+    line-height: 48px; /* 200% */
     letter-spacing: -1.44px;
   }
-  .pw-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  p {
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    width: 439px;
   }
-  .label {
-    margin-top: 16px;
+  h2 {
     color: var(--Gray-400, #5C7060);
     leading-trim: both;
     text-edge: cap;
@@ -77,7 +57,6 @@
     font-size: 20px;
     font-style: normal;
     font-weight: 300;
-    line-height: 48px; /* 240% */
     letter-spacing: -1.2px;
   }
   input {
@@ -94,24 +73,46 @@
     background: var(--Gray-100, #DDE3DF);
     padding: 16px 24px 18px 24px;
     border: none;
+    width: calc(100% - 48px);
   }
   input:focus {
     outline: none;
   }
+  input:focus {
+    outline: none;
+  }
+  input:disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
+  textarea {
+    flex: 1;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    background: var(--Gray-100, #DDE3DF);
+    padding: 16px 24px 18px 24px;
+    border: none;
+    width: calc(100% - 48px);
+    height: 135px;
+    resize: none;
+  }
+  textarea:focus {
+    outline: none;  
+  }
   button {
-    margin-top: 20px;
-    font-family: var(--regular-font);
-    background: var(--btn-secondary);
-    color: var(--text-card-color);
-    height: 65px;
-    font-size: 12px;
+    margin-top: 56px;
+    background-color: var(--btn-secondary);
     border-radius: 16px;
     cursor: pointer;
-    justify-content: center;
-    align-items: center;
     padding: 0 48px;
-    cursor: pointer;
-
+    height: 65px;
     color: #FFF;
     text-align: center;
     leading-trim: both;
@@ -124,7 +125,7 @@
     letter-spacing: -1.44px;
   }
   button:disabled {
-    opacity: .6;
     pointer-events: none;
+    opacity: .6;
   }
 </style>
