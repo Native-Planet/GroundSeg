@@ -66,6 +66,7 @@ var ClientManager = NewClientManager()
 func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
+	logger.Logger.Info(fmt.Sprintf("Auth config: %v",authed))
 	for key := range authed {
 		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
 		ClientManager.AddAuthClient(key, nil)
