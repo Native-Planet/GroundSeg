@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"goseg/config"
-	"goseg/system"
 	"goseg/logger"
+	"goseg/system"
 	"net"
 	"strings"
 	"time"
@@ -77,15 +77,6 @@ func mDNSServer() {
 		logger.Logger.Error(fmt.Sprintf("Failed to register mDNS server: %v", err))
 		return
 	}
-	// also spoof the np hostname
-	// _, err = zeroconf.Register(
-	// 	strings.Split(LocalDomain, ".")[0],
-	// 	"_workstation._tcp",
-	// 	"local.",
-	// 	1337,
-	// 	nil,
-	// 	nil,
-	// )
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to advertise mDNS host: %v", err))
 	}

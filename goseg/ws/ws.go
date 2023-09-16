@@ -1,10 +1,5 @@
 package ws
 
-// you can pass websockets to other packages for reads, but please
-// try to do all writes from here
-// otherwise you have to deal with passing mutexes which is annoying
-// and hard to think about
-
 import (
 	"encoding/json"
 	"fmt"
@@ -41,8 +36,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
-	tokenId := config.RandString(32)
-	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
+	// tokenId := config.RandString(32)
+	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -50,14 +45,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Info("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
-				logEvent := structs.LogsEvent{
-					Action:      false,
-					ContainerID: "all",
-					MuCon:       MuCon,
-				}
-				config.LogsEventBus <- logEvent
+				// logEvent := structs.LogsEvent{
+				// 	Action:      false,
+				// 	ContainerID: "all",
+				// 	MuCon:       MuCon,
+				// }
+				// config.LogsEventBus <- logEvent
 				// mute the session
-				auth.WsNilSession(MuCon.Conn)
+				auth.WsNilSession(conn)
 			}
 			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
@@ -67,6 +62,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
+		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
@@ -234,19 +230,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 					ack = "nack"
 				}
-				result := map[string]interface{}{
-					"type":     "activity",
-					"id":       payload.ID,
-					"error":    "null",
-					"response": ack,
-					"token":    newToken,
-				}
-				respJson, err := json.Marshal(result)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-					ack = "nack"
-				}
-				MuCon.Write(respJson)
+				token = newToken
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
