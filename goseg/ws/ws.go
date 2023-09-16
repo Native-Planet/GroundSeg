@@ -229,19 +229,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 					ack = "nack"
 				}
-				result := map[string]interface{}{
-					"type":     "activity",
-					"id":       payload.ID,
-					"error":    "null",
-					"response": ack,
-					"token":    newToken,
-				}
-				respJson, err := json.Marshal(result)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-					ack = "nack"
-				}
-				MuCon.Write(respJson)
+				token = newToken
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
