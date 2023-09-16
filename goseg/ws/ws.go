@@ -36,7 +36,6 @@ var (
 
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
-	conf := config.Conf()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
@@ -60,25 +59,25 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				// mute the session
 				auth.WsNilSession(MuCon.Conn)
 			}
-			logger.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
+			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
 		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error marshalling token (else): %v", err))
 			continue
 		}
 		token := map[string]string{
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
 		}
-		tokenContent, authed := auth.CheckToken(token, conn, r, conf.FirstBoot)
+		tokenContent, authed := auth.CheckToken(token, conn, r)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
@@ -167,6 +166,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
+				}
+				if !authed {
+					resp, err := handler.UnauthHandler()
+					if err != nil {
+						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+					}
+					MuCon.Write(resp)
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))

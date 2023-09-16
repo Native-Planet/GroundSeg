@@ -162,7 +162,7 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 }
 
 // check the validity of the token
-func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) (string, bool) {
+func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
 		return "", false
@@ -204,6 +204,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 				}
 			} else {
 				logger.Logger.Warn("TokenId doesn't match session!")
+				logger.Logger.Info(fmt.Sprintf("%v:%v -- %v:%v -- %v:%v -- %v:%v",ip,res["ip"],userAgent,res["user_agent"],res["id"],token["id"]))
 				return token["token"], false
 			}
 		}
