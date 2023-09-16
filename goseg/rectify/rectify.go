@@ -213,7 +213,7 @@ func SystemTransitionHandler() {
 	}
 }
 
-func ErrorTransitionHandler() {
+func TransitionHandler() {
 	for {
 		event := <-broadcast.SysTransBus
 		switch event.Type {

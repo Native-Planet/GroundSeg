@@ -15,6 +15,7 @@ import (
 
 var (
 	EventBus = make(chan structs.Event, 100)
+	Regions = make(map[string]structs.StartramRegion)
 )
 
 // get available regions from endpoint
@@ -43,6 +44,7 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 		logger.Logger.Warn(errmsg)
 		return regions, err
 	}
+	Regions = regions
 	return regions, nil
 }
 
