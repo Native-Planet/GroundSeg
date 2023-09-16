@@ -18,20 +18,23 @@ import (
 func UrbitTransitionHandler() {
 	for {
 		event := <-docker.UTransBus
-		broadcast.UrbTransMu.Lock()
-		switch event.Type {
-		case "togglePower":
-			if _, exists := broadcast.UrbitTransitions[event.Patp]; !exists {
-				broadcast.UrbitTransitions[event.Patp] = structs.UrbitTransitionBroadcast{}
+		current := broadcast.GetState()
+		urbitStruct, exists := current.Urbits[event.Patp]
+		if exists {
+			switch event.Type {
+			case "toggleDevMode":
+				urbitStruct.Transition.ToggleDevMode = event.Event
+			case "togglePower":
+				urbitStruct.Transition.TogglePower = event.Event
+			case "toggleNetwork":
+				urbitStruct.Transition.ToggleNetwork = event.Event
+			default:
+				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+				continue
 			}
-			currentStatus := broadcast.UrbitTransitions[event.Patp]
-			currentStatus.TogglePower = event.Event
-			broadcast.UrbitTransitions[event.Patp] = currentStatus
-			broadcast.UrbTransMu.Unlock()
-			logger.Logger.Info(fmt.Sprintf("Adding %v transition to \"%v\" for %v", event.Type, event.Event, event.Patp))
+			current.Urbits[event.Patp] = urbitStruct
+			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
-		default:
-			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
 }
@@ -93,6 +96,13 @@ func RectifyUrbit() {
 			}
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
+		case "toggle":
+			// loading - loading
+			// nil/null - Empty
+			current := broadcast.GetState()
+			current.Profile.Startram.Transition.Toggle = event.Data
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
 		case "register":
 			// key - registering startram key
 			// services - registering startram services
@@ -113,7 +123,6 @@ func RectifyUrbit() {
 						logger.Logger.Error(fmt.Sprintf("%v", err))
 					}
 				}
-				logger.Logger.Warn(fmt.Sprintf("%+v", containerState))
 				current.Profile.Startram.Info.Registered = conf.WgRegistered
 			}
 			broadcast.UpdateBroadcast(current)

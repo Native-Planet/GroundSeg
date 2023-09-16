@@ -5,6 +5,7 @@
   import { createEventDispatcher } from 'svelte'
 
   export let devMode
+  export let tToggleDevMode = ""
 
   const dispatch = createEventDispatcher()
 </script>
@@ -17,6 +18,7 @@
   <div class="section-right">
     <ToggleButton
       on:click={()=>dispatch("click")}
+      loading={tToggleDevMode.length > 0}
       on={devMode}
       />
   </div>

@@ -78,11 +78,13 @@ type Startram struct {
 		Endpoint   string                    `json:"endpoint"`
 		Regions    map[string]StartramRegion `json:"regions"`
 	} `json:"info"`
-	Transition struct {
-		Endpoint string `json:"endpoint"`
-		Register any    `json:"register"`
-		Toggle   any    `json:"toggle"`
-	} `json:"transition"`
+	Transition StartramTransition `json:"transition"`
+}
+
+type StartramTransition struct {
+	Endpoint string `json:"endpoint"`
+	Register any    `json:"register"`
+	Toggle   any    `json:"toggle"`
 }
 
 // broadcast payload subobject
@@ -108,6 +110,8 @@ type UrbitTransitionBroadcast struct {
 	Meld                      string `json:"meld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
+	ToggleNetwork             string `json:"toggleNetwork"`
+	ToggleDevMode             string `json:"toggleDevMode"`
 	DeleteShip                string `json:"deleteShip"`
 }
 

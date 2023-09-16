@@ -2,6 +2,7 @@
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
+  export let url = "#"
   const dispatch = createEventDispatcher()
 </script>
 
@@ -19,9 +20,9 @@
         height="24px" />
       Access Key
     </button>
-    <button class="btn">
+    <a href={url} target="_blank" class="btn">
       URL ↗
-    </button>
+    </a>
   </div>
 </div>
 

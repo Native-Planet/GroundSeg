@@ -25,17 +25,21 @@
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
   $: running = (ship?.running) || false
-  $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
-  $: tTogglePower = (tShip?.togglePower) || null
   $: loomSize = (ship?.loomSize)
+  $: lusCode = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
+  $: url = (ship?.url) || "#"
 
+  $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
+  $: tTogglePower = (tShip?.togglePower) || ""
+  $: tToggleDevMode = (tShip?.toggleDevMode) || ""
+  $: tToggleNetwork = (tShip?.toggleNetwork) || ""
 </script>
 <div class="body">
   <!-- Power -->
   <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
 
   <!-- Custom Urbit Domain -->
-  <CustomUrbitDomain />
+  <CustomUrbitDomain {url} />
 
   <!-- Custom MinIO Domain -->
   <CustomMinIODomain />
@@ -47,10 +51,10 @@
   <PackMeld />
 
   <!-- Dev Mode -->
-  <DevMode {devMode} on:click={()=>toggleDevMode(patp)} />
+  <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
   <!-- Remote Access -->
-  <RemoteAccess {remote} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>

@@ -52,16 +52,20 @@
     gap: 24px;
   }
   .new-key {
-    background-color: var(--btn-secondary);
+    background: var(--btn-secondary);
+    height: 65px;
+    padding: 0 48px;
     border-radius: 16px;
-    line-height: 32px;
-    height: calc(32px + 48px);
-    padding: 24px 48px;
-    cursor: pointer;
-    /* font */
-    font-family: var(--regular-font);
     font-size: 24px;
-    color: var(--text-card-color);
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   .spacer {
     flex: 1;

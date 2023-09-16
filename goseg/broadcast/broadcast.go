@@ -76,7 +76,7 @@ func bootstrapBroadcastState() error {
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
-	//go profileStatusLoop()
+	go profileStatusLoop()
 	return nil
 }
 
@@ -183,8 +183,8 @@ func constructProfileInfo() structs.Profile {
 
 	// Information from startram
 	startramInfo.Info.Region = config.StartramConfig.Region
-	startramInfo.Info.Expiry = nil // temp
-	startramInfo.Info.Renew = true // temp
+	startramInfo.Info.Expiry = config.StartramConfig.Lease
+	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
 
 	// Get Regions
 	regions, err := startram.GetRegions()
@@ -311,6 +311,7 @@ func shipStatusLoop() {
 			mu.RLock()
 			newState := broadcastState
 			mu.RUnlock()
+			updates = PreserveUrbitsTransitions(newState, updates)
 			newState.Urbits = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
@@ -327,9 +328,27 @@ func profileStatusLoop() {
 			mu.RLock()
 			newState := broadcastState
 			mu.RUnlock()
+			updates = PreserveProfileTransitions(newState, updates)
 			newState.Profile = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}
 	}
+}
+
+func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
+	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
+	return newProfile
+}
+
+func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[string]structs.Urbit) map[string]structs.Urbit {
+	for k, v := range oldState.Urbits {
+		urbitStruct, exists := newUrbits[k]
+		if !exists {
+			urbitStruct = structs.Urbit{}
+		}
+		urbitStruct.Transition = v.Transition
+		newUrbits[k] = urbitStruct
+	}
+	return newUrbits
 }

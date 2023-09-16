@@ -3,6 +3,7 @@
   import { structure, startramGetRegions, startramRegister } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
+  export let regionMode = false
   export let isOpen
   let key = ''
   let selected = 'us-east'
@@ -31,7 +32,6 @@
 
 {#if isOpen}
   <Modal>
-    {tRegister}
     <!--
     {#each urbitKeys as p}
       <div>{p} {JSON.stringify(urbits[p].transition.serviceRegistrationStatus)}</div>
@@ -39,9 +39,9 @@
     -->
     {#if tRegister == null}
       <div class="wrapper">
-        <h1>Register New Key</h1>
+        <h1>{regionMode ? "Change Region" : "Register New Key"}</h1>
         <p>Entering a new key will replace the current one</p>
-        <h2>New Key</h2>
+        <h2>{regionMode ? "Your" : "New"} Key</h2>
         <input disabled={tRegister != null} type="password" placeholder="NativePlanet-something-something" bind:value={key} />
         {#if regionKeys.length > 0}
           <h2>Select Region</h2>
