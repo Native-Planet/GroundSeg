@@ -70,7 +70,6 @@ func init() {
 	for key := range authed {
 		logger.Logger.Info(fmt.Sprintf("Loading saved token session %v",key))
 		ClientManager.AddAuthClient(key, nil)
-		AddToAuthMap(nil, key, true)
 	}
 }
 
@@ -124,10 +123,10 @@ func WsNilSession(conn *websocket.Conn) error {
 }
 
 // is this tokenid in the auth map?
-func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
-	ClientManager.Mu.RLock()
+func TokenIdAuthed(token string) bool {
+	ClientManager.Mu.RLock()  // Use the passed-in clientManager
 	defer ClientManager.Mu.RUnlock()
-	_, exists := ClientManager.AuthClients[token]
+	_, exists := ClientManager.AuthClients[token]  // Use the passed-in clientManager
 	return exists
 }
 
@@ -187,7 +186,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 		}
 		userAgent := r.Header.Get("User-Agent")
 		// you in auth map?
-		if TokenIdAuthed(ClientManager, token["id"]) {
+		if TokenIdAuthed(token["id"]) {
 			// check the decrypted token contents
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
