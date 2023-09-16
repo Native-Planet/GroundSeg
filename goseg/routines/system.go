@@ -55,6 +55,7 @@ func mDNSServer() {
 			counter++
 		}
 	}
+	// advertise the http server
 	_, err = zeroconf.Register(
 		strings.Split(LocalDomain, ".")[0],
 		"_http._tcp",
@@ -66,6 +67,18 @@ func mDNSServer() {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to register mDNS server: %v", err))
 		return
+	}
+	// also spoof the np hostname
+	_, err = zeroconf.Register(
+		strings.Split(LocalDomain, ".")[0],
+		"_workstation._tcp",
+		"local.",
+		0,
+		nil,
+		nil,
+	)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to advertise mDNS host: %v", err))
 	}
 	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain", LocalDomain))
 	// infinite blocking
