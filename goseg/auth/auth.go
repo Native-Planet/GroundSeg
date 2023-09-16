@@ -54,20 +54,22 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func NewClientManager() *structs.ClientManager {
-	return &structs.ClientManager{
-		AuthClients:   make(map[string]*structs.MuConn),
-		UnauthClients: make(map[string]*structs.MuConn),
-	}
-}
-
-var ClientManager = NewClientManager()
+var (
+	ClientManager = NewClientManager()
+)
 
 func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
 	for key := range authed {
 		ClientManager.AddAuthClient(key, nil)
+	}
+}
+
+func NewClientManager() *structs.ClientManager {
+	return &structs.ClientManager{
+		AuthClients:   make(map[string]*structs.MuConn),
+		UnauthClients: make(map[string]*structs.MuConn),
 	}
 }
 
@@ -88,11 +90,9 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	defer ClientManager.Mu.RUnlock()
 	for _, client := range ClientManager.AuthClients {
 		if client.Conn == conn {
-			logger.Logger.Info("Client is in auth map")
 			return true
 		}
 	}
-	logger.Logger.Info("Client not in auth map")
 	return false
 }
 
@@ -122,9 +122,9 @@ func WsNilSession(conn *websocket.Conn) error {
 
 // is this tokenid in the auth map?
 func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
-	ClientManager.Mu.RLock()
-	defer ClientManager.Mu.RUnlock()
-	_, exists := ClientManager.AuthClients[token]
+	clientManager.Mu.RLock()
+	defer clientManager.Mu.RUnlock()
+	_, exists := clientManager.AuthClients[token]
 	return exists
 }
 
@@ -167,7 +167,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 	if token["token"] == "" {
 		return "", false
 	}
-	logger.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
@@ -189,12 +188,9 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
 				if res["authorized"] == "true" {
-					logger.Logger.Info("Token authenticated")
 					return token["token"], true
 				} else {
 					res["authorized"] = "true"
-					conf := config.Conf()
-					key := conf.KeyFile
 					encryptedText, err := KeyfileEncrypt(res, key)
 					if err != nil {
 						logger.Logger.Error("Error encrypting token")
@@ -204,7 +200,6 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 				}
 			} else {
 				logger.Logger.Warn("TokenId doesn't match session!")
-				logger.Logger.Info(fmt.Sprintf("%v:%v -- %v:%v -- %v:%v -- %v:%v",ip,res["ip"],userAgent,res["user_agent"],res["id"],token["id"]))
 				return token["token"], false
 			}
 		}

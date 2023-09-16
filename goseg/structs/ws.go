@@ -62,21 +62,20 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 }
 
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
-	if client == nil {
-		return
-	}
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	client.Active = true
-	cm.AuthClients[id] = client
-	if _, ok := cm.UnauthClients[id]; ok {
-		delete(cm.UnauthClients, id)
-	}
-	for token, con := range cm.UnauthClients {
-		if con.Conn == client.Conn {
-			delete(cm.UnauthClients, token)
+	if client != nil {
+		client.Active = true
+		if _, ok := cm.UnauthClients[id]; ok {
+			delete(cm.UnauthClients, id)
+		}
+		for token, con := range cm.UnauthClients {
+			if con.Conn == client.Conn {
+				delete(cm.UnauthClients, token)
+			}
 		}
 	}
+	cm.AuthClients[id] = client
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
