@@ -3,6 +3,7 @@ package system
 // for retrieving hw info and managing host
 
 import (
+	"context"
 	"fmt"
 	"goseg/defaults"
 	"goseg/logger"
@@ -14,10 +15,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grandcat/zeroconf"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
-	"github.com/grandcat/zeroconf"
+)
+
+var (
+	LocalDomain = "nativeplanet.local"
 )
 
 func init() {
@@ -25,16 +30,21 @@ func init() {
 }
 
 func mDNSServer() {
-	hostname, err := os.Hostname()
+	domains, err := mDNSDiscovery()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to get hostname: %v", err))
-		return
+		logger.Logger.Warn("Couldn't discover mDNS servers on LAN -- defaulting to nativeplanet.local")
+	} else {
+		// check if there's already a nativeplanet.local
+		counter := 2
+		for contains(domains, strings.Split(LocalDomain, ".")[0]) {
+			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
+			counter++
+		}
 	}
-	domain := hostname + ".local"
 	_, err = zeroconf.Register(
-		hostname,
-		"_workstation._tcp",
-		domain,
+		strings.Split(LocalDomain, ".")[0],
+		"_http._tcp",
+		"local.",
 		80,
 		[]string{"txtv=0", "lo=1", "la=2"},
 		nil,
@@ -43,7 +53,40 @@ func mDNSServer() {
 		logger.Logger.Error(fmt.Sprintf("Failed to register service: %v", err))
 		return
 	}
+	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain", LocalDomain))
+	// infinite blocking
 	select {}
+}
+
+// return a slice of all discovered .local domains
+func mDNSDiscovery() ([]string, error) {
+	resolver, err := zeroconf.NewResolver(nil)
+	if err != nil {
+		return nil, err
+	}
+	entries := make(chan *zeroconf.ServiceEntry)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	go func() {
+		err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
+		if err != nil {
+			close(entries)
+		}
+	}()
+	var hosts []string
+	for entry := range entries {
+		hosts = append(hosts, entry.ServiceInstanceName())
+	}
+	return hosts, nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, a := range slice {
+		if a == item {
+			return true
+		}
+	}
+	return false
 }
 
 // get memory total/used in bytes

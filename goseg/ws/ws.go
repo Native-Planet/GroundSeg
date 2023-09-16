@@ -89,15 +89,15 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			// send setup broadcast if we're not done setting up
 			if conf.FirstBoot {
 				resp := structs.SetupBroadcast{
-					Type: "structure",
-					AuthLevel:  "setup",
-					Stage: conf.Setup,
-					Page: setup.Stages[conf.Setup],
-					Regions: startram.Regions,
+					Type:      "structure",
+					AuthLevel: "setup",
+					Stage:     conf.Setup,
+					Page:      setup.Stages[conf.Setup],
+					Regions:   startram.Regions,
 				}
 				respJSON, err := json.Marshal(resp)
 				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v",err))
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
 				}
 				MuCon.Write(respJSON)
 			}
@@ -184,7 +184,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				config.LogsEventBus <- logEvent
 			case "setup":
-				if err = setup.Setup(msg,MuCon,token); err != nil {
+				if err = setup.Setup(msg, MuCon, token); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -211,7 +211,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Error(errmsg)
 			}
 			MuCon.Write(respJson)
-		// unauthenticated action handlers
+			// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
