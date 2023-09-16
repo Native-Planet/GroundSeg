@@ -89,7 +89,7 @@ func mDNSServer() {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to advertise mDNS host: %v", err))
 	}
-	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain", LocalDomain))
+	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
 	// infinite blocking
 	select {}
 }
