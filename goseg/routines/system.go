@@ -135,7 +135,14 @@ func getAllIPs() ([]string, error) {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-			ips = append(ips, ip.String())
+			if ip.To4() == nil {
+				continue // skip ipv6
+			}
+			ipStr := ip.String()
+			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.17") {
+				continue // skip local-only IPs
+			}
+			ips = append(ips, ipStr)
 		}
 	}
 	return ips, nil
