@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
-	"strings"
+
+	"github.com/mdlayher/wifi"
+	"github.com/schollz/wifiscan"
 )
 
 func C2cMode() error {
@@ -28,52 +30,56 @@ func runCommand(command string, args ...string) (string, error) {
 }
 
 func getWifiDevice() (string, error) {
-	out, err := runCommand("nmcli", "device")
+	c, err := wifi.New()
 	if err != nil {
-		return "", fmt.Errorf("Couldn't list wifi devices: %v", err)
+		return "", err
 	}
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
-		words := strings.Fields(line)
-		if len(words) >= 2 && words[1] == "wifi" {
-			return words[0], nil
+	defer c.Close()
+	devices, err := c.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, device := range devices {
+		if device.Type == wifi.InterfaceTypeStation {
+			return device.Name, nil
 		}
 	}
-	return "", fmt.Errorf("No wifi device detected")
+	return "", fmt.Errorf("no WiFi device found")
 }
 
-func listWifiSSIDs() []string {
+func listWifiSSIDs() ([]string, error) {
 	var ssids []string
-	out, err := runCommand("nmcli", "-t", "dev", "wifi", "list")
+	wifis, err := wifiscan.Scan()
 	if err != nil {
-		return ssids
+		return nil, err
 	}
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
-		parts := strings.Split(line, ":")
-		if len(parts) > 2 {
-			ssids = append(ssids, parts[2])
-		}
+	for _, w := range wifis {
+		ssids = append(ssids, w.SSID)
 	}
-	return ssids
+	return ssids, nil
 }
 
-func connectToWifi(ssid, password string) error {
-	out, err := runCommand("nmcli", "dev", "wifi", "connect", ssid, "password", "\""+password+"\"")
+func connectToWifi(ifaceName, ssid, password string) error {
+	c, err := wifi.New()
 	if err != nil {
-		return fmt.Errorf("Couldn't connect to wifi network %v: %v", ssid, err)
+		return err
 	}
-	fmt.Println(out)
-	return nil
+	defer c.Close()
+	iface := &wifi.Interface{Name: ifaceName}
+	if password == "" {
+		return c.Connect(iface, ssid)
+	}
+	return c.ConnectWPAPSK(iface, ssid, password)
 }
 
-func disconnectWifi(ssid string) error {
-	out, err := runCommand("nmcli", "con", "down", ssid)
+func disconnectWifi(ifaceName string) error {
+	c, err := wifi.New()
 	if err != nil {
-		return fmt.Errorf("Error disconnecting from wifi network: %v", err)
+		return err
 	}
-	fmt.Println(out)
-	return nil
+	defer c.Close()
+	iface := &wifi.Interface{Name: ifaceName}
+	return c.Disconnect(iface)
 }
 
 func setupHostAPD(iface string) error {
