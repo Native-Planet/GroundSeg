@@ -29,11 +29,10 @@ const (
 )
 
 // handle bug report requests
-func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) {
+func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	var supportPayload structs.WsSupportPayload
 	if err := json.Unmarshal(msg, &supportPayload); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't unmarshal support payload: %v", err))
-		return
+		return fmt.Errorf("Couldn't unmarshal support payload: %v", err)
 	}
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
 	contact := supportPayload.Payload.Contact
@@ -41,26 +40,22 @@ func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn
 	ships := supportPayload.Payload.Ships
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error creating bug-report dir: %v", err))
-		return
+		return fmt.Errorf("Error creating bug-report dir: %v", err)
 	}
 	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to dump logs: %v", err))
-		return
+		return fmt.Errorf("Failed to dump logs: %v", err)
 	}
 	zipPath := filepath.Join(bugReportDir, timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error zipping bug report: %v", err))
-		return
+		return fmt.Errorf("Error zipping bug report: %v", err)
 	}
 	if err := os.RemoveAll(bugReportDir); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	}
 	if err := sendBugReport(bugReportDir+timestamp+".zip", contact, description); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't submit bug report: %v", err))
-		return
+		return fmt.Errorf("Couldn't submit bug report: %v", err)
 	}
-	return
+	return nil
 }
 
 // dump docker logs to path

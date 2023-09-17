@@ -125,7 +125,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "support":
-				handler.SupportHandler(msg, payload, r, conn)
+				if err := handler.SupportHandler(msg, payload, r, conn); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error creating bug report: %v", err))
+					ack = "nack"
+				}
 			case "broadcast":
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
