@@ -4,6 +4,7 @@
     exportUrbitShip,
     exportUrbitBucket
   } from '$lib/stores/websocket'
+  import { page } from '$app/stores'
   import { loadSession } from '$lib/stores/gs-crypto'
 
   import Modal from '$lib/Modal.svelte'
@@ -33,7 +34,9 @@
       return;
     }
     // send request
-    const response = await fetch('http://localhost:3000/export/' + patp, {
+    const hostname = $page.url.hostname
+    const port = "3000"
+    const response = await fetch("http://"+hostname+":"+port+"/export/"+patp, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
