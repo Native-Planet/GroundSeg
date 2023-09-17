@@ -6,6 +6,10 @@
   font-family: Inter;
   src: url('/Inter-V.ttf');
 }
+@font-face {
+  font-family: Source;
+  src: url('/SourceCodePro-Regular.otf');
+}
 body {
   margin: 0;
   /*
@@ -19,6 +23,7 @@ body {
 }
 
 :root {
+  --log-font: Source;
   --regular-font: Inter;
   --title-font: BPdotsUnicase;
   --bg-base: #E8E8E3CD;
