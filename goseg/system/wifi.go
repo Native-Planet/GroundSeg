@@ -3,8 +3,8 @@ package system
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
 	"io/ioutil"
+	"os/exec"
 	"strings"
 )
 
@@ -30,7 +30,7 @@ func runCommand(command string, args ...string) (string, error) {
 func getWifiDevice() (string, error) {
 	out, err := runCommand("nmcli", "device")
 	if err != nil {
-		return "", fmt.Errorf("Couldn't list wifi devices: %v",err)
+		return "", fmt.Errorf("Couldn't list wifi devices: %v", err)
 	}
 	lines := strings.Split(out, "\n")
 	for _, line := range lines {
@@ -59,18 +59,18 @@ func listWifiSSIDs() []string {
 }
 
 func connectToWifi(ssid, password string) error {
-	out, err := runCommand("nmcli","dev","wifi","connect",ssid,"password","\"network-password\"")
+	out, err := runCommand("nmcli", "dev", "wifi", "connect", ssid, "password", "\"network-password\"")
 	if err != nil {
-		return fmt.Errorf("Couldn't connect to wifi network %v: %v",ssid,err)
+		return fmt.Errorf("Couldn't connect to wifi network %v: %v", ssid, err)
 	}
 	fmt.Println(out)
 	return nil
 }
 
 func disconnectWifi(ssid string) error {
-	out, err := runCommand("nmcli","con","down",ssid)
+	out, err := runCommand("nmcli", "con", "down", ssid)
 	if err != nil {
-		return fmt.Errorf("Error disconnecting from wifi network: %v",err)
+		return fmt.Errorf("Error disconnecting from wifi network: %v", err)
 	}
 	fmt.Println(out)
 	return nil

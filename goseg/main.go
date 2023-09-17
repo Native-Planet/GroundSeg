@@ -106,7 +106,7 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
-	
+
 	// c2c mode
 	if !internetAvailable {
 		logger.Logger.Info("c2c mode goes here")
