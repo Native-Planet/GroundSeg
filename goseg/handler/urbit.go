@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/exporter"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -95,27 +96,6 @@ func UrbitHandler(msg []byte) error {
 	case "toggle-power":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: "loading"}
 		defer func() {
-			/*
-				ticker := time.NewTicker(500 * time.Millisecond)
-				for {
-					select {
-					case <-ticker.C:
-						patps := []string{patp}
-						urbitsMap, err := docker.GetShipStatus(patps)
-						if err != nil {
-							logger.Logger.Error(fmt.Sprintf("%v", err))
-							break
-						}
-						urb, exists := urbitsMap[patp]
-						if !exists {
-							logger.Logger.Error(fmt.Sprintf("%s doesn't exist in map", patp))
-							break
-						}
-						logger.Logger.Warn(fmt.Sprintf("%+v", urb))
-						//isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-					}
-				}
-			*/
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 		}()
 		update := make(map[string]structs.UrbitDocker)
@@ -140,6 +120,24 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
 			}
 		}
+		return nil
+	case "export-ship":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "loading"}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		// stop container
+		if err := docker.StopContainerByName(patp); err != nil {
+			return err
+		}
+		// whitelist the patp token pair
+		if err := exporter.WhitelistContainer(patp, urbitPayload.Token); err != nil {
+			return err
+		}
+		// transition: ready
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "ready"}
 		return nil
 	case "delete-ship":
 		conf := config.Conf()

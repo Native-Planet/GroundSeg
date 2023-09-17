@@ -12,7 +12,7 @@ export const saveSession = async token => {
   }
 }
 
-export const loadSession = () => {
+export const loadSession = async () => {
   const id = localStorage.getItem('id')
   const token = localStorage.getItem('token')
   if ((id === null) || (token === null)) {
