@@ -57,5 +57,5 @@ state Docker_daemon {
     MinioMC
     Netdata
 }
-Operations-->Docker: manage containers
+Operations-->Docker_daemon: manage containers
 ```
