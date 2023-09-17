@@ -9,8 +9,7 @@ stateDiagram-v2
     Broadcast-->WS_mux: broadcast latest update
     Broadcast-->Urbit_traffic: broadcast latest update
     note right of Broadcast
-        The broadcast is a summary of the current state of all components
-        which is rendered in the webUI
+        The broadcast is a summary of the current state of all components which is rendered in the webUI
     Static-->Operations: imported
     Static-->Routines: imported
     state Internals {
