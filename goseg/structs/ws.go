@@ -276,3 +276,18 @@ type WsSetupAction struct {
 	Key      string `json:"key"`
 	Region   string `json:"region"`
 }
+
+type WsSupportPayload struct {
+	ID      string          `json:"id"`
+	Type    string          `json:"type"`
+	Payload WsSupportAction `json:"payload"`
+	Token   WsTokenStruct   `json:"token"`
+}
+
+type WsSupportAction struct {
+	Type        string   `json:"type"`
+	Action      string   `json:"action"`
+	Contact     string   `json:"contact"`
+	Description string   `json:"description"`
+	Ships       []string `json:"ships"`
+}

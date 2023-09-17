@@ -125,8 +125,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "support":
-				if err = handler.SupportHandler(msg, payload, r, conn); err != nil {
-					logger.Logger.Error(fmt.Sprintf("%v", err))
+				if err := handler.SupportHandler(msg, payload, r, conn); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error creating bug report: %v", err))
 					ack = "nack"
 				}
 			case "broadcast":
