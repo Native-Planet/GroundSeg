@@ -59,7 +59,7 @@ func listWifiSSIDs() []string {
 }
 
 func connectToWifi(ssid, password string) error {
-	out, err := runCommand("nmcli", "dev", "wifi", "connect", ssid, "password", "\"network-password\"")
+	out, err := runCommand("nmcli", "dev", "wifi", "connect", ssid, "password", "\""+password+"\"")
 	if err != nil {
 		return fmt.Errorf("Couldn't connect to wifi network %v: %v", ssid, err)
 	}
