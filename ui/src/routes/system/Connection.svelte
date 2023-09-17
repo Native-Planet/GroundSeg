@@ -36,7 +36,7 @@
 </script>
 
 <div class="container">
-  <div class="title">CONNECTION</div>
+  <div class="sys-title">CONNECTION</div>
 
   <div class="wifi-toggle">
     <div class="wifi-text">Wireless Network</div>
@@ -95,8 +95,8 @@
   .container {
     margin: 0;
   }
-  .title {
-    margin-bottom: 20px;
+  .sys-title {
+    margin-bottom: 56px;
   }
   .wifi-toggle {
     display: flex;
@@ -108,7 +108,15 @@
   }
   .wifi-text {
     flex: 1;
-    font-size: 16px;
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
   }
   .active-title {
     font-size: 13px;

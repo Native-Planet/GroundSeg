@@ -1,25 +1,25 @@
 <script>
-  import { goto } from '$app/navigation';
-  import { structure, deleteUrbitShip } from '$lib/stores/websocket'
-  import Sigil from './Sigil.svelte'
+  import { 
+    exportUrbitShip,
+    exportUrbitBucket
+  } from '$lib/stores/websocket'
 
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
 
   export let patp
   export let isOpen
-
-  $: transition = ($structure?.urbits?.[patp]?.transition) || {}
-  $: tDeleteShip = (transition?.deleteShip) || null
 </script>
 
 <Modal>
   {#if isOpen}
   <div class="wrapper">
-    <div class="header">Delete Urbit Ship</div>
-    <Sigil name={patp} modal={true} />
-    <div class="name">You are attempting to delete all data related to <strong>{patp}</strong>.</div>
-    <button on:click={()=>deleteUrbitShip(patp)}>Delete</button>
+    <div class="header">Export For {patp}</div>
+    <div class="name">What do you want to export?</div>
+    <div class="button-wrapper">
+      <button on:click={()=>exportUrbitShip(patp)}>Urbit Ship</button>
+      <button on:click={()=>exportUrbitBucket(patp)}>Storage</button>
+    </div>
   </div>
   {/if}
 </Modal>
@@ -51,6 +51,10 @@
     letter-spacing: -1.44px;
     max-width: 460px;
     margin: 32px 0;
+  }
+  .button-wrapper {
+    display: flex;
+    gap: 48px;
   }
   button {
     display: inline-flex;

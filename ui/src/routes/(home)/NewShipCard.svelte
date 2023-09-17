@@ -8,7 +8,7 @@
     <div class="sigil"></div>
     <div class="bg"></div>
   </div>
-  <div class="add">+</div>
+  <div class="add" on:click={()=>goto("/boot")}>+</div>
 </div>
 
 <style>
@@ -26,6 +26,7 @@
     width: 40px;
     top: 40px;
     left: calc(50% - 15px);
+    cursor: pointer;
   }
   .ship {
     position: absolute;

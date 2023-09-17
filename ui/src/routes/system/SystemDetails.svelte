@@ -16,19 +16,52 @@
 </script>
 
 <div class="container">
-  <div class="title">SYSTEM DETAILS</div>
-  <Swap {swap}/>
-  <Ram {ram} />
-  <Storage {disk} />
-  <CPULoad {cpu} />
+  <div class="sys-title">
+    <span>SYSTEM DETAILS</span>
+    <button class="restart-groundseg">Restart GroundSeg</button>
+  </div>
+  <div class="item-wrapper">
+    <Swap {swap}/>
+  </div>
+  <div class="item-wrapper">
+    <Ram {ram} />
+  </div>
+  <div class="item-wrapper">
+    <Storage {disk} />
+  </div>
+  <div class="item-wrapper">
+    <CPULoad {cpu} />
+  </div>
   <CPUTemp {cpuTemp} />
 </div>
 
 <style>
-  .title {
-    margin-bottom: 24px;
+  .sys-title {
+    margin-bottom: 56px;
+    display: flex;
+    align-items: center;
   }
-  .container {
-    margin: 0;
+  .sys-title > span {
+    flex: 1;
+  }
+  .sys-title > button {
+    border-radius: 16px;
+    background: var(--Gray-400, #5C7060);
+    color: #FFF;
+
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    height: 64px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    padding: 0 48px;
+  }
+  .item-wrapper {
+    margin-bottom: 32px;
   }
 </style>

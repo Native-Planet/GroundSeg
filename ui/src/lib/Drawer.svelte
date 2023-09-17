@@ -23,16 +23,17 @@
 
 <style>
   .title {
-  color: #000;
-  leading-trim: both;
-  text-edge: cap;
-  text-transform: uppercase;
-  font-family: BPdotsUnicase;
-  font-size: 48px;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 32px; /* 66.667% */
-  letter-spacing: -2.88px;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    text-transform: uppercase;
+    font-family: BPdotsUnicase;
+    font-size: 48px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 32px; /* 66.667% */
+    letter-spacing: -2.88px;
+    margin-bottom: 56px;
   }
   .modal {
     position: fixed;

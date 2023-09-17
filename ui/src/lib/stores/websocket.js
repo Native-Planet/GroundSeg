@@ -407,6 +407,24 @@ export const deleteUrbitShip = patp => {
   send(payload)
 }
 
+export const exportUrbitShip = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"export-ship",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const exportUrbitBucket = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"export-bucket",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const setUrbitLoom = (patp, value) => {
   let payload = {
     "type":"urbit",
