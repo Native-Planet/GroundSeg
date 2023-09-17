@@ -13,6 +13,7 @@ stateDiagram-v2
         state Static {
             Structs
             Defaults
+            Logger
         }
         state Routines {
             Docker_rectifier
@@ -21,6 +22,8 @@ stateDiagram-v2
             Startram_rectifier
             Linux_updater
             502_refresher
+            System_info
+            mDNS
         }
         state Operations {
             Startram
@@ -47,5 +50,12 @@ stateDiagram-v2
             WsAuth-->Websocket: broadcast structure out
             Websocket-->WsAuth: action payload in
    }
+   state Docker {
+       Urbit
+       Minio
+       MinioMC
+       Netdata
+   }
+   Operations-->Docker: manage containers
 }
 ```
