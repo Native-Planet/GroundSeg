@@ -15,6 +15,7 @@ type UrbitTransition struct {
 	Patp  string
 	Type  string
 	Event string
+	Value int
 }
 
 // new ship transition eventbus payloads
