@@ -8,8 +8,6 @@ stateDiagram-v2
     classDef bcase fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
     Broadcast-->WS_mux: broadcast latest update
     Broadcast-->Urbit_traffic: broadcast latest update
-    note right of Broadcast
-        The broadcast is a summary of the current state of all components which is rendered in the webUI
     Static-->Operations: imported
     Static-->Routines: imported
     state Internals {
@@ -41,8 +39,6 @@ stateDiagram-v2
             Support_handler
             Urbit_handler
         }
-            note left of Process_handler
-                Handlers take actions from client sessions, call operations and update the internal state
         Process_handler-->Operations: multiple function calls to these packages to string together actions
         Operations-->Broadcast: send updated values
         Routines-->Broadcast: send updated values
