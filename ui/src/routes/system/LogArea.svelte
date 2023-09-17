@@ -81,7 +81,7 @@
     color: #000;
     leading-trim: both;
     text-edge: cap;
-    font-family: Source Code Pro;
+    font-family: var(--log-font, Source Code Pro);
     font-size: 16px;
     font-style: normal;
     font-weight: 400;
