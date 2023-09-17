@@ -1,14 +1,14 @@
 package handler
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"goseg/logger"
-	"archive/zip"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/structs"
 	"io"
 	"io/ioutil"
@@ -32,7 +32,7 @@ const (
 func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) {
 	var supportPayload structs.WsSupportPayload
 	if err := json.Unmarshal(msg, &supportPayload); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't unmarshal support payload: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't unmarshal support payload: %v", err))
 		return
 	}
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
@@ -41,23 +41,23 @@ func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn
 	ships := supportPayload.Payload.Ships
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error creating bug-report dir: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Error creating bug-report dir: %v", err))
 		return
 	}
 	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to dump logs: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Failed to dump logs: %v", err))
 		return
 	}
 	zipPath := filepath.Join(bugReportDir, timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error zipping bug report: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Error zipping bug report: %v", err))
 		return
 	}
 	if err := os.RemoveAll(bugReportDir); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v",err))
+		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	}
 	if err := sendBugReport(bugReportDir+timestamp+".zip", contact, description); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't submit bug report: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't submit bug report: %v", err))
 		return
 	}
 	return
@@ -122,27 +122,27 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 	}
 	// selected pier logs
 	for _, pier := range piers {
-		if err := dumpDockerLogs(pier,bugReportDir+"/"+pier+".log"); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Couldn't dump pier logs: %v",err))
+		if err := dumpDockerLogs(pier, bugReportDir+"/"+pier+".log"); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
 		}
-		if err := dumpDockerLogs("minio_"+pier,bugReportDir+"/minio_"+pier+".log"); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Couldn't dump minio logs: %v",err))
+		if err := dumpDockerLogs("minio_"+pier, bugReportDir+"/minio_"+pier+".log"); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Couldn't dump minio logs: %v", err))
 		}
 	}
 	// service logs
-	if err := dumpDockerLogs("wireguard",bugReportDir+"/wireguard.log"); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Couldn't dump pier logs: %v",err))
+	if err := dumpDockerLogs("wireguard", bugReportDir+"/wireguard.log"); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
 	}
 	// system.json
 	srcPath := filepath.Join(config.BasePath, "settings", "system.json")
 	destPath := filepath.Join(bugReportDir, "system.json")
 	if err := copyFile(srcPath, destPath); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v",err))
+		logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
 	}
 	if err := sanitizeJSON(destPath, "sessions", "privkey", "salt", "pwHash"); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't sanitize system.json! Removing from report"))
 		if err := os.Remove(destPath); err != nil {
-			return fmt.Errorf("Error removing unsanitized system log: %v",err)
+			return fmt.Errorf("Error removing unsanitized system log: %v", err)
 		}
 	}
 	// pier configs
@@ -150,12 +150,12 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 		srcPath = filepath.Join(config.BasePath, "settings", "pier", pier+".json")
 		destPath = filepath.Join(bugReportDir, pier+".json")
 		if err := copyFile(srcPath, destPath); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v",err))
+			logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
 		}
 		if err := sanitizeJSON(destPath, "minio_password"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't sanitize %v.json! Removing from report",pier))
+			logger.Logger.Error(fmt.Sprintf("Couldn't sanitize %v.json! Removing from report", pier))
 			if err := os.Remove(destPath); err != nil {
-				return fmt.Errorf("Error removing unsanitized pier log: %v",err)
+				return fmt.Errorf("Error removing unsanitized pier log: %v", err)
 			}
 		}
 	}
@@ -165,7 +165,7 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 		srcPath = filepath.Join(config.BasePath, "settings", configFile)
 		destPath = filepath.Join(bugReportDir, configFile)
 		if err := copyFile(srcPath, destPath); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v",err))
+			logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
 		}
 	}
 	// current and previous syslogs
@@ -174,12 +174,12 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 		srcPath := filepath.Join(config.BasePath, "settings", sysLog)
 		destPath := filepath.Join(bugReportDir, sysLog)
 		if err := copyFile(srcPath, destPath); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Couldn't copy system logs: %v",err))
+			logger.Logger.Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
 		}
 	}
 	/*
-	if err := sanitizeJSON("sample.json", "key1", "key3"); err != nil {
-	}
+		if err := sanitizeJSON("sample.json", "key1", "key3"); err != nil {
+		}
 	*/
 	return nil
 }
