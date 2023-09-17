@@ -62,6 +62,19 @@ func SysLogfile() string {
 	return fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
 }
 
+func PrevSysLogfile() string {
+	currentTime := time.Now()
+	year := currentTime.Year()
+	month := currentTime.Month()
+	if month == time.January {
+		year = year - 1
+		month = time.December
+	} else {
+		month = month - 1
+	}
+	return fmt.Sprintf("%s%d-%02d.log", logPath, year, month)
+}
+
 func muMultiWriter(writers ...io.Writer) *MuMultiWriter {
 	return &MuMultiWriter{
 		Writers: writers,

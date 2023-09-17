@@ -9,15 +9,12 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"goseg/system"
-	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 var (
@@ -30,13 +27,6 @@ const (
 	MaxFailedLogins = 5
 	LockoutDuration = 2 * time.Minute
 )
-
-// todo
-// handle bug report stuff
-func SupportHandler(msg []byte, payload structs.WsPayload, r *http.Request, conn *websocket.Conn) error {
-	logger.Logger.Info("Support")
-	return nil
-}
 
 func NewShipHandler(msg []byte) error {
 	logger.Logger.Info("New ship")
