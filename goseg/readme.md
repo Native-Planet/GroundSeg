@@ -5,6 +5,7 @@ stateDiagram-v2
     direction TB
     accTitle: Goseg package diagram
     accDescr: Interactions between packages in Groundseg Go rewrite
+    classDef bcase fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
     Broadcast-->WS_mux: broadcast latest update
     Broadcast-->Urbit_traffic: broadcast latest update
     note right of Broadcast
@@ -62,11 +63,11 @@ stateDiagram-v2
             Websocket-->WsAuth: action payload in
         }
     }
-state Docker_daemon {
-    Urbit
-    Minio
-    MinioMC
-    Netdata
-}
-Operations-->Docker_daemon: manage containers
+    state Docker_daemon {
+        Urbit
+        Minio
+        MinioMC
+        Netdata
+    }
+    Operations-->Docker_daemon: manage containers
 ```
