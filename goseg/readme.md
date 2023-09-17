@@ -5,6 +5,7 @@ stateDiagram-v2
     direction TB
     accTitle: Goseg package diagram
     accDescr: Interactions between packages in Groundseg Go rewrite
+    classDef bcase fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
     Broadcast-->WS_mux: broadcast latest update
     Broadcast-->Urbit_traffic: broadcast latest update
     Static-->Operations: imported
@@ -13,6 +14,7 @@ stateDiagram-v2
         state Static {
             Structs
             Defaults
+            Logger
         }
         state Routines {
             Docker_rectifier
@@ -21,6 +23,8 @@ stateDiagram-v2
             Startram_rectifier
             Linux_updater
             502_refresher
+            System_info
+            mDNS
         }
         state Operations {
             Startram
@@ -28,6 +32,12 @@ stateDiagram-v2
             System
             Config
             Transition
+        }
+        state Process_handler {
+            WS_handler
+            Startram_handler
+            Support_handler
+            Urbit_handler
         }
         Process_handler-->Operations: multiple function calls to these packages to string together actions
         Operations-->Broadcast: send updated values
@@ -46,6 +56,13 @@ stateDiagram-v2
         state WS_mux {
             WsAuth-->Websocket: broadcast structure out
             Websocket-->WsAuth: action payload in
-   }
-}
+        }
+    }
+    state Docker_daemon {
+        Urbit
+        Minio
+        MinioMC
+        Netdata
+    }
+    Operations-->Docker_daemon: manage containers
 ```
