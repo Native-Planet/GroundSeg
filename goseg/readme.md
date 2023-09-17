@@ -49,13 +49,13 @@ stateDiagram-v2
         state WS_mux {
             WsAuth-->Websocket: broadcast structure out
             Websocket-->WsAuth: action payload in
-   }
-   state Docker {
-       Urbit
-       Minio
-       MinioMC
-       Netdata
-   }
-   Operations-->Docker: manage containers
+        }
+    }
+state Docker {
+    Urbit
+    Minio
+    MinioMC
+    Netdata
 }
+Operations-->Docker: manage containers
 ```
