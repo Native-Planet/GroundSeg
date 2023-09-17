@@ -51,7 +51,7 @@ stateDiagram-v2
             Websocket-->WsAuth: action payload in
         }
     }
-state Docker {
+state Docker_daemon {
     Urbit
     Minio
     MinioMC
