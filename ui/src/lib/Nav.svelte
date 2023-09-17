@@ -18,7 +18,9 @@
       !registered ? "UNREGISTERED" :
       running ? "ONLINE" : "OFFLINE"
       }
+      <!--
     <DevToggle />
+      -->
   </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
     <div class="back" on:click={()=>goto("/")}>

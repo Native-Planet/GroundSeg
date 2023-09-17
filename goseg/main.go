@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/exporter"
 	"goseg/logger"
 	"goseg/rectify"
 	"goseg/routines"
@@ -129,5 +130,6 @@ func main() {
 	// Websocket
 	r := mux.NewRouter()
 	r.HandleFunc("/ws", ws.WsHandler)
+	r.HandleFunc("/export/{container}", exporter.ExportHandler).Methods("POST")
 	http.ListenAndServe(":3000", r)
 }
