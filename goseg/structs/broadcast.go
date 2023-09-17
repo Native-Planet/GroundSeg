@@ -109,6 +109,7 @@ type Urbit struct {
 type UrbitTransitionBroadcast struct {
 	Meld                      string `json:"meld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
+	ExportShip                string `json:"exportShip"`
 	TogglePower               string `json:"togglePower"`
 	ToggleNetwork             string `json:"toggleNetwork"`
 	ToggleDevMode             string `json:"toggleDevMode"`
