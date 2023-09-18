@@ -1,12 +1,18 @@
 package exporter
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,13 +50,10 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	/*
-		exportError := func(err error) {
-			logger.Logger.Error(fmt.Sprintf("Unable to export: %v", err))
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	*/
+	exportError := func(err error) {
+		logger.Logger.Error(fmt.Sprintf("Unable to export: %v", err))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 	cleanup := func(c string) {
 		RemoveContainerFromWhitelist(c)
 		docker.UTransBus <- structs.UrbitTransition{Patp: c, Type: "exportShip", Event: ""}
@@ -89,35 +92,83 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: 0}
 		return
 	}
-
 	// session is now valid. Defer cleanup
 	defer cleanup(container)
 	// make sure container is stopped
-	/*
-		pierStatus, err := docker.GetShipStatus([]string{container})
-		if err != nil {
-			exportError(err)
-		}
-		status, exists := pierStatus[container]
-		if !exists {
-			exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
-		}
-	*/
-	// compress volume transition compressed %
-	// temporary
-	ticker := time.NewTicker(500 * time.Millisecond)
-	count := 0
+	statusTicker := time.NewTicker(500 * time.Millisecond)
+loopLabel:
 	for {
-		if count > 100 {
-			break
-		}
 		select {
-		case <-ticker.C:
-			count = count + 5
-			docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: count}
+		case <-statusTicker.C:
+			pierStatus, err := docker.GetShipStatus([]string{container})
+			if err != nil {
+				exportError(err)
+				return
+			}
+			status, exists := pierStatus[container]
+			if !exists {
+				exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
+			}
+			if strings.Contains(status, "Exited") {
+				break loopLabel
+			}
 		}
 	}
+	// compress volume transition compressed %
+	volumeDirectory := "/var/lib/docker/volumes"
+	var memoryFile bytes.Buffer
+	filePath := filepath.Join(volumeDirectory, container, "_data")
+	// Create new zip archive in memory
+	zipWriter := zip.NewWriter(&memoryFile)
+	// Walk through the file path
+	var walkErr error
+	// Count total files
+	totalFiles := 0
+	filepath.Walk(filePath, func(_ string, info os.FileInfo, _ error) error {
+		if info != nil && !info.IsDir() {
+			totalFiles++
+		}
+		return nil
+	})
+	completedFiles := 0
+	filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			walkErr = err
+			return err
+		}
+		arcDir := strings.TrimPrefix(path, filePath+"/")
+		if filepath.Base(path) != "conn.sock" {
+			f, _ := zipWriter.Create(arcDir)
+			fileReader, _ := os.Open(path)
+			defer fileReader.Close()
+			io.Copy(f, fileReader)
+			completedFiles++
+		}
+		progress := int(float64(completedFiles) / float64(totalFiles) * 100)
+		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: progress}
+		return nil
+	})
+	if walkErr != nil {
+		exportError(walkErr)
+		return
+	}
+	// Close the zip archive
+	zipWriter.Close()
+	/*
+		ticker := time.NewTicker(500 * time.Millisecond)
+		count := 0
+		for {
+			if count > 100 {
+				break
+			}
+			select {
+			case <-ticker.C:
+				count = count + 5
+				docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: count}
+			}
+		}
+	*/
 	// send file
-	filePath := "/opt/nativeplanet/groundseg/settings/system.json"
-	http.ServeFile(w, r, filePath)
+	reader := bytes.NewReader(memoryFile.Bytes())
+	http.ServeContent(w, r, container+".zip", time.Now(), reader)
 }

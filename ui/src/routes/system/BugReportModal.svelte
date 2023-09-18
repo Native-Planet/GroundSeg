@@ -1,4 +1,5 @@
 <script>
+  import { submitReport } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let isOpen
@@ -16,6 +17,7 @@
       <h2>Describe Issue</h2>
       <textarea placeholder="Type here" bind:value={description} />
       <button
+        on:click={()=>submitReport(contact,description,[])}
         >Send
       </button>
     </div>
