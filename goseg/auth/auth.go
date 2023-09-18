@@ -98,6 +98,9 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 
 // deactivate ws session
 func WsNilSession(conn *websocket.Conn) error {
+	if conn == nil {
+		return fmt.Errorf("Invalid session")
+	}
 	if WsAuthCheck(conn) {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
