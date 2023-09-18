@@ -23,6 +23,7 @@ import (
 	"goseg/rectify"
 	"goseg/routines"
 	"goseg/startram"
+	"goseg/system"
 	"goseg/ws"
 	"net/http"
 	"time"
@@ -47,8 +48,15 @@ func main() {
 	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
-	availMsg := fmt.Sprintf("Internet available: %t", internetAvailable)
-	logger.Logger.Info(availMsg)
+	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+	// c2c mode
+	if !internetAvailable {
+		logger.Logger.Info("Entering C2C mode")
+		if err := system.C2cMode(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v",err))
+			panic("Couldn't run C2C mode!")
+		}
+	}
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
@@ -57,9 +65,6 @@ func main() {
 		// get version info from remote server
 		go func() {
 			_, versionUpdate := config.CheckVersion()
-			if versionUpdate {
-				logger.Logger.Info("Version info retrieved")
-			}
 			versionUpdateChannel <- versionUpdate
 		}()
 		// otherwise use cached if possible, or save hardcoded defaults and use that
@@ -105,11 +110,6 @@ func main() {
 			targetChan := versionStruct.Groundseg[releaseChannel]
 			config.VersionInfo = targetChan
 		}
-	}
-
-	// c2c mode
-	if !internetAvailable {
-		logger.Logger.Info("c2c mode goes here")
 	}
 
 	// grab wg now cause its huge

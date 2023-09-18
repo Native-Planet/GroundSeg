@@ -291,3 +291,16 @@ type WsSupportAction struct {
 	Description string   `json:"description"`
 	Ships       []string `json:"ships"`
 }
+
+type WsC2cPayload struct {
+	ID      string          `json:"id"`
+	Type    string          `json:"type"` // "c2c"
+	Payload WsC2cAction `json:"payload"`
+}
+
+type WsC2cAction struct {
+	Type        string   `json:"type"`
+	Action      string   `json:"action"`
+	SSID		string	 `json:"ssid"`
+	Password    string   `json:"password"`
+}
