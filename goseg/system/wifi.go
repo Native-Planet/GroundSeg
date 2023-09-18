@@ -120,7 +120,7 @@ func announceNetworks(dev string) {
 						continue
 					}
 					if err := client.WriteMessage(websocket.TextMessage, payloadJSON); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v",err))
+						logger.Logger.Error(fmt.Sprintf("Error sending message: %v",err))
 						clients[client] = false
 						continue
 					}
