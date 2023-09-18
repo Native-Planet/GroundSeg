@@ -165,8 +165,8 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 	// current and previous syslogs
 	sysLogs := []string{logger.SysLogfile(), logger.PrevSysLogfile()}
 	for _, sysLog := range sysLogs {
-		srcPath := filepath.Join(config.BasePath, "settings", sysLog)
-		destPath := filepath.Join(bugReportDir, sysLog)
+		srcPath := sysLog
+		destPath := filepath.Join(bugReportDir, filepath.Base(sysLog))
 		if err := copyFile(srcPath, destPath); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
 		}
