@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"strings"
 
 	"github.com/mdlayher/wifi"
-	"github.com/schollz/wifiscan"
 )
 
 func C2cMode() error {
@@ -47,16 +47,20 @@ func getWifiDevice() (string, error) {
 	return "", fmt.Errorf("no WiFi device found")
 }
 
-func listWifiSSIDs() ([]string, error) {
-	var ssids []string
-	wifis, err := wifiscan.Scan()
+func listWifiSSIDs(output string) []string {
+	out, err := runCommand("nmcli", "-t", "dev", "wifi")
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	for _, w := range wifis {
-		ssids = append(ssids, w.SSID)
+	lines := strings.Split(out, "\n")
+	var ssids []string
+	for _, line := range lines {
+		parts := strings.Split(line, ":")
+		if len(parts) > 2 {
+			ssids = append(ssids, parts[2])
+		}
 	}
-	return ssids, nil
+	return ssids
 }
 
 func connectToWifi(ifaceName, ssid, password string) error {
