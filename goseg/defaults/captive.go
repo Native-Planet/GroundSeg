@@ -1,0 +1,5 @@
+package defaults
+
+var (
+	CaptivePage = ``
+)
