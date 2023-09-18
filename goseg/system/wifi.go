@@ -89,8 +89,14 @@ func captiveAPI(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
-		if err := connectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to connect: %v",err))
+		if payload.Payload.Action == "connect" {
+			if err := connectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v",err))
+			} else {
+				if _, err := runCommand("systemclt","restart","groundseg"); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
+				}
+			}
 		}
 	}
 }
