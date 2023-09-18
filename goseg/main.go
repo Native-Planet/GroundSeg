@@ -136,6 +136,6 @@ func main() {
 
 	// Websocket
 	r.HandleFunc("/ws", ws.WsHandler)
-	r.HandleFunc("/export/{container}", exporter.ExportHandler).Methods("POST")
+	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	http.ListenAndServe(":3000", r)
 }

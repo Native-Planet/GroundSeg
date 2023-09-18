@@ -4,6 +4,7 @@
     exportUrbitShip,
     exportUrbitBucket
   } from '$lib/stores/websocket'
+  import { page } from '$app/stores'
   import { loadSession } from '$lib/stores/gs-crypto'
 
   import Modal from '$lib/Modal.svelte'
@@ -16,25 +17,46 @@
 
   $: transition = ($structure?.urbits?.[patp]?.transition) || {}
   $: exportShip = (transition?.exportShip) || ""
+  $: shipCompressed = (transition?.shipCompressed) || 0
+
+  $: changed = execIfChanged(exportShip)
+
+  const execIfChanged = async state => {
+    if (state == "ready")
+      await requestPier()
+    return state
+  }
 
   const requestPier = async () => {
     // get token
-    let token = await loadSession()
-    if ((token.id == null) || (token.token == null)) {
-      return
+    let token = await loadSession();
+    if (!token.id || !token.token) {
+      return;
     }
     // send request
-    const response = await fetch('http://localhost:3000/export/'+patp, {
+    const hostname = $page.url.hostname
+    const port = "3000"
+    const response = await fetch("http://"+hostname+":"+port+"/export/"+patp, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(token)
-    })
+    });
+
     // handle response
     if (response.ok) {
-      const data = await response.json();
-      console.log("Success:", data);
+      // Handle as Blob (file)
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      // the filename you want
+      a.download = patp+'.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
     } else {
       console.log("Error:", response.status);
     }
@@ -44,7 +66,11 @@
 <Modal>
   {#if isOpen}
   <div class="wrapper">
-  urbit: {JSON.stringify(exportShip)}, storage: tbd
+    <!-- debug -->
+    <div>urbit: {JSON.stringify(exportShip)}, storage: tbd</div>
+    <div>shipCompressed: {JSON.stringify(shipCompressed)}</div>
+    <!-- end debug -->
+
     <div class="header">Export For {patp}</div>
     <div class="name">What do you want to export?</div>
     <div class="button-wrapper">

@@ -30,6 +30,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.ToggleNetwork = event.Event
 			case "exportShip":
 				urbitStruct.Transition.ExportShip = event.Event
+			case "shipCompressed":
+				urbitStruct.Transition.ShipCompressed = event.Value
 			default:
 				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue
