@@ -66,7 +66,7 @@
 <Modal>
   {#if isOpen}
   <div class="wrapper">
-    <!-- debug -->
+    <!-- debug --
     <div>urbit: {JSON.stringify(exportShip)}, storage: tbd</div>
     <div>shipCompressed: {JSON.stringify(shipCompressed)}</div>
     <!-- end debug -->
@@ -75,13 +75,20 @@
     <div class="name">What do you want to export?</div>
     <div class="button-wrapper">
       <button
-        disabled={exportShip == "loading"}
+        disabled={exportShip != ""}
         on:click={()=>exportUrbitShip(patp)}
         >
-        Urbit Ship
+        {#if shipCompressed > 0}
+          Compressing..{shipCompressed}%
+        {:else if exportShip == "stopping"}
+          Stopping Your Ship
+        {:else if exportShip == "ready"}
+          Getting Zip File Ready
+        {:else}
+          Urbit Ship
+        {/if}
       </button>
       <button
-        disabled={exportShip == "loading"}
         on:click={()=>exportUrbitBucket(patp)}
         >
         Storage
