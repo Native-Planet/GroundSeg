@@ -51,7 +51,7 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	// if err := os.RemoveAll(bugReportDir); err != nil {
 	// 	logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	// }
-	if err := sendBugReport(bugReportDir+"/"+timestamp+"/"+timestamp+".zip", contact, description); err != nil {
+	if err := sendBugReport(bugReportDir+"/"+timestamp+".zip", contact, description); err != nil {
 		return fmt.Errorf("Couldn't submit bug report: %v", err)
 	}
 	return nil
