@@ -44,6 +44,7 @@ func loadService(loadFunc func() error, errMsg string) {
 
 func main() {
 	// global SysConfig var is managed through config package
+	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	availMsg := fmt.Sprintf("Internet available: %t", internetAvailable)
@@ -105,6 +106,12 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
+
+	// c2c mode
+	if !internetAvailable {
+		logger.Logger.Info("c2c mode goes here")
+	}
+
 	// grab wg now cause its huge
 	if wgConf, err := docker.GetLatestContainerInfo("wireguard"); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
@@ -128,7 +135,6 @@ func main() {
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 
 	// Websocket
-	r := mux.NewRouter()
 	r.HandleFunc("/ws", ws.WsHandler)
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	http.ListenAndServe(":3000", r)
