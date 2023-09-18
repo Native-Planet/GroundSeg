@@ -23,6 +23,7 @@ import (
 	"goseg/rectify"
 	"goseg/routines"
 	"goseg/startram"
+	"goseg/system"
 	"goseg/ws"
 	"net/http"
 	"time"
@@ -44,10 +45,18 @@ func loadService(loadFunc func() error, errMsg string) {
 
 func main() {
 	// global SysConfig var is managed through config package
+	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
-	availMsg := fmt.Sprintf("Internet available: %t", internetAvailable)
-	logger.Logger.Info(availMsg)
+	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+	// c2c mode
+	if !internetAvailable {
+		logger.Logger.Info("Entering C2C mode")
+		if err := system.C2cMode(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v",err))
+			panic("Couldn't run C2C mode!")
+		}
+	}
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
@@ -56,9 +65,6 @@ func main() {
 		// get version info from remote server
 		go func() {
 			_, versionUpdate := config.CheckVersion()
-			if versionUpdate {
-				logger.Logger.Info("Version info retrieved")
-			}
 			versionUpdateChannel <- versionUpdate
 		}()
 		// otherwise use cached if possible, or save hardcoded defaults and use that
@@ -105,6 +111,7 @@ func main() {
 			config.VersionInfo = targetChan
 		}
 	}
+
 	// grab wg now cause its huge
 	if wgConf, err := docker.GetLatestContainerInfo("wireguard"); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
@@ -128,7 +135,6 @@ func main() {
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 
 	// Websocket
-	r := mux.NewRouter()
 	r.HandleFunc("/ws", ws.WsHandler)
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	http.ListenAndServe(":3000", r)
