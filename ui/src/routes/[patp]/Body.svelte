@@ -28,21 +28,27 @@
   $: loomSize = (ship?.loomSize)
   $: lusCode = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
   $: url = (ship?.url) || "#"
+  $: minioUrl = (ship?.minioUrl) || "#"
+  $: minioPwd = (ship?.minioPwd) || ""
 
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
+
+  $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
 </script>
 <div class="body">
   <!-- Power -->
   <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
 
-  <!-- Custom Urbit Domain -->
-  <CustomUrbitDomain {url} />
+  {#if startramRegistered}
+    <!-- Custom Urbit Domain -->
+    <CustomUrbitDomain {url} />
 
-  <!-- Custom MinIO Domain -->
-  <CustomMinIODomain />
+    <!-- Custom MinIO Domain -->
+    <CustomMinIODomain {minioUrl} {minioPwd} />
+  {/if}
 
   <!-- Loom -->
   <Loom {patp} {loomSize} />

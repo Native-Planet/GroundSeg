@@ -251,7 +251,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch containerType {
 	case "vere":
 		containerConfig, hostConfig, err = urbitContainerConf(containerName)
-		//_, _, err := urbitContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
@@ -352,6 +351,11 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
+	}
+	if strings.Contains(containerName, "minio_") {
+		if err := setMinIOAdminAccount(containerName); err != nil {
+			return containerState, fmt.Errorf("failed to set admin account %s: %v", containerName, err)
+		}
 	}
 	desiredStatus := "running"
 	// save the current state of the container in memory for reference
@@ -500,4 +504,58 @@ func DockerPoller() {
 			return
 		}
 	}
+}
+
+// execute command
+func ExecDockerCommand(containerName string, cmd []string) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	// Create an Exec configuration
+	execConfig := types.ExecConfig{Cmd: cmd}
+	// Context
+	ctx := context.Background()
+
+	// Get container ID by name
+	containerID, err := getContainerIDByName(ctx, cli, containerName)
+	if err != nil {
+		return err
+	}
+	// Create an exec instance, replace 'container_id_here' with your container ID
+	resp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return err
+	}
+
+	// Start the exec command
+	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return err
+	}
+	defer hijackedResp.Close()
+
+	// Read the output
+	stdout, err := ioutil.ReadAll(hijackedResp.Reader)
+	if err != nil {
+		return err
+	}
+	logger.Logger.Warn(fmt.Sprintf("Output: %+v, %T", stdout, stdout))
+	return nil
+}
+
+// Function to get container ID by name
+func getContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, container := range containers {
+		for _, n := range container.Names {
+			if n == "/"+name {
+				return container.ID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Container not found")
 }

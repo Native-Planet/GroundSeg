@@ -151,6 +151,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
+		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
 		// collate all the info from our sources into the struct
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
@@ -163,9 +164,12 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
+		urbit.Info.MinIOUrl = minIOUrl
+		urbit.Info.MinIOPwd = "11111111"
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
+
 		// and insert the struct into the map we will use as input for the broadcast struct
 		updates[pier] = urbit
 	}

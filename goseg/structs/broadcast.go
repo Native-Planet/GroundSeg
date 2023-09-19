@@ -101,6 +101,8 @@ type Urbit struct {
 		DetectBootStatus bool   `json:"detectBootStatus"`
 		Remote           bool   `json:"remote"`
 		Vere             any    `json:"vere"`
+		MinIOUrl         string `json:"minioUrl"`
+		MinIOPwd         string `json:"minioPwd"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
