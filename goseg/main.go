@@ -144,35 +144,6 @@ func main() {
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-
-	// immediate connectivity check
-	if !internetAvailable {
-		logger.Logger.Info("No connection -- entering C2C mode")
-		if err := system.C2cMode(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v", err))
-			panic("Couldn't run C2C mode!")
-		}
-	}
-
-	// ongoing connectivity check
-	go C2cLoop()
-	r.Handle("/", fileServer)
-	server := &http.Server{
-		Addr:    ":80",
-		Handler: r,
-	}
-	go func() {
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			logger.Logger.Error(fmt.Sprintf("Could not listen on :80: %v", err))
-		}
-	}()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to stop HTTP server: %v", err))
-	} else {
-		logger.Logger.Info("Server stopped gracefully")
-	}
 	// ongoing connectivity check
 	go C2cLoop()
 	// async operation to retrieve version info if updates are on
