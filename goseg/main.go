@@ -226,6 +226,6 @@ func main() {
 	
 	// load the appropriate HTTP server forever
 	for {
-		go ServerControl()
+		ServerControl()
 	}
 }
