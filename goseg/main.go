@@ -27,7 +27,6 @@ import (
 	"goseg/startram"
 	"goseg/system"
 	"goseg/ws"
-	"io/fs"
 	"net/http"
 	"time"
 
@@ -37,10 +36,12 @@ import (
 var (
 	//go:embed web/*
 	content embed.FS
-	mainFs http.FileSystem = http.FS(content)
-	fileServer = http.FileServer(mainFs)
-	captiveFs, _ = fs.Sub(content, "web/captive")
-	capFileServer = http.FileServer(http.FS(captiveFs))
+	fs = http.FS(content)
+	fileServer = http.FileServer(fs)
+	//go:embed web/captive/*
+	capContent embed.FS
+	capFs = http.FS(capContent)
+	capFileServer = http.FileServer(capFs)
 	DevMode = false
 	shutdownChan = make(chan struct{})
 )
