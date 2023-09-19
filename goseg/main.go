@@ -46,7 +46,7 @@ var (
 )
 
 func ServerControl() {
-	activeServer := startC2CServer()
+	activeServer := startMainServer()
 	// var activeServer *http.Server
 	for {
 		select {
