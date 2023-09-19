@@ -19,7 +19,10 @@
   $: exportShip = (transition?.exportShip) || ""
   $: shipCompressed = (transition?.shipCompressed) || 0
 
-  $: changed = execIfChanged(exportShip)
+  $: shipChanged = execIfChanged(exportShip)
+
+  let shipExported = false
+  let bucketExported = false
 
   const execIfChanged = async state => {
     if (state == "ready")
@@ -57,6 +60,7 @@
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
+      shipExported = true
     } else {
       console.log("Error:", response.status);
     }
@@ -75,10 +79,12 @@
     <div class="name">What do you want to export?</div>
     <div class="button-wrapper">
       <button
-        disabled={exportShip != ""}
+        disabled={(exportShip != "") || shipExported}
         on:click={()=>exportUrbitShip(patp)}
         >
-        {#if shipCompressed > 0}
+        {#if shipExported}
+          Ship Exported
+        {:else if shipCompressed > 0}
           Compressing..{shipCompressed}%
         {:else if exportShip == "stopping"}
           Stopping Your Ship
