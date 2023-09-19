@@ -252,6 +252,8 @@ func main() {
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 	
-	// load the appropriate HTTP server
-	go ServerControl()
+	// load the appropriate HTTP server forever
+	for {
+		go ServerControl()
+	}
 }
