@@ -61,8 +61,11 @@ pipeline {
                         if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                             sh '''
                                 git checkout ${tag}
+                                cd ./ui
+                                docker build -t svelte-builder -f builder.Dockerfile
+                                docker run --rm -v ../goseg/web:/webui/build web-builder
                                 mkdir -p /opt/groundseg/version/bin
-                                cd ./goseg
+                                cd ../goseg
                                 env GOOS=linux GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
                                 env GOOS=linux GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
                             '''

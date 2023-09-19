@@ -33,7 +33,31 @@ import (
 
 var (
 	DevMode = false
+	c2cActive = false
+
 )
+
+func C2cLoop() {
+	for {
+		internetAvailable := config.NetCheck("1.1.1.1:53")
+		if !internetAvailable && !c2cActive {
+			if err := system.C2cMode(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode:", err))
+			} else {
+				c2cActive = true
+				logger.Logger.Info("No connection -- entering C2C mode")
+			}
+		} else if internetAvailable && c2cActive {
+			if err := system.TeardownHostAPD(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
+			} else {
+				c2cActive = false
+				logger.Logger.Info("Connection detected -- exiting C2C mode")
+			}
+		}
+		time.Sleep(30 * time.Second)
+	}
+}
 
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
@@ -49,14 +73,17 @@ func main() {
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-	// c2c mode
+	// immediate connectivity check
 	if !internetAvailable {
-		logger.Logger.Info("Entering C2C mode")
+		logger.Logger.Info("No connection -- entering C2C mode")
+		c2cActive = true
 		if err := system.C2cMode(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v", err))
 			panic("Couldn't run C2C mode!")
 		}
 	}
+	// ongoing connectivity check
+	go C2cLoop()
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false

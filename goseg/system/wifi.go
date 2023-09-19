@@ -230,7 +230,7 @@ rsn_pairwise=CCMP
 	return nil
 }
 
-func teardownHostAPD() error {
+func TeardownHostAPD() error {
 	_, err := runCommand("pkill", "-9", "hostapd")
 	if err != nil {
 		return err
