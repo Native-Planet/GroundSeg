@@ -1,4 +1,5 @@
-FROM node:18.15.0-buster-slim
+FROM node:18.17.0-buster-slim
+RUN npm install -g npm@9
 COPY ./ /webui
 WORKDIR /webui
 RUN npm install -g npm
