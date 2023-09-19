@@ -140,7 +140,6 @@ func startMainServer() *http.Server {
 
 func main() {
 	// global SysConfig var is managed through config package
-	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
