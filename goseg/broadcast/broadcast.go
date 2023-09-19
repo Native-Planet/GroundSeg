@@ -44,7 +44,7 @@ func WsDigester() {
 		event := <-structs.WsEventBus
 		if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
-			if err = WsNilSession(event.Conn.Conn); err != nil {
+			if err = auth.WsNilSession(event.Conn.Conn); err != nil {
 				logger.Logger.Warn("Couldn't remove WS session")
 			}
 			continue

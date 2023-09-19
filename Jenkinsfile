@@ -62,7 +62,7 @@ pipeline {
                             sh '''
                                 git checkout ${tag}
                                 cd ./ui
-                                docker build -t svelte-builder -f builder.Dockerfile
+                                docker build -t web-builder -f builder.Dockerfile
                                 docker run --rm -v ../goseg/web:/webui/build web-builder
                                 mkdir -p /opt/groundseg/version/bin
                                 cd ../goseg

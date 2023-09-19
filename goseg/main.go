@@ -15,6 +15,8 @@ package main
 // - Very good golang Docker libraries
 
 import (
+	"context"
+	"embed"
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
@@ -32,27 +34,56 @@ import (
 )
 
 var (
+	//go:embed web/*
+	content embed.FS
+	fs = http.FS(content)
+	fileServer = http.FileServer(fs)
+	//go:embed web/captive/*
+	capContent embed.FS
+	capFs = http.FS(capContent)
+	capFileServer = http.FileServer(capFs)
 	DevMode = false
-	c2cActive = false
-
+	shutdownChan = make(chan struct{})
 )
 
+func ServerControl() {
+	var activeServer *http.Server
+	for {
+		select {
+		case useC2C := <-system.C2cChan:
+			if activeServer != nil {
+				close(shutdownChan)
+				shutdownChan = make(chan struct{})
+				activeServer.Shutdown(context.Background())
+			}
+			if useC2C {
+				activeServer = startC2CServer()
+			} else {
+				activeServer = startMainServer()
+			}
+		}
+	}
+}
+
 func C2cLoop() {
+	c2cActive := false
 	for {
 		internetAvailable := config.NetCheck("1.1.1.1:53")
 		if !internetAvailable && !c2cActive {
 			if err := system.C2cMode(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode:", err))
 			} else {
-				c2cActive = true
 				logger.Logger.Info("No connection -- entering C2C mode")
+				c2cActive = true
+				system.C2cChan <- true
 			}
 		} else if internetAvailable && c2cActive {
 			if err := system.TeardownHostAPD(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
 			} else {
-				c2cActive = false
 				logger.Logger.Info("Connection detected -- exiting C2C mode")
+				c2cActive = false
+				system.C2cChan <- false
 			}
 		}
 		time.Sleep(30 * time.Second)
@@ -67,20 +98,80 @@ func loadService(loadFunc func() error, errMsg string) {
 	}()
 }
 
+func startC2CServer() *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/", capFileServer)
+	mux.HandleFunc("/api", system.CaptiveAPI)
+	server := &http.Server{
+		Addr:    ":80",
+		Handler: mux,
+	}
+	go func() {
+		select {
+		case <-shutdownChan:
+			server.Shutdown(context.Background())
+		}
+	}()
+	go server.ListenAndServe()
+	logger.Logger.Info("C2C web server serving")
+	return server
+}
+
+func startMainServer() *http.Server {
+	r := mux.NewRouter()
+	r.Handle("/", fileServer)
+	r.HandleFunc("/ws", ws.WsHandler)
+	r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	server := &http.Server{
+		Addr:    ":80",
+		Handler: r,
+	}
+	go func() {
+		select {
+		case <-shutdownChan:
+			server.Shutdown(context.Background())
+		}
+	}()
+	go server.ListenAndServe()
+	http.ListenAndServe(":80", r)
+	logger.Logger.Info("Main web server serving")
+	return server
+}
+
 func main() {
 	// global SysConfig var is managed through config package
 	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+
 	// immediate connectivity check
 	if !internetAvailable {
 		logger.Logger.Info("No connection -- entering C2C mode")
-		c2cActive = true
 		if err := system.C2cMode(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v", err))
 			panic("Couldn't run C2C mode!")
 		}
+	}
+
+	// ongoing connectivity check
+	go C2cLoop()
+	r.Handle("/", fileServer)
+	server := &http.Server{
+		Addr:    ":80",
+		Handler: r,
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			logger.Logger.Error(fmt.Sprintf("Could not listen on :80: %v", err))
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to stop HTTP server: %v", err))
+	} else {
+		logger.Logger.Info("Server stopped gracefully")
 	}
 	// ongoing connectivity check
 	go C2cLoop()
@@ -160,9 +251,7 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
-
-	// Websocket
-	r.HandleFunc("/ws", ws.WsHandler)
-	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	http.ListenAndServe(":3000", r)
+	
+	// load the appropriate HTTP server
+	go ServerControl()
 }

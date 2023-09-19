@@ -27,6 +27,13 @@ var (
 		},
 	}
 	clients = make(map[*websocket.Conn]bool)
+    C2cChan = make(chan bool)
+	proxy = &captive.Portal{
+		LoginPath:           "/",
+		PortalDomain:        "nativeplanet.local",
+		AllowedBypassPortal: false,
+		WebPath:             "c2c",
+	}
 )
 
 func C2cMode() error {
@@ -45,17 +52,11 @@ func C2cMode() error {
 }
 
 func CaptivePortal(dev string) error {
-	proxy := &captive.Portal{
-		LoginPath:           "/",
-		PortalDomain:        "nativeplanet.local",
-		AllowedBypassPortal: false,
-		WebPath:             "c2c",
-	}
 	go func() {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			http.FileServer(http.Dir("c2c"))
 		})
-		http.Handle("/api", http.HandlerFunc(captiveAPI))
+		http.Handle("/api", http.HandlerFunc(CaptiveAPI))
 		http.ListenAndServe(":80", nil)
 	}()
 	err := proxy.Run()
@@ -66,7 +67,7 @@ func CaptivePortal(dev string) error {
 	return nil
 }
 
-func captiveAPI(w http.ResponseWriter, r *http.Request) {
+func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 	dev, _ := getWifiDevice()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -107,18 +108,18 @@ func announceNetworks(dev string) {
 		select {
 		case <-tick:
 			networks := listWifiSSIDs(dev)
+			payload := struct {
+				Networks []string `json:"networks"`
+			}{
+				Networks: networks,
+			}
+			payloadJSON, err := json.Marshal(payload)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v", err))
+				continue
+			}
 			for client, _ := range clients {
 				if client != nil && clients[client] == true {
-					payload := struct {
-						Networks []string `json:"networks"`
-					}{
-						Networks: networks,
-					}
-					payloadJSON, err := json.Marshal(payload)
-					if err != nil {
-						logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v", err))
-						continue
-					}
 					if err := client.WriteMessage(websocket.TextMessage, payloadJSON); err != nil {
 						logger.Logger.Error(fmt.Sprintf("Error sending message: %v", err))
 						clients[client] = false
@@ -237,6 +238,9 @@ func TeardownHostAPD() error {
 	}
 	_, err = runCommand("pkill", "-9", "dnsmasq")
 	if err != nil {
+		return err
+	}
+	if err := proxy.Close(); err != nil {
 		return err
 	}
 	return nil
