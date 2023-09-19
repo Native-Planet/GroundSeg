@@ -64,6 +64,27 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 	}
 }
 
+func GetContainerRunningStatus(containerName string) (string, error) {
+	var status string
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+	}
+	// List containers
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	if err != nil {
+		return status, err
+	}
+	// Loop through containers to find the one with the given name
+	for _, container := range containers {
+		for _, name := range container.Names {
+			if name == "/"+containerName {
+				return container.Status, nil
+			}
+		}
+	}
+	return status, fmt.Errorf("Unable to get container running status: %v", containerName)
+}
+
 // return the name of a container's network
 func GetContainerNetwork(name string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -240,12 +261,12 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "minio":
-		_, _, err := minioContainerConf(containerName)
+		containerConfig, hostConfig, err = minioContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
 	case "miniomc":
-		_, _, err := mcContainerConf()
+		containerConfig, hostConfig, err = mcContainerConf()
 		if err != nil {
 			return containerState, err
 		}
