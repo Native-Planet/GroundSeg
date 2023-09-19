@@ -4,18 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"goseg/logger"
 	"goseg/structs"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/hsanjuan/go-captive"
 	"github.com/mdlayher/wifi"
-	"github.com/gorilla/websocket"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 			return true
 		},
 	}
-	clients  = make(map[*websocket.Conn]bool)
+	clients = make(map[*websocket.Conn]bool)
 )
 
 func C2cMode() error {
@@ -60,7 +60,7 @@ func CaptivePortal(dev string) error {
 	}()
 	err := proxy.Run()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v",err))
+		logger.Logger.Error(fmt.Sprintf("%v", err))
 		os.Exit(1)
 	}
 	return nil
@@ -91,9 +91,9 @@ func captiveAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if payload.Payload.Action == "connect" {
 			if err := connectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v",err))
+				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
-				if _, err := runCommand("systemclt","restart","groundseg"); err != nil {
+				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
 				}
 			}
@@ -116,11 +116,11 @@ func announceNetworks(dev string) {
 					}
 					payloadJSON, err := json.Marshal(payload)
 					if err != nil {
-						logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v",err))
+						logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v", err))
 						continue
 					}
 					if err := client.WriteMessage(websocket.TextMessage, payloadJSON); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Error sending message: %v",err))
+						logger.Logger.Error(fmt.Sprintf("Error sending message: %v", err))
 						clients[client] = false
 						continue
 					}
@@ -244,8 +244,8 @@ func teardownHostAPD() error {
 
 func applyCaptiveRules(dev string) error {
 	sysctlSettings := map[string]string{
-		"net.ipv4.ip_forward":           "1",
-		"net.ipv6.conf.all.forwarding":  "1",
+		"net.ipv4.ip_forward":              "1",
+		"net.ipv6.conf.all.forwarding":     "1",
 		"net.ipv4.conf.all.send_redirects": "0",
 	}
 	for key, value := range sysctlSettings {

@@ -53,7 +53,7 @@ func main() {
 	if !internetAvailable {
 		logger.Logger.Info("Entering C2C mode")
 		if err := system.C2cMode(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v",err))
+			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v", err))
 			panic("Couldn't run C2C mode!")
 		}
 	}
