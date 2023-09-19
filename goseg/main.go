@@ -144,7 +144,7 @@ func main() {
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-	system.C2cChan <- !internetAvailable
+	// system.C2cChan <- !internetAvailable
 	// ongoing connectivity check
 	go C2cLoop()
 	// async operation to retrieve version info if updates are on
