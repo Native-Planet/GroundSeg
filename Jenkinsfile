@@ -62,9 +62,11 @@ pipeline {
                             sh '''
                                 git checkout ${tag}
                                 cd ./ui
-                                docker build -t web-builder -f builder.Dockerfile
-                                docker run --rm -v ../goseg/web:/webui/build web-builder
-                                mkdir -p /opt/groundseg/version/bin
+                                DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                                container_id=$(docker create web-builder)
+                                docker cp $container_id:/webui/build ./web
+                                rm -rf ../goseg/web
+                                mv web ../goseg/
                                 cd ../goseg
                                 env GOOS=linux GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
                                 env GOOS=linux GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
