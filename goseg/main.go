@@ -119,6 +119,10 @@ func startC2CServer() *http.Server {
 }
 
 func startMainServer() *http.Server {
+	entries, _ := fs.ReadDir(".")
+    for _, entry := range entries {
+        fmt.Println(entry.Name())
+    }
 	r := mux.NewRouter()
 	r.Handle("/", fileServer)
 	r.HandleFunc("/ws", ws.WsHandler)
