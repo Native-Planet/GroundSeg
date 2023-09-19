@@ -124,6 +124,7 @@ func startMainServer() *http.Server {
         fmt.Println(entry.Name())
     }
 	r := mux.NewRouter()
+	r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", fileServer))
 	r.Handle("/", fileServer)
 	r.HandleFunc("/ws", ws.WsHandler)
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
