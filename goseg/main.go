@@ -47,7 +47,8 @@ var (
 )
 
 func ServerControl() {
-	var activeServer *http.Server
+	activeServer := startC2CServer()
+	// var activeServer *http.Server
 	for {
 		select {
 		case useC2C := <-system.C2cChan:
