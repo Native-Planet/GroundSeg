@@ -1,8 +1,23 @@
 <script>
   // Style
   import "../theme.css"
+
+  import Clipboard from 'clipboard'
   import { createEventDispatcher } from 'svelte'
+
+  export let minioUrl
+  export let minioPwd
+
+  let copied = false
+
   const dispatch = createEventDispatcher()
+
+  let copy = new Clipboard('#copy');
+    copy.on("success", ()=> {
+      copied = true;
+      setTimeout(()=> copied = false, 1000)
+    })
+
 </script>
 
 <div>
@@ -12,16 +27,20 @@
     <button class="save-button">Save</button>
   </div>
   <div class="wrapper">
-    <button class="btn">
+    <button id="copy" class="btn" data-clipboard-text={minioPwd}>
       <img
         src="/clipboard.svg"
         width="24px"
         height="24px" />
-      Copy MinIO Password
+      {#if copied}
+        Copied!
+      {:else}
+        Copy MinIO Password
+      {/if}
     </button>
-    <button class="btn">
+    <a href={minioUrl} target="_blank" class="btn">
       Settings
-    </button>
+    </a>
     <button class="btn">
       Disconnect
     </button>
