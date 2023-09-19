@@ -86,6 +86,9 @@ func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 
 // quick check if websocket is authed at all for unauth broadcast (not for auth on its own)
 func WsAuthCheck(conn *websocket.Conn) bool {
+	if conn == nil {
+		return false
+	}
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
 	for _, client := range ClientManager.AuthClients {

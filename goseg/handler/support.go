@@ -44,14 +44,14 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
 		return fmt.Errorf("Failed to dump logs: %v", err)
 	}
-	zipPath := filepath.Join(bugReportDir, timestamp+".zip")
+	zipPath := filepath.Join(config.BasePath, "bug-reports", timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
 		return fmt.Errorf("Error zipping bug report: %v", err)
 	}
 	if err := os.RemoveAll(bugReportDir); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	}
-	if err := sendBugReport(bugReportDir+timestamp+".zip", contact, description); err != nil {
+	if err := sendBugReport(filepath.Join(config.BasePath, "bug-reports", timestamp+".zip"), contact, description); err != nil {
 		return fmt.Errorf("Couldn't submit bug report: %v", err)
 	}
 	return nil
@@ -165,8 +165,8 @@ func dumpBugReport(timestamp, contact, description string, piers []string) error
 	// current and previous syslogs
 	sysLogs := []string{logger.SysLogfile(), logger.PrevSysLogfile()}
 	for _, sysLog := range sysLogs {
-		srcPath := filepath.Join(config.BasePath, "settings", sysLog)
-		destPath := filepath.Join(bugReportDir, sysLog)
+		srcPath := sysLog
+		destPath := filepath.Join(bugReportDir, filepath.Base(sysLog))
 		if err := copyFile(srcPath, destPath); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
 		}
