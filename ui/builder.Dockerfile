@@ -6,4 +6,4 @@ RUN npm install -g npm
 RUN npm install
 RUN ls
 RUN ls build
-CMD ["npm","run","build"]
+CMD ["npm","run","build","&&","ls"]
