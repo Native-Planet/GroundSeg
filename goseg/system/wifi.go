@@ -52,15 +52,7 @@ func C2cMode() error {
 }
 
 func CaptivePortal(dev string) error {
-	go func() {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			http.FileServer(http.Dir("c2c"))
-		})
-		http.Handle("/api", http.HandlerFunc(CaptiveAPI))
-		http.ListenAndServe(":80", nil)
-	}()
-	err := proxy.Run()
-	if err != nil {
+	if err := proxy.Run(); err != nil {
 		logger.Logger.Error(fmt.Sprintf("%v", err))
 		os.Exit(1)
 	}
