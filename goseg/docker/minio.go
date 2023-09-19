@@ -75,7 +75,6 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, err
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
-	command := fmt.Sprintf("server /data --console-address \":%v\" --address \":%v\"", shipConf.WgConsolePort, shipConf.WgS3Port)
 	tempPassword := "11111111"
 	environment := []string{
 		fmt.Sprintf("MINIO_ROOT_USER=%s", shipName),
@@ -91,9 +90,19 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		},
 	}
 	containerConfig = container.Config{
-		Image: desiredImage,
-		Cmd:   []string{command},
-		Env:   environment,
+		Image:      desiredImage,
+		Entrypoint: []string{"minio"},
+		Cmd: []string{
+			"server",
+			"/data",
+			"--address",
+			fmt.Sprintf(":%v", shipConf.WgS3Port),
+			//fmt.Sprintf("\":%v\"", shipConf.WgS3Port),
+			"--console-address",
+			fmt.Sprintf(":%v", shipConf.WgConsolePort),
+			//fmt.Sprintf("\":%v\"", shipConf.WgConsolePort),
+		},
+		Env: environment,
 	}
 	// always on wg nw
 	hostConfig = container.HostConfig{
