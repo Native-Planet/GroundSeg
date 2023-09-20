@@ -6,7 +6,7 @@
   import { goto } from '$app/navigation';
 
   // Websocket
-  import { connect, structure, connected } from '$lib/stores/websocket'
+  import { wsPort, connect, structure, connected } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
 
   import ApiSpinner from './ApiSpinner.svelte'
@@ -16,8 +16,7 @@
 
   onMount(()=> {
     const hostname = $page.url.hostname
-    const port = "3000"
-    connect("ws://" + hostname + ":" + port + "/ws")
+    connect("ws://" + hostname + ":" + $wsPort + "/ws")
     redirector()
   })
 
