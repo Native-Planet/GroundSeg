@@ -178,9 +178,10 @@ func startMainServer() *http.Server {
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         file, err := fs.Open(r.URL.Path)
-        defer file.Close()
         if err != nil {
             r.URL.Path = "/index.html"
+        } else {
+            defer file.Close()
         }
         http.FileServer(fs).ServeHTTP(w, r)
     }
