@@ -148,9 +148,16 @@ func startMainServer() *http.Server {
 	r := mux.NewRouter()
 	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	// redirect 404s to `/`
-	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        http.Redirect(w, r, "/", http.StatusSeeOther)
+	// SPA routing
+    r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        data, err := webContent.ReadFile("index.html")
+        if err != nil {
+            http.Error(w, "Couldn't find index!", http.StatusInternalServerError)
+            return
+        }
+        w.Header().Set("Content-Type", "text/html; charset=utf-8")
+        w.WriteHeader(http.StatusOK)
+        w.Write(data)
     })
 	server := &http.Server{
 		Addr:    ":80",
