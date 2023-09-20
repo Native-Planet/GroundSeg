@@ -147,9 +147,9 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-	r.HandleFunc("/", handleSPA)
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	http.Handle("/", handleSPA(webContent))
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
@@ -174,25 +174,17 @@ func startMainServer() *http.Server {
 	return server
 }
 
-func handleSPA(w http.ResponseWriter, r *http.Request) {
-    data, err := fs.ReadFile(webContent, r.URL.Path[1:])
-    if err != nil {
-        data, err = fs.ReadFile(webContent, "index.html")
-        if err != nil {
-			logger.Logger.Info(fmt.Sprintf("Debug: couldn't get path %v",r.URL.Path))
-            http.Error(w, "Internal server error", http.StatusInternalServerError)
-            return
+func handleSPA(fs fs.FS) http.Handler {
+    fileServer := http.FileServer(http.FS(fs))
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        _, err := fs.Open(r.URL.Path[1:])
+        if os.IsNotExist(err) {
+            r.URL.Path = "/index.html"
         }
-    }
-    contentType := mime.TypeByExtension(filepath.Ext(r.URL.Path))
-    if contentType == "" {
-        contentType = "text/html; charset=utf-8"
-    }
-    w.Header().Set("Content-Type", contentType)
-    w.WriteHeader(http.StatusOK)
-	logger.Logger.Info(fmt.Sprintf("Debug: Good path %v",r.URL.Path))
-    w.Write(data)
+        fileServer.ServeHTTP(w, r)
+    })
 }
+
 
 func main() {
 	// global SysConfig var is managed through config package
