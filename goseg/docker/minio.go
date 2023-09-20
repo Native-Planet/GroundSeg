@@ -1,6 +1,8 @@
 package docker
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"goseg/config"
 	"goseg/logger"
@@ -75,10 +77,22 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, err
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
-	tempPassword := "11111111"
+	// Create a byte slice of length 16
+	randomBytes := make([]byte, 16)
+	// Generate random bytes
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return containerConfig, hostConfig, err
+	}
+	// Convert to a 32-character long hex string
+	minIOPwd := hex.EncodeToString(randomBytes)
+	if err := config.SetMinIOPassword(containerName, minIOPwd); err != nil {
+		return containerConfig, hostConfig, err
+	}
+
 	environment := []string{
 		fmt.Sprintf("MINIO_ROOT_USER=%s", shipName),
-		fmt.Sprintf("MINIO_ROOT_PASSWORD=%s", tempPassword), //shipConf.MinioPassword),
+		fmt.Sprintf("MINIO_ROOT_PASSWORD=%s", minIOPwd), //shipConf.MinioPassword),
 		fmt.Sprintf("MINIO_DOMAIN=s3.%s", shipConf.WgURL),
 		fmt.Sprintf("MINIO_SERVER_URL=https://s3.%s", shipConf.WgURL),
 	}
