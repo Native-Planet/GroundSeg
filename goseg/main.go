@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+
 	// "os"
 	"path/filepath"
 	"strings"
@@ -176,15 +177,15 @@ func startMainServer() *http.Server {
 }
 
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        file, err := fs.Open(r.URL.Path)
-        if err != nil {
-            r.URL.Path = "/index.html"
-        } else {
-            defer file.Close()
-        }
-        http.FileServer(fs).ServeHTTP(w, r)
-    }
+	return func(w http.ResponseWriter, r *http.Request) {
+		file, err := fs.Open(r.URL.Path)
+		if err != nil {
+			r.URL.Path = "/index.html"
+		} else {
+			defer file.Close()
+		}
+		http.FileServer(fs).ServeHTTP(w, r)
+	}
 }
 
 func main() {
