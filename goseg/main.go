@@ -175,9 +175,9 @@ func startMainServer() *http.Server {
 }
 
 func handleSPA(w http.ResponseWriter, r *http.Request) {
-    data, err := webContent.ReadFile(r.URL.Path)
+    data, err := content.ReadFile(r.URL.Path)
     if err != nil {
-        data, err = webContent.ReadFile("index.html")
+        data, err = content.ReadFile("index.html")
         if err != nil {
             http.Error(w, "Internal server error", http.StatusInternalServerError)
             return
