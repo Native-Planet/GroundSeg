@@ -54,10 +54,10 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Unable to export: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	cleanup := func(c string) {
-		RemoveContainerFromWhitelist(c)
-		docker.UTransBus <- structs.UrbitTransition{Patp: c, Type: "exportShip", Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: c, Type: "shipCompressed", Value: 0}
+	cleanup := func(patp, containerName, exportTrans, compressedTrans string) {
+		RemoveContainerFromWhitelist(containerName)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
 	}
 	// check if container is whitelisted
 	vars := mux.Vars(r)
@@ -71,6 +71,16 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Get patp if minio container
+	patp := strings.TrimPrefix(container, "minio_")
+	exportTrans := "exportShip"
+	compressedTrans := "shipCompressed"
+	isMinIO := strings.Contains(container, "minio_")
+	if isMinIO {
+		exportTrans = "exportBucket"
+		compressedTrans = "bucketCompressed"
+	}
+
 	// check if token match
 	var tokenData structs.WsTokenStruct
 
@@ -78,8 +88,8 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err := fmt.Errorf("Export failed to decode token: %v", err)
 		logger.Logger.Error(fmt.Sprintf("Rejecting Export request: %v", err))
-		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "exportShip", Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: 0}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -88,29 +98,31 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("Export failed to decode token: %v", err)
 		logger.Logger.Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "exportShip", Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: 0}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
 		return
 	}
 	// session is now valid. Defer cleanup
-	defer cleanup(container)
+	defer cleanup(patp, container, exportTrans, compressedTrans)
 	// make sure container is stopped
 	statusTicker := time.NewTicker(500 * time.Millisecond)
-loopLabel:
-	for {
-		select {
-		case <-statusTicker.C:
-			pierStatus, err := docker.GetShipStatus([]string{container})
-			if err != nil {
-				exportError(err)
-				return
-			}
-			status, exists := pierStatus[container]
-			if !exists {
-				exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
-			}
-			if strings.Contains(status, "Exited") {
-				break loopLabel
+	if !isMinIO {
+	loopLabel:
+		for {
+			select {
+			case <-statusTicker.C:
+				pierStatus, err := docker.GetShipStatus([]string{container})
+				if err != nil {
+					exportError(err)
+					return
+				}
+				status, exists := pierStatus[container]
+				if !exists {
+					exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
+				}
+				if strings.Contains(status, "Exited") {
+					break loopLabel
+				}
 			}
 		}
 	}
@@ -145,7 +157,7 @@ loopLabel:
 			completedFiles++
 		}
 		progress := int(float64(completedFiles) / float64(totalFiles) * 100)
-		docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: progress}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress}
 		return nil
 	})
 	if walkErr != nil {
@@ -154,20 +166,6 @@ loopLabel:
 	}
 	// Close the zip archive
 	zipWriter.Close()
-	/*
-		ticker := time.NewTicker(500 * time.Millisecond)
-		count := 0
-		for {
-			if count > 100 {
-				break
-			}
-			select {
-			case <-ticker.C:
-				count = count + 5
-				docker.UTransBus <- structs.UrbitTransition{Patp: container, Type: "shipCompressed", Value: count}
-			}
-		}
-	*/
 	// send file
 	reader := bytes.NewReader(memoryFile.Bytes())
 	http.ServeContent(w, r, container+".zip", time.Now(), reader)

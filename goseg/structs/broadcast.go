@@ -111,12 +111,14 @@ type Urbit struct {
 type UrbitTransitionBroadcast struct {
 	Meld                      string `json:"meld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
-	ExportShip                string `json:"exportShip"`
-	ShipCompressed            int    `json:"shipCompressed"`
 	TogglePower               string `json:"togglePower"`
 	ToggleNetwork             string `json:"toggleNetwork"`
 	ToggleDevMode             string `json:"toggleDevMode"`
 	DeleteShip                string `json:"deleteShip"`
+	ExportShip                string `json:"exportShip"`
+	ShipCompressed            int    `json:"shipCompressed"`
+	ExportBucket              string `json:"exportBucket"`
+	BucketCompressed          int    `json:"bucketCompressed"`
 }
 
 // used to construct broadcast pier info subobject

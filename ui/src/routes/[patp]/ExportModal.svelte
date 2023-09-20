@@ -5,33 +5,46 @@
     exportUrbitShip,
     exportUrbitBucket
   } from '$lib/stores/websocket'
-  import { page } from '$app/stores'
   import { loadSession } from '$lib/stores/gs-crypto'
 
+  // Modal
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
 
   import { afterUpdate } from 'svelte'
+  import { page } from '$app/stores'
 
   export let patp
   export let isOpen
 
   $: transition = ($structure?.urbits?.[patp]?.transition) || {}
-  $: exportShip = (transition?.exportShip) || ""
-  $: shipCompressed = (transition?.shipCompressed) || 0
 
-  $: shipChanged = execIfChanged(exportShip)
+  $: tExportShip = (transition?.exportShip) || ""
+  $: tShipCompressed = (transition?.shipCompressed) || 0
+  $: shipChanged = execIfShipChanged(tExportShip)
+
+  $: tExportBucket = (transition?.exportBucket) || ""
+  $: tBucketCompressed = (transition?.bucketCompressed) || 0
+  $: bucketChanged = execIfBucketChanged(tExportBucket)
+
+  $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
 
   let shipExported = false
   let bucketExported = false
 
-  const execIfChanged = async state => {
+  const execIfShipChanged = async state => {
     if (state == "ready")
-      await requestPier()
+      await requestExport(patp)
     return state
   }
 
-  const requestPier = async () => {
+  const execIfBucketChanged = async state => {
+    if (state == "ready")
+      await requestExport("minio_"+patp)
+    return state
+  }
+
+  const requestExport = async (container) => {
     // get token
     let token = await loadSession();
     if (!token.id || !token.token) {
@@ -39,13 +52,15 @@
     }
     // send request
     const hostname = $page.url.hostname
-    const response = await fetch("http://"+hostname+":"+ $wsPort +"/export/"+patp, {
+    const response = await fetch("http://"+hostname+":"+ $wsPort +"/export/"+container, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(token)
     });
+
+    console.log(response)
 
     // handle response
     if (response.ok) {
@@ -56,11 +71,15 @@
       a.style.display = 'none';
       a.href = url;
       // the filename you want
-      a.download = patp+'.zip';
+      a.download = container+'.zip';
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      shipExported = true
+      if (container == patp) {
+        shipExported = true
+      } else {
+        bucketExported = true
+      }
     } else {
       console.log("Error:", response.status);
     }
@@ -70,36 +89,46 @@
 <Modal>
   {#if isOpen}
   <div class="wrapper">
-    <!-- debug --
-    <div>urbit: {JSON.stringify(exportShip)}, storage: tbd</div>
-    <div>shipCompressed: {JSON.stringify(shipCompressed)}</div>
-    <!-- end debug -->
-
-    <div class="header">Export For {patp}</div>
-    <div class="name">What do you want to export?</div>
-    <div class="button-wrapper">
-      <button
-        disabled={(exportShip != "") || shipExported}
-        on:click={()=>exportUrbitShip(patp)}
-        >
-        {#if shipExported}
-          Ship Exported
-        {:else if shipCompressed > 0}
-          Compressing..{shipCompressed}%
-        {:else if exportShip == "stopping"}
-          Stopping Your Ship
-        {:else if exportShip == "ready"}
-          Getting Zip File Ready
-        {:else}
-          Urbit Ship
-        {/if}
-      </button>
-      <button
-        on:click={()=>exportUrbitBucket(patp)}
-        >
-        Storage
-      </button>
-    </div>
+    <!-- debug
+    <div>urbit: {JSON.stringify(tExportShip)}, storage: {JSON.stringify(tExportBucket)}</div>
+    <div>tShipCompressed: {JSON.stringify(tShipCompressed)}</div>
+    <div>tBucketCompressed: {JSON.stringify(tBucketCompressed)}</div>
+    -->
+    <div class="header">Export: <strong>{patp}</strong></div>
+    <div class="name">Export Urbit Ship</div>
+    <button
+      disabled={(tExportShip != "") || shipExported}
+      on:click={()=>exportUrbitShip(patp)}
+      >
+      {#if shipExported}
+        Ship Exported
+      {:else if tShipCompressed > 0}
+        Compressing..{tShipCompressed}%
+      {:else if tExportShip == "stopping"}
+        Stopping Your Ship
+      {:else if tExportShip == "ready"}
+        Getting Zip File Ready
+      {:else}
+        Export Ship
+      {/if}
+    </button>
+    <div class="name">Export Storage</div>
+    <button
+      disabled={(tExportBucket != "") || bucketExported}
+      on:click={()=>exportUrbitBucket(patp)}
+      >
+      {#if bucketExported}
+        Storage Exported
+      {:else if tBucketCompressed > 0}
+        Compressing..{tBucketCompressed}%
+      {:else if tExportBucket == "stopping"}
+        Stopping The Container
+      {:else if tExportBucket == "ready"}
+        Getting Zip File Ready
+      {:else}
+        Export Storage
+      {/if}
+    </button>
   </div>
   {/if}
 </Modal>
@@ -130,7 +159,7 @@
     line-height: 42px; /* 133.333% */
     letter-spacing: -1.44px;
     max-width: 460px;
-    margin: 32px 0;
+    margin: 32px 0 16px 0;
   }
   .button-wrapper {
     display: flex;
@@ -155,6 +184,7 @@
     line-height: 32px; /* 133.333% */
     letter-spacing: -1.44px;
     cursor: pointer;
+    height: 65px;
   }
   button:disabled {
     opacity: .6;
