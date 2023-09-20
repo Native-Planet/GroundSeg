@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -146,19 +147,9 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	// SPA routing
-    r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        data, err := fs.ReadFile(content,"web/index.html")
-        if err != nil {
-            http.Error(w, "Couldn't find index!", http.StatusInternalServerError)
-            return
-        }
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        w.WriteHeader(http.StatusOK)
-        w.Write(data)
-    })
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
@@ -183,25 +174,22 @@ func startMainServer() *http.Server {
 	return server
 }
 
-
 func handleSPA(w http.ResponseWriter, r *http.Request) {
-    buildPath := "web"
-    f, err := frontend.BuildFs.Open(filepath.Join(buildPath, r.URL.Path))
-    if os.IsNotExist(err) {
-        index, err := frontend.BuildFs.ReadFile(filepath.Join(buildPath, "index.html"))
+    data, err := webContent.ReadFile(r.URL.Path)
+    if err != nil {
+        data, err = webContent.ReadFile("index.html")
         if err != nil {
-            http.Error(w, err.Error(), http.StatusBadRequest)
+            http.Error(w, "Internal server error", http.StatusInternalServerError)
             return
         }
-        w.WriteHeader(http.StatusAccepted)
-        w.Write(index)
-        return
-    } else if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
     }
-    defer f.Close()
-    http.FileServer(frontend.BuildHTTPFS()).ServeHTTP(w, r)
+    contentType := mime.TypeByExtension(filepath.Ext(r.URL.Path))
+    if contentType == "" {
+        contentType = "text/html; charset=utf-8"
+    }
+    w.Header().Set("Content-Type", contentType)
+    w.WriteHeader(http.StatusOK)
+    w.Write(data)
 }
 
 func main() {
