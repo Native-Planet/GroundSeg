@@ -147,7 +147,7 @@ func startC2CServer() *http.Server {
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
 	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-
+	http.HandleFunc("/", handleSPA)
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
 		Addr:    ":80",
