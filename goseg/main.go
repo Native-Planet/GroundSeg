@@ -143,13 +143,19 @@ func startC2CServer() *http.Server {
 }
 
 func startMainServer() *http.Server {
-	r := mux.NewRouter()
-    r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-    r.HandleFunc("/ws", ws.WsHandler)
-    r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	// r := mux.NewRouter()
+    // r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+    // r.HandleFunc("/ws", ws.WsHandler)
+    // r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	// debug
+	httpMux := http.NewServeMux()
+	httpMux.Handle("/", ContentTypeSetter(fileServer))
+	httpMux.HandleFunc("/ws", ws.WsHandler)
+	httpMux.HandleFunc("/export/", exporter.ExportHandler)
+	//
 	server := &http.Server{
 		Addr:    ":80",
-		Handler: r,
+		Handler: httpMux,
 	}
 	go func() {
 		select {
