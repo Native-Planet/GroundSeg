@@ -28,11 +28,11 @@ import (
 	"goseg/system"
 	"goseg/ws"
 	"io/fs"
-	"net/http"
-	"time"
-	"strings"
 	"mime"
+	"net/http"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -43,17 +43,17 @@ var (
 	//go:embed web/_app/immutable/chunks/_*
 	//go:embed web/_app/immutable/entry/_*
 	// we need to explicitly embed stuff starting with underscore
-	content embed.FS
+	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
-	fileServer = http.FileServer(http.FS(webContent))
+	fileServer    = http.FileServer(http.FS(webContent))
 	// fs = http.FS(content)
 	// fileServer = http.FileServer(fs)
 	//go:embed web/captive/*
-	capContent embed.FS
-	capFs = http.FS(capContent)
+	capContent    embed.FS
+	capFs         = http.FS(capContent)
 	capFileServer = http.FileServer(capFs)
-	DevMode = false
-	shutdownChan = make(chan struct{})
+	DevMode       = false
+	shutdownChan  = make(chan struct{})
 )
 
 func ServerControl() {
@@ -125,7 +125,6 @@ func ContentTypeSetter(next http.Handler) http.Handler {
 	})
 }
 
-
 func startC2CServer() *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle("/", capFileServer)
@@ -147,14 +146,14 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-    r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-    r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
 	}
 	w := mux.NewRouter()
-    w.HandleFunc("/ws", ws.WsHandler)
+	w.HandleFunc("/ws", ws.WsHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,
@@ -257,7 +256,7 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
-	
+
 	// load the appropriate HTTP server forever
 	for {
 		ServerControl()
