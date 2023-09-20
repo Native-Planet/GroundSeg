@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -175,16 +176,15 @@ func startMainServer() *http.Server {
 }
 
 func handleSPA(fs fs.FS) http.Handler {
-    fileServer := http.FileServer(http.FS(fs))
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        _, err := fs.Open(r.URL.Path[1:])
-        if os.IsNotExist(err) {
-            r.URL.Path = "/index.html"
-        }
-        fileServer.ServeHTTP(w, r)
-    })
+	fileServer := http.FileServer(http.FS(fs))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := fs.Open(r.URL.Path[1:])
+		if os.IsNotExist(err) {
+			r.URL.Path = "/index.html"
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 }
-
 
 func main() {
 	// global SysConfig var is managed through config package
