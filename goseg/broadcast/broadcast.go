@@ -154,6 +154,10 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 			setRemote = true
 		}
 		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
+		minIOPwd, err := config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+		}
 		// collate all the info from our sources into the struct
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
@@ -167,7 +171,7 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.MinIOUrl = minIOUrl
-		urbit.Info.MinIOPwd = "11111111"
+		urbit.Info.MinIOPwd = minIOPwd
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

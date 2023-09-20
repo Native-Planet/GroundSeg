@@ -33,18 +33,21 @@ var (
 	Architecture = getArchitecture()
 	// struct of /retrieve blob
 	StartramConfig structs.StartramRetrieve
+	// struct of minio passwords
+	MinIOPasswords = make(map[string]string)
 	// unused for now, set with `./groundseg dev`
 	DebugMode = false
 	Ready     = false
 	// representation of desired/actual container states
 	GSContainers = make(map[string]structs.ContainerState)
 	// channel for log stream requests
-	LogsEventBus = make(chan structs.LogsEvent, 100)
-	DockerDir    = "/var/lib/docker/volumes/"
-	confPath     = filepath.Join(BasePath, "settings", "system.json")
-	confMutex    sync.Mutex
-	contMutex    sync.Mutex
-	versMutex    sync.Mutex
+	LogsEventBus  = make(chan structs.LogsEvent, 100)
+	DockerDir     = "/var/lib/docker/volumes/"
+	confPath      = filepath.Join(BasePath, "settings", "system.json")
+	confMutex     sync.Mutex
+	contMutex     sync.Mutex
+	versMutex     sync.Mutex
+	minioPwdMutex sync.Mutex
 )
 
 // try initializing from system.json on disk
