@@ -34,11 +34,15 @@ import (
 	"mime"
 	"path/filepath"
 
-	// "github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 )
 
 var (
 	//go:embed web/*
+	//go:embed web/_app/immutable/assets/_*
+	//go:embed web/_app/immutable/chunks/_*
+	//go:embed web/_app/immutable/entry/_*
+	// we need to explicitly embed stuff starting with underscore?
 	content embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer = http.FileServer(http.FS(webContent))
@@ -143,19 +147,13 @@ func startC2CServer() *http.Server {
 }
 
 func startMainServer() *http.Server {
-	// r := mux.NewRouter()
-    // r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-    // r.HandleFunc("/ws", ws.WsHandler)
-    // r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	// debug
-	httpMux := http.NewServeMux()
-	httpMux.Handle("/", ContentTypeSetter(fileServer))
-	httpMux.HandleFunc("/ws", ws.WsHandler)
-	httpMux.HandleFunc("/export/", exporter.ExportHandler)
-	//
+	r := mux.NewRouter()
+    r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+    r.HandleFunc("/ws", ws.WsHandler)
+    r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
 		Addr:    ":80",
-		Handler: httpMux,
+		Handler: r,
 	}
 	go func() {
 		select {
