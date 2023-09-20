@@ -42,7 +42,7 @@ var (
 	//go:embed web/_app/immutable/assets/_*
 	//go:embed web/_app/immutable/chunks/_*
 	//go:embed web/_app/immutable/entry/_*
-	// we need to explicitly embed stuff starting with underscore?
+	// we need to explicitly embed stuff starting with underscore
 	content embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer = http.FileServer(http.FS(webContent))
