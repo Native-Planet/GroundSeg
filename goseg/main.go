@@ -149,8 +149,8 @@ func startC2CServer() *http.Server {
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-	http.Handle("/", handleSPA(webContent))
+	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	// http.Handle("/", handleSPA(webContent))
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
@@ -175,23 +175,23 @@ func startMainServer() *http.Server {
 	return server
 }
 
-func handleSPA(fs fs.FS) http.Handler {
-	fileServer := http.FileServer(http.FS(fs))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fs.Open(r.URL.Path[1:])
-		if os.IsNotExist(err) {
-			r.URL.Path = "/index.html"
-		}
-		fileServer.ServeHTTP(w, r)
-	})
-}
+// func handleSPA(fs fs.FS) http.Handler {
+// 	fileServer := http.FileServer(http.FS(fs))
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		_, err := fs.Open(r.URL.Path[1:])
+// 		if os.IsNotExist(err) {
+// 			r.URL.Path = "/index.html"
+// 		}
+// 		fileServer.ServeHTTP(w, r)
+// 	})
+// }
 
 func main() {
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-	// system.C2cChan <- !internetAvailable
+	system.C2cChan <- !internetAvailable
 	// ongoing connectivity check
 	go C2cLoop()
 	// async operation to retrieve version info if updates are on
