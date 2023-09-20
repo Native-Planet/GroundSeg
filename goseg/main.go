@@ -150,7 +150,7 @@ func startMainServer() *http.Server {
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	// SPA routing
     r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        data, err := fs.ReadFile("index.html")
+        data, err := fs.ReadFile(content,"web/index.html")
         if err != nil {
             http.Error(w, "Couldn't find index!", http.StatusInternalServerError)
             return
