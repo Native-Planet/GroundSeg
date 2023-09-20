@@ -163,7 +163,7 @@ func startMainServer() *http.Server {
 		select {
 		case <-shutdownChan:
 			server.Shutdown(context.Background())
-			wSserver.Shutdown(context.Background())
+			wsServer.Shutdown(context.Background())
 		}
 	}()
 	go server.ListenAndServe()
