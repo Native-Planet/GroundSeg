@@ -148,19 +148,26 @@ func startC2CServer() *http.Server {
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
     r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-    r.HandleFunc("/ws", ws.WsHandler)
     r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
 	}
+	w := mux.NewRouter()
+    w.HandleFunc("/ws", ws.WsHandler)
+	wsServer := &http.Server{
+		Addr:    ":3000",
+		Handler: w,
+	}
 	go func() {
 		select {
 		case <-shutdownChan:
 			server.Shutdown(context.Background())
+			wsServer.Shutdown(context.Background())
 		}
 	}()
 	go server.ListenAndServe()
+	go wsServer.ListenAndServe()
 	// http.ListenAndServe(":80", r)
 	logger.Logger.Info("GroundSeg web UI serving")
 	return server
