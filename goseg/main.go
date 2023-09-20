@@ -35,9 +35,12 @@ import (
 
 var (
 	//go:embed web/*
-	content embed.FS
-	fs = http.FS(content)
-	fileServer = http.FileServer(fs)
+	var webContent fs.FS
+	webContent, _ = fs.Sub(content, "web")
+	fileServer = http.FileServer(http.FS(webContent))
+	// content embed.FS
+	// fs = http.FS(content)
+	// fileServer = http.FileServer(fs)
 	//go:embed web/captive/*
 	capContent embed.FS
 	capFs = http.FS(capContent)
@@ -119,15 +122,10 @@ func startC2CServer() *http.Server {
 }
 
 func startMainServer() *http.Server {
-	entries, _ := content.ReadDir(".")
-    for _, entry := range entries {
-        fmt.Println(entry.Name())
-    }
 	r := mux.NewRouter()
-	r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", fileServer))
-	r.Handle("/", fileServer)
-	r.HandleFunc("/ws", ws.WsHandler)
-	r.HandleFunc("/export/{container}", exporter.ExportHandler)
+    r.PathPrefix("/").Handler(fileServer)
+    r.HandleFunc("/ws", ws.WsHandler)
+    r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
