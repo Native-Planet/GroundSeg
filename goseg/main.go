@@ -30,6 +30,9 @@ import (
 	"io/fs"
 	"net/http"
 	"time"
+	"strings"
+	"mime"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 )
@@ -102,6 +105,23 @@ func loadService(loadFunc func() error, errMsg string) {
 	}()
 }
 
+// autodetect mime type
+func ContentTypeSetter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, "/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		ext := filepath.Ext(r.URL.Path)
+		mimeType := mime.TypeByExtension(ext)
+		if mimeType != "" {
+			w.Header().Set("Content-Type", mimeType)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+
 func startC2CServer() *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle("/", capFileServer)
@@ -123,7 +143,7 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-    r.PathPrefix("/").Handler(fileServer)
+    r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
     r.HandleFunc("/ws", ws.WsHandler)
     r.HandleFunc("/export/{container}", exporter.ExportHandler)
 	server := &http.Server{
