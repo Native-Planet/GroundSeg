@@ -149,7 +149,7 @@ func startC2CServer() *http.Server {
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
 	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(webContent))))
+	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(http.FS(webContent)))))
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
@@ -176,14 +176,14 @@ func startMainServer() *http.Server {
 }
 
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		file, err := fs.Open(r.URL.Path)
-		defer file.Close()
-		if err != nil {
-			r.URL.Path = "/index.html"
-		}
-		http.FileServer(fs).ServeHTTP(w, r)
-	}
+    return func(w http.ResponseWriter, r *http.Request) {
+        file, err := fs.Open(r.URL.Path)
+        defer file.Close()
+        if err != nil {
+            r.URL.Path = "/index.html"
+        }
+        http.FileServer(fs).ServeHTTP(w, r)
+    }
 }
 
 func main() {
