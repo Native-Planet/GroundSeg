@@ -158,8 +158,8 @@ func startMainServer() *http.Server {
 		}
 	}()
 	go server.ListenAndServe()
-	http.ListenAndServe(":80", r)
-	logger.Logger.Info("Main web server serving")
+	// http.ListenAndServe(":80", r)
+	logger.Logger.Info("GroundSeg web UI serving")
 	return server
 }
 
