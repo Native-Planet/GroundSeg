@@ -119,7 +119,6 @@ func ContentTypeSetter(next http.Handler) http.Handler {
 		ext := filepath.Ext(r.URL.Path)
 		mimeType := mime.TypeByExtension(ext)
 		if mimeType != "" {
-			logger.Logger.Info(fmt.Sprintf("Debug: %v url/%v ext with %v mime",r.URL.Path,ext,mimeType))
 			w.Header().Set("Content-Type", mimeType)
 		}
 		next.ServeHTTP(w, r)
