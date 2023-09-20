@@ -260,6 +260,9 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "minio":
+		if err := DeleteContainer(containerName); err != nil {
+			return containerState, err
+		}
 		containerConfig, hostConfig, err = minioContainerConf(containerName)
 		if err != nil {
 			return containerState, err
