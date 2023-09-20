@@ -154,9 +154,12 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 			setRemote = true
 		}
 		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
-		minIOPwd, err := config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+		minIOPwd := ""
+		if conf.WgRegistered && conf.WgOn {
+			minIOPwd, err = config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+			}
 		}
 		// collate all the info from our sources into the struct
 		urbit.Info.Running = isRunning
