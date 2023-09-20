@@ -50,7 +50,7 @@ func LoadMinIOs() error {
 			info, err := StartContainer(label, "minio")
 			if err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
-				return err
+				continue
 			}
 			config.UpdateContainerState(label, info)
 		}
@@ -109,6 +109,20 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		NetworkMode: "container:wireguard",
 		Mounts:      mounts,
 	}
+	ticker := time.NewTicker(500 * time.Millisecond)
+minioNetworkLoop:
+	for {
+		select {
+		case <-ticker.C:
+			status, err := GetContainerRunningStatus("wireguard")
+			if err != nil {
+				return containerConfig, hostConfig, err
+			}
+			if strings.Contains(status, "Up") {
+				break minioNetworkLoop
+			}
+		}
+	}
 	return containerConfig, hostConfig, nil
 }
 
@@ -134,6 +148,7 @@ func mcContainerConf() (container.Config, container.HostConfig, error) {
 		NetworkMode: "container:wireguard",
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
+mcNetworkLoop:
 	for {
 		select {
 		case <-ticker.C:
@@ -142,9 +157,77 @@ func mcContainerConf() (container.Config, container.HostConfig, error) {
 				return containerConfig, hostConfig, err
 			}
 			if strings.Contains(status, "Up") {
-				break
+				break mcNetworkLoop
 			}
 		}
 	}
 	return containerConfig, hostConfig, nil
+}
+
+func setMinIOAdminAccount(containerName string) error {
+	// get patp
+	patp, err := getPatpFromMinIOName(containerName)
+	if err != nil {
+		return err
+	}
+	// get urbit config
+	urbConf := config.UrbitConf(patp)
+	// make sure mc is running
+	ticker := time.NewTicker(500 * time.Millisecond)
+mcRunning:
+	for {
+		select {
+		case <-ticker.C:
+			status, _ := GetContainerRunningStatus("mc")
+			if strings.Contains(status, "Up") {
+				break mcRunning
+			}
+		}
+	}
+	// temp password
+	pwd := "11111111"
+	// set alias
+	aliasCommand := []string{
+		"mc",
+		"alias",
+		"set",
+		fmt.Sprintf("patp_%s", patp),
+		fmt.Sprintf("http://localhost:%v", urbConf.WgS3Port),
+		patp,
+		pwd, // temp
+	}
+	if err := ExecDockerCommand(containerName, aliasCommand); err != nil {
+		return err
+	}
+	// make bucket
+	createCommand := []string{
+		"mc",
+		"mb",
+		"--ignore-existing",
+		fmt.Sprintf("patp_%s/bucket", patp),
+	}
+	if err := ExecDockerCommand(containerName, createCommand); err != nil {
+		return err
+	}
+	publicCommand := []string{
+		"mc",
+		"anonymous",
+		"set",
+		"public",
+		fmt.Sprintf("patp_%s/bucket", patp),
+	}
+	if err := ExecDockerCommand(containerName, publicCommand); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getPatpFromMinIOName(containerName string) (string, error) {
+	// Check if string starts with "minio_"
+	if !strings.HasPrefix(containerName, "minio_") {
+		return "", fmt.Errorf("Invalid MinIO container name")
+	}
+	// Split the string
+	splitStr := strings.SplitN(containerName, "_", 2)
+	return splitStr[1], nil
 }
