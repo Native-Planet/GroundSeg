@@ -5,6 +5,7 @@ export const structure = writable({})
 export const ready = writable(false)
 export const connected = writable(false)
 export const logs = writable({})
+export const wsPort = writable("3000")
 
 let PENDING = new Set();
 let SESSION;

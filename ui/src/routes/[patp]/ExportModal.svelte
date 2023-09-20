@@ -1,5 +1,6 @@
 <script>
   import { 
+    wsPort,
     structure,
     exportUrbitShip,
     exportUrbitBucket
@@ -38,8 +39,7 @@
     }
     // send request
     const hostname = $page.url.hostname
-    const port = "3000"
-    const response = await fetch("http://"+hostname+":"+port+"/export/"+patp, {
+    const response = await fetch("http://"+hostname+":"+ $wsPort +"/export/"+patp, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
