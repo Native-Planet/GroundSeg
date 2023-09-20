@@ -160,7 +160,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 
 	mounts := []mount.Mount{
 		{
-			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
+			Type:   mount.TypeBind, // todo: use TypeBind if custom dir provided
 			Source: shipName,
 			Target: "/urbit",
 		},
