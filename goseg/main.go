@@ -27,6 +27,7 @@ import (
 	"goseg/startram"
 	"goseg/system"
 	"goseg/ws"
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -35,10 +36,9 @@ import (
 
 var (
 	//go:embed web/*
-	var webContent fs.FS
+	content embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer = http.FileServer(http.FS(webContent))
-	// content embed.FS
 	// fs = http.FS(content)
 	// fileServer = http.FileServer(fs)
 	//go:embed web/captive/*
