@@ -183,6 +183,27 @@ func startMainServer() *http.Server {
 	return server
 }
 
+
+func handleSPA(w http.ResponseWriter, r *http.Request) {
+    buildPath := "web"
+    f, err := frontend.BuildFs.Open(filepath.Join(buildPath, r.URL.Path))
+    if os.IsNotExist(err) {
+        index, err := frontend.BuildFs.ReadFile(filepath.Join(buildPath, "index.html"))
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusBadRequest)
+            return
+        }
+        w.WriteHeader(http.StatusAccepted)
+        w.Write(index)
+        return
+    } else if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer f.Close()
+    http.FileServer(frontend.BuildHTTPFS()).ServeHTTP(w, r)
+}
+
 func main() {
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
