@@ -148,6 +148,10 @@ func startMainServer() *http.Server {
 	r := mux.NewRouter()
 	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
 	r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	// redirect 404s to `/`
+	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        http.Redirect(w, r, "/", http.StatusSeeOther)
+    })
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
