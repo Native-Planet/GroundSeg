@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	// "os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -38,12 +39,11 @@ import (
 )
 
 var (
-	/*
-		//go:embed web/*
-		//go:embed web/_app/immutable/assets/_*
-		//go:embed web/_app/immutable/chunks/_*
-		//go:embed web/_app/immutable/entry/_*
-	*/
+	//go:embed web/*
+	//go:embed web/_app/*
+	//go:embed web/_app/immutable/assets/_*
+	//go:embed web/_app/immutable/chunks/_*
+	//go:embed web/_app/immutable/entry/_*
 	// we need to explicitly embed stuff starting with underscore
 	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
@@ -148,14 +148,15 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-	r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(http.FS(webContent)))))
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
 	}
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
+	w.HandleFunc("/export/{container}", exporter.ExportHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,
@@ -174,12 +175,23 @@ func startMainServer() *http.Server {
 	return server
 }
 
+func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        file, err := fs.Open(r.URL.Path)
+        if err != nil {
+            r.URL.Path = "/index.html"
+        } else {
+            defer file.Close()
+        }
+        http.FileServer(fs).ServeHTTP(w, r)
+    }
+}
+
 func main() {
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-	// system.C2cChan <- !internetAvailable
 	// ongoing connectivity check
 	go C2cLoop()
 	// async operation to retrieve version info if updates are on
