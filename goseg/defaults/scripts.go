@@ -81,6 +81,7 @@ var (
 	urbit prep --loom $loom $dirname`
 
 	StartScript = `#!/bin/bash
+	echo "BOOT SHIP"
 
 	set -eu
 	set -x
