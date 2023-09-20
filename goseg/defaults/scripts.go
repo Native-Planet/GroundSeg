@@ -200,6 +200,7 @@ var (
 		tmux kill-session -t urbit
 		exit 0
 	else
+		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname"
 		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
 	fi`
 
