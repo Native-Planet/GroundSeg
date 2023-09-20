@@ -39,6 +39,7 @@ import (
 
 var (
 	//go:embed web/*
+	//go:embed web/_app/*
 	//go:embed web/_app/immutable/assets/_*
 	//go:embed web/_app/immutable/chunks/_*
 	//go:embed web/_app/immutable/entry/_*
@@ -178,6 +179,7 @@ func handleSPA(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         data, err = fs.ReadFile(webContent, "index.html")
         if err != nil {
+			logger.Logger.Info(fmt.Sprintf("Debug: couldn't get path %v",r.URL.Path))
             http.Error(w, "Internal server error", http.StatusInternalServerError)
             return
         }
@@ -188,6 +190,7 @@ func handleSPA(w http.ResponseWriter, r *http.Request) {
     }
     w.Header().Set("Content-Type", contentType)
     w.WriteHeader(http.StatusOK)
+	logger.Logger.Info(fmt.Sprintf("Debug: Good path %v",r.URL.Path))
     w.Write(data)
 }
 
