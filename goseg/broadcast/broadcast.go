@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	clients           = make(map[*websocket.Conn]bool)
 	hostInfoInterval  = 1 * time.Second // how often we refresh system info
 	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
@@ -45,6 +44,9 @@ func WsDigester() {
 		event := <-structs.WsEventBus
 		if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
+			if err = auth.WsNilSession(event.Conn.Conn); err != nil {
+				logger.Logger.Warn("Couldn't remove WS session")
+			}
 			continue
 		}
 	}

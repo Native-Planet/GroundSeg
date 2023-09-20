@@ -15,6 +15,8 @@ package main
 // - Very good golang Docker libraries
 
 import (
+	"context"
+	"embed"
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
@@ -25,15 +27,79 @@ import (
 	"goseg/startram"
 	"goseg/system"
 	"goseg/ws"
+	"io/fs"
 	"net/http"
 	"time"
+	"strings"
+	"mime"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 )
 
 var (
+	//go:embed web/*
+	//go:embed web/_app/immutable/assets/_*
+	//go:embed web/_app/immutable/chunks/_*
+	//go:embed web/_app/immutable/entry/_*
+	// we need to explicitly embed stuff starting with underscore
+	content embed.FS
+	webContent, _ = fs.Sub(content, "web")
+	fileServer = http.FileServer(http.FS(webContent))
+	// fs = http.FS(content)
+	// fileServer = http.FileServer(fs)
+	//go:embed web/captive/*
+	capContent embed.FS
+	capFs = http.FS(capContent)
+	capFileServer = http.FileServer(capFs)
 	DevMode = false
+	shutdownChan = make(chan struct{})
 )
+
+func ServerControl() {
+	activeServer := startMainServer()
+	// var activeServer *http.Server
+	for {
+		select {
+		case useC2C := <-system.C2cChan:
+			if activeServer != nil {
+				close(shutdownChan)
+				shutdownChan = make(chan struct{})
+				activeServer.Shutdown(context.Background())
+			}
+			if useC2C {
+				activeServer = startC2CServer()
+			} else {
+				activeServer = startMainServer()
+			}
+		}
+	}
+}
+
+func C2cLoop() {
+	c2cActive := false
+	for {
+		internetAvailable := config.NetCheck("1.1.1.1:53")
+		if !internetAvailable && !c2cActive {
+			if err := system.C2cMode(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode:", err))
+			} else {
+				logger.Logger.Info("No connection -- entering C2C mode")
+				c2cActive = true
+				system.C2cChan <- true
+			}
+		} else if internetAvailable && c2cActive {
+			if err := system.TeardownHostAPD(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
+			} else {
+				logger.Logger.Info("Connection detected -- exiting C2C mode")
+				c2cActive = false
+				system.C2cChan <- false
+			}
+		}
+		time.Sleep(30 * time.Second)
+	}
+}
 
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
@@ -43,20 +109,71 @@ func loadService(loadFunc func() error, errMsg string) {
 	}()
 }
 
+// autodetect mime type
+func ContentTypeSetter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, "/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		ext := filepath.Ext(r.URL.Path)
+		mimeType := mime.TypeByExtension(ext)
+		if mimeType != "" {
+			w.Header().Set("Content-Type", mimeType)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+
+func startC2CServer() *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/", capFileServer)
+	mux.HandleFunc("/api", system.CaptiveAPI)
+	server := &http.Server{
+		Addr:    ":80",
+		Handler: mux,
+	}
+	go func() {
+		select {
+		case <-shutdownChan:
+			server.Shutdown(context.Background())
+		}
+	}()
+	go server.ListenAndServe()
+	logger.Logger.Info("C2C web server serving")
+	return server
+}
+
+func startMainServer() *http.Server {
+	r := mux.NewRouter()
+    r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+    r.HandleFunc("/ws", ws.WsHandler)
+    r.HandleFunc("/export/{container}", exporter.ExportHandler)
+	server := &http.Server{
+		Addr:    ":80",
+		Handler: r,
+	}
+	go func() {
+		select {
+		case <-shutdownChan:
+			server.Shutdown(context.Background())
+		}
+	}()
+	go server.ListenAndServe()
+	// http.ListenAndServe(":80", r)
+	logger.Logger.Info("GroundSeg web UI serving")
+	return server
+}
+
 func main() {
 	// global SysConfig var is managed through config package
-	r := mux.NewRouter()
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
-	// c2c mode
-	if !internetAvailable {
-		logger.Logger.Info("Entering C2C mode")
-		if err := system.C2cMode(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error running C2C mode: %v",err))
-			panic("Couldn't run C2C mode!")
-		}
-	}
+	// system.C2cChan <- !internetAvailable
+	// ongoing connectivity check
+	go C2cLoop()
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
@@ -133,9 +250,9 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
-
-	// Websocket
-	r.HandleFunc("/ws", ws.WsHandler)
-	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	http.ListenAndServe(":3000", r)
+	
+	// load the appropriate HTTP server forever
+	for {
+		ServerControl()
+	}
 }
