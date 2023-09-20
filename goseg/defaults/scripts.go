@@ -2,7 +2,7 @@ package defaults
 
 var (
 	PrepScript = `#!/bin/bash
-	set -eu
+	set -eux
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -81,7 +81,7 @@ var (
 
 	StartScript = `#!/bin/bash
 
-	set -eu
+	set -eux
 	# set defaults
 	amesPort="34343"
 	httpPort="80"
@@ -204,7 +204,7 @@ var (
 	PackScript = `#!/bin/bash
 	echo "URTH PACK"
 	
-	set -eu
+	set -eux
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -297,7 +297,7 @@ var (
 	MeldScript = `#!/bin/bash
 	echo "URTH MELD"
 	
-	set -eu
+	set -eux
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
