@@ -157,10 +157,11 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			},
 		}
 	}
-
+	
+	logger.Logger.Info(fmt.Sprintf("Debug: start_urbit.sh --loom=%v --dirname=%v --devmode=%v",loomValue,shipName,devMode))
 	mounts := []mount.Mount{
 		{
-			Type:   mount.TypeBind, // todo: use TypeBind if custom dir provided
+			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
 			Source: shipName,
 			Target: "/urbit",
 		},
