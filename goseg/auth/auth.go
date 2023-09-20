@@ -108,18 +108,22 @@ func WsNilSession(conn *websocket.Conn) error {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.AuthClients {
-			if client.Conn == conn {
-				client.Active = false
-				return nil
+			if client.Conn != nil {
+				if client.Conn == conn {
+					client.Active = false
+					return nil
+				}
 			}
 		}
 	} else {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.UnauthClients {
-			if client.Conn == conn {
-				client.Active = false
-				return nil
+			if client.Conn != nil {
+				if client.Conn == conn {
+					client.Active = false
+					return nil
+				}
 			}
 		}
 	}
