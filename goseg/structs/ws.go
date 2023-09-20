@@ -85,10 +85,10 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 	// also remove from other map
 	if _, ok := cm.AuthClients[id]; ok {
 		delete(cm.AuthClients, id)
-		for token, con := range cm.AuthClients {
-			if con.Conn == client.Conn {
-				delete(cm.AuthClients, token)
-			}
+	}
+	for token, con := range cm.AuthClients {
+		if con.Conn == client.Conn {
+			delete(cm.AuthClients, token)
 		}
 	}
 }

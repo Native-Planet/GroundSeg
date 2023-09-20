@@ -148,15 +148,15 @@ func startC2CServer() *http.Server {
 
 func startMainServer() *http.Server {
 	r := mux.NewRouter()
-	r.HandleFunc("/export/{container}", exporter.ExportHandler)
-	r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
-	// http.Handle("/", handleSPA(webContent))
+	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
+	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(webContent))))
 	server := &http.Server{
 		Addr:    ":80",
 		Handler: r,
 	}
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
+	w.HandleFunc("/export/{container}", exporter.ExportHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,
@@ -175,16 +175,16 @@ func startMainServer() *http.Server {
 	return server
 }
 
-// func handleSPA(fs fs.FS) http.Handler {
-// 	fileServer := http.FileServer(http.FS(fs))
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		_, err := fs.Open(r.URL.Path[1:])
-// 		if os.IsNotExist(err) {
-// 			r.URL.Path = "/index.html"
-// 		}
-// 		fileServer.ServeHTTP(w, r)
-// 	})
-// }
+func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		file, err := fs.Open(r.URL.Path)
+		defer file.Close()
+		if err != nil {
+			r.URL.Path = "/index.html"
+		}
+		http.FileServer(fs).ServeHTTP(w, r)
+	}
+}
 
 func main() {
 	// global SysConfig var is managed through config package
