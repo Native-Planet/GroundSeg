@@ -3,6 +3,7 @@ package defaults
 var (
 	PrepScript = `#!/bin/bash
 	set -eu
+	set -x
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -80,8 +81,10 @@ var (
 	urbit prep --loom $loom $dirname`
 
 	StartScript = `#!/bin/bash
+	echo "BOOT SHIP"
 
 	set -eu
+	set -x
 	# set defaults
 	amesPort="34343"
 	httpPort="80"
@@ -198,6 +201,7 @@ var (
 		tmux kill-session -t urbit
 		exit 0
 	else
+		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname"
 		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
 	fi`
 
@@ -205,6 +209,7 @@ var (
 	echo "URTH PACK"
 	
 	set -eu
+	set -x
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -298,6 +303,7 @@ var (
 	echo "URTH MELD"
 	
 	set -eu
+	set -x
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"

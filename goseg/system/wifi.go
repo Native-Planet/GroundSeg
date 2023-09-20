@@ -27,8 +27,8 @@ var (
 		},
 	}
 	clients = make(map[*websocket.Conn]bool)
-    C2cChan = make(chan bool)
-	proxy = &captive.Portal{
+	C2cChan = make(chan bool)
+	proxy   = &captive.Portal{
 		LoginPath:           "/",
 		PortalDomain:        "nativeplanet.local",
 		AllowedBypassPortal: false,

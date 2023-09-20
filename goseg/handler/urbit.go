@@ -36,7 +36,9 @@ func UrbitHandler(msg []byte) error {
 			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 		}
 		if shipConf.BootStatus == "boot" {
-			docker.StartContainer(patp, "vere")
+			if _, err := docker.StartContainer(patp, "vere"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
+			}
 		}
 		return nil
 	case "toggle-network":
@@ -69,7 +71,9 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf("No remote registration")
 		}
 		if shipConf.BootStatus == "boot" {
-			docker.StartContainer(patp, "vere")
+			if _, err := docker.StartContainer(patp, "vere"); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
+			}
 		}
 		return nil
 	case "toggle-devmode":
