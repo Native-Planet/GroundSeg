@@ -198,8 +198,11 @@ mcRunning:
 			}
 		}
 	}
-	// temp password
-	pwd := "11111111"
+	// get password
+	pwd, err := config.GetMinIOPassword(fmt.Sprintf("patp_%s", patp))
+	if err != nil {
+		return err
+	}
 	// set alias
 	aliasCommand := []string{
 		"mc",
@@ -208,7 +211,7 @@ mcRunning:
 		fmt.Sprintf("patp_%s", patp),
 		fmt.Sprintf("http://localhost:%v", urbConf.WgS3Port),
 		patp,
-		pwd, // temp
+		pwd,
 	}
 	if _, err := ExecDockerCommand(containerName, aliasCommand); err != nil {
 		return err

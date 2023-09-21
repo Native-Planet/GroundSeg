@@ -368,3 +368,17 @@ func RegisterExistingShips() error {
 	logger.Logger.Info("Registration retrieved")
 	return nil
 }
+
+func RegisterNewShip(ship string) error {
+	logger.Logger.Info(fmt.Sprintf("Registering service for new ship: %s", ship))
+	if err := SvcCreate(ship, "urbit"); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
+	}
+	if err := SvcCreate("s3."+ship, "minio"); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
+	}
+	if err := backoffRetrieve(); err != nil {
+		return err
+	}
+	return nil
+}
