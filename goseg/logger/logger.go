@@ -93,7 +93,7 @@ func init() {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}
 	multiWriter = muMultiWriter(os.Stdout, logFile)
-	jsonHandler := slog.New(slog.NewJSONHandler(multiWriter, nil))
+	jsonHandler := slog.NewJSONHandler(multiWriter, nil)
 	var level slog.Level
 	for _, arg := range os.Args[1:] {
 		if arg == "dev" {
