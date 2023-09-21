@@ -53,6 +53,27 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
+	// compare existing config to current version info
+	// update if new
+	// sorry this is ugly
+	shipConf := config.UrbitConf(containerName)
+	newConf := shipConf
+	if config.Architecture == "amd64" {
+		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
+			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
+		}
+	} else if config.Architecture == "arm64" {
+		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
+			newConf.UrbitArm64Sha256 = containerInfo["hash"]
+		}
+	}
+	newConf.UrbitVersion = containerInfo["tag"]
+	newConf.UrbitRepo = containerInfo["repo"]
+	if shipConf != newConf {
+		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName:newConf}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v",err))
+		}
+	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
 	// reload urbit conf from disk
 	err = config.LoadUrbitConfig(containerName)
@@ -60,8 +81,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		errmsg := fmt.Errorf("Error loading %s config: %v", containerName, err)
 		return containerConfig, hostConfig, errmsg
 	}
-	// put in memory
-	shipConf := config.UrbitConf(containerName)
 	// todo: this BootStatus doesnt actually have anythin to do with pack and meld right now
 	act := shipConf.BootStatus
 	// get the correct startup script based on BootStatus val
