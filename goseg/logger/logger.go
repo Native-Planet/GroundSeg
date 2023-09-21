@@ -94,7 +94,7 @@ func init() {
 	}
 	multiWriter = muMultiWriter(os.Stdout, logFile)
 	jsonHandler := slog.New(slog.NewJSONHandler(multiWriter, nil))
-	var level *DynamicLevelHandler
+	var level slog.Level
 	for _, arg := range os.Args[1:] {
 		if arg == "dev" {
 			level = LevelDebug
