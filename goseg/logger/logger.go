@@ -20,7 +20,7 @@ var (
 )
 
 const (
-	LevelInfo = slog.LevelInfo
+	LevelInfo  = slog.LevelInfo
 	LevelDebug = slog.LevelDebug
 )
 
@@ -59,7 +59,7 @@ func (d *DynamicLevelHandler) WithGroup(name string) slog.Handler {
 }
 
 func (d *DynamicLevelHandler) Level() slog.Level {
-    return d.currentLevel.Level()
+	return d.currentLevel.Level()
 }
 
 func init() {

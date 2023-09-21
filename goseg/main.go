@@ -21,6 +21,7 @@ import (
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
+	"goseg/handler"
 	"goseg/logger"
 	"goseg/rectify"
 	"goseg/routines"
@@ -30,8 +31,6 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
-
-	// "os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -49,8 +48,6 @@ var (
 	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer    = http.FileServer(http.FS(webContent))
-	// fs = http.FS(content)
-	// fileServer = http.FileServer(fs)
 	//go:embed web/captive/*
 	capContent    embed.FS
 	capFs         = http.FS(capContent)
@@ -158,6 +155,7 @@ func startMainServer() *http.Server {
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
 	w.HandleFunc("/export/{container}", exporter.ExportHandler)
+	w.HandleFunc("/export/{uploadSession}/{patp}", handler.UploadHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,

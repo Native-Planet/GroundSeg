@@ -79,9 +79,8 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	if retrieve.Status != "No record" {
 		// pin that ho to the global vars
 		config.StartramConfig = retrieve
-		s := "<hidden>"
-		logger.Logger.Debug(fmt.Sprintf("StarTram info retrieved: %s", s))
-		logger.Logger.Debug(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
+		logger.Logger.Info(fmt.Sprintf("StarTram info retrieved"))
+		logger.Logger.Debug(fmt.Sprintf("StarTram info: %s", string(body)))
 	} else {
 		regStatus = false
 		return retrieve, fmt.Errorf("No registration record")
@@ -98,8 +97,8 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	err = fmt.Errorf("No registration")
 	if regStatus {
 		err = nil
+		EventBus <- structs.Event{Type: "retrieve", Data: nil}
 	}
-	EventBus <- structs.Event{Type: "retrieve", Data: nil}
 	return retrieve, err
 }
 
@@ -179,10 +178,11 @@ func SvcCreate(subdomain string, svcType string) error {
 		return fmt.Errorf("Error unmarshalling response: %v", err)
 	}
 	if respObj.Error == 0 {
-		_, err := Retrieve()
-		if err != nil {
-			return fmt.Errorf("Error retrieving post-registration: %v", err)
-		}
+		// _, err := Retrieve()
+		// if err != nil {
+		// 	return fmt.Errorf("Error retrieving post-registration: %v", err)
+		// } // this can cause some fucked up infinite loops
+		logger.Logger.Info("Service %s created",subdomain)
 	} else {
 		return fmt.Errorf("Error creating %s: %v", subdomain, respObj.Debug)
 	}

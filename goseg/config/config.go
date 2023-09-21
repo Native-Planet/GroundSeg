@@ -226,12 +226,10 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 	contMutex.Lock()
 	GSContainers[name] = containerState
 	logMsg := "<hidden>"
-	if DebugMode {
-		res, _ := json.Marshal(containerState)
-		logMsg = string(res)
-	}
+	res, _ := json.Marshal(containerState)
 	contMutex.Unlock()
 	logger.Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
+	logger.Logger.Debug(fmt.Sprintf("%s state:%s", name, string(res)))
 }
 
 // get the current container state
