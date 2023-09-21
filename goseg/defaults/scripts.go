@@ -3,6 +3,7 @@ package defaults
 var (
 	PrepScript = `#!/bin/bash
 	set -eu
+	echo $@
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
