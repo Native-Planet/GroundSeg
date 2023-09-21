@@ -70,7 +70,7 @@ func SystemHandler(msg []byte) error {
 		case "shutdown":
 			logger.Logger.Info(fmt.Sprintf("Device shutdown requested"))
 			if config.DebugMode {
-				logger.Logger.Info(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 				os.Exit(0)
 			} else {
 				logger.Logger.Info(fmt.Sprintf("Turning off device.."))
@@ -80,7 +80,7 @@ func SystemHandler(msg []byte) error {
 		case "restart":
 			logger.Logger.Info(fmt.Sprintf("Device restart requested"))
 			if config.DebugMode {
-				logger.Logger.Info(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
+				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
 				os.Exit(0)
 			} else {
 				logger.Logger.Info(fmt.Sprintf("Restarting device.."))

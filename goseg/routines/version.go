@@ -132,7 +132,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// systemctl restart groundseg
 	if config.DebugMode {
-		logger.Logger.Info("DebugMode detected. Skipping systemd command. Exiting istead..")
+		logger.Logger.Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
 		os.Exit(0)
 	} else {
 		logger.Logger.Info("Restarting GroundSeg systemd service")
