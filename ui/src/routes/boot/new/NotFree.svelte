@@ -8,6 +8,7 @@
   import EnvSetup from './EnvSetup.svelte'
   import CreatePier from './CreatePier.svelte'
   import BootingShip from './BootingShip.svelte'
+  import SettingRemote from './SettingRemote.svelte'
   import Completed from './Completed.svelte'
   import Aborted from './Aborted.svelte'
 
@@ -34,7 +35,9 @@
 {:else if tBootStage == "creating"}
   <CreatePier {name} on:emit={()=>coverage = 20} /> 
 {:else if tBootStage == "booting"}
-  <BootingShip {name} on:emit={()=>coverage = 65} /> 
+  <BootingShip {name} on:emit={()=>coverage = 42} /> 
+{:else if tBootStage == "remote"}
+  <SettingRemote {name} on:emit={()=>coverage = 86} /> 
 {:else if tBootStage == "completed"}
   <Completed {name} on:emit={()=>coverage = 100} /> 
 {:else if tBootStage == "aborted"}
