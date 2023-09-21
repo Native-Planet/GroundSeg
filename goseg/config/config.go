@@ -34,7 +34,7 @@ var (
 	// struct of /retrieve blob
 	StartramConfig structs.StartramRetrieve
 	// struct of minio passwords
-	MinIOPasswords = make(map[string]string)
+	minIOPasswords = make(map[string]string)
 	// unused for now, set with `./groundseg dev`
 	DebugMode = false
 	Ready     = false
