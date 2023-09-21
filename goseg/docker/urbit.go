@@ -155,6 +155,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--port=" + amesPort,
 			},
 		}
+		logger.Logger.Debug(fmt.Sprintf("Boot command: %v",containerConfig.Cmd))
 	} else {
 		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
@@ -187,7 +188,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		}
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Debug: start_urbit.sh --loom=%v --dirname=%v --devmode=%v", loomValue, shipName, devMode))
+	logger.Logger.Debug(fmt.Sprintf("Debug: start_urbit.sh --loom=%v --dirname=%v --devmode=%v", loomValue, shipName, devMode))
 	mounts := []mount.Mount{
 		{
 			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
