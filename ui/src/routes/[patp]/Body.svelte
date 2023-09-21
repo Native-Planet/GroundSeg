@@ -26,7 +26,7 @@
   $: remote = (ship?.remote) || false
   $: running = (ship?.running) || false
   $: loomSize = (ship?.loomSize)
-  $: lusCode = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
+  $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
@@ -44,7 +44,7 @@
 
   {#if startramRegistered}
     <!-- Custom Urbit Domain -->
-    <CustomUrbitDomain {url} />
+    <CustomUrbitDomain {url} {lusCode} />
 
     <!-- Custom MinIO Domain -->
     <CustomMinIODomain {minioUrl} {minioPwd} />

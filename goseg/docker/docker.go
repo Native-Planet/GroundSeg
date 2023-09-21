@@ -260,9 +260,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 	case "minio":
-		if err := DeleteContainer(containerName); err != nil {
-			return containerState, err
-		}
+		DeleteContainer(containerName)
 		containerConfig, hostConfig, err = minioContainerConf(containerName)
 		if err != nil {
 			return containerState, err
@@ -510,41 +508,45 @@ func DockerPoller() {
 }
 
 // execute command
-func ExecDockerCommand(containerName string, cmd []string) error {
+func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Create an Exec configuration
-	execConfig := types.ExecConfig{Cmd: cmd}
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmd,
+	}
 	// Context
 	ctx := context.Background()
 
 	// Get container ID by name
 	containerID, err := getContainerIDByName(ctx, cli, containerName)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Create an exec instance, replace 'container_id_here' with your container ID
 	resp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Start the exec command
 	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{})
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer hijackedResp.Close()
 
 	// Read the output
-	stdout, err := ioutil.ReadAll(hijackedResp.Reader)
+	//stdout, err := ioutil.ReadAll(hijackedResp.Reader)
+	output, err := ioutil.ReadAll(hijackedResp.Reader)
 	if err != nil {
-		return err
+		return "", err
 	}
-	logger.Logger.Warn(fmt.Sprintf("Output: %+v, %T", stdout, stdout))
-	return nil
+	return string(output), nil
 }
 
 // Function to get container ID by name

@@ -126,22 +126,13 @@ func UrbitHandler(msg []byte) error {
 		}
 		return nil
 	case "export-bucket":
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportBucket", Event: "stopping"}
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			return fmt.Errorf("Couldn't update urbit config: %v", err)
-		}
-		// stop container
-		if err := docker.StopContainerByName(patp); err != nil {
-			return err
-		}
+		containerName := fmt.Sprintf("minio_%s", patp)
 		// whitelist the patp token pair
-		if err := exporter.WhitelistContainer(patp, urbitPayload.Token); err != nil {
+		if err := exporter.WhitelistContainer(containerName, urbitPayload.Token); err != nil {
 			return err
 		}
 		// transition: ready
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "ready"}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportBucket", Event: "ready"}
 		return nil
 	case "export-ship":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "stopping"}
