@@ -139,6 +139,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
+		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v",containerName,shipConf))
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
