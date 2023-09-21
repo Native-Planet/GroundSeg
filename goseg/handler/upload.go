@@ -33,7 +33,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	validSession := false
 	session := vars["uploadSession"]
-	patp := vars["patp"]
+	// patp := vars["patp"]
 	for _, valid := range UploadSessions {
 		if session == valid {
 			validSession = true
