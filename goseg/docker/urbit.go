@@ -155,7 +155,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--port=" + amesPort,
 			},
 		}
-		logger.Logger.Debug(fmt.Sprintf("Boot command: %v",containerConfig.Cmd))
 	} else {
 		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
@@ -199,5 +198,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
+	logger.Logger.Debug(fmt.Sprintf("Boot command: %v",containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }
