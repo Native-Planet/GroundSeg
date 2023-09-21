@@ -2,4 +2,4 @@
 cd ui
 /bin/bash build.sh
 cd ../goseg
-go run main.go
+go run main.go dev
