@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,7 +21,7 @@ var (
 
 const (
 	LevelInfo = slog.LevelInfo
-	LevelWarn = slog.LevelWarn
+	LevelDebug = slog.LevelDebug
 )
 
 type MuMultiWriter struct {
@@ -57,6 +58,10 @@ func (d *DynamicLevelHandler) WithGroup(name string) slog.Handler {
 	return NewDynamicLevelHandler(d.currentLevel, d.handler.WithGroup(name))
 }
 
+func (d *DynamicLevelHandler) Level() slog.Level {
+    return d.currentLevel.Level()
+}
+
 func init() {
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
@@ -88,7 +93,7 @@ func init() {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}
 	multiWriter = muMultiWriter(os.Stdout, logFile)
-	jsonHandler = slog.New(slog.NewJSONHandler(multiWriter, nil))
+	jsonHandler := slog.New(slog.NewJSONHandler(multiWriter, nil))
 	var level *DynamicLevelHandler
 	for _, arg := range os.Args[1:] {
 		if arg == "dev" {
