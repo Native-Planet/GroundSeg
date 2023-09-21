@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/auth"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
@@ -163,7 +164,9 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 				logger.Logger.Error(fmt.Sprintf("Failed to get MinIO Password: %v", err))
 			}
 		}
+		lusCode, _ := click.GetLusCode(pier)
 		// collate all the info from our sources into the struct
+		urbit.Info.LusCode = lusCode
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
 		urbit.Info.URL = urbitURL

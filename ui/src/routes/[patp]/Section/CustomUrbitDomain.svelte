@@ -1,9 +1,18 @@
 <script>
   // Style
   import "../theme.css"
+  import Clipboard from 'clipboard'
   import { createEventDispatcher } from 'svelte'
   export let url = "#"
+  export let lusCode = ""
   const dispatch = createEventDispatcher()
+  let copied = false
+
+  let copy = new Clipboard('#lus-code');
+    copy.on("success", ()=> {
+      copied = true;
+      setTimeout(()=> copied = false, 1000)
+    })
 </script>
 
 <div>
@@ -13,12 +22,16 @@
     <button class="save-button">Save</button>
   </div>
   <div class="wrapper">
-    <button class="btn">
+    <button id="lus-code" class="btn" data-clipboard-text={lusCode}>
       <img
         src="/clipboard.svg"
         width="24px"
         height="24px" />
-      Access Key
+      {#if copied}
+        Copied!
+      {:else}
+        Access Key
+      {/if}
     </button>
     <a href={url} target="_blank" class="btn">
       URL ↗

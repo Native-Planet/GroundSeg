@@ -90,6 +90,7 @@ type StartramTransition struct {
 // broadcast payload subobject
 type Urbit struct {
 	Info struct {
+		LusCode          string `json:"lusCode"`
 		Network          string `json:"network"`
 		Running          bool   `json:"running"`
 		URL              string `json:"url"`
