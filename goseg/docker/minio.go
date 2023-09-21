@@ -210,7 +210,7 @@ mcRunning:
 		patp,
 		pwd, // temp
 	}
-	if err := ExecDockerCommand(containerName, aliasCommand); err != nil {
+	if _, err := ExecDockerCommand(containerName, aliasCommand); err != nil {
 		return err
 	}
 	// make bucket
@@ -220,7 +220,7 @@ mcRunning:
 		"--ignore-existing",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
-	if err := ExecDockerCommand(containerName, createCommand); err != nil {
+	if _, err := ExecDockerCommand(containerName, createCommand); err != nil {
 		return err
 	}
 	publicCommand := []string{
@@ -230,7 +230,7 @@ mcRunning:
 		"public",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
-	if err := ExecDockerCommand(containerName, publicCommand); err != nil {
+	if _, err := ExecDockerCommand(containerName, publicCommand); err != nil {
 		return err
 	}
 	return nil
