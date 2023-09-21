@@ -99,9 +99,7 @@ func DockerSubscriptionHandler() {
 			}
 
 		default:
-			if config.DebugMode == true {
-				logger.Logger.Info(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
-			}
+			logger.Logger.Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 		}
 	}
 }
