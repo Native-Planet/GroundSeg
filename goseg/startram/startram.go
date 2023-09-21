@@ -80,6 +80,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		// pin that ho to the global vars
 		config.StartramConfig = retrieve
 		s := "<hidden>"
+		logger.Logger.Debug(fmt.Sprintf("StarTram info retrieved: %s", s))
 		logger.Logger.Debug(fmt.Sprintf("StarTram info retrieved: %s", string(body)))
 	} else {
 		regStatus = false
