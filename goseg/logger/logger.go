@@ -11,15 +11,50 @@ import (
 )
 
 var (
-	logPath     string
-	logFile     *os.File
-	multiWriter io.Writer
-	Logger      *slog.Logger
+	logPath        string
+	logFile        *os.File
+	multiWriter    io.Writer
+	Logger         *slog.Logger
+	dynamicHandler *DynamicLevelHandler
+)
+
+const (
+	LevelInfo = slog.LevelInfo
+	LevelWarn = slog.LevelWarn
 )
 
 type MuMultiWriter struct {
 	Writers []io.Writer
 	Mu      sync.Mutex
+}
+
+type DynamicLevelHandler struct {
+	currentLevel slog.Leveler
+	handler      slog.Handler
+}
+
+func NewDynamicLevelHandler(initialLevel slog.Leveler, h slog.Handler) *DynamicLevelHandler {
+	return &DynamicLevelHandler{currentLevel: initialLevel, handler: h}
+}
+
+func (d *DynamicLevelHandler) SetLevel(newLevel slog.Leveler) {
+	d.currentLevel = newLevel
+}
+
+func (d *DynamicLevelHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= d.currentLevel.Level()
+}
+
+func (d *DynamicLevelHandler) Handle(ctx context.Context, r slog.Record) error {
+	return d.handler.Handle(ctx, r)
+}
+
+func (d *DynamicLevelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return NewDynamicLevelHandler(d.currentLevel, d.handler.WithAttrs(attrs))
+}
+
+func (d *DynamicLevelHandler) WithGroup(name string) slog.Handler {
+	return NewDynamicLevelHandler(d.currentLevel, d.handler.WithGroup(name))
 }
 
 func init() {
@@ -52,9 +87,27 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}
-
 	multiWriter = muMultiWriter(os.Stdout, logFile)
-	Logger = slog.New(slog.NewJSONHandler(multiWriter, nil))
+	jsonHandler = slog.New(slog.NewJSONHandler(multiWriter, nil))
+	var level *DynamicLevelHandler
+	for _, arg := range os.Args[1:] {
+		if arg == "dev" {
+			level = LevelDebug
+		} else {
+			level = LevelInfo
+		}
+	}
+	dynamicHandler = NewDynamicLevelHandler(level, jsonHandler)
+	Logger = slog.New(dynamicHandler)
+	Logger.Debug("Debug level test")
+}
+
+func ToggleDebugLogging(enable bool) {
+	if enable {
+		dynamicHandler.SetLevel(LevelDebug)
+	} else {
+		dynamicHandler.SetLevel(LevelInfo)
+	}
 }
 
 func SysLogfile() string {
