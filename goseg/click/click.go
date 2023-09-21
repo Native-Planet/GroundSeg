@@ -42,7 +42,7 @@ func GetLusCode(patp string) (string, error) {
 		return "", fmt.Errorf("Click +code failed to create hoon: %v", err)
 	}
 	// defer hoon file deletion
-	//defer deleteHoon(patp, file)
+	defer deleteHoon(patp, file)
 	// execute hoon file
 	response, err := clickExec(patp, file)
 	if err != nil {
