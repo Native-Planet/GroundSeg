@@ -33,6 +33,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	validSession := false
 	session := vars["uploadSession"]
+	patp := vars["patp"]
 	for _, valid := range UploadSessions {
 		if session == valid {
 			validSession = true
@@ -42,7 +43,8 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if validSession {
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			http.Error(w, "Unable to read uploaded file", http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"status": "failure", "message": "Unable to read uploaded file"}`))
 			return
 		}
 		defer file.Close()
@@ -51,32 +53,53 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		totalChunks := r.FormValue("dztotalchunkcount")
 		index, err := strconv.Atoi(chunkIndex)
 		if err != nil {
-			http.Error(w, "Invalid chunk index", http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"status": "failure", "message": "Invalid chunk index"}`))
 			return
 		}
 		total, err := strconv.Atoi(totalChunks)
 		if err != nil {
-			http.Error(w, "Invalid total chunk count", http.StatusBadRequest)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"status": "failure", "message": "Invalid total chunk count"}`))
 			return
 		}
 		tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
 		tempFile, err := os.Create(tempFilePath)
 		if err != nil {
-			http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"status": "failure", "message": "Failed to create temp file"}`))
 			return
 		}
 		defer tempFile.Close()
 		io.Copy(tempFile, file)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "success", "message": "Chunk received successfully"}`))
 		if allChunksReceived(filename, total) {
-			err := combineChunks(filename, total)
-			if err != nil {
-				http.Error(w, "Failed to combine chunks", http.StatusInternalServerError)
+			if err := combineChunks(filename, total); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"status": "failure", "message": "Failed to combine chunks"}`))
 				return
 			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status": "success", "message": "Upload successful"}`))
+			index := -1
+			for i, v := range UploadSessions {
+				if v == session {
+					index = i
+					break
+				}
+			}
+			if index == -1 {
+				logger.Logger.Warn("Couldn't remove upload session %v; not found in valid sessions")
+			} else {
+				UploadSessions = append(UploadSessions[:index], UploadSessions[index+1:]...)
+			}
 		}
+		return
 	} else {
 		logger.Logger.Error(fmt.Sprintf("Invalid upload session request %v", session))
-		http.Error(w, "Invalid upload session", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"status": "failure", "message": "Invalid upload session"}`))
 		return
 	}
 }

@@ -134,6 +134,13 @@ type WsUrbitPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type WsUrbitAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Patp   string `json:"patp"`
+	Value  int    `json:value"`
+}
+
 type WsNewShipPayload struct {
 	ID      string          `json:"id"`
 	Type    string          `json:"type"`
@@ -167,13 +174,6 @@ type WsNewShipAction struct {
 	Key     string `json:"key"`
 	Remote  bool   `json:"remote"`
 	Command string `json:"command"`
-}
-
-type WsUrbitAction struct {
-	Type   string `json:"type"`
-	Action string `json:"action"`
-	Patp   string `json:"patp"`
-	Value  int    `json:value"`
 }
 
 type WsSystemAction struct {

@@ -48,7 +48,7 @@ func UrbitHandler(msg []byte) error {
 		conf := config.Conf()
 		logger.Logger.Warn(fmt.Sprintf("%v", currentNetwork))
 		if currentNetwork == "wireguard" {
-			shipConf.Network = "none"
+			shipConf.Network = "bridge"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
@@ -57,7 +57,7 @@ func UrbitHandler(msg []byte) error {
 			if err := docker.DeleteContainer(patp); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
 			}
-		} else if currentNetwork == "none" && conf.WgRegistered == true {
+		} else if currentNetwork != "wireguard" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
 			update := make(map[string]structs.UrbitDocker)
 			update[patp] = shipConf

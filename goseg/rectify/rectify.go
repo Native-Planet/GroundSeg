@@ -136,6 +136,7 @@ func RectifyUrbit() {
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "retrieve":
+			conf := config.Conf()
 			for patp, _ := range config.UrbitConfAll() {
 				modified := false
 				serviceCreated := true
@@ -145,15 +146,15 @@ func RectifyUrbit() {
 				// check if existing ship was not created
 				found := false
 				for _, remote := range startramConfig.Subdomains {
-					if patp == remote.URL {
+					if patp+"."+conf.EndpointUrl == remote.URL {
 						found = true
 						break
 					}
 				}
 				if !found {
 					logger.Logger.Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
-					go startram.SvcCreate(patp, "urbit")
-					go startram.SvcCreate("s3."+patp, "minio")
+					startram.SvcCreate(patp, "urbit")
+					startram.SvcCreate("s3."+patp, "minio")
 				}
 				for _, remote := range startramConfig.Subdomains {
 					if remote.Status == "creating" {
