@@ -30,8 +30,6 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
-
-	// "os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -49,8 +47,6 @@ var (
 	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer    = http.FileServer(http.FS(webContent))
-	// fs = http.FS(content)
-	// fileServer = http.FileServer(fs)
 	//go:embed web/captive/*
 	capContent    embed.FS
 	capFs         = http.FS(capContent)
