@@ -199,7 +199,7 @@ mcRunning:
 		}
 	}
 	// get password
-	pwd, err := config.GetMinIOPassword(fmt.Sprintf("patp_%s", patp))
+	pwd, err := config.GetMinIOPassword(fmt.Sprintf("minio_%s", patp))
 	if err != nil {
 		return err
 	}
