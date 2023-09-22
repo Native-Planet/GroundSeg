@@ -232,6 +232,7 @@ func constructSystemInfo() structs.System {
 	sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	sysInfo.Info.Updates = system.SystemUpdates
 	sysInfo.Transition = SystemTransitions
+	sysInfo.Info.Wifi = system.WifiInfo
 	return sysInfo
 }
 

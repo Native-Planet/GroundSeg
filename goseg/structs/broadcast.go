@@ -57,7 +57,7 @@ type SystemUpdates struct {
 
 // broadcast payload subobject
 type SystemWifi struct {
-	Status   string   `json:"status"`
+	Status   bool   `json:"status"`
 	Active   string   `json:"active"`
 	Networks []string `json:"networks"`
 }
