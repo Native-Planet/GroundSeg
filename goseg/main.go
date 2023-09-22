@@ -187,6 +187,8 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 func main() {
+	// push error messages to fe
+	go rectify.ErrorMessageHandler()
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
@@ -225,8 +227,6 @@ func main() {
 	go rectify.NewShipTransitionHandler()
 	// digest retrieve data
 	go rectify.RectifyUrbit()
-	// push error messages to fe
-	go rectify.ErrorMessageHandler()
 	// get the startram config from server
 	if conf.WgRegistered == true {
 		_, err := startram.Retrieve()
