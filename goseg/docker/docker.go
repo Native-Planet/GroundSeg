@@ -318,9 +318,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		_, err = cli.ContainerCreate(ctx, &container.Config{
-			Image: desiredImage,
-		}, nil, nil, nil, containerName)
+		_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 		if err != nil {
 			return containerState, err
 		}
@@ -344,9 +342,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			_, err = cli.ContainerCreate(ctx, &container.Config{
-				Image: desiredImage,
-			}, nil, nil, nil, containerName)
+			_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
 				return containerState, err
 			}
