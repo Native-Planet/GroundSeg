@@ -8,7 +8,9 @@
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
-  <div class="title">NEW SHIP</div>
+  <div class="title-wrapper">
+    <div class="title">NEW SHIP</div>
+  </div>
   {#if tBootStage.length < 1}
     <Free />
   {:else}
@@ -26,27 +28,28 @@
   }
   .card-wrapper {
     background: var(--bg-base);
-    border-radius: 16px;
     margin: auto;
-    height: 70vh;
-    display:flex;
-    flex-direction: column;
-    align-items: center;
+    width: calc(1173px - 160px);
+    border-radius: 16px;
+    flex-shrink: 0;
+    padding: 80px;
   }
-  .slim .card-wrapper {
-    background: var(--bg-base);
-    border-radius: 16px;
-    margin: auto;
-    height: 70vh;
-    display:flex;
-    gap: 40px;
-    flex-direction: column;
-    align-items: center;
+  .title-wrapper {
+    overflow: hidden;
   }
   .title {
-    font-family: var(--title-font);
+    position: relative;
+    top: -19px;
+    color: #000;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: BPdotsUnicase;
     font-size: 48px;
-    padding-top: 40px;
-    padding-bottom: 40px;
+    line-height: 47px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: -2.88px;
+    text-transform: uppercase;
   }
 </style>

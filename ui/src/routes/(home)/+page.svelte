@@ -26,19 +26,18 @@
   .slim {
     width: calc(100vw - 40px);
   }
-  .card-wrapper::-webkit-scrollbar {display: none;}
   .card-wrapper {
     background: var(--bg-base);
     border-radius: 16px;
     margin: auto;
-    max-height: calc(90vh - 60px);
     display: flex;
+    min-height: calc(520px - 80px);
     flex-wrap: wrap;
     padding: 40px;
     gap: 80px;
-    overflow: auto;
   }
   .ship {
     flex-basis: 288px;
+    height: 180px;
   }
 </style>

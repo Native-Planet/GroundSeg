@@ -24,86 +24,119 @@
 <div class="input-wrapper">
   <div class="label">Bootfile</div>
   <KeyDropper on:change={e=> key = e.detail} />
-</div>
-<div class="check-wrapper" on:click={()=>remote = !remote}>
-  <div class="checkbox" class:highlight={remote} ></div>
-  <div class="check-label">Set to remote</div>
-</div>
-<div class="buttons">
-  <button class="back" on:click={()=>goto('/boot')}>Back</button>
-  <button
-    class="boot"
-    on:click={()=>bootShip(noSig,key,remote)}
-    disabled={
-    (key.length < 1) || (name.length < 1) || (!validPatp)
-    }>
-    Boot
-  </button>
-  <div class="spacer"></div>
+  <div class="check-wrapper" on:click={()=>remote = !remote}>
+    <div class="checkbox">
+      {#if remote}
+        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+      {/if}
+    </div>
+    <div class="check-label">Set to remote</div>
+  </div>
+  <div class="buttons">
+    <button class="btn back" on:click={()=>goto('/boot')}>Back</button>
+    <button
+      class="btn boot"
+      on:click={()=>bootShip(noSig,key,remote)}
+      disabled={
+      (key.length < 1) || (name.length < 1) || (!validPatp)
+      }>
+      Boot
+    </button>
+  </div>
 </div>
 
 <style>
   .sigil-wrapper {
-    width: 160px;
-    height: 160px;
-    border: solid 4px var(--text-color);
-    border-radius: 24px;
+    width: 128px;
+    height: 128px;
+    border-radius: 16px;
     overflow: hidden;
-    margin-bottom: 20px;
-  }
-  .spacer {
-    flex: 2;
+    margin: auto;
+    margin: 55px auto 32px auto;
   }
   .input-wrapper {
-    width: 60%;
+    margin: auto;
     display: flex;
+    width: 621px;
+    padding-bottom: 0px;
     flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
   }
   .check-wrapper {
-    cursor: pointer;
-    user-select: none;
-    width: 60%;
     display: flex;
-    gap: 12px;
-    align-items: start;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    user-select: none; /* Standard syntax */
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE/Edge */
   }
   .checkbox {
-    width: 20px;
-    height: 20px;
-    border: solid 1px var(--btn-secondary);
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 2px solid var(--Gray-200, #ABBAAE);
+  }
+  .checkmark {
+    margin: 4px;
   }
   .check-label {
-    line-height: 20px;
-    font-size: 12px;
-    margin-bottom: 24px;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   .label {
-    font-size: 12px;
-    margin-bottom: 8px;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   .buttons {
-    width: 60%;
     display: flex;
-    gap: 20px;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .btn {
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    color: #FFF;
   }
   .back {
     font-family: var(--regular-font);
     color: var(--text-card-color);
     cursor: pointer;
-    line-height: 38px;
-    flex: 1;
-    border-radius: 12px;
     background-color: var(--btn-secondary);
+    border-radius: 16px;
+    padding: 0 48px;
   }
   .boot {
     font-family: var(--regular-font);
     color: var(--text-card-color);
     cursor: pointer;
-    line-height: 38px;
-    flex: 1;
-    border-radius: 12px;
+    border-radius: 16px;
     background-color: var(--btn-primary);
+    height: 65px;
+    padding: 0 48px;
   }
   .back:hover {
     background-color: var(--bg-card);
@@ -115,21 +148,27 @@
     opacity: .6;
     pointer-events: none;
   }
-  .highlight {
-    background-color: var(--btn-secondary);
-  }
-  input {
-    font-family: var(--regular-font);
-    color: var(--text-color);
-    padding-left: 20px;
-    border: 2px solid var(--btn-secondary);
-    background-color: var(--bg-modal);
-    border-radius: 12px;
-    font-size: 16px;
-    line-height: 36px;
-    margin-bottom: 20px;
-  }
   input:focus {
     outline: none;
+  }
+  input {
+    flex: 1;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    padding: 10px 22px 12px 22px;
+    width: calc(100% - 48px);
+    border: 2px solid var(--Gray-400, #5C7060);
+    background: var(--bg-base);
+    color: var(--text-color);
+
+  }
+  input::placeholder {
+    color: var(--Gray-200, #ABBAAE);
   }
 </style>
