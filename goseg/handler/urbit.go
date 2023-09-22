@@ -163,6 +163,9 @@ func UrbitHandler(msg []byte) error {
 		if err := docker.StopContainerByName(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
+		}
 		if conf.WgRegistered {
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
