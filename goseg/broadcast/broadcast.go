@@ -12,7 +12,6 @@ import (
 	"goseg/structs"
 	"goseg/system"
 	"os"
-
 	"strings"
 	"sync"
 	"time"
