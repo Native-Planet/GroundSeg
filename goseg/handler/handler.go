@@ -116,6 +116,14 @@ func SystemHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Error updating host system: %v", err))
 			}
 		}
+	case "wifi-toggle":
+		if err := system.ToggleDevice(system.Device); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't toggle wifi device: %v",err))
+		}
+	case "wifi-connect":
+		if err := system.ConnectToWifi(system.Device, systemPayload.Payload.SSID, systemPayload.Payload.Password); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't connect to wifi: %v",err))
+		}
 	default:
 		return fmt.Errorf("Unrecognized system action: %v", systemPayload.Payload.Action)
 	}

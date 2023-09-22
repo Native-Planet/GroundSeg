@@ -182,6 +182,8 @@ type WsSystemAction struct {
 	Command string `json:"command"`
 	Value   int    `json:"value"`
 	Update  string `json:"update"`
+	SSID    string `json:"ssid"`
+	Password string `json:"password"`
 }
 
 type WsTokenStruct struct {
