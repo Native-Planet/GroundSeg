@@ -225,6 +225,8 @@ func main() {
 	go rectify.NewShipTransitionHandler()
 	// digest retrieve data
 	go rectify.RectifyUrbit()
+	// push error messages to fe
+	go rectify.ErrorMessageHandler()
 	// get the startram config from server
 	if conf.WgRegistered == true {
 		_, err := startram.Retrieve()

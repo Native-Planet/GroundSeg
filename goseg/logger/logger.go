@@ -17,6 +17,7 @@ var (
 	multiWriter    io.Writer
 	Logger         *slog.Logger
 	dynamicHandler *DynamicLevelHandler
+	ErrBus = make(chan string)
 )
 
 const (
@@ -62,6 +63,34 @@ func (d *DynamicLevelHandler) Level() slog.Level {
 	return d.currentLevel.Level()
 }
 
+type ErrorChannelHandler struct {
+	underlyingHandler slog.Handler
+}
+
+func NewErrorChannelHandler(handler slog.Handler) *ErrorChannelHandler {
+	return &ErrorChannelHandler{underlyingHandler: handler}
+}
+
+func (e *ErrorChannelHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return e.underlyingHandler.Enabled(ctx, level)
+}
+
+func (e *ErrorChannelHandler) Handle(ctx context.Context, r slog.Record) error {
+	// If the level is Error, send the message to ErrBus channel
+	if r.Level == slog.LevelError {
+		ErrBus <- r.Message
+	}
+	return e.underlyingHandler.Handle(ctx, r)
+}
+
+func (e *ErrorChannelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return NewErrorChannelHandler(e.underlyingHandler.WithAttrs(attrs))
+}
+
+func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
+	return NewErrorChannelHandler(e.underlyingHandler.WithGroup(name))
+}
+
 func init() {
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
@@ -103,8 +132,8 @@ func init() {
 		}
 	}
 	dynamicHandler = NewDynamicLevelHandler(level, jsonHandler)
-	Logger = slog.New(dynamicHandler)
-	Logger.Debug("Debug level test")
+	customHandler := NewErrorChannelHandler(dynamicHandler)
+	Logger = slog.New(customHandler)
 }
 
 func ToggleDebugLogging(enable bool) {
