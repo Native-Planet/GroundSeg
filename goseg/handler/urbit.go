@@ -154,18 +154,6 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "ready"}
 		return nil
 	case "delete-ship":
-		conf := config.Conf()
-		var res []string
-		for _, pier := range conf.Piers {
-			if pier != patp {
-				res = append(res, pier)
-			}
-		}
-		if err = config.UpdateConf(map[string]interface{}{
-			"piers": res,
-		}); err != nil {
-			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
-		}
 		contConf := config.GetContainerState()
 		patpConf := contConf[patp]
 		patpConf.DesiredStatus = "stopped"
@@ -185,7 +173,7 @@ func UrbitHandler(msg []byte) error {
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
-		conf = config.Conf()
+		conf := config.Conf()
 		piers := cutSlice(conf.Piers,patp)
 		if err = config.UpdateConf(map[string]interface{}{
 			"piers":  piers,
@@ -195,6 +183,9 @@ func UrbitHandler(msg []byte) error {
 		if err := docker.DeleteVolume(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
+		contConf = config.GetContainerState()
+		contConf = delete(contConf,patp)
+		config.UpdateContainerState(patp,contConf)
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
