@@ -1,9 +1,11 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte'
   import { goto } from '$app/navigation';
-  import { resetNewShip } from '$lib/stores/websocket'
+  import { structure, resetNewShip } from '$lib/stores/websocket'
 
   export let name = ""
+
+  $: url = ($structure?.urbits?.[name]?.info?.url) || "#"
 
   const dispatch = createEventDispatcher()
   onMount(()=>dispatch("emit"))
@@ -22,7 +24,7 @@
 <div class="text">Boot Complete</div>
 <div class="buttons">
   <button class="btn" on:click={handleClick}>Settings</button>
-  <a class="btn" href="#" on:click={handleReset} target="_blank">Visit URL</a>
+  <a class="btn" href={url} on:click={handleReset} target="_blank">Visit URL</a>
 </div>
 <div class="reset" on:click={handleReset}>Boot Another Ship</div>
 
@@ -35,10 +37,11 @@
   }
   .buttons {
     display: flex;
-    width: 280px;
-    gap: 20px;
+    gap: 16px;
     text-align: center;
     align-items: center;
+    height: 65px;
+    justify-content: center;
   }
   button {
     background: var(--btn-secondary);
@@ -47,14 +50,18 @@
     background: var(--btn-primary);
   }
   .btn {
-    font-size: 12px;
-    height: 42px;
-    line-height: 42px;
-    color: var(--text-card-color);
-    text-decoration: none;
-    flex: 1;
-    border-radius: 12px;
-    cursor: pointer;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    padding: 16px 48px 17px 48px;
+    border-radius: 16px;
   }
   .reset {
     margin-top: 40px;

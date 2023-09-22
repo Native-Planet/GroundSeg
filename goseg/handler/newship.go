@@ -133,6 +133,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 				errmsg := fmt.Sprintf("Failed to delete local container for new ship: %v", err)
 				logger.Logger.Error(errmsg)
 			}
+			docker.StartContainer("minio_"+patp, "minio")
 			info, err := docker.StartContainer(patp, "vere")
 			if err != nil {
 				errmsg := fmt.Sprintf("%v", err)

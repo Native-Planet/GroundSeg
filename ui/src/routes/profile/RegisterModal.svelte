@@ -40,7 +40,11 @@
     {#if tRegister == null}
       <div class="wrapper">
         <h1>{regionMode ? "Change Region" : "Register New Key"}</h1>
-        <p>Entering a new key will replace the current one</p>
+        {#if regionMode}
+          <p>Enter your StarTram Key to switch regions</p>
+        {:else}
+          <p>Entering a new key will replace the current one</p>
+        {/if}
         <h2>{regionMode ? "Your" : "New"} Key</h2>
         <input disabled={tRegister != null} type="password" placeholder="NativePlanet-something-something" bind:value={key} />
         {#if regionKeys.length > 0}
