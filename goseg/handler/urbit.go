@@ -180,8 +180,30 @@ func UrbitHandler(msg []byte) error {
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v", patp))
 		}
+		conf = config.Conf()
+		piers := cutSlice(conf.Piers,patp)
+		if err = config.UpdateConf(map[string]interface{}{
+			"piers":  piers,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
+		}
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
+}
+
+// remove a string from a slice of strings
+func cutSlice(slice []string, s string) []string {
+    index := -1
+    for i, v := range slice {
+        if v == s {
+            index = i
+            break
+        }
+    }
+    if index == -1 {
+        return slice
+    }
+    return append(slice[:index], slice[index+1:]...)
 }
