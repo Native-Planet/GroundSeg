@@ -167,18 +167,18 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
 		}
 		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v", patp))
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
 		if conf.WgRegistered {
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", patp))
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
 			}
 			if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", patp))
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 			}
 		}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v", patp))
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
 		conf = config.Conf()
 		piers := cutSlice(conf.Piers,patp)
