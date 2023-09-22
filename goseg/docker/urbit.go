@@ -53,6 +53,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
+	minioInfo, err := GetLatestContainerInfo("minio")
 	// compare existing config to current version info
 	// update if new
 	// sorry this is ugly
@@ -62,13 +63,21 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
 			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
 		}
+		if minioInfo["hash"] != shipConf.MinioAmd64Sha256 {
+			newConf.MinioAmd64Sha256 = minioInfo["hash"]
+		}
 	} else if config.Architecture == "arm64" {
 		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
 			newConf.UrbitArm64Sha256 = containerInfo["hash"]
 		}
+		if minioInfo["hash"] != shipConf.MinioArm64Sha256 {
+			newConf.MinioArm64Sha256 = minioInfo["hash"]
+		}
 	}
 	newConf.UrbitVersion = containerInfo["tag"]
 	newConf.UrbitRepo = containerInfo["repo"]
+	newConf.MinioVersion = minioInfo["tag"]
+	newConf.MinioRepo = minioInfo["repo"]
 	if shipConf != newConf {
 		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName:newConf}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v",err))
@@ -130,6 +139,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
+		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v",containerName,shipConf))
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
@@ -176,8 +186,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			},
 		}
 	}
-
-	logger.Logger.Info(fmt.Sprintf("Debug: start_urbit.sh --loom=%v --dirname=%v --devmode=%v", loomValue, shipName, devMode))
 	mounts := []mount.Mount{
 		{
 			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
@@ -190,5 +198,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
+	logger.Logger.Debug(fmt.Sprintf("Boot command: %v",containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }
