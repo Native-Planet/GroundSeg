@@ -314,8 +314,15 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		logger.Logger.Info(msg)
 	case existingContainer.State == "exited":
-		// if the container exists but is stopped, start it
-		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
 			return containerState, err
 		}
@@ -335,9 +342,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			_, err = cli.ContainerCreate(ctx, &container.Config{
-				Image: desiredImage,
-			}, nil, nil, nil, containerName)
+			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
 				return containerState, err
 			}
