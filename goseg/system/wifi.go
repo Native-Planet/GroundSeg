@@ -35,6 +35,7 @@ var (
 		WebPath:             "c2c",
 	}
 	WifiInfo structs.SystemWifi
+	Device string
 )
 
 func init() {
@@ -42,6 +43,7 @@ func init() {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v",err))
 	} else {
+		Device = dev
 		constructWifiInfo(dev)
 		go wifiInfoLoop(dev)
 	}
@@ -255,6 +257,20 @@ func DisconnectWifi(ifaceName string) error {
 	defer c.Close()
 	iface := &wifi.Interface{Name: ifaceName}
 	return c.Disconnect(iface)
+}
+
+func ToggleDevice(dev string) error {
+	var cmd string
+	if ifCheck(dev) {
+		cmd = "down"
+	} else {
+		cmd = "up"
+	}
+	_, err := runCommand("sudo", "ip", "link", "set", dev, cmd)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func setupHostAPD(iface string) error {
