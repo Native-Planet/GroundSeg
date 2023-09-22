@@ -166,6 +166,11 @@ func UrbitHandler(msg []byte) error {
 		}); err != nil {
 			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
 		}
+		contConf := config.GetContainerState()
+		patpConf := contConf[patp]
+		patpConf.DesiredStatus = "stopped"
+		contConf[patp] = patpConf
+		config.UpdateContainerState(patp,patpConf)
 		if err := docker.StopContainerByName(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
