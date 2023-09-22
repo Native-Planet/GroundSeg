@@ -371,3 +371,15 @@ func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[str
 	}
 	return newUrbits
 }
+
+func ReloadUrbits() error {
+	logger.Logger.Info("Reloading ships in broadcast")
+	urbits, err := ConstructPierInfo()
+	if err != nil {
+		return err
+	}
+	mu.Lock()
+	broadcastState.Urbits = urbits
+	mu.Unlock()
+	return nil
+}

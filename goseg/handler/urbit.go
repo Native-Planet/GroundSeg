@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
@@ -155,6 +156,7 @@ func UrbitHandler(msg []byte) error {
 		return nil
 	case "delete-ship":
 		conf := config.Conf()
+		// update DesiredStatus to 'stopped'
 		contConf := config.GetContainerState()
 		patpConf := contConf[patp]
 		patpConf.DesiredStatus = "stopped"
@@ -188,6 +190,10 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
 		config.DeleteContainerState(patp)
+		// remove from broadcast
+		if err := broadcast.ReloadUrbits(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
+		}
 		logger.Logger.Info(fmt.Sprintf("%v container deleted",patp))
 		return nil
 	default:
