@@ -166,8 +166,8 @@ func UrbitHandler(msg []byte) error {
 		}); err != nil {
 			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
 		}
-		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+		if err := docker.StopContainerByName(patp); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
 		if conf.WgRegistered {
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
@@ -186,6 +186,9 @@ func UrbitHandler(msg []byte) error {
 			"piers":  piers,
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
+		}
+		if err := docker.DeleteVolume(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
 		return nil
 	default:
