@@ -20,38 +20,44 @@
   $: validPatp = checkPatp(noSig)
 </script>
 
-<div class="outer" class:error={tBootStage == "aborted"}>
-  <div class="back">
-    <Sigil {name} swap={true} reverse={true} />
+<div class="wrapper-not-free">
+  <div class="outer" class:error={tBootStage == "aborted"}>
+    <div class="back">
+      <Sigil {name} swap={true} reverse={true} />
+    </div>
+    <div class="front">
+      <Sigil {name} coverage={coverage} moonbar={false} />
+    </div>
   </div>
-  <div class="front">
-    <Sigil {name} coverage={coverage} moonbar={false} />
-  </div>
+  <div class="patp">{name.toUpperCase()}</div>
+  {#if tBootStage == "starting"}
+    <!-- 10% completion -->
+    <EnvSetup {name} on:emit={()=>coverage = 0} /> 
+  {:else if tBootStage == "creating"}
+    <CreatePier {name} on:emit={()=>coverage = 20} /> 
+  {:else if tBootStage == "booting"}
+    <BootingShip {name} on:emit={()=>coverage = 42} /> 
+  {:else if tBootStage == "remote"}
+    <SettingRemote {name} on:emit={()=>coverage = 86} /> 
+  {:else if tBootStage == "completed"}
+    <Completed {name} on:emit={()=>coverage = 100} /> 
+  {:else if tBootStage == "aborted"}
+    <Aborted {name} on:emit={()=>coverage = 0} {error} /> 
+  {/if}
 </div>
-<div class="patp">{name.toUpperCase()}</div>
-{#if tBootStage == "starting"}
-  <!-- 10% completion -->
-  <EnvSetup {name} on:emit={()=>coverage = 0} /> 
-{:else if tBootStage == "creating"}
-  <CreatePier {name} on:emit={()=>coverage = 20} /> 
-{:else if tBootStage == "booting"}
-  <BootingShip {name} on:emit={()=>coverage = 42} /> 
-{:else if tBootStage == "remote"}
-  <SettingRemote {name} on:emit={()=>coverage = 86} /> 
-{:else if tBootStage == "completed"}
-  <Completed {name} on:emit={()=>coverage = 100} /> 
-{:else if tBootStage == "aborted"}
-  <Aborted {name} on:emit={()=>coverage = 0} {error} /> 
-{/if}
 
 <style>
+  .wrapper-not-free {
+    text-align: center;
+  }
   .outer {
     position: relative;
-    width: 160px;
-    height: 160px;
-    border: solid 4px var(--text-color);
-    border-radius: 24px;
+    width: 128px;
+    height: 128px;
+    border-radius: 16px;
     overflow: hidden;
+    margin: auto;
+    margin-top: 55px;
   }
   .error {
     border-color: red;
