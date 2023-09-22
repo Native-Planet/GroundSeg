@@ -154,11 +154,12 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "exportShip", Event: "ready"}
 		return nil
 	case "delete-ship":
+		conf := config.Conf()
 		contConf := config.GetContainerState()
 		patpConf := contConf[patp]
 		patpConf.DesiredStatus = "stopped"
 		contConf[patp] = patpConf
-		config.UpdateContainerState(patp,patpConf)
+		config.UpdateContainerState(patp, patpConf)
 		if err := docker.StopContainerByName(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
@@ -173,19 +174,18 @@ func UrbitHandler(msg []byte) error {
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
-		conf := config.Conf()
-		piers := cutSlice(conf.Piers,patp)
+		conf = config.Conf()
+		piers := cutSlice(conf.Piers, patp)
 		if err = config.UpdateConf(map[string]interface{}{
-			"piers":  piers,
+			"piers": piers,
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
 		}
 		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
-		contConf = config.GetContainerState()
-		contConf = delete(contConf,patp)
-		config.UpdateContainerState(patp,contConf)
+		config.DeleteContainerState(patp)
+		logger.Logger.Info(fmt.Sprintf("%v container deleted",patp))
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
@@ -194,15 +194,15 @@ func UrbitHandler(msg []byte) error {
 
 // remove a string from a slice of strings
 func cutSlice(slice []string, s string) []string {
-    index := -1
-    for i, v := range slice {
-        if v == s {
-            index = i
-            break
-        }
-    }
-    if index == -1 {
-        return slice
-    }
-    return append(slice[:index], slice[index+1:]...)
+	index := -1
+	for i, v := range slice {
+		if v == s {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return slice
+	}
+	return append(slice[:index], slice[index+1:]...)
 }
