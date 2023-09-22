@@ -35,13 +35,13 @@ var (
 		WebPath:             "c2c",
 	}
 	WifiInfo structs.SystemWifi
-	Device string
+	Device   string
 )
 
 func init() {
 	dev, err := getWifiDevice()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v", err))
 	} else {
 		Device = dev
 		constructWifiInfo(dev)
@@ -64,7 +64,7 @@ func constructWifiInfo(dev string) {
 	if WifiInfo.Status {
 		c, err := wifi.New()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client: %v",err))
+			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client: %v", err))
 			WifiInfo.Status = false
 			WifiInfo.Active = ""
 			WifiInfo.Networks = []string{}
@@ -204,7 +204,7 @@ func getWifiDevice() (string, error) {
 func ListWifiSSIDs(dev string) []string {
 	out, err := runCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't gather wifi networks: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't gather wifi networks: %v", err))
 		return nil
 	}
 	lines := strings.Split(out, "\n")
@@ -221,7 +221,7 @@ func ListWifiSSIDs(dev string) []string {
 func getConnectedSSID(c *wifi.Client, dev string) string {
 	interfaces, err := c.Interfaces()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't get devices: %v",err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't get devices: %v", err))
 		return ""
 	}
 	for _, iface := range interfaces {

@@ -12,7 +12,6 @@ import (
 	"goseg/structs"
 	"goseg/system"
 	"os"
-
 	"strings"
 	"sync"
 	"time"
@@ -60,7 +59,7 @@ func bootstrapBroadcastState() error {
 	logger.Logger.Info("Bootstrapping state")
 	// this returns a map of ship:running status
 	logger.Logger.Info("Resolving pier status")
-	urbits, err := constructPierInfo()
+	urbits, err := ConstructPierInfo()
 	if err != nil {
 		return err
 	}
@@ -100,10 +99,11 @@ func LoadStartramRegions() error {
 }
 
 // this is for building the broadcast objects describing piers
-func constructPierInfo() (map[string]structs.Urbit, error) {
+func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
 	conf := config.Conf()
 	piers := conf.Piers
+	logger.Logger.Debug(fmt.Sprintf("Piers: %v",piers))
 	updates := make(map[string]structs.Urbit)
 	// load fresh broadcast state
 	currentState := GetState()
@@ -322,7 +322,7 @@ func shipStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			updates, err := constructPierInfo()
+			updates, err := ConstructPierInfo()
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
@@ -370,4 +370,16 @@ func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[str
 		newUrbits[k] = urbitStruct
 	}
 	return newUrbits
+}
+
+func ReloadUrbits() error {
+	logger.Logger.Info("Reloading ships in broadcast")
+	urbits, err := ConstructPierInfo()
+	if err != nil {
+		return err
+	}
+	mu.Lock()
+	broadcastState.Urbits = urbits
+	mu.Unlock()
+	return nil
 }

@@ -182,7 +182,7 @@ func SvcCreate(subdomain string, svcType string) error {
 		// if err != nil {
 		// 	return fmt.Errorf("Error retrieving post-registration: %v", err)
 		// } // this can cause some fucked up infinite loops
-		logger.Logger.Info("Service %s created",subdomain)
+		logger.Logger.Info("Service %s created", subdomain)
 	} else {
 		return fmt.Errorf("Error creating %s: %v", subdomain, respObj.Debug)
 	}

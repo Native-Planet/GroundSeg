@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
@@ -155,33 +156,62 @@ func UrbitHandler(msg []byte) error {
 		return nil
 	case "delete-ship":
 		conf := config.Conf()
-		var res []string
-		for _, pier := range conf.Piers {
-			if pier != patp {
-				res = append(res, pier)
-			}
+		// update DesiredStatus to 'stopped'
+		contConf := config.GetContainerState()
+		patpConf := contConf[patp]
+		patpConf.DesiredStatus = "stopped"
+		contConf[patp] = patpConf
+		config.UpdateContainerState(patp, patpConf)
+		if err := docker.StopContainerByName(patp); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
-		if err = config.UpdateConf(map[string]interface{}{
-			"piers": res,
-		}); err != nil {
-			return fmt.Errorf("Couldn't remove pier from config! %v", patp)
-		}
-		if err := docker.DeleteVolume(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove docker volume for %v", patp))
+		if err := docker.DeleteContainer(patp); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
 		}
 		if conf.WgRegistered {
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", patp))
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
 			}
 			if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", patp))
+				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 			}
 		}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v", patp))
+			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
+		conf = config.Conf()
+		piers := cutSlice(conf.Piers, patp)
+		if err = config.UpdateConf(map[string]interface{}{
+			"piers": piers,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
+		}
+		if err := docker.DeleteVolume(patp); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+		}
+		config.DeleteContainerState(patp)
+		// remove from broadcast
+		if err := broadcast.ReloadUrbits(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
+		}
+		logger.Logger.Info(fmt.Sprintf("%v container deleted",patp))
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
+}
+
+// remove a string from a slice of strings
+func cutSlice(slice []string, s string) []string {
+	index := -1
+	for i, v := range slice {
+		if v == s {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return slice
+	}
+	return append(slice[:index], slice[index+1:]...)
 }
