@@ -34,7 +34,57 @@ var (
 		AllowedBypassPortal: false,
 		WebPath:             "c2c",
 	}
+	WifiInfo structs.SystemWifi
 )
+
+func init() {
+	dev, err := getWifiDevice()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v",err))
+	} else {
+		constructWifiInfo(dev)
+		go wifiInfoLoop(dev)
+	}
+}
+
+func wifiInfoLoop(dev string) {
+	tick := time.Tick(10 * time.Second)
+	for {
+		select {
+		case <-tick:
+			constructWifiInfo(dev)
+		}
+	}
+}
+
+func constructWifiInfo(dev string) {
+	WifiInfo.Status = ifCheck(dev)
+	if WifiInfo.Status {
+		c, err := wifi.New()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client: %v",err))
+			WifiInfo.Status = false
+			WifiInfo.Active = ""
+			WifiInfo.Networks = []string{}
+		}
+		defer c.Close()
+		active := getConnectedSSID(c, dev)
+		WifiInfo.Active = active
+		WifiInfo.Networks = ListWifiSSIDs(dev)
+	} else {
+		WifiInfo.Active = ""
+		WifiInfo.Networks = []string{}
+	}
+}
+
+func ifCheck(dev string) bool {
+	out, err := runCommand("ip", "link", "show", dev)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't check interface %v: %v", dev, err))
+		return false
+	}
+	return strings.Contains(string(out), "UP")
+}
 
 func C2cMode() error {
 	dev, err := getWifiDevice()
@@ -83,7 +133,7 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if payload.Payload.Action == "connect" {
-			if err := connectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
+			if err := ConnectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
 				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
@@ -99,7 +149,7 @@ func announceNetworks(dev string) {
 	for {
 		select {
 		case <-tick:
-			networks := listWifiSSIDs(dev)
+			networks := ListWifiSSIDs(dev)
 			payload := struct {
 				Networks []string `json:"networks"`
 			}{
@@ -149,9 +199,10 @@ func getWifiDevice() (string, error) {
 	return "", fmt.Errorf("no WiFi device found")
 }
 
-func listWifiSSIDs(output string) []string {
-	out, err := runCommand("nmcli", "-t", "dev", "wifi")
+func ListWifiSSIDs(dev string) []string {
+	out, err := runCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't gather wifi networks: %v",err))
 		return nil
 	}
 	lines := strings.Split(out, "\n")
@@ -165,7 +216,25 @@ func listWifiSSIDs(output string) []string {
 	return ssids
 }
 
-func connectToWifi(ifaceName, ssid, password string) error {
+func getConnectedSSID(c *wifi.Client, dev string) string {
+	interfaces, err := c.Interfaces()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't get devices: %v",err))
+		return ""
+	}
+	for _, iface := range interfaces {
+		if iface.Name == dev && iface.Type == wifi.InterfaceTypeStation {
+			bss, err := c.BSS(iface)
+			if err != nil {
+				continue
+			}
+			return bss.SSID
+		}
+	}
+	return ""
+}
+
+func ConnectToWifi(ifaceName, ssid, password string) error {
 	c, err := wifi.New()
 	if err != nil {
 		return err
@@ -178,7 +247,7 @@ func connectToWifi(ifaceName, ssid, password string) error {
 	return c.ConnectWPAPSK(iface, ssid, password)
 }
 
-func disconnectWifi(ifaceName string) error {
+func DisconnectWifi(ifaceName string) error {
 	c, err := wifi.New()
 	if err != nil {
 		return err
