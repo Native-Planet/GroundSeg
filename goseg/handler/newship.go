@@ -2,11 +2,14 @@ package handler
 
 import (
 	"fmt"
+	"goseg/click"
 	"goseg/config"
 	"goseg/defaults"
 	"goseg/docker"
 	"goseg/logger"
+	"goseg/startram"
 	"goseg/structs"
+	"strings"
 	"time"
 )
 
@@ -86,36 +89,80 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	//errorCleanup(patp, errmsg)
 	//return
 
-	// todo: Conditional Goroutines
-	// register startram
-	// - condition: wgRegistered
-	// toggle to remote
-	// - condition: wgRegistered, remote set to true, service has been registered
-
+	// if startram is registered
+	conf := config.Conf()
+	if conf.WgRegistered {
+		// Register Services
+		go newShipRegisterService(patp)
+	}
 	// check for +code
-	go waitForShipReady(patp)
+	go waitForShipReady(shipPayload)
 }
 
-func waitForShipReady(patp string) {
+func waitForShipReady(shipPayload structs.WsNewShipPayload) {
+	patp := shipPayload.Payload.Patp
+	remote := shipPayload.Payload.Remote
 	// transition: booting
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "booting"}
 	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
-	ticker := time.NewTicker(1 * time.Second)
-	count := 1 // temp
+	lusCodeTicker := time.NewTicker(1 * time.Second)
 	for {
 		select {
-		case <-ticker.C:
-			//code = "xxxxxx-xxxxxx-xxxxxx-xxxxxx"
-			// todo: request +code
-			logger.Logger.Info("fake +code request")
-			if count > 15 {
-				//if len(code) == 27 {
-				// transition: completed
-				docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
-				return
-			} else {
-				count = count + 1
+		case <-lusCodeTicker.C:
+			code, err := click.GetLusCode(patp)
+			if err != nil {
+				continue
 			}
+			if len(code) == 27 {
+				break
+			}
+		}
+		conf := config.Conf()
+		if conf.WgRegistered && conf.WgOn && remote {
+			newShipToggleRemote(patp)
+			shipConf := config.UrbitConf(patp)
+			shipConf.Network = "wireguard"
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				errmsg := fmt.Sprintf("Failed to update urbit config for new ship: %v", err)
+				errorCleanup(patp, errmsg)
+				return
+			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				errmsg := fmt.Sprintf("Failed to delete local container for new ship: %v", err)
+				logger.Logger.Error(errmsg)
+			}
+			info, err := docker.StartContainer(patp, "vere")
+			if err != nil {
+				errmsg := fmt.Sprintf("%v", err)
+				logger.Logger.Error(errmsg)
+				errorCleanup(patp, errmsg)
+				return
+			}
+			config.UpdateContainerState(patp, info)
+		}
+		docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
+		return
+	}
+}
+
+func newShipToggleRemote(patp string) {
+	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "remote"}
+	remoteTicker := time.NewTicker(1 * time.Second)
+	// break if all subdomains with this patp has status of "ok"
+	for {
+		select {
+		case <-remoteTicker.C:
+			tramConf := config.StartramConfig
+			for _, subd := range tramConf.Subdomains {
+				if strings.Contains(subd.URL, patp) {
+					if subd.Status != "ok" {
+						continue
+					}
+				}
+			}
+			return
 		}
 	}
 }
@@ -166,10 +213,10 @@ func errorCleanup(patp string, errmsg string) {
 	// send error transition
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)}
 	// notify that we are cleaning up
-	logger.Logger.Info(fmt.Sprintf("New ship creation failed: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("New ship creation failed: %s: %s", patp, errmsg))
 	logger.Logger.Info(fmt.Sprintf("Running cleanup routine"))
 	// remove <patp>.json
-	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %v", patp))
+	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
 	if err := config.RemoveUrbitConfig(patp); err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
@@ -227,4 +274,10 @@ func appendSysConfigPier(patp string) error {
 		return err
 	}
 	return nil
+}
+
+func newShipRegisterService(patp string) {
+	if err := startram.RegisterNewShip(patp); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
+	}
 }

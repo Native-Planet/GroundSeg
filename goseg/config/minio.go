@@ -1,11 +1,13 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func GetMinIOPassword(name string) (string, error) {
 	minioPwdMutex.Lock()
 	defer minioPwdMutex.Unlock()
-	password, exists := MinIOPasswords[name]
+	password, exists := minIOPasswords[name]
 	if !exists {
 		return "", fmt.Errorf("%v password does not exist!", name)
 	}
@@ -15,6 +17,6 @@ func GetMinIOPassword(name string) (string, error) {
 func SetMinIOPassword(name, password string) error {
 	minioPwdMutex.Lock()
 	defer minioPwdMutex.Unlock()
-	MinIOPasswords[name] = password
+	minIOPasswords[name] = password
 	return nil
 }
