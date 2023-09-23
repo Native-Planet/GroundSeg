@@ -184,19 +184,14 @@ func runCommand(command string, args ...string) (string, error) {
 }
 
 func getWifiDevice() (string, error) {
-	c, err := wifi.New()
+	cmd := "nmcli device status | grep wifi | grep -v p2p | awk '{print $1}'"
+	out, err := exec.Command("sh", "-c", cmd).Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("no WiFi device found")
 	}
-	defer c.Close()
-	devices, err := c.Interfaces()
-	if err != nil {
-		return "", err
-	}
-	for _, device := range devices {
-		if device.Type == wifi.InterfaceTypeStation {
-			return device.Name, nil
-		}
+	wifiDevice := strings.TrimSpace(string(out))
+	if wifiDevice != "" {
+		return wifiDevice, nil
 	}
 	return "", fmt.Errorf("no WiFi device found")
 }
