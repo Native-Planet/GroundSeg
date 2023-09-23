@@ -25,6 +25,20 @@ var (
 	NewShipTransBus = make(chan structs.NewShipTransition, 100)
 )
 
+func init() {
+    cli, err := client.NewClientWithOpts(client.FromEnv)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    version, err := cli.Version()
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    logger.Logger.Info(fmt.Sprintf("Docker version: ", version.Version))
+}
+
 // return the container status of a slice of ships
 func GetShipStatus(patps []string) (map[string]string, error) {
 	statuses := make(map[string]string)
