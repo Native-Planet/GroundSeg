@@ -80,7 +80,7 @@ func constructWifiInfo(dev string) {
 }
 
 func ifCheck() bool {
-	out, err := runCommand("nmcli","radio","wifi")
+	out, err := runCommand("nmcli", "radio", "wifi")
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't check interface: %v", err))
 		return false
@@ -266,7 +266,7 @@ func ToggleDevice(dev string) error {
 	} else {
 		cmd = "on"
 	}
-	_, err := runCommand("nmcli","radio","wifi",cmd)
+	_, err := runCommand("nmcli", "radio", "wifi", cmd)
 	if err != nil {
 		return err
 	}

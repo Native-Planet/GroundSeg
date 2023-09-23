@@ -233,11 +233,11 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 }
 
 // delete a container from the config map
-func DeleteContainerState(name string) { 
+func DeleteContainerState(name string) {
 	contMutex.Lock()
-	delete(GSContainers,name)
+	delete(GSContainers, name)
 	contMutex.Unlock()
-	logger.Logger.Debug(fmt.Sprintf("%s removed from container state map",name))
+	logger.Logger.Debug(fmt.Sprintf("%s removed from container state map", name))
 }
 
 // get the current container state
