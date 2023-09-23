@@ -48,7 +48,7 @@ func updateDocker() {
 	logger.Logger.Info("Unsupported Docker version detected -- attempting to upgrade")
     packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
     for _, pkg := range packages {
-        out, err := exec.Command("apt-get", "remove", pkg).CombinedOutput()
+        out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
         if err != nil {
             logger.Logger.Error(fmt.Sprintf("Error removing package %s: %v\n%s", pkg, err, out))
             return
@@ -56,7 +56,7 @@ func updateDocker() {
     }
     commands := []string{
         "apt-get update",
-        "apt-get install ca-certificates curl gnupg",
+        "apt-get install -y ca-certificates curl gnupg",
         "install -m 0755 -d /etc/apt/keyrings",
         `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg`,
         "chmod a+r /etc/apt/keyrings/docker.gpg",
@@ -74,7 +74,7 @@ func updateDocker() {
         logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
         return
     }
-	dockerPackages := []string{"install", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"}
+	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"}
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
     if err != nil {
         logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
