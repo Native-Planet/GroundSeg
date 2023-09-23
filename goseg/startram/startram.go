@@ -193,7 +193,7 @@ func SvcCreate(subdomain string, svcType string) error {
 func SvcDelete(subdomain string, svcType string) error {
 	logger.Logger.Info(fmt.Sprintf("Deleting %s registration: %s", svcType, subdomain))
 	conf := config.Conf()
-	url := "https://" + conf.EndpointUrl + "/v1/create"
+	url := "https://" + conf.EndpointUrl + "/v1/delete"
 	var delObj structs.StartramSvc
 	var respObj structs.StartramSvcResp
 	delObj.Pubkey = conf.Pubkey
@@ -203,13 +203,7 @@ func SvcDelete(subdomain string, svcType string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
-	client := &http.Client{}
-	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(delJSON))
-	if err != nil {
-		return fmt.Errorf("Unable to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(createJSON))
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
