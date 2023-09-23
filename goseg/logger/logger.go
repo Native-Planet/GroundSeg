@@ -17,7 +17,7 @@ var (
 	multiWriter    io.Writer
 	Logger         *slog.Logger
 	dynamicHandler *DynamicLevelHandler
-	ErrBus = make(chan string, 100)
+	ErrBus         = make(chan string, 100)
 )
 
 const (

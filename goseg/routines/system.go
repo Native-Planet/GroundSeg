@@ -56,33 +56,33 @@ func mDNSServer() {
 			counter++
 		}
 	}
-	ips, err := getAllIPs()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	// advertise the http server
+	// advertise the http server on loop
 	// we use RegisterProxy so we can spoof the hostname
-	_, err = zeroconf.RegisterProxy(
-		strings.Split(LocalDomain, ".")[0],
-		"_http._tcp",
-		"local.",
-		80,
-		strings.Split(LocalDomain, ".")[0],
-		ips,
-		[]string{"txtv=0", "lo=1", "la=2"},
-		nil,
-	)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to register mDNS server: %v", err))
-		return
+	for {
+		ips, err := getAllIPs()
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		server, err := zeroconf.RegisterProxy(
+			strings.Split(LocalDomain, ".")[0],
+			"_http._tcp",
+			"local.",
+			80,
+			strings.Split(LocalDomain, ".")[0],
+			ips,
+			[]string{"txtv=0", "lo=1", "la=2"},
+			nil,
+		)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
+		} // else {
+		// 	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
+		// }
+		time.Sleep(120 * time.Second)
+		server.Shutdown()
 	}
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to advertise mDNS host: %v", err))
-	}
-	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
-	// infinite blocking
-	select {}
+	// reannounce every 2 minutes
 }
 
 // return a slice of all discovered .local domains
@@ -130,7 +130,7 @@ func getAllIPs() ([]string, error) {
 				continue // skip ipv6
 			}
 			ipStr := ip.String()
-			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.17") {
+			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.17") || strings.HasPrefix(ipStr, "172.18") {
 				continue // skip local-only IPs
 			}
 			ips = append(ips, ipStr)

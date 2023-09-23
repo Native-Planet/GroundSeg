@@ -33,7 +33,9 @@ func DockerListener() {
 			// Convert the Docker event to our custom event and send it to the EventBus
 			eventBus <- structs.Event{Type: event.Action, Data: event}
 		case err := <-errs:
-			logger.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
+			}
 		}
 	}
 }
