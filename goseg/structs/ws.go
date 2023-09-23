@@ -177,12 +177,12 @@ type WsNewShipAction struct {
 }
 
 type WsSystemAction struct {
-	Type    string `json:"type"`
-	Action  string `json:"action"`
-	Command string `json:"command"`
-	Value   int    `json:"value"`
-	Update  string `json:"update"`
-	SSID    string `json:"ssid"`
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Command  string `json:"command"`
+	Value    int    `json:"value"`
+	Update   string `json:"update"`
+	SSID     string `json:"ssid"`
 	Password string `json:"password"`
 }
 

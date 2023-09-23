@@ -79,8 +79,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	newConf.MinioVersion = minioInfo["tag"]
 	newConf.MinioRepo = minioInfo["repo"]
 	if shipConf != newConf {
-		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName:newConf}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v",err))
+		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName: newConf}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
 		}
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
@@ -139,7 +139,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
-		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v",containerName,shipConf))
+		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
@@ -198,6 +198,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
-	logger.Logger.Debug(fmt.Sprintf("Boot command: %v",containerConfig.Cmd))
+	logger.Logger.Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }
