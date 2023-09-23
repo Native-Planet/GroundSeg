@@ -28,15 +28,15 @@ var (
 func init() {
     cli, err := client.NewClientWithOpts(client.FromEnv)
     if err != nil {
-        fmt.Println(err)
+        logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
         return
     }
-    version, err := cli.Version()
+    version, err := cli.ServerVersion(context.TODO())
     if err != nil {
-        fmt.Println(err)
+        logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
         return
     }
-    logger.Logger.Info(fmt.Sprintf("Docker version: ", version.Version))
+    logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
 // return the container status of a slice of ships
