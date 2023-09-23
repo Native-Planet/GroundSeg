@@ -80,6 +80,10 @@ func constructWifiInfo(dev string) {
 }
 
 func ifCheck(dev string) bool {
+	if dev == "" {
+		logger.Logger.Error("No wifi device detected")
+		return false
+	}
 	out, err := runCommand("ip", "link", "show", dev)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't check interface %v: %v", dev, err))
@@ -105,7 +109,7 @@ func C2cMode() error {
 
 func CaptivePortal(dev string) error {
 	if err := proxy.Run(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v", err))
+		logger.Logger.Error(fmt.Sprintf("Error creating captive portal: %v", err))
 		os.Exit(1)
 	}
 	return nil
@@ -205,7 +209,7 @@ func ListWifiSSIDs(dev string) []string {
 	out, err := runCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't gather wifi networks: %v", err))
-		return nil
+		return []string{}
 	}
 	lines := strings.Split(out, "\n")
 	var ssids []string
