@@ -56,14 +56,14 @@ func mDNSServer() {
 			counter++
 		}
 	}
-	ips, err := getAllIPs()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	// advertise the http server
+	// advertise the http server on loop
 	// we use RegisterProxy so we can spoof the hostname
 	for {
+		ips, err := getAllIPs()
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
 		server, err := zeroconf.RegisterProxy(
 			strings.Split(LocalDomain, ".")[0],
 			"_http._tcp",
@@ -76,9 +76,9 @@ func mDNSServer() {
 		)
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
-		} else {
-			logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
-		}
+		} // else {
+		// 	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
+		// }
 		time.Sleep(120 * time.Second)
 		server.Shutdown()
 	}

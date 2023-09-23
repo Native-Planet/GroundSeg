@@ -83,21 +83,7 @@ func init() {
 			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 			panic("")
 		}
-		// generate and insert wireguard keys
-		wgPriv, wgPub, err := WgKeyGen()
-		salt := RandString(32)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
-		} else {
-			err = UpdateConf(map[string]interface{}{
-				"pubkey":  wgPub,
-				"privkey": wgPriv,
-				"salt":    salt,
-			})
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("%v", err))
-			}
-		}
+		// generate and insert aes & wireguard keys
 		keyPath := filepath.Join(BasePath, "settings", "session.key")
 		keyfile, err := os.Stat(keyPath)
 		if err != nil || keyfile.Size() == 0 {
@@ -107,6 +93,20 @@ func init() {
 			}
 		}
 		file, _ = os.Open(confPath)
+		salt := RandString(32)
+		wgPriv, wgPub, err := WgKeyGen()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		} else {
+			if err = UpdateConf(map[string]interface{}{
+				"pubkey":  wgPub,
+				"privkey": wgPriv,
+				"salt":    salt,
+				"keyfile":  keyPath,
+			}); err != nil {
+				logger.Logger.Error(fmt.Sprintf("%v", err))
+			}
+		}
 	}
 	defer file.Close()
 	// read the sysconfig to memory
@@ -153,6 +153,24 @@ func init() {
 	if err != nil {
 		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
 		logger.Logger.Error(errmsg)
+	}
+	// create a keyfile if you dont have one (gs1)
+	conf := Conf()
+	if conf.KeyFile == "" {
+		keyPath := filepath.Join(BasePath, "settings", "session.key")
+		keyfile, err := os.Stat(keyPath)
+		if err != nil || keyfile.Size() == 0 {
+			keyContent := RandString(32)
+			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+			}
+		}
+		file, _ = os.Open(confPath)
+		if err = UpdateConf(map[string]interface{}{
+			"keyfile":  keyPath,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
 	}
 }
 
