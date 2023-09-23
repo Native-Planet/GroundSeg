@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,9 +35,51 @@ func init() {
     version, err := cli.ServerVersion(context.TODO())
     if err != nil {
         logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
+        if strings.Contains(err.Error(), "is too new") {
+            updateDocker()
+        }
         return
     }
     logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
+}
+
+// attempt to update docker daemon (apt only)
+func updateDocker() {
+	logger.Logger.Info("Unsupported Docker version detected -- attempting to upgrade")
+    packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
+    for _, pkg := range packages {
+        out, err := exec.Command("apt-get", "remove", pkg).CombinedOutput()
+        if err != nil {
+            logger.Logger.Error(fmt.Sprintf("Error removing package %s: %v\n%s", pkg, err, out))
+            return
+        }
+    }
+    commands := []string{
+        "apt-get update",
+        "apt-get install ca-certificates curl gnupg",
+        "install -m 0755 -d /etc/apt/keyrings",
+        `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg`,
+        "chmod a+r /etc/apt/keyrings/docker.gpg",
+    }
+    for _, cmd := range commands {
+        out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+        if err != nil {
+            logger.Logger.Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
+        }
+    }
+    // Update Docker sources list
+    cmd := `echo 'deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable' | tee /etc/apt/sources.list.d/docker.list > /dev/null`
+    out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+    if err != nil {
+        logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
+        return
+    }
+	dockerPackages := []string{"install", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"}
+	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
+    if err != nil {
+        logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+    }
+    logger.Logger.Info("Successfully updated Docker")
 }
 
 // return the container status of a slice of ships
