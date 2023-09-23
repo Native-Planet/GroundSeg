@@ -266,11 +266,11 @@ func DisconnectWifi(ifaceName string) error {
 func ToggleDevice(dev string) error {
 	var cmd string
 	if ifCheck(dev) {
-		cmd = "down"
+		cmd = "off"
 	} else {
-		cmd = "up"
+		cmd = "on"
 	}
-	_, err := runCommand("sudo", "ip", "link", "set", dev, cmd)
+	_, err := runCommand("nmcli","radio","wifi",cmd)
 	if err != nil {
 		return err
 	}
