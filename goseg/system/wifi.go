@@ -211,8 +211,8 @@ func ListWifiSSIDs(dev string) []string {
 	var ssids []string
 	for _, line := range lines {
 		parts := strings.Split(line, ":")
-		if len(parts) > 2 {
-			ssids = append(ssids, parts[2])
+		if len(parts) > 6 && parts[6] != "" {
+			ssids = append(ssids, parts[6])
 		}
 	}
 	return ssids
