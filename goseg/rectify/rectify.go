@@ -13,6 +13,7 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"strings"
+	"time"
 )
 
 func UrbitTransitionHandler() {
@@ -248,6 +249,33 @@ func SystemTransitionHandler() {
 			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
+}
+
+func ErrorMessageHandler() {
+	for {
+		event := <-logger.ErrBus
+		broadcast.SysTransMu.Lock()
+		broadcast.SystemTransitions.Error = append(broadcast.SystemTransitions.Error, event)
+		broadcast.SysTransMu.Unlock()
+		go removeErrorHandler(event, 5*time.Second)
+	}
+}
+
+func removeErrorHandler(err string, duration time.Duration) {
+	time.AfterFunc(duration, func() {
+		broadcast.SysTransMu.Lock()
+		defer broadcast.SysTransMu.Unlock()
+		index := -1
+		for i, e := range broadcast.SystemTransitions.Error {
+			if e == err {
+				index = i
+				break
+			}
+		}
+		if index != -1 {
+			broadcast.SystemTransitions.Error = append(broadcast.SystemTransitions.Error[:index], broadcast.SystemTransitions.Error[index+1:]...)
+		}
+	})
 }
 
 func TransitionHandler() {

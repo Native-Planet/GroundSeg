@@ -103,7 +103,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
 	conf := config.Conf()
 	piers := conf.Piers
-	logger.Logger.Debug(fmt.Sprintf("Piers: %v",piers))
 	updates := make(map[string]structs.Urbit)
 	// load fresh broadcast state
 	currentState := GetState()

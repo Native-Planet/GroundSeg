@@ -187,6 +187,8 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 func main() {
+	// push error messages to fe
+	go rectify.ErrorMessageHandler()
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
