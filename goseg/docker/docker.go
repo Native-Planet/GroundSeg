@@ -58,7 +58,7 @@ func updateDocker() {
         "apt-get update",
         "apt-get install -y ca-certificates curl gnupg",
         "install -m 0755 -d /etc/apt/keyrings",
-        `curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg`,
+        `yes | curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg`,
         "chmod a+r /etc/apt/keyrings/docker.gpg",
     }
     for _, cmd := range commands {
@@ -68,8 +68,15 @@ func updateDocker() {
         }
     }
     // Update Docker sources list
-    cmd := `echo 'deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable' | tee /etc/apt/sources.list.d/docker.list > /dev/null`
-    out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error fetching version codename: %v\n%s", err, out))
+		return
+	}
+	codename := strings.TrimSpace(string(out))
+	sourcesList := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable", "$(dpkg --print-architecture)", codename)
+	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
+	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
     if err != nil {
         logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
         return
