@@ -86,7 +86,7 @@ func updateDocker() {
 		logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
 		return
 	}
-	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"}
+	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
     if err != nil {
         logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
