@@ -43,7 +43,7 @@ func init() {
     logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
-// attempt to update docker daemon (apt only)
+// attempt to update docker daemon (ubuntu/mint only)
 func updateDocker() {
 	logger.Logger.Info("Unsupported Docker version detected -- attempting to upgrade")
     packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
@@ -73,6 +73,11 @@ func updateDocker() {
 		return
 	}
 	codename := strings.TrimSpace(string(out))
+	if contains([]string{"ulyana","ulyssa","uma","una"},codename) {
+		codename = "focal"
+	} else if contains([]string{"vanessa","vera","victoria"},codename) {
+		codename = "jammy"
+	}
 	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
 	if archErr != nil {
 		logger.Logger.Error(fmt.Sprintf("Error fetching system architecture: %v\n%s", archErr, archOut))
@@ -637,4 +642,13 @@ func getContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 		}
 	}
 	return "", fmt.Errorf("Container not found")
+}
+
+func contains(slice []string, str string) bool {
+	for _, item := range slice {
+	  if item == str {
+		return true
+	  }
+	}
+	return false
 }
