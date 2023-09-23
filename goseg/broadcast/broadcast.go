@@ -115,7 +115,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		logger.Logger.Error(errmsg)
 		return updates, err
 	}
-	logger.Logger.Debug(fmt.Sprintf("pierStatus: %v",pierStatus))
 	hostName, err := os.Hostname()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting hostname, defaulting to `nativeplanet`: %v", err)
