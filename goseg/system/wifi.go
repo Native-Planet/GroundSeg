@@ -60,7 +60,7 @@ func wifiInfoLoop(dev string) {
 }
 
 func constructWifiInfo(dev string) {
-	WifiInfo.Status = ifCheck(dev)
+	WifiInfo.Status = ifCheck()
 	if WifiInfo.Status {
 		c, err := wifi.New()
 		if err != nil {
@@ -79,17 +79,13 @@ func constructWifiInfo(dev string) {
 	}
 }
 
-func ifCheck(dev string) bool {
-	if dev == "" {
-		logger.Logger.Error("No wifi device detected")
-		return false
-	}
-	out, err := runCommand("ip", "link", "show", dev)
+func ifCheck() bool {
+	out, err := runCommand("nmcli","radio","wifi")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't check interface %v: %v", dev, err))
+		logger.Logger.Error(fmt.Sprintf("Couldn't check interface: %v", err))
 		return false
 	}
-	return strings.Contains(string(out), "UP")
+	return strings.Contains(string(out), "enabled")
 }
 
 func C2cMode() error {
@@ -265,12 +261,12 @@ func DisconnectWifi(ifaceName string) error {
 
 func ToggleDevice(dev string) error {
 	var cmd string
-	if ifCheck(dev) {
-		cmd = "down"
+	if ifCheck() {
+		cmd = "off"
 	} else {
-		cmd = "up"
+		cmd = "on"
 	}
-	_, err := runCommand("sudo", "ip", "link", "set", dev, cmd)
+	_, err := runCommand("nmcli","radio","wifi",cmd)
 	if err != nil {
 		return err
 	}
