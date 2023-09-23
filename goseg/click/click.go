@@ -32,7 +32,7 @@ func GetLusCode(patp string) (string, error) {
 		}
 		return code.LusCode, nil
 	}
-	logger.Logger.Debug(fmt.Sprintf("Allowing +code request for %s", patp))
+	// logger.Logger.Debug(fmt.Sprintf("Allowing +code request for %s", patp))
 	// <file>.hoon
 	file := "code"
 	// actual hoon

@@ -194,7 +194,7 @@ func UrbitHandler(msg []byte) error {
 		if err := broadcast.ReloadUrbits(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
 		}
-		logger.Logger.Info(fmt.Sprintf("%v container deleted",patp))
+		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)

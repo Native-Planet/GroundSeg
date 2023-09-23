@@ -83,7 +83,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		logger.Logger.Debug(fmt.Sprintf("StarTram info: %s", string(body)))
 	} else {
 		regStatus = false
-		return retrieve, fmt.Errorf("No registration record")
+		return retrieve, fmt.Errorf(fmt.Sprintf("No registration record"))
 	}
 	if conf.WgRegistered != regStatus {
 		logger.Logger.Info("Updating registration status")
@@ -114,39 +114,39 @@ func Register(regCode string, region string) error {
 	regObj.Region = region
 	regJSON, err := json.Marshal(regObj)
 	if err != nil {
-		return fmt.Errorf("Couldn't marshal registration: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(regJSON))
 	if err != nil {
-		return fmt.Errorf("Unable to connect to API server: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("Error reading response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
 	}
 	if err = json.Unmarshal(body, &respObj); err != nil {
-		return fmt.Errorf("Error unmarshalling response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
 	}
 	if respObj.Error == 0 {
 		err = config.UpdateConf(map[string]interface{}{
 			"wgRegistered": true,
 		})
 		if err != nil {
-			return fmt.Errorf("Error updating registration status: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error updating registration status: %v", err))
 		}
 		_, err := Retrieve()
 		if err != nil {
-			return fmt.Errorf("Error retrieving post-registration: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error retrieving post-registration: %v", err))
 		}
 	} else {
 		err = config.UpdateConf(map[string]interface{}{
 			"wgRegistered": false,
 		})
 		if err != nil {
-			return fmt.Errorf("Error updating registration status: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error updating registration status: %v", err))
 		}
-		return fmt.Errorf("Error registering at %s: %v", url, respObj.Debug)
+		return fmt.Errorf(fmt.Sprintf("Error registering at %s: %v", url, respObj.Debug))
 	}
 	return nil
 }
@@ -163,28 +163,28 @@ func SvcCreate(subdomain string, svcType string) error {
 	createObj.SvcType = svcType
 	createJSON, err := json.Marshal(createObj)
 	if err != nil {
-		return fmt.Errorf("Couldn't marshal registration: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(createJSON))
 	if err != nil {
-		return fmt.Errorf("Unable to connect to API server: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("Error reading response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
 	}
 	if err = json.Unmarshal(body, &respObj); err != nil {
-		return fmt.Errorf("Error unmarshalling response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
 	}
 	if respObj.Error == 0 {
 		// _, err := Retrieve()
 		// if err != nil {
 		// 	return fmt.Errorf("Error retrieving post-registration: %v", err)
 		// } // this can cause some fucked up infinite loops
-		logger.Logger.Info("Service %s created", subdomain)
+		logger.Logger.Info(fmt.Sprintf("Service %v created", subdomain))
 	} else {
-		return fmt.Errorf("Error creating %s: %v", subdomain, respObj.Debug)
+		return fmt.Errorf(fmt.Sprintf("Error creating %v: %v", subdomain, respObj.Debug))
 	}
 	return nil
 }
@@ -201,7 +201,7 @@ func SvcDelete(subdomain string, svcType string) error {
 	delObj.SvcType = svcType
 	delJSON, err := json.Marshal(delObj)
 	if err != nil {
-		return fmt.Errorf("Couldn't marshal registration: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
 	client := &http.Client{}
 	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(delJSON))
@@ -211,23 +211,23 @@ func SvcDelete(subdomain string, svcType string) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Unable to connect to API server: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("Error reading response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
 	}
 	if err = json.Unmarshal(body, &respObj); err != nil {
-		return fmt.Errorf("Error unmarshalling response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
 	}
 	if respObj.Error == 0 {
 		_, err := Retrieve()
 		if err != nil {
-			return fmt.Errorf("Error retrieving post-deletion: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error retrieving post-deletion: %v", err))
 		}
 	} else {
-		return fmt.Errorf("Error deleting %s: %v", subdomain, respObj.Debug)
+		return fmt.Errorf(fmt.Sprintf("Error deleting %s: %v", subdomain, respObj.Debug))
 	}
 	return nil
 }
@@ -244,27 +244,27 @@ func AliasCreate(subdomain string, alias string) error {
 	aliasObj.Alias = alias
 	aliasJSON, err := json.Marshal(aliasObj)
 	if err != nil {
-		return fmt.Errorf("Couldn't marshal registration: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(aliasJSON))
 	if err != nil {
-		return fmt.Errorf("Unable to connect to API server: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("Error reading response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
 	}
 	if err = json.Unmarshal(body, &respObj); err != nil {
-		return fmt.Errorf("Error unmarshalling response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
 	}
 	if respObj.Error == 0 {
 		_, err := Retrieve()
 		if err != nil {
-			return fmt.Errorf("Error retrieving post-creation: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error retrieving post-creation: %v", err))
 		}
 	} else {
-		return fmt.Errorf("Error aliasing %s: %v", alias, respObj.Debug)
+		return fmt.Errorf(fmt.Sprintf("Error aliasing %s: %v", alias, respObj.Debug))
 	}
 	return nil
 }
@@ -281,33 +281,33 @@ func AliasDelete(subdomain string, alias string) error {
 	delAliasObj.Alias = alias
 	delAliasJSON, err := json.Marshal(delAliasObj)
 	if err != nil {
-		return fmt.Errorf("Couldn't marshal alias deletion: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal alias deletion: %v", err))
 	}
 	client := &http.Client{}
 	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(delAliasJSON))
 	if err != nil {
-		return fmt.Errorf("Unable to create request: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to create request: %v", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Unable to connect to API server: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("Error reading response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
 	}
 	if err = json.Unmarshal(body, &respObj); err != nil {
-		return fmt.Errorf("Error unmarshalling response: %v", err)
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
 	}
 	if respObj.Error == 0 {
 		_, err := Retrieve()
 		if err != nil {
-			return fmt.Errorf("Error retrieving post-deletion: %v", err)
+			return fmt.Errorf(fmt.Sprintf("Error retrieving post-deletion: %v", err))
 		}
 	} else {
-		return fmt.Errorf("Error deleting alias %s: %v", alias, respObj.Debug)
+		return fmt.Errorf(fmt.Sprintf("Error deleting alias %s: %v", alias, respObj.Debug))
 	}
 	return nil
 }
@@ -332,9 +332,7 @@ func backoffRetrieve() error {
 		}
 		// timeout after 5min
 		if time.Since(startTime) > 5*time.Minute {
-			errmsg := fmt.Errorf("Registration retrieval timed out")
-			logger.Logger.Error(fmt.Sprintf("%v", errmsg))
-			return errmsg
+			return fmt.Errorf("Registration retrieval timed out")
 		}
 		// linear cooldown
 		logger.Logger.Warn(fmt.Sprintf("%v", duration))
@@ -354,6 +352,7 @@ func RegisterExistingShips() error {
 		for _, ship := range conf.Piers {
 			if err := SvcCreate(ship, "urbit"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
+				continue
 			}
 			if err := SvcCreate("s3."+ship, "minio"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))
@@ -372,7 +371,7 @@ func RegisterExistingShips() error {
 func RegisterNewShip(ship string) error {
 	logger.Logger.Info(fmt.Sprintf("Registering service for new ship: %s", ship))
 	if err := SvcCreate(ship, "urbit"); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
+		return fmt.Errorf(fmt.Sprintf("Couldn't register pier: %v: %v", ship, err))
 	}
 	if err := SvcCreate("s3."+ship, "minio"); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't register S3: %v: %v", ship, err))

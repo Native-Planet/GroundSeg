@@ -32,8 +32,8 @@ type System struct {
 }
 
 type SystemTransitionBroadcast struct {
-	Swap bool   `json:"swap"`
-	Type string `json:"type"`
+	Swap  bool     `json:"swap"`
+	Type  string   `json:"type"`
 	Error []string `json:"error"`
 }
 
