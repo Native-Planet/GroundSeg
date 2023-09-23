@@ -117,7 +117,7 @@ func SystemHandler(msg []byte) error {
 			}
 		}
 	case "wifi-toggle":
-		if err := system.ToggleDevice(); err != nil {
+		if err := system.ToggleDevice(system.Device); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't toggle wifi device: %v", err))
 		}
 	case "wifi-connect":

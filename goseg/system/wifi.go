@@ -263,7 +263,7 @@ func DisconnectWifi(ifaceName string) error {
 	return c.Disconnect(iface)
 }
 
-func ToggleDevice() error {
+func ToggleDevice(dev string) error {
 	var cmd string
 	if ifCheck(dev) {
 		cmd = "off"
