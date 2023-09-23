@@ -203,7 +203,7 @@ func SvcDelete(subdomain string, svcType string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
 	}
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(createJSON))
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(delJSON))
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
