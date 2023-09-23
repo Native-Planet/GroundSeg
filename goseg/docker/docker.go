@@ -54,6 +54,19 @@ func updateDocker() {
             return
         }
     }
+	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
+	if archErr != nil {
+		logger.Logger.Error(fmt.Sprintf("Error fetching system architecture: %v\n%s", archErr, archOut))
+		return
+	}
+	architecture := strings.TrimSpace(string(archOut))
+	sourcesList := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable", architecture, codename)
+	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
+	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
+		return
+	}
 	commands := []string{
 		"apt-get update",
 		"apt-get install -y ca-certificates curl gnupg",
