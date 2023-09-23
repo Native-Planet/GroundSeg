@@ -54,13 +54,13 @@ func updateDocker() {
             return
         }
     }
-    commands := []string{
-        "apt-get update",
-        "apt-get install -y ca-certificates curl gnupg",
-        "install -m 0755 -d /etc/apt/keyrings",
-        `yes | curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg`,
-        "chmod a+r /etc/apt/keyrings/docker.gpg",
-    }
+	commands := []string{
+		"apt-get update",
+		"apt-get install -y ca-certificates curl gnupg",
+		"install -m 0755 -d /etc/apt/keyrings",
+		`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg`, // Added --yes
+		"chmod a+r /etc/apt/keyrings/docker.gpg",
+	}
     for _, cmd := range commands {
         out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
         if err != nil {
