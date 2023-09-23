@@ -28,7 +28,7 @@ var (
 func init() {
     cli, err := client.NewClientWithOpts(client.FromEnv)
     if err != nil {
-        logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
+        logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
         return
     }
     version, err := cli.ServerVersion(context.TODO())
