@@ -163,7 +163,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 				logger.Logger.Error(fmt.Sprintf("Failed to get MinIO Password: %v", err))
 			}
 		}
-		lusCode, _ := click.GetLusCode(pier)
+		var lusCode string
+		if strings.Contains(pierStatus[pier], "Up") {
+			lusCode, _ = click.GetLusCode(pier)
+		}
 		// collate all the info from our sources into the struct
 		urbit.Info.LusCode = lusCode
 		urbit.Info.Running = isRunning
