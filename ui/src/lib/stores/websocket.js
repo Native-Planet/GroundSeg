@@ -308,21 +308,20 @@ export const startramCancel = async (key,reset) => {
 //  Upload Pier
 //
 
-export const freeUpload = () => {
+export const openUploadEndpoint = endpoint => {
   let payload = {
     "type":"pier_upload",
-    "action":"free"
+    "action":"open-endpoint",
+    "endpoint": endpoint
   }
   send(payload)
 }
 
-export const uploadMetadata = (patp,size,secret) => {
+export const closeUploadEndpoint = endpoint => {
   let payload = {
     "type":"pier_upload",
-    "action":"metadata",
-    "patp":patp,
-    "size":size,
-    "secret":secret
+    "action":"close-endpoint",
+    "endpoint": endpoint
   }
   send(payload)
 }

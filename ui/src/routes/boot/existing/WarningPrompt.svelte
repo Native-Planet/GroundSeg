@@ -1,82 +1,85 @@
 <script>
-  import { goto } from '$app/navigation';
-  import { createEventDispatcher } from 'svelte';
-  export let status
-  const dispatch = createEventDispatcher()
+  import { closeModal } from 'svelte-modals'
+  import Modal from '$lib/Modal.svelte'
+
+  import { warningDone } from './store'
+
+  export let isOpen
+
+  const kickstartUpload = () => {
+    warningDone.set(true)
+    closeModal()
+  }
 </script>
-<div class="wrapper">
-  <div class="modal">
-    <div class="question">Is your pier offline?</div>
-    <div class="info">Confirm that your pier is offline before importing your pier. It will be corrupted if it is online somewhere else.</div>
-    <div class="buttons">
-      <button
-        class="no"
-        on:click={()=>goto("/boot")}
-        >No, it is not
-      </button>
-      <button
-        class="yes"
-        disabled={status != "uploading"}
-        on:click={()=>dispatch('confirm')}
-        >Yes, it is offline
-      </button>
+{#if isOpen}
+  <Modal>
+    <div class="wrapper">
+      <h1>Is your pier offline?</h1>
+      <p>Confirm that your pier is offline before importing your pier. It will be corrupted if it is online somewhere else.</p>
+      <div class="buttons-wrapper">
+        <button
+          on:click={closeModal}
+          >No, it is not
+        </button>
+        <button
+          on:click={kickstartUpload}
+          class="confirm"
+          >Yes, it is offline
+        </button>
+      </div>
     </div>
-  </div>
-</div>
+  </Modal>
+{/if}
 <style>
   .wrapper {
-    position:absolute;
-    left: 0;
-    top: 0;
-    backdrop-filter: blur(4px);
-    -moz-backdrop-filter: blur(4px);
-    -o-backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(4px);
-    width: 100vw;
-    height: 100vh;
-    background: #FFFFFF3D;
+    margin: 32px;
+    font-family: var(--regular-font);
   }
-  .modal {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: calc(50vh - (392px/2));
-    left: calc(50vw - (572px/2));
-    background: var(--bg-modal);
-    width: calc(572px - 80px);
-    height: calc(392px - 80px);
-    border-radius: 16px;
-    padding: 40px;
-    gap: 40px;
-  }
-  .question {
+  h1 {
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
     font-size: 24px;
-    line-height: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
   }
-  .info {
-    font-size: 16px;
-    flex: 1;
+  p {
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    width: 500px;
   }
-  .buttons {
+  .buttons-wrapper {
     display: flex;
-    gap: 24px;
+    gap: 16px;
   }
   button {
-    flex:1;
-    font-size: 16px;
-    line-height: 42px;
-    color: var(--text-card-color);
+    margin-top: 56px;
+    background-color: var(--btn-secondary);
     border-radius: 16px;
     cursor: pointer;
+    padding: 0 48px;
+    height: 65px;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
   }
-  button:disabled {
-    opacity: .6;
-    pointer-events: none;
-  }
-  .no {
-    background-color: var(--btn-secondary);
-  }
-  .yes {
-    background-color: var(--bg-card);
+  .confirm {
+    background: var(--NP_Green, #047710);
   }
 </style>
