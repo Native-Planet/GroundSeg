@@ -43,9 +43,9 @@ func init() {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v", err))
 	} else {
-		Device = dev
-		constructWifiInfo(dev)
-		go wifiInfoLoop(dev)
+		Device = dev[0]
+		constructWifiInfo(dev[0])
+		go wifiInfoLoop(dev[0])
 	}
 }
 
@@ -93,11 +93,11 @@ func C2cMode() error {
 	if err != nil {
 		return err
 	}
-	if err := setupHostAPD(dev); err != nil {
+	if err := setupHostAPD(dev[0]); err != nil {
 		return err
 	}
-	go announceNetworks(dev)
-	if err := CaptivePortal(dev); err != nil {
+	go announceNetworks(dev[0])
+	if err := CaptivePortal(dev[0]); err != nil {
 		return err
 	}
 	return nil
@@ -135,7 +135,7 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if payload.Payload.Action == "connect" {
-			if err := ConnectToWifi(dev, payload.Payload.SSID, payload.Payload.Password); err != nil {
+			if err := ConnectToWifi(dev[0], payload.Payload.SSID, payload.Payload.Password); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
 				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
@@ -183,22 +183,17 @@ func runCommand(command string, args ...string) (string, error) {
 	return out.String(), err
 }
 
-func getWifiDevice() (string, error) {
-	c, err := wifi.New()
+func getWifiDevice() ([]string, error) {
+	cmd := "nmcli device status | grep wifi | awk '{print $1}'"
+	out, err := exec.Command("sh", "-c", cmd).Output()
 	if err != nil {
-		return "", err
+		return []string{}, fmt.Errorf("no WiFi device found")
 	}
-	defer c.Close()
-	devices, err := c.Interfaces()
-	if err != nil {
-		return "", err
+	wifiDevices := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if wifiDevices != nil {
+		return wifiDevices, nil
 	}
-	for _, device := range devices {
-		if device.Type == wifi.InterfaceTypeStation {
-			return device.Name, nil
-		}
-	}
-	return "", fmt.Errorf("no WiFi device found")
+	return []string{}, fmt.Errorf("no WiFi device found")
 }
 
 func ListWifiSSIDs(dev string) []string {
