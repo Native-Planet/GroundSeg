@@ -103,7 +103,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "pier_upload":
-				logger.Logger.Info("Pier upload")
+				if err = handler.UploadHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "password":
 				if err = handler.PwHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))

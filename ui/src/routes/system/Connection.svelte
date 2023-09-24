@@ -11,9 +11,9 @@
   let selectedNetwork = ""
   let password = ''
 
-  $: wifi = ($structure?.system?.wifi) || {}
+  $: wifi = ($structure?.system?.info?.wifi) || {}
   $: status = (wifi?.status) || false
-  $: active = (wifi?.active) || null
+  $: active = (wifi?.active) || ""
   $: networks = (wifi?.networks) || []
 
   afterUpdate(()=>{
@@ -39,7 +39,7 @@
   <div class="sys-title">CONNECTION</div>
 
   <div class="wifi-toggle">
-    <div class="wifi-text">Wireless Network</div>
+    <div class="wifi-text">Wi-Fi</div>
     <ToggleButton
       on:click={toggleWifi}
       on={status}
@@ -119,47 +119,87 @@
     letter-spacing: -1.44px;
   }
   .active-title {
-    font-size: 13px;
-    margin: 12px 0;
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    margin-bottom: 16px;
+    margin-top: 32px;
   }
   .active-selector {
     display: flex;
     background: var(--bg-modal);
-    padding: 8px 0 8px 24px;
     align-items: center;
-    border-radius: 8px;
+    border-radius: 16px;
+    height: 65px;
+    cursor: pointer;
   }
   .active-text {
     flex: 1;
     font-size: 13px;
     font-weight: 600;
+
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding: 20px;
   }
   .active-arrow {
     width: 40px;
   }
   .networks {
+    margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
     background: var(--btn-secondary);
-    padding: 20px;
+    padding: 20px 0;
     color: var(--text-card-color);
-    border-radius: 8px;
+    border-radius: 16px;
+  }
+  .network {
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding: 10px 20px;
+  }
+  .network:hover {
+    background: var(--bg-card);
+    
   }
   .submit {
-    margin-top: 20px;
+    margin-top: 32px;
     display: flex;
     flex-direction: column;
   }
   input {
-    padding: 8px 20px;
     font-family: var(--regular-font);
     color: var(--text-color);
     padding-left: 20px;
     border: 2px solid var(--btn-secondary);
     background-color: var(--bg-modal);
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 16px;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding: 0 20px 0 20px;
+    height: 61px;
   }
   input:focus {
     outline: none;
@@ -170,12 +210,19 @@
     gap: 24px;
   }
   button {
-    border-radius: 12px;
+    border-radius: 16px;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding: 0 48px;
     color: var(--text-card-color);
-    padding: 12px 24px;
     font-family: var(--regular-font);
-    font-size: 12px;
     cursor: pointer;
+    height: 65px;
   }
   button:disabled {
     opacity: .6;
