@@ -21,7 +21,7 @@ import (
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
-	"goseg/handler"
+	"goseg/importer"
 	"goseg/logger"
 	"goseg/rectify"
 	"goseg/routines"
@@ -155,7 +155,7 @@ func startMainServer() *http.Server {
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
 	w.HandleFunc("/export/{container}", exporter.ExportHandler)
-	w.HandleFunc("/export/{uploadSession}/{patp}", handler.UploadHandler)
+	w.HandleFunc("/import/{uploadSession}/{patp}", importer.HTTPUploadHandler)
 	wsServer := &http.Server{
 		Addr:    ":3000",
 		Handler: w,
