@@ -85,7 +85,7 @@ type StartramSvcResp struct {
 	Pubkey    string `json:"pubkey"`
 	Status    string `json:"status"`
 	Lease     string `json:"lease"`
-	Code	  int    `jsone:"code"`
+	Code      int    `jsone:"code"`
 }
 
 // Custom unmarshal for StartramRegisterResp
