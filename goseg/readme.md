@@ -63,6 +63,7 @@ stateDiagram-v2
         Minio
         MinioMC
         Netdata
+        WireGuard
     }
     Operations-->Docker_daemon: manage containers
 ```

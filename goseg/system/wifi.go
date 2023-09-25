@@ -64,7 +64,7 @@ func constructWifiInfo(dev string) {
 	if WifiInfo.Status {
 		c, err := wifi.New()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", dev, err))
 			WifiInfo.Status = false
 			WifiInfo.Active = ""
 			WifiInfo.Networks = []string{}
