@@ -4,7 +4,7 @@
   import { checkPatp } from '$lib/stores/patp'
   import { generateRandom } from '$lib/stores/gs-crypto'
   import { warningDone } from './store'
-  import { wsPort, structure, openUploadEndpoint } from '$lib/stores/websocket'
+  import { wsPort, structure, modifyUploadEndpoint, openUploadEndpoint } from '$lib/stores/websocket'
   import Sigil from './Sigil.svelte'
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
@@ -15,20 +15,16 @@
   const endpoint = generateRandom(32)
   const dispatch = createEventDispatcher()
 
-  let remote = true;
-  let fix = true;
-
-  let percent = 0
-
   /**********************
   |   DEFAULT VALUES    |
   **********************/
 
-  let filename = ""
   let patp = ""
-  /* Options for additional functionality during post upload */
-  let remoteCheck = true
-  let fixCheck = true
+  let filename = ""
+  let remote = true;
+  let fix = true;
+  let percent = 0
+
   /*  Uploader API address */
   $: addr = "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
@@ -70,9 +66,12 @@
 
   const handleUpload = (file, done) => {
     filename = file.name
-    patp = filename.split(".")[0]
-    // todo: add patp check here
-    openUploadEndpoint(endpoint)
+    let p = filename.split(".")[0]
+    let valid = checkPatp(p)
+    if (valid) {
+      patp = p 
+    }
+    openUploadEndpoint(endpoint,remote,fix)
     waitForWarning(done)
   }
 
@@ -86,8 +85,6 @@
   }
 
   const handleProgress = (file,prog,sent) => {
-    console.log(prog)
-    console.log(sent)
     dispatch("progress",prog)
     percent = prog
   }
@@ -103,6 +100,20 @@
     document.getElementById('dropper').click();
   }
 
+  const handleRemote = () => {
+    remote = !remote
+    if (patp.length > 0) {
+      openUploadEndpoint(endpoint,remote,fix)
+    }
+  }
+
+  const handleFix = () => {
+    fix = !fix
+    if (patp.length > 0) {
+      openUploadEndpoint(endpoint,remote,fix)
+    }
+  }
+
 
 </script>
 
@@ -114,7 +125,7 @@
     <button on:click={selectDropper} class="btn action-btn">Choose</button>
   </div>
   {#if registered && running}
-  <div class="check-wrapper" on:click={()=>remote = !remote}>
+  <div class="check-wrapper" on:click={handleRemote}>
     <div class="checkbox">
       {#if remote}
         <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
@@ -123,7 +134,7 @@
     <div class="check-label">Set to remote</div>
   </div>
   {/if}
-  <div class="check-wrapper" on:click={()=>fix = !fix}>
+  <div class="check-wrapper" on:click={handleFix}>
     <div class="checkbox">
       {#if fix}
         <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
