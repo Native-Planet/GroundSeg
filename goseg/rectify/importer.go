@@ -26,10 +26,8 @@ func ImportShipTransitionHandler() {
 			uploadStruct.Patp = event.Event
 		case "error":
 			uploadStruct.Error = event.Event
-		case "done":
-			uploadStruct.Done = event.Value
-		case "total":
-			uploadStruct.Total = event.Value
+		case "extracted":
+			uploadStruct.Extracted = int64(event.Value)
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 			continue

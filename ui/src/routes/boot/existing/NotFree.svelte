@@ -22,12 +22,11 @@
 
   export let status
   export let name
-  export let total
-  export let done
   export let error
   export let uploaded
+  export let extracted
 
-  let coverage = 25
+  let coverage = 0
 </script>
 
 <div class="wrapper-not-free">
@@ -45,7 +44,7 @@
   {:else if status == "creating"}
     <CreatePier {name} on:emit={()=>coverage = 60} /> 
   {:else if status == "extracting"}
-    <Extracting {name} {total} {done} on:emit={()=>coverage = 78} /> 
+    <Extracting {name} {extracted} on:emit={()=>coverage = 78} /> 
   {:else if status == "booting"}
     <BootingShip {name} on:emit={()=>coverage = 86} /> 
   {:else if status == "remote"}

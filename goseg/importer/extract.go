@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"goseg/docker"
+	"goseg/structs"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +20,7 @@ func checkExtension(filename string) string {
 	return strings.ToLower(filepath.Ext(filename))
 }
 
-// extractZip extracts .zip files
+// extractZip extracts .zip files and sends % extracted to channel
 func extractZip(src, dest string) error {
 	// Open the zip archive
 	r, err := zip.OpenReader(src)
@@ -27,63 +29,80 @@ func extractZip(src, dest string) error {
 	}
 	defer r.Close()
 
-	// Iterate through each file
+	// Initialize total and extracted sizes
+	var totalSize int64 = 0
+	var extractedSize int64 = 0
+
+	// Calculate the total size of all files in the zip
 	for _, f := range r.File {
-		// Create full path for the file
-		fpath := filepath.Join(dest, f.Name)
+		totalSize += int64(f.UncompressedSize)
+	}
 
-		// Create all directories in the path
-		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
-			return err
-		}
-
-		// Skip if it's a directory entry
-		if f.FileInfo().IsDir() {
-			continue
-		}
-
-		// Open the file from the zip archive
+	// Loop through the files in the zip archive
+	for _, f := range r.File {
+		// Open the file inside the zip
 		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
 
-		// Create the destination file
-		outFile, err := os.Create(fpath)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(outFile, rc)
+		// Define the path and create directories as needed
+		target := filepath.Join(dest, f.Name)
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, f.Mode()); err != nil {
+				return err
+			}
+		} else {
+			// Create the parent directory if it doesn't exist
+			parent := filepath.Dir(target)
+			if err := os.MkdirAll(parent, 0755); err != nil {
+				return err
+			}
 
-		// Close the file handles
-		outFile.Close()
+			// Extract the file
+			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, f.Mode())
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(file, rc); err != nil {
+				return err
+			}
+			file.Close()
+		}
 		rc.Close()
 
-		if err != nil {
-			return err
-		}
+		// Update extracted size and send to the channel
+		extractedSize += int64(f.UncompressedSize)
+		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
 	}
 	return nil
 }
+
+// extractTarGz extracts .tar.gz files and sends % extracted to channel
 func extractTarGz(src, dest string) error {
-	// Open the compressed file
+	// Open the tar.gz file
 	file, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Create gzip reader
+	// Create a gzip reader
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return err
 	}
 	defer gzr.Close()
 
-	// Create tar reader
+	// Create a tar reader
 	tr := tar.NewReader(gzr)
 
-	// Iterate through each file
+	// Initialize total and extracted sizes
+	var totalSize int64 = 0
+	var extractedSize int64 = 0
+
+	// Loop through the tar archive
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -93,32 +112,32 @@ func extractTarGz(src, dest string) error {
 			return err
 		}
 
-		// Create full path for the file
-		fpath := filepath.Join(dest, header.Name)
+		// Update total size
+		totalSize += header.Size
 
-		// Create all directories in the path
-		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
-			return err
+		// Define the path and create directories as needed
+		target := filepath.Join(dest, header.Name)
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			// Extract the file
+			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(file, tr); err != nil {
+				return err
+			}
+			file.Close()
 		}
 
-		// Skip if it's a directory entry
-		if header.FileInfo().IsDir() {
-			continue
-		}
-
-		// Create the destination file
-		outFile, err := os.Create(fpath)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(outFile, tr)
-
-		// Close the file handle
-		outFile.Close()
-
-		if err != nil {
-			return err
-		}
+		// Update extracted size and send to the channel
+		extractedSize += header.Size
+		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
 	}
 	return nil
 }

@@ -2,12 +2,10 @@
   import { createEventDispatcher, onMount } from 'svelte'
   const dispatch = createEventDispatcher()
   onMount(()=>dispatch("emit"))
-  export let name = ""
-  export let done = 0
-  export let total = 0
+  export let extracted
 </script>
 
-<div class="text">Extracting your pier - {(done / total * 100).toFixed(1)}%</div>
+<div class="text">Extracting your pier - {extracted}%</div>
 
 <style>
   .text {

@@ -33,7 +33,7 @@ type LogsEvent struct {
 type UploadTransition struct {
 	Type  string
 	Event string
-	Value int64
+	Value int
 }
 
 // for keeping track of container desired/actual state
