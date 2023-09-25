@@ -308,11 +308,24 @@ export const startramCancel = async (key,reset) => {
 //  Upload Pier
 //
 
-export const openUploadEndpoint = endpoint => {
+export const openUploadEndpoint = (endpoint,remote,fix) => {
   let payload = {
     "type":"pier_upload",
     "action":"open-endpoint",
-    "endpoint": endpoint
+    "endpoint": endpoint,
+    "remote": remote,
+    "fix": fix
+  }
+  send(payload)
+}
+
+export const modifyUploadEndpoint = (endpoint,remote,fix) => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"modify-endpoint",
+    "endpoint": endpoint,
+    "remote": remote,
+    "fix": fix
   }
   send(payload)
 }

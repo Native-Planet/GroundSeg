@@ -226,7 +226,9 @@ type WsUploadPayload struct {
 type WsUploadAction struct {
 	Type     string `json:"type"`
 	Action   string `json:"action"`
-	Endpoint string `json:endpoint"`
+	Endpoint string `json:"endpoint"`
+	Remote   bool   `json:"remote"`
+	Fix      bool   `json:"fix"`
 }
 
 type WsLogsPayload struct {
