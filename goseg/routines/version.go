@@ -31,7 +31,7 @@ func CheckVersionLoop() {
 			case <-ticker.C:
 				// Get latest information
 				latestVersion, _ := config.CheckVersion()
-	
+
 				// Check for gs binary updates based on hash
 				currentHash := conf.BinHash
 				latestHash := latestVersion.Groundseg.Amd64Sha256
