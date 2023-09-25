@@ -143,6 +143,13 @@ func filterResponse(resType string, response string) (string, bool, error) {
 				}
 			}
 		}
+	case "success": // use this if no value need to be returned
+		for _, line := range responseSlice {
+			if strings.Contains(line, "[0 %avow 0 %noun %success]") {
+				return "", true, nil
+			}
+		}
+		return "", false, nil
 	case "default":
 		return "", false, fmt.Errorf("Unknown poke response")
 	}

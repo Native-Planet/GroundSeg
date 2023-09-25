@@ -26,8 +26,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type uploadSession struct {
+	Token  structs.WsTokenStruct
+	Remote bool
+	Fix    bool
+}
+
 var (
-	uploadSessions = make(map[string]structs.WsTokenStruct) // todo: add checkbox data to struct
+	uploadSessions = make(map[string]uploadSession) // todo: add checkbox data to struct
 	uploadDir      = filepath.Join(config.BasePath, "uploads")
 	tempDir        = filepath.Join(config.BasePath, "temp")
 	uploadMu       sync.Mutex
@@ -41,19 +47,32 @@ func init() {
 func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 	uploadMu.Lock()
 	defer uploadMu.Unlock()
+	// grab from payload
 	endpoint := uploadPayload.Payload.Endpoint
 	token := uploadPayload.Token
-	// Check if endpoint exists in uploadSessions
-	if existingToken, exists := uploadSessions[endpoint]; exists {
-		if existingToken == token {
-			// If tokens are the same, do nothing
-			return nil
+	remote := uploadPayload.Payload.Remote
+	fix := uploadPayload.Payload.Fix
+
+	// check if endpoint exists
+	existingSession, exists := uploadSessions[endpoint]
+	if !exists {
+		//build new configuration
+		sesh := uploadSession{
+			Token:  token,
+			Remote: remote,
+			Fix:    fix,
 		}
-		// Tokens are different, return error
+		uploadSessions[endpoint] = sesh
+		return nil
+	}
+	// check if token is valid
+	if existingSession.Token != token {
 		return errors.New("token mismatch")
 	}
-	// If endpoint not in uploadSessions, add it
-	uploadSessions[endpoint] = token
+	// Modify checkboxes
+	existingSession.Remote = remote
+	existingSession.Fix = fix
+	uploadSessions[endpoint] = existingSession
 	return nil
 }
 
@@ -73,8 +92,7 @@ func Reset() error {
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: ""}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: ""}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: ""}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "done", Value: 0}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "total", Value: 0}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: 0}
 	return nil
 }
 
@@ -92,6 +110,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	session := vars["uploadSession"]
 	validSession := VerifySession(session)
+
 	patp := vars["patp"]
 	handleSend := func(requestCode int, status, message string) {
 		if status == "failure" {
@@ -141,8 +160,18 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			handleSend(http.StatusOK, "success", "Upload successful")
+			uploadMu.Lock()
+			sesh, exists := uploadSessions[session]
+			// debug
+			if exists {
+				logger.Logger.Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
+			} else {
+				logger.Logger.Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
+			}
+			// end debug
+			uploadMu.Unlock()
 			ClearUploadSession(session)
-			go configureUploadedPier(filename, patp)
+			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix)
 			return
 		}
 	} else {
@@ -183,7 +212,7 @@ func combineChunks(filename string, total int) error {
 	return nil
 }
 
-func configureUploadedPier(filename, patp string) {
+func configureUploadedPier(filename, patp string, remote, fix bool) {
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
 	err := shipcreator.CreateUrbitConfig(patp)
@@ -278,13 +307,12 @@ func configureUploadedPier(filename, patp string) {
 		go registerServices(patp)
 	}
 	// check for +code
-	go waitForShipReady(patp)
+	go waitForShipReady(filename, patp, remote, fix)
 }
 
-func waitForShipReady(patp string) {
+func waitForShipReady(filename, patp string, remote, fix bool) {
 	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
 	lusCodeTicker := time.NewTicker(1 * time.Second)
-ForLoop:
 	for {
 		select {
 		case <-lusCodeTicker.C:
@@ -293,11 +321,66 @@ ForLoop:
 				continue
 			}
 			if len(code) == 27 {
-				break ForLoop
+				break
 			}
 		}
+		if fix {
+			if err := click.FixAcme(patp); err != nil {
+				errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
+				logger.Logger.Error(errmsg)
+			}
+		}
+		conf := config.Conf()
+		if conf.WgRegistered && conf.WgOn && remote {
+			importShipToggleRemote(patp)
+			shipConf := config.UrbitConf(patp)
+			shipConf.Network = "wireguard"
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
+				errorCleanup(filename, patp, errmsg)
+				return
+			}
+			logger.Logger.Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
+			if err := docker.DeleteContainer(patp); err != nil {
+				errmsg := fmt.Sprintf("Failed to delete local container for imported ship: %v", err)
+				logger.Logger.Error(errmsg)
+			}
+			docker.StartContainer("minio_"+patp, "minio")
+			logger.Logger.Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
+			info, err := docker.StartContainer(patp, "vere")
+			if err != nil {
+				errmsg := fmt.Sprintf("%v", err)
+				logger.Logger.Error(errmsg)
+				errorCleanup(filename, patp, errmsg)
+				return
+			}
+			config.UpdateContainerState(patp, info)
+		}
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "completed"}
+		return
 	}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "completed"}
+}
+
+func importShipToggleRemote(patp string) {
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "remote"}
+	remoteTicker := time.NewTicker(1 * time.Second)
+	// break if all subdomains with this patp has status of "ok"
+	for {
+		select {
+		case <-remoteTicker.C:
+			tramConf := config.StartramConfig
+			for _, subd := range tramConf.Subdomains {
+				if strings.Contains(subd.URL, patp) {
+					if subd.Status != "ok" {
+						continue
+					}
+				}
+			}
+			return
+		}
+	}
 }
 
 func errorCleanup(filename, patp, errmsg string) {
