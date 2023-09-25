@@ -64,12 +64,18 @@ func init() {
 	for key := range authed {
 		ClientManager.AddAuthClient(key, nil)
 	}
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			ClientManager.CleanupStaleSessions(30 * time.Minute)
+		}
+	}()
 }
 
 func NewClientManager() *structs.ClientManager {
 	return &structs.ClientManager{
-		AuthClients:   make(map[string]*structs.MuConn),
-		UnauthClients: make(map[string]*structs.MuConn),
+		AuthClients:   make(map[string][]*structs.MuConn),
+		UnauthClients: make(map[string][]*structs.MuConn),
 	}
 }
 
@@ -77,11 +83,12 @@ func NewClientManager() *structs.ClientManager {
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	if ClientManager.AuthClients[token].Conn == conn {
-		return true
-	} else {
-		return false
+	for _, existConn := range ClientManager.AuthClients[token] {
+		if existConn.Conn == conn {
+			return true
+		}
 	}
+	return false
 }
 
 // quick check if websocket is authed at all for unauth broadcast (not for auth on its own)
@@ -91,8 +98,8 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	}
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	for _, client := range ClientManager.AuthClients {
-		if client.Conn != nil {
+	for token, _ := range ClientManager.AuthClients {
+		for _, client := range ClientManager.AuthClients[token] {
 			if client.Conn == conn {
 				return true
 			}
@@ -110,10 +117,12 @@ func WsNilSession(conn *websocket.Conn) error {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.AuthClients {
-			if client.Conn != nil {
-				if client.Conn == conn {
-					client.Active = false
-					return nil
+			for _, existClient := range client {
+				if existClient.Conn != nil {
+					if existClient.Conn == conn {
+						existClient.Active = false
+						return nil
+					}
 				}
 			}
 		}
@@ -121,10 +130,12 @@ func WsNilSession(conn *websocket.Conn) error {
 		ClientManager.Mu.Lock()
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.UnauthClients {
-			if client.Conn != nil {
-				if client.Conn == conn {
-					client.Active = false
-					return nil
+			for _, existClient := range client {
+				if existClient.Conn != nil {
+					if existClient.Conn == conn {
+						existClient.Active = false
+						return nil
+					}
 				}
 			}
 		}

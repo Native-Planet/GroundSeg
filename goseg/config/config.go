@@ -101,7 +101,7 @@ func init() {
 				"pubkey":  wgPub,
 				"privkey": wgPriv,
 				"salt":    salt,
-				"keyfile":  keyPath,
+				"keyfile": keyPath,
 			}); err != nil {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
 			}
@@ -166,7 +166,7 @@ func init() {
 		}
 		file, _ = os.Open(confPath)
 		if err = UpdateConf(map[string]interface{}{
-			"keyfile":  keyPath,
+			"keyfile": keyPath,
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}

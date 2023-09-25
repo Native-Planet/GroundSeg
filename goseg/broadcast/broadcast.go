@@ -36,6 +36,9 @@ func init() {
 	if err := bootstrapBroadcastState(); err != nil {
 		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
 	}
+	if err := LoadStartramRegions(); err != nil {
+		logger.Logger.Error("Couldn't load StarTram regions")
+	}
 	go WsDigester()
 }
 
@@ -89,7 +92,7 @@ func LoadStartramRegions() error {
 	logger.Logger.Info("Retrieving StarTram region info")
 	regions, err := startram.GetRegions()
 	if err != nil {
-		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
+		return err
 	} else {
 		mu.Lock()
 		broadcastState.Profile.Startram.Info.Regions = regions
@@ -207,12 +210,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
 
 	// Get Regions
-	regions, err := startram.GetRegions()
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't get StarTram regions: %v", err))
-	} else {
-		startramInfo.Info.Regions = regions
-	}
+	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
 	// Build profile struct
 	var profile structs.Profile
 	profile.Startram = startramInfo
