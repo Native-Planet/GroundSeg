@@ -1,6 +1,6 @@
 <script>
   import Dropzone from "dropzone"
-  import { onMount } from 'svelte'
+  import { onMount, createEventDispatcher } from 'svelte'
   import { checkPatp } from '$lib/stores/patp'
   import { generateRandom } from '$lib/stores/gs-crypto'
   import { warningDone } from './store'
@@ -13,6 +13,7 @@
   import WarningPrompt from './WarningPrompt.svelte'
 
   const endpoint = generateRandom(32)
+  const dispatch = createEventDispatcher()
 
   let remote = true;
   let fix = true;
@@ -85,6 +86,9 @@
   }
 
   const handleProgress = (file,prog,sent) => {
+    console.log(prog)
+    console.log(sent)
+    dispatch("progress",prog)
     percent = prog
   }
 
@@ -106,7 +110,7 @@
   <div class="label">Pier</div>
   <div class="upload">
     <div id="dropper"></div>
-    <div on:click={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : patp}</div>
+    <div on:click={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : filename}</div>
     <button on:click={selectDropper} class="btn action-btn">Choose</button>
   </div>
   {#if registered && running}

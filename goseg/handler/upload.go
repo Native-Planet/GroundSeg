@@ -20,6 +20,10 @@ func UploadHandler(msg []byte) error {
 		if err := importer.SetUploadSession(uploadPayload); err != nil {
 			return fmt.Errorf("Failed to open upload endpoint: %v", uploadPayload.Payload.Endpoint)
 		}
+	case "reset":
+		if err := importer.Reset(); err != nil {
+			return fmt.Errorf("Failed to reset importer: %v", err)
+		}
 	default:
 		return fmt.Errorf("Unrecognized upload action: %v", uploadPayload.Payload.Action)
 	}
