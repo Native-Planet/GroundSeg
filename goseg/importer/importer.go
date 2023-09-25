@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"goseg/click"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/logger"
+	"goseg/shipcreator"
+	"goseg/startram"
 	"goseg/structs"
 	"io"
 	"io/ioutil"
@@ -15,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -22,7 +27,7 @@ import (
 )
 
 var (
-	uploadSessions = make(map[string]structs.WsTokenStruct)
+	uploadSessions = make(map[string]structs.WsTokenStruct) // todo: add checkbox data to struct
 	uploadDir      = filepath.Join(config.BasePath, "uploads")
 	tempDir        = filepath.Join(config.BasePath, "temp")
 	uploadMu       sync.Mutex
@@ -64,6 +69,15 @@ func VerifySession(session string) bool {
 	return exists
 }
 
+func Reset() error {
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: ""}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: ""}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: ""}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "done", Value: 0}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "total", Value: 0}
+	return nil
+}
+
 func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -79,12 +93,22 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	session := vars["uploadSession"]
 	validSession := VerifySession(session)
 	patp := vars["patp"]
+	handleSend := func(requestCode int, status, message string) {
+		if status == "failure" {
+			logger.Logger.Error(fmt.Sprintf("Upload error: %v", message))
+			docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: message}
+			docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
+		}
+		w.WriteHeader(requestCode)
+		w.Write([]byte(fmt.Sprintf(`{"status": "%s", "message": "%s"}`, status, message)))
+	}
 
 	if validSession {
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: patp}
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
 		file, fileHeader, err := r.FormFile("file")
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"status": "failure", "message": "Unable to read uploaded file"}`))
+			handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Unable to read uploaded file: %v", err))
 			return
 		}
 		defer file.Close()
@@ -92,47 +116,41 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		filename := fileHeader.Filename
 		chunkIndex := r.FormValue("dzchunkindex")
 		totalChunks := r.FormValue("dztotalchunkcount")
+		logger.Logger.Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
 		index, err := strconv.Atoi(chunkIndex)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"status": "failure", "message": "Invalid chunk index"}`))
+			handleSend(http.StatusBadRequest, "failure", "Invalid chunk index")
 			return
 		}
 		total, err := strconv.Atoi(totalChunks)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"status": "failure", "message": "Invalid total chunk count"}`))
+			handleSend(http.StatusBadRequest, "failure", "Invalid total chunk count")
 			return
 		}
 		tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
 		tempFile, err := os.Create(tempFilePath)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"status": "failure", "message": "Failed to create temp file"}`))
+			handleSend(http.StatusBadRequest, "failure", "Failed to create temp file")
 			return
 		}
 		defer tempFile.Close()
 		io.Copy(tempFile, file)
 		if allChunksReceived(filename, total) {
 			if err := combineChunks(filename, total); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(`{"status": "failure", "message": "Failed to combine chunks"}`))
+				handleSend(http.StatusBadRequest, "failure", "Failed to combine chunks")
 				return
 			}
+			handleSend(http.StatusOK, "success", "Upload successful")
 			ClearUploadSession(session)
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status": "success", "message": "Upload successful"}`))
 			go configureUploadedPier(filename, patp)
 			return
 		}
 	} else {
 		logger.Logger.Error(fmt.Sprintf("Invalid upload session request %v", session))
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"status": "failure", "message": "Invalid upload session"}`))
+		handleSend(http.StatusUnauthorized, "failure", "Invalid upload session")
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "success", "message": "Chunk received successfully"}`))
+	handleSend(http.StatusOK, "success", "Chunk received successfully")
 	return
 }
 
@@ -165,6 +183,152 @@ func combineChunks(filename string, total int) error {
 	return nil
 }
 
+func configureUploadedPier(filename, patp string) {
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
+	// create pier config
+	err := shipcreator.CreateUrbitConfig(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	// update system.json
+	err = shipcreator.AppendSysConfigPier(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	// Prepare environment for pier
+	logger.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+	// delete container if exists
+	err = docker.DeleteContainer(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	// delete volume if exists
+	err = docker.DeleteVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	// create new docker volume
+	err = docker.CreateVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	// extract file to volume directory
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
+	volPath := filepath.Join(config.DockerDir, patp, "_data")
+	compressedPath := filepath.Join("/opt/nativeplanet/groundseg/uploads", filename)
+	switch checkExtension(filename) {
+	case ".zip":
+		err := extractZip(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	case ".tar.gz":
+		err := extractTarGz(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	default:
+		errmsg := fmt.Sprintf("Unsupported file type %v", filename)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	logger.Logger.Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
+	// run restructure
+	if err := restructureDirectory(patp); err != nil {
+		errorCleanup(filename, patp, fmt.Sprintf("%v", err))
+		return
+	}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
+	// start container
+	logger.Logger.Info(fmt.Sprintf("Starting extracted pier: %v", patp))
+	info, err := docker.StartContainer(patp, "vere")
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	config.UpdateContainerState(patp, info)
+	os.Remove(filepath.Join(config.BasePath, "uploads", filename))
+
+	// debug, force error
+	//errmsg := "Self induced error, for debugging purposes"
+	//errorCleanup(filename, patp, errmsg)
+	//return
+
+	// if startram is registered
+	conf := config.Conf()
+	if conf.WgRegistered {
+		// Register Services
+		go registerServices(patp)
+	}
+	// check for +code
+	go waitForShipReady(patp)
+}
+
+func waitForShipReady(patp string) {
+	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
+	lusCodeTicker := time.NewTicker(1 * time.Second)
+ForLoop:
+	for {
+		select {
+		case <-lusCodeTicker.C:
+			code, err := click.GetLusCode(patp)
+			if err != nil {
+				continue
+			}
+			if len(code) == 27 {
+				break ForLoop
+			}
+		}
+	}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "completed"}
+}
+
+func errorCleanup(filename, patp, errmsg string) {
+	// notify that we are cleaning up
+	logger.Logger.Info(fmt.Sprintf("Pier import process failed: %s: %s", patp, errmsg))
+	logger.Logger.Info(fmt.Sprintf("Running cleanup routine"))
+	//remove file
+	logger.Logger.Info(fmt.Sprintf("Removing %v", filename))
+	os.Remove(filepath.Join(config.BasePath, "uploads", filename))
+	// remove <patp>.json
+	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
+	if err := config.RemoveUrbitConfig(patp); err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	// remove patp from system.json
+	logger.Logger.Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
+	err := shipcreator.RemoveSysConfigPier(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	// remove docker volume
+	err = docker.DeleteVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	return
+}
+
 func restructureDirectory(patp string) error {
 	// get docker volume path for patp
 	volDir := ""
@@ -185,11 +349,10 @@ func restructureDirectory(patp string) error {
 	if volDir == "" {
 		return fmt.Errorf("No docker volume for %d!", patp)
 	}
-	dataDir := filepath.Join(volDir, "_data")
-	logger.Logger.Debug("%v volume path: %v", patp, dataDir)
+	logger.Logger.Debug(fmt.Sprintf("%v volume path: %v", patp, volDir))
 	// find .urb
 	var urbLoc []string
-	_ = filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -206,15 +369,15 @@ func restructureDirectory(patp string) error {
 		return fmt.Errorf("No ship found in pier directory")
 	}
 	logger.Logger.Debug(fmt.Sprintf(".urb subdirectory in %v", urbLoc[0]))
-	pierDir := filepath.Join(dataDir, patp)
-	tempDir := filepath.Join(dataDir, "temp_dir")
-	unusedDir := filepath.Join(dataDir, "unused")
+	pierDir := filepath.Join(volDir, patp)
+	tempDir := filepath.Join(volDir, "temp_dir")
+	unusedDir := filepath.Join(volDir, "unused")
 	// move it into the right place
 	if filepath.Join(pierDir, ".urb") != filepath.Join(urbLoc[0], ".urb") {
 		logger.Logger.Info(".urb location incorrect! Restructuring directory structure")
 		logger.Logger.Debug(fmt.Sprintf(".urb found in %v", urbLoc[0]))
 		logger.Logger.Debug(fmt.Sprintf("Moving to %v", tempDir))
-		if dataDir == urbLoc[0] { // .urb in root
+		if volDir == urbLoc[0] { // .urb in root
 			_ = os.MkdirAll(tempDir, 0755)
 			items, _ := ioutil.ReadDir(urbLoc[0])
 			for _, item := range items {
@@ -226,7 +389,7 @@ func restructureDirectory(patp string) error {
 			os.Rename(urbLoc[0], tempDir)
 		}
 		unused := []string{}
-		dirs, _ := ioutil.ReadDir(dataDir)
+		dirs, _ := ioutil.ReadDir(volDir)
 		for _, dir := range dirs {
 			dirName := dir.Name()
 			if dirName != "temp_dir" && dirName != "unused" {
@@ -236,7 +399,7 @@ func restructureDirectory(patp string) error {
 		if len(unused) > 0 {
 			_ = os.MkdirAll(unusedDir, 0755)
 			for _, u := range unused {
-				os.Rename(filepath.Join(dataDir, u), filepath.Join(unusedDir, u))
+				os.Rename(filepath.Join(volDir, u), filepath.Join(unusedDir, u))
 			}
 		}
 		os.Rename(tempDir, pierDir)
@@ -247,13 +410,8 @@ func restructureDirectory(patp string) error {
 	return nil
 }
 
-func configureUploadedPier(filename, patp string) {
-	// temp
-	logger.Logger.Warn(fmt.Sprintf("configure uploaded pier called: %s", patp))
-
-	// extract file to volume directory
-	// run restructure
-	// configs
-	// StartContainer
-	// errorCleanup
+func registerServices(patp string) {
+	if err := startram.RegisterNewShip(patp); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
+	}
 }

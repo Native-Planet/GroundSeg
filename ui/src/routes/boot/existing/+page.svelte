@@ -5,6 +5,7 @@
   import { structure } from '$lib/stores/websocket';
 
   import Dropzone from './Dropzone.svelte';
+  import NotFree from './NotFree.svelte';
 
   let showPrompt = false
   let confirmed = false
@@ -22,21 +23,30 @@
   }
 
   $: upload = ($structure?.upload) || {}
-  $: patp = (upload?.patp) || null
-  $: size = (upload?.size) || 0
-  $: status = (upload?.status) || "free"
-  $: uploaded = (upload?.uploaded) || 0
+
+  // debug
+  $: upload = ($structure?.upload) || {}
+  $: status = (upload?.status) || ""
+  $: patp = (upload?.patp) || ""
+  $: total = (upload?.total) || 0
+  $: done = (upload?.done) || 0
+  $: error = (upload?.error) || ""
+  let uploaded = 0
 </script>
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
   <div class="title-wrapper">
     <div class="title">IMPORT PIER</div>
   </div>
-  <div class="warning">
-    <div class="text">Warning</div>
-    <div class="text">Make sure your pier is not running anywhere else or your <strong>pier will be corrupted</strong></div>
-  </div>
-  <Dropzone />
+  {#if status.length < 1}
+    <div class="warning">
+      <div class="text">Warning</div>
+      <div class="text">Make sure your pier is not running anywhere else or your <strong>pier will be corrupted</strong></div>
+    </div>
+    <Dropzone on:progress={e=>uploaded=e.detail} />
+  {:else}
+    <NotFree {status} name={patp} {total} {done} {error} {uploaded} />
+  {/if}
 </div>
 <style>
   .wide {

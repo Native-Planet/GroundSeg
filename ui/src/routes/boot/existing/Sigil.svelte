@@ -1,118 +1,75 @@
 <script>
-  import { onMount } from 'svelte'
-  //import { getPatpArray } from '$lib/stores/patp'
-  //import { renderPy } from '$lib/stores/websocket'
+  import { afterUpdate } from 'svelte';
+  import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { sigil, stringRenderer } from '@tlon/sigil-js'
-  import { parse, stringify } from 'svgson'
-  export let patp
-  export let size
-  export let rad
-  export let percent
-  export let moon = false
-  export let padding = "0px"
+  export let name
+  export let swap = false
+  export let reverse = false
+  export let coverage = 100
+  export let moonbar = true
 
-  let bg = '#000000';
+  $: noSig = sigRemove(name)
+  $: validPatp = checkPatp(noSig)
+  $: isMoon = (noSig.length == 27) || (noSig.length == 20)
+  $: isPlanet = (noSig.length == 13)
+  $: isStar = (noSig.length == 6)
+  $: isGalaxy = (noSig.length == 3)
 
-  const parser = new DOMParser();
-  const n = Math.floor(Math.random() * Math.pow(2, 32))
+  let displayed = ""
 
-  const buildSVG = (p,bg) => {
-    let svg;
-    if (patp.length < 14) {
-      return sigil({
-        patp: p,
-        margin: false,
-        renderer: myRenderer,
-        colors: [bg,'white'],
+  afterUpdate(()=> {
+    if (validPatp && (isMoon || isPlanet || isStar || isGalaxy)) {
+      let root = getComputedStyle(document.documentElement);
+      let bg = root.getPropertyValue('--bg-modal');
+      let fg = root.getPropertyValue('--text-color');
+      if (swap) {
+        let tmp = bg
+        bg = fg
+        fg = tmp
+      }
+      let patp = noSig
+      if (isMoon) {
+        patp = patp.slice(-13)
+      } 
+      displayed = sigil({
+        patp: patp,
+        renderer: stringRenderer,
+        size: 120,
+        colors: [bg, fg],
       })
-    }
-    if (patp.length < 28) {
-      moon = true
-      parent = patp.slice(-13)
-      return sigil({
-        patp: parent,
-        margin: false,
-        renderer: myRenderer,
-        colors: [bg,'white']
-    })}
-    return "comet"
-  }
-
-  const myRenderer = e => {
-    e.children[0]['attributes']['fill'] = "none"
-    return stringify(e)
-  }
-
-  const renderSVG = (id,s) => {
-    if (s != "comet") {
-      var doc = new DOMParser().parseFromString(s, 'application/xml');
-      var nid = id + "-" + patp + "-" + n
-      var el = document.getElementById(nid)
-      el.appendChild(el.ownerDocument.importNode(doc.documentElement, true))
-    }
-  }
-
-  onMount(()=> {
-    let root = getComputedStyle(document.documentElement);
-    bg = root.getPropertyValue('--bg-card');
-    renderSVG('sig', buildSVG(patp,bg))
+    } else {
+        displayed = ""
+      }
   })
 
 </script>
-
-<div 
-  class="wrapper"
-  style="
-    height:{size};
-    width:{size};
-    border-radius:{rad};
-    padding: {padding};
-    background: {
-      percent == 0 
-      ? "transparent"
-      : "linear-gradient(to top, " + bg + " " + percent + "%, transparent " + (100 - percent) + "%;"
-    }
-    padding:{padding};">
-  <!--background: linear-gradient(to top, {bg} {percent}%, transparent {100 - percent}%);-->
-
-  <div
-    class="sigil"
-    id='sig-{patp}-{n}'
-    style="
-      width:{size};
-      height:{size};
-      ">
-  <!--
-  {#if moon}
-    <div class="moon">moon</div>
-  {/if}
-  -->
+<div
+  class="sigil"
+  style="height: {reverse ? 128 : 128 - (128*coverage/100)}px;"
+  >
+    {@html displayed}
+    {#if isMoon}<div class:moonbar={moonbar}>moon</div>{/if}
   </div>
-</div>
-
 <style>
-  .wrapper {
-    overflow: hidden;
-    position: relative;
-  }
   .sigil {
-    background-image: url("/comet.svg");
-    background-size: contain;
+    position: relative;
+    width: 128px;
+    background: var(--bg-modal);
+    overflow: hidden;
+    transition: height 1000ms;
   }
-
-  /*
-  .moon {
-    border-radius: 4px;
-    background: #040404e0;
-    color: var(--text-card-color);
+  .moonbar {
     position: absolute;
+    background: #5C7060BF;
+    height: 24px;
+    line-height: 24px;
+    font-size: 9px;
+    font-weight: 800;
     bottom: 0;
-    left: 0;
     right: 0;
-    font-size: 14px;
-    line-height: 28px;
-    padding: 1px 3px 3px 3px;
+    padding: 0 12px;
     text-align: center;
+    color: var(--text-card-color);
+    border-radius: 16px 0 0 0;
   }
-  */
 </style>
