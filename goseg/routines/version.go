@@ -25,30 +25,32 @@ func CheckVersionLoop() {
 	ticker := time.NewTicker(checkInterval)
 	conf := config.Conf()
 	releaseChannel := conf.UpdateBranch
-	for {
-		select {
-		case <-ticker.C:
-			// Get latest information
-			latestVersion, _ := config.CheckVersion()
-
-			// Check for gs binary updates based on hash
-			currentHash := conf.BinHash
-			latestHash := latestVersion.Groundseg.Amd64Sha256
-			if config.Architecture != "amd64" {
-				latestHash = latestVersion.Groundseg.Arm64Sha256
-			}
-			if currentHash != latestHash {
-				logger.Logger.Info("GroundSeg Binary update!")
-				// updateBinary will likely restart the program, so
-				// we don't have to care about the docker updates.
-				updateBinary(releaseChannel, latestVersion)
-			} else {
-				// check docker updates
-				currentChannelVersion := config.VersionInfo
-				latestChannelVersion := latestVersion
-				if latestChannelVersion != currentChannelVersion {
-					config.VersionInfo = latestVersion
-					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+	if conf.UpdateMode == "auto" {
+		for {
+			select {
+			case <-ticker.C:
+				// Get latest information
+				latestVersion, _ := config.CheckVersion()
+	
+				// Check for gs binary updates based on hash
+				currentHash := conf.BinHash
+				latestHash := latestVersion.Groundseg.Amd64Sha256
+				if config.Architecture != "amd64" {
+					latestHash = latestVersion.Groundseg.Arm64Sha256
+				}
+				if currentHash != latestHash {
+					logger.Logger.Info("GroundSeg Binary update!")
+					// updateBinary will likely restart the program, so
+					// we don't have to care about the docker updates.
+					updateBinary(releaseChannel, latestVersion)
+				} else {
+					// check docker updates
+					currentChannelVersion := config.VersionInfo
+					latestChannelVersion := latestVersion
+					if latestChannelVersion != currentChannelVersion {
+						config.VersionInfo = latestVersion
+						updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+					}
 				}
 			}
 		}
