@@ -28,8 +28,7 @@
   $: upload = ($structure?.upload) || {}
   $: status = (upload?.status) || ""
   $: patp = (upload?.patp) || ""
-  $: total = (upload?.total) || 0
-  $: done = (upload?.done) || 0
+  $: extracted = (upload?.extracted) || 0
   $: error = (upload?.error) || ""
   let uploaded = 0
 </script>
@@ -45,7 +44,7 @@
     </div>
     <Dropzone on:progress={e=>uploaded=e.detail} />
   {:else}
-    <NotFree {status} name={patp} {total} {done} {error} {uploaded} />
+    <NotFree {status} name={patp} {error} {uploaded} {extracted} />
   {/if}
 </div>
 <style>
