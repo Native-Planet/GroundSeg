@@ -40,8 +40,9 @@ var (
 
 func init() {
 	dev, err := getWifiDevice()
-	if err != nil {
+	if err != nil || dev[0] == "" {
 		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v", err))
+		return
 	} else {
 		Device = dev[0]
 		constructWifiInfo(dev[0])
