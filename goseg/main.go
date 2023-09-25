@@ -225,6 +225,8 @@ func main() {
 	go rectify.SystemTransitionHandler()
 	// digest new ship transition events
 	go rectify.NewShipTransitionHandler()
+	// digest imported ship transition events
+	go rectify.ImportShipTransitionHandler()
 	// digest retrieve data
 	go rectify.RectifyUrbit()
 	// get the startram config from server

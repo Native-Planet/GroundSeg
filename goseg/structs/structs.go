@@ -30,6 +30,12 @@ type LogsEvent struct {
 	MuCon       *MuConn // pointer to ws session
 }
 
+type UploadTransition struct {
+	Type  string
+	Event string
+	Value int64
+}
+
 // for keeping track of container desired/actual state
 type ContainerState struct {
 	ID             string

@@ -326,6 +326,14 @@ export const closeUploadEndpoint = endpoint => {
   send(payload)
 }
 
+export const resetImportShip = () => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"reset",
+  }
+  send(payload)
+}
+
 //
 //  Boot New Ship
 //

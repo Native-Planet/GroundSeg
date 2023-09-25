@@ -144,10 +144,11 @@ type Logs struct {
 
 // broadcast payload subobject
 type Upload struct {
-	Status   string `json:"status"`
-	Size     int    `json:"size"`
-	Uploaded int    `json:"uploaded"`
-	Patp     any    `json:"patp"`
+	Status string `json:"status"`
+	Total  int64  `json:"total"`
+	Done   int64  `json:"done"`
+	Patp   string `json:"patp"`
+	Error  string `json:"error"`
 }
 
 // broadcast payload subobject
