@@ -98,12 +98,10 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	}
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	for _, client := range ClientManager.AuthClients {
-		for _, existClient := range client {
-			if existClient.Conn != nil {
-				if existClient.Conn == conn {
-					return true
-				}
+	for token, _ := range ClientManager.AuthClients {
+		for _, client := range ClientManager.AuthClients[token] {
+			if client.Conn == conn {
+				return true
 			}
 		}
 	}
