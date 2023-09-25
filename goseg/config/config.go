@@ -27,15 +27,14 @@ var (
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
-	// BasePath = os.Getenv("GS_BASE_PATH")
-	BasePath = "/opt/nativeplanet/groundseg"
+	BasePath = getBasePath()
 	// only amd64 or arm64
 	Architecture = getArchitecture()
 	// struct of /retrieve blob
 	StartramConfig structs.StartramRetrieve
 	// struct of minio passwords
 	minIOPasswords = make(map[string]string)
-	// unused for now, set with `./groundseg dev`
+	// set with `./groundseg dev` (enables verbose logging)
 	DebugMode = false
 	Ready     = false
 	// representation of desired/actual container states
@@ -188,6 +187,15 @@ func getArchitecture() string {
 		return "arm64"
 	default:
 		return "amd64"
+	}
+}
+
+func getBasePath() string {
+	switch os.Getenv("GS_BASE_PATH") {
+	case "":
+		return "/opt/nativeplanet/groundseg"
+	default:
+		return os.Getenv("GS_BASE_PATH")
 	}
 }
 
