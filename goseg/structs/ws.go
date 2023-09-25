@@ -146,23 +146,29 @@ func (cm *ClientManager) CleanupStaleSessions(timeout time.Duration) {
 	defer cm.Mu.Unlock()
 	now := time.Now()
 	for token, clients := range cm.AuthClients {
-		for i, client := range clients {
-			if now.Sub(client.LastActive) > timeout {
-				cm.AuthClients[token] = append(cm.AuthClients[token][:i], cm.AuthClients[token][i+1:]...)
+		activeClients := []*MuConn{}
+		for _, client := range clients {
+			if now.Sub(client.LastActive) <= timeout {
+				activeClients = append(activeClients, client)
 			}
 		}
-		if len(cm.AuthClients[token]) == 0 {
+		if len(activeClients) == 0 {
 			delete(cm.AuthClients, token)
+		} else {
+			cm.AuthClients[token] = activeClients
 		}
 	}
 	for token, clients := range cm.UnauthClients {
-		for i, client := range clients {
-			if now.Sub(client.LastActive) > timeout {
-				cm.UnauthClients[token] = append(cm.UnauthClients[token][:i], cm.UnauthClients[token][i+1:]...)
+		activeClients := []*MuConn{}
+		for _, client := range clients {
+			if now.Sub(client.LastActive) <= timeout {
+				activeClients = append(activeClients, client)
 			}
 		}
-		if len(cm.UnauthClients[token]) == 0 {
+		if len(activeClients) == 0 {
 			delete(cm.UnauthClients, token)
+		} else {
+			cm.UnauthClients[token] = activeClients
 		}
 	}
 }
