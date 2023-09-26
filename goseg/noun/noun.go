@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/dgryski/go-bitstream"
+	"github.com/Native-Planet/go-bitstream"
 	"github.com/spaolacci/murmur3"
 	"math/big"
 	"math/bits"
