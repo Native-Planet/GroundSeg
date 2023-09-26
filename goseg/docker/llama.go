@@ -43,3 +43,36 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	}
 	return containerConfig, hostConfig, nil
 }
+
+func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
+	desiredImage := "nativeplanet/llama-gpt-ui:latest@sha256:bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
+	containerConfig := container.Config{
+		Image:    desiredImage,
+		Hostname: "llama-gpt-ui",
+		Env: []string{
+			"OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXX",
+			"OPENAI_API_HOST=http://llama-gpt-api:8000",
+			"DEFAULT_MODEL=/models/llama-2-7b-chat.bin",
+			`NEXT_PUBLIC_DEFAULT_SYSTEM_PROMPT=You are a helpful and friendly AI assistant. Respond very concisely.`,
+			"WAIT_HOSTS=llama-gpt-api:8000",
+			"WAIT_TIMEOUT=3600",
+		},
+		ExposedPorts: nat.PortSet{
+			"3000/tcp": struct{}{},
+		},
+	}
+	hostConfig := container.HostConfig{
+		RestartPolicy: container.RestartPolicy{
+			Name: "on-failure",
+		},
+		PortBindings: nat.PortMap{
+			"3000/tcp": []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: "3002",
+				},
+			},
+		},
+	}
+	return containerConfig, hostConfig, nil
+}
