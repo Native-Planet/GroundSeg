@@ -11,7 +11,6 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -118,11 +117,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		logger.Logger.Error(errmsg)
 		return updates, err
 	}
-	hostName, err := os.Hostname()
-	if err != nil {
-		errmsg := fmt.Sprintf("Error getting hostname, defaulting to `nativeplanet`: %v", err)
-		logger.Logger.Warn(errmsg)
-		hostName = "nativeplanet"
+	hostName := system.LocalUrl
+	if hostName == "" {
+		logger.Logger.Warn(fmt.Sprintf("Error getting local URL, defaulting to `nativeplanet.local`"))
+		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
 	for pier, status := range pierStatus {
@@ -153,7 +151,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			bootStatus = false
 		}
 		setRemote := false
-		urbitURL := fmt.Sprintf("http://%s.local:%d", hostName, dockerConfig.HTTPPort)
+		urbitURL := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
 		if dockerConfig.Network == "wireguard" {
 			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true

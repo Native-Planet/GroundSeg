@@ -35,7 +35,8 @@ var (
 		WebPath:             "c2c",
 	}
 	WifiInfo structs.SystemWifi
-	Device   string
+	Device   string // wifi device name
+	LocalUrl string // eg nativeplanet.local
 )
 
 func init() {
