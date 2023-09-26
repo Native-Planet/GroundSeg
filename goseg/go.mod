@@ -1,6 +1,6 @@
 module goseg
 
-go 1.21.0
+go 1.21
 
 require (
 	github.com/docker/docker v24.0.5+incompatible
@@ -18,6 +18,7 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/dgryski/go-bitstream v0.0.0-20180413035011-3522498ce2c8 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
