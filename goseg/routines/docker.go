@@ -135,7 +135,6 @@ func makeBroadcast(contName string, status string) {
 	broadcast.BroadcastToClients()
 }
 
-
 // loop to make sure ships are reachable
 // if 502 2x in 2 min, restart wg container
 func Check502Loop() {
@@ -151,9 +150,9 @@ func Check502Loop() {
 				continue
 			}
 			shipConf := config.UrbitConf(pier)
-			resp, err := http.Get("https://"+shipConf.WgURL)
+			resp, err := http.Get("https://" + shipConf.WgURL)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v",pier,err))
+				logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
 				continue
 			}
 			defer resp.Body.Close()
@@ -161,7 +160,7 @@ func Check502Loop() {
 				if shipConf.BootStatus == "boot" && conf.WgOn == true && shipConf.Network == "wireguard" {
 					if status[pier] == true {
 						if err := docker.RestartContainer("wireguard"); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v",err))
+							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 						}
 					} else if status[pier] == false {
 						status[pier] = true

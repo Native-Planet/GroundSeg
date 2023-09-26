@@ -142,29 +142,29 @@ func (cm *ClientManager) BroadcastAuth(data []byte) {
 }
 
 func (cm *ClientManager) CleanupStaleSessions(timeout time.Duration) {
-    cm.Mu.Lock()
-    defer cm.Mu.Unlock()
-    now := time.Now()
-    for token, clients := range cm.AuthClients {
-        for i, client := range clients {
-            if client != nil && now.Sub(client.LastActive) > timeout {
-                cm.AuthClients[token] = append(cm.AuthClients[token][:i], cm.AuthClients[token][i+1:]...)
-            }
-        }
-        if len(cm.AuthClients[token]) == 0 {
-            delete(cm.AuthClients, token)
-        }
-    }
-    for token, clients := range cm.UnauthClients {
-        for i, client := range clients {
-            if client != nil && now.Sub(client.LastActive) > timeout {
-                cm.UnauthClients[token] = append(cm.UnauthClients[token][:i], cm.UnauthClients[token][i+1:]...)
-            }
-        }
-        if len(cm.UnauthClients[token]) == 0 {
-            delete(cm.UnauthClients, token)
-        }
-    }
+	cm.Mu.Lock()
+	defer cm.Mu.Unlock()
+	now := time.Now()
+	for token, clients := range cm.AuthClients {
+		for i, client := range clients {
+			if client != nil && now.Sub(client.LastActive) > timeout {
+				cm.AuthClients[token] = append(cm.AuthClients[token][:i], cm.AuthClients[token][i+1:]...)
+			}
+		}
+		if len(cm.AuthClients[token]) == 0 {
+			delete(cm.AuthClients, token)
+		}
+	}
+	for token, clients := range cm.UnauthClients {
+		for i, client := range clients {
+			if client != nil && now.Sub(client.LastActive) > timeout {
+				cm.UnauthClients[token] = append(cm.UnauthClients[token][:i], cm.UnauthClients[token][i+1:]...)
+			}
+		}
+		if len(cm.UnauthClients[token]) == 0 {
+			delete(cm.UnauthClients, token)
+		}
+	}
 }
 
 type WsType struct {

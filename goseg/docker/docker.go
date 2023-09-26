@@ -650,19 +650,19 @@ func RestartContainer(name string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return fmt.Errorf("Couldn't create client: %v",err)
+		return fmt.Errorf("Couldn't create client: %v", err)
 	}
 	defer cli.Close()
-	containerID, err := getContainerIDByName(ctx,cli,name)
+	containerID, err := getContainerIDByName(ctx, cli, name)
 	if err != nil {
-		return fmt.Errorf("Couldn't get ID: %v",err)
+		return fmt.Errorf("Couldn't get ID: %v", err)
 	}
 	timeout := 30
 	stopOptions := container.StopOptions{
 		Timeout: &timeout,
 	}
 	if err := cli.ContainerRestart(ctx, containerID, stopOptions); err != nil {
-		return fmt.Errorf("Couldn't restart container: %v",err)
+		return fmt.Errorf("Couldn't restart container: %v", err)
 	}
 	return nil
 }
