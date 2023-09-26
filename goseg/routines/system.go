@@ -56,6 +56,7 @@ func mDNSServer() {
 			counter++
 		}
 	}
+	system.LocalUrl = LocalDomain
 	// advertise the http server on loop
 	// we use RegisterProxy so we can spoof the hostname
 	for {
