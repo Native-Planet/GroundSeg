@@ -98,9 +98,9 @@ func WsAuthCheck(conn *websocket.Conn) bool {
 	}
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	for token, _ := range ClientManager.AuthClients {
-		for _, client := range ClientManager.AuthClients[token] {
-			if client.Conn == conn {
+	for _, clients := range ClientManager.AuthClients {
+		for _, client := range clients {
+			if client != nil && client.Conn == conn {
 				return true
 			}
 		}
@@ -118,6 +118,9 @@ func WsNilSession(conn *websocket.Conn) error {
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.AuthClients {
 			for _, existClient := range client {
+				if existClient == nil {
+					continue
+				}
 				if existClient.Conn != nil {
 					if existClient.Conn == conn {
 						existClient.Active = false
@@ -131,6 +134,9 @@ func WsNilSession(conn *websocket.Conn) error {
 		defer ClientManager.Mu.Unlock()
 		for _, client := range ClientManager.UnauthClients {
 			for _, existClient := range client {
+				if existClient == nil {
+					continue
+				}
 				if existClient.Conn != nil {
 					if existClient.Conn == conn {
 						existClient.Active = false

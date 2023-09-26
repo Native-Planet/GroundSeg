@@ -155,21 +155,26 @@ func Check502Loop() {
 				logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
 				continue
 			}
-			defer resp.Body.Close()
+			if resp.Body != nil {
+				defer resp.Body.Close()
+			}
 			if resp.StatusCode == http.StatusBadGateway {
-				if shipConf.BootStatus == "boot" && conf.WgOn == true && shipConf.Network == "wireguard" {
-					if status[pier] == true {
+				if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
+					if _, found := status[pier]; found {
+						// found = 2x in a row
 						if err := docker.RestartContainer("wireguard"); err != nil {
 							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 						}
-					} else if status[pier] == false {
+						// remove from map after restart
+						delete(status, pier)
+					} else {
+						// first 502
 						status[pier] = true
 					}
 				}
-			} else {
-				if _, ok := status[pier]; ok {
-					delete(status, pier)
-				}
+			} else if _, found := status[pier]; found {
+				// if not 502 and pier is in status map, remove it
+				delete(status, pier)
 			}
 		}
 	}
