@@ -146,29 +146,25 @@ func (cm *ClientManager) CleanupStaleSessions(timeout time.Duration) {
 	defer cm.Mu.Unlock()
 	now := time.Now()
 	for token, clients := range cm.AuthClients {
-		activeClients := []*MuConn{}
-		for _, client := range clients {
-			if now.Sub(client.LastActive) <= timeout {
-				activeClients = append(activeClients, client)
+		for i := len(clients) - 1; i >= 0; i-- {
+			client := clients[i]
+			if client != nil && now.Sub(client.LastActive) > timeout {
+				cm.AuthClients[token] = append(cm.AuthClients[token][:i], cm.AuthClients[token][i+1:]...)
 			}
 		}
-		if len(activeClients) == 0 {
+		if len(cm.AuthClients[token]) == 0 {
 			delete(cm.AuthClients, token)
-		} else {
-			cm.AuthClients[token] = activeClients
 		}
 	}
 	for token, clients := range cm.UnauthClients {
-		activeClients := []*MuConn{}
-		for _, client := range clients {
-			if now.Sub(client.LastActive) <= timeout {
-				activeClients = append(activeClients, client)
+		for i := len(clients) - 1; i >= 0; i-- {
+			client := clients[i]
+			if client != nil && now.Sub(client.LastActive) > timeout {
+				cm.UnauthClients[token] = append(cm.UnauthClients[token][:i], cm.UnauthClients[token][i+1:]...)
 			}
 		}
-		if len(activeClients) == 0 {
+		if len(cm.UnauthClients[token]) == 0 {
 			delete(cm.UnauthClients, token)
-		} else {
-			cm.UnauthClients[token] = activeClients
 		}
 	}
 }

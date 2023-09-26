@@ -8,6 +8,8 @@ import (
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
+	"net/http"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
@@ -17,6 +19,10 @@ import (
 var (
 	eventBus = make(chan structs.Event, 100)
 )
+
+func init() {
+	go Check502Loop()
+}
 
 // subscribe to docker events and feed them into eventbus
 func DockerListener() {
@@ -127,4 +133,49 @@ func makeBroadcast(contName string, status string) {
 		broadcast.UpdateBroadcast(current)
 	}
 	broadcast.BroadcastToClients()
+}
+
+// loop to make sure ships are reachable
+// if 502 2x in 2 min, restart wg container
+func Check502Loop() {
+	status := make(map[string]bool)
+	time.Sleep(180 * time.Second)
+	for {
+		time.Sleep(60 * time.Second)
+		conf := config.Conf()
+		for _, pier := range conf.Piers {
+			err := config.LoadUrbitConfig(pier)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+				continue
+			}
+			shipConf := config.UrbitConf(pier)
+			resp, err := http.Get("https://" + shipConf.WgURL)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+				continue
+			}
+			if resp.Body != nil {
+				defer resp.Body.Close()
+			}
+			if resp.StatusCode == http.StatusBadGateway {
+				if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
+					if _, found := status[pier]; found {
+						// found = 2x in a row
+						if err := docker.RestartContainer("wireguard"); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+						}
+						// remove from map after restart
+						delete(status, pier)
+					} else {
+						// first 502
+						status[pier] = true
+					}
+				}
+			} else if _, found := status[pier]; found {
+				// if not 502 and pier is in status map, remove it
+				delete(status, pier)
+			}
+		}
+	}
 }
