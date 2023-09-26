@@ -316,7 +316,7 @@ func cue(i *big.Int) Noun {
 	return cueFromStream(r)
 }
 
-func main() {
+// func main() {
 	/*
 		// Test byteLength
 		fmt.Println(byteLength(0))                 // Expected: 0
@@ -350,9 +350,9 @@ func main() {
 	//fmt.Println(jam(1234567890987654321))
 	//fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
 
-  i := new(big.Int)
-  i.SetString("1569560238373119425266963811040232206341",10)
-	fmt.Println(pretty(cue(i),false))
+//   i := new(big.Int)
+//   i.SetString("1569560238373119425266963811040232206341",10)
+// 	fmt.Println(pretty(cue(i),false))
 
 	//jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
 	//fmt.Println(jam(jtest))
@@ -392,4 +392,4 @@ func main() {
 		fmt.Println(pretty(x, false))              // Expected: [0 0]
 		fmt.Println(pretty(x, true))               // Expected: 0 0
 	*/
-}
+// }
