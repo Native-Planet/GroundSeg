@@ -1,5 +1,0 @@
-package defaults
-
-var (
-	CaptivePage = ``
-)
