@@ -53,6 +53,36 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
+	minioInfo, err := GetLatestContainerInfo("minio")
+	// compare existing config to current version info
+	// update if new
+	// sorry this is ugly
+	shipConf := config.UrbitConf(containerName)
+	newConf := shipConf
+	if config.Architecture == "amd64" {
+		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
+			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
+		}
+		if minioInfo["hash"] != shipConf.MinioAmd64Sha256 {
+			newConf.MinioAmd64Sha256 = minioInfo["hash"]
+		}
+	} else if config.Architecture == "arm64" {
+		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
+			newConf.UrbitArm64Sha256 = containerInfo["hash"]
+		}
+		if minioInfo["hash"] != shipConf.MinioArm64Sha256 {
+			newConf.MinioArm64Sha256 = minioInfo["hash"]
+		}
+	}
+	newConf.UrbitVersion = containerInfo["tag"]
+	newConf.UrbitRepo = containerInfo["repo"]
+	newConf.MinioVersion = minioInfo["tag"]
+	newConf.MinioRepo = minioInfo["repo"]
+	if shipConf != newConf {
+		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName: newConf}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
+		}
+	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
 	// reload urbit conf from disk
 	err = config.LoadUrbitConfig(containerName)
@@ -60,8 +90,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		errmsg := fmt.Errorf("Error loading %s config: %v", containerName, err)
 		return containerConfig, hostConfig, errmsg
 	}
-	// put in memory
-	shipConf := config.UrbitConf(containerName)
 	// todo: this BootStatus doesnt actually have anythin to do with pack and meld right now
 	act := shipConf.BootStatus
 	// get the correct startup script based on BootStatus val
@@ -87,7 +115,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			logger.Logger.Warn("Unable to reset %s boot script!", containerName)
+			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
 	}
 	// write the script
@@ -99,7 +127,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	// gather boot option values
 	shipName := shipConf.PierName
 	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
-	dirnameValue := shipConf.PierName
 	var devMode string
 	if shipConf.DevMode == true {
 		devMode = "True"
@@ -112,6 +139,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
+		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
@@ -120,9 +148,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			Cmd: []string{
 				"bash",
 				"/urbit/start_urbit.sh",
-				shipName,
 				"--loom=" + loomValue,
-				"--dirname=" + dirnameValue,
+				"--dirname=" + shipName,
 				"--devmode=" + devMode,
 				"--http-port=" + httpPort,
 				"--port=" + amesPort,
@@ -146,20 +173,22 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		// finally construct the container config structs
 		containerConfig = container.Config{
 			Image: desiredImage,
+			ExposedPorts: nat.PortSet{
+				"80/tcp":    struct{}{},
+				"34343/udp": struct{}{},
+			},
 			Cmd: []string{
 				"bash",
 				"/urbit/start_urbit.sh",
-				shipName,
 				"--loom=" + loomValue,
-				"--dirname=" + dirnameValue,
+				"--dirname=" + shipName,
 				"--devmode=" + devMode,
 			},
 		}
 	}
-
 	mounts := []mount.Mount{
 		{
-			Type:   mount.TypeBind,
+			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
 			Source: shipName,
 			Target: "/urbit",
 		},
@@ -169,5 +198,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
+	logger.Logger.Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }

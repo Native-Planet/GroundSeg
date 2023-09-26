@@ -9,10 +9,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -56,14 +58,29 @@ func wgContainerConf() (container.Config, container.HostConfig, error) {
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
 	// construct the container config struct
 	containerConfig = container.Config{
-		Image:      desiredImage,
-		Entrypoint: []string{"/bin/bash"},
-		Tty:        true,
-		OpenStdin:  true,
+		Image:     desiredImage,
+		Hostname:  "wireguard",
+		Tty:       true,
+		OpenStdin: true,
 	}
-	// always on wg nw
+	// Define volume mount
+	mounts := []mount.Mount{
+		{
+			Type:   mount.TypeVolume,
+			Source: "wireguard",
+			Target: "/config",
+		},
+	}
+	wgConfig, err := config.GetWgConf()
+	if err != nil {
+		return containerConfig, hostConfig, err
+	}
 	hostConfig = container.HostConfig{
-		NetworkMode: "container:wireguard",
+		Mounts: mounts,
+		CapAdd: wgConfig.CapAdd,
+		Sysctls: map[string]string{
+			"net.ipv4.conf.all.src_valid_mark": strconv.Itoa(wgConfig.Sysctls.NetIpv4ConfAllSrcValidMark),
+		},
 	}
 	return containerConfig, hostConfig, nil
 }
@@ -87,7 +104,7 @@ func WriteWgConf() error {
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(config.DockerDir, "settings", "wireguard", "_data", "wg0.conf")
+	filePath := filepath.Join(config.DockerDir, "wireguard", "_data", "wg0.conf")
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config

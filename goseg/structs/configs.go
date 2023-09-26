@@ -1,5 +1,7 @@
 package structs
 
+import "encoding/json"
+
 // system.json config struct
 type SysConfig struct {
 	Setup        string   `json:"setup"`
@@ -20,7 +22,6 @@ type SysConfig struct {
 	LinuxUpdates struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
-		Previous bool   `json:"previous"`
 	} `json:"linuxUpdates"`
 	DockerData     string `json:"dockerData"`
 	WgOn           bool   `json:"wgOn"`
@@ -75,6 +76,109 @@ type UrbitDocker struct {
 	ShowUrbitWeb     string `json:"show_urbit_web"`
 	DevMode          bool   `json:"dev_mode"`
 	Click            bool   `json:"click"`
+}
+
+// Define the interface
+type PortSetter interface {
+	SetPort(port interface{})
+}
+
+// Add SetPort methods for relevant fields in the struct
+func (u *UrbitDocker) SetWgHTTPPort(port interface{}) {
+	u.WgHTTPPort = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgAmesPort(port interface{}) {
+	u.WgAmesPort = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgS3Port(port interface{}) {
+	u.WgS3Port = toInt(port)
+}
+
+func (u *UrbitDocker) SetWgConsolePort(port interface{}) {
+	u.WgConsolePort = toInt(port)
+}
+
+// Helper function to convert a value to int, returns 0 if not an int
+func toInt(value interface{}) int {
+	if v, ok := value.(float64); ok { // JSON numbers are float64
+		return int(v)
+	}
+	return 0
+}
+
+// Custom unmarshaler
+func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for k, v := range raw {
+		switch k {
+		case "pier_name":
+			u.PierName, _ = v.(string)
+		case "http_port":
+			u.HTTPPort = toInt(v)
+		case "ames_port":
+			u.AmesPort = toInt(v)
+		case "loom_size":
+			u.LoomSize = toInt(v)
+		case "urbit_version":
+			u.UrbitVersion, _ = v.(string)
+		case "minio_version":
+			u.MinioVersion, _ = v.(string)
+		case "urbit_repo":
+			u.UrbitRepo, _ = v.(string)
+		case "minio_repo":
+			u.MinioRepo, _ = v.(string)
+		case "urbit_amd64_sha256":
+			u.UrbitAmd64Sha256, _ = v.(string)
+		case "urbit_arm64_sha256":
+			u.UrbitArm64Sha256, _ = v.(string)
+		case "minio_amd64_sha256":
+			u.MinioAmd64Sha256, _ = v.(string)
+		case "minio_arm64_sha256":
+			u.MinioArm64Sha256, _ = v.(string)
+		case "minio_password":
+			u.MinioPassword, _ = v.(string)
+		case "network":
+			u.Network, _ = v.(string)
+		case "wg_url":
+			u.WgURL, _ = v.(string)
+		case "wg_http_port":
+			u.SetWgHTTPPort(v)
+		case "wg_ames_port":
+			u.SetWgAmesPort(v)
+		case "wg_s3_port":
+			u.SetWgS3Port(v)
+		case "wg_console_port":
+			u.SetWgConsolePort(v)
+		case "meld_schedule":
+			u.MeldSchedule, _ = v.(bool)
+		case "meld_frequency":
+			u.MeldFrequency = toInt(v)
+		case "meld_time":
+			u.MeldTime, _ = v.(string)
+		case "meld_last":
+			u.MeldLast, _ = v.(string)
+		case "meld_next":
+			u.MeldNext, _ = v.(string)
+		case "boot_status":
+			u.BootStatus, _ = v.(string)
+		case "custom_urbit_web":
+			u.CustomUrbitWeb, _ = v.(string)
+		case "custom_s3_web":
+			u.CustomS3Web, _ = v.(string)
+		case "show_urbit_web":
+			u.ShowUrbitWeb, _ = v.(string)
+		case "dev_mode":
+			u.DevMode, _ = v.(bool)
+		case "click":
+			u.Click, _ = v.(bool)
+		}
+	}
+	return nil
 }
 
 // wireguard config json

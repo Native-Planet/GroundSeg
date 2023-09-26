@@ -9,7 +9,6 @@
   import Power from './Section/Power.svelte'
   import CustomUrbitDomain from './Section/CustomUrbitDomain.svelte'
   import CustomMinIODomain from './Section/CustomMinIODomain.svelte'
-  import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
@@ -26,54 +25,59 @@
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
   $: running = (ship?.running) || false
-  $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
-  $: tTogglePower = (tShip?.togglePower) || null
   $: loomSize = (ship?.loomSize)
+  $: lusCode = (ship?.lusCode) || ""
+  $: url = (ship?.url) || "#"
+  $: minioUrl = (ship?.minioUrl) || "#"
+  $: minioPwd = (ship?.minioPwd) || ""
 
+  $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
+  $: tTogglePower = (tShip?.togglePower) || ""
+  $: tToggleDevMode = (tShip?.toggleDevMode) || ""
+  $: tToggleNetwork = (tShip?.toggleNetwork) || ""
+
+  $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
 </script>
 <div class="body">
   <!-- Power -->
   <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
 
-  <!-- Custom Urbit Domain -->
-  <CustomUrbitDomain />
+  {#if startramRegistered}
+    <!-- Custom Urbit Domain -->
+    <CustomUrbitDomain {url} {lusCode} />
 
-  <!-- Custom MinIO Domain -->
-  <CustomMinIODomain />
-
-  <!-- MinIO Settings -->
-  <MinIO />
+    <!-- Custom MinIO Domain -->
+    <CustomMinIODomain {minioUrl} {minioPwd} />
+  {/if}
 
   <!-- Loom -->
-  <Loom {loomSize} />
+  <Loom {patp} {loomSize} />
 
   <!-- Pack & Meld -->
   <PackMeld />
 
   <!-- Dev Mode -->
-  <DevMode {devMode} on:click={()=>toggleDevMode(patp)} />
+  <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
   <!-- Remote Access -->
-  <RemoteAccess {remote} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Bottom Panel -->
-  <BottomPanel />
-
+  <BottomPanel {patp}/>
 </div>
 
 <style>
+  .body::-webkit-scrollbar {display: none;}
   .body {
     background-color: var(--bg-card);
-    position: absolute;
-    bottom: 0;
-    height: calc(743px - 150px - 40px);
     width: calc(100% - 40px);
-    padding: 20px;
+    padding: 20px 20px 0 20px;
     max-width: 100vw;
     border-radius: 16px 0 120px 16px;
     color: var(--text-card-color);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 45px;
+    overflow-y: scroll;
   }
 </style>

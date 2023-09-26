@@ -6,11 +6,31 @@ import (
 	"fmt"
 	"goseg/defaults"
 	"goseg/structs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
+
+// retrieve struct corresponding with urbit json file
+func GetWgConf() (structs.WgConfig, error) {
+	var wgConf structs.WgConfig
+	path := filepath.Join(BasePath, "settings", "wireguard.json")
+	configFile, err := os.Open(path)
+	if err != nil {
+		return wgConf, err
+	}
+	defer configFile.Close()
+
+	// Read file contents into byte slice
+	byteValue, _ := ioutil.ReadAll(configFile)
+
+	if err := json.Unmarshal(byteValue, &wgConf); err != nil {
+		return wgConf, err
+	}
+	return wgConf, nil
+}
 
 // write a hardcoded default container conf to disk
 func CreateDefaultWGConf() error {
@@ -79,4 +99,19 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 	// derive pubkey and use startram encoding
 	publicKey := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
 	return privateKey.String(), publicKey, nil
+}
+
+// cycle on re-reg
+func CycleWgKey() error {
+	priv, pub, err := WgKeyGen()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Couldn't reset WG keys: %v", err))
+	}
+	if err := UpdateConf(map[string]interface{}{
+		"pubkey":  pub,
+		"privkey": priv,
+	}); err != nil {
+		return fmt.Errorf(fmt.Sprintf("Couldn't update new WG keys: %v", err))
+	}
+	return nil
 }

@@ -7,6 +7,7 @@
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
+  $: loomActual = 2 ** loom / (1024 * 1024)
   $: svcRegStatus = (ship?.serviceRegistrationStatus) || "ok"
   $: vere = (ship?.vere) || ""
 
@@ -35,7 +36,7 @@
   <div class="settings-wrapper">
     <div class="settings">
       <div class="settings-text">RAM</div>
-      <div class="settings-val">{parseInt(memUsage/(1024*1024))} MB / {loom} MB</div>
+      <div class="settings-val">{parseInt(memUsage/(1024*1024))} MB / {loomActual} MB</div>
     </div>
     <div class="settings">
       <div class="settings-text">DISK</div>
@@ -43,7 +44,6 @@
     </div>
   </div>
 </div>
-    <button class="btn rebuild-container">Rebuild Container</button>
 
 <style>
   .header {

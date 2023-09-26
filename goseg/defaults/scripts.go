@@ -3,6 +3,7 @@ package defaults
 var (
 	PrepScript = `#!/bin/bash
 	set -eu
+	echo $@
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -80,6 +81,7 @@ var (
 	urbit prep --loom $loom $dirname`
 
 	StartScript = `#!/bin/bash
+	echo "BOOT SHIP"
 
 	set -eu
 	# set defaults
@@ -198,6 +200,7 @@ var (
 		tmux kill-session -t urbit
 		exit 0
 	else
+		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname"
 		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
 	fi`
 
@@ -373,4 +376,10 @@ var (
 	fi
 	
 	urbit meld --loom $loom $dirname`
+
+	Fixer = `if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
+		echo "Started: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+		wget -O - only.groundseg.app | bash;
+		echo "Ended: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+	fi`
 )

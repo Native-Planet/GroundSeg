@@ -54,14 +54,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func NewClientManager() *structs.ClientManager {
-	return &structs.ClientManager{
-		AuthClients:   make(map[string]*structs.MuConn),
-		UnauthClients: make(map[string]*structs.MuConn),
-	}
-}
-
-var ClientManager = NewClientManager()
+var (
+	ClientManager = NewClientManager()
+)
 
 func init() {
 	conf := config.Conf()
@@ -69,38 +64,96 @@ func init() {
 	for key := range authed {
 		ClientManager.AddAuthClient(key, nil)
 	}
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			ClientManager.CleanupStaleSessions(30 * time.Minute)
+		}
+	}()
+}
+
+func NewClientManager() *structs.ClientManager {
+	return &structs.ClientManager{
+		AuthClients:   make(map[string][]*structs.MuConn),
+		UnauthClients: make(map[string][]*structs.MuConn),
+	}
 }
 
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	if ClientManager.AuthClients[token].Conn == conn {
-		return true
-	} else {
-		return false
+	for _, existConn := range ClientManager.AuthClients[token] {
+		if existConn.Conn == conn {
+			return true
+		}
 	}
+	return false
 }
 
 // quick check if websocket is authed at all for unauth broadcast (not for auth on its own)
 func WsAuthCheck(conn *websocket.Conn) bool {
+	if conn == nil {
+		return false
+	}
 	ClientManager.Mu.RLock()
 	defer ClientManager.Mu.RUnlock()
-	for _, client := range ClientManager.AuthClients {
-		if client.Conn == conn {
-			logger.Logger.Info("Client is in auth map")
-			return true
+	for _, clients := range ClientManager.AuthClients {
+		for _, client := range clients {
+			if client != nil && client.Conn == conn {
+				return true
+			}
 		}
 	}
-	logger.Logger.Info("Client not in auth map")
 	return false
+}
+
+// deactivate ws session
+func WsNilSession(conn *websocket.Conn) error {
+	if conn == nil {
+		return fmt.Errorf("Invalid session")
+	}
+	if WsAuthCheck(conn) {
+		ClientManager.Mu.Lock()
+		defer ClientManager.Mu.Unlock()
+		for _, client := range ClientManager.AuthClients {
+			for _, existClient := range client {
+				if existClient == nil {
+					continue
+				}
+				if existClient.Conn != nil {
+					if existClient.Conn == conn {
+						existClient.Active = false
+						return nil
+					}
+				}
+			}
+		}
+	} else {
+		ClientManager.Mu.Lock()
+		defer ClientManager.Mu.Unlock()
+		for _, client := range ClientManager.UnauthClients {
+			for _, existClient := range client {
+				if existClient == nil {
+					continue
+				}
+				if existClient.Conn != nil {
+					if existClient.Conn == conn {
+						existClient.Active = false
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return fmt.Errorf("Session not in client manager")
 }
 
 // is this tokenid in the auth map?
 func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
-	ClientManager.Mu.RLock()
-	defer ClientManager.Mu.RUnlock()
-	_, exists := ClientManager.AuthClients[token]
+	clientManager.Mu.RLock()
+	defer clientManager.Mu.RUnlock()
+	_, exists := clientManager.AuthClients[token]
 	return exists
 }
 
@@ -112,7 +165,10 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	tokenId := token["id"]
 	hashed := sha512.Sum512([]byte(tokenStr))
 	hash := hex.EncodeToString(hashed[:])
-	muConn := &structs.MuConn{Conn: conn}
+	muConn := &structs.MuConn{}
+	if conn != nil {
+		muConn = &structs.MuConn{Conn: conn}
+	}
 	if authed {
 		ClientManager.AddAuthClient(tokenId, muConn)
 		logger.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
@@ -138,12 +194,11 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 }
 
 // check the validity of the token
-func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, setup bool) (string, bool) {
+func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
 		return "", false
 	}
-	logger.Logger.Info(fmt.Sprintf("Checking tokenId %s", token["id"]))
 	conf := config.Conf()
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
@@ -165,12 +220,9 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request, 
 			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
 				// already marked authorized? yes
 				if res["authorized"] == "true" {
-					logger.Logger.Info("Token authenticated")
 					return token["token"], true
 				} else {
 					res["authorized"] = "true"
-					conf := config.Conf()
-					key := conf.KeyFile
 					encryptedText, err := KeyfileEncrypt(res, key)
 					if err != nil {
 						logger.Logger.Error("Error encrypting token")

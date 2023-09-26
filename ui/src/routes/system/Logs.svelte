@@ -1,10 +1,13 @@
 <script>
+  import { showLogs } from './store'
+  import LogsDrawer from './LogsDrawer.svelte'
+  import { openModal } from 'svelte-modals'
 </script>
 
 <div class="container">
-  <div class="title">SYSTEM LOGS</div>
+  <div class="sys-title">SYSTEM LOGS</div>
   <div class="spacer"></div>
-  <button class="btn">View</button>
+  <button class="btn" on:click={()=>openModal(LogsDrawer,{"title":"System Logs"})}>View</button>
 </div>
 
 <style>
@@ -14,21 +17,28 @@
     gap: 24px;
     align-items: center;
   }
-  .title {
+  .sys-title {
     margin: 0;
   }
   .spacer {
     flex: 1;
   }
   .btn {
-    font-family: var(--regular-font);
-    color: var(--text-card-color);
-    height: 42px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 12px;
+    height: 56px;
+    border-radius: 16px;
     cursor: pointer;
-    padding: 0 36px;
+    padding: 0 48px;
     background: var(--btn-secondary);
+
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
   }
 </style>

@@ -3,62 +3,82 @@
   const dispatch = createEventDispatcher()
   export let on = false
   export let loading = false
+
+  /* debug
+  let on = false
+  const loop = () => {on = !on;setTimeout(loop,3000)}
+  loop()
+  */
 </script>
 
 <div
-  class="wrapper"
+  class:on={on} 
   class:loading={loading}
-  class:highlight={on}
-  on:click={()=>dispatch("click")}>
-  <div class="text-wrapper">
-    <div class="text">On</div>
-    <div class="text">Off</div>
+  class="wrapper">
+  <div class="text on-text">On</div>
+  <div class="text off-text">Off</div>
+  <div on:click={()=>dispatch('click')} class="outer">
+    <div class="inner" style="margin-left:{on ? 71 : 8}px"></div>
   </div>
-  <div class="button {on ? "on" : "off"}"></div>
 </div>
 
 <style>
   .wrapper {
     position: relative;
-    width: 80px;
-    height: 40px;
-    float: right;
-    border-radius: 8px;
-    background-color: var(--btn-secondary);
-    color: var(--text-card-color);
+    width: 135px;
+    height: 65px;
+    flex-shrink: 0;
+
+    border-radius: 16px;
+    background: var(--text-color, #313933);
     cursor: pointer;
+    display: inline-flex;
   }
-  .hightlight {
-    background-color: var(--btn-primary);
+  .outer {
+    position: absolute;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+  }
+  .inner {
+    width: 56px;
+    height: 49px;
+    border-radius: 10px;
+    background: #161D17;
+    transition: margin-left 0.2s ease;
+    margin-top: 8px;
+  }
+  .on {
+    background: #077D13;
+  }
+  .on > .outer > .inner {
+    background: #07D91C;
+  }
+  .on-text {
+    position: absolute;
+    left: 12px;
+  }
+  .off-text {
+    position: absolute;
+    right: 12px;
+  }
+  .text {
+    top: 16px;
+    color: var(--NP_White, #F8F8F6);
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    width: 47px;
+    height: 47px;
   }
   .loading {
     opacity: .6;
     pointer-events: none;
-  }
-  .text-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 40px;
-  }
-  .text {
-    flex: 1;
-    text-align: center;
-    font-size: 12px;
-  }
-  .button {
-    position: absolute;
-    background-color: var(--btn-special);
-    width: 36px;
-    height: 32px;
-    top: 4px;
-    border-radius: 6px;
-  }
-  .off {
-    left: 4px;
-    background-color: var(--bg-card);
-  }
-  .on {
-    right: 4px;
   }
 </style>

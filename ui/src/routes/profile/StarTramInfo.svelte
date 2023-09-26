@@ -5,110 +5,62 @@
   export let registered
 </script>
 
-<div class="wrapper">
-  <div class="title">STARTRAM</div>
-  {#if registered}
+{#if registered}
+  <div class="wrapper">
+    <div class="prof-title">STARTRAM</div>
     <div class="info-wrapper">
       <div class="info">
-        <div class="item">Autorenew</div>
-        <div class="item">{renew ? "Yes" : "No"}</div>
+        <div class="item bold">Plan</div>
+        <div class="item">{!renew ? "Subscription" : "Non-Recurring"}</div>
       </div>
       <div class="info">
-        <div class="item">Expiration Date</div>
+        <div class="item bold">{!renew ? "Renewal Date" : "Expiration Date"}</div>
         <div class="item">{expiry}</div>
       </div>
     </div>
-  {:else}
+  </div>
+{:else}
+  <div>
+    <div class="prof-title">STARTRAM</div>
     <div class="info-box">Not Registered</div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
-  .wrapper {
-    width: 30%;
-  }
-  .title {
-    margin-bottom: 12px;
+  .prof-title {
+    margin-bottom: 32px;
   }
   .info-wrapper {
     display: flex;
     margin-bottom: 12px;
+    gap: calc(56px * 1.5);
   }
   .info {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
   .info-box {
     border: solid 1px var(--text-color);
-    width: 120px;
-    padding: 8px 0;
-    border-radius: 12px;
-    text-align: center;
-    font-size: 12px;
+    padding: 16px;
+    border-radius: 16px;
     opacity: .6;
+    /* text */
+    text-align: center;
+    font-size: 15px;
+    line-height: 32px;
   }
   .item {
-    font-size: 14px;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    margin-bottom: 12px;
+    letter-spacing: -1.44px;
+  }
+  .bold {
+    font-weight: 500;
   }
 </style>
-
-<!--
-<div class="body">
-  <div class="panel left">
-    <div class="header">Subscription Information</div>
-    <table>
-      {#if registered}
-        <tr class="top">
-          <td>Active Region</td>
-          <td>{renew ? "Renewal" : "Expiry"} Date</td>
-          <td>Auto Renewal</td>
-        </tr>
-        <tr class="bottom">
-          <td>{region.toUpperCase()}</td>
-          <td>{expiry}</td>
-          <td>{renew ? "Yes":"No"}</td>
-        </tr>
-      {:else}
-        <tr class="top">
-          <td></td>
-          <td>Not Registered</td>
-          <td></td>
-        </tr>
-      {/if}
-    </table>
-    <div class="header">Current Endpoint</div>
-    <div class="endpoint">{endpoint}</div>
-  </div>
-  <div class="spacer"></div>
-  {#if registered}
-    <div class="panel right">
-      <div class="header">Troubleshoot</div>
-      <button on:click={startramToggle} class="btn-troubleshoot">
-        {#if tToggle == "loading"}
-          Loading..
-        {:else}
-          Turn {running ? "Off" : "On"}
-        {/if}
-      </button>
-      <button on:click={startramRestart} class="btn-troubleshoot">Restart StarTram</button>
-      <div class="header">Account</div>
-      <div class="account">
-        <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Another Key</button>
-        <button on:click={()=>showEndpointModal.set(true)} class="btn-account">Modify Endpoint</button>
-        {#if registered}
-          <button on:click={()=>showCancelModal.set(true)} class="btn-account">Cancel Subscription</button>
-        {/if}
-      </div>
-    </div>
-  {:else}
-    <div class="unregistered-panel right">
-      <div class="account">
-        <button on:click={()=>showRegisterModal.set(true)} class="btn-account">Register Key</button>
-        <button on:click={()=>showEndpointModal.set(true)} class="btn-account">Modify Endpoint</button>
-      </div>
-    </div>
-  {/if}
-</div>
--->

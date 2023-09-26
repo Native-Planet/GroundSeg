@@ -3,22 +3,16 @@
   import Header from './Header.svelte'
   import Body from './Body.svelte'
   import DeleteModal from './DeleteModal.svelte'
-  import { showDeleteModal } from './store'
+  import Sigil from './Sigil.svelte'
   $: patp = $page.params.patp
 </script>
 
 <div class="wrapper">
-  <!-- TODO: Move to own Component -->
   <div class="mask"></div>
-  <div class="sigil"></div>
-
+  <div class="sigil"><Sigil name={patp} /></div>
   <Header {patp} />
   <Body {patp} />
 </div>
-
-{#if $showDeleteModal}
-  <DeleteModal {patp} />
-{/if}
 
 <style>
   .wrapper {

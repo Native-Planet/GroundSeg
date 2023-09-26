@@ -4,8 +4,12 @@ package system
 
 import (
 	"fmt"
+	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +34,7 @@ func GetCPU() int {
 // get used/avail disk in bytes
 func GetDisk() (uint64, uint64) {
 	d, _ := disk.Usage("/")
-	return d.Used, d.Free
+	return d.Total, d.Used
 }
 
 // get cpu temp (may not work on some devices)
@@ -51,18 +55,59 @@ func GetTemp() float64 {
 	return float64(temp) / 1000.0
 }
 
-// return 0 for no 1 for yes(?)
-func HasSwap() int {
-	data, err := ioutil.ReadFile("/proc/swaps")
+func IsNPBox(basePath string) bool {
+	filePath := filepath.Join(basePath, "nativeplanet")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return false
+	}
+	logger.Logger.Info("Thank you for supporting Native Planet!")
+	return true
+}
+
+// set up auto-reinstall script
+func FixerScript(basePath string) error {
+	// check if it's one of our boxes
+	if IsNPBox(basePath) {
+		// Create fixer.sh
+		fixer := filepath.Join(basePath, "fixer.sh")
+		if _, err := os.Stat(fixer); os.IsNotExist(err) {
+			logger.Logger.Info("Fixer script not detected, creating")
+			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
+			if err != nil {
+				return err
+			}
+		}
+		//make it a cron
+		if !cronExists(fixer) {
+			logger.Logger.Info("Fixer cron not found, creating")
+			cronJob := fmt.Sprintf("*/5 * * * * /bin/bash %s\n", fixer)
+			err := addCron(cronJob)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func cronExists(fixerPath string) bool {
+	out, err := exec.Command("crontab", "-l").Output()
 	if err != nil {
-		errmsg := fmt.Sprintf("Error reading swap status:", err)
-		logger.Logger.Error(errmsg)
-		return 0
+		return false
 	}
-	lines := strings.Split(string(data), "\n")
-	if len(lines) > 1 {
-		return 1
-	} else {
-		return 0
+	return strings.Contains(string(out), fixerPath)
+}
+
+func addCron(job string) error {
+	tmpfile, err := ioutil.TempFile("", "cron")
+	if err != nil {
+		return err
 	}
+	defer os.Remove(tmpfile.Name())
+	out, _ := exec.Command("crontab", "-l").Output()
+	tmpfile.WriteString(string(out))
+	tmpfile.WriteString(job)
+	tmpfile.Close()
+	cmd := exec.Command("crontab", tmpfile.Name())
+	return cmd.Run()
 }

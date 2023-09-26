@@ -6,9 +6,15 @@
   font-family: Inter;
   src: url('/Inter-V.ttf');
 }
+@font-face {
+  font-family: Source;
+  src: url('/SourceCodePro-Regular.otf');
+}
 body {
   margin: 0;
   /*
+  background-position: cover;
+  background-attachment: fixed;
   background-image: url('https://wallpapercave.com/wp/wp5052793.jpg');
   background-image: url('https://wallpaper-mania.com/wp-content/uploads/2018/09/High_resolution_wallpaper_background_ID_77701302686.jpg');
   background-image: url('https://images.hdqwalls.com/download/best-nature-image-1920x1080.jpg');
@@ -17,6 +23,7 @@ body {
 }
 
 :root {
+  --log-font: Source;
   --regular-font: Inter;
   --title-font: BPdotsUnicase;
   --bg-base: #E8E8E3CD;
@@ -30,6 +37,8 @@ body {
   --text-color: #313933;
   --text-card-color: #F8F8F6;
   --boot-selector-color: #F1F2EE;
+  --bg-boot-arrow: #ABBAAE;
   --locked-color: #A31708;
   font-family: var(--regular-font);
 }
+

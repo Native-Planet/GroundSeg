@@ -1,10 +1,5 @@
 package ws
 
-// you can pass websockets to other packages for reads, but please
-// try to do all writes from here
-// otherwise you have to deal with passing mutexes which is annoying
-// and hard to think about
-
 import (
 	"encoding/json"
 	"fmt"
@@ -13,8 +8,11 @@ import (
 	"goseg/config"
 	"goseg/handler"
 	"goseg/logger"
+	"goseg/setup"
+	"goseg/startram"
 	"goseg/structs"
 	"net/http"
+	"strings"
 
 	// "time"
 
@@ -33,65 +31,71 @@ var (
 
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
-	conf := config.Conf()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
-	tokenId := config.RandString(32)
-	MuCon := auth.ClientManager.NewConnection(conn, tokenId)
-	// keepalive for ws
-	// MuCon.Conn.SetPongHandler(func(string) error {
-	// 	MuCon.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	// 	return nil
-	// })
-	// pingInterval := 15 * time.Second
-	// go func() {
-	// 	ticker := time.NewTicker(pingInterval)
-	// 	defer ticker.Stop()
-	// 	for {
-	// 		select {
-	// 		case <-ticker.C:
-	// 			if err := MuCon.Write([]byte("ping")); err != nil {
-	// 				return
-	// 			}
-	// 		}
-	// 	}
-	// }()
-	// unsafe for mutex?
+	// tokenId := config.RandString(32)
+	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				logger.Logger.Info("WS closed")
 				conn.Close()
+				// cancel all log streams for this ws
+				// logEvent := structs.LogsEvent{
+				// 	Action:      false,
+				// 	ContainerID: "all",
+				// 	MuCon:       MuCon,
+				// }
+				// config.LogsEventBus <- logEvent
+				// mute the session
+				auth.WsNilSession(conn)
 			}
-			logger.Logger.Error(fmt.Sprintf("Error reading websocket message: %v", err))
+			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
 		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error unmarshalling payload: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
+		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error marshalling token (else): %v", err))
+			logger.Logger.Error(fmt.Sprintf("Error marshalling token (else): %v", err))
 			continue
 		}
 		token := map[string]string{
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
 		}
-		tokenContent, authed := auth.CheckToken(token, conn, r, conf.FirstBoot)
+		tokenContent, authed := auth.CheckToken(token, conn, r)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
 		}
 		ack := "ack"
-		if authed {
+		conf := config.Conf()
+		if authed || conf.FirstBoot {
+			// send setup broadcast if we're not done setting up
+			if conf.FirstBoot {
+				resp := structs.SetupBroadcast{
+					Type:      "structure",
+					AuthLevel: "setup",
+					Stage:     conf.Setup,
+					Page:      setup.Stages[conf.Setup],
+					Regions:   startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
+				}
+				MuCon.Write(respJSON)
+			}
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
@@ -99,7 +103,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "pier_upload":
-				logger.Logger.Info("Pier upload")
+				if err = handler.UploadHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "password":
 				if err = handler.PwHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
@@ -121,8 +128,8 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "support":
-				if err = handler.SupportHandler(msg, payload, r, conn); err != nil {
-					logger.Logger.Error(fmt.Sprintf("%v", err))
+				if err := handler.SupportHandler(msg, payload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error creating bug report: %v", err))
 					ack = "nack"
 				}
 			case "broadcast":
@@ -147,19 +154,46 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
-				if err := MuCon.Write(resp); err != nil {
-					logger.Logger.Warn("Unable to broadcast to unauth client")
-				}
+				MuCon.Write(resp)
 			case "verify":
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				authed := true
+				if conf.FirstBoot {
+					authed = false
+				}
+				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
+				}
+				if !authed {
+					resp, err := handler.UnauthHandler()
+					if err != nil {
+						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+					}
+					MuCon.Write(resp)
 				}
 				if err := broadcast.BroadcastToClients(); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
+			case "logs":
+				var logPayload structs.WsLogsPayload
+				if err := json.Unmarshal(msg, &logPayload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+					continue
+				}
+				logEvent := structs.LogsEvent{
+					Action:      logPayload.Payload.Action,
+					ContainerID: logPayload.Payload.ContainerID,
+					MuCon:       MuCon,
+				}
+				config.LogsEventBus <- logEvent
+			case "setup":
+				if err = setup.Setup(msg, MuCon, token); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
+				conf = config.Conf()
 			default:
 				errmsg := fmt.Sprintf("Unknown auth request type: %s", msgType.Payload.Type)
 				logger.Logger.Warn(errmsg)
@@ -181,9 +215,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
 				logger.Logger.Error(errmsg)
 			}
-			if err := MuCon.Write(respJson); err != nil {
-				continue
-			}
+			MuCon.Write(respJson)
 			// unauthenticated action handlers
 		} else {
 			switch msgType.Payload.Type {
@@ -193,9 +225,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 				broadcast.BroadcastToClients()
-			case "setup":
-				logger.Logger.Info("Setup")
-				// setup.Setup(payload)
 			case "verify":
 				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
@@ -204,46 +233,28 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 					ack = "nack"
 				}
-				result := map[string]interface{}{
-					"type":     "activity",
-					"id":       payload.ID,
-					"error":    "null",
-					"response": ack,
-					"token":    newToken,
-				}
-				respJson, err := json.Marshal(result)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-					ack = "nack"
-				}
-				if err := MuCon.Write(respJson); err != nil {
-					continue
-				}
+				token = newToken
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload:", err))
+					logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
-				if err := MuCon.Write(resp); err != nil {
-					logger.Logger.Warn("Unable to broadcast to unauth client")
-				}
+				MuCon.Write(resp)
 				ack = "nack"
 			}
-		}
-		// ack/nack for unauth
-		result := map[string]interface{}{
-			"type":     "activity",
-			"id":       payload.ID,
-			"error":    "null",
-			"response": ack,
-			"token":    token,
-		}
-		respJson, err := json.Marshal(result)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
-		}
-		if err := MuCon.Write(respJson); err != nil {
-			continue
+			// ack/nack for unauth broadcast
+			result := map[string]interface{}{
+				"type":     "activity",
+				"id":       payload.ID,
+				"error":    "null",
+				"response": ack,
+				"token":    token,
+			}
+			respJson, err := json.Marshal(result)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error marshalling token (init): %v", err))
+			}
+			MuCon.Write(respJson)
 		}
 	}
 }

@@ -4,16 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/auth"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
-	"math"
-	"os"
-
-	// "reflect"
 	"strings"
 	"sync"
 	"time"
@@ -22,12 +19,11 @@ import (
 )
 
 var (
-	clients           = make(map[*websocket.Conn]bool)
 	hostInfoInterval  = 1 * time.Second // how often we refresh system info
 	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
-	unauthState       structs.UnauthBroadcast
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
+	SysTransBus       = make(chan structs.SystemTransitionBroadcast, 100)
 	SystemTransitions structs.SystemTransitionBroadcast
 	UrbTransMu        sync.RWMutex
 	SysTransMu        sync.RWMutex
@@ -39,6 +35,25 @@ func init() {
 	if err := bootstrapBroadcastState(); err != nil {
 		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
 	}
+	if err := LoadStartramRegions(); err != nil {
+		logger.Logger.Error("Couldn't load StarTram regions")
+	}
+	go WsDigester()
+}
+
+func WsDigester() {
+	for {
+		event := <-structs.WsEventBus
+		if event.Conn.Conn != nil {
+			if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
+				logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
+				if err = auth.WsNilSession(event.Conn.Conn); err != nil {
+					logger.Logger.Warn("Couldn't remove WS session")
+				}
+				continue
+			}
+		}
+	}
 }
 
 // take in config file and addt'l info to initialize broadcast
@@ -46,7 +61,7 @@ func bootstrapBroadcastState() error {
 	logger.Logger.Info("Bootstrapping state")
 	// this returns a map of ship:running status
 	logger.Logger.Info("Resolving pier status")
-	urbits, err := constructPierInfo()
+	urbits, err := ConstructPierInfo()
 	if err != nil {
 		return err
 	}
@@ -54,18 +69,20 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.Urbits = urbits
 	mu.Unlock()
-	// get startram regions
-	if err := LoadStartramRegions(); err != nil {
-		logger.Logger.Warn("%v", err)
-	}
 	// update with system state
 	sysInfo := constructSystemInfo()
 	mu.Lock()
 	broadcastState.System = sysInfo
 	mu.Unlock()
+	// update with profile state
+	profileInfo := constructProfileInfo()
+	mu.Lock()
+	broadcastState.Profile = profileInfo
+	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
+	go profileStatusLoop()
 	return nil
 }
 
@@ -74,7 +91,7 @@ func LoadStartramRegions() error {
 	logger.Logger.Info("Retrieving StarTram region info")
 	regions, err := startram.GetRegions()
 	if err != nil {
-		return fmt.Errorf("Couldn't get StarTram regions: %v", err)
+		return err
 	} else {
 		mu.Lock()
 		broadcastState.Profile.Startram.Info.Regions = regions
@@ -84,7 +101,7 @@ func LoadStartramRegions() error {
 }
 
 // this is for building the broadcast objects describing piers
-func constructPierInfo() (map[string]structs.Urbit, error) {
+func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
 	conf := config.Conf()
 	piers := conf.Piers
@@ -100,11 +117,10 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		logger.Logger.Error(errmsg)
 		return updates, err
 	}
-	hostName, err := os.Hostname()
-	if err != nil {
-		errmsg := fmt.Sprintf("Error getting hostname, defaulting to `nativeplanet`: %v", err)
-		logger.Logger.Warn(errmsg)
-		hostName = "nativeplanet"
+	hostName := system.LocalUrl
+	if hostName == "" {
+		logger.Logger.Warn(fmt.Sprintf("Error getting local URL, defaulting to `nativeplanet.local`"))
+		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
 	for pier, status := range pierStatus {
@@ -135,14 +151,29 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 			bootStatus = false
 		}
 		setRemote := false
+		urbitURL := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
 		if dockerConfig.Network == "wireguard" {
+			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
+		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
+		minIOPwd := ""
+		if conf.WgRegistered && conf.WgOn {
+			minIOPwd, err = config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
+			if err != nil {
+				logger.Logger.Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+			}
+		}
+		var lusCode string
+		if strings.Contains(pierStatus[pier], "Up") {
+			lusCode, _ = click.GetLusCode(pier)
+		}
 		// collate all the info from our sources into the struct
+		urbit.Info.LusCode = lusCode
 		urbit.Info.Running = isRunning
 		urbit.Info.Network = shipNetworks[pier]
-		urbit.Info.URL = fmt.Sprintf("http://%s.local:%d", hostName, dockerConfig.HTTPPort)
-		urbit.Info.LoomSize = int(math.Pow(2, float64(dockerConfig.LoomSize)) / math.Pow(1024, 2))
+		urbit.Info.URL = urbitURL
+		urbit.Info.LoomSize = dockerConfig.LoomSize
 		urbit.Info.DiskUsage = dockerStats.DiskUsage
 		urbit.Info.MemUsage = dockerStats.MemoryUsage
 		urbit.Info.DevMode = dockerConfig.DevMode
@@ -150,13 +181,38 @@ func constructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
 		urbit.Info.Vere = dockerConfig.UrbitVersion
+		urbit.Info.MinIOUrl = minIOUrl
+		urbit.Info.MinIOPwd = minIOPwd
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
+
 		// and insert the struct into the map we will use as input for the broadcast struct
 		updates[pier] = urbit
 	}
 	return updates, nil
+}
+
+func constructProfileInfo() structs.Profile {
+	// Build startram struct
+	var startramInfo structs.Startram
+	// Information from config
+	conf := config.Conf()
+	startramInfo.Info.Registered = conf.WgRegistered
+	startramInfo.Info.Running = conf.WgOn
+	startramInfo.Info.Endpoint = conf.EndpointUrl
+
+	// Information from startram
+	startramInfo.Info.Region = config.StartramConfig.Region
+	startramInfo.Info.Expiry = config.StartramConfig.Lease
+	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
+
+	// Get Regions
+	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
+	// Build profile struct
+	var profile structs.Profile
+	profile.Startram = startramInfo
+	return profile
 }
 
 // put together the system[usage] subobject
@@ -170,8 +226,11 @@ func constructSystemInfo() structs.System {
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
 	usedDisk, freeDisk := system.GetDisk()
 	sysInfo.Info.Usage.Disk = append(diskObj, usedDisk, freeDisk)
-	sysInfo.Info.Usage.SwapFile = system.HasSwap()
+	conf := config.Conf()
+	sysInfo.Info.Usage.SwapFile = conf.SwapVal
+	sysInfo.Info.Updates = system.SystemUpdates
 	sysInfo.Transition = SystemTransitions
+	sysInfo.Info.Wifi = system.WifiInfo
 	return sysInfo
 }
 
@@ -190,102 +249,6 @@ func GetContainerNetworks(containers []string) map[string]string {
 	}
 	return res
 }
-
-/*
-// update broadcastState with a map of items
-// old method that sucks
-func UpdateBroadcastState(values map[string]interface{}) error {
-	mu.Lock()
-	v := reflect.ValueOf(&broadcastState).Elem()
-	for key, value := range values {
-		field := v.FieldByName(key)
-		if !field.IsValid() || !field.CanSet() {
-			mu.Unlock()
-			return fmt.Errorf("field %s does not exist or is not settable", key)
-		}
-		val := reflect.ValueOf(value)
-		if val.Kind() == reflect.Interface {
-			val = val.Elem() // Extract the underlying value from the interface
-		}
-		if err := recursiveUpdate(field, val); err != nil {
-			mu.Unlock()
-			return fmt.Errorf("error updating field %s: %v", key, err)
-			return err
-		}
-	}
-	mu.Unlock()
-	BroadcastToClients()
-	return nil
-}
-
-// this allows us to insert stuff into nested structs/keys and not overwrite the existing contents
-// do not use this, it can't overwrite nested structs for some reason
-func recursiveUpdate(dst, src reflect.Value) error {
-	if !dst.CanSet() {
-		return fmt.Errorf("field (type: %s, kind: %s) is not settable", dst.Type(), dst.Kind())
-	}
-
-	// If both dst and src are structs, overwrite dst with src
-	if dst.Kind() == reflect.Struct && src.Kind() == reflect.Struct {
-		dst.Set(src)
-		return nil
-	}
-
-	// If dst is a struct and src is a map, handle them field by field
-	if dst.Kind() == reflect.Struct && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			dstField := dst.FieldByName(key.String())
-			if !dstField.IsValid() {
-				return fmt.Errorf("field %s does not exist in the struct", key.String())
-			}
-			// Initialize the map if it's nil and we're trying to set a map
-			if dstField.Kind() == reflect.Map && dstField.IsNil() && src.MapIndex(key).Kind() == reflect.Map {
-				dstField.Set(reflect.MakeMap(dstField.Type()))
-			}
-			if !dstField.CanSet() {
-				return fmt.Errorf("field %s is not settable in the struct", key.String())
-			}
-			srcVal := src.MapIndex(key)
-			if srcVal.Kind() == reflect.Interface {
-				srcVal = srcVal.Elem()
-			}
-			if err := recursiveUpdate(dstField, srcVal); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// If both dst and src are maps, handle them recursively
-	if dst.Kind() == reflect.Map && src.Kind() == reflect.Map {
-		for _, key := range src.MapKeys() {
-			srcVal := src.MapIndex(key)
-			// If the key doesn't exist in dst, initialize it
-			dstVal := dst.MapIndex(key)
-			if !dstVal.IsValid() {
-				dstVal = reflect.New(dst.Type().Elem()).Elem()
-			}
-			// Recursive call to handle potential nested maps or structs
-			if err := recursiveUpdate(dstVal, srcVal); err != nil {
-				return err
-			}
-			// Initialize the map if it's nil
-			if dst.IsNil() {
-				dst.Set(reflect.MakeMap(dst.Type()))
-			}
-			dst.SetMapIndex(key, dstVal)
-		}
-		return nil
-	}
-
-	// For non-map or non-struct fields, or for direct updates
-	if dst.Type() != src.Type() {
-		return fmt.Errorf("type mismatch: expected %s, got %s", dst.Type(), src.Type())
-	}
-	dst.Set(src)
-	return nil
-}
-*/
 
 // stupid update method instead of psychotic recursion
 func UpdateBroadcast(broadcast structs.AuthBroadcast) {
@@ -323,7 +286,6 @@ func BroadcastToClients() error {
 	if err != nil {
 		return err
 	}
-
 	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
@@ -358,7 +320,7 @@ func shipStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			updates, err := constructPierInfo()
+			updates, err := ConstructPierInfo()
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
 				continue
@@ -366,9 +328,56 @@ func shipStatusLoop() {
 			mu.RLock()
 			newState := broadcastState
 			mu.RUnlock()
+			updates = PreserveUrbitsTransitions(newState, updates)
 			newState.Urbits = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}
 	}
+}
+
+func profileStatusLoop() {
+	ticker := time.NewTicker(hostInfoInterval)
+	for {
+		select {
+		case <-ticker.C:
+			updates := constructProfileInfo()
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
+			updates = PreserveProfileTransitions(newState, updates)
+			newState.Profile = updates
+			UpdateBroadcast(newState)
+			BroadcastToClients()
+		}
+	}
+}
+
+func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
+	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
+	return newProfile
+}
+
+func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[string]structs.Urbit) map[string]structs.Urbit {
+	for k, v := range oldState.Urbits {
+		urbitStruct, exists := newUrbits[k]
+		if !exists {
+			urbitStruct = structs.Urbit{}
+		}
+		urbitStruct.Transition = v.Transition
+		newUrbits[k] = urbitStruct
+	}
+	return newUrbits
+}
+
+func ReloadUrbits() error {
+	logger.Logger.Info("Reloading ships in broadcast")
+	urbits, err := ConstructPierInfo()
+	if err != nil {
+		return err
+	}
+	mu.Lock()
+	broadcastState.Urbits = urbits
+	mu.Unlock()
+	return nil
 }

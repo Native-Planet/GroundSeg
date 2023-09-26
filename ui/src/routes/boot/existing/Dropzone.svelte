@@ -1,32 +1,35 @@
 <script>
   import Dropzone from "dropzone"
-  import { onMount } from 'svelte'
-  import { checkPatp } from '$lib/stores/patp';
-  import { structure, uploadMetadata, freeUpload } from '$lib/stores/websocket'
-  import Sigil from './Sigil.svelte';
+  import { onMount, createEventDispatcher } from 'svelte'
+  import { checkPatp } from '$lib/stores/patp'
+  import { generateRandom } from '$lib/stores/gs-crypto'
+  import { warningDone } from './store'
+  import { wsPort, structure, modifyUploadEndpoint, openUploadEndpoint } from '$lib/stores/websocket'
+  import Sigil from './Sigil.svelte'
   import { page } from '$app/stores'
-  import { createEventDispatcher } from 'svelte';
+  import { goto } from '$app/navigation'
 
-  export let confirmed = false
-  export let status
-  export let size
-  export let patp
+  import { openModal } from 'svelte-modals'
+  import WarningPrompt from './WarningPrompt.svelte'
 
-  let percent = 0
-
+  const endpoint = generateRandom(32)
   const dispatch = createEventDispatcher()
-  const secret = "aaaaaaaa"
 
   /**********************
   |   DEFAULT VALUES    |
   **********************/
 
-  $: patp = ($structure?.upload?.patp) || "Not chosen"
-  /* Options for additional functionality during post upload */
-  let remoteCheck = true
-  let fixCheck = true
+  let patp = ""
+  let filename = ""
+  let remote = true;
+  let fix = true;
+  let percent = 0
+
   /*  Uploader API address */
-  $: addr = "http://" + $page.url.hostname + ":27016/upload"
+  $: addr = "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
+  $: registered = ($structure?.profile?.startram?.info?.registered) || false
+  $: running = ($structure?.profile?.startram?.info?.running) || false
+
 
   /*  Now, we intialize the dropzone during mount */
   onMount(()=> {
@@ -34,8 +37,8 @@
       /* Display */
       disablePreviews: true,
       /* HTTP */
-      withCredentials: true,
-      url: addr,
+      /*withCredentials: true,*/
+      url: handleAddr,
       /* Chunking */
       chunkSize: 50000000, // bytes
       chunking: true,
@@ -45,46 +48,44 @@
       /* File Settings */
       acceptedFiles: '.zip, .tar, .tgz, .gz',
       maxFilesize: 11000000, // megabytes
-      paramName: setName, // The name that will be used to transfer the file
+      paramName: "file", // The name that will be used to transfer the file
       /* Events */
-      /* Accept: returns a done() if accepted */
+      /* Accept: call done() in accepted */
       /* Success: Completed all chunks */
       /* Error: Something went wrong */
-      accept: verifyFile,
+      accept: handleUpload,
       uploadprogress: handleProgress,
       success: onSuccess,
       error: onError,
   })})
 
-  $: registered = ($structure?.profile?.startram?.info?.registered) || false
-  $: running = ($structure?.profile?.startram?.info?.running) || false
-
-  const setName = () => {
-    let remote = remoteCheck ? "remote" :"local"
-    let fixer = fixCheck ? "yes" : "no"
-    if (registered && running) {
-      return "pier-" + remote + "-" + fixer + "-" + secret
-    } else {
-    return "pier-local-" + fixer + "-" + secret
-    }
+  const handleAddr = () => {
+    const fullAddr = addr + "/" + patp
+    return fullAddr
   }
 
-  const verifyFile = (f,done) => {
-    const patp = f.name.split('.')[0]
-    const size = f.size
-    if (!checkPatp(patp)) { return }
-    dispatch('drop',{"size":f.size,"patp":patp,"secret":secret})
-    return loop(done).then(r=>{return r})
-  } 
-
-  const loop = async done => {
-    while (!confirmed) {
-      await new Promise(resolve => setTimeout(resolve, 250))
+  const handleUpload = (file, done) => {
+    filename = file.name
+    let p = filename.split(".")[0]
+    let valid = checkPatp(p)
+    if (valid) {
+      patp = p 
     }
-    return done()
+    openUploadEndpoint(endpoint,remote,fix)
+    waitForWarning(done)
+  }
+
+  const waitForWarning = (done) => {
+    if (!$warningDone) {
+      setTimeout(()=>waitForWarning(done),200) 
+    } else {
+      warningDone.set(false)
+      done()
+    }
   }
 
   const handleProgress = (file,prog,sent) => {
+    dispatch("progress",prog)
     percent = prog
   }
 
@@ -96,78 +97,62 @@
   }
   // This is to give the button access to the dropper element
   const selectDropper = () => {
-    freeUpload()
     document.getElementById('dropper').click();
+  }
+
+  const handleRemote = () => {
+    remote = !remote
+    if (patp.length > 0) {
+      openUploadEndpoint(endpoint,remote,fix)
+    }
+  }
+
+  const handleFix = () => {
+    fix = !fix
+    if (patp.length > 0) {
+      openUploadEndpoint(endpoint,remote,fix)
+    }
   }
 
 
 </script>
 
-<div id="dropper"></div>
-<div class="checkboxes">
+<div class="input-wrapper">
+  <div class="label">Pier</div>
+  <div class="upload">
+    <div id="dropper"></div>
+    <div on:click={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : filename}</div>
+    <button on:click={selectDropper} class="btn action-btn">Choose</button>
+  </div>
   {#if registered && running}
-    <div class="check-wrapper" on:click={()=>remoteCheck = !remoteCheck}>
-      <div class="checkbox" class:highlight={remoteCheck}></div>
-      <div class="check-label">Set to remote</div>
+  <div class="check-wrapper" on:click={handleRemote}>
+    <div class="checkbox">
+      {#if remote}
+        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+      {/if}
     </div>
+    <div class="check-label">Set to remote</div>
+  </div>
   {/if}
-  <div class="check-wrapper" on:click={()=>fixCheck = !fixCheck}>
-    <div class="checkbox" class:highlight={fixCheck}></div>
-    <div class="check-label">Fix common issues</div>
-  </div>
-</div>
-<div class="upload">
-  <div on:click={selectDropper} class="select">{patp}</div>
-  <button on:click={selectDropper} class="choose-btn">Choose</button>
-</div>
-{#if (checkPatp(patp) && ((status != "free") || (status != "failed")))}
-  <div class="ship">
-    <Sigil
-      {patp}
-      padding="20px"
-      {percent}
-      size="120px"
-      rad="16px"
-      />
-    <div class="info">
-      <div class="item">Uploaded: {percent}%</div>
-      <div class="item">File Size: {size}</div>
+  <div class="check-wrapper" on:click={handleFix}>
+    <div class="checkbox">
+      {#if fix}
+        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+      {/if}
     </div>
+    <div class="check-label">Update configuration if needed </div>
   </div>
-{/if}
+  <div class="buttons">
+    <button class="btn back" on:click={()=>goto('/boot')}>Back</button>
+    <button class="btn action-btn" disabled={patp.length < 1} on:click={()=>openModal(WarningPrompt)}>Import</button>
+  </div>
+</div>
 
 <style>
   #dropper {
     display:none;
   }
-  .upload {
-    display: flex;
-    gap: 24px;
-    height: 48px;
-    margin-bottom: 24px;
-    width: 681px;
-  }
-  .select {
-    flex: 1;
-    border-radius: 16px;
-    border: solid 2px var(--btn-secondary);
-    color: var(--text-color);
-    line-height: 48px;
-    background: none;
-    padding-left: 20px;
-    font-size: 12px;
-    padding-left: 24px;
-  }
-  .choose {
-    display: none;
-  }
-  .choose-btn {
-    border-radius: 16px;
-    background-color: var(--btn-secondary);
-    color: var(--text-card-color);
-    padding: 0 48px;
-    cursor: pointer;
-  }
+  /*
   .ship {
     display: flex;
     width: 60%;
@@ -205,5 +190,121 @@
     line-height: 20px;
     font-size: 12px;
     margin-bottom: 24px;
+  }
+  */
+  .input-wrapper {
+    margin: auto;
+    display: flex;
+    width: 621px;
+    padding-bottom: 0px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .label {
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+  }
+  .upload {
+    display: flex;
+    gap: 16px;
+    width: 621px;
+    margin: auto;
+  }
+  .select {
+    flex: 1;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    padding: 15px 22px 12px 22px;
+    width: calc(100% - 48px);
+    border: 2px solid var(--Gray-400, #5C7060);
+    background: var(--bg-base);
+    color: var(--text-color);
+  }
+  .check-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    user-select: none; /* Standard syntax */
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE/Edge */
+  }
+  .checkbox {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 2px solid var(--Gray-200, #ABBAAE);
+  }
+  .checkmark {
+    margin: 4px;
+  }
+  .check-label {
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+  }
+  .buttons {
+    display: flex;
+    gap: 16px
+  }
+  .btn {
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
+    color: #FFF;
+    height: 65px;
+  }
+  .back {
+    font-family: var(--regular-font);
+    color: var(--text-card-color);
+    cursor: pointer;
+    background-color: var(--btn-secondary);
+    border-radius: 16px;
+    padding: 0 48px;
+  }
+  .action-btn {
+    font-family: var(--regular-font);
+    color: var(--text-card-color);
+    cursor: pointer;
+    border-radius: 16px;
+    background-color: var(--btn-primary);
+    height: 65px;
+    padding: 0 48px;
+  }
+  .action-btn:hover {
+    background-color: var(--bg-card);
+  }
+  .action-btn:hover {
+    background-color: var(--bg-card);
+  }
+  .action-btn:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

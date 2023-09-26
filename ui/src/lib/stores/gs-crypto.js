@@ -3,12 +3,16 @@
 //
 
 export const saveSession = async token => {
-  console.log("saving token")
-  localStorage.setItem('id',token.id)
-  localStorage.setItem('token',token.token)
+  if ((token.id === "") || (token.token === "")) {
+    console.log("empty token field")
+  } else {
+    console.log("saving token")
+    localStorage.setItem('id',token.id)
+    localStorage.setItem('token',token.token)
+  }
 }
 
-export const loadSession = () => {
+export const loadSession = async () => {
   const id = localStorage.getItem('id')
   const token = localStorage.getItem('token')
   if ((id === null) || (token === null)) {

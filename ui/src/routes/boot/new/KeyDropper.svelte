@@ -57,26 +57,38 @@
   />
   <div class="upload-icon">
     <input type="file" bind:files >
-    <Fa icon={faFileArrowUp} size="1.2x" />
+    Choose
   </div>
+  <!--
   <img on:click={toggleViewKey} src="/eye-{viewKey ? "closed" : "open"}.svg" alt="eye" />
+  -->
 </div>
 
 <style>
   .pass-wrapper {
     display: flex;
-    margin-bottom: 20px;
+  }
+  input:focus {
+    outline: none;
   }
   input {
     flex: 1;
-    padding: 10px 20px;
-    font-size: 12px;
-    font-family: var(--regular-font);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    padding: 10px 22px 12px 22px;
+    width: calc(100% - 48px);
+    border: 2px solid var(--Gray-400, #5C7060);
     color: var(--text-color);
-    background: var(--bg-modal);
-    outline: none;
-    border: solid 2px var(--btn-secondary);
-    border-radius: 12px;
+    background: var(--bg-base);
+  }
+  input::placeholder {
+    color: var(--Gray-200, #ABBAAE);
   }
   ::-moz-placeholder {
     opacity: .6;
@@ -86,9 +98,20 @@
   }
   .upload-icon {
     position: relative;
-    margin: auto;
-    padding: 0 12px 0 12px;
+    margin-left: 16px;
     cursor: pointer;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    border-radius: 16px;
+    background: var(--Gray-400, #5C7060);
+    padding: 12px 48px;
   }
   .upload-icon > input {
     cursor: pointer;

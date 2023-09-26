@@ -10,6 +10,7 @@
   // Components
   import ToggleButton from '$lib/ToggleButton.svelte'
   import StarTramInfo from './StarTramInfo.svelte'
+  import StarTramModify from './StarTramModify.svelte'
 
   // Info
   $: info = ($structure?.profile?.startram?.info) || {}
@@ -21,8 +22,6 @@
   // Transition
   $: transition = ($structure?.profile?.startram?.transition) || {}
   $: tToggle = (transition?.toggle) || null
-  //$: region = (info?.region) || "us-east"
-  //$: endpoint = (info?.endpoint) || ""
 </script>
 
 <div class="container">
@@ -38,28 +37,35 @@
       <ToggleButton on:click={startramToggle} loading={tToggle} on={running} />
     {/if}
   </div>
+  <StarTramModify />
 </div>
 
 <style>
   .container {
     margin: auto;
-    width: calc(1104px - 80px);
+    width: calc(1104px - (56px * 2));
     max-width: 98vw;
-    padding: 40px;
+    padding: 56px;
   }
   .top {
     display: flex;
     gap: 24px;
   }
   .new-key {
-    background-color: var(--btn-secondary);
-    border-radius: 12px;
-    color: var(--text-card-color);
-    height: 42px;
+    background: var(--btn-secondary);
+    height: 65px;
     padding: 0 48px;
-    font-family: var(--regular-font);
-    font-size: 12px;
-    cursor: pointer;
+    border-radius: 16px;
+    font-size: 24px;
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   .spacer {
     flex: 1;

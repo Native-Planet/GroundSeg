@@ -3,6 +3,7 @@ package routines
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
 	"io"
@@ -10,42 +11,46 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"time"
 )
 
 var (
 	// version server check interval
-	checkInterval = 15 * time.Second
+	checkInterval = 1 * time.Hour
 )
 
 func CheckVersionLoop() {
 	ticker := time.NewTicker(checkInterval)
 	conf := config.Conf()
 	releaseChannel := conf.UpdateBranch
-	for {
-		select {
-		case <-ticker.C:
-			// Get latest information
-			latestVersion, _ := config.CheckVersion()
+	if conf.UpdateMode == "auto" {
+		for {
+			select {
+			case <-ticker.C:
+				// Get latest information
+				latestVersion, _ := config.CheckVersion()
 
-			// Check for gs binary updates based on hash
-			currentHash := conf.BinHash
-			latestHash := latestVersion.Groundseg.Amd64Sha256
-			if config.Architecture != "amd64" {
-				latestHash = latestVersion.Groundseg.Arm64Sha256
-			}
-			if currentHash != latestHash {
-				logger.Logger.Info("GroundSeg Binary update!")
-				// updateBinary will likely restart the program, so
-				// we don't have to care about the docker updates.
-				updateBinary(releaseChannel, latestVersion)
-			} else {
-				// check docker updates
-				currentChannelVersion := config.VersionInfo
-				latestChannelVersion := latestVersion
-				if latestChannelVersion != currentChannelVersion {
-					config.VersionInfo = latestVersion
-					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+				// Check for gs binary updates based on hash
+				currentHash := conf.BinHash
+				latestHash := latestVersion.Groundseg.Amd64Sha256
+				if config.Architecture != "amd64" {
+					latestHash = latestVersion.Groundseg.Arm64Sha256
+				}
+				if currentHash != latestHash {
+					logger.Logger.Info("GroundSeg Binary update!")
+					// updateBinary will likely restart the program, so
+					// we don't have to care about the docker updates.
+					updateBinary(releaseChannel, latestVersion)
+				} else {
+					// check docker updates
+					currentChannelVersion := config.VersionInfo
+					latestChannelVersion := latestVersion
+					if latestChannelVersion != currentChannelVersion {
+						config.VersionInfo = latestVersion
+						updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+					}
 				}
 			}
 		}
@@ -129,7 +134,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// systemctl restart groundseg
 	if config.DebugMode {
-		logger.Logger.Info("DebugMode detected. Skipping systemd command. Exiting istead..")
+		logger.Logger.Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
 		os.Exit(0)
 	} else {
 		logger.Logger.Info("Restarting GroundSeg systemd service")
@@ -142,13 +147,78 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 }
 
+func contains(slice []string, item string) bool {
+	for _, a := range slice {
+		if a == item {
+			return true
+		}
+	}
+	return false
+}
+
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
 	logger.Logger.Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
 	logger.Logger.Info(fmt.Sprintf(
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
 		release, currentVersion, latestVersion,
 	))
-	// check individual images
-	// update persistent
-	// restart affected containers
+	conf := config.Conf()
+	statuses, err := docker.GetShipStatus(conf.Piers)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't get ship statuses: %v", err))
+		return
+	}
+	valCurrent := reflect.ValueOf(currentVersion)
+	valLatest := reflect.ValueOf(latestVersion)
+
+	typeOfVersion := valCurrent.Type()
+
+	for i := 0; i < valCurrent.NumField(); i++ {
+		sw := typeOfVersion.Field(i).Name
+		if sw != "groundseg" {
+			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
+			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
+			if config.Architecture == "amd64" {
+				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
+					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
+						docker.StartContainer(sw, sw)
+					} else if sw == "vere" {
+						for pier, status := range statuses {
+							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							if isRunning {
+								docker.StartContainer(pier, "vere")
+							}
+						}
+					} else if sw == "minio" {
+						for pier, status := range statuses {
+							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							if isRunning {
+								docker.StartContainer("minio_"+pier, "minio")
+							}
+						}
+					}
+				}
+			} else {
+				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
+					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
+						docker.StartContainer(sw, sw)
+					} else if sw == "vere" {
+						for pier, status := range statuses {
+							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							if isRunning {
+								docker.StartContainer(pier, "vere")
+							}
+						}
+					} else if sw == "minio" {
+						for pier, status := range statuses {
+							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							if isRunning {
+								docker.StartContainer("minio_"+pier, "minio")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }

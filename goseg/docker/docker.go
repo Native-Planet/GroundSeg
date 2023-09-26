@@ -7,7 +7,10 @@ import (
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
+	"io"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,9 +22,83 @@ import (
 )
 
 var (
-	UTransBus       = make(chan structs.UrbitTransition, 100)
-	NewShipTransBus = make(chan structs.NewShipTransition, 100)
+	UTransBus          = make(chan structs.UrbitTransition, 100)
+	NewShipTransBus    = make(chan structs.NewShipTransition, 100)
+	ImportShipTransBus = make(chan structs.UploadTransition, 100)
 )
+
+func init() {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
+		return
+	}
+	version, err := cli.ServerVersion(context.TODO())
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
+		if strings.Contains(err.Error(), "is too new") {
+			updateDocker()
+		}
+		return
+	}
+	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
+}
+
+// attempt to update docker daemon (ubuntu/mint only)
+func updateDocker() {
+	logger.Logger.Info("Unsupported Docker version detected -- attempting to upgrade")
+	packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
+	for _, pkg := range packages {
+		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error removing package %s: %v\n%s", pkg, err, out))
+			return
+		}
+	}
+	commands := []string{
+		"apt-get update",
+		"apt-get install -y ca-certificates curl gnupg",
+		"install -m 0755 -d /etc/apt/keyrings",
+		`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg`, // Added --yes
+		"chmod a+r /etc/apt/keyrings/docker.gpg",
+	}
+	for _, cmd := range commands {
+		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
+		}
+	}
+	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error fetching version codename: %v\n%s", err, out))
+		return
+	}
+	codename := strings.TrimSpace(string(out))
+	if contains([]string{"ulyana", "ulyssa", "uma", "una"}, codename) {
+		codename = "focal"
+	} else if contains([]string{"vanessa", "vera", "victoria"}, codename) {
+		codename = "jammy"
+	}
+	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
+	if archErr != nil {
+		logger.Logger.Error(fmt.Sprintf("Error fetching system architecture: %v\n%s", archErr, archOut))
+		return
+	}
+	architecture := strings.TrimSpace(string(archOut))
+	sourcesList := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable", architecture, codename)
+	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
+	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
+		return
+	}
+	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
+	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+	}
+	logger.Logger.Info("Successfully updated Docker")
+}
 
 // return the container status of a slice of ships
 func GetShipStatus(patps []string) (map[string]string, error) {
@@ -62,6 +139,27 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 	}
 }
 
+func GetContainerRunningStatus(containerName string) (string, error) {
+	var status string
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+	}
+	// List containers
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	if err != nil {
+		return status, err
+	}
+	// Loop through containers to find the one with the given name
+	for _, container := range containers {
+		for _, name := range container.Names {
+			if name == "/"+containerName {
+				return container.Status, nil
+			}
+		}
+	}
+	return status, fmt.Errorf("Unable to get container running status: %v", containerName)
+}
+
 // return the name of a container's network
 func GetContainerNetwork(name string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -87,6 +185,20 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 		return res, err
 	}
 	defer cli.Close()
+	inspect, err := cli.ContainerInspect(context.Background(), containerName)
+	if err != nil {
+		return res, err
+	}
+	var totalSize int64
+	for _, mount := range inspect.Mounts {
+		if mount.Type == "volume" {
+			size, err := getDirSize(mount.Source)
+			if err != nil {
+				return res, err
+			}
+			totalSize += size
+		}
+	}
 	statsResp, err := cli.ContainerStats(context.Background(), containerName, false)
 	if err != nil {
 		return res, err
@@ -97,18 +209,24 @@ func GetContainerStats(containerName string) (structs.ContainerStats, error) {
 		return res, err
 	}
 	memUsage := stat.MemoryStats.Usage
-	inspectResp, err := cli.ContainerInspect(context.Background(), containerName)
-	if err != nil {
-		return res, err
-	}
-	diskUsage := int64(0)
-	if inspectResp.SizeRw != nil {
-		diskUsage = *inspectResp.SizeRw
-	}
 	return structs.ContainerStats{
 		MemoryUsage: memUsage,
-		DiskUsage:   diskUsage,
+		DiskUsage:   totalSize,
 	}, nil
+}
+
+func getDirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
 }
 
 // creates a volume by name
@@ -208,27 +326,27 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch containerType {
 	case "vere":
 		containerConfig, hostConfig, err = urbitContainerConf(containerName)
-		//_, _, err := urbitContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
 	case "netdata":
-		_, _, err := netdataContainerConf()
+		containerConfig, hostConfig, err = netdataContainerConf()
 		if err != nil {
 			return containerState, err
 		}
 	case "minio":
-		_, _, err := minioContainerConf(containerName)
+		DeleteContainer(containerName)
+		containerConfig, hostConfig, err = minioContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
 	case "miniomc":
-		_, _, err := mcContainerConf()
+		containerConfig, hostConfig, err = mcContainerConf()
 		if err != nil {
 			return containerState, err
 		}
 	case "wireguard":
-		_, _, err := wgContainerConf()
+		containerConfig, hostConfig, err = wgContainerConf()
 		if err != nil {
 			return containerState, err
 		}
@@ -260,7 +378,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
-		_, err := cli.ContainerCreate(ctx, &containerConfig, nil, nil, nil, containerName)
+		_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 		if err != nil {
 			return containerState, err
 		}
@@ -271,8 +389,15 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		logger.Logger.Info(msg)
 	case existingContainer.State == "exited":
-		// if the container exists but is stopped, start it
-		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
 			return containerState, err
 		}
@@ -292,9 +417,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			_, err = cli.ContainerCreate(ctx, &container.Config{
-				Image: desiredImage,
-			}, nil, nil, nil, containerName)
+			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
 				return containerState, err
 			}
@@ -309,6 +432,11 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
+	}
+	if strings.Contains(containerName, "minio_") {
+		if err := setMinIOAdminAccount(containerName); err != nil {
+			return containerState, fmt.Errorf("failed to set admin account %s: %v", containerName, err)
+		}
 	}
 	desiredStatus := "running"
 	// save the current state of the container in memory for reference
@@ -401,37 +529,38 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 	if err != nil {
 		return false, err
 	}
-	// check if the desired image is available locally
 	images, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, err
 	}
 	for _, img := range images {
-		if img.ID == imageInfo["hash"] {
-			return true, nil
+		for _, digest := range img.RepoDigests {
+			if digest == fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]) {
+				return true, nil
+			}
 		}
 	}
-	_, err = cli.ImagePull(ctx, desiredImage, types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), types.ImagePullOptions{})
 	if err != nil {
 		return false, err
 	}
+	defer resp.Close()
+	io.Copy(ioutil.Discard, resp) // wait until it's done
 	return true, nil
 }
 
-// FindContainer looks for a container with the given name and returns it, or nil if not found
+// looks for a container with the given name and returns it, or nil if not found
 func FindContainer(containerName string) (*types.Container, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
-
 	// Fetch list of running containers
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
-
 	// Search for the container with the given name
 	for _, container := range containers {
 		for _, name := range container.Names {
@@ -456,4 +585,93 @@ func DockerPoller() {
 			return
 		}
 	}
+}
+
+// execute command
+func ExecDockerCommand(containerName string, cmd []string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return "", err
+	}
+	// Create an Exec configuration
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmd,
+	}
+	// Context
+	ctx := context.Background()
+
+	// Get container ID by name
+	containerID, err := getContainerIDByName(ctx, cli, containerName)
+	if err != nil {
+		return "", err
+	}
+	// Create an exec instance, replace 'container_id_here' with your container ID
+	resp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return "", err
+	}
+
+	// Start the exec command
+	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", err
+	}
+	defer hijackedResp.Close()
+
+	// Read the output
+	//stdout, err := ioutil.ReadAll(hijackedResp.Reader)
+	output, err := ioutil.ReadAll(hijackedResp.Reader)
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// Function to get container ID by name
+func getContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, container := range containers {
+		for _, n := range container.Names {
+			if n == "/"+name {
+				return container.ID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Container not found")
+}
+
+// restart a running container
+func RestartContainer(name string) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return fmt.Errorf("Couldn't create client: %v", err)
+	}
+	defer cli.Close()
+	containerID, err := getContainerIDByName(ctx, cli, name)
+	if err != nil {
+		return fmt.Errorf("Couldn't get ID: %v", err)
+	}
+	timeout := 30
+	stopOptions := container.StopOptions{
+		Timeout: &timeout,
+	}
+	if err := cli.ContainerRestart(ctx, containerID, stopOptions); err != nil {
+		return fmt.Errorf("Couldn't restart container: %v", err)
+	}
+	return nil
+}
+
+func contains(slice []string, str string) bool {
+	for _, item := range slice {
+		if item == str {
+			return true
+		}
+	}
+	return false
 }

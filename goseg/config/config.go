@@ -11,6 +11,7 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"goseg/structs"
+	"goseg/system"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -26,22 +27,26 @@ var (
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
-	// BasePath = os.Getenv("GS_BASE_PATH")
-	BasePath = "/opt/nativeplanet/groundseg"
+	BasePath = getBasePath()
 	// only amd64 or arm64
 	Architecture = getArchitecture()
 	// struct of /retrieve blob
 	StartramConfig structs.StartramRetrieve
-	// unused for now, set with `./groundseg dev`
+	// struct of minio passwords
+	minIOPasswords = make(map[string]string)
+	// set with `./groundseg dev` (enables verbose logging)
 	DebugMode = false
 	Ready     = false
 	// representation of desired/actual container states
 	GSContainers = make(map[string]structs.ContainerState)
-	DockerDir    = "/var/lib/docker/volumes/"
-	confPath     = filepath.Join(BasePath, "settings", "system.json")
-	confMutex    sync.Mutex
-	contMutex    sync.Mutex
-	versMutex    sync.Mutex
+	// channel for log stream requests
+	LogsEventBus  = make(chan structs.LogsEvent, 100)
+	DockerDir     = "/var/lib/docker/volumes/"
+	confPath      = filepath.Join(BasePath, "settings", "system.json")
+	confMutex     sync.Mutex
+	contMutex     sync.Mutex
+	versMutex     sync.Mutex
+	minioPwdMutex sync.Mutex
 )
 
 // try initializing from system.json on disk
@@ -59,8 +64,10 @@ func init() {
 		// default base path
 		BasePath = "/opt/nativeplanet/groundseg"
 	}
-	pathMsg := fmt.Sprintf("Loading configs from %s", BasePath)
-	logger.Logger.Info(pathMsg)
+	if err := system.FixerScript(BasePath); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
+	}
+	logger.Logger.Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	file, err := os.Open(confPath)
 	if err != nil {
@@ -68,22 +75,34 @@ func init() {
 		err = createDefaultConf()
 		if err != nil {
 			// panic if we can't create it
-			errmsg := fmt.Sprintf("Unable to create config! Please elevate permissions. %v", err)
-			logger.Logger.Error(errmsg)
-			panic(errmsg)
+			logger.Logger.Error(fmt.Sprintf("Unable to create config! %v", err))
+			fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
+			fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
+			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
+			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+			panic("")
 		}
-		// generate and insert wireguard keys
-		wgPriv, wgPub, err := WgKeyGen()
+		// generate and insert aes & wireguard keys
+		keyPath := filepath.Join(BasePath, "settings", "session.key")
+		keyfile, err := os.Stat(keyPath)
+		if err != nil || keyfile.Size() == 0 {
+			keyContent := RandString(32)
+			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+			}
+		}
+		file, _ = os.Open(confPath)
 		salt := RandString(32)
+		wgPriv, wgPub, err := WgKeyGen()
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		} else {
-			err = UpdateConf(map[string]interface{}{
+			if err = UpdateConf(map[string]interface{}{
 				"pubkey":  wgPub,
 				"privkey": wgPriv,
 				"salt":    salt,
-			})
-			if err != nil {
+				"keyfile": keyPath,
+			}); err != nil {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
 			}
 		}
@@ -91,10 +110,8 @@ func init() {
 	defer file.Close()
 	// read the sysconfig to memory
 	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&globalConfig)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		logger.Logger.Error(errmsg)
+	if err = decoder.Decode(&globalConfig); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
 	}
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
@@ -136,6 +153,24 @@ func init() {
 		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
 		logger.Logger.Error(errmsg)
 	}
+	// create a keyfile if you dont have one (gs1)
+	conf := Conf()
+	if conf.KeyFile == "" {
+		keyPath := filepath.Join(BasePath, "settings", "session.key")
+		keyfile, err := os.Stat(keyPath)
+		if err != nil || keyfile.Size() == 0 {
+			keyContent := RandString(32)
+			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+			}
+		}
+		file, _ = os.Open(confPath)
+		if err = UpdateConf(map[string]interface{}{
+			"keyfile": keyPath,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+	}
 }
 
 // return the global conf var
@@ -152,6 +187,15 @@ func getArchitecture() string {
 		return "arm64"
 	default:
 		return "amd64"
+	}
+}
+
+func getBasePath() string {
+	switch os.Getenv("GS_BASE_PATH") {
+	case "":
+		return "/opt/nativeplanet/groundseg"
+	default:
+		return os.Getenv("GS_BASE_PATH")
 	}
 }
 
@@ -208,12 +252,18 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 	contMutex.Lock()
 	GSContainers[name] = containerState
 	logMsg := "<hidden>"
-	if DebugMode {
-		res, _ := json.Marshal(containerState)
-		logMsg = string(res)
-	}
+	res, _ := json.Marshal(containerState)
 	contMutex.Unlock()
 	logger.Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
+	logger.Logger.Debug(fmt.Sprintf("%s state:%s", name, string(res)))
+}
+
+// delete a container from the config map
+func DeleteContainerState(name string) {
+	contMutex.Lock()
+	delete(GSContainers, name)
+	contMutex.Unlock()
+	logger.Logger.Debug(fmt.Sprintf("%s removed from container state map", name))
 }
 
 // get the current container state

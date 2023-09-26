@@ -32,7 +32,9 @@ type System struct {
 }
 
 type SystemTransitionBroadcast struct {
-	Swap int `json:"swap"`
+	Swap  bool     `json:"swap"`
+	Type  string   `json:"type"`
+	Error []string `json:"error"`
 }
 
 // broadcast payload subobject
@@ -47,17 +49,16 @@ type SystemUsage struct {
 // broadcast payload subobject
 type SystemUpdates struct {
 	Linux struct {
-		State   string `json:"state"`
-		Upgrade int    `json:"upgrade"`
-		New     int    `json:"new"`
-		Remove  int    `json:"remove"`
-		Ignore  int    `json:"ignore"`
+		Upgrade int `json:"upgrade"`
+		New     int `json:"new"`
+		Remove  int `json:"remove"`
+		Ignore  int `json:"ignore"`
 	} `json:"linux"`
 }
 
 // broadcast payload subobject
 type SystemWifi struct {
-	Status   string   `json:"status"`
+	Status   bool     `json:"status"`
 	Active   string   `json:"active"`
 	Networks []string `json:"networks"`
 }
@@ -78,15 +79,19 @@ type Startram struct {
 		Endpoint   string                    `json:"endpoint"`
 		Regions    map[string]StartramRegion `json:"regions"`
 	} `json:"info"`
-	Transition struct {
-		Register any `json:"register"`
-		Toggle   any `json:"toggle"`
-	} `json:"transition"`
+	Transition StartramTransition `json:"transition"`
+}
+
+type StartramTransition struct {
+	Endpoint string `json:"endpoint"`
+	Register any    `json:"register"`
+	Toggle   any    `json:"toggle"`
 }
 
 // broadcast payload subobject
 type Urbit struct {
 	Info struct {
+		LusCode          string `json:"lusCode"`
 		Network          string `json:"network"`
 		Running          bool   `json:"running"`
 		URL              string `json:"url"`
@@ -98,6 +103,8 @@ type Urbit struct {
 		DetectBootStatus bool   `json:"detectBootStatus"`
 		Remote           bool   `json:"remote"`
 		Vere             any    `json:"vere"`
+		MinIOUrl         string `json:"minioUrl"`
+		MinIOPwd         string `json:"minioPwd"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -107,7 +114,13 @@ type UrbitTransitionBroadcast struct {
 	Meld                      string `json:"meld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
+	ToggleNetwork             string `json:"toggleNetwork"`
+	ToggleDevMode             string `json:"toggleDevMode"`
 	DeleteShip                string `json:"deleteShip"`
+	ExportShip                string `json:"exportShip"`
+	ShipCompressed            int    `json:"shipCompressed"`
+	ExportBucket              string `json:"exportBucket"`
+	BucketCompressed          int    `json:"bucketCompressed"`
 }
 
 // used to construct broadcast pier info subobject
@@ -131,10 +144,10 @@ type Logs struct {
 
 // broadcast payload subobject
 type Upload struct {
-	Status   string `json:"status"`
-	Size     int    `json:"size"`
-	Uploaded int    `json:"uploaded"`
-	Patp     any    `json:"patp"`
+	Status    string `json:"status"`
+	Patp      string `json:"patp"`
+	Error     string `json:"error"`
+	Extracted int64  `json:"extracted"`
 }
 
 // broadcast payload subobject
@@ -151,7 +164,7 @@ type SetupBroadcast struct {
 	Type      string                    `json:"type"`
 	AuthLevel string                    `json:"auth_level"`
 	Stage     string                    `json:"stage"`
-	Page      string                    `json:"page"`
+	Page      int                       `json:"page"`
 	Regions   map[string]StartramRegion `json:"regions"`
 }
 

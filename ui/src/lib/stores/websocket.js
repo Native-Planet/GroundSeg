@@ -4,6 +4,8 @@ import { loadSession, saveSession, generateRandom } from './gs-crypto'
 export const structure = writable({})
 export const ready = writable(false)
 export const connected = writable(false)
+export const logs = writable({})
+export const wsPort = writable("3000")
 
 let PENDING = new Set();
 let SESSION;
@@ -62,6 +64,17 @@ export const handleMessage = data => {
   } else if (data.type == "structure") {
     console.log(data)
     structure.set(data)
+  } else if (data.hasOwnProperty('log')) {
+    logs.update(l=>{
+      let containerID = data.log.container_id
+      let containerLine = data.log.line
+      if (l.hasOwnProperty(containerID)) {
+        l[containerID] = l[containerID] + "\n" + containerLine
+      } else {
+        l[containerID] = containerLine
+      }
+      return l
+    })
   } else {
     console.log("server alive")
   }
@@ -248,7 +261,6 @@ export const startramGetRegions = () => {
 }
 
 export const startramRegister = (key,region) => {
-  console.log("starst")
   let payload = {
     "type":"startram",
     "action":"register",
@@ -296,27 +308,47 @@ export const startramCancel = async (key,reset) => {
 //  Upload Pier
 //
 
-export const freeUpload = () => {
+export const openUploadEndpoint = (endpoint,remote,fix) => {
   let payload = {
     "type":"pier_upload",
-    "action":"free"
+    "action":"open-endpoint",
+    "endpoint": endpoint,
+    "remote": remote,
+    "fix": fix
   }
   send(payload)
 }
 
-export const uploadMetadata = (patp,size,secret) => {
+export const modifyUploadEndpoint = (endpoint,remote,fix) => {
   let payload = {
     "type":"pier_upload",
-    "action":"metadata",
-    "patp":patp,
-    "size":size,
-    "secret":secret
+    "action":"modify-endpoint",
+    "endpoint": endpoint,
+    "remote": remote,
+    "fix": fix
+  }
+  send(payload)
+}
+
+export const closeUploadEndpoint = endpoint => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"close-endpoint",
+    "endpoint": endpoint
+  }
+  send(payload)
+}
+
+export const resetImportShip = () => {
+  let payload = {
+    "type":"pier_upload",
+    "action":"reset",
   }
   send(payload)
 }
 
 //
-//  Urbits
+//  Boot New Ship
 //
 
 export const bootShip = (patp,key,remote) => {
@@ -337,6 +369,10 @@ export const resetNewShip = () => {
   }
   send(payload)
 }
+
+//
+//  Urbits
+//
 
 export const registerServiceAgain = patp => {
   let payload = {
@@ -392,6 +428,34 @@ export const deleteUrbitShip = patp => {
   send(payload)
 }
 
+export const exportUrbitShip = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"export-ship",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const exportUrbitBucket = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"export-bucket",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const setUrbitLoom = (patp, value) => {
+  let payload = {
+    "type":"urbit",
+    "action":"loom",
+    "patp":patp,
+    "value": value
+  }
+  send(payload)
+}
+
 /*
 export const urbitsMeldUrth = async ship => {
   let id = await generateRandom(16)
@@ -412,6 +476,19 @@ export const submitReport = (contact,description,ships) => {
     "contact":contact,
     "description":description,
     "ships":ships
+  }
+  send(payload)
+}
+
+//
+//  Logs
+//
+
+export const toggleLog = (name,action) => {
+  let payload = {
+    "type":"logs",
+    "action":action,
+    "container_id": name,
   }
   send(payload)
 }
