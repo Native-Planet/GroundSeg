@@ -56,6 +56,7 @@ var (
 	shutdownChan  = make(chan struct{})
 )
 
+// run either the main webserver or the c2c webserver
 func ServerControl() {
 	activeServer := startMainServer()
 	// var activeServer *http.Server
@@ -76,11 +77,12 @@ func ServerControl() {
 	}
 }
 
+// test for internet connectivity and interrupt ServerControl if we need to switch
 func C2cLoop() {
 	c2cActive := false
 	for {
 		internetAvailable := config.NetCheck("1.1.1.1:53")
-		if !internetAvailable && !c2cActive {
+		if !internetAvailable && !c2cActive && system.Device != "" {
 			if err := system.C2cMode(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode:", err))
 			} else {
