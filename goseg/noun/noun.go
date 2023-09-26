@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/dgryski/go-bitstream"
+	"github.com/Native-Planet/go-bitstream"
 	"github.com/spaolacci/murmur3"
 	"math/big"
 	"math/bits"
@@ -317,79 +317,79 @@ func cue(i *big.Int) Noun {
 }
 
 // func main() {
-	/*
-		// Test byteLength
-		fmt.Println(byteLength(0))                 // Expected: 0
-		fmt.Println(byteLength(255))               // Expected: 1
-		fmt.Println(byteLength(256))               // Expected: 2
+/*
+	// Test byteLength
+	fmt.Println(byteLength(0))                 // Expected: 0
+	fmt.Println(byteLength(255))               // Expected: 1
+	fmt.Println(byteLength(256))               // Expected: 2
 
-		// Test intBytes
-		fmt.Printf("%x\n", intBytes(0))            // Expected: ''
-		fmt.Printf("%x\n", intBytes(256))          // Expected: '0001'
+	// Test intBytes
+	fmt.Printf("%x\n", intBytes(0))            // Expected: ''
+	fmt.Printf("%x\n", intBytes(256))          // Expected: '0001'
 
-		// Test mum
-		fmt.Println(mum(0xcafebabe, 0x7fff, 0))    // Expected: 2046756072 (or similar based on hash function)
-		fmt.Println(mum(0xdeadbeef, 0xfffe, 8790750394176177384)) // Expected: 422532488 (or similar based on hash function)
+	// Test mum
+	fmt.Println(mum(0xcafebabe, 0x7fff, 0))    // Expected: 2046756072 (or similar based on hash function)
+	fmt.Println(mum(0xdeadbeef, 0xfffe, 8790750394176177384)) // Expected: 422532488 (or similar based on hash function)
 
-		// Test mugBoth
-		fmt.Println(mugBoth(2046756072, 2046756072)) // Expected: 422532488 (or similar based on hash function)
+	// Test mugBoth
+	fmt.Println(mugBoth(2046756072, 2046756072)) // Expected: 422532488 (or similar based on hash function)
 
-		// Test deep
-		fmt.Println(deep(1))                       // Expected: false
-		fmt.Println(deep(Cell{1, 2, 0}))           // Expected: true
+	// Test deep
+	fmt.Println(deep(1))                       // Expected: false
+	fmt.Println(deep(Cell{1, 2, 0}))           // Expected: true
 
-		// Test mug
-		fmt.Println(mug(0))                        // Expected: 2046756072 (or similar based on hash function)
-		fmt.Println(mug(Cell{0, 0, 0}))            // Expected: 422532488 (or similar based on hash function)
+	// Test mug
+	fmt.Println(mug(0))                        // Expected: 2046756072 (or similar based on hash function)
+	fmt.Println(mug(Cell{0, 0, 0}))            // Expected: 422532488 (or similar based on hash function)
 
-	  fmt.Println("wtf")*/
-	//nn := cue(3426417)
-	//fmt.Println(pretty(nn, false))
-	//fmt.Println(jam(0))          // Expected: [1 [2 3]]
-	//fmt.Println(jam(1))          // Expected: [1 [2 3]]
-	//fmt.Println(jam(1234567890987654321))
-	//fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
+  fmt.Println("wtf")*/
+//nn := cue(3426417)
+//fmt.Println(pretty(nn, false))
+//fmt.Println(jam(0))          // Expected: [1 [2 3]]
+//fmt.Println(jam(1))          // Expected: [1 [2 3]]
+//fmt.Println(jam(1234567890987654321))
+//fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
 
 //   i := new(big.Int)
 //   i.SetString("1569560238373119425266963811040232206341",10)
 // 	fmt.Println(pretty(cue(i),false))
 
-	//jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
-	//fmt.Println(jam(jtest))
-	//fmt.Println(pretty(cue(jam(jtest)), false))
+//jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
+//fmt.Println(jam(jtest))
+//fmt.Println(pretty(cue(jam(jtest)), false))
 
-	// Test pretty
-	/*
-		noun1 := Cell{1, Cell{2, 3, 0}, 0}
-		fmt.Println(pretty(noun1, false))          // Expected: [1 [2 3]]
+// Test pretty
+/*
+	noun1 := Cell{1, Cell{2, 3, 0}, 0}
+	fmt.Println(pretty(noun1, false))          // Expected: [1 [2 3]]
 
-		// Test translate
-		seq := []Noun{1, Cell{2, 3, 0}, 4}
-		noun2 := translate(seq)
-		fmt.Println(pretty(noun2, false))          // Expected: [1 [2 3] 4]
+	// Test translate
+	seq := []Noun{1, Cell{2, 3, 0}, 4}
+	noun2 := translate(seq)
+	fmt.Println(pretty(noun2, false))          // Expected: [1 [2 3] 4]
 
-		// Test jam and cue
-		j := jam(noun1)
-		fmt.Println(j)
-		c := cue(j)
-		fmt.Println(pretty(c, false))              // Expected: [1 [2 3]]
+	// Test jam and cue
+	j := jam(noun1)
+	fmt.Println(j)
+	c := cue(j)
+	fmt.Println(pretty(c, false))              // Expected: [1 [2 3]]
 
-		// Additional tests based on the original Python doctests
-		x := Cell{1, Cell{2, 3, 0}, 0}
-		fmt.Println(x.Head)                        // Expected: 1
-		tail := x.Tail.(Cell)
-		fmt.Println(tail.Head)                     // Expected: 2
-		fmt.Println(tail.Tail)                     // Expected: 3
+	// Additional tests based on the original Python doctests
+	x := Cell{1, Cell{2, 3, 0}, 0}
+	fmt.Println(x.Head)                        // Expected: 1
+	tail := x.Tail.(Cell)
+	fmt.Println(tail.Head)                     // Expected: 2
+	fmt.Println(tail.Tail)                     // Expected: 3
 
-		y := Cell{Cell{1, 2, 0}, Cell{3, 4, 0}, 0}
-		fmt.Println(mug(y))                        // Expected: 1496649457 (or similar based on hash function)
-		// Note: The following tests related to reference equality in Python do not have a direct equivalent in Go.
-		// In Go, we don't have the concept of sharing storage for struct types like in Python.
-		// So, we'll skip the tests that check for reference equality.
+	y := Cell{Cell{1, 2, 0}, Cell{3, 4, 0}, 0}
+	fmt.Println(mug(y))                        // Expected: 1496649457 (or similar based on hash function)
+	// Note: The following tests related to reference equality in Python do not have a direct equivalent in Go.
+	// In Go, we don't have the concept of sharing storage for struct types like in Python.
+	// So, we'll skip the tests that check for reference equality.
 
-		// Test pretty function with different tail positions
-		x = Cell{0, 0, 0}
-		fmt.Println(pretty(x, false))              // Expected: [0 0]
-		fmt.Println(pretty(x, true))               // Expected: 0 0
-	*/
+	// Test pretty function with different tail positions
+	x = Cell{0, 0, 0}
+	fmt.Println(pretty(x, false))              // Expected: [0 0]
+	fmt.Println(pretty(x, true))               // Expected: 0 0
+*/
 // }
