@@ -33,7 +33,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	halfCores := runtime.NumCPU() / 2
-	scriptPath := filepath.Join(config.DockerDir, "llama-gpt-api", "_data", "run", "run.sh")
+	scriptPath := filepath.Join(config.DockerDir, "llama-gpt-api", "_data", "api", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
@@ -70,12 +70,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
-				Source: "/llama-gpt-api/models", // host dir
+				Source: "llama-gpt-api/models", // host dir
 				Target: "/models", // in the container
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: "/llama-gpt-api/api",
+				Source: "llama-gpt-api/api",
 				Target: "/api",
 			},
 		},
