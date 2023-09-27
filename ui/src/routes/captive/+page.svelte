@@ -86,14 +86,17 @@
           </div>
         </div>
       {:else if status == "failed"}
-        <div class="status-state"
+        <div
+          class="status-state"
           in:slide={{ delay: 250, duration: 300, easing: quintOut, axis: 'x' }}
           out:slide={{ duration: 300, easing: quintOut, axis: 'x' }}
           >
-          <div class="main-text error"
-          in:slide={{ delay: 250, duration: 300, easing: quintOut, axis: 'x' }}
-          out:slide={{ duration: 300, easing: quintOut, axis: 'x' }}
-          >Attempt to connect to {selected} failed!</div>
+          <div 
+            class="main-text error"
+            in:slide={{ delay: 250, duration: 300, easing: quintOut, axis: 'x' }}
+            out:slide={{ duration: 300, easing: quintOut, axis: 'x' }}
+               >
+               Attempt to connect to {selected} failed!</div>
         </div>
       {:else}
         <div class="label">Network Password</div>

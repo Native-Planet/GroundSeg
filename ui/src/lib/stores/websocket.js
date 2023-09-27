@@ -6,6 +6,8 @@ export const ready = writable(false)
 export const connected = writable(false)
 export const logs = writable({})
 export const wsPort = writable("3000")
+export const isC2CMode = writable(false)
+export const ssids = writable([])
 
 let PENDING = new Set();
 let SESSION;
@@ -59,11 +61,18 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  if (data.type === "activity") {
+  if (data.type === "c2c") {
+    ssids.set(data.ssids)
+    isC2CMode.set(true)
+  } else if (data.type === "activity") {
     handleActivity(data)
+    ssids.set([])
+    isC2CMode.set(false)
   } else if (data.type == "structure") {
     console.log(data)
     structure.set(data)
+    ssids.set([])
+    isC2CMode.set(false)
   } else if (data.hasOwnProperty('log')) {
     logs.update(l=>{
       let containerID = data.log.container_id
@@ -75,8 +84,12 @@ export const handleMessage = data => {
       }
       return l
     })
+    structure.set(data)
+    ssids.set([])
   } else {
     console.log("server alive")
+    structure.set(data)
+    ssids.set([])
   }
 }
 

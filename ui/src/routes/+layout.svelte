@@ -6,7 +6,7 @@
   import { goto } from '$app/navigation';
 
   // Websocket
-  import { wsPort, connect, structure, connected } from '$lib/stores/websocket'
+  import { isC2CMode, wsPort, connect, structure, connected } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
 
   import ApiSpinner from './ApiSpinner.svelte'
@@ -26,30 +26,36 @@
   let count = 0
   const redirector = () => {
     if ($connected) {
-      const auth = (authLevel === "authorized")
-      if (auth) {
-        if (($page.route.id === "/login") || ($page.route.id.includes("setup"))) {
-          goto("/")
+      if ($isC2CMode) {
+        if ($page.route.id !== "/captive") {
+          goto("/captive")
         }
       } else {
-        if (authLevel === "unauthorized") {
-          if ($page.route.id !== "/login") {
+        const auth = (authLevel === "authorized")
+        if (auth) {
+          if (($page.route.id === "/login") || ($page.route.id.includes("setup"))) {
+            goto("/")
+          }
+        } else {
+          if (authLevel === "unauthorized") {
+            if ($page.route.id !== "/login") {
+              if (count > 2) {
+                count = 0
+                goto("/login")
+              } else {
+                count += 1 
+              }
+            }
+          }
+          if (authLevel === "setup") {
             if (count > 2) {
               count = 0
-              goto("/login")
+              if (stage) {
+                goto("/setup/" + stage)
+              }
             } else {
               count += 1 
             }
-          }
-        }
-        if (authLevel === "setup") {
-          if (count > 2) {
-            count = 0
-            if (stage) {
-              goto("/setup/" + stage)
-            }
-          } else {
-            count += 1 
           }
         }
       }

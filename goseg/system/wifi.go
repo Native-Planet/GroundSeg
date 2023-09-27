@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"goseg/accesspoint"
 	"goseg/logger"
 	"goseg/structs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -27,7 +28,6 @@ var (
 		},
 	}
 	clients = make(map[*websocket.Conn]bool)
-	C2cChan = make(chan bool)
 	proxy   = &captive.Portal{
 		LoginPath:           "/",
 		PortalDomain:        "nativeplanet.local",
@@ -37,6 +37,9 @@ var (
 	WifiInfo structs.SystemWifi
 	Device   string // wifi device name
 	LocalUrl string // eg nativeplanet.local
+
+	c2cEnabled = false
+	c2cMu      sync.Mutex
 )
 
 func init() {
@@ -49,6 +52,19 @@ func init() {
 		constructWifiInfo(dev[0])
 		go wifiInfoLoop(dev[0])
 	}
+}
+
+func IsC2CMode() bool {
+	c2cMu.Lock()
+	defer c2cMu.Unlock()
+	return c2cEnabled
+}
+
+func SetC2CMode(isTrue bool) error {
+	c2cMu.Lock()
+	defer c2cMu.Unlock()
+	c2cEnabled = isTrue
+	return nil
 }
 
 func wifiInfoLoop(dev string) {
@@ -90,16 +106,12 @@ func ifCheck() bool {
 	return strings.Contains(string(out), "enabled")
 }
 
-func C2cMode() error {
-	dev, err := getWifiDevice()
-	if err != nil {
-		return err
-	}
-	if err := setupHostAPD(dev[0]); err != nil {
-		return err
-	}
-	go announceNetworks(dev[0])
-	if err := CaptivePortal(dev[0]); err != nil {
+func C2CMode() error {
+	// todo: get ssid and load to var
+	// get wifi device
+	dev, _ := getWifiDevice()
+	// start AP
+	if err := accesspoint.Start(dev[0]); err != nil {
 		return err
 	}
 	return nil
@@ -270,53 +282,61 @@ func ToggleDevice(dev string) error {
 	return nil
 }
 
+/*
 func setupHostAPD(iface string) error {
-	hostapdConf := `
-interface=` + iface + `
-driver=nl80211
-ssid=nativeplanet
-hw_mode=g
-channel=6
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=nativeplanet
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
-`
-	err := ioutil.WriteFile("/etc/hostapd/hostapd.conf", []byte(hostapdConf), 0644)
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("hostapd", "/etc/hostapd/hostapd.conf")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("ifconfig", iface, "10.0.0.1", "netmask", "255.255.255.0", "up")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("dnsmasq", "--interface="+iface, "--bind-interfaces", "--dhcp-range=10.0.0.2,10.0.0.20,12h")
-	if err != nil {
-		return err
-	}
 	return nil
-}
+	   	hostapdConf := `
 
-func TeardownHostAPD() error {
-	_, err := runCommand("pkill", "-9", "hostapd")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("pkill", "-9", "dnsmasq")
-	if err != nil {
-		return err
-	}
-	if err := proxy.Close(); err != nil {
-		return err
-	}
+	   interface=` + iface + `
+	   driver=nl80211
+	   ssid=nativeplanet
+	   hw_mode=g
+	   channel=6
+	   macaddr_acl=0
+	   auth_algs=1
+	   ignore_broadcast_ssid=0
+	   wpa=2
+	   wpa_passphrase=nativeplanet
+	   wpa_key_mgmt=WPA-PSK
+	   wpa_pairwise=TKIP
+	   rsn_pairwise=CCMP
+	   `
+
+	   	err := ioutil.WriteFile("/etc/hostapd/hostapd.conf", []byte(hostapdConf), 0644)
+	   	if err != nil {
+	   		return err
+	   	}
+	   	_, err = runCommand("hostapd", "/etc/hostapd/hostapd.conf")
+	   	if err != nil {
+	   		return err
+	   	}
+	   	_, err = runCommand("ifconfig", iface, "10.0.0.1", "netmask", "255.255.255.0", "up")
+	   	if err != nil {
+	   		return err
+	   	}
+	   	_, err = runCommand("dnsmasq", "--interface="+iface, "--bind-interfaces", "--dhcp-range=10.0.0.2,10.0.0.20,12h")
+	   	if err != nil {
+	   		return err
+	   	}
+	   	return nil
+}
+*/
+
+func UnaliveC2C() error {
+	accesspoint.Stop()
+	/*
+		_, err := runCommand("pkill", "-9", "hostapd")
+		if err != nil {
+			return err
+		}
+		_, err = runCommand("pkill", "-9", "dnsmasq")
+		if err != nil {
+			return err
+		}
+		if err := proxy.Close(); err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
