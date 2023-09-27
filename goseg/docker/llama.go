@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/defaults"
 	"goseg/logger"
 	"runtime"
 
@@ -28,6 +29,11 @@ func LoadLlama() error {
 
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	halfCores := runtime.NumCPU() / 2
+	scriptPath := filepath.Join(config.DockerDir, "llama-gpt-api", "_data", "run", "run.sh")
+	err = ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755)
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
+	}
 	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
 	containerConfig := container.Config{
 		Image:    desiredImage,
