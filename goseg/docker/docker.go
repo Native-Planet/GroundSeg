@@ -469,6 +469,8 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	var res map[string]string
+	// hardcoded llama stuff for testing
+	res = make(map[string]string)
 	if containerType == "llama-api" {
 		res["tag"] = "latest"
 		res["hash"] = "b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
