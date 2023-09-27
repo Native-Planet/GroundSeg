@@ -699,3 +699,20 @@ func contains(slice []string, str string) bool {
 	}
 	return false
 }
+
+func volumeExists(volumeName string) (bool, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return false, fmt.Errorf("Failed to create client: %v", err)
+	}
+	volumeList, err := cli.VolumeList(context.Background(), volume.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, volume := range volumeList.Volumes {
+		if volume.Name == volumeName {
+			return true, nil
+		}
+	}
+	return false, nil
+}

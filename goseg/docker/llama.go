@@ -32,15 +32,34 @@ func LoadLlama() error {
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
+	apiContainerName := "llama-gpt-api"
+	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
 	halfCores := runtime.NumCPU() / 2
-	scriptPath := filepath.Join(config.DockerDir, "llama-gpt-api", "_data", "api", "run.sh")
+	exists, err := volumeExists(apiContainerName)
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
+	}
+	if !exists {
+		if err = CreateVolume(apiContainerName); err != nil {
+			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
+		}
+	}
+	exists, err = volumeExists(apiContainerName+"_api")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
+	}
+	if !exists {
+		if err = CreateVolume(apiContainerName+"_api"); err != nil {
+			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
+		}
+	}
+	scriptPath := filepath.Join(config.DockerDir, apiContainerName, "_data", "api", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
-	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
 	containerConfig = container.Config{
 		Image:    desiredImage,
-		Hostname: "llama-gpt-api",
+		Hostname: apiContainerName,
 		Cmd:      []string{"/bin/sh", "/api/run.sh"},
 		Env: []string{
 			"MODEL=/models/llama-2-7b-chat.bin",
@@ -70,12 +89,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
-				Source: "llama-models", // host dir
+				Source: apiContainerName, // host dir
 				Target: "/models", // in the container
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: "llama-api",
+				Source: apiContainerName+"_api",
 				Target: "/api",
 			},
 		},
