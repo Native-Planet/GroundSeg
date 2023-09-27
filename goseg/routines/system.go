@@ -65,6 +65,7 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
+		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v",LocalDomain,ips))
 		server, err := zeroconf.RegisterProxy(
 			strings.Split(LocalDomain, ".")[0],
 			"_http._tcp",
