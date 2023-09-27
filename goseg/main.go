@@ -31,6 +31,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -48,7 +49,6 @@ var (
 	content       embed.FS
 	webContent, _ = fs.Sub(content, "web")
 	fileServer    = http.FileServer(http.FS(webContent))
-	//go:embed web/captive/*
 	capContent    embed.FS
 	capFs         = http.FS(capContent)
 	capFileServer = http.FileServer(capFs)
@@ -275,6 +275,9 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
+	if os.Getenv("GS_LLAMA") == "true" {
+		loadService(docker.LoadLlama, "Unable to load Llama GPT!")
+	}
 
 	// load the appropriate HTTP server forever
 	for {

@@ -96,6 +96,7 @@ func updateDocker() {
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+		return
 	}
 	logger.Logger.Info("Successfully updated Docker")
 }
@@ -350,6 +351,16 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
+	case "llama-api":
+		containerConfig, hostConfig, err = llamaApiContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "llama-ui":
+		containerConfig, hostConfig, err = llamaUIContainerConf()
+		if err != nil {
+			return containerState, err
+		}
 	default:
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
@@ -458,6 +469,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	var res map[string]string
+	// hardcoded llama stuff for testing
+	res = make(map[string]string)
+	if containerType == "llama-api" {
+		res["tag"] = "latest"
+		res["hash"] = "b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
+		res["repo"] = "ghcr.io/abetlen/llama-cpp-python"
+		return res, nil
+	} else if containerType == "llama-ui" {
+		res["tag"] = "latest"
+		res["hash"] = "bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
+		res["repo"] = "nativeplanet/llama-gpt-ui"
+		return res, nil
+	}
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
 	versionInfo := config.VersionInfo
@@ -674,4 +698,46 @@ func contains(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func volumeExists(volumeName string) (bool, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return false, fmt.Errorf("Failed to create client: %v", err)
+	}
+	volumeList, err := cli.VolumeList(context.Background(), volume.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for _, volume := range volumeList.Volumes {
+		if volume.Name == volumeName {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+
+func addOrGetNetwork(networkName string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", fmt.Errorf("Failed to create client: %v", err)
+	}
+	networks, err := cli.NetworkList(context.Background(), types.NetworkListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Failed to list networks: %v", err)
+	}
+	for _, network := range networks {
+		if network.Name == networkName {
+			return network.ID, nil
+		}
+	}
+	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
+		Driver: "bridge",
+		Scope:  "local",
+	})
+	if err != nil {
+		return "", fmt.Errorf("Failed to create custom bridge network: %v", err)
+	}
+	return networkResponse.ID, nil
 }
