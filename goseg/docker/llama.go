@@ -1,11 +1,30 @@
 package docker
 
 import (
+	"fmt"
+	"goseg/config"
+	"runtime"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 )
 
+func LoadLlama() error {
+	info, err := StartContainer("llama-api", "llama-api")
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
+	}
+	config.UpdateContainerState("llama-api", info)
+	info, err = StartContainer("llama-ui", "llama-ui")
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
+	}
+	config.UpdateContainerState("llama-ui", info)
+	return nil
+}
+
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
+	halfCores := runtime.NumCPU() / 2
 	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
 	containerConfig := container.Config{
 		Image:    desiredImage,
@@ -24,6 +43,9 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	hostConfig := container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
+		},
+		Resources: container.Resources{
+			NanoCPUs: int64(halfCores * 100000),
 		},
 		PortBindings: nat.PortMap{
 			"8000/tcp": []nat.PortBinding{

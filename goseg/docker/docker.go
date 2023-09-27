@@ -96,6 +96,7 @@ func updateDocker() {
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+		return
 	}
 	logger.Logger.Info("Successfully updated Docker")
 }
@@ -347,6 +348,16 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 	case "wireguard":
 		containerConfig, hostConfig, err = wgContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "llama-api":
+		containerConfig, hostConfig, err = llamaApiContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "llama-ui":
+		containerConfig, hostConfig, err = llamaUIContainerConf()
 		if err != nil {
 			return containerState, err
 		}
