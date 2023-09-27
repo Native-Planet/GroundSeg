@@ -13,12 +13,12 @@ import (
 
 func LoadLlama() error {
 	logger.Logger.Info("Loading Llama GPT")
-	info, err := StartContainer("llama-api", "llama-api")
+	info, err := StartContainer("llama-gpt-api", "llama-api")
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
 	}
 	config.UpdateContainerState("llama-api", info)
-	info, err = StartContainer("llama-ui", "llama-ui")
+	info, err = StartContainer("llama-gpt-ui", "llama-ui")
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
 	}
