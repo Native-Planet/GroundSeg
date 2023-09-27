@@ -53,7 +53,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
-	scriptPath := filepath.Join(config.DockerDir, apiContainerName, "_data", "api", "run.sh")
+	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "api", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
