@@ -1,10 +1,12 @@
 package docker
 
 import (
+	"path/filepath"
 	"fmt"
 	"goseg/config"
 	"goseg/defaults"
 	"goseg/logger"
+	"io/ioutil"
 	"runtime"
 
 	"github.com/docker/docker/api/types/container"
@@ -28,14 +30,15 @@ func LoadLlama() error {
 }
 
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
+	var containerConfig container.Config
+	var hostConfig container.HostConfig
 	halfCores := runtime.NumCPU() / 2
 	scriptPath := filepath.Join(config.DockerDir, "llama-gpt-api", "_data", "run", "run.sh")
-	err = ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755)
-	if err != nil {
+	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
-	containerConfig := container.Config{
+	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: "llama-gpt-api",
 		Cmd:      []string{"/bin/sh", "/api/run.sh"},
@@ -49,7 +52,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
-	hostConfig := container.HostConfig{
+	hostConfig = container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
