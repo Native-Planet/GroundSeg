@@ -469,6 +469,17 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 // so we can easily get the correct repo/release channel/tag/hash
 func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	var res map[string]string
+	if containerType == "llama-api" {
+		res["tag"] = "latest"
+		res["hash"] = "b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
+		res["repo"] = "ghcr.io/abetlen/llama-cpp-python"
+		return res, nil
+	} else if containerType == "llama-ui" {
+		res["tag"] = "latest"
+		res["hash"] = "bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
+		res["repo"] = "nativeplanet/llama-gpt-ui"
+		return res, nil
+	}
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
 	versionInfo := config.VersionInfo
