@@ -72,6 +72,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	hostConfig = container.HostConfig{
+		NetworkMode:  container.NetworkMode("bridge"),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
@@ -123,6 +124,7 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	hostConfig := container.HostConfig{
+		NetworkMode:  container.NetworkMode("bridge"),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
