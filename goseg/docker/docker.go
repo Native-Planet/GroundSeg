@@ -716,3 +716,28 @@ func volumeExists(volumeName string) (bool, error) {
 	}
 	return false, nil
 }
+
+
+func addOrGetNetwork(networkName string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", fmt.Errorf("Failed to create client: %v", err)
+	}
+	networks, err := cli.NetworkList(context.Background(), types.NetworkListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Failed to list networks: %v", err)
+	}
+	for _, network := range networks {
+		if network.Name == networkName {
+			return network.ID, nil
+		}
+	}
+	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
+		Driver: "bridge",
+		Scope:  "local",
+	})
+	if err != nil {
+		return "", fmt.Errorf("Failed to create custom bridge network: %v", err)
+	}
+	return networkResponse.ID, nil
+}

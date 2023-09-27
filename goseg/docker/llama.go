@@ -53,6 +53,10 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
+	llamaNet, err := addOrGetNetwork("llama")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+	}
 	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
@@ -72,7 +76,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	hostConfig = container.HostConfig{
-		NetworkMode:  container.NetworkMode("bridge"),
+		NetworkMode:  container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
@@ -108,7 +112,13 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 
 func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 	desiredImage := "nativeplanet/llama-gpt-ui:latest@sha256:bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
-	containerConfig := container.Config{
+	var containerConfig container.Config
+	var hostConfig container.HostConfig
+	llamaNet, err := addOrGetNetwork("llama")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+	}
+	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: "llama-gpt-ui",
 		Env: []string{
@@ -123,8 +133,8 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 			"3000/tcp": struct{}{},
 		},
 	}
-	hostConfig := container.HostConfig{
-		NetworkMode:  container.NetworkMode("bridge"),
+	hostConfig = container.HostConfig{
+		NetworkMode:  container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
