@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -57,7 +58,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				},
 			},
 		},
-		mounts := []mount.Mount{
+		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
 				Source: "models",
