@@ -131,7 +131,7 @@ func getAllIPs() ([]string, error) {
 				continue // skip ipv6
 			}
 			ipStr := ip.String()
-			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.17") || strings.HasPrefix(ipStr, "172.18") {
+			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.1") || strings.HasPrefix(ipStr, "172.2") {
 				continue // skip local-only IPs
 			}
 			ips = append(ips, ipStr)
