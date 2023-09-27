@@ -63,6 +63,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				Source: "models",
 				Target: "/models",
 			},
+		},
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
