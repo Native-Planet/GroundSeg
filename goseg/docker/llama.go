@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"goseg/config"
+	"goseg/logger"
 	"runtime"
 
 	"github.com/docker/docker/api/types/container"
@@ -10,6 +11,7 @@ import (
 )
 
 func LoadLlama() error {
+	logger.Logger.Info("Loading Llama GPT")
 	info, err := StartContainer("llama-api", "llama-api")
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
