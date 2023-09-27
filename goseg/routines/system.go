@@ -80,8 +80,8 @@ func mDNSServer() {
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		}
-		time.Sleep(120 * time.Second)
 		server.Shutdown()
+		time.Sleep(120 * time.Second)
 	}
 	// reannounce every 2 minutes
 }
