@@ -48,7 +48,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			Name: "on-failure",
 		},
 		Resources: container.Resources{
-			NanoCPUs: int64(halfCores * 100000),
+			NanoCPUs: int64(halfCores) * 1e9,
 		},
 		PortBindings: nat.PortMap{
 			"8000/tcp": []nat.PortBinding{
