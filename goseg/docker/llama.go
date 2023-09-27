@@ -70,12 +70,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		Mounts: []mount.Mount{
 			{
 				Type:   mount.TypeVolume,
-				Source: "llama-gpt-api/models", // host dir
+				Source: "llama-models", // host dir
 				Target: "/models", // in the container
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: "llama-gpt-api/api",
+				Source: "llama-api",
 				Target: "/api",
 			},
 		},
