@@ -57,10 +57,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				},
 			},
 		},
-		Binds: []string{
-			"./models:/models",
-			"./api:/api",
-		},
+		mounts := []mount.Mount{
+			{
+				Type:   mount.TypeVolume,
+				Source: "models",
+				Target: "/models",
+			},
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
