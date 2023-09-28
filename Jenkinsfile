@@ -60,31 +60,29 @@ pipeline {
             }
         } */
         stage('build') {
-            stage('amd64 build') {
-                steps {
-                    /* build binaries and move to web dir */
-                    script {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                            sh '''
-                                git checkout ${tag}
-                                cd ./ui
-                                DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
-                                container_id=$(docker create web-builder)
-                                docker cp $container_id:/webui/build ./web
-                                rm -rf ../goseg/web
-                                mv web ../goseg/
-                                cd ../goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
-                            '''
-                        }
-                        /* production releases get promoted from edge */
-                        if( "${channel}" == "latest" ) {
-                            sh '''
-                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
-                            '''
-                        }
+            steps {
+                /* build binaries and move to web dir */
+                script {
+                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                        sh '''
+                            git checkout ${tag}
+                            cd ./ui
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            docker cp $container_id:/webui/build ./web
+                            rm -rf ../goseg/web
+                            mv web ../goseg/
+                            cd ../goseg
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                        '''
+                    }
+                    /* production releases get promoted from edge */
+                    if( "${channel}" == "latest" ) {
+                        sh '''
+                            cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                            cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                        '''
                     }
                 }
             }
