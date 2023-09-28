@@ -1,5 +1,7 @@
 # Native Planet GroundSeg
 
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
 GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
 It simplifies the process of getting onto the Urbit network and provides a range of additional services 
 that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
