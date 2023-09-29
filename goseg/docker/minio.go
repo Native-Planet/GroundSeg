@@ -230,7 +230,7 @@ mcRunning:
 		"mc",
 		"anonymous",
 		"set",
-		"public",
+		"download",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
 	if _, err := ExecDockerCommand(containerName, publicCommand); err != nil {
