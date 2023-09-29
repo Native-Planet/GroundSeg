@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goseg/auth"
 	"goseg/config"
+	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
 )
@@ -29,6 +30,7 @@ var (
 
 func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 	var setupPayload structs.WsSetupPayload
+	logger.Logger.Info("Setup")
 	err := json.Unmarshal(msg, &setupPayload)
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal setup payload: %v", err)
