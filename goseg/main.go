@@ -71,7 +71,7 @@ func C2cLoop() {
 			}
 		} else if internetAvailable && c2cActive {
 			if err := system.UnaliveC2C(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
+				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode: %v", err))
 			} else {
 				logger.Logger.Info("Connection detected -- exiting C2C mode")
 				c2cActive = false
@@ -159,7 +159,7 @@ func main() {
 		// trigger this with `./groundseg dev`
 		if arg == "dev" {
 			logger.Logger.Info("Starting pprof (:6060)")
-			fmt.Println(http.ListenAndServe("0.0.0.0:6060", nil))
+			http.ListenAndServe("0.0.0.0:6060", nil)
 		}
 	}
 	if conf.UpdateMode == "auto" {
