@@ -6,6 +6,8 @@ export const ready = writable(false)
 export const connected = writable(false)
 export const logs = writable({})
 export const wsPort = writable("3000")
+export const isC2CMode = writable(false)
+export const ssids = writable([])
 
 let PENDING = new Set();
 let SESSION;
@@ -59,11 +61,19 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  if (data.type === "activity") {
+  if (data.type === "c2c") {
+    console.log(data)
+    ssids.set(data.ssids)
+    isC2CMode.set(true)
+  } else if (data.type === "activity") {
     handleActivity(data)
+    ssids.set([])
+    isC2CMode.set(false)
   } else if (data.type == "structure") {
     console.log(data)
     structure.set(data)
+    ssids.set([])
+    isC2CMode.set(false)
   } else if (data.hasOwnProperty('log')) {
     logs.update(l=>{
       let containerID = data.log.container_id
@@ -75,8 +85,12 @@ export const handleMessage = data => {
       }
       return l
     })
+    structure.set(data)
+    ssids.set([])
   } else {
     console.log("server alive")
+    structure.set(data)
+    ssids.set([])
   }
 }
 
@@ -491,6 +505,21 @@ export const toggleLog = (name,action) => {
     "container_id": name,
   }
   send(payload)
+}
+
+//
+//  C2C
+//
+
+export const submitNetwork = (ssid,password) => {
+  let payload = {
+    "type":"c2c",
+    "ssid":ssid,
+    "password": password
+  }
+  // Send the request
+  console.log("sending c2c request for " + ssid)
+  SESSION.send(JSON.stringify(payload))
 }
 
 //

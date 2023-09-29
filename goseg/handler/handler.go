@@ -162,6 +162,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 }
 
 func enforceLockout() {
+	// todo: extend remainder
 	remainder = 120
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -195,6 +196,26 @@ func LogoutHandler(msg []byte) error {
 	}
 	auth.RemoveFromAuthMap(logoutPayload.Token.ID, true)
 	return nil
+}
+
+// return the c2c payload
+func C2CHandler(payload structs.C2CPayload) ([]byte, error) {
+	var resp []byte
+	var err error
+	switch payload.Type {
+	case "c2c":
+		system.C2CConnect(payload.SSID, payload.Password)
+	default:
+		blob := structs.C2CBroadcast{
+			Type:  "c2c",
+			SSIDS: system.C2CStoredSSIDs,
+		}
+		resp, err = json.Marshal(blob)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+		}
+	}
+	return resp, nil
 }
 
 // return the unauth payload
