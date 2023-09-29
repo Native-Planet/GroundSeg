@@ -160,6 +160,12 @@ type UnauthBroadcast struct {
 }
 
 // broadcast payload subobject
+type C2CBroadcast struct {
+	Type  string   `json:"type"`
+	SSIDS []string `json:"ssids"`
+}
+
+// broadcast payload subobject
 type SetupBroadcast struct {
 	Type      string                    `json:"type"`
 	AuthLevel string                    `json:"auth_level"`

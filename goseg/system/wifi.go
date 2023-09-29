@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"goseg/accesspoint"
 	"goseg/logger"
 	"goseg/structs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -27,7 +28,6 @@ var (
 		},
 	}
 	clients = make(map[*websocket.Conn]bool)
-	C2cChan = make(chan bool)
 	proxy   = &captive.Portal{
 		LoginPath:           "/",
 		PortalDomain:        "nativeplanet.local",
@@ -37,6 +37,9 @@ var (
 	WifiInfo structs.SystemWifi
 	Device   string // wifi device name
 	LocalUrl string // eg nativeplanet.local
+
+	c2cEnabled = false
+	c2cMu      sync.Mutex
 )
 
 func init() {
@@ -49,6 +52,19 @@ func init() {
 		constructWifiInfo(dev[0])
 		go wifiInfoLoop(dev[0])
 	}
+}
+
+func IsC2CMode() bool {
+	c2cMu.Lock()
+	defer c2cMu.Unlock()
+	return c2cEnabled
+}
+
+func SetC2CMode(isTrue bool) error {
+	c2cMu.Lock()
+	defer c2cMu.Unlock()
+	c2cEnabled = isTrue
+	return nil
 }
 
 func wifiInfoLoop(dev string) {
@@ -90,17 +106,61 @@ func ifCheck() bool {
 	return strings.Contains(string(out), "enabled")
 }
 
-func C2cMode() error {
-	dev, err := getWifiDevice()
+func C2CMode() error {
+	logger.Logger.Debug(fmt.Sprintf("C2C Mode called"))
+	// make sure wifi is enabled
+	runCommand("nmcli", "radio", "wifi", "on")
+	// this is necessary because it takes a while for the SSIDs to populate
+	time.Sleep(10 * time.Second)
+	// get wifi device
+	dev, _ := getWifiDevice()
+	// todo: start wifi if not started
+	// store ssids
+	C2CStoredSSIDs = ListWifiSSIDs(dev[0])
+
+	// stop systemd-resolved
+	cmd := exec.Command("systemctl", "stop", "systemd-resolved")
+	_, err := cmd.CombinedOutput()
 	if err != nil {
+		logger.Logger.Debug(fmt.Sprintf("Failed to stop systemd-resolved: %v", err))
+	}
+	// stop AP
+	accesspoint.Stop()
+	// start AP
+	if err := accesspoint.Start(dev[0]); err != nil {
 		return err
 	}
-	if err := setupHostAPD(dev[0]); err != nil {
-		return err
+	return nil
+}
+
+func C2CConnect(ssid, password string) {
+	logger.Logger.Debug("C2C Attempting to connect to ssid")
+	UnaliveC2C()
+	dev, _ := getWifiDevice()
+	runCommand("nmcli", "radio", "wifi", "on")
+	time.Sleep(5 * time.Second)
+	runCommand("sudo", "ip", "link", "set", dev[0], "up")
+	// attempt to connect
+	err := ConnectToWifi(dev[0], ssid, password)
+	if err != nil {
+		C2CMode()
+	} else {
+		cmd := exec.Command("systemctl", "restart", "groundseg")
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			logger.Logger.Debug(fmt.Sprintf("Failed to restart groundseg: %v", err))
+		}
 	}
-	go announceNetworks(dev[0])
-	if err := CaptivePortal(dev[0]); err != nil {
-		return err
+}
+
+func UnaliveC2C() error {
+	// stop AP
+	accesspoint.Stop()
+	// start systemd-resolved
+	cmd := exec.Command("systemctl", "start", "systemd-resolved")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to start systemd-resolved: %v", err)
 	}
 	return nil
 }
@@ -265,56 +325,6 @@ func ToggleDevice(dev string) error {
 	}
 	_, err := runCommand("nmcli", "radio", "wifi", cmd)
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func setupHostAPD(iface string) error {
-	hostapdConf := `
-interface=` + iface + `
-driver=nl80211
-ssid=nativeplanet
-hw_mode=g
-channel=6
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=nativeplanet
-wpa_key_mgmt=WPA-PSK
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
-`
-	err := ioutil.WriteFile("/etc/hostapd/hostapd.conf", []byte(hostapdConf), 0644)
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("hostapd", "/etc/hostapd/hostapd.conf")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("ifconfig", iface, "10.0.0.1", "netmask", "255.255.255.0", "up")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("dnsmasq", "--interface="+iface, "--bind-interfaces", "--dhcp-range=10.0.0.2,10.0.0.20,12h")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func TeardownHostAPD() error {
-	_, err := runCommand("pkill", "-9", "hostapd")
-	if err != nil {
-		return err
-	}
-	_, err = runCommand("pkill", "-9", "dnsmasq")
-	if err != nil {
-		return err
-	}
-	if err := proxy.Close(); err != nil {
 		return err
 	}
 	return nil
