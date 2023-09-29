@@ -17,6 +17,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 )
@@ -28,6 +29,8 @@ var (
 )
 
 func init() {
+	// kill old webui container if running
+	killContainerUsingPort(80)
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
@@ -42,6 +45,40 @@ func init() {
 		return
 	}
 	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
+}
+
+func killContainerUsingPort(n uint16) {
+	// Initialize Docker client
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+
+	// Prepare filters to get only running containers
+	filters := filters.NewArgs()
+	filters.Add("status", "running")
+
+	// List running containers
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{Filters: filters})
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
+		return
+	}
+
+	// Check if any container is using host's port 80 and stop it
+	for _, cont := range containers {
+		for _, port := range cont.Ports {
+			if port.PublicPort == n {
+				logger.Logger.Debug(fmt.Sprintf("Stopping container %s using host's port %v", cont.ID, n))
+				options := container.StopOptions{}
+				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
+					logger.Logger.Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
+				}
+				return
+			}
+		}
+	}
 }
 
 // attempt to update docker daemon (ubuntu/mint only)
@@ -716,7 +753,6 @@ func volumeExists(volumeName string) (bool, error) {
 	}
 	return false, nil
 }
-
 
 func addOrGetNetwork(networkName string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
