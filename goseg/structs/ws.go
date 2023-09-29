@@ -175,6 +175,12 @@ type WsType struct {
 	} `json:"payload"`
 }
 
+type C2CPayload struct {
+	Type     string `json:"type"`
+	SSID     string `json:"ssid"`
+	Password string `json:"password"`
+}
+
 type WsPayload struct {
 	ID      string        `json:"id"`
 	Type    string        `json:"type"`

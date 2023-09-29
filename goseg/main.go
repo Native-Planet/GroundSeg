@@ -15,7 +15,6 @@ package main
 // - Very good golang Docker libraries
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"goseg/config"
@@ -56,47 +55,26 @@ var (
 	shutdownChan  = make(chan struct{})
 )
 
-// run either the main webserver or the c2c webserver
-func ServerControl() {
-	activeServer := startMainServer()
-	// var activeServer *http.Server
-	for {
-		select {
-		case useC2C := <-system.C2cChan:
-			if activeServer != nil {
-				close(shutdownChan)
-				shutdownChan = make(chan struct{})
-				activeServer.Shutdown(context.Background())
-			}
-			if useC2C {
-				activeServer = startC2CServer()
-			} else {
-				activeServer = startMainServer()
-			}
-		}
-	}
-}
-
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func C2cLoop() {
 	c2cActive := false
 	for {
 		internetAvailable := config.NetCheck("1.1.1.1:53")
 		if !internetAvailable && !c2cActive && system.Device != "" {
-			if err := system.C2cMode(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode:", err))
+			if err := system.C2CMode(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
 			} else {
 				logger.Logger.Info("No connection -- entering C2C mode")
 				c2cActive = true
-				system.C2cChan <- true
+				system.SetC2CMode(true)
 			}
 		} else if internetAvailable && c2cActive {
-			if err := system.TeardownHostAPD(); err != nil {
+			if err := system.UnaliveC2C(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
 			} else {
 				logger.Logger.Info("Connection detected -- exiting C2C mode")
 				c2cActive = false
-				system.C2cChan <- false
+				system.SetC2CMode(false)
 			}
 		}
 		time.Sleep(30 * time.Second)
@@ -127,26 +105,7 @@ func ContentTypeSetter(next http.Handler) http.Handler {
 	})
 }
 
-func startC2CServer() *http.Server {
-	mux := http.NewServeMux()
-	mux.Handle("/", capFileServer)
-	mux.HandleFunc("/api", system.CaptiveAPI)
-	server := &http.Server{
-		Addr:    ":80",
-		Handler: mux,
-	}
-	go func() {
-		select {
-		case <-shutdownChan:
-			server.Shutdown(context.Background())
-		}
-	}()
-	go server.ListenAndServe()
-	logger.Logger.Info("C2C web server serving")
-	return server
-}
-
-func startMainServer() *http.Server {
+func startServer() { // *http.Server {
 	r := mux.NewRouter()
 	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
 	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(http.FS(webContent)))))
@@ -162,18 +121,12 @@ func startMainServer() *http.Server {
 		Addr:    ":3000",
 		Handler: w,
 	}
-	go func() {
-		select {
-		case <-shutdownChan:
-			server.Shutdown(context.Background())
-			wsServer.Shutdown(context.Background())
-		}
-	}()
 	go server.ListenAndServe()
-	go wsServer.ListenAndServe()
+	wsServer.ListenAndServe()
+	//go wsServer.ListenAndServe()
 	// http.ListenAndServe(":80", r)
-	logger.Logger.Info("GroundSeg web UI serving")
-	return server
+	//logger.Logger.Info("GroundSeg web UI serving")
+	//return server
 }
 
 func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
@@ -279,8 +232,5 @@ func main() {
 		loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 	}
 
-	// load the appropriate HTTP server forever
-	for {
-		ServerControl()
-	}
+	startServer()
 }
