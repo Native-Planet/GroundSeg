@@ -159,7 +159,7 @@ func main() {
 		// trigger this with `./groundseg dev`
 		if arg == "dev" {
 			logger.Logger.Info("Starting pprof (:6060)")
-			http.ListenAndServe("0.0.0.0:6060", nil)
+			go http.ListenAndServe("0.0.0.0:6060", nil)
 		}
 	}
 	if conf.UpdateMode == "auto" {
