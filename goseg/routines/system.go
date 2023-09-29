@@ -53,6 +53,7 @@ func mDNSServer() {
 		counter := 2
 		for contains(domains, strings.Split(LocalDomain, ".")[0]) {
 			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
+			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...",LocalDomain))
 			counter++
 		}
 	}
@@ -65,23 +66,22 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
+		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v",system.LocalUrl,ips))
 		server, err := zeroconf.RegisterProxy(
-			strings.Split(LocalDomain, ".")[0],
+			strings.Split(system.LocalUrl, ".")[0],
 			"_http._tcp",
 			"local.",
 			80,
-			strings.Split(LocalDomain, ".")[0],
+			strings.Split(system.LocalUrl, ".")[0],
 			ips,
 			[]string{"txtv=0", "lo=1", "la=2"},
 			nil,
 		)
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
-		} // else {
-		// 	logger.Logger.Info(fmt.Sprintf("Registered %v mDNS domain (IPs: %v)", LocalDomain, ips))
-		// }
-		time.Sleep(120 * time.Second)
+		}
 		server.Shutdown()
+		time.Sleep(120 * time.Second)
 	}
 	// reannounce every 2 minutes
 }
@@ -131,7 +131,7 @@ func getAllIPs() ([]string, error) {
 				continue // skip ipv6
 			}
 			ipStr := ip.String()
-			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.17") || strings.HasPrefix(ipStr, "172.18") {
+			if strings.HasPrefix(ipStr, "127") || strings.HasPrefix(ipStr, "172.1") || strings.HasPrefix(ipStr, "172.2") {
 				continue // skip local-only IPs
 			}
 			ips = append(ips, ipStr)

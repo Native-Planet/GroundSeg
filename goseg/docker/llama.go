@@ -1,15 +1,69 @@
 package docker
 
 import (
+	"path/filepath"
+	"fmt"
+	"goseg/config"
+	"goseg/defaults"
+	"goseg/logger"
+	"io/ioutil"
+	"runtime"
+
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
 )
 
+func LoadLlama() error {
+	logger.Logger.Info("Loading Llama GPT")
+	info, err := StartContainer("llama-gpt-api", "llama-api")
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
+	}
+	config.UpdateContainerState("llama-api", info)
+	info, err = StartContainer("llama-gpt-ui", "llama-ui")
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
+	}
+	config.UpdateContainerState("llama-ui", info)
+	return nil
+}
+
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
+	var containerConfig container.Config
+	var hostConfig container.HostConfig
+	apiContainerName := "llama-gpt-api"
 	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
-	containerConfig := container.Config{
+	halfCores := runtime.NumCPU() / 2
+	exists, err := volumeExists(apiContainerName)
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
+	}
+	if !exists {
+		if err = CreateVolume(apiContainerName); err != nil {
+			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
+		}
+	}
+	exists, err = volumeExists(apiContainerName+"_api")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
+	}
+	if !exists {
+		if err = CreateVolume(apiContainerName+"_api"); err != nil {
+			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
+		}
+	}
+	llamaNet, err := addOrGetNetwork("llama")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+	}
+	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
+	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
+	}
+	containerConfig = container.Config{
 		Image:    desiredImage,
-		Hostname: "llama-gpt-api",
+		Hostname: apiContainerName,
 		Cmd:      []string{"/bin/sh", "/api/run.sh"},
 		Env: []string{
 			"MODEL=/models/llama-2-7b-chat.bin",
@@ -21,9 +75,13 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
-	hostConfig := container.HostConfig{
+	hostConfig = container.HostConfig{
+		NetworkMode:  container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
+		},
+		Resources: container.Resources{
+			NanoCPUs: int64(halfCores) * 1e9,
 		},
 		PortBindings: nat.PortMap{
 			"8000/tcp": []nat.PortBinding{
@@ -33,9 +91,17 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				},
 			},
 		},
-		Binds: []string{
-			"./models:/models",
-			"./api:/api",
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeVolume,
+				Source: apiContainerName, // host dir
+				Target: "/models", // in the container
+			},
+			{
+				Type:   mount.TypeVolume,
+				Source: apiContainerName+"_api",
+				Target: "/api",
+			},
 		},
 		CapAdd: []string{
 			"IPC_LOCK",
@@ -46,7 +112,13 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 
 func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 	desiredImage := "nativeplanet/llama-gpt-ui:latest@sha256:bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
-	containerConfig := container.Config{
+	var containerConfig container.Config
+	var hostConfig container.HostConfig
+	llamaNet, err := addOrGetNetwork("llama")
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+	}
+	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: "llama-gpt-ui",
 		Env: []string{
@@ -61,7 +133,8 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 			"3000/tcp": struct{}{},
 		},
 	}
-	hostConfig := container.HostConfig{
+	hostConfig = container.HostConfig{
+		NetworkMode:  container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
