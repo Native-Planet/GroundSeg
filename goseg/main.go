@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,6 +154,14 @@ func main() {
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
+	// debug mode
+	for _, arg := range os.Args[1:] {
+		// trigger this with `./groundseg dev`
+		if arg == "dev" {
+			logger.Logger.Info("Starting pprof (:6060)")
+			fmt.Println(http.ListenAndServe("localhost:6060", nil))
+		}
+	}
 	if conf.UpdateMode == "auto" {
 		remoteVersion = true
 		// get version info from remote server
