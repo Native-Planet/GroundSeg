@@ -122,9 +122,9 @@ func mainWSHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn)
 	}
 	ack := "ack"
 	conf := config.Conf()
-	if authed || conf.FirstBoot {
+	if authed || conf.Setup != "complete" {
 		// send setup broadcast if we're not done setting up
-		if conf.FirstBoot {
+		if conf.Setup != "complete" {
 			resp := structs.SetupBroadcast{
 				Type:      "structure",
 				AuthLevel: "setup",
@@ -201,7 +201,7 @@ func mainWSHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn)
 			MuCon.Write(resp)
 		case "verify":
 			authed := true
-			if conf.FirstBoot {
+			if conf.Setup != "complete" {
 				authed = false
 			}
 			if err := auth.AddToAuthMap(conn, token, authed); err != nil {
