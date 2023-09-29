@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,7 +71,7 @@ func C2cLoop() {
 			}
 		} else if internetAvailable && c2cActive {
 			if err := system.UnaliveC2C(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode:", err))
+				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode: %v", err))
 			} else {
 				logger.Logger.Info("Connection detected -- exiting C2C mode")
 				c2cActive = false
@@ -153,6 +154,14 @@ func main() {
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
+	// debug mode
+	for _, arg := range os.Args[1:] {
+		// trigger this with `./groundseg dev`
+		if arg == "dev" {
+			logger.Logger.Info("Starting pprof (:6060)")
+			http.ListenAndServe("0.0.0.0:6060", nil)
+		}
+	}
 	if conf.UpdateMode == "auto" {
 		remoteVersion = true
 		// get version info from remote server

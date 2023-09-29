@@ -9,8 +9,15 @@ subscription, users can also access their Urbit ship remotely.
 
 ## Dependencies
 
-- docker
-- systemd
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+These are optional external packages for used wifi support:
+
+- `hostapd`
+- `nmcli`
 
 ## Installation
 
