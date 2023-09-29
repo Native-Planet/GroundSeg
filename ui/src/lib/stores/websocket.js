@@ -62,6 +62,7 @@ export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
   if (data.type === "c2c") {
+    console.log(data)
     ssids.set(data.ssids)
     isC2CMode.set(true)
   } else if (data.type === "activity") {
@@ -504,6 +505,21 @@ export const toggleLog = (name,action) => {
     "container_id": name,
   }
   send(payload)
+}
+
+//
+//  C2C
+//
+
+export const submitNetwork = (ssid,password) => {
+  let payload = {
+    "type":"c2c",
+    "ssid":ssid,
+    "password": password
+  }
+  // Send the request
+  console.log("sending c2c request for " + ssid)
+  SESSION.send(JSON.stringify(payload))
 }
 
 //

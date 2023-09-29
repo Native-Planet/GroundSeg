@@ -19,6 +19,10 @@ import (
 	"github.com/shirou/gopsutil/mem"
 )
 
+var (
+	C2CStoredSSIDs []string
+)
+
 // get memory total/used in bytes
 func GetMemory() (uint64, uint64) {
 	v, _ := mem.VirtualMemory()

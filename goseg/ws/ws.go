@@ -56,8 +56,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
-	//_, msg, err := conn.ReadMessage()
-	_, _, err := conn.ReadMessage()
+	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 			logger.Logger.Info("WS closed")
@@ -67,9 +66,14 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 		logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 		return "break"
 	}
-	resp, err := handler.C2CHandler()
+	var payload structs.C2CPayload
+	if err := json.Unmarshal(msg, &payload); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
+		return "continue"
+	}
+	resp, err := handler.C2CHandler(payload)
 	if err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+		logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
 	}
 	MuCon := auth.ClientManager.NewConnection(conn, "somebody-once-told-me")
 	MuCon.Write(resp)

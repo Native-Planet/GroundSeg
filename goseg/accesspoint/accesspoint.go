@@ -72,28 +72,12 @@ func Stop() error {
 	return nil
 }
 
-// IsRunning checks if either 'hostapd' or 'dnsmasq' processes are running
-func isRunning() (bool, error) {
-	// Run 'pgrep' command to find processes by name
-	out, err := exec.Command("pgrep", "-af", "hostapd|dnsmasq").Output()
-	if err != nil {
-		// If err is not nil, pgrep didn't find the processes, which is not an error in our case
-		return false, nil
-	}
-	// Convert output to string and check if 'hostapd' or 'dnsmasq' is in it
-	processOutput := string(out)
-	if strings.Contains(processOutput, "hostapd") || strings.Contains(processOutput, "dnsmasq") {
-		return true, nil
-	}
-	return false, nil
-}
-
 // general internal functions
 
 // checks if either 'hostapd' or 'dnsmasq' processes are running
-func IsRunning() (bool, error) {
+func isRunning() (bool, error) {
 	// Run 'pgrep' command to find processes by name
-	out, err := exec.Command("pgrep", "-af", "hostapd|dnsmasq").Output()
+	out, err := exec.Command("pgrep", "-af", "'hostapd|dnsmasq'").Output()
 	if err != nil {
 		// If err is not nil, pgrep didn't find the processes, which is not an error in our case
 		return false, nil
@@ -118,6 +102,7 @@ func checkDependencies() error {
 
 // ExecuteShell executes a shell command and returns its output
 func executeShell(commandString string) (string, error) {
+	logger.Logger.Debug(fmt.Sprintf("%v", commandString))
 	// Initialize the command
 	cmd := exec.Command("sh", "-c", commandString)
 
@@ -133,5 +118,6 @@ func executeShell(commandString string) (string, error) {
 	}
 
 	// Decode the result
+	logger.Logger.Debug(stdout.String())
 	return stdout.String(), nil
 }

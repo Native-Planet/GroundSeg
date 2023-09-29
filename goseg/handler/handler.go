@@ -199,21 +199,21 @@ func LogoutHandler(msg []byte) error {
 }
 
 // return the c2c payload
-func C2CHandler() ([]byte, error) {
-	blob := structs.C2CBroadcast{
-		Type: "c2c",
-		SSIDS: []string{
-			"Skyline_5GHz",
-			"CoffeeBean_Guest",
-			"MysticForest", "QuantumWave",
-			"SilentHill", "Hobbiton_Wifi",
-			"GalacticZone",
-			"NinjaNetwork",
-		},
-	}
-	resp, err := json.Marshal(blob)
-	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+func C2CHandler(payload structs.C2CPayload) ([]byte, error) {
+	var resp []byte
+	var err error
+	switch payload.Type {
+	case "c2c":
+		system.C2CConnect(payload.SSID, payload.Password)
+	default:
+		blob := structs.C2CBroadcast{
+			Type:  "c2c",
+			SSIDS: system.C2CStoredSSIDs,
+		}
+		resp, err = json.Marshal(blob)
+		if err != nil {
+			return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+		}
 	}
 	return resp, nil
 }

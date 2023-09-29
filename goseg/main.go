@@ -59,8 +59,7 @@ var (
 func C2cLoop() {
 	c2cActive := false
 	for {
-		//internetAvailable := config.NetCheck("1.1.1.1:53")
-		internetAvailable := false
+		internetAvailable := config.NetCheck("1.1.1.1:53")
 		if !internetAvailable && !c2cActive && system.Device != "" {
 			if err := system.C2CMode(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))

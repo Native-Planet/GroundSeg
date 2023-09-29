@@ -1,9 +1,11 @@
 <script>
   import Fa from 'svelte-fa'
-  import { faLock } from '@fortawesome/free-solid-svg-icons';
+  import { faLock } from '@fortawesome/free-solid-svg-icons'
 
-  import { slide } from 'svelte/transition';
-	import { quintOut } from 'svelte/easing';
+  import { slide } from 'svelte/transition'
+	import { quintOut } from 'svelte/easing'
+
+  import { ssids, submitNetwork } from '$lib/stores/websocket'
 
   let status = ""  // current status
   let selected = "" // selected network to attempt connection
@@ -19,21 +21,14 @@
   // connect to ssid
   const attemptConnect = () => {
     status = "connecting" 
-    setTimeout(fakeFailureState, 10000)
+    submitNetwork(selected,pwd)
+    //setTimeout(fakeFailureState, 10000)
   }
 
-  // debug
-  let ssidArr = [
-    "Skyline_5GHz",
-    "CoffeeBean_Guest",
-    "MysticForest",
-    "QuantumWave",
-    "SilentHill",
-    "Hobbiton_Wifi",
-    "GalacticZone",
-    "NinjaNetwork"
-  ];
+  $: ssidArr = Array.isArray($ssids) ? $ssids : []
 
+  // debug
+  //let ssidArr = ["Skyline_5GHz", "GalacticZone", "NinjaNetwork"]
   const fakeFailureState = () => {
     status = "failed"
     setTimeout(resetSelected, 3000)
