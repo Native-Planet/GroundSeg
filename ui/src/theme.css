@@ -1,0 +1,44 @@
+@font-face {
+  font-family: BPdotsUnicase;
+  src: url('/BPdotsUnicaseBold.otf');
+}
+@font-face {
+  font-family: Inter;
+  src: url('/Inter-V.ttf');
+}
+@font-face {
+  font-family: Source;
+  src: url('/SourceCodePro-Regular.otf');
+}
+body {
+  margin: 0;
+  /*
+  background-position: cover;
+  background-attachment: fixed;
+  background-image: url('https://wallpapercave.com/wp/wp5052793.jpg');
+  background-image: url('https://wallpaper-mania.com/wp-content/uploads/2018/09/High_resolution_wallpaper_background_ID_77701302686.jpg');
+  background-image: url('https://images.hdqwalls.com/download/best-nature-image-1920x1080.jpg');
+  background-image: url('https://r4.wallpaperflare.com/wallpaper/289/250/397/windows-xp-bliss-hd-wallpaper-e291b2c0dd269edbaa7802b51088d942.jpg');
+  */
+}
+
+:root {
+  --log-font: Source;
+  --regular-font: Inter;
+  --title-font: BPdotsUnicase;
+  --bg-base: #E8E8E3CD;
+  --bg-card: #161D17;
+  --bg-modal: #DDE3DF;
+  --bg-warning: #EDF02C;
+  --fg-card: #2C3A2E;
+  --btn-special: #08A317;
+  --btn-primary: #047710;
+  --btn-secondary: #5C7060;
+  --text-color: #313933;
+  --text-card-color: #F8F8F6;
+  --boot-selector-color: #F1F2EE;
+  --bg-boot-arrow: #ABBAAE;
+  --locked-color: #A31708;
+  font-family: var(--regular-font);
+}
+

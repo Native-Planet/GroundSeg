@@ -1,5 +1,7 @@
 # Native Planet GroundSeg
 
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
 GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
 It simplifies the process of getting onto the Urbit network and provides a range of additional services 
 that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
@@ -8,12 +10,11 @@ subscription, users can also access their Urbit ship remotely.
 ## Dependencies
 
 - docker
-- glibc ^2.31
 - systemd
 
 ## Installation
 
-**Disclaimer:** GroundSeg runs with `sudo` privileges on your device. This is required for controlling various aspects of the device.
+**Disclaimer:** GroundSeg runs with `sudo` privileges on your device. This is required for controlling various aspects of the device. For this reason, we recommend a dedicated device.
 
 ### Docker + GroundSeg (Recommended)
 This installs `docker` and the GroundSeg binary. Use this if you do not know what you're doing.
@@ -30,7 +31,7 @@ This downloads the appropriate service file for you init system and the groundse
 sudo wget -O - only.groundseg.app | bash
 ```
 
-### Switching to the Edge branch (Unstable)
+### Switching to the `edge` release channel (Unstable)
 
 1. In `/opt/nativeplanet/groundseg/settings/system.json`, set `"updateBranch"` to `"edge"`
 2. `sudo systemctl restart groundseg`

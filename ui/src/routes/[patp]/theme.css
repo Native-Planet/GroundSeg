@@ -1,0 +1,32 @@
+.title {
+  font-size: 24px;
+  margin-bottom: 56px;
+  font-family: var(--title-font);
+}
+.section {
+  display: flex;
+  align-items: center;
+}
+.section-left {
+  flex: 1;
+}
+.section-right {
+  flex: 1;
+  text-align: right;
+}
+.section-title {
+  font-family: var(--regular-font);
+  leading-trim: both;
+  text-edge: cap;
+  font-family: Inter;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: normal;
+  letter-spacing: -1.44px;
+}
+.section-description {
+  margin-top: 16px;
+  font-family: var(--regular-font);
+  font-size: 16px;
+}

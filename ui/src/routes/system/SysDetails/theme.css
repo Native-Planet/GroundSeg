@@ -1,0 +1,32 @@
+.info-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  align-self: stretch;
+
+  color: var(--NP_Black, #161D17);
+  leading-trim: both;
+  text-edge: cap;
+  font-family: Inter;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 300;
+  letter-spacing: -1.44px;
+}
+.info-title {
+  flex: 1;
+}
+.bar-bg {
+  margin-top: 8px;
+  width: 100%;
+  height: 54px;
+  background-color: var(--bg-modal);
+  border-radius: 16px;
+  border: 8px solid var(--bg-modal);
+}
+.bar-fg {
+  background-color: var(--btn-primary);
+  height: 54px;
+  border-radius: 12px;
+  transition: width 500ms;
+}

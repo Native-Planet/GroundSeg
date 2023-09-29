@@ -9,6 +9,10 @@ pipeline {
             choices: ['no' , 'yes'],
             description: 'Merge tag into master branch (doesn\'t do anything in dev)',
             name: 'MERGE')
+        choice(
+            choices: ['staging.version.groundseg.app' , 'version.groundseg.app'],
+            description: 'Choose version server',
+            name: 'VERSION_SERVER')
     }
     environment {
         /* translate git branch to release channel */
@@ -29,6 +33,8 @@ pipeline {
         versionauth = credentials('VersionAuth')
         /* release tag to be built*/
         tag = "${params.RELEASE_TAG}"
+        /* staging or production version server */
+        version_server = "${params.VERSION_SERVER}"
     }
     stages {
         stage('checkout') {
@@ -54,69 +60,32 @@ pipeline {
             }
         } */
         stage('build') {
-          parallel {
-            stage('amd64 build') {
-                steps {
-                    /* build amd64 binary and move to web dir */
-                    script {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                            sh '''
-                                git checkout ${tag}
-                                mkdir -p /opt/groundseg/version/bin
-                                cd ./build-scripts
-                                docker build --tag nativeplanet/groundseg-builder:3.11.2 .
-                                cd ..
-                                rm -rf /var/jenkins_home/tmp
-                                mkdir -p /var/jenkins_home/tmp
-                                cp -r api /var/jenkins_home/tmp
-                                docker run -v /home/np/np-cicd/jenkins_conf/tmp/binary:/binary -v /home/np/np-cicd/jenkins_conf/tmp/api:/api nativeplanet/groundseg-builder:3.11.2
-                                chmod +x /var/jenkins_home/tmp/binary/groundseg
-                                mv /var/jenkins_home/tmp/binary/groundseg /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                            '''
-                        }
-                        if( "${channel}" == "latest" ) {
-                            sh '''
-                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
-                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
-                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
-                            '''
-                        }
+            steps {
+                /* build binaries and move to web dir */
+                script {
+                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                        sh '''
+                            git checkout ${tag}
+                            cd ./ui
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            docker cp $container_id:/webui/build ./web
+                            rm -rf ../goseg/web
+                            mv web ../goseg/
+                            cd ../goseg
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                        '''
+                    }
+                    /* production releases get promoted from edge */
+                    if( "${channel}" == "latest" ) {
+                        sh '''
+                            cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                            cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                        '''
                     }
                 }
             }
-            stage('arm64 build') {
-                agent { node { label 'arm' } }
-                steps {
-                    /* build arm64 binary and stash it, build and push crossplatform webui docker image */
-                    checkout([$class: 'GitSCM',
-                              branches: [[name: "${params.RELEASE_TAG}"]],
-                              doGenerateSubmoduleConfigurations: false,
-                              extensions: [],
-                              gitTool: 'Default',
-                              submoduleCfg: [],
-                              userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
-                            ])
-                    script {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                            sh '''
-                                git checkout ${tag}
-                                cd build-scripts
-                                docker build --tag nativeplanet/groundseg-builder:3.10.9 .
-                                cd ..
-                                docker run -v "$(pwd)/binary":/binary -v "$(pwd)/api":/api nativeplanet/groundseg-builder:3.10.9
-                                cd ui
-                                docker buildx build --push --tag nativeplanet/groundseg-webui:${channel} --platform linux/amd64,linux/arm64 .
-                                cd ../..
-                            '''
-                            stash includes: 'binary/groundseg', name: 'groundseg_arm64'
-                        }
-                    }
-                    /* workspace has to be cleaned or build will fail next time */
-                    cleanWs()
-                }
-            }
-          }
         }
         stage('move binaries') {
             steps {
@@ -124,11 +93,6 @@ pipeline {
                 script {
                     if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {  
                         sh 'echo "debug: post-build actions"'
-                        dir('/opt/groundseg/version/bin/'){
-                        unstash 'groundseg_arm64'
-                        }
-                        sh 'mv /opt/groundseg/version/bin/binary/groundseg /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}'
-                        sh 'rm -rf /opt/groundseg/version/bin/binary/'
                         sh '''#!/bin/bash -x
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
@@ -151,20 +115,6 @@ pipeline {
                     script: '''#!/bin/bash -x
                         val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}|awk '{print \$1}'`
                         echo ${val}
-                    ''',
-                    returnStdout: true
-                ).trim()
-                webui_amd64_hash = sh(
-                    script: '''#!/bin/bash -x
-                    curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" \
-                    |jq -r '.images[]|select(.architecture=="amd64").digest'|sed 's/sha256://g'
-                    ''',
-                    returnStdout: true
-                ).trim()
-                webui_arm64_hash = sh(
-                    script: '''#!/bin/bash -x
-                    curl -s "https://hub.docker.com/v2/repositories/nativeplanet/groundseg-webui/tags/${channel}/?page_size=100" \
-                    |jq -r '.images[]|select(.architecture=="arm64").digest'|sed 's/sha256://g'
                     ''',
                     returnStdout: true
                 ).trim()
@@ -210,72 +160,60 @@ pipeline {
                         sh '''#!/bin/bash -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
                             mv ./release/groundseg_install.sh /opt/groundseg/get/only.sh
-                            webui_amd64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.amd64_sha256'`
-                            webui_arm64_hash=`curl https://version.groundseg.app | jq -r '.[].edge.webui.arm64_sha256'`
+                            webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
+                            webui_arm64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.arm64_sha256'`
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/amd64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_url/payload \
                                 -d "{\\"value\\":\\"${amdbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/arm64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_url/payload \
                                 -d "{\\"value\\":\\"${armbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/amd64_sha256/${amdsha}
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_sha256/${amdsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/arm64_sha256/${armsha}
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/webui/amd64_sha256/${webui_amd64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/major/${major}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/webui/arm64_sha256/${webui_arm64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/minor/${minor}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/major/${major}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/minor/${minor}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/latest/groundseg/patch/${patch}
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/patch/${patch}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/amd64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
                                 -d "{\\"value\\":\\"${amdbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/arm64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
                                 -d "{\\"value\\":\\"${armbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/webui/amd64_sha256/${webui_amd64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/webui/arm64_sha256/${webui_arm64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/major/${major}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/minor/${minor}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/canary/groundseg/patch/${patch}
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
                         '''
                     }
                     if( "${channel}" == "edge" ) {
                         sh '''#!/bin/bash -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/amd64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
                                 -d "{\\"value\\":\\"${amdbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/arm64_url/payload \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_url/payload \
                                 -d "{\\"value\\":\\"${armbin}\\"}"
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/amd64_sha256/${amdsha}
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_sha256/${amdsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/arm64_sha256/${armsha}
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_sha256/${armsha}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/webui/amd64_sha256/${webui_amd64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/major/${major}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/webui/arm64_sha256/${webui_arm64_hash}
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/minor/${minor}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/major/${major}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/minor/${minor}
-                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                https://version.groundseg.app/modify/groundseg/edge/groundseg/patch/${patch}
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
                 }
