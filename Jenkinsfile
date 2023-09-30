@@ -222,7 +222,7 @@ pipeline {
                                 https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
-                    if( "${to_canary}" == true ) {
+                    if( "${to_canary}" == "True" ) {
                         sh '''#!/bin/bash -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
