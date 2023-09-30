@@ -82,6 +82,9 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 			}
 		}
 		cm.AuthClients[id] = append(cm.AuthClients[id], client)
+	} else {
+		fakeConn := &MuConn{}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
 	}
 }
 
@@ -102,6 +105,9 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 			}
 		}
 		cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
+	} else {
+		fakeConn := &MuConn{}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
 	}
 }
 
