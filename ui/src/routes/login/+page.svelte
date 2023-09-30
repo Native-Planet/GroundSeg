@@ -41,14 +41,16 @@
       <div class="title">LOGIN</div>
 
       <!-- Password Input -->
-      <input
-        type="password"
-        disabled={!unlocked}
-        bind:value={loginPassword}
-        on:keydown={e => {
-          if (e.key === 'Enter') { handleLogin() }
-        }}
-      />
+      <div class="pw-wrapper">
+        <input
+          type="password"
+          disabled={!unlocked}
+          bind:value={loginPassword}
+          on:keydown={e => {
+            if (e.key === 'Enter') { handleLogin() }
+          }}
+        />
+      </div>
       <button on:click={handleLogin} login>Submit</button>
     {:else}
       <div class="locked-icon"><Fa icon={faLock} size="8x" /></div>
@@ -72,7 +74,7 @@
   .wide {
     width: 992px;
     height: calc(100vh - 240px);
-    margin-top: 120px;
+    margin-top: 60px;
     max-width: 98vw;
   }
   .slim {
@@ -83,33 +85,50 @@
     font-family: var(--title-font);
   }
   input {
-    width: 50%;
-    line-height: 42px;
-    border: solid 2px var(--btn-secondary);
+    flex: 1;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
     border-radius: 16px;
-    background: none;
+    background: var(--Gray-100, #DDE3DF);
+    padding: 16px 24px 18px 24px;
+    border: none;
+    height: 30px;
+    width: 480px;
     text-align: center;
   }
-  input:active, :focus {
-    outline: none; 
-  }
-  input:disabled {
-    border-color: red;
+  input:focus {
+    outline: none;
   }
   button {
+    margin-top: 55px;
+    font-family: var(--regular-font);
     background: var(--btn-special);
     color: var(--text-card-color);
-    margin: 20px;
-    padding: 12px 32px;
-    border: none;
+    height: 65px;
+    font-size: 12px;
     border-radius: 16px;
-  }
-  button:hover {
     cursor: pointer;
-  }
-  button:disabled {
-    pointer-events: none;
-    opacity: .6;
+    justify-content: center;
+    align-items: center;
+    padding: 0 48px;
+    cursor: pointer;
+
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
   }
   .info {
     margin: 20px;

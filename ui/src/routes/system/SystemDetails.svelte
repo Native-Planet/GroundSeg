@@ -18,7 +18,7 @@
 <div class="container">
   <div class="sys-title">
     <span>SYSTEM DETAILS</span>
-    <button class="restart-groundseg">Restart GroundSeg</button>
+    <button on:click={restartGroundSeg} class="restart-groundseg">Restart GroundSeg</button>
   </div>
   <div class="item-wrapper">
     <Swap {swap}/>

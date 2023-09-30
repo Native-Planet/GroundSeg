@@ -16,7 +16,6 @@
 
 <style>
   .container {
-    gap: 20px;
     background-color: var(--bg-base);
     color: var(--text-color);
     margin: auto;
@@ -26,26 +25,27 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding: 64px;
   }
   .wide {
-    width: 992px;
-    height: calc(100vh - 240px);
-    margin-top: 120px;
+    width: calc(992px - 128px);
+    min-height: calc(100vh - 368px);
+    margin-top: 64px;
     max-width: 98vw;
   }
   .slim {
     width: 100vw;
   }
   .steps {
-    margin-top: 24px;
+    margin-top: 32px;
     display: flex;
     justify-content: center;
-    gap: 4px;
+    gap: 8px;
   }
   .step {
-    border-radius: 4px;
-    width: 16px;
-    height: 16px;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
     background: #DDE3DF;
   }
   .highlight {

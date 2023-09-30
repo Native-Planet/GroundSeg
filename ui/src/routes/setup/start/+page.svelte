@@ -20,26 +20,51 @@
     width: 48px;
   }
   .title {
-    font-size: 48px;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
     font-family: var(--title-font);
+    font-size: 48px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: normal;
+    letter-spacing: -1.92px;
   }
   .subtitle {
-    line-height: 42px;
-    font-size: 18px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
+    margin: 48px;
   }
   button {
+    margin-top: 20px;
+    font-family: var(--regular-font);
     background: var(--btn-special);
     color: var(--text-card-color);
-    margin: 20px;
-    padding: 12px 32px;
-    border: none;
+    height: 65px;
+    font-size: 12px;
     border-radius: 16px;
-  }
-  button:hover {
     cursor: pointer;
-  }
-  button:disabled {
-    pointer-events: none;
-    opacity: .6;
+    justify-content: center;
+    align-items: center;
+    padding: 0 48px;
+    cursor: pointer;
+
+    color: #FFF;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 32px; /* 133.333% */
+    letter-spacing: -1.44px;
   }
 </style>
