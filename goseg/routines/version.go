@@ -34,6 +34,13 @@ func CheckVersionLoop() {
 			case <-ticker.C:
 				// Get latest information
 				latestVersion, _ := config.CheckVersion()
+				currentChannelVersion := config.VersionInfo
+				latestChannelVersion := latestVersion
+				// check docker updates
+				if latestChannelVersion != currentChannelVersion {
+					config.VersionInfo = latestVersion
+					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+				}
 				// Check for gs binary updates based on hash
 				binPath := filepath.Join(config.BasePath, "groundseg")
 				currentHash, err := getSha256(binPath)
@@ -50,14 +57,6 @@ func CheckVersionLoop() {
 					// updateBinary will likely restart the program, so
 					// we don't have to care about the docker updates.
 					updateBinary(releaseChannel, latestVersion)
-				} else {
-					// check docker updates
-					currentChannelVersion := config.VersionInfo
-					latestChannelVersion := latestVersion
-					if latestChannelVersion != currentChannelVersion {
-						config.VersionInfo = latestVersion
-						updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
-					}
 				}
 			}
 		}
