@@ -11,7 +11,6 @@ import (
 	"goseg/setup"
 	"goseg/startram"
 	"goseg/structs"
-	"goseg/system"
 	"net/http"
 	"strings"
 
@@ -31,29 +30,29 @@ var (
 )
 
 // switch on ws event cases
-func WsHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
-		return
-	}
-	// tokenId := config.RandString(32)
-	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
-	for {
-		var handleLoop string
-		if system.IsC2CMode() {
-			handleLoop = c2cHandler(w, r, conn)
-		} else {
-			handleLoop = mainWSHandler(w, r, conn)
-		}
-		if handleLoop == "break" {
-			break
-		}
-		if handleLoop == "continue" {
-			continue
-		}
-	}
-}
+// func WsHandler(w http.ResponseWriter, r *http.Request) {
+// 	conn, err := upgrader.Upgrade(w, r, nil)
+// 	if err != nil {
+// 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
+// 		return
+// 	}
+// 	// tokenId := config.RandString(32)
+// 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
+// 	for {
+// 		var handleLoop string
+// 		if system.IsC2CMode() {
+// 			handleLoop = c2cHandler(w, r, conn)
+// 		} else {
+// 			handleLoop = mainWSHandler(w, r, conn)
+// 		}
+// 		if handleLoop == "break" {
+// 			break
+// 		}
+// 		if handleLoop == "continue" {
+// 			continue
+// 		}
+// 	}
+// }
 
 func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
 	_, msg, err := conn.ReadMessage()
@@ -80,7 +79,7 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 	return ""
 }
 
-func mainWSHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
+func WSHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
