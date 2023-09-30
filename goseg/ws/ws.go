@@ -94,6 +94,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			MuCon.Write(resp)
+			continue
 		}
 		if authed || conf.Setup != "complete" {
 			// send setup broadcast if we're not done setting up
