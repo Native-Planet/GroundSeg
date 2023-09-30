@@ -115,6 +115,8 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 			}
 			if len(code) == 27 {
 				break
+			} else {
+				continue
 			}
 		}
 		conf := config.Conf()
