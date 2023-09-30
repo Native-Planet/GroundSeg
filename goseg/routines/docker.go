@@ -152,7 +152,7 @@ func Check502Loop() {
 			shipConf := config.UrbitConf(pier)
 			pierNetwork, err := docker.GetContainerNetwork(pier)
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v",pier))
+				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v", pier))
 				continue
 			}
 			if pierNetwork == "wireguard" && shipConf.BootStatus == "boot" {
@@ -165,7 +165,7 @@ func Check502Loop() {
 					defer resp.Body.Close()
 				}
 				if resp.StatusCode == http.StatusBadGateway {
-					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v",pier))
+					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
 						if _, found := status[pier]; found {
 							// found = 2x in a row

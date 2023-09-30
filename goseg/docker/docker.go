@@ -363,7 +363,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 // contructs a container.Config, then runs through whether to boot/restart/etc
 // saves the current container state in memory after completion
 func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
-	logger.Logger.Debug(fmt.Sprintf("StartContainer issued for %v",containerName))
+	logger.Logger.Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
 	// bundle of info about container
 	var containerState structs.ContainerState
 	// config params for container
