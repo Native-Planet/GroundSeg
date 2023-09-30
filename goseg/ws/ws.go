@@ -79,7 +79,7 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 	return ""
 }
 
-func WsHandler(w http.ResponseWriter, r *http.Request) {
+func WsHandler(w http.ResponseWriter, r *http.Request) string {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
