@@ -34,9 +34,13 @@ func CheckVersionLoop() {
 			case <-ticker.C:
 				// Get latest information
 				latestVersion, _ := config.CheckVersion()
-
 				// Check for gs binary updates based on hash
-				currentHash := conf.BinHash
+				binPath := filepath.Join(config.BasePath, "groundseg")
+				currentHash, err := getSha256(binPath)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't hash binary: %v", err))
+					continue
+				}
 				latestHash := latestVersion.Groundseg.Amd64Sha256
 				if config.Architecture != "amd64" {
 					latestHash = latestVersion.Groundseg.Arm64Sha256
