@@ -67,7 +67,7 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	if client != nil {
+	if client != nil && client.Conn != nil {
 		client.Active = true
 		if _, ok := cm.UnauthClients[id]; ok {
 			// remove from UnauthClients
@@ -81,26 +81,34 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 				delete(cm.UnauthClients, id)
 			}
 		}
+		cm.AuthClients[id] = append(cm.AuthClients[id], client)
+	} else {
+		fakeConn := &MuConn{}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
 	}
-	cm.AuthClients[id] = append(cm.AuthClients[id], client)
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	// remove from AuthClients if present
-	if _, ok := cm.AuthClients[id]; ok {
-		for i, con := range cm.AuthClients[id] {
-			if con.Conn == client.Conn {
-				cm.AuthClients[id] = append(cm.AuthClients[id][:i], cm.AuthClients[id][i+1:]...)
-				break
+	if client != nil && client.Conn != nil {
+		// remove from AuthClients if present
+		if _, ok := cm.AuthClients[id]; ok {
+			for i, con := range cm.AuthClients[id] {
+				if con.Conn == client.Conn {
+					cm.AuthClients[id] = append(cm.AuthClients[id][:i], cm.AuthClients[id][i+1:]...)
+					break
+				}
+			}
+			if len(cm.AuthClients[id]) == 0 {
+				delete(cm.AuthClients, id)
 			}
 		}
-		if len(cm.AuthClients[id]) == 0 {
-			delete(cm.AuthClients, id)
-		}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
+	} else {
+		fakeConn := &MuConn{}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
 	}
-	cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
