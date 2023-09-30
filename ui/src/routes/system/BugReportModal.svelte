@@ -1,14 +1,17 @@
 <script>
-  import { submitReport } from '$lib/stores/websocket'
+  import { structure, submitReport } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let isOpen
   let contact = ''
   let description = ''
+  $: urbits = ($structure?.urbits) || {}
+  $: urbitKeys = Object.keys(urbits)
 </script>
 
 {#if isOpen}
-  <Modal>
+  <Modal width={800}>
+    {JSON.stringify(urbitKeys)}
     <div class="wrapper">
       <h1>Report Bug</h1>
       <p>Submit a bug with your logs and we will contact you within 48 hours.</p>
@@ -16,6 +19,7 @@
       <input placeholder="Email or Urbit Ship Name" bind:value={contact} />
       <h2>Describe Issue</h2>
       <textarea placeholder="Type here" bind:value={description} />
+      <h2>Additional Information (Optional)</h2>
       <button
         on:click={()=>submitReport(contact,description,[])}
         >Send
@@ -49,7 +53,6 @@
     font-style: normal;
     font-weight: 300;
     letter-spacing: -1.44px;
-    width: 439px;
   }
   h2 {
     color: var(--Gray-400, #5C7060);
@@ -102,7 +105,7 @@
     padding: 16px 24px 18px 24px;
     border: none;
     width: calc(100% - 48px);
-    height: 135px;
+    height: 120px;
     resize: none;
   }
   textarea:focus {

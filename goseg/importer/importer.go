@@ -322,6 +322,8 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 			}
 			if len(code) == 27 {
 				break
+			} else {
+				continue
 			}
 		}
 		if fix {

@@ -46,15 +46,26 @@ func GetLusCode(patp string) (string, error) {
 	// execute hoon file
 	response, err := clickExec(patp, file)
 	if err != nil {
+		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
 	}
 	// retrieve code
 	code, _, err := filterResponse("code", response)
 	if err != nil {
+		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
 	}
 	storeLusCode(patp, code)
 	return code, nil
+}
+
+func storeLusCodeError(patp string) {
+	logger.Logger.Debug(fmt.Sprintf("Recording +code failure for %s", patp))
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	lusCodes[patp] = structs.ClickLusCode{
+		LastError: time.Now(),
+	}
 }
 
 func storeLusCode(patp, code string) {
@@ -74,6 +85,10 @@ func allowLusCodeRequest(patp string) bool {
 	data, exists := lusCodes[patp]
 	if !exists {
 		return true
+	}
+	// flood control
+	if time.Since(data.LastError) < 1*time.Second {
+		return false
 	}
 	// if +code not legit
 	if len(data.LusCode) != 27 {
