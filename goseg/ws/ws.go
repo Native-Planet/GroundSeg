@@ -11,6 +11,7 @@ import (
 	"goseg/setup"
 	"goseg/startram"
 	"goseg/structs"
+	"goseg/system"
 	"net/http"
 	"strings"
 
@@ -80,9 +81,23 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		ack := "ack"
 		conf := config.Conf()
-		if authed || conf.FirstBoot {
+		// handle c2c stuff before auth checks
+		if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
+			var payload structs.C2CPayload
+			if err := json.Unmarshal(msg, &payload); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
+				continue
+			}
+			resp, err := handler.C2CHandler(payload)
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
+				continue
+			}
+			MuCon.Write(resp)
+		}
+		if authed || conf.Setup != "complete" {
 			// send setup broadcast if we're not done setting up
-			if conf.FirstBoot {
+			if conf.Setup != "complete" {
 				resp := structs.SetupBroadcast{
 					Type:      "structure",
 					AuthLevel: "setup",
@@ -103,7 +118,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "pier_upload":
-				logger.Logger.Info("Pier upload")
+				if err = handler.UploadHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "password":
 				if err = handler.PwHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
