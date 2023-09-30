@@ -40,6 +40,7 @@ pipeline {
         tag = "${params.RELEASE_TAG}"
         /* staging or production version server */
         version_server = "${params.VERSION_SERVER}"
+        to_canary = "${params.TO_CANARY}"
     }
     stages {
         stage('checkout') {
@@ -221,7 +222,7 @@ pipeline {
                                 https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
-                    if( "${params.TO_CANARY}" == true ) {
+                    if( "${to_canary}" == true ) {
                         sh '''#!/bin/bash -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
