@@ -150,31 +150,39 @@ func Check502Loop() {
 				continue
 			}
 			shipConf := config.UrbitConf(pier)
-			resp, err := http.Get("https://" + shipConf.WgURL)
+			pierNetwork, err := docker.GetContainerNetwork(pier)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v",pier))
 				continue
 			}
-			if resp.Body != nil {
-				defer resp.Body.Close()
-			}
-			if resp.StatusCode == http.StatusBadGateway {
-				if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
-					if _, found := status[pier]; found {
-						// found = 2x in a row
-						if err := docker.RestartContainer("wireguard"); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
-						}
-						// remove from map after restart
-						delete(status, pier)
-					} else {
-						// first 502
-						status[pier] = true
-					}
+			if pierNetwork == "wireguard" && shipConf.BootStatus == "boot" {
+				resp, err := http.Get("https://" + shipConf.WgURL)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+					continue
 				}
-			} else if _, found := status[pier]; found {
-				// if not 502 and pier is in status map, remove it
-				delete(status, pier)
+				if resp.Body != nil {
+					defer resp.Body.Close()
+				}
+				if resp.StatusCode == http.StatusBadGateway {
+					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v",pier))
+					if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
+						if _, found := status[pier]; found {
+							// found = 2x in a row
+							if err := docker.RestartContainer("wireguard"); err != nil {
+								logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+							}
+							// remove from map after restart
+							delete(status, pier)
+						} else {
+							// first 502
+							status[pier] = true
+						}
+					}
+				} else if _, found := status[pier]; found {
+					// if not 502 and pier is in status map, remove it
+					delete(status, pier)
+				}
 			}
 		}
 	}
