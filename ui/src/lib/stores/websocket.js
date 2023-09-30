@@ -517,9 +517,7 @@ export const submitNetwork = (ssid,password) => {
     "ssid":ssid,
     "password": password
   }
-  // Send the request
-  console.log("sending c2c request for " + ssid)
-  SESSION.send(JSON.stringify(payload))
+  send(payload)
 }
 
 //
