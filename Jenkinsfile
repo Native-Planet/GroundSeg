@@ -12,7 +12,7 @@ pipeline {
         booleanParam(
             name: 'TO_CANARY',
             defaultValue: false,
-            description: 'Also push build to canary channel (if edge/latest)'
+            description: 'Also push build to canary channel (if edge)'
         )
         choice(
             choices: ['staging.version.groundseg.app' , 'version.groundseg.app'],
@@ -40,6 +40,7 @@ pipeline {
         tag = "${params.RELEASE_TAG}"
         /* staging or production version server */
         version_server = "${params.VERSION_SERVER}"
+        to_canary = "${params.TO_CANARY}"
     }
     stages {
         stage('checkout') {
@@ -161,6 +162,7 @@ pipeline {
             }
             steps {
                 script {
+                    def to_canary = "${params.TO_CANARY}".toLowerCase()
                     if( "${channel}" == "latest" ) {
                         sh '''#!/bin/bash -x
                             mv ./release/standard_install.sh /opt/groundseg/get/install.sh
@@ -221,7 +223,7 @@ pipeline {
                                 https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
                         '''
                     }
-                    if( "${params.TO_CANARY}" == true ) {
+                    if( "${to_canary}" == "true" ) {
                         sh '''#!/bin/bash -x
                             curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                 https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \

@@ -376,6 +376,7 @@ type WsSupportAction struct {
 	Contact     string   `json:"contact"`
 	Description string   `json:"description"`
 	Ships       []string `json:"ships"`
+	CPUProfile  bool     `json:"cpu_profile"`
 }
 
 type WsC2cPayload struct {

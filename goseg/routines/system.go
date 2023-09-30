@@ -53,7 +53,7 @@ func mDNSServer() {
 		counter := 2
 		for contains(domains, strings.Split(LocalDomain, ".")[0]) {
 			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
-			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...",LocalDomain))
+			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
 			counter++
 		}
 	}
@@ -66,7 +66,7 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
-		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v",system.LocalUrl,ips))
+		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
 		server, err := zeroconf.RegisterProxy(
 			strings.Split(system.LocalUrl, ".")[0],
 			"_http._tcp",
