@@ -26,7 +26,7 @@ var (
 	UTransBus          = make(chan structs.UrbitTransition, 100)
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100)
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)
-	ContainerStats	   = make(map[string]structs.ContainerStats)
+	ContainerStats     = make(map[string]structs.ContainerStats)
 	ContainerStatList  []string
 )
 
