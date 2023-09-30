@@ -1,6 +1,8 @@
 package routines
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
@@ -12,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,9 +34,20 @@ func CheckVersionLoop() {
 			case <-ticker.C:
 				// Get latest information
 				latestVersion, _ := config.CheckVersion()
-
+				currentChannelVersion := config.VersionInfo
+				latestChannelVersion := latestVersion
+				// check docker updates
+				if latestChannelVersion != currentChannelVersion {
+					config.VersionInfo = latestVersion
+					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+				}
 				// Check for gs binary updates based on hash
-				currentHash := conf.BinHash
+				binPath := filepath.Join(config.BasePath, "groundseg")
+				currentHash, err := getSha256(binPath)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't hash binary: %v", err))
+					continue
+				}
 				latestHash := latestVersion.Groundseg.Amd64Sha256
 				if config.Architecture != "amd64" {
 					latestHash = latestVersion.Groundseg.Arm64Sha256
@@ -43,14 +57,6 @@ func CheckVersionLoop() {
 					// updateBinary will likely restart the program, so
 					// we don't have to care about the docker updates.
 					updateBinary(releaseChannel, latestVersion)
-				} else {
-					// check docker updates
-					currentChannelVersion := config.VersionInfo
-					latestChannelVersion := latestVersion
-					if latestChannelVersion != currentChannelVersion {
-						config.VersionInfo = latestVersion
-						updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
-					}
 				}
 			}
 		}
@@ -131,6 +137,19 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if err := os.Rename(oldPath, newPath); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
+	}
+	versionStr := "v" + strconv.Itoa(versionInfo.Groundseg.Major) + "." +
+		strconv.Itoa(versionInfo.Groundseg.Minor) + "." +
+		strconv.Itoa(versionInfo.Groundseg.Patch)
+	binHash, err := getSha256(newPath)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
+	}
+	if err := config.UpdateConf(map[string]interface{}{
+		"gsVersion": versionStr,
+		"binHash":   binHash,
+	}); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't update config: %v", err))
 	}
 	// systemctl restart groundseg
 	if config.DebugMode {
@@ -221,4 +240,18 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 			}
 		}
 	}
+}
+
+func getSha256(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+	hashValue := hex.EncodeToString(hasher.Sum(nil))
+	return hashValue, nil
 }
