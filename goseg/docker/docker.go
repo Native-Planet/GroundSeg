@@ -26,6 +26,8 @@ var (
 	UTransBus          = make(chan structs.UrbitTransition, 100)
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100)
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)
+	ContainerStats	   = make(map[string]structs.ContainerStats)
+	ContainerStatList  []string
 )
 
 func init() {
@@ -44,6 +46,7 @@ func init() {
 		}
 		return
 	}
+	go getContainerStats()
 	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
@@ -216,41 +219,49 @@ func GetContainerNetwork(name string) (string, error) {
 }
 
 // return the disk and memory usage for a container
-func GetContainerStats(containerName string) (structs.ContainerStats, error) {
-	var res structs.ContainerStats
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return res, err
-	}
-	defer cli.Close()
-	inspect, err := cli.ContainerInspect(context.Background(), containerName)
-	if err != nil {
-		return res, err
-	}
-	var totalSize int64
-	for _, mount := range inspect.Mounts {
-		if mount.Type == "volume" {
-			size, err := getDirSize(mount.Source)
-			if err != nil {
-				return res, err
+func getContainerStats() (structs.ContainerStats, error) {
+	ticker := time.NewTicker(1 * time.Minute)
+	for {
+		select {
+		case <-ticker.C:
+			for _, pier := range ContainerStatList {
+				var res structs.ContainerStats
+				cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+				if err != nil {
+					return res, err
+				}
+				defer cli.Close()
+				inspect, err := cli.ContainerInspect(context.Background(), pier)
+				if err != nil {
+					return res, err
+				}
+				var totalSize int64
+				for _, mount := range inspect.Mounts {
+					if mount.Type == "volume" {
+						size, err := getDirSize(mount.Source)
+						if err != nil {
+							return res, err
+						}
+						totalSize += size
+					}
+				}
+				statsResp, err := cli.ContainerStats(context.Background(), pier, false)
+				if err != nil {
+					return res, err
+				}
+				defer statsResp.Body.Close()
+				var stat types.StatsJSON
+				if err := json.NewDecoder(statsResp.Body).Decode(&stat); err != nil {
+					return res, err
+				}
+				memUsage := stat.MemoryStats.Usage
+				ContainerStats[pier] = structs.ContainerStats{
+					MemoryUsage: memUsage,
+					DiskUsage:   totalSize,
+				}
 			}
-			totalSize += size
 		}
 	}
-	statsResp, err := cli.ContainerStats(context.Background(), containerName, false)
-	if err != nil {
-		return res, err
-	}
-	defer statsResp.Body.Close()
-	var stat types.StatsJSON
-	if err := json.NewDecoder(statsResp.Body).Decode(&stat); err != nil {
-		return res, err
-	}
-	memUsage := stat.MemoryStats.Usage
-	return structs.ContainerStats{
-		MemoryUsage: memUsage,
-		DiskUsage:   totalSize,
-	}, nil
 }
 
 func getDirSize(path string) (int64, error) {
