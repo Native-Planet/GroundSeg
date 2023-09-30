@@ -15,7 +15,7 @@
   <div class="info">
     <div class="price">$4 / mo</div>
     <div class="promo">Billed annually or $5 month-to-month</div>
-    <div class="why">Access your urbit from anywhere / Run multiple urbits from one device / Hassle-free image hosting</div>
+    <div class="why">Access your urbit from anywhere - Run multiple urbits from one device - Hassle-free image hosting</div>
   </div>
   {#if regionKeys.length > 0}
     <div class="activate">
@@ -51,9 +51,16 @@
     flex: 1;
   }
   .title {
-    font-size: 48px;
+    color: #000;
+    leading-trim: both;
+    text-edge: cap;
     font-family: var(--title-font);
-    line-height: calc(48px * 2);
+    font-size: 48px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: normal;
+    letter-spacing: -1.92px;
+    margin-bottom: 32px;
   }
   .info {
     display: flex;
@@ -63,44 +70,91 @@
     width: 420px;
   }
   .price {
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
     font-size: 36px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: normal;
+    letter-spacing: -1.44px;
     margin-bottom: 8px;
   }
   .promo {
-    font-size: 18px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
+    margin-bottom: 16px;
   }
   .why {
-    margin-top: 16px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
     font-size: 18px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
     text-align: center;
   }
   .activate {
-    margin-top: 24px;
+    margin-top: 32px;
     width: 100%;
   }
   .name {
-    font-size: 16px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
+    margin-bottom: 16px;
   }
   input {
-    width: 30vw;
     min-width: 600px;
     max-width: 100vw;
-    line-height: 42px;
+    line-height: 59px;
     border: solid 2px var(--btn-secondary);
     border-radius: 16px;
     background: none;
     padding-left: 20px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   input:active, :focus {
     outline: none; 
   }
   button {
     background: var(--btn-special);
-    color: var(--text-card-color);
-    margin: 20px;
-    padding: 12px 32px;
+    padding: 0px 48px;
+    height: 65px;
     border: none;
     border-radius: 16px;
+    color: var(--text-card-color);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   button:hover {
     cursor: pointer;
@@ -110,18 +164,31 @@
     opacity: .6;
   }
   .get {
-    margin-top: 30px;
+    margin-top: 32px;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 300;
   }
   a {
     color: var(--text-color);
     text-decoration: underline;
   }
   .skip {
+    cursor: pointer;
     text-decoration: underline;
-    margin-bottom: 20px;
+    margin-top: 32px;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
   }
   .regions {
-    margin-top: 12px;
     display: flex;
     gap: 20px;
   }
@@ -129,9 +196,18 @@
     flex: 1;
     border-radius: 16px;
     border: solid 2px var(--btn-secondary);
-    padding: 12px;
-    font-size: 12px;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
     text-align: center;
+    height: 61px;
+    line-height: 61px;
   }
   .region:hover {
     cursor: pointer;

@@ -22,23 +22,27 @@
 
   $: authLevel = ($structure?.auth_level) || "unauthorized"
   $: stage = ($structure?.stage) || null
+  $: pageRouteID = $page.route.id
+
+  // debug
+  //let stage = "start"
 
   let count = 0
   const redirector = () => {
     if ($connected) {
       if ($isC2CMode) {
-        if ($page.route.id !== "/captive") {
+        if (pageRouteID !== "/captive") {
           goto("/captive")
         }
       } else {
         const auth = (authLevel === "authorized")
         if (auth) {
-          if (($page.route.id === "/login") || ($page.route.id.includes("setup"))) {
+          if ((pageRouteID === "/login") || ($page.route.id.includes("setup"))) {
             goto("/")
           }
         } else {
           if (authLevel === "unauthorized") {
-            if ($page.route.id !== "/login") {
+            if (pageRouteID !== "/login") {
               if (count > 2) {
                 count = 0
                 goto("/login")
