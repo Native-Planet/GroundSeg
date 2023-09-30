@@ -81,8 +81,8 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 				delete(cm.UnauthClients, id)
 			}
 		}
+		cm.AuthClients[id] = append(cm.AuthClients[id], client)
 	}
-	cm.AuthClients[id] = append(cm.AuthClients[id], client)
 }
 
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
@@ -101,8 +101,8 @@ func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 				delete(cm.AuthClients, id)
 			}
 		}
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
 	}
-	cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
 }
 
 func (cm *ClientManager) BroadcastUnauth(data []byte) {
