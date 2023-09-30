@@ -83,7 +83,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) string {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
-		return
+		return ""
 	}
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
