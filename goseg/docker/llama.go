@@ -1,12 +1,12 @@
 package docker
 
 import (
-	"path/filepath"
 	"fmt"
 	"goseg/config"
 	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
+	"path/filepath"
 	"runtime"
 
 	"github.com/docker/docker/api/types/container"
@@ -44,18 +44,18 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
-	exists, err = volumeExists(apiContainerName+"_api")
+	exists, err = volumeExists(apiContainerName + "_api")
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
 	}
 	if !exists {
-		if err = CreateVolume(apiContainerName+"_api"); err != nil {
+		if err = CreateVolume(apiContainerName + "_api"); err != nil {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
 	llamaNet, err := addOrGetNetwork("llama")
 	if err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
 	}
 	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
@@ -76,7 +76,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	hostConfig = container.HostConfig{
-		NetworkMode:  container.NetworkMode(llamaNet),
+		NetworkMode: container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
@@ -95,11 +95,11 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			{
 				Type:   mount.TypeVolume,
 				Source: apiContainerName, // host dir
-				Target: "/models", // in the container
+				Target: "/models",        // in the container
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: apiContainerName+"_api",
+				Source: apiContainerName + "_api",
 				Target: "/api",
 			},
 		},
@@ -116,7 +116,7 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 	var hostConfig container.HostConfig
 	llamaNet, err := addOrGetNetwork("llama")
 	if err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v",err)
+		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
 	}
 	containerConfig = container.Config{
 		Image:    desiredImage,
@@ -134,7 +134,7 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	hostConfig = container.HostConfig{
-		NetworkMode:  container.NetworkMode(llamaNet),
+		NetworkMode: container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},

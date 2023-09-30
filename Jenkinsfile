@@ -12,7 +12,7 @@ pipeline {
         booleanParam(
             name: 'TO_CANARY',
             defaultValue: false,
-            description: 'Also push build to canary channel (if edge/latest)'
+            description: 'Also push build to canary channel (if edge)'
         )
         choice(
             choices: ['staging.version.groundseg.app' , 'version.groundseg.app'],

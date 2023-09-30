@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -37,12 +38,19 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	contact := supportPayload.Payload.Contact
 	description := supportPayload.Payload.Description
 	ships := supportPayload.Payload.Ships
+	cpuProfile := supportPayload.Payload.CPUProfile
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
 		return fmt.Errorf("Error creating bug-report dir: %v", err)
 	}
 	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
 		return fmt.Errorf("Failed to dump logs: %v", err)
+	}
+	if cpuProfile {
+		profilePath := filepath.Join(config.BasePath, "bug-reports", timestamp, "cpu.profile")
+		if err := captureCPUProfile(profilePath); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't collect CPU profile: %v", err))
+		}
 	}
 	zipPath := filepath.Join(config.BasePath, "bug-reports", timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
@@ -298,5 +306,20 @@ func sendBugReport(bugReportPath, contact, description string) error {
 		return fmt.Errorf("%s: %s", resp.Status, resp.Body)
 	}
 	logger.Logger.Info("Bug: Report submitted")
+	return nil
+}
+
+func captureCPUProfile(filename string) error {
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	logger.Logger.Info("Profiling CPU for 30 seconds")
+	if err := pprof.StartCPUProfile(f); err != nil {
+		return err
+	}
+	time.Sleep(30 * time.Second)
+	pprof.StopCPUProfile()
 	return nil
 }
