@@ -79,7 +79,7 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 	return ""
 }
 
-func WSHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
+func WsHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
