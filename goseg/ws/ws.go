@@ -79,7 +79,14 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 	return ""
 }
 
-func WsHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) string {
+func WsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
+		return
+	}
+	// tokenId := config.RandString(32)
+	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
