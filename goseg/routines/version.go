@@ -1,6 +1,8 @@
 package routines
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"goseg/config"
 	"goseg/docker"
@@ -12,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,6 +135,19 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		logger.Logger.Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
 	}
+	versionStr := "v" + strconv.Itoa(versionInfo.Groundseg.Major) + "." +
+		strconv.Itoa(versionInfo.Groundseg.Minor) + "." +
+		strconv.Itoa(versionInfo.Groundseg.Patch)
+	binHash, err := getSha256(newPath)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
+	}
+	if err := config.UpdateConf(map[string]interface{}{
+		"gsVersion": versionStr,
+		"binHash":   binHash,
+	}); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't update config: %v", err))
+	}
 	// systemctl restart groundseg
 	if config.DebugMode {
 		logger.Logger.Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
@@ -221,4 +237,18 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 			}
 		}
 	}
+}
+
+func getSha256(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+	hashValue := hex.EncodeToString(hasher.Sum(nil))
+	return hashValue, nil
 }
