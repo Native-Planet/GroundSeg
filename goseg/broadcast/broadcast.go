@@ -105,6 +105,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
 	conf := config.Conf()
 	piers := conf.Piers
+	docker.ContainerStatList = piers
 	updates := make(map[string]structs.Urbit)
 	// load fresh broadcast state
 	currentState := GetState()
@@ -119,7 +120,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	}
 	hostName := system.LocalUrl
 	if hostName == "" {
-		logger.Logger.Warn(fmt.Sprintf("Error getting local URL, defaulting to `nativeplanet.local`"))
+		logger.Logger.Warn(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
 		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
@@ -134,11 +135,9 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		dockerConfig := config.UrbitConf(pier)
 		// get container stats from docker
 		var dockerStats structs.ContainerStats
-		dockerStats, err = docker.GetContainerStats(pier)
-		if err != nil {
-			//errmsg := fmt.Sprintf("Unable to load %s stats: %v", pier, err) // temp surpress
-			//logger.Logger.Error(errmsg)
-			continue
+		res, ok := docker.ContainerStats[pier]
+		if ok {
+			dockerStats = res
 		}
 		urbit := structs.Urbit{}
 		if existingUrbit, exists := currentState.Urbits[pier]; exists {

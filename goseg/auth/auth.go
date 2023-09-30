@@ -168,16 +168,18 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	muConn := &structs.MuConn{}
 	if conn != nil {
 		muConn = &structs.MuConn{Conn: conn}
-	}
-	if authed {
-		ClientManager.AddAuthClient(tokenId, muConn)
-		logger.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
+		if authed {
+			ClientManager.AddAuthClient(tokenId, muConn)
+			logger.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
+		} else {
+			ClientManager.AddUnauthClient(tokenId, muConn)
+			logger.Logger.Info(fmt.Sprintf("%s added to unauth", tokenId))
+		}
+		now := time.Now().Format("2006-01-02_15:04:05")
+		return AddSession(tokenId, hash, now, authed)
 	} else {
-		ClientManager.AddUnauthClient(tokenId, muConn)
-		logger.Logger.Info(fmt.Sprintf("%s added to unauth", tokenId))
+		return fmt.Errorf("Can't add nil session to authmap")
 	}
-	now := time.Now().Format("2006-01-02_15:04:05")
-	return AddSession(tokenId, hash, now, authed)
 }
 
 // the same but the other way
