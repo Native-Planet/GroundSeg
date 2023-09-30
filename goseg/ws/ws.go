@@ -79,11 +79,11 @@ func c2cHandler(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) st
 	return ""
 }
 
-func WsHandler(w http.ResponseWriter, r *http.Request) string {
+func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
-		return ""
+		return
 	}
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
@@ -103,19 +103,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) string {
 			auth.WsNilSession(conn)
 		}
 		logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
-		return "break"
+		return
 	}
 	var payload structs.WsPayload
 	if err := json.Unmarshal(msg, &payload); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-		return "continue"
+		return
 	}
 	MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 	var msgType structs.WsType
 	err = json.Unmarshal(msg, &msgType)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error marshalling token (else): %v", err))
-		return "continue"
+		return
 	}
 	token := map[string]string{
 		"id":    payload.Token.ID,
@@ -228,7 +228,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) string {
 			var logPayload structs.WsLogsPayload
 			if err := json.Unmarshal(msg, &logPayload); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-				return "continue"
+				return
 			}
 			logEvent := structs.LogsEvent{
 				Action:      logPayload.Payload.Action,
@@ -304,5 +304,5 @@ func WsHandler(w http.ResponseWriter, r *http.Request) string {
 		}
 		MuCon.Write(respJson)
 	}
-	return ""
+	return
 }
