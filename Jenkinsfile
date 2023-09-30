@@ -9,6 +9,11 @@ pipeline {
             choices: ['no' , 'yes'],
             description: 'Merge tag into master branch (doesn\'t do anything in dev)',
             name: 'MERGE')
+        booleanParam(
+            name: 'TO_CANARY',
+            defaultValue: false,
+            description: 'Also push build to canary channel (if edge/latest)'
+        )
         choice(
             choices: ['staging.version.groundseg.app' , 'version.groundseg.app'],
             description: 'Choose version server',
@@ -214,6 +219,26 @@ pipeline {
                                 https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/minor/${minor}
                             curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                 https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
+                        '''
+                    }
+                    if( "${params.TO_CANARY}" == true ) {
+                        sh '''#!/bin/bash -x
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
                         '''
                     }
                 }
