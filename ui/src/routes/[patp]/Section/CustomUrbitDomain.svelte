@@ -16,7 +16,10 @@
 </script>
 
 <div>
-  <div class="section-title">Custom Urbit Domain</div>
+  <div class="section-title-wrapper">
+    <div class="section-title">Urbit</div>
+    <div class="what">?</div>
+  </div>
   <div class="wrapper">
     <input type="text" placeholder="ship.example.com" />
     <button class="save-button">Save</button>
@@ -33,13 +36,16 @@
         Access Key
       {/if}
     </button>
-    <a href={url} target="_blank" class="btn">
-      URL ↗
-    </a>
+    <a href={url} target="_blank" class="btn">URL ↗ </a>
   </div>
 </div>
 
 <style>
+  .section-title-wrapper {
+    display: flex; 
+    align-items: center;
+    gap: 16px;
+  }
   .wrapper {
     display: flex;
     gap: 16px;
@@ -92,5 +98,17 @@
     gap: 8px;
     border-radius: 12px;
     background: var(--NP_White, #F8F8F6);
+  }
+  .what {
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    border: 1px solid #FFF;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .what:hover {
+    opacity: .2;
   }
 </style>

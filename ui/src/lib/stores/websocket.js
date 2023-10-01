@@ -397,6 +397,15 @@ export const registerServiceAgain = patp => {
   send(payload)
 }
 
+export const toggleBootStatus = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-boot-status",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const toggleDevMode = patp => {
   let payload = {
     "type":"urbit",
