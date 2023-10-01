@@ -245,6 +245,16 @@ func SystemTransitionHandler() {
 			broadcast.SysTransMu.Lock()
 			broadcast.SystemTransitions.Swap = event.Swap
 			broadcast.SysTransMu.Unlock()
+		case "bugReport":
+			current := broadcast.GetState()
+			current.System.Transition.BugReport = event.BugReport
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
+		case "bugReportError":
+			current := broadcast.GetState()
+			current.System.Transition.BugReportError = event.BugReportError
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
@@ -276,18 +286,4 @@ func removeErrorHandler(err string, duration time.Duration) {
 			broadcast.SystemTransitions.Error = append(broadcast.SystemTransitions.Error[:index], broadcast.SystemTransitions.Error[index+1:]...)
 		}
 	})
-}
-
-func TransitionHandler() {
-	for {
-		event := <-broadcast.SysTransBus
-		switch event.Type {
-		case "swap":
-			broadcast.SysTransMu.Lock()
-			broadcast.SystemTransitions.Swap = event.Swap
-			broadcast.SysTransMu.Unlock()
-		default:
-			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
-		}
-	}
 }

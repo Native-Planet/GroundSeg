@@ -120,7 +120,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	}
 	hostName := system.LocalUrl
 	if hostName == "" {
-		logger.Logger.Debug(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
+		logger.Logger.Warn(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
 		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
@@ -305,6 +305,7 @@ func hostStatusLoop() {
 			mu.RLock()
 			newState := broadcastState
 			mu.RUnlock()
+			update = PreserveSystemTransitions(newState, update)
 			newState.System = update
 			UpdateBroadcast(newState)
 			BroadcastToClients()
@@ -355,6 +356,11 @@ func profileStatusLoop() {
 func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
 	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
 	return newProfile
+}
+
+func PreserveSystemTransitions(oldState structs.AuthBroadcast, newSystem structs.System) structs.System {
+	newSystem.Transition = oldState.System.Transition
+	return newSystem
 }
 
 func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[string]structs.Urbit) map[string]structs.Urbit {
