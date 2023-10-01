@@ -42,10 +42,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, msg, err := conn.ReadMessage()
 		var payload structs.WsPayload
-		if err := json.Unmarshal(msg, &payload); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-			continue
-		}
+		unmarshalErr := json.Unmarshal(msg, &payload)
 		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
@@ -62,6 +59,10 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			logger.Logger.Debug(fmt.Sprintf("WS closed: %v", err))
 			break
+		}
+		if unmarshalErr != nil {
+			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", unmarshalErr))
+			continue
 		}
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
