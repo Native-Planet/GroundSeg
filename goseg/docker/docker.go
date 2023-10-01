@@ -435,10 +435,8 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		return containerState, err
 	}
 	// check if container exists
-	existingContainer, err := FindContainer(containerName)
-	if err != nil {
-		return containerState, err
-	}
+	existingContainer, _ := FindContainer(containerName)
+
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {

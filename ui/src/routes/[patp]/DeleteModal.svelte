@@ -1,5 +1,6 @@
 <script>
-  import { goto } from '$app/navigation';
+  import { goto } from '$app/navigation'
+  import { afterUpdate } from 'svelte'
   import { structure, deleteUrbitShip } from '$lib/stores/websocket'
   import Sigil from './Sigil.svelte'
 
@@ -10,7 +11,14 @@
   export let isOpen
 
   $: transition = ($structure?.urbits?.[patp]?.transition) || {}
-  $: tDeleteShip = (transition?.deleteShip) || null
+  $: tDeleteShip = (transition?.deleteShip) || ""
+
+  afterUpdate(()=>{
+    if (tDeleteShip == "done") {
+      closeModal()
+      goto("/")
+    }
+  })
 </script>
 
 <Modal>
@@ -19,7 +27,19 @@
     <div class="header">Delete Urbit Ship</div>
     <Sigil name={patp} modal={true} />
     <div class="name">You are attempting to delete all data related to <strong>{patp}</strong>.</div>
-    <button on:click={()=>deleteUrbitShip(patp)}>Delete</button>
+    <button disabled={tDeleteShip.length > 0} on:click={()=>deleteUrbitShip(patp)}>
+      {#if tDeleteShip.length < 1}
+        Delete
+      {:else if tDeleteShip == "stopping"}
+        Stopping the ship
+      {:else if tDeleteShip == "removing-services"}
+        Removing StarTram services
+      {:else if tDeleteShip == "deleting"}
+        Deleting local data
+      {:else if tDeleteShip == "success"}
+        {patp} deleted!
+      {/if}
+    </button>
   </div>
   {/if}
 </Modal>
@@ -71,5 +91,9 @@
     line-height: 32px; /* 133.333% */
     letter-spacing: -1.44px;
     cursor: pointer;
+  }
+  button:disabled {
+    pointer-events: none;
+    opacity: .6;
   }
 </style>

@@ -10,6 +10,7 @@ import (
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
+	"time"
 )
 
 // we'll deal with breaking up this monstrosity
@@ -159,6 +160,7 @@ func UrbitHandler(msg []byte) error {
 		// update DesiredStatus to 'stopped'
 		contConf := config.GetContainerState()
 		patpConf := contConf[patp]
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "stopping"}
 		patpConf.DesiredStatus = "stopped"
 		contConf[patp] = patpConf
 		config.UpdateContainerState(patp, patpConf)
@@ -169,6 +171,7 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
 		}
 		if conf.WgRegistered {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "removing-services"}
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
 			}
@@ -176,6 +179,7 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 			}
 		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "deleting"}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
@@ -190,11 +194,16 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
 		config.DeleteContainerState(patp)
+		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "done"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: ""}
 		// remove from broadcast
 		if err := broadcast.ReloadUrbits(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
 		}
-		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
