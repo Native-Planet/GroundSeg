@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"goseg/broadcast"
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
@@ -30,9 +31,14 @@ const (
 
 // handle bug report requests
 func SupportHandler(msg []byte, payload structs.WsPayload) error {
+	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "loading"}
+	handleError := func(err error) error {
+		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReportError", BugReportError: fmt.Sprintf("%v", err)}
+		return err
+	}
 	var supportPayload structs.WsSupportPayload
 	if err := json.Unmarshal(msg, &supportPayload); err != nil {
-		return fmt.Errorf("Couldn't unmarshal support payload: %v", err)
+		return handleError(fmt.Errorf("Couldn't unmarshal support payload: %v", err))
 	}
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
 	contact := supportPayload.Payload.Contact
@@ -41,10 +47,10 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	cpuProfile := supportPayload.Payload.CPUProfile
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
-		return fmt.Errorf("Error creating bug-report dir: %v", err)
+		return handleError(fmt.Errorf("Error creating bug-report dir: %v", err))
 	}
 	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
-		return fmt.Errorf("Failed to dump logs: %v", err)
+		return handleError(fmt.Errorf("Failed to dump logs: %v", err))
 	}
 	if cpuProfile {
 		profilePath := filepath.Join(config.BasePath, "bug-reports", timestamp, "cpu.profile")
@@ -54,14 +60,19 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	}
 	zipPath := filepath.Join(config.BasePath, "bug-reports", timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
-		return fmt.Errorf("Error zipping bug report: %v", err)
+		return handleError(fmt.Errorf("Error zipping bug report: %v", err))
 	}
 	if err := os.RemoveAll(bugReportDir); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	}
 	if err := sendBugReport(zipPath, contact, description); err != nil {
-		return fmt.Errorf("Couldn't submit bug report: %v", err)
+		return handleError(fmt.Errorf("Couldn't submit bug report: %v", err))
 	}
+	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "success"}
+	time.Sleep(3 * time.Second)
+	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "done"}
+	time.Sleep(1 * time.Second)
+	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: ""}
 	return nil
 }
 
