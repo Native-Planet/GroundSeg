@@ -49,7 +49,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
-				logger.Logger.Info("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
 				logEvent := structs.LogsEvent{
@@ -61,7 +60,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				// mute the session
 				auth.WsNilSession(conn)
 			}
-			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
+			logger.Logger.Debug(fmt.Sprintf("WS closed: %v", err))
 			break
 		}
 		var msgType structs.WsType
