@@ -10,6 +10,7 @@ import (
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
+	"strings"
 	"time"
 )
 
@@ -41,6 +42,30 @@ func UrbitHandler(msg []byte) error {
 			if _, err := docker.StartContainer(patp, "vere"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 			}
+		}
+		return nil
+	case "toggle-boot-status":
+		if shipConf.BootStatus == "ignore" {
+			statusMap, err := docker.GetShipStatus([]string{patp})
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to get ship status for %s", patp))
+			}
+			status, exists := statusMap[patp]
+			if !exists {
+				logger.Logger.Error(fmt.Sprintf("Running status for %s doesn't exist", patp))
+			}
+			if strings.Contains(status, "Up") {
+				shipConf.BootStatus = "boot"
+			} else {
+				shipConf.BootStatus = "noboot"
+			}
+		} else {
+			shipConf.BootStatus = "ignore"
+		}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		return nil
 	case "toggle-network":

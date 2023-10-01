@@ -40,7 +40,13 @@
 </script>
 <div class="body">
   <!-- Power -->
-  <Power {running} {tTogglePower} on:click={()=>toggleUrbitPower(patp)} />
+  <Power
+    {patp}
+    {running}
+    {detectBootStatus}
+    {tTogglePower}
+    on:click={()=>toggleUrbitPower(patp)} 
+    />
 
   {#if startramRegistered}
     <!-- Custom Urbit Domain -->
