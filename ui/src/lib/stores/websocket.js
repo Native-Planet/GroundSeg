@@ -483,13 +483,14 @@ export const urbitsMeldUrth = async ship => {
 //  Support
 //
 
-export const submitReport = (contact,description,ships) => {
+export const submitReport = (contact,description,ships,cpuProfile) => {
   let payload = {
     "type":"support",
     "action":"bug-report",
     "contact":contact,
     "description":description,
-    "ships":ships
+    "ships":ships,
+    "cpu_profile":cpuProfile
   }
   send(payload)
 }
