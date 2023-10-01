@@ -19,14 +19,16 @@ import (
 	"time"
 )
 
-var (
-	// version server check interval
-	checkInterval = 1 * time.Hour
-)
-
 func CheckVersionLoop() {
-	ticker := time.NewTicker(checkInterval)
 	conf := config.Conf()
+	var updateInterval int
+	if conf.UpdateInterval < 60 {
+		updateInterval = 60
+	} else {
+		updateInterval = conf.UpdateInterval
+	}
+	checkInterval := time.Duration(updateInterval) * time.Second
+	ticker := time.NewTicker(checkInterval)
 	releaseChannel := conf.UpdateBranch
 	if conf.UpdateMode == "auto" {
 		for {

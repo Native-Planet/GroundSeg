@@ -9,6 +9,7 @@ import (
 	"goseg/logger"
 	"goseg/structs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -143,6 +144,11 @@ func Check502Loop() {
 	for {
 		time.Sleep(60 * time.Second)
 		conf := config.Conf()
+		pierStatus, err := docker.GetShipStatus(conf.Piers)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
+			continue
+		}
 		for _, pier := range conf.Piers {
 			err := config.LoadUrbitConfig(pier)
 			if err != nil {
@@ -155,7 +161,11 @@ func Check502Loop() {
 				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v", pier))
 				continue
 			}
-			if pierNetwork == "wireguard" && shipConf.BootStatus == "boot" {
+			turnedOn := false
+			if strings.Contains(pierStatus[pier], "Up") {
+				turnedOn = true
+			}
+			if turnedOn && pierNetwork == "wireguard" && conf.WgOn {
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
@@ -166,18 +176,16 @@ func Check502Loop() {
 				}
 				if resp.StatusCode == http.StatusBadGateway {
 					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
-					if shipConf.BootStatus == "boot" && conf.WgOn && shipConf.Network == "wireguard" {
-						if _, found := status[pier]; found {
-							// found = 2x in a row
-							if err := docker.RestartContainer("wireguard"); err != nil {
-								logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
-							}
-							// remove from map after restart
-							delete(status, pier)
-						} else {
-							// first 502
-							status[pier] = true
+					if _, found := status[pier]; found {
+						// found = 2x in a row
+						if err := docker.RestartContainer("wireguard"); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 						}
+						// remove from map after restart
+						delete(status, pier)
+					} else {
+						// first 502
+						status[pier] = true
 					}
 				} else if _, found := status[pier]; found {
 					// if not 502 and pier is in status map, remove it

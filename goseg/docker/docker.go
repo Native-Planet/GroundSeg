@@ -23,16 +23,24 @@ import (
 )
 
 var (
-	UTransBus          = make(chan structs.UrbitTransition, 100)
-	NewShipTransBus    = make(chan structs.NewShipTransition, 100)
-	ImportShipTransBus = make(chan structs.UploadTransition, 100)
-	ContainerStats     = make(map[string]structs.ContainerStats)
-	ContainerStatList  []string
+	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
+	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
+	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
+	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
+	ContainerStatList  []string                                    // slice of containers to poll for resource use
 )
 
 func init() {
 	// kill old webui container if running
-	killContainerUsingPort(80)
+	_, err := FindContainer("groundseg-webui")
+	if err == nil {
+		if err = StopContainerByName("groundseg-webui"); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't stop old webui container: %v", err))
+		}
+	}
+	if err = killContainerUsingPort(80); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
+	}
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
@@ -50,12 +58,12 @@ func init() {
 	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
-func killContainerUsingPort(n uint16) {
+func killContainerUsingPort(n uint16) error {
 	// Initialize Docker client
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Prepare filters to get only running containers
@@ -66,22 +74,23 @@ func killContainerUsingPort(n uint16) {
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{Filters: filters})
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
-		return
+		return err
 	}
 
 	// Check if any container is using host's port 80 and stop it
 	for _, cont := range containers {
 		for _, port := range cont.Ports {
 			if port.PublicPort == n {
-				logger.Logger.Debug(fmt.Sprintf("Stopping container %s using host's port %v", cont.ID, n))
+				logger.Logger.Debug(fmt.Sprintf("Stopping container %s to free port %v", cont.ID, n))
 				options := container.StopOptions{}
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
 					logger.Logger.Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
 				}
-				return
+				return nil
 			}
 		}
 	}
+	return nil
 }
 
 // attempt to update docker daemon (ubuntu/mint only)
@@ -91,7 +100,7 @@ func updateDocker() {
 	for _, pkg := range packages {
 		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error removing package %s: %v\n%s", pkg, err, out))
+			logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
 			return
 		}
 	}
@@ -110,7 +119,7 @@ func updateDocker() {
 	}
 	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error fetching version codename: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
 		return
 	}
 	codename := strings.TrimSpace(string(out))
@@ -121,7 +130,7 @@ func updateDocker() {
 	}
 	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
 	if archErr != nil {
-		logger.Logger.Error(fmt.Sprintf("Error fetching system architecture: %v\n%s", archErr, archOut))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
 		return
 	}
 	architecture := strings.TrimSpace(string(archOut))
@@ -129,13 +138,13 @@ func updateDocker() {
 	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
 	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
 		return
 	}
 	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
 		return
 	}
 	logger.Logger.Info("Successfully updated Docker")
@@ -642,7 +651,7 @@ func FindContainer(containerName string) (*types.Container, error) {
 			}
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("Container %v not found", containerName)
 }
 
 // periodically poll docker in case we miss something
