@@ -41,29 +41,29 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
 		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
-				logger.Logger.Info("WS closed")
-				conn.Close()
-				// cancel all log streams for this ws
-				// logEvent := structs.LogsEvent{
-				// 	Action:      false,
-				// 	ContainerID: "all",
-				// 	MuCon:       MuCon,
-				// }
-				// config.LogsEventBus <- logEvent
-				// mute the session
-				auth.WsNilSession(conn)
-			}
-			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
-			break
-		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
 		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
+		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
+				logger.Logger.Info("WS closed")
+				conn.Close()
+				// cancel all log streams for this ws
+				logEvent := structs.LogsEvent{
+					Action:      false,
+					ContainerID: "all",
+					MuCon:       MuCon,
+				}
+				config.LogsEventBus <- logEvent
+				// mute the session
+				auth.WsNilSession(conn)
+			}
+			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
+			break
+		}
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {

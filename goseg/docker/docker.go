@@ -100,7 +100,7 @@ func updateDocker() {
 	for _, pkg := range packages {
 		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error removing package %s: %v\n%s", pkg, err, out))
+			logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
 			return
 		}
 	}
@@ -119,7 +119,7 @@ func updateDocker() {
 	}
 	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error fetching version codename: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
 		return
 	}
 	codename := strings.TrimSpace(string(out))
@@ -130,7 +130,7 @@ func updateDocker() {
 	}
 	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
 	if archErr != nil {
-		logger.Logger.Error(fmt.Sprintf("Error fetching system architecture: %v\n%s", archErr, archOut))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
 		return
 	}
 	architecture := strings.TrimSpace(string(archOut))
@@ -138,13 +138,13 @@ func updateDocker() {
 	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
 	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error updating Docker sources list: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
 		return
 	}
 	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error installing Docker packages: %v\n%s", err, out))
+		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
 		return
 	}
 	logger.Logger.Info("Successfully updated Docker")
