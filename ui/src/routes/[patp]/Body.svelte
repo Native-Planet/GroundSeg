@@ -30,11 +30,13 @@
   $: url = (ship?.url) || "#"
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
+  $: minioLinked = (ship?.minioLinked) || false
 
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
+  $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
 
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
 </script>
@@ -53,7 +55,13 @@
     <CustomUrbitDomain {url} {lusCode} />
 
     <!-- Custom MinIO Domain -->
-    <CustomMinIODomain {minioUrl} {minioPwd} />
+    <CustomMinIODomain
+      {patp}
+      {minioUrl}
+      {minioPwd}
+      {minioLinked}
+      {tToggleMinIOLink}
+      />
   {/if}
 
   <!-- Loom -->
