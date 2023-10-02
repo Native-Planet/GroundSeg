@@ -46,12 +46,20 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				logger.Logger.Debug("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
-				// logEvent := structs.LogsEvent{
-				// 	Action:      false,
-				// 	ContainerID: "all",
-				// 	MuCon:       MuCon,
-				// }
-				// config.LogsEventBus <- logEvent
+				auth.ClientManager.Mu.RLock()
+				for _, clients := range auth.ClientManager.AuthClients {
+					for _, client := range clients {
+						if client != nil && client.Conn == conn {
+							logEvent := structs.LogsEvent{
+								Action:      false,
+								ContainerID: "all",
+								MuCon:       client,
+							}
+							config.LogsEventBus <- logEvent
+						}
+					}
+				}
+				auth.ClientManager.Mu.RUnlock()
 				// mute the session
 				auth.WsNilSession(conn)
 			}
