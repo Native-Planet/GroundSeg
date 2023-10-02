@@ -112,20 +112,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			MuCon.Write(respJSON)
 		}
 		if authed || conf.Setup != "complete" {
-			if conf.Setup != "complete" {
-				resp := structs.SetupBroadcast{
-					Type:      "structure",
-					AuthLevel: "setup",
-					Stage:     conf.Setup,
-					Page:      setup.Stages[conf.Setup],
-					Regions:   startram.Regions,
-				}
-				respJSON, err := json.Marshal(resp)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
-				}
-				MuCon.Write(respJSON)
-			}
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
@@ -231,6 +217,20 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 				ack = "nack"
+			}
+			if conf.Setup != "complete" {
+				resp := structs.SetupBroadcast{
+					Type:      "structure",
+					AuthLevel: "setup",
+					Stage:     conf.Setup,
+					Page:      setup.Stages[conf.Setup],
+					Regions:   startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
+				}
+				MuCon.Write(respJSON)
 			}
 			// ack/nack for auth
 			result := map[string]interface{}{
