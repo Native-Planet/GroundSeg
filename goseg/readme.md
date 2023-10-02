@@ -15,7 +15,7 @@ stateDiagram-v2
         Dockerhub
         StarTram_API
     }
-    state Startram_Node {
+    state Startram_node {
         Wireguard_server
     }
     state Internals {
