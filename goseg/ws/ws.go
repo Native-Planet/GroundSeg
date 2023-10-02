@@ -111,7 +111,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
 				}
 				MuCon.Write(respJSON)
-				continue
 			}
 			switch msgType.Payload.Type {
 			case "new_ship":
