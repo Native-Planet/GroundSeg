@@ -233,7 +233,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			MuCon.Write(respJson)
 			// unauthenticated action handlers
-		} else {
+		} else if conf.Setup == "complete" {
 			switch msgType.Payload.Type {
 			case "login":
 				if err = handler.LoginHandler(MuCon, msg); err != nil {
