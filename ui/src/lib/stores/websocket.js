@@ -397,6 +397,15 @@ export const registerServiceAgain = patp => {
   send(payload)
 }
 
+export const toggleBootStatus = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-boot-status",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const toggleDevMode = patp => {
   let payload = {
     "type":"urbit",
@@ -419,6 +428,15 @@ export const toggleNetwork = patp => {
   let payload = {
     "type":"urbit",
     "action":"toggle-network",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const toggleMinIOLink = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-minio-link",
     "patp":patp
   }
   send(payload)

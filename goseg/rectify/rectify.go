@@ -37,6 +37,10 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.ExportBucket = event.Event
 			case "bucketCompressed":
 				urbitStruct.Transition.BucketCompressed = event.Value
+			case "deleteShip":
+				urbitStruct.Transition.DeleteShip = event.Event
+			case "toggleMinIOLink":
+				urbitStruct.Transition.ToggleMinIOLink = event.Event
 			default:
 				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue

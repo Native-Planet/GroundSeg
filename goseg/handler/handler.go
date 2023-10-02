@@ -65,6 +65,21 @@ func SystemHandler(msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal system payload: %v", err)
 	}
 	switch systemPayload.Payload.Action {
+	case "groundseg":
+		logger.Logger.Info(fmt.Sprintf("Device shutdown requested"))
+		switch systemPayload.Payload.Command {
+		case "restart":
+			if config.DebugMode {
+				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping GroundSeg restart. Exiting program."))
+				os.Exit(0)
+			} else {
+				logger.Logger.Info(fmt.Sprintf("Restarting GroundSeg.."))
+				cmd := exec.Command("sytemctl", "restart", "groundseg")
+				cmd.Run()
+			}
+		default:
+			return fmt.Errorf("Unrecognized groundseg.service command: %v", systemPayload.Payload.Command)
+		}
 	case "power":
 		switch systemPayload.Payload.Command {
 		case "shutdown":

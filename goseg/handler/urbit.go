@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/broadcast"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
+	"strings"
+	"time"
 )
 
 // we'll deal with breaking up this monstrosity
@@ -40,6 +43,57 @@ func UrbitHandler(msg []byte) error {
 			if _, err := docker.StartContainer(patp, "vere"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 			}
+		}
+		return nil
+	case "toggle-minio-link":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
+		// todo: scry for actual info
+		isLinked := false
+		if isLinked {
+			// todo: unlink
+			return nil
+		}
+		// create service account
+		svcAccount, err := docker.CreateMinIOServiceAccount(patp)
+		if err != nil {
+			return fmt.Errorf("Failed to create MinIO service account for %s: %v", patp, err)
+		}
+		// get minio endpoint
+		var endpoint string
+		endpoint = shipConf.CustomS3Web
+		if endpoint == "" {
+			endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+		}
+		// link to urbit
+		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
+			return fmt.Errorf("Failed to link MinIO information %s: %v", patp, err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "success"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: ""}
+		return nil
+	case "toggle-boot-status":
+		if shipConf.BootStatus == "ignore" {
+			statusMap, err := docker.GetShipStatus([]string{patp})
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to get ship status for %s", patp))
+			}
+			status, exists := statusMap[patp]
+			if !exists {
+				logger.Logger.Error(fmt.Sprintf("Running status for %s doesn't exist", patp))
+			}
+			if strings.Contains(status, "Up") {
+				shipConf.BootStatus = "boot"
+			} else {
+				shipConf.BootStatus = "noboot"
+			}
+		} else {
+			shipConf.BootStatus = "ignore"
+		}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		return nil
 	case "toggle-network":
@@ -159,6 +213,7 @@ func UrbitHandler(msg []byte) error {
 		// update DesiredStatus to 'stopped'
 		contConf := config.GetContainerState()
 		patpConf := contConf[patp]
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "stopping"}
 		patpConf.DesiredStatus = "stopped"
 		contConf[patp] = patpConf
 		config.UpdateContainerState(patp, patpConf)
@@ -169,6 +224,7 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
 		}
 		if conf.WgRegistered {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "removing-services"}
 			if err := startram.SvcDelete(patp, "urbit"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
 			}
@@ -176,6 +232,7 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 			}
 		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "deleting"}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 		}
@@ -190,11 +247,16 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
 		}
 		config.DeleteContainerState(patp)
+		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "done"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: ""}
 		// remove from broadcast
 		if err := broadcast.ReloadUrbits(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
 		}
-		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
 		return nil
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)

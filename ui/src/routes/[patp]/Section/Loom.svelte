@@ -8,7 +8,7 @@
   <div class="section-left">
     <div class="section-title">Loom Size</div>
     <div class="section-description">
-      This function will refragment your ship’s memory capacity, optimizing its performance. We recommend scheduling these once a week
+      This function will modify your ship's maximum allowed RAM usage. We recommend 2048 MB to 8192 MB depending on usage
     </div>
   </div>
   <div class="section-right">

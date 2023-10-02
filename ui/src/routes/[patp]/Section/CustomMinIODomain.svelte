@@ -4,9 +4,14 @@
 
   import Clipboard from 'clipboard'
   import { createEventDispatcher } from 'svelte'
+  import { toggleMinIOLink } from '$lib/stores/websocket'
 
+  export let patp
   export let minioUrl
   export let minioPwd
+  export let minioLinked
+
+  export let tToggleMinIOLink
 
   let copied = false
 
@@ -17,7 +22,6 @@
       copied = true;
       setTimeout(()=> copied = false, 1000)
     })
-
 </script>
 
 <div>
@@ -27,7 +31,7 @@
     <button class="save-button">Save</button>
   </div>
   <div class="wrapper">
-    <button id="copy" class="btn" data-clipboard-text={minioPwd}>
+    <button id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
       <img
         src="/clipboard.svg"
         width="24px"
@@ -41,8 +45,16 @@
     <a href={minioUrl} target="_blank" class="btn">
       Settings
     </a>
-    <button class="btn">
-      Disconnect
+    <button
+      class="btn"
+      on:click={()=>toggleMinIOLink(patp)}
+      disabled={tToggleMinIOLink == "linking"}
+      >
+      {#if tToggleMinIOLink == "success"}
+        MinIO connected!
+      {:else}
+        {minioLinked ? "Disconnect" : "Connect to Urbit"}
+      {/if}
     </button>
   </div>
 </div>
@@ -100,5 +112,13 @@
     gap: 8px;
     border-radius: 12px;
     background: var(--NP_White, #F8F8F6);
+    cursor: pointer;
+  }
+  .btn:disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
+  .copy-btn {
+    width: 285px;
   }
 </style>
