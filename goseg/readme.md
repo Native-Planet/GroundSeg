@@ -10,6 +10,14 @@ stateDiagram-v2
     Broadcast-->Urbit_traffic: broadcast latest update
     Static-->Operations: imported
     Static-->Routines: imported
+    state External {
+        Version_server
+        Dockerhub
+        StarTram_API
+    }
+    state Startram_Node {
+        Wireguard_server
+    }
     state Internals {
         state Static {
             Structs
@@ -42,6 +50,8 @@ stateDiagram-v2
         Process_handler-->Operations: multiple function calls to these packages to string together actions
         Operations-->Broadcast: send updated values
         Routines-->Broadcast: send updated values
+        Externals-->Routines: retrieve updated information
+        Operations-->Externals: configure StarTram
     }
     [*]-->WS_mux
     [*]-->Urbit_traffic
@@ -66,4 +76,5 @@ stateDiagram-v2
         WireGuard
     }
     Operations-->Docker_daemon: manage containers
+    Docker_daemon-->Startram_node: forward webui and ames
 ```
