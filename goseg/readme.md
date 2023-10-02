@@ -10,11 +10,6 @@ stateDiagram-v2
     Broadcast-->Urbit_traffic: broadcast latest update
     Static-->Operations: imported
     Static-->Routines: imported
-    state External {
-        Version_server
-        Dockerhub
-        StarTram_API
-    }
     state Startram_node {
         Wireguard_server
     }
@@ -74,6 +69,11 @@ stateDiagram-v2
         MinioMC
         Netdata
         WireGuard
+    }
+    state External {
+        Version_server
+        Dockerhub
+        StarTram_API
     }
     Operations-->Docker_daemon: manage containers
     Docker_daemon-->Startram_node: forward webui and ames
