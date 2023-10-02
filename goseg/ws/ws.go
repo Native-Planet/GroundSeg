@@ -96,22 +96,22 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			MuCon.Write(resp)
 			continue
 		}
-		if authed || conf.Setup != "complete" {
-			// send setup broadcast if we're not done setting up
-			if conf.Setup != "complete" {
-				resp := structs.SetupBroadcast{
-					Type:      "structure",
-					AuthLevel: "setup",
-					Stage:     conf.Setup,
-					Page:      setup.Stages[conf.Setup],
-					Regions:   startram.Regions,
-				}
-				respJSON, err := json.Marshal(resp)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
-				}
-				MuCon.Write(respJSON)
+		// send setup broadcast if we're not done setting up
+		if conf.Setup != "complete" {
+			resp := structs.SetupBroadcast{
+				Type:      "structure",
+				AuthLevel: "setup",
+				Stage:     conf.Setup,
+				Page:      setup.Stages[conf.Setup],
+				Regions:   startram.Regions,
 			}
+			respJSON, err := json.Marshal(resp)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
+			}
+			MuCon.Write(respJSON)
+		}
+		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
@@ -182,7 +182,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
-				if !authed {
+				if !authed && conf.Setup == "complete" {
 					resp, err := handler.UnauthHandler()
 					if err != nil {
 						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
@@ -217,6 +217,20 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
 				ack = "nack"
+			}
+			if conf.Setup != "complete" {
+				resp := structs.SetupBroadcast{
+					Type:      "structure",
+					AuthLevel: "setup",
+					Stage:     conf.Setup,
+					Page:      setup.Stages[conf.Setup],
+					Regions:   startram.Regions,
+				}
+				respJSON, err := json.Marshal(resp)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
+				}
+				MuCon.Write(respJSON)
 			}
 			// ack/nack for auth
 			result := map[string]interface{}{
