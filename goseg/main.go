@@ -60,7 +60,7 @@ var (
 func C2cLoop() {
 	c2cActive := false
 	for {
-		internetAvailable := config.NetCheck("1.1.1.1:53")
+		internetAvailable := connCheck()
 		if !internetAvailable && !c2cActive && system.Device != "" {
 			if err := system.C2CMode(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
@@ -79,6 +79,26 @@ func C2cLoop() {
 			}
 		}
 		time.Sleep(30 * time.Second)
+	}
+}
+
+func connCheck() bool {
+	internetAvailable := config.NetCheck("1.1.1.1:53")
+	if internetAvailable {
+		return true
+	}
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if config.NetCheck("1.1.1.1:53") {
+				return true
+			}
+		case <-timeout:
+			return false
+		}
 	}
 }
 
