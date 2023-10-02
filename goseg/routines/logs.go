@@ -28,6 +28,7 @@ var (
 func LogEvent() {
 	for {
 		event := <-config.LogsEventBus
+		logger.Logger.Debug(fmt.Sprintf("Log action %v",event.Action))
 		switch event.Action {
 		case true:
 			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
@@ -39,6 +40,7 @@ func LogEvent() {
 			go streamLogs(ctx, event.MuCon, event.ContainerID)
 		// cancel all log streams on ws break
 		case false:
+			logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
 			if event.ContainerID == "all" {
 				if conMap, exists := logsMap[event.MuCon]; exists {
 					for container, cancel := range conMap {
