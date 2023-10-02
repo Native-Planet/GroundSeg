@@ -15,8 +15,13 @@ var (
 )
 
 func ConfigureSwap(file string, val int) error {
-	if val <= 0 {
+	if val < 0 {
 		return fmt.Errorf("Invalid value: %v", val)
+	}
+	if val == 0 {
+		if err := stopSwap(file); err != nil {
+			return fmt.Errorf("Couldn't remove swap: %v", err)
+		}
 	}
 	if _, err := os.Stat(file); os.IsNotExist(err) {
 		if err := makeSwap(file, val); err != nil {
