@@ -50,8 +50,8 @@ stateDiagram-v2
         Process_handler-->Operations: multiple function calls to these packages to string together actions
         Operations-->Broadcast: send updated values
         Routines-->Broadcast: send updated values
-        Externals-->Routines: retrieve updated information
-        Operations-->Externals: configure StarTram
+        External-->Routines: retrieve updated information
+        Operations-->External: configure StarTram
     }
     [*]-->WS_mux
     [*]-->Urbit_traffic
