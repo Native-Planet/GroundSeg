@@ -1,5 +1,7 @@
 <script>
-  import { updateLinux, restartGroundSeg, setSwap, structure } from '$lib/stores/websocket'
+  import { updateLinux, restartGroundSeg, setSwap, structure, connected } from '$lib/stores/websocket'
+
+  import { afterUpdate } from 'svelte'
 
   import Swap from './SysDetails/Swap.svelte'
   import Ram from './SysDetails/Ram.svelte'
@@ -13,12 +15,45 @@
   $: disk = (usage?.disk) || [0,0,0]
   $: cpu = (usage?.cpu) || 0
   $: cpuTemp = (usage?.cpu_temp) || 0
+
+  let restarting = false
+  let dead = false
+  let success = false
+
+  const handleGroundSegRestart = () => {
+    restarting = true
+    restartGroundSeg()
+  }
+
+  afterUpdate(()=> {
+    if (restarting) {
+      if (!$connected) {
+        dead = true
+      } else {
+        if (dead) {
+        restarting = false
+        success = true
+          setTimeout(()=>{
+            success = false
+            dead = false
+          }
+          , 3000)
+        }
+      }
+    }
+  })
 </script>
 
 <div class="container">
   <div class="sys-title">
     <span>SYSTEM DETAILS</span>
-    <button on:click={restartGroundSeg} class="restart-groundseg">Restart GroundSeg</button>
+    <button on:click={handleGroundSegRestart} class="restart-groundseg" disabled={restarting}>
+      {#if success}
+        GroundSeg Restarted!
+      {:else}
+        {restarting ? "GroundSeg Restarting..." : "Restart GroundSeg"}
+      {/if}
+    </button>
   </div>
   <div class="item-wrapper">
     <Swap {swap}/>
@@ -60,6 +95,10 @@
     line-height: 32px; /* 133.333% */
     letter-spacing: -1.44px;
     padding: 0 48px;
+  }
+  .sys-title > button:disabled {
+    opacity: 0.6;
+    pointer-events: none;
   }
   .item-wrapper {
     margin-bottom: 32px;
