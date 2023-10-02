@@ -40,8 +40,8 @@ func LogEvent() {
 			go streamLogs(ctx, event.MuCon, event.ContainerID)
 		// cancel all log streams on ws break
 		case false:
-			logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
 			if event.ContainerID == "all" {
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
 				if conMap, exists := logsMap[event.MuCon]; exists {
 					for container, cancel := range conMap {
 						cancel()
@@ -49,6 +49,7 @@ func LogEvent() {
 					}
 				}
 			} else {
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
 				if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
 					cancel()
 					delete(logsMap[event.MuCon], event.ContainerID)
