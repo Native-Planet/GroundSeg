@@ -118,6 +118,7 @@ type UrbitTransitionBroadcast struct {
 	TogglePower               string `json:"togglePower"`
 	ToggleNetwork             string `json:"toggleNetwork"`
 	ToggleDevMode             string `json:"toggleDevMode"`
+	ToggleMinIOLink           string `json:"toggleMinIOLink"`
 	DeleteShip                string `json:"deleteShip"`
 	ExportShip                string `json:"exportShip"`
 	ShipCompressed            int    `json:"shipCompressed"`

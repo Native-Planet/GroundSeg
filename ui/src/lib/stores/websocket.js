@@ -433,6 +433,15 @@ export const toggleNetwork = patp => {
   send(payload)
 }
 
+export const toggleMinIOLink = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-minio-link",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const toggleUrbitPower = patp => {
   let payload = {
     "type":"urbit",

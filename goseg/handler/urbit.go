@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/broadcast"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
@@ -43,6 +44,33 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 			}
 		}
+		return nil
+	case "toggle-minio-link":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
+		// todo: scry for actual info
+		isLinked := false
+		if isLinked {
+			// todo: unlink
+			return nil
+		}
+		// create service account
+		svcAccount, err := docker.CreateMinIOServiceAccount(patp)
+		if err != nil {
+			return fmt.Errorf("Failed to create MinIO service account for %s: %v", patp, err)
+		}
+		// get minio endpoint
+		var endpoint string
+		endpoint = shipConf.CustomS3Web
+		if endpoint == "" {
+			endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+		}
+		// link to urbit
+		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
+			return fmt.Errorf("Failed to link MinIO information %s: %v", patp, err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "success"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: ""}
 		return nil
 	case "toggle-boot-status":
 		if shipConf.BootStatus == "ignore" {

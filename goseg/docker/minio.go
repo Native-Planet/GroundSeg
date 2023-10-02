@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goseg/config"
 	"goseg/logger"
+	"goseg/structs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -247,4 +248,60 @@ func getPatpFromMinIOName(containerName string) (string, error) {
 	// Split the string
 	splitStr := strings.SplitN(containerName, "_", 2)
 	return splitStr[1], nil
+}
+
+func CreateMinIOServiceAccount(patp string) (structs.MinIOServiceAccount, error) {
+	var svcAccount structs.MinIOServiceAccount
+	svcAccount.AccessKey = "urbit_minio"
+	svcAccount.Alias = fmt.Sprintf("patp_%s", patp)
+	svcAccount.User = patp
+	// create secret key
+	bytes := make([]byte, 20) // 20 bytes * 2 (hex encoding) = 40 characters
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return svcAccount, err
+	}
+	svcAccount.SecretKey = hex.EncodeToString(bytes)
+	// send command
+	containerName := fmt.Sprintf("minio_%s", patp)
+	cmd := []string{
+		"mc",
+		"admin",
+		"user",
+		"svcacct",
+		"rm",
+		svcAccount.Alias,
+		fmt.Sprintf("%s", svcAccount.AccessKey),
+	}
+	response, err := ExecDockerCommand(containerName, cmd)
+	if err != nil {
+		return svcAccount, fmt.Errorf("Failed to remove old service account for %s: %v", patp, err)
+	}
+	logger.Logger.Debug(fmt.Sprintf("Remove old service account response: %s", response))
+	// couldn't edit, add new instead
+	if strings.Contains(response, "successfully") {
+		cmd = []string{
+			"mc",
+			"admin",
+			"user",
+			"svcacct",
+			"add",
+			"--access-key",
+			fmt.Sprintf("%s", svcAccount.AccessKey),
+			"--secret-key",
+			fmt.Sprintf("%s", svcAccount.SecretKey),
+			svcAccount.Alias,
+			svcAccount.User,
+		}
+		response, err := ExecDockerCommand(containerName, cmd)
+		if err != nil {
+			return svcAccount, fmt.Errorf("Failed to create service account for %s: %v", patp, err)
+		}
+		if strings.Contains(response, "ERROR") {
+			return svcAccount, fmt.Errorf("Failed to create service account for %s: %v", patp, response)
+		}
+	} else {
+		return svcAccount, fmt.Errorf("Failed to remove old service account for %s: %v", patp, response)
+	}
+	return svcAccount, nil
 }
