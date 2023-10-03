@@ -7,6 +7,7 @@
   import { toggleMinIOLink } from '$lib/stores/websocket'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
 
+  export let minioAlias
   export let startramRunning
   export let patp
   export let minioUrl
@@ -57,11 +58,16 @@
       {/if}
     </button>
     <div class="spacer"></div>
-    <button disabled={!startramRunning} class="btn domain-btn" class:active={showCustom} on:click={()=>showCustom = !showCustom}>Set Custom MinIO Domain</button>
+    <button
+      class="btn domain-btn"
+      class:active={showCustom}
+      on:click={()=>showCustom = !showCustom}>
+      {minioAlias.length > 0 ? "Modify" : "Set"} Custom MinIO Domain
+    </button>
   </div>
   {#if showCustom}
     <!-- Custom MinIO Domain -->
-    <CustomMinIODomain {patp} />
+    <CustomMinIODomain {patp} {minioAlias} on:done={()=>showCustom = false} />
   {/if}
 </div>
 

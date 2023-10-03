@@ -31,36 +31,73 @@ func UrbitHandler(msg []byte) error {
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "set-urbit-domain":
+		defer func() {
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
+		}()
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
 		// check if new domain is valid
-		newDomain := urbitPayload.Payload.Domain
+		alias := urbitPayload.Payload.Domain
 		oldDomain := shipConf.WgURL
-		areAliases, err := AreSubdomainsAliases(newDomain, oldDomain)
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
 		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
 			return fmt.Errorf("Failed to check Urbit domain alias for %s: %v", patp, err)
 		}
 		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
 			return fmt.Errorf("Invalid Urbit domain alias for %s", patp)
 		}
-		// delete old alias
-		logger.Logger.Warn(fmt.Sprintf("DELETE OLD URBIT ALIAS"))
-		// add new alias
-		logger.Logger.Warn(fmt.Sprintf("ADD NEW URBIT ALIAS"))
+		// Creae Alias
+		if err := startram.AliasCreate(patp, alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return err
+		}
+		shipConf.CustomUrbitWeb = alias
+		shipConf.ShowUrbitWeb = "custom" // or "default"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "done"}
 		return nil
 	case "set-minio-domain":
+		defer func() {
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
+		}()
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
 		// check if new domain is valid
-		newDomain := urbitPayload.Payload.Domain
+		alias := urbitPayload.Payload.Domain
 		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
-		areAliases, err := AreSubdomainsAliases(newDomain, oldDomain)
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
 		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
 			return fmt.Errorf("Failed to check MinIO domain alias for %s: %v", patp, err)
 		}
 		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
 			return fmt.Errorf("Invalid MinIO domain alias for %s", patp)
 		}
-		// delete old alias
-		logger.Logger.Debug(fmt.Sprintf("DELETE OLD MINIO ALIAS"))
-		// add new alias
-		logger.Logger.Debug(fmt.Sprintf("ADD NEW MINIO ALIAS"))
+		// Creae Alias
+		if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
+		shipConf.CustomS3Web = alias
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
 		return nil
 	case "rebuild-container":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "loading"}

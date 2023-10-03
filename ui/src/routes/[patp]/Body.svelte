@@ -28,6 +28,9 @@
   $: loomSize = (ship?.loomSize)
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
+  $: showUrbAlias = (ship?.showUrbAlias) || false
+  $: urbitAlias = (ship?.urbitAlias) || ""
+  $: minioAlias = (ship?.minioAlias) || ""
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
@@ -53,6 +56,7 @@
 
   <!-- Urbit Info -->
   <Urbit
+    {urbitAlias}
     {url}
     {patp}
     {lusCode}
@@ -65,6 +69,7 @@
     <MinIO 
       {startramRunning}
       {patp}
+      {minioAlias}
       {minioUrl}
       {minioPwd}
       {minioLinked}

@@ -4,6 +4,7 @@
   import Clipboard from 'clipboard'
   import { onMount, createEventDispatcher } from 'svelte'
   import CustomUrbitDomain from './CustomUrbitDomain.svelte'
+  export let urbitAlias
   export let patp
   export let url = "#"
   export let lusCode = ""
@@ -39,11 +40,17 @@
     </button>
     <a href={url} class:disabled={!running} target="_blank" class="btn">URL ↗ </a>
     <div class="spacer"></div>
-    <button disabled={!startramRegistered} class="btn domain-btn" class:active={showCustom} on:click={()=>showCustom = !showCustom}>Set Custom Urbit Domain</button>
+    <button
+      disabled={!startramRegistered}
+      class="btn domain-btn"
+      class:active={showCustom}
+      on:click={()=>showCustom = !showCustom}>
+      {urbitAlias.length > 0 ? "Modify" : "Set"} Custom Urbit Domain
+    </button>
   </div>
   {#if showCustom}
     <!-- Custom Urbit Domain -->
-    <CustomUrbitDomain {patp} />
+    <CustomUrbitDomain {urbitAlias} {patp} on:done={()=>showCustom = false} />
   {/if}
 </div>
 
