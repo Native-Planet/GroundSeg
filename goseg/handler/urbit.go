@@ -30,6 +30,18 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	case "toggle-alias":
+		if shipConf.ShowUrbitWeb == "custom" {
+			shipConf.ShowUrbitWeb = "default"
+		} else {
+			shipConf.ShowUrbitWeb = "custom"
+		}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		return nil
 	case "set-urbit-domain":
 		defer func() {
 			time.Sleep(1 * time.Second)

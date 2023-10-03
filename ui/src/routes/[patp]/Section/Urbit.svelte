@@ -4,12 +4,19 @@
   import Clipboard from 'clipboard'
   import { onMount, createEventDispatcher } from 'svelte'
   import CustomUrbitDomain from './CustomUrbitDomain.svelte'
+  import { toggleUrbitAlias } from '$lib/stores/websocket'
+
+  import Fa from 'svelte-fa'
+  import { faRepeat } from '@fortawesome/free-solid-svg-icons'
+
   export let urbitAlias
+  export let showUrbAlias
   export let patp
   export let url = "#"
   export let lusCode = ""
   export let running = false
   export let startramRegistered = false
+
   const dispatch = createEventDispatcher()
   let copied = false
   let copy
@@ -27,7 +34,7 @@
 <div>
   <div class="section-title">Urbit Information</div>
   <div class="wrapper">
-    <button disabled={!running} id="lus-code" class="btn" data-clipboard-text={lusCode}>
+    <button disabled={!running || lusCode.length < 27} id="lus-code" class="btn" data-clipboard-text={lusCode}>
       <img
         src="/clipboard.svg"
         width="24px"
@@ -38,8 +45,16 @@
         Access Key
       {/if}
     </button>
-    <a href={url} class:disabled={!running} target="_blank" class="btn">URL ↗ </a>
+    <a href={url} class:disabled={!running} target="_blank" class="btn">
+      {#if showUrbAlias && (urbitAlias.length > 0)}
+        Custom 
+      {/if}
+      URL ↗ 
+    </a>
     <div class="spacer"></div>
+    {#if urbitAlias.length > 0}
+      <button class="btn domain-btn" on:click={()=>toggleUrbitAlias(patp)}><Fa icon={faRepeat} size="1x" /> Switch URL</button>
+    {/if}
     <button
       disabled={!startramRegistered}
       class="btn domain-btn"
