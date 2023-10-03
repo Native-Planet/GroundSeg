@@ -7,8 +7,8 @@
   } from '$lib/stores/websocket'
 
   import Power from './Section/Power.svelte'
-  import CustomUrbitDomain from './Section/CustomUrbitDomain.svelte'
-  import CustomMinIODomain from './Section/CustomMinIODomain.svelte'
+  import Urbit from './Section/Urbit.svelte'
+  import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
@@ -39,6 +39,7 @@
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
 
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
+  $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
 </script>
 <div class="body">
   <!-- Power -->
@@ -50,12 +51,19 @@
     on:click={()=>toggleUrbitPower(patp)} 
     />
 
-  {#if startramRegistered}
-    <!-- Custom Urbit Domain -->
-    <CustomUrbitDomain {url} {lusCode} />
+  <!-- Urbit Info -->
+  <Urbit
+    {url}
+    {patp}
+    {lusCode}
+    {running}
+    {startramRegistered}
+    />
 
-    <!-- Custom MinIO Domain -->
-    <CustomMinIODomain
+  {#if startramRegistered}
+    <!-- MinIO Info -->
+    <MinIO 
+      {startramRunning}
       {patp}
       {minioUrl}
       {minioPwd}

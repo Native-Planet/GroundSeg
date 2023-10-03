@@ -23,6 +23,8 @@ func UrbitTransitionHandler() {
 		urbitStruct, exists := current.Urbits[event.Patp]
 		if exists {
 			switch event.Type {
+			case "rebuildContainer":
+				urbitStruct.Transition.RebuildContainer = event.Event
 			case "toggleDevMode":
 				urbitStruct.Transition.ToggleDevMode = event.Event
 			case "togglePower":

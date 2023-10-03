@@ -208,6 +208,7 @@ type WsUrbitAction struct {
 	Action string `json:"action"`
 	Patp   string `json:"patp"`
 	Value  int    `json:value"`
+	Domain string `json:"domain"`
 }
 
 type WsNewShipPayload struct {
