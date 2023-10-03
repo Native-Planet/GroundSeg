@@ -415,6 +415,26 @@ export const toggleDevMode = patp => {
   send(payload)
 }
 
+export const setMinIODomain = (patp, domain) => {
+  let payload = {
+    "type":"urbit",
+    "action":"set-minio-domain",
+    "patp":patp,
+    "domain": domain
+  }
+  send(payload)
+}
+
+export const setUrbitDomain = (patp, domain) => {
+  let payload = {
+    "type":"urbit",
+    "action":"set-urbit-domain",
+    "patp":patp,
+    "domain": domain
+  }
+  send(payload)
+}
+
 export const toggleAutoBoot = patp => {
   let payload = {
     "type":"urbit",
@@ -474,6 +494,15 @@ export const exportUrbitBucket = patp => {
     "type":"urbit",
     "action":"export-bucket",
     "patp":patp
+  }
+  send(payload)
+}
+
+export const rebuildContainer = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"rebuild-container",
+    "patp": patp
   }
   send(payload)
 }

@@ -1,65 +1,28 @@
 <script>
   // Style
   import "../theme.css"
-
-  import Clipboard from 'clipboard'
-  import { createEventDispatcher } from 'svelte'
-  import { toggleMinIOLink } from '$lib/stores/websocket'
-
+  import { setMinIODomain } from '$lib/stores/websocket'
   export let patp
-  export let minioUrl
-  export let minioPwd
-  export let minioLinked
-
-  export let tToggleMinIOLink
-
-  let copied = false
-
-  const dispatch = createEventDispatcher()
-
-  let copy = new Clipboard('#copy');
-    copy.on("success", ()=> {
-      copied = true;
-      setTimeout(()=> copied = false, 1000)
-    })
+  let domain = ""
 </script>
 
 <div>
-  <div class="section-title">MinIO</div>
-  <div class="wrapper">
-    <input type="text" placeholder="minio.example.com" />
-    <button class="save-button">Save</button>
+  <div class="section-title-wrapper">
+    <div class="section-title">Custom MinIO Domain</div>
+    <div class="what">?</div>
   </div>
   <div class="wrapper">
-    <button id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
-      <img
-        src="/clipboard.svg"
-        width="24px"
-        height="24px" />
-      {#if copied}
-        Copied!
-      {:else}
-        Copy MinIO Password
-      {/if}
-    </button>
-    <a href={minioUrl} target="_blank" class="btn">
-      Settings
-    </a>
-    <button
-      class="btn"
-      on:click={()=>toggleMinIOLink(patp)}
-      disabled={tToggleMinIOLink == "linking"}
-      >
-      {#if tToggleMinIOLink == "success"}
-        MinIO connected!
-      {:else}
-        {minioLinked ? "Disconnect" : "Connect to Urbit"}
-      {/if}
-    </button>
+    <input type="text" placeholder="minio.example.com" bind:value={domain} />
+    <button disabled={domain.length < 1} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>Save</button>
   </div>
 </div>
 
 <style>
+  .section-title-wrapper {
+    display: flex; 
+    align-items: center;
+    gap: 16px;
+  }
   .wrapper {
     display: flex;
     gap: 16px;
@@ -96,29 +59,23 @@
     font-weight: 300;
     line-height: 24px; /* 75% */
     letter-spacing: -1.92px;
-  }
-  .btn {
-    color: #161D17;
-    text-align: right;
-    font-family: Inter;
-    font-size: 24px;
-    font-style: normal;
-    font-weight: 300;
-    line-height: 24px; /* 100% */
-    letter-spacing: -1.44px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 12px;
-    background: var(--NP_White, #F8F8F6);
     cursor: pointer;
   }
-  .btn:disabled {
+  .save-button:disabled {
     opacity: .6;
     pointer-events: none;
   }
-  .copy-btn {
-    width: 285px;
+  .what {
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    border: 1px solid #FFF;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
   }
+  .what:hover {
+    opacity: .2;
+  }
+  
 </style>

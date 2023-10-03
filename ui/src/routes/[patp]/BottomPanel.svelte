@@ -1,9 +1,13 @@
 <script>
+  import { structure, rebuildContainer } from '$lib/stores/websocket'
   import LogsDrawer from './LogsDrawer.svelte'
   import DeleteModal from './DeleteModal.svelte'
   import ExportModal from './ExportModal.svelte'
   import { openModal } from 'svelte-modals'
   export let patp
+
+  $: tRebuildContainer = ($structure?.urbits?.[patp]?.transition?.rebuildContainer) || ""
+  $: t = tRebuildContainer
 </script>
 <div class="bottom-panel">
   <button 
@@ -12,7 +16,15 @@
     Logs
   </button>
   <div class="spacer"></div>
-  <div class="btn rebuild">Rebuild</div>
+  <div class="btn rebuild" class:disabled={t.length > 0} on:click={()=>rebuildContainer(patp)}>
+    {#if t.length < 1}
+      Rebuild
+    {:else if t == "loading"}
+      Rebuilding
+    {:else if t == "success"}
+      Success!
+    {/if}
+  </div>
   <button 
     class="btn" 
     on:click={()=>openModal(ExportModal,{"patp":patp})}>
@@ -53,6 +65,10 @@
   }
   .rebuild {
     background-color: var(--fg-card);
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
   }
   .spacer {
     flex: 1;

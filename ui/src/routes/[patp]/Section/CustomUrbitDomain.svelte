@@ -1,42 +1,19 @@
 <script>
   // Style
   import "../theme.css"
-  import Clipboard from 'clipboard'
-  import { createEventDispatcher } from 'svelte'
-  export let url = "#"
-  export let lusCode = ""
-  const dispatch = createEventDispatcher()
-  let copied = false
-
-  let copy = new Clipboard('#lus-code');
-    copy.on("success", ()=> {
-      copied = true;
-      setTimeout(()=> copied = false, 1000)
-    })
+  import { setUrbitDomain } from '$lib/stores/websocket'
+  export let patp
+  let domain = ""
 </script>
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Urbit</div>
+    <div class="section-title">Custom Urbit Domain</div>
     <div class="what">?</div>
   </div>
   <div class="wrapper">
-    <input type="text" placeholder="ship.example.com" />
-    <button class="save-button">Save</button>
-  </div>
-  <div class="wrapper">
-    <button id="lus-code" class="btn" data-clipboard-text={lusCode}>
-      <img
-        src="/clipboard.svg"
-        width="24px"
-        height="24px" />
-      {#if copied}
-        Copied!
-      {:else}
-        Access Key
-      {/if}
-    </button>
-    <a href={url} target="_blank" class="btn">URL ↗ </a>
+    <input type="text" placeholder="ship.example.com" bind:value={domain} />
+    <button disabled={domain.length < 1} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>Save</button>
   </div>
 </div>
 
@@ -82,22 +59,11 @@
     font-weight: 300;
     line-height: 24px; /* 75% */
     letter-spacing: -1.92px;
+    cursor: pointer;
   }
-  .btn {
-    color: #161D17;
-    text-align: right;
-    font-family: Inter;
-    font-size: 24px;
-    font-style: normal;
-    font-weight: 300;
-    line-height: 24px; /* 100% */
-    letter-spacing: -1.44px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 12px;
-    background: var(--NP_White, #F8F8F6);
+  .save-button:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
   .what {
     width: 20px;
