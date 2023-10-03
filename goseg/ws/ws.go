@@ -56,7 +56,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 								MuCon:       client,
 							}
 							config.LogsEventBus <- logEvent
+							break
 						}
+						break
 					}
 				}
 				auth.ClientManager.Mu.RUnlock()
