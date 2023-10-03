@@ -117,14 +117,14 @@ func (cm *ClientManager) BroadcastUnauth(data []byte) {
 	for _, clients := range cm.UnauthClients {
 		for _, client := range clients {
 			if client != nil && client.Active {
-				client.Mu.Lock()
-				err := client.Conn.WriteMessage(websocket.TextMessage, data)
-				if err != nil {
+				// client.Mu.Lock()
+				// err := client.Conn.WriteMessage(websocket.TextMessage, data)
+				if err := client.Write(data); err != nil {
 					client.Active = false
 				} else {
 					client.LastActive = time.Now()
 				}
-				client.Mu.Unlock()
+				// client.Mu.Unlock()
 			}
 		}
 	}
@@ -136,14 +136,14 @@ func (cm *ClientManager) BroadcastAuth(data []byte) {
 	for _, clients := range cm.AuthClients {
 		for _, client := range clients {
 			if client != nil && client.Active {
-				client.Mu.Lock()
-				err := client.Conn.WriteMessage(websocket.TextMessage, data)
-				if err != nil {
+				// client.Mu.Lock()
+				// err := client.Conn.WriteMessage(websocket.TextMessage, data)
+				if err := client.Write(data); err != nil {
 					client.Active = false
 				} else {
 					client.LastActive = time.Now()
 				}
-				client.Mu.Unlock()
+				// client.Mu.Unlock()
 			}
 		}
 	}

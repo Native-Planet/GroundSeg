@@ -120,7 +120,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	}
 	hostName := system.LocalUrl
 	if hostName == "" {
-		logger.Logger.Warn(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
+		logger.Logger.Debug(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
 		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
