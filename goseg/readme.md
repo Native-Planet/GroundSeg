@@ -10,9 +10,6 @@ stateDiagram-v2
     Broadcast-->Urbit_traffic: broadcast latest update
     Static-->Operations: imported
     Static-->Routines: imported
-    state Startram_node {
-        Wireguard_server
-    }
     state Internals {
         state Static {
             Structs
@@ -71,6 +68,7 @@ stateDiagram-v2
     }
     External-->Routines: retrieve updated information
     Operations-->Startram: configure StarTram
+    Routines-->Startram: retrieve remote config for startram
     state Docker_daemon {
         Urbit
         Minio
