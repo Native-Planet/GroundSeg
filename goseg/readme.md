@@ -68,6 +68,7 @@ stateDiagram-v2
     }
     External-->Routines: retrieve updated information
     Operations-->Startram: configure StarTram
+    Routines-->Startram: retrieve remote config for startram
     state Docker_daemon {
         Urbit
         Minio
