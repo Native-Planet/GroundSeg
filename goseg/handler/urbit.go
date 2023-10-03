@@ -33,11 +33,11 @@ func UrbitHandler(msg []byte) error {
 	case "mars-meld":
 		// send |pack
 		if err := click.SendPack(patp); err != nil {
-			return fmt.Error("Failed to |pack to %s: %v", patp, err)
+			return fmt.Errorf("Failed to |pack to %s: %v", patp, err)
 		}
 		// send |meld
 		if err := click.SendMeld(patp); err != nil {
-			return fmt.Error("Failed to |meld to %s: %v", patp, err)
+			return fmt.Errorf("Failed to |meld to %s: %v", patp, err)
 		}
 		return nil
 	case "urth-meld":
