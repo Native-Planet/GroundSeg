@@ -7,12 +7,13 @@
   } from '$lib/stores/websocket'
 
   import Power from './Section/Power.svelte'
-  import CustomUrbitDomain from './Section/CustomUrbitDomain.svelte'
-  import CustomMinIODomain from './Section/CustomMinIODomain.svelte'
+  import Urbit from './Section/Urbit.svelte'
+  import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
+  import Chop from './Section/Chop.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -28,6 +29,9 @@
   $: loomSize = (ship?.loomSize)
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
+  $: showUrbAlias = (ship?.showUrbAlias) || false
+  $: urbitAlias = (ship?.urbitAlias) || ""
+  $: minioAlias = (ship?.minioAlias) || ""
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
@@ -39,6 +43,7 @@
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
 
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
+  $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
 </script>
 <div class="body">
   <!-- Power -->
@@ -50,13 +55,23 @@
     on:click={()=>toggleUrbitPower(patp)} 
     />
 
-  {#if startramRegistered}
-    <!-- Custom Urbit Domain -->
-    <CustomUrbitDomain {url} {lusCode} />
+  <!-- Urbit Info -->
+  <Urbit
+    {showUrbAlias}
+    {urbitAlias}
+    {url}
+    {patp}
+    {lusCode}
+    {running}
+    {startramRegistered}
+    />
 
-    <!-- Custom MinIO Domain -->
-    <CustomMinIODomain
+  {#if startramRegistered}
+    <!-- MinIO Info -->
+    <MinIO 
+      {startramRunning}
       {patp}
+      {minioAlias}
       {minioUrl}
       {minioPwd}
       {minioLinked}
@@ -64,17 +79,24 @@
       />
   {/if}
 
-  <!-- Loom -->
-  <Loom {patp} {loomSize} />
-
   <!-- Pack & Meld -->
-  <PackMeld />
+  <PackMeld
+    {patp}
+    />
+
+  <!-- Remote Access -->
+  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Dev Mode -->
   <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
-  <!-- Remote Access -->
-  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
+  <!-- Loom -->
+  <Loom {patp} {loomSize} />
+
+  <!-- Chop -->
+  <Chop
+    {patp}
+    />
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>

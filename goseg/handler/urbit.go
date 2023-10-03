@@ -11,6 +11,7 @@ import (
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
+	"net"
 	"strings"
 	"time"
 )
@@ -29,11 +30,125 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	case "mars-meld":
+		// send |pack
+		if err := click.SendPack(patp); err != nil {
+			return fmt.Errorf("Failed to |pack to %s: %v", patp, err)
+		}
+		// send |meld
+		if err := click.SendMeld(patp); err != nil {
+			return fmt.Errorf("Failed to |meld to %s: %v", patp, err)
+		}
+		return nil
+	case "urth-meld":
+		logger.Logger.Warn(fmt.Sprintf("urth meld called: %s", patp))
+		return nil
+	case "toggle-alias":
+		if shipConf.ShowUrbitWeb == "custom" {
+			shipConf.ShowUrbitWeb = "default"
+		} else {
+			shipConf.ShowUrbitWeb = "custom"
+		}
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		return nil
+	case "set-urbit-domain":
+		defer func() {
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
+		}()
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
+		// check if new domain is valid
+		alias := urbitPayload.Payload.Domain
+		oldDomain := shipConf.WgURL
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return fmt.Errorf("Failed to check Urbit domain alias for %s: %v", patp, err)
+		}
+		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return fmt.Errorf("Invalid Urbit domain alias for %s", patp)
+		}
+		// Creae Alias
+		if err := startram.AliasCreate(patp, alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return err
+		}
+		shipConf.CustomUrbitWeb = alias
+		shipConf.ShowUrbitWeb = "custom" // or "default"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "done"}
+		return nil
+	case "set-minio-domain":
+		defer func() {
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
+		}()
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
+		// check if new domain is valid
+		alias := urbitPayload.Payload.Domain
+		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
+		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Failed to check MinIO domain alias for %s: %v", patp, err)
+		}
+		if !areAliases {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Invalid MinIO domain alias for %s", patp)
+		}
+		// Creae Alias
+		if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return err
+		}
+		shipConf.CustomS3Web = alias
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
+		return nil
+	case "rebuild-container":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "loading"}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete container %s", patp))
+		}
+		_, err := docker.StartContainer(patp, "vere")
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "error"}
+			return fmt.Errorf("Failed to rebuild container %s: %v", patp, err)
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
+		return nil
 	case "loom":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "loading"}
 		shipConf.LoomSize = urbitPayload.Payload.Value
 		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "error"}
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "done"}
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		if err := docker.DeleteContainer(patp); err != nil {
@@ -44,6 +159,11 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 			}
 		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "done"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 		return nil
 	case "toggle-minio-link":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
@@ -276,4 +396,22 @@ func cutSlice(slice []string, s string) []string {
 		return slice
 	}
 	return append(slice[:index], slice[index+1:]...)
+}
+
+// AreSubdomainsAliases checks if two subdomains are aliases of each other.
+func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
+	// Lookup CNAME for the first domain
+	cname1, err := net.LookupCNAME(domain1)
+	if err != nil {
+		return false, err
+	}
+
+	// Lookup CNAME for the second domain
+	cname2, err := net.LookupCNAME(domain2)
+	if err != nil {
+		return false, err
+	}
+
+	// Compare CNAMEs
+	return cname1 == cname2, nil
 }

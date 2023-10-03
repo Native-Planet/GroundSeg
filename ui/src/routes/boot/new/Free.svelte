@@ -52,7 +52,7 @@
     border-radius: 16px;
     overflow: hidden;
     margin: auto;
-    margin: 55px auto 32px auto;
+    margin: 0 auto 32px auto;
   }
   .input-wrapper {
     margin: auto;

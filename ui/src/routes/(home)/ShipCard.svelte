@@ -42,7 +42,7 @@
     <NameBar {patp} {running} />
   </div>
   <div class="container-info">
-    <ContainerInfo {memUsage} {diskUsage} {loomActual} />
+    <ContainerInfo {memUsage} {diskUsage} />
   </div>
   <div class="buttons">
     <ShipButtons {patp} {url}/>

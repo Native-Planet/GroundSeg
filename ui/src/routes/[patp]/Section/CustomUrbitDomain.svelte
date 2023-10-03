@@ -1,42 +1,43 @@
 <script>
   // Style
   import "../theme.css"
-  import Clipboard from 'clipboard'
-  import { createEventDispatcher } from 'svelte'
-  export let url = "#"
-  export let lusCode = ""
-  const dispatch = createEventDispatcher()
-  let copied = false
+  import { setUrbitDomain, structure } from '$lib/stores/websocket'
+  import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
+  export let patp
+  export let urbitAlias
+  let domain = ""
 
-  let copy = new Clipboard('#lus-code');
-    copy.on("success", ()=> {
-      copied = true;
-      setTimeout(()=> copied = false, 1000)
-    })
+  const dispatch = createEventDispatcher()
+
+  $: tUrbitDomain = ($structure?.urbits?.[patp]?.transition?.urbitDomain) || ""
+  $: t = tUrbitDomain
+
+  onMount(()=>domain = urbitAlias)
+  afterUpdate(()=> {
+    if (t == "done") {
+      dispatch("done")
+    }
+  })
 </script>
 
 <div>
   <div class="section-title-wrapper">
-    <div class="section-title">Urbit</div>
+    <div class="section-title">Custom Urbit Domain</div>
     <div class="what">?</div>
   </div>
   <div class="wrapper">
-    <input type="text" placeholder="ship.example.com" />
-    <button class="save-button">Save</button>
-  </div>
-  <div class="wrapper">
-    <button id="lus-code" class="btn" data-clipboard-text={lusCode}>
-      <img
-        src="/clipboard.svg"
-        width="24px"
-        height="24px" />
-      {#if copied}
-        Copied!
-      {:else}
-        Access Key
+    <input type="text" placeholder="ship.example.com" bind:value={domain} disabled={t.length > 0} />
+    <button disabled={(domain.length < 1) || (domain == urbitAlias) || (t.length > 0)} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>
+      {#if t.length < 1}
+        Save
+      {:else if t == "loading"}
+        Loading..
+      {:else if t == "error"}
+        Error
+      {:else if t == "success"}
+        Success!
       {/if}
     </button>
-    <a href={url} target="_blank" class="btn">URL ↗ </a>
   </div>
 </div>
 
@@ -82,22 +83,11 @@
     font-weight: 300;
     line-height: 24px; /* 75% */
     letter-spacing: -1.92px;
+    cursor: pointer;
   }
-  .btn {
-    color: #161D17;
-    text-align: right;
-    font-family: Inter;
-    font-size: 24px;
-    font-style: normal;
-    font-weight: 300;
-    line-height: 24px; /* 100% */
-    letter-spacing: -1.44px;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 12px;
-    background: var(--NP_White, #F8F8F6);
+  .save-button:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
   .what {
     width: 20px;

@@ -97,7 +97,9 @@ type Urbit struct {
 		Network          string `json:"network"`
 		Running          bool   `json:"running"`
 		URL              string `json:"url"`
-		UrbAlias         bool   `json:"urbAlias"`
+		UrbitAlias       string `json:"urbitAlias"`
+		MinIOAlias       string `json:"minioAlias"`
+		ShowUrbAlias     bool   `json:"showUrbAlias"`
 		MemUsage         uint64 `json:"memUsage"`
 		DiskUsage        int64  `json:"diskUsage"`
 		LoomSize         int    `json:"loomSize"`
@@ -124,6 +126,10 @@ type UrbitTransitionBroadcast struct {
 	ShipCompressed            int    `json:"shipCompressed"`
 	ExportBucket              string `json:"exportBucket"`
 	BucketCompressed          int    `json:"bucketCompressed"`
+	RebuildContainer          string `json:"rebuildContainer"`
+	Loom                      string `json:"loom"`
+	UrbitDomain               string `json:"urbitDomain"`
+	MinIODomain               string `json:"minioDomain"`
 }
 
 // used to construct broadcast pier info subobject

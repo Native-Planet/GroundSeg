@@ -415,6 +415,26 @@ export const toggleDevMode = patp => {
   send(payload)
 }
 
+export const setMinIODomain = (patp, domain) => {
+  let payload = {
+    "type":"urbit",
+    "action":"set-minio-domain",
+    "patp":patp,
+    "domain": domain
+  }
+  send(payload)
+}
+
+export const setUrbitDomain = (patp, domain) => {
+  let payload = {
+    "type":"urbit",
+    "action":"set-urbit-domain",
+    "patp":patp,
+    "domain": domain
+  }
+  send(payload)
+}
+
 export const toggleAutoBoot = patp => {
   let payload = {
     "type":"urbit",
@@ -478,6 +498,15 @@ export const exportUrbitBucket = patp => {
   send(payload)
 }
 
+export const rebuildContainer = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"rebuild-container",
+    "patp": patp
+  }
+  send(payload)
+}
+
 export const setUrbitLoom = (patp, value) => {
   let payload = {
     "type":"urbit",
@@ -488,14 +517,41 @@ export const setUrbitLoom = (patp, value) => {
   send(payload)
 }
 
-/*
-export const urbitsMeldUrth = async ship => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.urbitsMeldUrth(id,ship,token)
+export const toggleUrbitAlias = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-alias",
+    "patp":patp,
+  }
+  send(payload)
 }
-*/
+
+export const marsPackMeld = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"mars-meld",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const urthPackMeld = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"urth-meld",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const urbitChop = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"chop",
+    "patp":patp,
+  }
+  send(payload)
+}
 
 //
 //  Support
