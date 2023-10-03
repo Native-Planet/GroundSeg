@@ -45,7 +45,6 @@ stateDiagram-v2
         Process_handler-->Operations: multiple function calls to these packages to string together actions
         Operations-->Broadcast: send updated values
         Routines-->Broadcast: send updated values
-        External-->Routines: retrieve updated information
     }
     [*]-->WS_mux
     [*]-->Urbit_traffic
@@ -74,6 +73,7 @@ stateDiagram-v2
         Dockerhub
         StarTram_API
     }
+    External-->Routines: retrieve updated information
     Operations-->External: configure StarTram
     Operations-->Docker_daemon: manage containers
     Docker_daemon-->Startram_node: forward webui and ames
