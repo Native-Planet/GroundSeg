@@ -61,13 +61,6 @@ stateDiagram-v2
             Websocket-->WsAuth: action payload in
         }
     }
-    state Docker_daemon {
-        Urbit
-        Minio
-        MinioMC
-        Netdata
-        WireGuard
-    }
     state External {
         Version_server
         Dockerhub
@@ -75,6 +68,13 @@ stateDiagram-v2
     }
     External-->Routines: retrieve updated information
     Operations-->External: configure StarTram
+    state Docker_daemon {
+        Urbit
+        Minio
+        MinioMC
+        Netdata
+        WireGuard
+    }
     Operations-->Docker_daemon: manage containers
     Docker_daemon-->Startram_node: forward webui and ames
 ```
