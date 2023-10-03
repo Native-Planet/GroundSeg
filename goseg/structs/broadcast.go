@@ -125,6 +125,7 @@ type UrbitTransitionBroadcast struct {
 	ExportBucket              string `json:"exportBucket"`
 	BucketCompressed          int    `json:"bucketCompressed"`
 	RebuildContainer          string `json:"rebuildContainer"`
+	Loom                      string `json:"loom"`
 }
 
 // used to construct broadcast pier info subobject

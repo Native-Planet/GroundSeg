@@ -77,10 +77,16 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
 		return nil
 	case "loom":
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "loading"}
 		shipConf.LoomSize = urbitPayload.Payload.Value
 		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "error"}
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "done"}
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		if err := docker.DeleteContainer(patp); err != nil {
@@ -91,6 +97,11 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 			}
 		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "success"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "done"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 		return nil
 	case "toggle-minio-link":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}

@@ -9,6 +9,14 @@
   export let isOpen
   $: loomMB = (2**loomSize) / (1024*1024)
   $: curLoomMB = (2**curLoomSize) / (1024*1024)
+  $: tLoom = ($structure?.urbits?.[patp]?.transition?.loom) || ""
+
+  afterUpdate(()=>{
+    if (tLoom == "done") {
+      closeModal()
+    }
+
+  })
 </script>
 
 <Modal>
@@ -16,7 +24,15 @@
   <div class="wrapper">
     <div class="header">Modify Urbit Loom</div>
     <div class="name">You are about to change your Urbit loom size from {loomMB} MB to {curLoomMB} MB</div>
-    <button on:click={()=>setUrbitLoom(patp, curLoomSize)}>Modify</button>
+    <button disabled={tLoom.Length > 0} on:click={()=>setUrbitLoom(patp, curLoomSize)}>
+      {#if tLoom.length < 1}
+        Modify
+      {:else if tLoom == "loading"}
+        Modifying..
+      {:else if tLoom == "success"}
+        Modified!
+      {/if}
+    </button>
   </div>
   {/if}
 </Modal>
@@ -69,31 +85,8 @@
     letter-spacing: -1.44px;
     cursor: pointer;
   }
-  .transition-shutdown {
-    background: var(--bg-card);
-    padding: 120px 0;
-    color: var(--text-card-color);
-    font-size: 32px;
-  }
-  .transition-restart {
-    background: var(--bg-card);
-    padding: 120px 0;
-    color: var(--text-card-color);
-    font-size: 32px;
-    animation: breathe 5s infinite;
-  }
-  @keyframes breathe {
-    0% {
-      background-color: #FFFFFF00;
-      color: var(--text-color);
-    }
-    50% {
-      background-color: var(--bg-card);
-      color: var(--text-card-color);
-    }
-    100% {
-      background-color: #FFFFFF00;
-      color: var(--text-color);
-    }
+  button:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>
