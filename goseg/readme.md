@@ -64,10 +64,13 @@ stateDiagram-v2
     state External {
         Version_server
         Dockerhub
+    }
+    state Startram {
         StarTram_API
+        WG_SERVER
     }
     External-->Routines: retrieve updated information
-    Operations-->External: configure StarTram
+    Operations-->Startram: configure StarTram
     state Docker_daemon {
         Urbit
         Minio
@@ -76,5 +79,5 @@ stateDiagram-v2
         WireGuard
     }
     Operations-->Docker_daemon: manage containers
-    Docker_daemon-->Startram_node: forward webui and ames
+    Docker_daemon-->Startram: forward webui and ames
 ```
