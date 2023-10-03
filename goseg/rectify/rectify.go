@@ -25,6 +25,10 @@ func UrbitTransitionHandler() {
 			switch event.Type {
 			case "loom":
 				urbitStruct.Transition.Loom = event.Event
+			case "urbitDomain":
+				urbitStruct.Transition.UrbitDomain = event.Event
+			case "minioDomain":
+				urbitStruct.Transition.MinIODomain = event.Event
 			case "rebuildContainer":
 				urbitStruct.Transition.RebuildContainer = event.Event
 			case "toggleDevMode":

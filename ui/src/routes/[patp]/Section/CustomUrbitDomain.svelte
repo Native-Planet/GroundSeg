@@ -1,9 +1,23 @@
 <script>
   // Style
   import "../theme.css"
-  import { setUrbitDomain } from '$lib/stores/websocket'
+  import { setUrbitDomain, structure } from '$lib/stores/websocket'
+  import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
   export let patp
+  export let urbitAlias
   let domain = ""
+
+  const dispatch = createEventDispatcher()
+
+  $: tUrbitDomain = ($structure?.urbits?.[patp]?.transition?.urbitDomain) || ""
+  $: t = tUrbitDomain
+
+  onMount(()=>domain = urbitAlias)
+  afterUpdate(()=> {
+    if (t == "done") {
+      dispatch("done")
+    }
+  })
 </script>
 
 <div>
@@ -12,8 +26,18 @@
     <div class="what">?</div>
   </div>
   <div class="wrapper">
-    <input type="text" placeholder="ship.example.com" bind:value={domain} />
-    <button disabled={domain.length < 1} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>Save</button>
+    <input type="text" placeholder="ship.example.com" bind:value={domain} disabled={t.length > 0} />
+    <button disabled={(domain.length < 1) || (domain == urbitAlias) || (t.length > 0)} class="save-button" on:click={()=>setUrbitDomain(patp, domain)}>
+      {#if t.length < 1}
+        Save
+      {:else if t == "loading"}
+        Loading..
+      {:else if t == "error"}
+        Error
+      {:else if t == "success"}
+        Success!
+      {/if}
+    </button>
   </div>
 </div>
 

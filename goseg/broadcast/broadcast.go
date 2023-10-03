@@ -155,6 +155,12 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
+		urbitAlias := dockerConfig.CustomUrbitWeb
+		minIOAlias := dockerConfig.CustomS3Web
+		showUrbAlias := false
+		if dockerConfig.ShowUrbitWeb == "custom" {
+			showUrbAlias = true
+		}
 		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
 		minIOPwd := ""
 		if conf.WgRegistered && conf.WgOn {
@@ -182,6 +188,9 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.MinIOUrl = minIOUrl
 		urbit.Info.MinIOPwd = minIOPwd
+		urbit.Info.UrbitAlias = urbitAlias
+		urbit.Info.MinIOAlias = minIOAlias
+		urbit.Info.ShowUrbAlias = showUrbAlias
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
