@@ -67,7 +67,7 @@ stateDiagram-v2
     }
     state Startram {
         StarTram_API
-        WG_SERVER
+        WG_Server
     }
     External-->Routines: retrieve updated information
     Operations-->Startram: configure StarTram
