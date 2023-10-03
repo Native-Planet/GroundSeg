@@ -13,6 +13,7 @@
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
+  import Chop from './Section/Chop.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -78,17 +79,24 @@
       />
   {/if}
 
-  <!-- Loom -->
-  <Loom {patp} {loomSize} />
-
   <!-- Pack & Meld -->
-  <PackMeld />
+  <PackMeld
+    {patp}
+    />
+
+  <!-- Remote Access -->
+  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Dev Mode -->
   <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
-  <!-- Remote Access -->
-  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
+  <!-- Loom -->
+  <Loom {patp} {loomSize} />
+
+  <!-- Chop -->
+  <Chop
+    {patp}
+    />
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>

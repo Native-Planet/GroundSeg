@@ -526,14 +526,32 @@ export const toggleUrbitAlias = patp => {
   send(payload)
 }
 
-/*
-export const urbitsMeldUrth = async ship => {
-  let id = await generateRandom(16)
-  let token = await loadSession()
-  PENDING.add(id)
-  SESSION.urbitsMeldUrth(id,ship,token)
+export const marsPackMeld = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"mars-meld",
+    "patp":patp,
+  }
+  send(payload)
 }
-*/
+
+export const urthPackMeld = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"urth-meld",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const urbitChop = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"chop",
+    "patp":patp,
+  }
+  send(payload)
+}
 
 //
 //  Support

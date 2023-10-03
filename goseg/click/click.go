@@ -19,6 +19,14 @@ var (
 	codeMutex sync.Mutex
 )
 
+func SendPack(patp string) error {
+	return nil
+}
+
+func SendMeld(patp string) error {
+	return nil
+}
+
 // Get +code from Urbit
 func GetLusCode(patp string) (string, error) {
 	// in var already?
