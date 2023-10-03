@@ -63,7 +63,7 @@
               <div class="check-label">{p}</div>
             </div>
           {/each}
-          {#if urbitKeys.length > 0}
+          {#if urbitKeys.length > 1}
             <div class="check-wrapper" on:click={toggleSelectAll}>
               <div class="checkbox">
                 {#if all}
