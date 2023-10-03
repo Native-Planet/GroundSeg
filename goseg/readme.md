@@ -10,6 +10,9 @@ stateDiagram-v2
     Broadcast-->Urbit_traffic: broadcast latest update
     Static-->Operations: imported
     Static-->Routines: imported
+    state Startram_node {
+        Wireguard_server
+    }
     state Internals {
         state Static {
             Structs
@@ -27,7 +30,7 @@ stateDiagram-v2
             mDNS
         }
         state Operations {
-            Startram
+            Startram_config
             Docker
             System
             Config
@@ -58,6 +61,16 @@ stateDiagram-v2
             Websocket-->WsAuth: action payload in
         }
     }
+    state External {
+        Version_server
+        Dockerhub
+    }
+    state Startram {
+        StarTram_API
+        WG_Server
+    }
+    External-->Routines: retrieve updated information
+    Operations-->Startram: configure StarTram
     state Docker_daemon {
         Urbit
         Minio
@@ -66,4 +79,5 @@ stateDiagram-v2
         WireGuard
     }
     Operations-->Docker_daemon: manage containers
+    Docker_daemon-->Startram: forward webui and ames
 ```
