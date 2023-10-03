@@ -30,7 +30,7 @@ stateDiagram-v2
             mDNS
         }
         state Operations {
-            Startram
+            Startram_config
             Docker
             System
             Config
