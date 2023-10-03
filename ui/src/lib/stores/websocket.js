@@ -517,6 +517,15 @@ export const setUrbitLoom = (patp, value) => {
   send(payload)
 }
 
+export const toggleUrbitAlias = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-alias",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 /*
 export const urbitsMeldUrth = async ship => {
   let id = await generateRandom(16)

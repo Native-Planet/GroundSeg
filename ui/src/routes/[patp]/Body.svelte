@@ -56,6 +56,7 @@
 
   <!-- Urbit Info -->
   <Urbit
+    {showUrbAlias}
     {urbitAlias}
     {url}
     {patp}
