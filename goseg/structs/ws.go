@@ -56,13 +56,13 @@ type ClientManager struct {
 }
 
 // register a new connection
-func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string, authed bool) *MuConn {
+func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *MuConn {
 	muConn := &MuConn{Conn: conn, Active: true, LastActive: time.Now()}
-	if authed {
-		cm.AddAuthClient(tokenId, muConn)
-	} else {
-		cm.AddUnauthClient(tokenId, muConn)
-	}
+	// if authed {
+	// 	cm.AddAuthClient(tokenId, muConn)
+	// } else {
+	// 	cm.AddUnauthClient(tokenId, muConn)
+	// }
 	return muConn
 }
 

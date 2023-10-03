@@ -84,7 +84,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": payload.Token.Token,
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
-		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID, authed)
+		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
