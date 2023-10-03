@@ -57,8 +57,6 @@ type ClientManager struct {
 
 // register a new connection
 func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string, authed bool) *MuConn {
-	cm.Mu.Lock()
-	defer cm.Mu.Unlock()
 	muConn := &MuConn{Conn: conn, Active: true, LastActive: time.Now()}
 	if authed {
 		cm.AddAuthClient(tokenId, muConn)
