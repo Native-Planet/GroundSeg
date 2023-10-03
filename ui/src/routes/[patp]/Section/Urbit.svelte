@@ -17,6 +17,8 @@
   export let running = false
   export let startramRegistered = false
 
+  $: displayedUrl = (showUrbAlias ? "https://"+urbitAlias : url)
+
   const dispatch = createEventDispatcher()
   let copied = false
   let copy
@@ -45,7 +47,7 @@
         Access Key
       {/if}
     </button>
-    <a href={url} class:disabled={!running} target="_blank" class="btn">
+    <a href={displayedUrl} class:disabled={!running} target="_blank" class="btn">
       {#if showUrbAlias && (urbitAlias.length > 0)}
         Custom 
       {/if}
