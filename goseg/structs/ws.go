@@ -61,9 +61,9 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string, aut
 	defer cm.Mu.Unlock()
 	muConn := &MuConn{Conn: conn, Active: true, LastActive: time.Now()}
 	if authed {
-		cm.AddAuthClient(tokenId, conn)
+		cm.AddAuthClient(tokenId, muConn)
 	} else {
-		cm.AddUnauthClient(tokenId, conn)
+		cm.AddUnauthClient(tokenId, muConn)
 	}
 	return muConn
 }
