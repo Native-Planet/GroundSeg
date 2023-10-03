@@ -10,6 +10,16 @@
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
+  const handleBack = () => {
+    const bootExist = $page.route.id.includes("new")
+    const bootNew = $page.route.id.includes("existing")
+    if (bootExist || bootNew) {
+      goto("/boot")
+    } else {
+      goto("/")
+    }
+  }
+
 </script>
 
 <div class="wrapper {wide ? "wide" : "slim"}">
@@ -23,7 +33,7 @@
       -->
   </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
-    <div class="back" on:click={()=>goto("/")}>
+    <div class="back" on:click={handleBack}>
     </div>
   {:else}
     <div class="nav">
