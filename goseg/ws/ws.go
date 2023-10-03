@@ -73,7 +73,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
-		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		var msgType structs.WsType
 		err = json.Unmarshal(msg, &msgType)
 		if err != nil {
@@ -85,6 +84,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": payload.Token.Token,
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
+		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID, authed)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
