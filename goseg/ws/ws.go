@@ -229,6 +229,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 				if !authed && conf.Setup == "complete" {
+					logger.Logger.Debug("Not authed in auth flow")
 					resp, err := handler.UnauthHandler()
 					if err != nil {
 						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
