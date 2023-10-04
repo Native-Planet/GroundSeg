@@ -85,12 +85,8 @@ export const handleMessage = data => {
       }
       return l
     })
-    structure.set(data)
-    ssids.set([])
   } else {
     console.log("server alive")
-    structure.set(data)
-    ssids.set([])
   }
 }
 
