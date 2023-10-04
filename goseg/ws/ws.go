@@ -71,29 +71,44 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 	}
 	tokenId := payload.Token.ID
-	if tokenId == "" {
-		tokenId = config.RandString(32)
-	}
 	logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
 	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 	token := map[string]string{
-		"id":    tokenId,
+		"id":    payload.Token.ID,
 		"token": payload.Token.Token,
 	}
 	tokenContent, authed := auth.CheckToken(token, conn, r)
 	token = map[string]string{
-		"id":    tokenId,
+		"id":    payload.Token.ID,
 		"token": tokenContent,
 	}
 	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Unable to track auth session: %v", err))
 	}
 	if !authed {
-		resp, err := handler.UnauthHandler()
+		var ack string
+		newToken, err := auth.CreateToken(conn, r, false)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
+			ack = "nack"
+		}
+		token = newToken
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 		}
-		MuCon.Write(resp)
+		result := map[string]interface{}{
+			"type":     "activity",
+			"id":       payload.ID,
+			"error":    "null",
+			"response": ack,
+			"token":    token,
+		}
+		respJson, err := json.Marshal(result)
+		if err != nil {
+			errmsg := fmt.Sprintf("Error marshalling token (init): %v", err)
+			logger.Logger.Error(errmsg)
+		}
+		MuCon.Write(respJson)
 	}
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
