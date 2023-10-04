@@ -84,6 +84,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Unable to track auth session: %v", err))
 	}
+	if !authed {
+		resp, err := handler.UnauthHandler()
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+		}
+		MuCon.Write(resp)
+	}
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
