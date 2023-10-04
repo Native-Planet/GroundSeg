@@ -14,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 var (
@@ -38,23 +36,24 @@ func init() {
 	if err := LoadStartramRegions(); err != nil {
 		logger.Logger.Error("Couldn't load StarTram regions")
 	}
-	go WsDigester()
+	// go WsDigester()
 }
 
-func WsDigester() {
-	for {
-		event := <-structs.WsEventBus
-		if event.Conn.Conn != nil {
-			if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
-				logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
-				if err = auth.WsNilSession(event.Conn.Conn); err != nil {
-					logger.Logger.Warn("Couldn't remove WS session")
-				}
-				continue
-			}
-		}
-	}
-}
+// serialized single thread for ws writes (mutex instead so this isnt necessary)
+// func WsDigester() {
+// 	for {
+// 		event := <-structs.WsEventBus
+// 		if event.Conn.Conn != nil {
+// 			if err := event.Conn.Conn.WriteMessage(websocket.TextMessage, event.Data); err != nil {
+// 				logger.Logger.Warn(fmt.Sprintf("WS error: %v", err))
+// 				if err = auth.WsNilSession(event.Conn.Conn); err != nil {
+// 					logger.Logger.Warn("Couldn't remove WS session")
+// 				}
+// 				continue
+// 			}
+// 		}
+// 	}
+// }
 
 // take in config file and addt'l info to initialize broadcast
 func bootstrapBroadcastState() error {

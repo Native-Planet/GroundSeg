@@ -28,7 +28,7 @@ var (
 func LogEvent() {
 	for {
 		event := <-config.LogsEventBus
-		logger.Logger.Debug(fmt.Sprintf("Log action %v",event.Action))
+		logger.Logger.Debug(fmt.Sprintf("Log action %v", event.Action))
 		switch event.Action {
 		case true:
 			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
@@ -41,7 +41,7 @@ func LogEvent() {
 		// cancel all log streams on ws break
 		case false:
 			if event.ContainerID == "all" {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if conMap, exists := logsMap[event.MuCon]; exists {
 					for container, cancel := range conMap {
 						cancel()
@@ -49,7 +49,7 @@ func LogEvent() {
 					}
 				}
 			} else {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
 					cancel()
 					delete(logsMap[event.MuCon], event.ContainerID)
@@ -173,6 +173,7 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 		message := structs.WsLogMessage{}
 		message.Log.ContainerID = containerID
 		message.Log.Line = cleanedLogs
+		message.Type = "log"
 		logJSON, err := json.Marshal(message)
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
@@ -225,6 +226,7 @@ func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
 	default:
 		message := structs.WsLogMessage{}
 		message.Log.ContainerID = "system"
+		message.Type = "log"
 		logLines, err := logger.TailLogs(logger.SysLogfile(), 500)
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Error tailing logs: %v", err))
@@ -257,6 +259,7 @@ func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, lo
 				message := structs.WsLogMessage{}
 				message.Log.ContainerID = containerID
 				message.Log.Line = logString
+				message.Type = "log"
 				logJSON, err := json.Marshal(message)
 				if err != nil {
 					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
@@ -281,6 +284,7 @@ func sendSysLogs(ctx context.Context, MuCon *structs.MuConn, line string) {
 			message := structs.WsLogMessage{}
 			message.Log.ContainerID = "system"
 			message.Log.Line = line
+			message.Type = "log"
 			logJSON, err := json.Marshal(message)
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))

@@ -154,6 +154,7 @@ func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	clientManager.Mu.RLock()
 	defer clientManager.Mu.RUnlock()
 	_, exists := clientManager.AuthClients[token]
+	logger.Logger.Debug(fmt.Sprintf("%s present in authmap: %v", token, exists))
 	return exists
 }
 
@@ -239,6 +240,23 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 		}
 	}
 	return token["token"], false
+}
+
+// make a token authed
+func AuthToken(token string) (string, error) {
+	conf := config.Conf()
+	key := conf.KeyFile
+	res, err := KeyfileDecrypt(token, key)
+	if err != nil {
+		return "", err
+	}
+	res["authorized"] = "true"
+	encryptedText, err := KeyfileEncrypt(res, key)
+	if err != nil {
+		logger.Logger.Error("Error encrypting token")
+		return "", err
+	}
+	return encryptedText, nil
 }
 
 // create a new session token
