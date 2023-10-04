@@ -71,6 +71,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 	}
 	tokenId := payload.Token.ID
+	if tokenId == "" {
+		tokenId = config.RandString(32)
+	}
 	logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
 	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 	token := map[string]string{
