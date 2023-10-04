@@ -83,19 +83,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"id":    payload.Token.ID,
 		"token": tokenContent,
 	}
-	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to track auth session: %v", err))
-	}
 	if !authed {
 		var ack string
-		newToken, err := auth.CreateToken(conn, r, false)
+		token, err = auth.CreateToken(conn, r, false)
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
 			ack = "nack"
-		}
-		token = newToken
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 		}
 		result := map[string]interface{}{
 			"type":     "activity",
@@ -110,6 +103,9 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(errmsg)
 		}
 		MuCon.Write(respJson)
+	}
+	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to track auth session: %v", err))
 	}
 	for {
 		// mutexed read operations
