@@ -77,12 +77,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
 	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 	token := map[string]string{
-		"id":    payload.Token.ID,
+		"id":    tokenId,
 		"token": payload.Token.Token,
 	}
 	tokenContent, authed := auth.CheckToken(token, conn, r)
 	token = map[string]string{
-		"id":    payload.Token.ID,
+		"id":    tokenId,
 		"token": tokenContent,
 	}
 	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
