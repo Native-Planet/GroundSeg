@@ -37,10 +37,43 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
+			logger.Logger.Debug("WS closed")
+			conn.Close()
+			// cancel all log streams for this ws
+			auth.ClientManager.Mu.RLock()
+			for _, clients := range auth.ClientManager.AuthClients {
+				for _, client := range clients {
+					if client != nil && client.Conn == conn {
+						logEvent := structs.LogsEvent{
+							Action:      false,
+							ContainerID: "all",
+							MuCon:       client,
+						}
+						config.LogsEventBus <- logEvent
+						break
+					}
+					break
+				}
+			}
+			auth.ClientManager.Mu.RUnlock()
+			// mute the session
+			auth.WsNilSession(conn)
+		}
+		logger.Logger.Debug(fmt.Sprintf("WS error: %v", err))
+	}
+	var payload structs.WsPayload
+	if err := json.Unmarshal(msg, &payload); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+	}
+	tokenId := payload.Token.ID
+	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
-		_, msg, err := conn.ReadMessage()
+		_, msg, err := MuCon.Read(auth.ClientManager)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				logger.Logger.Debug("WS closed")
@@ -84,7 +117,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"token": payload.Token.Token,
 		}
 		tokenContent, authed := auth.CheckToken(token, conn, r)
-		MuCon := auth.ClientManager.NewConnection(conn, payload.Token.ID)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,

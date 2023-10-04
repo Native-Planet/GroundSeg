@@ -42,6 +42,45 @@ func (ws *MuConn) Write(data []byte) error {
 	return nil
 }
 
+// mutexed ws read
+func (ws *MuConn) Read(cm *ClientManager) (int, []byte, error) {
+	ws.Mu.RLock()
+	messageType, data, err := ws.Conn.ReadMessage()
+	ws.Mu.RUnlock()
+	return messageType, data, err
+}
+
+// find *muconn in map or create new one if not present
+func (cm *ClientManager) GetMuConn(conn *websocket.Conn, tokenId string) *MuConn {
+	cm.Mu.RLock()
+	for _, muConns := range cm.AuthClients {
+		for _, muConn := range muConns {
+			if muConn.Conn == conn {
+				cm.Mu.RUnlock()
+				return muConn
+			}
+		}
+	}
+	for _, muConns := range cm.UnauthClients {
+		for _, muConn := range muConns {
+			if muConn.Conn == conn {
+				cm.Mu.RUnlock()
+				return muConn
+			}
+		}
+	}
+	cm.Mu.RUnlock()
+	newMuConn := &MuConn{
+		Conn:       conn,
+		Active:     true,
+		LastActive: time.Now(),
+	}
+	cm.Mu.Lock()
+	cm.UnauthClients[tokenId] = append(cm.UnauthClients[tokenId], newMuConn)
+	cm.Mu.Unlock()
+	return newMuConn
+}
+
 // func (ws *MuConn) Write(data []byte) {
 // 	WsEventBus <- WsChanEvent{Conn: ws, Data: data}
 // }
