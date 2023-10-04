@@ -110,24 +110,32 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	if client != nil && client.Conn != nil {
-		client.Active = true
-		if _, ok := cm.UnauthClients[id]; ok {
-			// remove from UnauthClients
-			for i, con := range cm.UnauthClients[id] {
-				if con.Conn == client.Conn {
-					cm.UnauthClients[id] = append(cm.UnauthClients[id][:i], cm.UnauthClients[id][i+1:]...)
-					break
-				}
-			}
-			if len(cm.UnauthClients[id]) == 0 {
-				delete(cm.UnauthClients, id)
-			}
-		}
-		cm.AuthClients[id] = append(cm.AuthClients[id], client)
-	} else {
+	if client == nil || client.Conn == nil {
 		fakeConn := &MuConn{}
 		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
+		return
+	}
+	client.Active = true
+	if _, ok := cm.UnauthClients[id]; ok {
+		for i, con := range cm.UnauthClients[id] {
+			if con.Conn == client.Conn {
+				cm.UnauthClients[id] = append(cm.UnauthClients[id][:i], cm.UnauthClients[id][i+1:]...)
+				break
+			}
+		}
+		if len(cm.UnauthClients[id]) == 0 {
+			delete(cm.UnauthClients, id)
+		}
+	}
+	existsInAuth := false
+	for _, existingClient := range cm.AuthClients[id] {
+		if existingClient.Conn == client.Conn {
+			existsInAuth = true
+			break
+		}
+	}
+	if !existsInAuth {
+		cm.AuthClients[id] = append(cm.AuthClients[id], client)
 	}
 }
 
