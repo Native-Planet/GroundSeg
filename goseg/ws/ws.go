@@ -351,12 +351,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "verify":
 				logger.Logger.Info("New client")
 				// auth.CreateToken also adds to unauth map
-				newToken, err := auth.CreateToken(conn, r, false)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
-					ack = "nack"
+				// newToken, err := auth.CreateToken(conn, r, false)
+				// if err != nil {
+				// 	logger.Logger.Error(fmt.Sprintf("Unable to create token: %v", err))
+				// 	ack = "nack"
+				// }
+				// token = newToken
+				tokenContent, authed := auth.CheckToken(token, conn, r)
+				token = map[string]string{
+					"id":    payload.Token.ID,
+					"token": tokenContent,
 				}
-				token = newToken
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
