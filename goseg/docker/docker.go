@@ -482,7 +482,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			// if the hashes don't match, recreate the container with the new one
 			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
-				return containerState, err
+				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)",containerName))
 			}
 			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
@@ -513,6 +513,89 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		Image:         desiredImage,                  // full repo:tag@hash string
 		Type:          containerType,                 // eg `vere` (corresponds with version server label)
 		DesiredStatus: desiredStatus,                 // what the user sets
+		ActualStatus:  containerDetails.State.Status, // what the daemon reports
+		CreatedAt:     containerDetails.Created,      // this is a string
+		Config:        containerConfig,               // container.Config struct constructed above
+		Host:          hostConfig,                    // host.Config struct constructed above
+	}
+	return containerState, err
+}
+
+// create a stopped container
+func CreateContainer(containerName string, containerType string)  (structs.ContainerState, error) {
+	var containerState structs.ContainerState
+	var containerConfig container.Config
+	var hostConfig container.HostConfig
+	switch containerType {
+	case "vere":
+		containerConfig, hostConfig, err = urbitContainerConf(containerName)
+		if err != nil {
+			return containerState, err
+		}
+	case "netdata":
+		containerConfig, hostConfig, err = netdataContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "minio":
+		DeleteContainer(containerName)
+		containerConfig, hostConfig, err = minioContainerConf(containerName)
+		if err != nil {
+			return containerState, err
+		}
+	case "miniomc":
+		containerConfig, hostConfig, err = mcContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "wireguard":
+		containerConfig, hostConfig, err = wgContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "llama-api":
+		containerConfig, hostConfig, err = llamaApiContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	case "llama-ui":
+		containerConfig, hostConfig, err = llamaUIContainerConf()
+		if err != nil {
+			return containerState, err
+		}
+	default:
+		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
+		return containerState, errmsg
+	}
+	imageInfo, err := GetLatestContainerInfo(containerType)
+	if err != nil {
+		return containerState, err
+	}
+	// check if the desired image is available locally
+	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+	_, err = PullImageIfNotExist(desiredImage, imageInfo)
+	if err != nil {
+		return containerState, err
+	}
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return containerState, err
+	}
+	_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+	if err != nil {
+		return containerState, err
+	}
+	containerDetails, err := cli.ContainerInspect(ctx, containerName)
+	if err != nil {
+		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
+	}
+	containerState = structs.ContainerState{
+		ID:            containerDetails.ID,           // container id hash
+		Name:          containerName,                 // name (eg @p)
+		Image:         desiredImage,                  // full repo:tag@hash string
+		Type:          containerType,                 // eg `vere` (corresponds with version server label)
+		DesiredStatus: "stopped",                     // what the user sets
 		ActualStatus:  containerDetails.State.Status, // what the daemon reports
 		CreatedAt:     containerDetails.Created,      // this is a string
 		Config:        containerConfig,               // container.Config struct constructed above
