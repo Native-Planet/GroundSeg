@@ -33,7 +33,7 @@ func LogEvent() {
 		case true:
 			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
 			ctx, cancel := context.WithCancel(context.Background())
-			if _, exists := logsMap[event.MuCon]; exists {
+			if _, exists := logsMap[event.MuCon]; !exists {
 				logsMap[event.MuCon] = make(map[string]context.CancelFunc)
 			}
 			logsMap[event.MuCon][event.ContainerID] = cancel
