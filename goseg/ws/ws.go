@@ -362,6 +362,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					"id":    payload.Token.ID,
 					"token": tokenContent,
 				}
+				logger.Logger.Debug(fmt.Sprintf("Verify %v check result: %v",payload.Token.ID,authed))
 				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Unable to track auth session: %v", err))
 				}
