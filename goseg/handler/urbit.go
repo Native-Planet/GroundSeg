@@ -30,18 +30,18 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
-	case "mars-meld":
+	case "mars-pack":
 		// send |pack
 		if err := click.SendPack(patp); err != nil {
 			return fmt.Errorf("Failed to |pack to %s: %v", patp, err)
 		}
-		// send |meld
-		if err := click.SendMeld(patp); err != nil {
-			return fmt.Errorf("Failed to |meld to %s: %v", patp, err)
-		}
 		return nil
 	case "urth-meld":
 		logger.Logger.Warn(fmt.Sprintf("urth meld called: %s", patp))
+		// stop ship
+		// start ship as pack
+		// start ship as meld
+		// start ship if "boot"
 		return nil
 	case "toggle-alias":
 		if shipConf.ShowUrbitWeb == "custom" {
