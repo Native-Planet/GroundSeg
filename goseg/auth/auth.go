@@ -154,7 +154,7 @@ func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	clientManager.Mu.RLock()
 	defer clientManager.Mu.RUnlock()
 	_, exists := clientManager.AuthClients[token]
-	logger.Logger.Debug(fmt.Sprintf("%s present in authmap: %s", token, exists))
+	logger.Logger.Debug(fmt.Sprintf("%s present in authmap: %v", token, exists))
 	return exists
 }
 
