@@ -398,6 +398,7 @@ type WsLogMessage struct {
 		ContainerID string `json:"container_id"`
 		Line        string `json:"line"`
 	} `json:"log"`
+	Type string `json:"type"`
 }
 
 type WsSetupPayload struct {
