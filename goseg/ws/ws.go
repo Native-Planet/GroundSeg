@@ -159,9 +159,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			MuCon.Write(respJSON)
 		}
-		logger.Logger.Debug(fmt.Sprintf("%s preauthed: %v", tokenId, msgType.Payload.Type))
 		if authed || conf.Setup != "complete" {
-			logger.Logger.Debug(fmt.Sprintf("%s authed: %v", tokenId, msgType.Payload.Type))
 			switch msgType.Payload.Type {
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {

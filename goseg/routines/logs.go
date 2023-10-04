@@ -28,12 +28,12 @@ var (
 func LogEvent() {
 	for {
 		event := <-config.LogsEventBus
-		logger.Logger.Debug(fmt.Sprintf("Log action %v",event.Action))
+		logger.Logger.Debug(fmt.Sprintf("Log action %v", event.Action))
 		switch event.Action {
 		case true:
 			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
 			ctx, cancel := context.WithCancel(context.Background())
-			if _, exists := logsMap[event.MuCon]; !exists {
+			if _, exists := logsMap[event.MuCon]; exists {
 				logsMap[event.MuCon] = make(map[string]context.CancelFunc)
 			}
 			logsMap[event.MuCon][event.ContainerID] = cancel
@@ -41,7 +41,7 @@ func LogEvent() {
 		// cancel all log streams on ws break
 		case false:
 			if event.ContainerID == "all" {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if conMap, exists := logsMap[event.MuCon]; exists {
 					for container, cancel := range conMap {
 						cancel()
@@ -49,7 +49,7 @@ func LogEvent() {
 					}
 				}
 			} else {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v",event.ContainerID))
+				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
 					cancel()
 					delete(logsMap[event.MuCon], event.ContainerID)
