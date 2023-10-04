@@ -62,7 +62,7 @@ func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
 	for key := range authed {
-		ClientManager.AddAuthClient(key, &structs.MuCon{})
+		ClientManager.AddAuthClient(key, &structs.MuConn{})
 	}
 	go func() {
 		for {
