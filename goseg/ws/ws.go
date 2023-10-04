@@ -141,6 +141,21 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Debug(fmt.Sprintf("WS error: %v", err))
 			break
 		}
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+		}
+		tokenId := payload.Token.ID
+		logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
+		MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
+		token := map[string]string{
+			"id":    payload.Token.ID,
+			"token": payload.Token.Token,
+		}
+		tokenContent, authed := auth.CheckToken(token, conn, r)
+		token = map[string]string{
+			"id":    payload.Token.ID,
+			"token": tokenContent,
+		}
 		var payload structs.WsPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
