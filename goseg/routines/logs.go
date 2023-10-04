@@ -211,6 +211,9 @@ func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error
 				for scanner.Scan() {
 					sendSysLogs(ctx, MuCon, scanner.Text())
 				}
+				if err := scanner.Err(); err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Syslog scan error: %v", err))
+				}
 			}
 		case err := <-watcher.Errors:
 			return err
