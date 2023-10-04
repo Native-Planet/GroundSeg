@@ -108,6 +108,10 @@ func (cm *ClientManager) NewConnection(conn *websocket.Conn, tokenId string) *Mu
 func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
+	if !client.Active {
+		cm.AuthClients[id] = append(cm.AuthClients[id], client)
+		return
+	}
 	if client == nil || client.Conn == nil {
 		fakeConn := &MuConn{}
 		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)

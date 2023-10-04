@@ -62,7 +62,7 @@ func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
 	for key := range authed {
-		ClientManager.AddAuthClient(key, nil)
+		ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
 	}
 	go func() {
 		for {
@@ -168,7 +168,7 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 	hash := hex.EncodeToString(hashed[:])
 	muConn := &structs.MuConn{}
 	if conn != nil {
-		muConn = &structs.MuConn{Conn: conn}
+		muConn = &structs.MuConn{Conn: conn, Active: true}
 		if authed {
 			ClientManager.AddAuthClient(tokenId, muConn)
 			logger.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
