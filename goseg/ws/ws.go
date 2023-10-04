@@ -33,6 +33,7 @@ var (
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
+	logger.Logger.Debug("New ws session")
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return

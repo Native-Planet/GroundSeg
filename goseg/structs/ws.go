@@ -140,23 +140,31 @@ func (cm *ClientManager) AddAuthClient(id string, client *MuConn) {
 func (cm *ClientManager) AddUnauthClient(id string, client *MuConn) {
 	cm.Mu.Lock()
 	defer cm.Mu.Unlock()
-	if client != nil && client.Conn != nil {
-		// remove from AuthClients if present
-		if _, ok := cm.AuthClients[id]; ok {
-			for i, con := range cm.AuthClients[id] {
-				if con.Conn == client.Conn {
-					cm.AuthClients[id] = append(cm.AuthClients[id][:i], cm.AuthClients[id][i+1:]...)
-					break
-				}
-			}
-			if len(cm.AuthClients[id]) == 0 {
-				delete(cm.AuthClients, id)
-			}
-		}
-		cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
-	} else {
+	if client == nil || client.Conn == nil {
 		fakeConn := &MuConn{}
 		cm.UnauthClients[id] = append(cm.UnauthClients[id], fakeConn)
+		return
+	}
+	if _, ok := cm.AuthClients[id]; ok {
+		for i, con := range cm.AuthClients[id] {
+			if con.Conn == client.Conn {
+				cm.AuthClients[id] = append(cm.AuthClients[id][:i], cm.AuthClients[id][i+1:]...)
+				break
+			}
+		}
+		if len(cm.AuthClients[id]) == 0 {
+			delete(cm.AuthClients, id)
+		}
+	}
+	existsInUnauth := false
+	for _, existingClient := range cm.UnauthClients[id] {
+		if existingClient.Conn == client.Conn {
+			existsInUnauth = true
+			break
+		}
+	}
+	if !existsInUnauth {
+		cm.UnauthClients[id] = append(cm.UnauthClients[id], client)
 	}
 }
 
