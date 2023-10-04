@@ -38,6 +38,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
+	// initial handling before we assign ws session to mutex
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
@@ -110,8 +111,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		MuCon.Write(respJson)
 	}
-	// tokenId := config.RandString(32)
-	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
 		// mutexed read operations
 		_, msg, err := MuCon.Read(auth.ClientManager)

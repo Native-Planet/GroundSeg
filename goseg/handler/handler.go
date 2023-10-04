@@ -157,9 +157,13 @@ func LoginHandler(conn *structs.MuConn, msg []byte) error {
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
 		failedLogins = 0
+		newToken, err := auth.AuthToken(loginPayload.Token.Token)
+		if err != nil {
+			return err
+		}
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
-			"token": loginPayload.Token.Token,
+			"token": newToken,
 		}
 		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
 			return fmt.Errorf("Unable to process login: %v", err)
