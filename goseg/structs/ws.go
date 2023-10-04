@@ -7,6 +7,7 @@ package structs
 // 🐝 Careful! ❤️
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ type WsChanEvent struct {
 
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
+	fmt.Println("ws write:", string(data))
 	ws.Mu.Lock()
 	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		ws.Mu.Unlock()
