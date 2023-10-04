@@ -76,7 +76,7 @@ func (cm *ClientManager) GetMuConn(conn *websocket.Conn, tokenId string) *MuConn
 		LastActive: time.Now(),
 	}
 	cm.Mu.Lock()
-	cm.UnauthClients[tokenId] = append(cm.UnauthClients[tokenId], newMuConn)
+	// cm.UnauthClients[tokenId] = append(cm.UnauthClients[tokenId], newMuConn)
 	cm.Mu.Unlock()
 	return newMuConn
 }

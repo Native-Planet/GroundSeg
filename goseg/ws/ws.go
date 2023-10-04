@@ -64,6 +64,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		logger.Logger.Debug(fmt.Sprintf("WS error: %v", err))
 	}
+	// get the token from payload and check vs auth map
 	var payload structs.WsPayload
 	if err := json.Unmarshal(msg, &payload); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
@@ -83,6 +84,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	// tokenId := config.RandString(32)
 	// MuCon := auth.ClientManager.NewConnection(conn, tokenId)
 	for {
+		// mutexed read operations
 		_, msg, err := MuCon.Read(auth.ClientManager)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
