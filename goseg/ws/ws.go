@@ -325,9 +325,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			switch msgType.Payload.Type {
 			case "login":
-				if err = handler.LoginHandler(MuCon, msg); err != nil {
+				newToken, err := handler.LoginHandler(MuCon, msg)
+				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
+				} else {
+					token = newToken
 				}
 				broadcast.BroadcastToClients()
 			case "verify":

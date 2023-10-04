@@ -146,37 +146,37 @@ func SystemHandler(msg []byte) error {
 }
 
 // validate password and add to auth session map
-func LoginHandler(conn *structs.MuConn, msg []byte) error {
+func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	loginMu.Lock()
 	defer loginMu.Unlock()
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+		return make(map[string]string), fmt.Errorf("Couldn't unmarshal login payload: %v", err)
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
 		failedLogins = 0
 		newToken, err := auth.AuthToken(loginPayload.Token.Token)
 		if err != nil {
-			return err
+			return make(map[string]string), err
 		}
 		token := map[string]string{
 			"id":    loginPayload.Token.ID,
 			"token": newToken,
 		}
 		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
-			return fmt.Errorf("Unable to process login: %v", err)
+			return make(map[string]string), fmt.Errorf("Unable to process login: %v", err)
 		}
 		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
-		return nil
+		return token, nil
 	} else {
 		failedLogins++
 		logger.Logger.Warn(fmt.Sprintf("Failed auth"))
 		if failedLogins >= MaxFailedLogins && remainder == 0 {
 			go enforceLockout()
 		}
-		return nil
+		return map[string]string{"id": loginPayload.Token.ID, "token": loginPayload.Token.Token}, nil
 	}
 }
 
