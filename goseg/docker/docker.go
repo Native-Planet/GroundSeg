@@ -528,7 +528,7 @@ func CreateContainer(containerName string, containerType string)  (structs.Conta
 	var hostConfig container.HostConfig
 	switch containerType {
 	case "vere":
-		containerConfig, hostConfig, err = urbitContainerConf(containerName)
+		containerConfig, hostConfig, err := urbitContainerConf(containerName)
 		if err != nil {
 			return containerState, err
 		}
