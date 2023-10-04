@@ -171,6 +171,19 @@ func init() {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
+	if conf.Setup == "" {
+		var update string
+		if conf.FirstBoot == true {
+			update = "start"
+		} else {
+			update = "complete"
+		}
+		if err = UpdateConf(map[string]interface{}{
+			"setup": update,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+		}
+	}
 }
 
 // return the global conf var
