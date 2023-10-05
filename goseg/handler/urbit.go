@@ -31,15 +31,16 @@ func UrbitHandler(msg []byte) error {
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "pack":
+		// error handling
+		packError := func(err error) error {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
+			return err
+		}
 		// clear transition after end
 		defer func() {
 			time.Sleep(3 * time.Second)
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""}
 		}()
-		packError := func(err error) error {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
-			return err
-		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
 		statuses, err := docker.GetShipStatus([]string{patp})
 		if err != nil {
@@ -65,12 +66,10 @@ func UrbitHandler(msg []byte) error {
 			if err != nil {
 				return packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
 			}
-			/*
-				_, err = docker.StartContainer(patp, "vere")
-				if err != nil {
-					return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
-				}
-			*/
+			_, err = docker.StartContainer(patp, "vere")
+			if err != nil {
+				return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
+			}
 		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
 		return nil
