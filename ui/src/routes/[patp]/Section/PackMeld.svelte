@@ -3,7 +3,7 @@
   import "../theme.css"
   import { openModal } from 'svelte-modals'
   import PackScheduleModal from '../PackScheduleModal.svelte'
-  import { urthPackMeld, marsPack } from '$lib/stores/websocket'
+  import { structure, urthPackMeld, marsPack } from '$lib/stores/websocket'
   import { createEventDispatcher } from 'svelte'
 
   export let patp
@@ -15,6 +15,7 @@
     openModal(PackScheduleModal)
   }
 
+  $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
 
 </script>
 
@@ -29,7 +30,17 @@
     <div class="btn-wrapper">
       <div class="spacer"></div>
       <button class="start urth" on:click={()=>urthPackMeld(patp)}>Pack & Meld</button>
-      <button class="start" on:click={()=>marsPack(patp)}>Pack</button>
+      <button disabled={tPack.length > 0} class="start" on:click={()=>marsPack(patp)}>
+        {#if tPack.length < 1}
+          Pack
+        {:else if tPack == "packing"}
+          Packing..
+        {:else if tPack == "success"}
+          Success!
+        {:else}
+          Failed :(
+        {/if}
+      </button>
       <button class="calendar" on:click={handleModal}>
         <img src="/calendar.svg" alt="calendar icon" width="20px" height="20px"/>
       </button>
@@ -47,6 +58,10 @@
   }
   button {
     cursor: pointer;
+  }
+  button:disabled {
+    opacity: .6;
+    pointer-events: none;
   }
   .start {
     display: flex;

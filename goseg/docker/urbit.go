@@ -115,20 +115,24 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
 	// reset ship status to boot for next time
+	logger.Logger.Warn(fmt.Sprintf("shipConf.BootStatus %+v", shipConf.BootStatus))
+	logger.Logger.Warn(fmt.Sprintf("shipConf.BootStatus %+v", shipConf.BootStatus))
+	logger.Logger.Warn(fmt.Sprintf("shipConf.BootStatus %+v", shipConf.BootStatus))
+	logger.Logger.Warn(fmt.Sprintf("shipConf.BootStatus %+v", shipConf.BootStatus))
 	if act != "boot" && act != "pack" {
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "boot"
-		var newConfig map[string]structs.UrbitDocker
+		newConfig := make(map[string]structs.UrbitDocker)
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
-	// this is only for offline ships, otherwise we send a click
+		// this is only for offline ships, otherwise we send a click
 	} else if act == "pack" {
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "noboot"
-		newConfig = make(map[string]structs.UrbitDocker)
+		newConfig := make(map[string]structs.UrbitDocker)
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
