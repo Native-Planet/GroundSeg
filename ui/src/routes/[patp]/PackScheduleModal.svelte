@@ -76,9 +76,9 @@
   }
   .day-wrapper {
     display: flex;
+    gap: 32px;
   }
   .day {
-    flex: 1;
   }
   .button-wrapper {
     margin-top: 32px;
