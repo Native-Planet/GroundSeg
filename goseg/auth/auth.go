@@ -62,6 +62,7 @@ func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
 	for key := range authed {
+		logger.Logger.Debug(fmt.Sprintf("Cached auth session: %v",key))
 		ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
 	}
 	go func() {

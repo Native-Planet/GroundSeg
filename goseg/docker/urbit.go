@@ -115,9 +115,18 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
 	// reset ship status to boot for next time
-	if act != "boot" {
+	if act != "boot" && act != "pack" {
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "boot"
+		var newConfig map[string]structs.UrbitDocker
+		newConfig[containerName] = updateUrbitConf
+		err = config.UpdateUrbitConfig(newConfig)
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
+		}
+	} else if act == "pack" {
+		updateUrbitConf := shipConf
+		updateUrbitConf.BootStatus = "noboot"
 		var newConfig map[string]structs.UrbitDocker
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
