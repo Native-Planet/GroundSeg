@@ -93,10 +93,11 @@
   <!-- Loom -->
   <Loom {patp} {loomSize} />
 
-  <!-- Chop -->
+  <!-- Chop --
   <Chop
     {patp}
     />
+  -->
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>
