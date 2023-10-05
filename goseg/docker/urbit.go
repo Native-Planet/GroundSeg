@@ -38,6 +38,13 @@ func LoadUrbits() error {
 				continue
 			}
 			config.UpdateContainerState(pier, info)
+		} else {
+			info, err := CreateContainer(pier, "vere")
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				continue
+			}
+			config.UpdateContainerState(pier, info)
 		}
 	}
 	return nil
