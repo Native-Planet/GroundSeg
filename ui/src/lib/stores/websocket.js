@@ -525,7 +525,7 @@ export const toggleUrbitAlias = patp => {
 export const marsPack = patp => {
   let payload = {
     "type":"urbit",
-    "action":"mars-pack",
+    "action":"pack",
     "patp":patp,
   }
   send(payload)
@@ -534,7 +534,7 @@ export const marsPack = patp => {
 export const urthPackMeld = patp => {
   let payload = {
     "type":"urbit",
-    "action":"urth-meld",
+    "action":"pack-meld",
     "patp":patp,
   }
   send(payload)

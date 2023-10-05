@@ -115,7 +115,8 @@ type Urbit struct {
 
 // broadcast payload subobject
 type UrbitTransitionBroadcast struct {
-	Meld                      string `json:"meld"`
+	Pack                      string `json:"pack"`
+	PackMeld                  string `json:"packMeld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
 	ToggleNetwork             string `json:"toggleNetwork"`

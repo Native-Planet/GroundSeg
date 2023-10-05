@@ -124,11 +124,11 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
-	// this is only for offline ships, otherwise we send a click
+		// this is only for offline ships, otherwise we send a click
 	} else if act == "pack" {
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "noboot"
-		newConfig = make(map[string]structs.UrbitDocker)
+		newConfig := make(map[string]structs.UrbitDocker)
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
