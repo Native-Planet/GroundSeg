@@ -16,6 +16,7 @@
   }
 
   $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
+  $: tPackMeld = ($structure?.urbits?.[patp]?.transition?.packMeld) || ""
 
 </script>
 
@@ -29,7 +30,23 @@
   <div class="section-right">
     <div class="btn-wrapper">
       <div class="spacer"></div>
-      <button class="start urth" on:click={()=>urthPackMeld(patp)}>Pack & Meld</button>
+      <button disabled={tPackMeld.length > 0} class="start urth" on:click={()=>urthPackMeld(patp)}>
+        {#if tPackMeld.length < 1}
+          Pack & Meld
+        {:else if tPackMeld == "stopping"}
+          Getting ready
+        {:else if tPackMeld == "packing"}
+          Packing..
+        {:else if tPackMeld == "melding"}
+          Melding..
+        {:else if tPackMeld == "starting"}
+          Starting ship
+        {:else if tPackMeld == "success"}
+          Success!
+        {:else}
+          Failed :(
+        {/if}
+      </button>
       <button disabled={tPack.length > 0} class="start" on:click={()=>marsPack(patp)}>
         {#if tPack.length < 1}
           Pack

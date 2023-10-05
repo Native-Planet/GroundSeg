@@ -74,11 +74,83 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
 		return nil
 	case "pack-meld":
-		logger.Logger.Warn(fmt.Sprintf("urth meld called: %s", patp))
+		packMeldError := func(err error) error {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "error"}
+			return err
+		}
+		// clear transition after end
+		defer func() {
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: ""}
+		}()
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return packMeldError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		}
+		isRunning := strings.Contains(status, "Up")
 		// stop ship
+		if isRunning {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
+			if err := docker.StopContainerByName(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+			}
+		}
 		// start ship as pack
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
+		logger.Logger.Info(fmt.Sprintf("Attempting to urth pack %s", patp))
+		shipConf.BootStatus = "pack"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err = config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
+		}
+
+		logger.Logger.Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
+		waitComplete(patp)
+
 		// start ship as meld
+		logger.Logger.Info(fmt.Sprintf("Attempting to urth meld %s", patp))
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "melding"}
+		shipConf.BootStatus = "meld"
+		update = make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err = config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
+		}
+
+		logger.Logger.Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
+		waitComplete(patp)
+
 		// start ship if "boot"
+		if isRunning {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "starting"}
+			shipConf.BootStatus = "boot"
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			err := config.UpdateUrbitConfig(update)
+			if err != nil {
+				return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
+			}
+			_, err = docker.StartContainer(patp, "vere")
+			if err != nil {
+				return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
+			}
+		}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "success"}
 		return nil
 	case "toggle-alias":
 		if shipConf.ShowUrbitWeb == "custom" {
@@ -451,4 +523,27 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 
 	// Compare CNAMEs
 	return cname1 == cname2, nil
+}
+
+func waitComplete(patp string) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	for {
+		select {
+		case <-ticker.C:
+			statuses, err := docker.GetShipStatus([]string{patp})
+			if err != nil {
+				continue
+			}
+			status, exists := statuses[patp]
+			if !exists {
+				continue
+			}
+			if strings.Contains(status, "Up") {
+				logger.Logger.Debug(fmt.Sprintf("%s continue waiting...", patp))
+				continue
+			}
+			logger.Logger.Debug(fmt.Sprintf("%s finished", patp))
+			return
+		}
+	}
 }
