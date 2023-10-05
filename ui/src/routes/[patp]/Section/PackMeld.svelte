@@ -1,7 +1,9 @@
 <script>
   // Style
   import "../theme.css"
-  import { urthPackMeld, marsPackMeld } from '$lib/stores/websocket'
+  import { openModal } from 'svelte-modals'
+  import PackScheduleModal from '../PackScheduleModal.svelte'
+  import { urthPackMeld, marsPack } from '$lib/stores/websocket'
   import { createEventDispatcher } from 'svelte'
 
   export let patp
@@ -9,11 +11,16 @@
   const dispatch = createEventDispatcher()
 
 
+  const handleModal = () => {
+    openModal(PackScheduleModal)
+  }
+
+
 </script>
 
 <div class="section">
   <div class="section-left">
-    <div class="section-title">Pack & Meld</div>
+    <div class="section-title">Pack Pier</div>
     <div class="section-description">
       This function will refragement your ship's memory capacity, optimizing its performance. We recommend scheduling these once a week
     </div>
@@ -21,9 +28,9 @@
   <div class="section-right">
     <div class="btn-wrapper">
       <div class="spacer"></div>
-      <button class="start urth" on:click={()=>urthPackMeld(patp)}>Hard Meld</button>
-      <button class="start" on:click={()=>marsPackMeld(patp)}>Start</button>
-      <button class="calendar">
+      <button class="start urth" on:click={()=>urthPackMeld(patp)}>Pack & Meld</button>
+      <button class="start" on:click={()=>marsPack(patp)}>Pack</button>
+      <button class="calendar" on:click={handleModal}>
         <img src="/calendar.svg" alt="calendar icon" width="20px" height="20px"/>
       </button>
     </div>
