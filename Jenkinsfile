@@ -128,7 +128,7 @@ pipeline {
                     script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
-                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                            ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
                         echo ${major}
@@ -139,7 +139,7 @@ pipeline {
                     script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
-                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                            ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         minor=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
                         echo ${minor}
@@ -150,7 +150,7 @@ pipeline {
                     script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
-                            ver=`echo ${tag}|awk -F '-' '{print \$2}'`
+                            ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         patch=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
                         echo ${patch}
