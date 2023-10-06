@@ -33,7 +33,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:8e2c4c119a0b2c027e0793b235e746b4194cd4b8a52830b91bb91d4f9600cf4c"
 	halfCores := runtime.NumCPU() / 2
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
@@ -115,6 +115,11 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				Type:   mount.TypeVolume,
 				Source: apiContainerName + "_api",
 				Target: "/api",
+			},
+			{
+				Type:   mount.TypeVolume,
+				Source: "lick",
+				Target: "/lick",
 			},
 		},
 		Binds: binds,
