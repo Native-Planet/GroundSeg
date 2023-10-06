@@ -65,6 +65,9 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 		RestartPolicy: container.RestartPolicy{
 			Name: "unless-stopped",
 		},
+		Resources: container.Resources{
+			NanoCPUs: 1e8,
+		},
 		SecurityOpt: []string{"apparmor=unconfined"},
 		PortBindings: nat.PortMap{
 			"19999/tcp": []nat.PortBinding{
