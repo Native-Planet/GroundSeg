@@ -25,6 +25,8 @@ func UrbitTransitionHandler() {
 			switch event.Type {
 			case "pack":
 				urbitStruct.Transition.Pack = event.Event
+			case "packMeld":
+				urbitStruct.Transition.PackMeld = event.Event
 			case "loom":
 				urbitStruct.Transition.Loom = event.Event
 			case "urbitDomain":
