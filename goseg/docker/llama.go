@@ -75,6 +75,20 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
+	conf := config.Conf()
+	var piers []string
+	for _, pier := range conf.Piers {
+		if config.UrbitsConfig[pier].BootStatus == "boot" {
+			piers = append(piers, pier)
+		}
+	}
+	var binds []string
+	for _, pier := range piers {
+		hostPath := VolumeDir + "/" + pier + "/_data/" + pier + "/.urb/dev"
+		volPath := "/piers/" + pier
+		pierBind := hostPath + ":" + volPath
+		binds = append(binds, pierBind)
+	}
 	hostConfig = container.HostConfig{
 		NetworkMode: container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
@@ -103,6 +117,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				Target: "/api",
 			},
 		},
+		Binds: binds,
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
