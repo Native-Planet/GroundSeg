@@ -82,25 +82,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			piers = append(piers, pier)
 		}
 	}
-	mounts := []mount.Mount{
-		{
-			Type:   mount.TypeVolume,
-			Source: apiContainerName, // host dir
-			Target: "/models",        // in the container
-		},
-		{
-			Type:   mount.TypeVolume,
-			Source: apiContainerName + "_api",
-			Target: "/api",
-		},
-	}
+	binds := []string
 	for _, pier := range piers {
-		pierMount := mount.Mount{
-			Type:   mount.TypeVolume,
-			Source: pier + "/.urb/dev/",
-			Target: "/piers/" + pier + "/dev",
-		}
-		mounts = append(mounts, pierMount)
+		hostPath := VolumeDir + "/" + pier + "/.urb/dev"
+		volPath := "/piers/" + pier
+		pierBind := hostPath + ":" + volPath
+		binds = append(binds, pierBind)
 	}
 	hostConfig = container.HostConfig{
 		NetworkMode: container.NetworkMode(llamaNet),
@@ -118,7 +105,19 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				},
 			},
 		},
-		Mounts: mounts,
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeVolume,
+				Source: apiContainerName, // host dir
+				Target: "/models",        // in the container
+			},
+			{
+				Type:   mount.TypeVolume,
+				Source: apiContainerName + "_api",
+				Target: "/api",
+			},
+		},
+		Binds: binds,
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
