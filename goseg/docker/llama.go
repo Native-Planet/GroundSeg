@@ -75,6 +75,33 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
+	conf := config.Conf()
+	var piers []string
+	for _, pier := range conf.Piers {
+		if config.UrbitsConfig[pier].BootStatus == "boot" {
+			piers = append(piers, pier)
+		}
+	}
+	mounts := []mount.Mount{
+		{
+			Type:   mount.TypeVolume,
+			Source: apiContainerName, // host dir
+			Target: "/models",        // in the container
+		},
+		{
+			Type:   mount.TypeVolume,
+			Source: apiContainerName + "_api",
+			Target: "/api",
+		},
+	}
+	for _, pier := range piers {
+		pierMount := mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: pier + "/.urb/dev/",
+			Target: "piers/" + pier + "/dev",
+		}
+		mounts = append(mounts, pierMount)
+	}
 	hostConfig = container.HostConfig{
 		NetworkMode: container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
@@ -91,18 +118,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				},
 			},
 		},
-		Mounts: []mount.Mount{
-			{
-				Type:   mount.TypeVolume,
-				Source: apiContainerName, // host dir
-				Target: "/models",        // in the container
-			},
-			{
-				Type:   mount.TypeVolume,
-				Source: apiContainerName + "_api",
-				Target: "/api",
-			},
-		},
+		Mounts: mounts,
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
