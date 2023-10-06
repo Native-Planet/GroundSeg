@@ -82,7 +82,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			piers = append(piers, pier)
 		}
 	}
-	binds := []string
+	var binds []string
 	for _, pier := range piers {
 		hostPath := VolumeDir + "/" + pier + "/.urb/dev"
 		volPath := "/piers/" + pier
