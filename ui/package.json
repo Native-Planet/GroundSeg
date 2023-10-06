@@ -21,6 +21,8 @@
 		"svelte": "^3.56.0",
 		"svelte-fa": "^3.0.4",
 		"svelte-modals": "^1.3.0",
+		"svelte-select": "^5.7.0",
+		"svelte-time-picker": "^2.0.0",
 		"svgson": "^5.3.1",
 		"tweetnacl": "^1.0.3",
 		"tweetnacl-util": "^0.15.1",
