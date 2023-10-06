@@ -98,7 +98,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		pierMount := mount.Mount{
 			Type:   mount.TypeVolume,
 			Source: pier + "/.urb/dev/",
-			Target: "piers/" + pier + "/dev",
+			Target: "/piers/" + pier + "/dev",
 		}
 		mounts = append(mounts, pierMount)
 	}
