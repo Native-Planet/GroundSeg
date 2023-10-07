@@ -54,17 +54,21 @@ pipeline {
                           userRemoteConfigs: [[credentialsId: 'Github token', url: 'https://github.com/Native-Planet/GroundSeg.git']]
                         ])
             }
-        } /*
+        }
         stage('SonarQube') {
             environment {
                 scannerHome = "${tool 'SonarQubeScanner'}"
             }
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.python.version=3.11"
+                script {
+                    if( "${channel}" == "edge" ) {
+                        withSonarQubeEnv('SonarQube') {
+                            sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.python.version=3.11"
+                        }
+                    }
                 }
             }
-        } */
+        }
         stage('build') {
             steps {
                 /* build binaries and move to web dir */
