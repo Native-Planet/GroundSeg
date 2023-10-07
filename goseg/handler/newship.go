@@ -9,6 +9,7 @@ import (
 	"goseg/shipcreator"
 	"goseg/startram"
 	"goseg/structs"
+	"os"
 	"strings"
 	"time"
 )
@@ -94,6 +95,15 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	if conf.WgRegistered {
 		// Register Services
 		go newShipRegisterService(patp)
+	}
+	if os.Getenv("GS_LLAMA") == "true" {
+		if err := docker.StopContainerByName("llama"); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
+		}
+		_, err = docker.StartContainer("llama", "llama")
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't restart Llama: %v", err))
+		}
 	}
 	// check for +code
 	go waitForShipReady(shipPayload)

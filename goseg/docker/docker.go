@@ -23,6 +23,7 @@ import (
 )
 
 var (
+	VolumeDir          = "/var/lib/docker/volumes"
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
 	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
@@ -482,7 +483,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			// if the hashes don't match, recreate the container with the new one
 			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)",containerName))
+				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 			}
 			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
@@ -522,7 +523,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 }
 
 // create a stopped container
-func CreateContainer(containerName string, containerType string)  (structs.ContainerState, error) {
+func CreateContainer(containerName string, containerType string) (structs.ContainerState, error) {
 	var containerState structs.ContainerState
 	var containerConfig container.Config
 	var hostConfig container.HostConfig

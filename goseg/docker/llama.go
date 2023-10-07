@@ -33,7 +33,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "ghcr.io/abetlen/llama-cpp-python:latest@sha256:b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:3d9a676df23d5bfb7df40c82627c560a95c75212691cf55d37dfc62b2c9366d7"
 	halfCores := runtime.NumCPU() / 2
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
@@ -75,6 +75,20 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
+	conf := config.Conf()
+	var piers []string
+	for _, pier := range conf.Piers {
+		if config.UrbitsConfig[pier].BootStatus == "boot" {
+			piers = append(piers, pier)
+		}
+	}
+	var binds []string
+	for _, pier := range piers {
+		hostPath := VolumeDir + "/" + pier + "/_data/" + pier + "/.urb/dev"
+		volPath := "/piers/" + pier
+		pierBind := hostPath + ":" + volPath
+		binds = append(binds, pierBind)
+	}
 	hostConfig = container.HostConfig{
 		NetworkMode: container.NetworkMode(llamaNet),
 		RestartPolicy: container.RestartPolicy{
@@ -102,7 +116,13 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 				Source: apiContainerName + "_api",
 				Target: "/api",
 			},
+			{
+				Type:   mount.TypeVolume,
+				Source: "lick",
+				Target: "/lick",
+			},
 		},
+		Binds: binds,
 		CapAdd: []string{
 			"IPC_LOCK",
 		},
