@@ -12,7 +12,7 @@
 
 
   const handleModal = () => {
-    openModal(PackScheduleModal)
+    openModal(PackScheduleModal,{"patp":patp})
   }
 
   $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
