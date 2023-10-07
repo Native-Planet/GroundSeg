@@ -3,11 +3,28 @@
   // Modal
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
+  import { structure } from '$lib/stores/websocket'
   import Selector from './Selector.svelte'
   import Clock from './Clock.svelte'
   export let isOpen
- 
+  export let patp
+
+  $: info = ($structure?.urbits?.[patp]?.info) || {}
+  $: lastPack = (info?.lastPack) || 0
+  $: nextPack = (info?.nextPack) || 0
+  $: meldIntervalType = (info?.meldIntervalType) || ""
+  $: meldIntervalValue = (info?.meldIntervalValue) || 0
+  $: meldHour = (info?.meldHour) || 0
+  $: meldMinute = (info?.meldMinute) || 0
+  $: meldMeridian = (info?.meldMeridian) || 0
+  $: meldDay = (info?.meldDay) || 0
+  $: meldDate = (info?.meldDate) || 0
+  $: meldScheduleActive = (info?.meldScheduleActive) || false
+
+  $: transition = ($structure?.urbits?.[patp]?.tranistion) || {}
+
   $: num = num > 1 ? num : 1
+
   let selectedOption = "Week"
   let selectedDay = "Wednesday"
   let selectedDate = 1
@@ -31,6 +48,18 @@
           Next: 5/3/2023 3:00 PM (In 4 days)
         </div>
       </div>
+      <!--
+      <div>lastPack {lastPack}</div>
+      <div>nextPack {nextPack}</div>
+      <div>meldIntervalType {meldIntervalType}</div>
+      <div>meldIntervalValue {meldIntervalValue}</div>
+      <div>meldHour {meldHour}</div>
+      <div>meldMinute {meldMinute}</div>
+      <div>meldMeridian {meldMeridian}</div>
+      <div>meldDay {meldDay}</div>
+      <div>meldDate {meldDate}</div>
+      <div>meldScheduleActive {meldScheduleActive}</div>
+      -->
 
       <div class="macro">
         <div>Every</div>

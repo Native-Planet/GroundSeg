@@ -66,6 +66,7 @@ type UrbitDocker struct {
 	WgS3Port         int    `json:"wg_s3_port"`
 	WgConsolePort    int    `json:"wg_console_port"`
 	MeldSchedule     bool   `json:"meld_schedule"`
+	MeldScheduleType string `json:"meld_schedule_type"`
 	MeldFrequency    int    `json:"meld_frequency"`
 	MeldTime         string `json:"meld_time"`
 	MeldLast         string `json:"meld_last"`

@@ -12,6 +12,7 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -70,6 +71,15 @@ func UrbitHandler(msg []byte) error {
 			if err != nil {
 				return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 			}
+		}
+		// set last meld
+		now := time.Now().Unix()
+		shipConf.MeldLast = strconv.FormatInt(now, 10)
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err = config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
 		return nil

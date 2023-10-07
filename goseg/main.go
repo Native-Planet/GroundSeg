@@ -220,6 +220,8 @@ func main() {
 			logger.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
 	}
+	// pack scheduler
+	go routines.PackScheduleLoop()
 	// log manager routine
 	go routines.LogEvent()
 	// block until version info returns
