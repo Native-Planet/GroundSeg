@@ -513,6 +513,29 @@ export const setUrbitLoom = (patp, value) => {
   send(payload)
 }
 
+export const setPackSchedule = (patp, frequency, intervalType, time, day, date) => {
+  let payload = {
+    "type":"urbit",
+    "action":"schedule-pack",
+    "patp":patp,
+    "frequency": frequency,
+    "intervalType": intervalType,
+    "time": time,
+    "day": day,
+    "date": date
+  }
+  send(payload)
+}
+
+export const pausePackSchedule = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"pause-pack-schedule",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 export const toggleUrbitAlias = patp => {
   let payload = {
     "type":"urbit",
