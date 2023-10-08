@@ -93,22 +93,30 @@ type StartramTransition struct {
 // broadcast payload subobject
 type Urbit struct {
 	Info struct {
-		LusCode          string `json:"lusCode"`
-		Network          string `json:"network"`
-		Running          bool   `json:"running"`
-		URL              string `json:"url"`
-		UrbitAlias       string `json:"urbitAlias"`
-		MinIOAlias       string `json:"minioAlias"`
-		ShowUrbAlias     bool   `json:"showUrbAlias"`
-		MemUsage         uint64 `json:"memUsage"`
-		DiskUsage        int64  `json:"diskUsage"`
-		LoomSize         int    `json:"loomSize"`
-		DevMode          bool   `json:"devMode"`
-		DetectBootStatus bool   `json:"detectBootStatus"`
-		Remote           bool   `json:"remote"`
-		Vere             any    `json:"vere"`
-		MinIOUrl         string `json:"minioUrl"`
-		MinIOPwd         string `json:"minioPwd"`
+		LusCode            string `json:"lusCode"`
+		Network            string `json:"network"`
+		Running            bool   `json:"running"`
+		URL                string `json:"url"`
+		UrbitAlias         string `json:"urbitAlias"`
+		MinIOAlias         string `json:"minioAlias"`
+		ShowUrbAlias       bool   `json:"showUrbAlias"`
+		MemUsage           uint64 `json:"memUsage"`
+		DiskUsage          int64  `json:"diskUsage"`
+		LoomSize           int    `json:"loomSize"`
+		DevMode            bool   `json:"devMode"`
+		DetectBootStatus   bool   `json:"detectBootStatus"`
+		Remote             bool   `json:"remote"`
+		Vere               any    `json:"vere"`
+		MinIOUrl           string `json:"minioUrl"`
+		MinIOPwd           string `json:"minioPwd"`
+		LastPack           string `json:"lastPack"`
+		NextPack           string `json:"nextPack"`
+		PackScheduleActive bool   `json:"packScheduleActive"`
+		PackIntervalType   string `json:"packIntervalType"`
+		PackIntervalValue  int    `json:"packIntervalValue"`
+		PackTime           string `json:"packTime"`
+		PackDay            string `json:"packDay"`
+		PackDate           int    `json:"packDate"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

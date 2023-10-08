@@ -259,11 +259,16 @@ type WsUrbitPayload struct {
 }
 
 type WsUrbitAction struct {
-	Type   string `json:"type"`
-	Action string `json:"action"`
-	Patp   string `json:"patp"`
-	Value  int    `json:value"`
-	Domain string `json:"domain"`
+	Type         string `json:"type"`
+	Action       string `json:"action"`
+	Patp         string `json:"patp"`
+	Value        int    `json:value"`
+	Domain       string `json:"domain"`
+	Frequency    int    `json:"frequency"`
+	IntervalType string `json:"intervalType"`
+	Time         string `json:"time"`
+	Day          string `json:"day"`
+	Date         int    `json:"date"`
 }
 
 type WsNewShipPayload struct {

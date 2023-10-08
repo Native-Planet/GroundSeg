@@ -1,21 +1,62 @@
 <script>
-  //import Select from 'svelte-select';
   // Modal
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
+
+  import { structure, setPackSchedule, pausePackSchedule } from '$lib/stores/websocket'
   import Selector from './Selector.svelte'
   import Clock from './Clock.svelte'
+
   export let isOpen
- 
-  $: num = num > 1 ? num : 1
+  export let patp
+
+  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+  const dates = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+  let editMode = false
+
+  $: info = ($structure?.urbits?.[patp]?.info) || {}
+  $: transition = ($structure?.urbits?.[patp]?.tranistion) || {}
+
+  // Last pack display
+  $: lastPack = (Number(info?.lastPack) * 1000) || "0"
+  $: lastPackConverted = new Date(lastPack);
+  $: currentTime = Math.floor(Date.now())
+  $: lastPackRelative =  currentTime - lastPack
+  $: lastPackInHours = Math.floor(lastPackRelative / (3600 * 1000))
+  $: lastPackInDays = Math.floor(lastPackRelative / (3600 * 24 * 1000))
+
+  // Next pack display (todo)
+  $: nextPack = (info?.nextPack) || 0
+
+  // Pack time
+  $: packTime = "0000"
+
+  // Pack day for Week
+  $: packDay = (info?.packDay) || "Sunday"
+  $: selectedDay = packDay
+
+  // Pack Date for Month
+  $: packDate = (info?.packDate) || 0
+  $: selectedDate = packDate
+
+  // Interval Settings
+  $: packIntervalType = (info?.packIntervalType) || ""
+  $: packIntervalValue = (info?.packIntervalValue) || 0
+
+  // Scheduled?
+  $: packScheduleActive = (info?.packScheduleActive) || false
+
+  // frequency can never be below 0
+  $: num = num >= 1 ? num : packIntervalValue
+
   let selectedOption = "Week"
-  let selectedDay = "Wednesday"
-  let selectedDate = 1
-  let days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-  let dates = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
 
   const handleClockChange = e => {
-    console.log(e.detail)
+    packTime = e.detail
+  }
+
+  const handleSaveSchedule = () => {
+    setPackSchedule(patp, num, selectedOption.toLowerCase(), packTime, selectedDay.toLowerCase(), selectedDate)
   }
 </script>
 
@@ -25,23 +66,30 @@
       <div class="header">Schedule Pack</div>
       <div class="information">
         <div class="pack">
-          Last: 1/3/2023 3:00 PM (3 days ago)
+          <div class="pack-title">
+            Previous: {lastPackConverted.toLocaleString()}
+          </div>
+          <div class="pack-subtitle">
+            ({lastPackRelative < (86400 * 1000) ? lastPackInHours + " Hours" : lastPackInDays + " Days"} ago)
+          </div>
         </div>
         <div class="pack">
-          Next: 5/3/2023 3:00 PM (In 4 days)
+          <div class="pack-title">
+            Next: 5/3/2023 3:00 PM (In 4 days)
+          </div>
         </div>
       </div>
 
       <div class="macro">
         <div>Every</div>
-        <input type="number" bind:value={num}/>
+        <input type="number" id="interval" bind:value={num}/>
         <Selector {num} on:change={e=>selectedOption=e.detail}/>
       </div>
 
       <div class="micro">
         <div class="time-wrapper">
           <div class="micro-title">Time</div>
-          <Clock on:select={handleClockChange} />
+          <Clock on:select={handleClockChange} {patp} />
         </div>
 
         {#if selectedOption == "Week"}
@@ -77,9 +125,11 @@
         {/if}
       </div>
       <div class="button-wrapper">
-        <button>Save Schedule</button>
+        <button on:click={handleSaveSchedule}>Save Schedule</button>
         <div class="spacer"></div>
-        <button class="stop">Pause Schedule</button>
+        {#if packScheduleActive} 
+          <button class="stop" on:click={()=>pausePackSchedule(patp)}>Pause Schedule</button>
+        {/if}
       </div>
     </div>
   {/if}
@@ -105,6 +155,16 @@
     gap: 32px;
   }
   .pack {
+    height: 55px;
+    border-radius: 16px;
+    background: var(--Gray-100, #DDE3DF);
+    border: none;
+    padding: 0 24px;
+    display: flex;
+    align-items: center; 
+    gap: 8px;
+  }
+  .pack-title {
     text-align: center;
     color: var(--NP_Black, #313933);
     leading-trim: both;
@@ -112,13 +172,19 @@
     font-family: Inter;
     font-size: 16px;
     font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+  }
+  .pack-subtitle {
+    text-align: center;
+    color: var(--NP_Black, #313933);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 12px;
+    font-style: normal;
     font-weight: 500;
     letter-spacing: -1.44px;
-    line-height: 55px;
-    border-radius: 16px;
-    background: var(--Gray-100, #DDE3DF);
-    border: none;
-    padding: 0 24px;
   }
   .macro {
     display: flex;

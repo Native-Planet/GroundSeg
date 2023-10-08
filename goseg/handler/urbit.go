@@ -12,6 +12,7 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -70,6 +71,15 @@ func UrbitHandler(msg []byte) error {
 			if err != nil {
 				return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 			}
+		}
+		// set last meld
+		now := time.Now().Unix()
+		shipConf.MeldLast = strconv.FormatInt(now, 10)
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err = config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
 		return nil
@@ -246,6 +256,38 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "success"}
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
+		return nil
+	case "pause-pack-schedule":
+		shipConf.MeldSchedule = false
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Failed to pause pack schedule: %v", err)
+		}
+		return nil
+	case "schedule-pack":
+		frequency := urbitPayload.Payload.Frequency
+		// frequency not 0
+		if frequency < 1 {
+			return fmt.Errorf("pack frequency cannot be 0!")
+		}
+		intervalType := urbitPayload.Payload.IntervalType
+		switch intervalType {
+		case "month", "week", "day":
+			shipConf.MeldTime = urbitPayload.Payload.Time
+			shipConf.MeldSchedule = true
+			shipConf.MeldScheduleType = intervalType
+			shipConf.MeldFrequency = frequency
+			shipConf.MeldDay = urbitPayload.Payload.Day
+			shipConf.MeldDate = urbitPayload.Payload.Date
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Failed to update pack schedule: %v", err)
+			}
+		default:
+			return fmt.Errorf("Schedule pack unknown interval type: %v", intervalType)
+		}
 		return nil
 	case "loom":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "loading"}
