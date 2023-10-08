@@ -90,7 +90,8 @@ func queuePack() error {
 		logger.Logger.Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
 		oneMinuteLater := now.Add(1 * time.Minute)
 		if oneMinuteLater.After(meldNext) || oneMinuteLater.Equal(meldNext) {
-			go setScheduledPackTimer(patp, meldNext.Sub(now))
+			//go setScheduledPackTimer(patp, meldNext.Sub(now))
+			logger.Logger.Debug("Scheduled pack temporarily turned off")
 		}
 	}
 	return nil

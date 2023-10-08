@@ -172,6 +172,22 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if strings.Contains(pierStatus[pier], "Up") {
 			lusCode, _ = click.GetLusCode(pier)
 		}
+
+		// pack day
+		days := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+		packDay := "Monday"
+		for _, v := range days {
+			if v == dockerConfig.MeldDay {
+				packDay = dockerConfig.MeldDay
+			}
+		}
+
+		// pack date
+		packDate := 1
+		if dockerConfig.MeldDate > 1 {
+			packDate = dockerConfig.MeldDate
+		}
+
 		// collate all the info from our sources into the struct
 		urbit.Info.LusCode = lusCode
 		urbit.Info.Running = isRunning
@@ -190,6 +206,13 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.UrbitAlias = urbitAlias
 		urbit.Info.MinIOAlias = minIOAlias
 		urbit.Info.ShowUrbAlias = showUrbAlias
+		urbit.Info.PackScheduleActive = dockerConfig.MeldSchedule
+		urbit.Info.PackDay = packDay
+		urbit.Info.PackDate = packDate
+		urbit.Info.PackTime = dockerConfig.MeldTime
+		urbit.Info.LastPack = dockerConfig.MeldLast
+		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
+		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

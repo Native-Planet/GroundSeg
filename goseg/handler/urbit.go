@@ -257,6 +257,38 @@ func UrbitHandler(msg []byte) error {
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
 		return nil
+	case "pause-pack-schedule":
+		shipConf.MeldSchedule = false
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			return fmt.Errorf("Failed to pause pack schedule: %v", err)
+		}
+		return nil
+	case "schedule-pack":
+		frequency := urbitPayload.Payload.Frequency
+		// frequency not 0
+		if frequency < 1 {
+			return fmt.Errorf("pack frequency cannot be 0!")
+		}
+		intervalType := urbitPayload.Payload.IntervalType
+		switch intervalType {
+		case "month", "week", "day":
+			shipConf.MeldTime = urbitPayload.Payload.Time
+			shipConf.MeldSchedule = true
+			shipConf.MeldScheduleType = intervalType
+			shipConf.MeldFrequency = frequency
+			shipConf.MeldDay = urbitPayload.Payload.Day
+			shipConf.MeldDate = urbitPayload.Payload.Date
+			update := make(map[string]structs.UrbitDocker)
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Failed to update pack schedule: %v", err)
+			}
+		default:
+			return fmt.Errorf("Schedule pack unknown interval type: %v", intervalType)
+		}
+		return nil
 	case "loom":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "loading"}
 		shipConf.LoomSize = urbitPayload.Payload.Value

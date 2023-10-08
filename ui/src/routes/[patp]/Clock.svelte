@@ -1,10 +1,19 @@
 <script>
   import { createEventDispatcher } from 'svelte'
+  import { structure } from '$lib/stores/websocket'
   const dispatch = createEventDispatcher()
+  export let patp
 
-  let hour = "12"
-  let minute = "30"
-  let designation = "AM"
+  $: packTime = ($structure?.urbits?.[patp]?.info?.packTime)
+
+  $: hourUnadjusted = packTime.slice(0,2)
+  $: hourInt = Number(hourUnadjusted)
+  $: hourStr = hourInt > 11 ? (hourInt - 12).toString() : hourInt.toString()
+  $: hour = hourStr.length == 1 ? "0" + hourStr : hourStr
+
+  $: minute = packTime.slice(2,4)
+
+  $: meridian = hourInt > 11 ? "PM" : "AM"
 
   let hours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12']
   let minutes = [
@@ -18,8 +27,21 @@
   let hourMenu = false
   let minuteMenu = false
 
-  $: intHour = parseInt(hour,10)
-  $: intMinute = parseInt(minute,10)
+  $: time = dispatch("select",handleTime(hour,minute,meridian))
+
+  const handleTime = (h,m,mer) => {
+    const intHour = parseInt(h, 10)
+    if (mer == "AM") {
+      if (intHour > 11) {
+        return "00" + minute
+      }
+      return hour + minute
+    }
+    if (intHour == 12) {
+      return hour + minute
+    }
+    return (intHour + 12) + minute
+  }
 
   const toggleHourMenu = () => {
     hourMenu = !hourMenu
@@ -76,8 +98,8 @@
     {/if}
   </div>
   <div class="am-pm">
-    <div class="item" on:click={()=>designation="AM"} class:active={designation=="AM"}>AM</div>
-    <div class="item" on:click={()=>designation="PM"} class:active={designation=="PM"}>PM</div>
+    <div class="item" on:click={()=>meridian="AM"} class:active={meridian=="AM"}>AM</div>
+    <div class="item" on:click={()=>meridian="PM"} class:active={meridian=="PM"}>PM</div>
   </div>
   <div class="main-spacer"></div>
 </div>
