@@ -25,11 +25,16 @@
   $: lastPackInHours = Math.floor(lastPackRelative / (3600 * 1000))
   $: lastPackInDays = Math.floor(lastPackRelative / (3600 * 24 * 1000))
 
-  // Next pack display (todo)
-  $: nextPack = (info?.nextPack) || 0
+  // Next pack display
+  $: nextPack = (Number(info?.nextPack) * 1000) || "0"
+  $: nextPackConverted = new Date(nextPack);
+  $: currentTime = Math.floor(Date.now())
+  $: nextPackRelative =  nextPack - currentTime
+  $: nextPackInHours = Math.floor(nextPackRelative / (3600 * 1000))
+  $: nextPackInDays = Math.floor(nextPackRelative / (3600 * 24 * 1000))
 
   // Pack time
-  $: packTime = "0000"
+  $: packTime = "1230"
 
   // Pack day for Week
   $: packDay = (info?.packDay) || "Sunday"
@@ -47,9 +52,21 @@
   $: packScheduleActive = (info?.packScheduleActive) || false
 
   // frequency can never be below 0
-  $: num = num >= 1 ? num : packIntervalValue
+  $: num = handleInterval(packIntervalValue, num)
 
-  let selectedOption = "Week"
+  const handleInterval = (interval, n) => {
+    console.log(interval)
+    console.log(n)
+    if (n) {
+      if (n > 0) {
+        return n
+      } 
+      return 1
+    }
+    return interval
+  }
+
+  $: selectedOption = packIntervalType.charAt(0).toUpperCase() + packIntervalType.slice(1)
 
   const handleClockChange = e => {
     packTime = e.detail
@@ -70,20 +87,29 @@
             Previous: {lastPackConverted.toLocaleString()}
           </div>
           <div class="pack-subtitle">
-            ({lastPackRelative < (86400 * 1000) ? lastPackInHours + " Hours" : lastPackInDays + " Days"} ago)
+            {lastPackRelative < (86400 * 1000) ? lastPackInHours + " Hours" : lastPackInDays + " Days"} ago
           </div>
         </div>
         <div class="pack">
-          <div class="pack-title">
-            Next: 5/3/2023 3:00 PM (In 4 days)
-          </div>
+          {#if packScheduleActive}
+            <div class="pack-title">
+              Next: {nextPackConverted.toLocaleString()}
+            </div>
+            <div class="pack-subtitle">
+              in {nextPackRelative < (86400 * 1000) ? nextPackInHours + " Hours" : nextPackInDays + " Days"}
+            </div>
+          {:else}
+            <div class="pack-title">
+              Next: Paused
+            </div>
+          {/if}
         </div>
       </div>
 
       <div class="macro">
         <div>Every</div>
         <input type="number" id="interval" bind:value={num}/>
-        <Selector {num} on:change={e=>selectedOption=e.detail}/>
+        <Selector {num} {packIntervalType} on:change={e=>selectedOption=e.detail}/>
       </div>
 
       <div class="micro">
@@ -161,8 +187,10 @@
     border: none;
     padding: 0 24px;
     display: flex;
+    flex-direction: column;
     align-items: center; 
-    gap: 8px;
+    justify-content: center;
+    flex: 1;
   }
   .pack-title {
     text-align: center;
@@ -184,7 +212,6 @@
     font-size: 12px;
     font-style: normal;
     font-weight: 500;
-    letter-spacing: -1.44px;
   }
   .macro {
     display: flex;
