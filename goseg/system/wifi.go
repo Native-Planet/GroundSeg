@@ -141,7 +141,7 @@ func C2CConnect(ssid, password string) {
 	time.Sleep(5 * time.Second)
 	runCommand("sudo", "ip", "link", "set", dev[0], "up")
 	// attempt to connect
-	err := ConnectToWifi(dev[0], ssid, password)
+	err := ConnectToWifi(ssid, password)
 	if err != nil {
 		C2CMode()
 	} else {
@@ -174,7 +174,6 @@ func CaptivePortal(dev string) error {
 }
 
 func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
-	dev, _ := getWifiDevice()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
@@ -197,7 +196,7 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if payload.Payload.Action == "connect" {
-			if err := ConnectToWifi(dev[0], payload.Payload.SSID, payload.Payload.Password); err != nil {
+			if err := ConnectToWifi(payload.Payload.SSID, payload.Payload.Password); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
 				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
@@ -293,17 +292,14 @@ func getConnectedSSID(c *wifi.Client, dev string) string {
 	return ""
 }
 
-func ConnectToWifi(ifaceName, ssid, password string) error {
-	c, err := wifi.New()
+func ConnectToWifi(ssid, password string) error {
+	// Connect to WiFi using nmcli
+	cmd := exec.Command("nmcli", "dev", "wifi", "connect", ssid, "password", password)
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to wifi: %v", err)
 	}
-	defer c.Close()
-	iface := &wifi.Interface{Name: ifaceName}
-	if password == "" {
-		return c.Connect(iface, ssid)
-	}
-	return c.ConnectWPAPSK(iface, ssid, password)
+	return nil
 }
 
 func DisconnectWifi(ifaceName string) error {

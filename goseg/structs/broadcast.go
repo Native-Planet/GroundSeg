@@ -37,6 +37,7 @@ type SystemTransitionBroadcast struct {
 	Error          []string `json:"error"`
 	BugReport      string   `json:"bugReport"`
 	BugReportError string   `json:"bugReportError"`
+	WifiConnect    string   `json:"wifiConnect"`
 }
 
 // broadcast payload subobject
