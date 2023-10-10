@@ -4,8 +4,9 @@
   import { createEventDispatcher } from 'svelte'
 
   export let num
+  export let packIntervalType
 
-  let currentOption = "Week"
+  let currentOption = packIntervalType.charAt(0).toUpperCase() + packIntervalType.slice(1)
   let optionMenu = false
 
   const dispatch = createEventDispatcher()
@@ -42,6 +43,7 @@
     position: relative;
     display: flex;
     align-items: center;
+    z-index: 1;
   }
   .selector {
     user-select: none;
@@ -73,6 +75,7 @@
     width: calc(100% - 48px);
     background: var(--bg-modal);
     padding: 12px 24px;
+    border: solid 1px var(--btn-secondary);
   }
   .option {
     cursor: pointer;
