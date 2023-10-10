@@ -23,7 +23,6 @@ var (
 	broadcastState    structs.AuthBroadcast
 	scheduledPacks    = make(map[string]time.Time)
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
-	SysTransBus       = make(chan structs.SystemTransitionBroadcast, 100)
 	SchedulePackBus   = make(chan string)
 	SystemTransitions structs.SystemTransitionBroadcast
 	PackMu            sync.RWMutex

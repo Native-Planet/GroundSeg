@@ -255,25 +255,24 @@ func RectifyUrbit() {
 
 func SystemTransitionHandler() {
 	for {
-		event := <-broadcast.SysTransBus
+		event := <-docker.SysTransBus
+		current := broadcast.GetState()
 		switch event.Type {
+		case "wifiConnect":
+			current.System.Transition.WifiConnect = event.Event
 		case "swap":
-			broadcast.SysTransMu.Lock()
-			broadcast.SystemTransitions.Swap = event.Swap
-			broadcast.SysTransMu.Unlock()
+			current.System.Transition.Swap = event.BoolEvent
 		case "bugReport":
-			current := broadcast.GetState()
-			current.System.Transition.BugReport = event.BugReport
+			current.System.Transition.BugReport = event.Event
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		case "bugReportError":
-			current := broadcast.GetState()
-			current.System.Transition.BugReportError = event.BugReportError
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
+			current.System.Transition.BugReportError = event.Event
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
+		broadcast.UpdateBroadcast(current)
+		broadcast.BroadcastToClients()
 	}
 }
 

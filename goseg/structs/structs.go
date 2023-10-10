@@ -18,6 +18,14 @@ type UrbitTransition struct {
 	Value int
 }
 
+// system transition eventbus payloads
+type SystemTransition struct {
+	Type      string
+	Event     string
+	Value     int
+	BoolEvent bool
+}
+
 // new ship transition eventbus payloads
 type NewShipTransition struct {
 	Type  string

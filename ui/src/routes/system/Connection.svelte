@@ -16,6 +16,8 @@
   $: active = (wifi?.active) || ""
   $: networks = (wifi?.networks) || []
 
+  $: tWifiConnect = ($structure?.system?.transition?.wifiConnect) || ""
+
   afterUpdate(()=>{
     if (!status) {
       if (showNetworks) {
@@ -24,6 +26,9 @@
     }
     if (selectedNetwork == active) {
       toChange = false
+    }
+    if (!toChange) {
+      password = ''
     }
   })
 
@@ -50,7 +55,7 @@
     {#if status}
       <div class="active">
         <div class="active-title">Network Name</div>
-        <div class="active-selector" on:click={()=>showNetworks = !showNetworks}>
+        <div class="active-selector" class:disabled={tWifiConnect.length > 0} on:click={()=>showNetworks = !showNetworks}>
           {#if toChange}
             <div class="active-text">{selectedNetwork}</div>
           {:else}
@@ -69,7 +74,7 @@
       </div>
 
       {#if showNetworks}
-        <div class="networks">
+        <div class="networks" class:disabled={tWifiConnect.length > 0}>
           {#each networks as n}
             <div class="network" on:click={()=>{selectNetwork(n)}}>{n}</div>
           {/each}
@@ -78,10 +83,20 @@
 
       {#if toChange}
         <div class="submit">
-          <input type="password" placeholder="Wi-Fi Password" bind:value={password} />
+          <input disabled={tWifiConnect.length > 0} type="password" placeholder="Wi-Fi Password" bind:value={password} />
           <div class="submit-buttons">
-            <button class="cancel" on:click={()=>toChange = false}>Cancel</button>
-            <button disabled={password.length < 1} class="connect" on:click={()=>connectWifi(selectedNetwork,password)}>Connect</button>
+            <button class="cancel" on:click={()=>toChange = false} disabled={tWifiConnect.length > 0}>Cancel</button>
+            <button disabled={(password.length < 1) || tWifiConnect.length > 0} class="connect" on:click={()=>connectWifi(selectedNetwork,password)}>
+              {#if tWifiConnect.length < 1}
+                Connect
+              {:else if tWifiConnect == "connecting"}
+                Attempting to connect..
+              {:else if tWifiConnect == "success"}
+                Connected!
+              {:else if tWifiConnect == "error"}
+                Failed due to invalid credentials!
+              {/if}
+            </button>
           </div>
         </div>
       {/if}
@@ -204,6 +219,10 @@
   input:focus {
     outline: none;
   }
+  input:disabled {
+    opacity: .6;
+    pointer-events: none;
+  }
   .submit-buttons {
     margin-top: 20px;
     display: flex;
@@ -233,5 +252,9 @@
   }
   .connect {
     background-color: var(--btn-primary);
+  }
+  .disabled {
+    opacity:.6;
+    pointer-events: none;
   }
 </style>
