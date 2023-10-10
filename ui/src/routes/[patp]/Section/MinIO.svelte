@@ -7,6 +7,7 @@
   import { toggleMinIOLink } from '$lib/stores/websocket'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
 
+  export let running
   export let minioAlias
   export let startramRunning
   export let patp
@@ -49,7 +50,7 @@
     <button
       class="btn"
       on:click={()=>toggleMinIOLink(patp)}
-      disabled={(tToggleMinIOLink == "linking") || !startramRunning}
+      disabled={(tToggleMinIOLink == "linking") || !startramRunning || !running}
       >
       {#if tToggleMinIOLink == "success"}
         MinIO connected!

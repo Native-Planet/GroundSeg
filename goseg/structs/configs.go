@@ -159,6 +159,12 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.SetWgConsolePort(v)
 		case "meld_schedule":
 			u.MeldSchedule, _ = v.(bool)
+		case "meld_schedule_type":
+			u.MeldScheduleType, _ = v.(string)
+		case "meld_day":
+			u.MeldDay, _ = v.(string)
+		case "meld_date":
+			u.MeldDate = toInt(v)
 		case "meld_frequency":
 			u.MeldFrequency = toInt(v)
 		case "meld_time":

@@ -2,6 +2,7 @@ package routines
 
 import (
 	"fmt"
+	"goseg/broadcast"
 	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
@@ -18,17 +19,23 @@ func PackScheduleLoop() {
 		logger.Logger.Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
 	}
 	ticker := time.NewTicker(1 * time.Minute)
+	//ticker := time.NewTicker(15 * time.Second)
 	for {
 		select {
+		case <-broadcast.SchedulePackBus:
+			if err := queuePack(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
+			}
 		case <-ticker.C:
 			if err := queuePack(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
+				logger.Logger.Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
 			}
 		}
 	}
 }
 
 func queuePack() error {
+	var err error
 	logger.Logger.Debug("Updating pack schedule")
 	conf := config.Conf()
 	for _, patp := range conf.Piers {
@@ -39,10 +46,8 @@ func queuePack() error {
 		}
 		// prep next pack
 		var unixTime int64 = 0 // Default to 0
-
 		// Check if string is empty or not a legitimate Unix time
 		if shipConf.MeldLast != "" {
-			var err error
 			unixTime, err = strconv.ParseInt(shipConf.MeldLast, 10, 64)
 			if err != nil {
 				// If conversion fails, set to 0
@@ -51,50 +56,117 @@ func queuePack() error {
 		}
 		// Convert int64 to time.Time
 		meldNext := time.Unix(unixTime, 0)
+		// Check Pack type
 		switch shipConf.MeldScheduleType {
 		case "month":
-			meldNext = meldNext.AddDate(0, shipConf.MeldFrequency, 0)
+			meldNext, err = setMonthSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDate, shipConf.MeldTime)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				continue
+			}
 		case "week":
-			meldNext = meldNext.Add(time.Hour * 24 * 7 * time.Duration(shipConf.MeldFrequency))
+			meldNext, err = setWeekSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDay, shipConf.MeldTime)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				continue
+			}
 		case "day":
-			meldNext = meldNext.Add(time.Hour * 24 * time.Duration(shipConf.MeldFrequency))
+			meldNext, err = setDaySchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldTime)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				continue
+			}
 		default:
 			logger.Logger.Warn(fmt.Sprintf("Pack schedule type for %s is not set. Defaulting to week", patp))
-			meldNext = meldNext.Add(time.Hour * 24 * 7 * time.Duration(shipConf.MeldFrequency))
-		}
-		timeString := shipConf.MeldTime
-		// Default to midnight
-		hour, minute := 0, 0
-		// Extract hour and minute from the string if it's valid
-		if len(timeString) == 4 {
-			var err1, err2 error
-			hour, err1 = strconv.Atoi(timeString[0:2])
-			minute, err2 = strconv.Atoi(timeString[2:4])
-			if err1 != nil || err2 != nil || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-				hour, minute = 0, 0
+			meldNext, err = setWeekSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDay, shipConf.MeldTime)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				continue
 			}
 		}
-		// Create a new time object with the same date but new time
-		meldNext = time.Date(
-			meldNext.Year(),
-			meldNext.Month(),
-			meldNext.Day(),
-			hour,
-			minute,
-			meldNext.Second(),
-			meldNext.Nanosecond(),
-			meldNext.Location(),
-		)
+		logger.Logger.Warn(fmt.Sprintf("next meld %+v", meldNext))
+		if err := broadcast.UpdateScheduledPack(patp, meldNext); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
+		}
+
 		now := time.Now()
 		// if less than 1 * time.Minute left, create routine with timer
 		logger.Logger.Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
 		oneMinuteLater := now.Add(1 * time.Minute)
 		if oneMinuteLater.After(meldNext) || oneMinuteLater.Equal(meldNext) {
-			//go setScheduledPackTimer(patp, meldNext.Sub(now))
-			logger.Logger.Debug("Scheduled pack temporarily turned off")
+			go setScheduledPackTimer(patp, meldNext.Sub(now))
 		}
 	}
 	return nil
+}
+
+func setMonthSchedule(meldLast time.Time, freq, date int, meldTime string) (time.Time, error) {
+	// convert time to int
+	hour, minute, err := convertMeldTime(meldTime)
+	if err != nil {
+		return meldLast, err
+	}
+	meldNext := time.Date(meldLast.Year(), meldLast.Month(), date, hour, minute, 0, 0, meldLast.Location())
+	if meldNext.Before(meldLast) {
+		meldNext = meldNext.AddDate(0, freq, 0)
+	}
+	return meldNext, nil
+}
+
+func setDaySchedule(meldLast time.Time, freq int, meldTime string) (time.Time, error) {
+	// convert time to int
+	hour, minute, err := convertMeldTime(meldTime)
+	if err != nil {
+		return meldLast, err
+	}
+	meldNext := meldLast.AddDate(0, 0, freq)
+	meldNext = time.Date(meldNext.Year(), meldNext.Month(), meldNext.Day(), hour, minute, 0, 0, meldLast.Location())
+	return meldNext, nil
+}
+
+func setWeekSchedule(meldLast time.Time, freq int, dayStr, meldTime string) (time.Time, error) {
+	// Map string weekday to time.Weekday
+	weekdayMap := map[string]time.Weekday{
+		"monday":    time.Monday,
+		"tuesday":   time.Tuesday,
+		"wednesday": time.Wednesday,
+		"thursday":  time.Thursday,
+		"friday":    time.Friday,
+		"saturday":  time.Saturday,
+		"sunday":    time.Sunday,
+	}
+	day, ok := weekdayMap[dayStr]
+	if !ok {
+		return meldLast, fmt.Errorf("Invalid weekday: %s", day)
+	}
+	// Calculate days to the next specific weekday
+	daysUntilNext := (int(day) - int(meldLast.Weekday()) + 7) % 7
+	// Add freq weeks to the days
+	daysUntilNext += (freq - 1) * 7
+	// Get next specific weekday
+	nextWeekday := meldLast.AddDate(0, 0, daysUntilNext)
+	// Reset time to midnight
+	nextWeekday = time.Date(nextWeekday.Year(), nextWeekday.Month(), nextWeekday.Day(), 0, 0, 0, 0, nextWeekday.Location())
+	// convert time to int
+	hour, minute, err := convertMeldTime(meldTime)
+	if err != nil {
+		return meldLast, err
+	}
+	meldNext := time.Date(nextWeekday.Year(), nextWeekday.Month(), nextWeekday.Day(), hour, minute, 0, 0, nextWeekday.Location())
+	return meldNext, nil
+}
+
+func convertMeldTime(meldTime string) (int, int, error) {
+	hour, err := strconv.Atoi(meldTime[0:2])
+	if err != nil {
+		return 0, 0, fmt.Errorf("Invalid hour: %v", meldTime)
+	}
+	// convert minute to int
+	minute, err := strconv.Atoi(meldTime[2:4])
+	if err != nil {
+		return 0, 0, fmt.Errorf("Invalid minute: %v", meldTime)
+	}
+	return hour, minute, nil
 }
 
 func setScheduledPackTimer(patp string, delay time.Duration) {

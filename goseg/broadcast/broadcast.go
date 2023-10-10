@@ -11,6 +11,7 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,9 +21,12 @@ var (
 	hostInfoInterval  = 1 * time.Second // how often we refresh system info
 	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
 	broadcastState    structs.AuthBroadcast
+	scheduledPacks    = make(map[string]time.Time)
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
 	SysTransBus       = make(chan structs.SystemTransitionBroadcast, 100)
+	SchedulePackBus   = make(chan string)
 	SystemTransitions structs.SystemTransitionBroadcast
+	PackMu            sync.RWMutex
 	UrbTransMu        sync.RWMutex
 	SysTransMu        sync.RWMutex
 	mu                sync.RWMutex // synchronize access to broadcastState
@@ -54,6 +58,23 @@ func init() {
 // 		}
 // 	}
 // }
+
+func UpdateScheduledPack(patp string, meldNext time.Time) error {
+	PackMu.Lock()
+	defer PackMu.Unlock()
+	scheduledPacks[patp] = meldNext
+	return nil
+}
+
+func GetScheduledPack(patp string) time.Time {
+	PackMu.Lock()
+	defer PackMu.Unlock()
+	nextPack, exists := scheduledPacks[patp]
+	if !exists {
+		return time.Time{}
+	}
+	return nextPack
+}
 
 // take in config file and addt'l info to initialize broadcast
 func bootstrapBroadcastState() error {
@@ -174,11 +195,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 
 		// pack day
-		days := []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
 		for _, v := range days {
 			if v == dockerConfig.MeldDay {
-				packDay = dockerConfig.MeldDay
+				packDay = strings.Title(dockerConfig.MeldDay)
 			}
 		}
 
@@ -211,6 +232,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackDate = packDate
 		urbit.Info.PackTime = dockerConfig.MeldTime
 		urbit.Info.LastPack = dockerConfig.MeldLast
+		urbit.Info.NextPack = strconv.FormatInt(GetScheduledPack(pier).Unix(), 10)
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		UrbTransMu.RLock()

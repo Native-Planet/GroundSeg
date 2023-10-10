@@ -288,6 +288,7 @@ func UrbitHandler(msg []byte) error {
 		default:
 			return fmt.Errorf("Schedule pack unknown interval type: %v", intervalType)
 		}
+		broadcast.SchedulePackBus <- "schedule"
 		return nil
 	case "loom":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "loading"}

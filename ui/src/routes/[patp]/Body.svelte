@@ -69,6 +69,7 @@
   {#if startramRegistered}
     <!-- MinIO Info -->
     <MinIO 
+      {running}
       {startramRunning}
       {patp}
       {minioAlias}
