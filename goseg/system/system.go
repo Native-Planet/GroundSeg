@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -43,20 +44,36 @@ func GetDisk() (uint64, uint64) {
 
 // get cpu temp (may not work on some devices)
 func GetTemp() float64 {
-	data, err := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
+	// Run the 'sensors' command
+	cmd := exec.Command("sensors")
+	// Capture stdout
+	out, err := cmd.Output()
 	if err != nil {
-		// errmsg := fmt.Sprintf("Error reading temperature:", err) // ignore for vps testing
-		// logger.Logger.Error(errmsg)
+		logger.Logger.Error(fmt.Sprintf("Failed to get sensor data: %v", err))
 		return 0
 	}
-	tempStr := strings.TrimSpace(string(data))
-	temp, err := strconv.Atoi(tempStr)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error converting temperature to integer:", err)
-		logger.Logger.Error(errmsg)
-		return 0
+	keyword := "Package id 0:"
+	for _, ln := range strings.Split(string(out), "\n") {
+		if strings.Contains(ln, keyword) {
+			// Use regex to find the first temperature
+			re := regexp.MustCompile(`\+([0-9]+\.[0-9]+)`)
+			match := re.FindStringSubmatch(ln)
+
+			// Convert to float
+			if len(match) > 1 {
+				temp, err := strconv.ParseFloat(match[1], 64)
+				if err == nil {
+					return temp
+				} else {
+					logger.Logger.Error(fmt.Sprintf("Unable to parse float for CPU temperature: %v", err))
+					return 0
+				}
+			} else {
+				return 0
+			}
+		}
 	}
-	return float64(temp) / 1000.0
+	return 0
 }
 
 func IsNPBox(basePath string) bool {
