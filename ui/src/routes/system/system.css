@@ -5,6 +5,7 @@
   padding: 56px;
   border-radius: 16px;
   margin: 0;
+  min-width: 700px;
 }
 .sys-title {
   color: #000;
