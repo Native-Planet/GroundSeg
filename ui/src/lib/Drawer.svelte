@@ -67,6 +67,7 @@
     position: relative;
     background: white;
     height: calc(850px - (48px * 2));
+    max-height: 80vh;
     padding: 48px;
   }
 </style>

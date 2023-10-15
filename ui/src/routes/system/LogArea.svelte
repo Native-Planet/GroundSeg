@@ -6,7 +6,9 @@
   export let type
   let div
 	let autoscroll
+  let isLatest = true
   let copied = false
+  let y 
 
   $: lines = ($logs[type]) || ""
   $: splitLines = lines.split("\n") || []
@@ -29,6 +31,9 @@
 	})
 	afterUpdate(() => {
 		if (autoscroll) div.scrollTo(0, div.scrollHeight);
+    if (isLatest) {
+      toLatest()
+    }
 	})
 
   const toLatest = () => {
@@ -48,9 +53,7 @@
   {:else}
     <img id="logs" data-clipboard-text={lines} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
   {/if}
-  {#if !autoscroll}
-    <button on:click={toLatest} class="latest">Latest</button>
-  {/if}
+  <button on:click={toLatest} class="latest">Latest</button>
   <div class="log-wrapper" bind:this={div}>
     {#if (prettyLines.length > 0)}
       {#each prettyLines as ln}
