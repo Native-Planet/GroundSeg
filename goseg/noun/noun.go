@@ -76,7 +76,7 @@ func mug(n Noun) uint64 {
 	}
 } // ... [previous code]
 
-func pretty(n Noun, tailPos bool) string {
+func Pretty(n Noun, tailPos bool) string {
 	if deep(n) {
 		cell := n.(Cell)
 		content := fmt.Sprintf("%s %s", pretty(cell.Head, false), pretty(cell.Tail, true))
@@ -187,43 +187,47 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 	refs := make(map[int]Noun)
 	var cur int
 
-	readBits := func(n int) uint64 {
-		result := 0
+	// Helper function to create a big int from int64 value
+	newBigInt := func(val int64) *big.Int {
+		return new(big.Int).SetInt64(val)
+	}
+
+	readBits := func(n int) *big.Int {
+		result := newBigInt(0)
+		one := newBigInt(1)
 		for i := 0; i < n; i++ {
 			bit, err := s.ReadBit()
 			if err != nil {
 				panic("oh shit")
 			}
 			if bit == bitstream.One {
-				result |= 1 << i
-			} else {
-				result |= 0 << i
+				result.Or(result, new(big.Int).Lsh(one, uint(i)))
 			}
 		}
-		return uint64(result)
+		return result
 	}
 
 	one := func() bool {
 		val, _ := s.ReadBit()
 		cur++
 		return val == bitstream.One
-
 	}
 
-	rub := func() uint64 {
+	rub := func() *big.Int {
 		z := 0
 		for !one() {
 			z++
 		}
 		if z == 0 {
-			return 0
+			return newBigInt(0)
 		}
 
 		below := z - 1
 		lbits := readBits(below)
 
-		bex := uint64(1 << below)
-		val := readBits(int(bex ^ lbits))
+    oneInt := newBigInt(1)
+		bex := new(big.Int).Lsh(oneInt, uint(below))
+		val := readBits(int(new(big.Int).Xor(bex, lbits).Int64()))
 		return val
 	}
 
@@ -232,7 +236,7 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 		var ret Noun
 		if one() {
 			if one() {
-				refValue := int(rub())
+				refValue := int(rub().Int64())
 				ret = refs[refValue]
 			} else {
 				head, newCur := r(cur)
@@ -264,14 +268,14 @@ func readInt(length int, s *bytes.Buffer) *big.Int {
 	return &r
 }
 
-func jam(n Noun) *big.Int {
+func Jam(n Noun) *big.Int {
 	out := new(bytes.Buffer)
 	jamToStream(n, out)
 	//fmt.Println(out.Bytes())
 	return readInt(out.Len(), out)
 }
 
-func cue(i *big.Int) Noun {
+func Cue(i *big.Int) Noun {
 	var buf bytes.Buffer
 	w := bitstream.NewWriter(&buf)
 
@@ -316,8 +320,8 @@ func cue(i *big.Int) Noun {
 	return cueFromStream(r)
 }
 
-// func main() {
-/*
+ //func main() {
+  /*
 	// Test byteLength
 	fmt.Println(byteLength(0))                 // Expected: 0
 	fmt.Println(byteLength(255))               // Expected: 1
@@ -350,10 +354,10 @@ func cue(i *big.Int) Noun {
 //fmt.Println(jam(1234567890987654321))
 //fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
 
-//   i := new(big.Int)
-//   i.SetString("1569560238373119425266963811040232206341",10)
-// 	fmt.Println(pretty(cue(i),false))
-
+   //i := new(big.Int)
+   //i.SetString("1569560238373119425266963811040232206341",10)
+ 	//fmt.Println(pretty(cue(i),false))
+//
 //jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
 //fmt.Println(jam(jtest))
 //fmt.Println(pretty(cue(jam(jtest)), false))
@@ -392,4 +396,4 @@ func cue(i *big.Int) Noun {
 	fmt.Println(pretty(x, false))              // Expected: [0 0]
 	fmt.Println(pretty(x, true))               // Expected: 0 0
 */
-// }
+ //}
