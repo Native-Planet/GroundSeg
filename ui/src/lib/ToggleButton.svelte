@@ -28,6 +28,7 @@
     width: 135px;
     height: 65px;
     flex-shrink: 0;
+    user-select: none;
 
     border-radius: 16px;
     background: var(--text-color, #313933);
