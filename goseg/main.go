@@ -182,6 +182,12 @@ func main() {
 			go http.ListenAndServe("0.0.0.0:6060", nil)
 		}
 	}
+	// setup swap
+	logger.Logger.Info(fmt.Sprintf("Setting up swap %v for %vG", conf.SwapFile, conf.SwapVal))
+	if err := system.ConfigureSwap(conf.SwapFile, conf.SwapVal); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
+	}
+	// update mode
 	if conf.UpdateMode == "auto" {
 		remoteVersion = true
 		// get version info from remote server

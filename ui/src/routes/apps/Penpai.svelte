@@ -2,6 +2,8 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+  import  { structure } from '$lib/stores/websocket'
+
   let selectedModel = "Llama 7B"
   let models = ["Llama 7B","Llama 12B","Llama 32B"]
   let showModels = false
@@ -13,6 +15,9 @@
   const selectModel = model => {
     selectedModel = model
   }
+
+  $: urbits = ($structure?.urbits) || {}
+  $: urbitKeys = Object.keys(urbits)
 </script>
 
 <div class="container">
@@ -23,18 +28,6 @@
       on:click={()=>installed=!installed}>
       Dev Toggle
     </span>
-  </div>
-
-  <div class="wifi-toggle">
-    <div class="wifi-text">Connect to Companion App</div>
-    {#if installed}
-      <ToggleButton
-        on:click={()=>status=!status}
-        on={status}
-        />
-    {:else}
-      <button class="connect">Install</button>
-    {/if}
   </div>
 
   <div class="wifi-options">
@@ -64,6 +57,22 @@
    <button class="connect">Change Model</button>
   </div>
 
+  <div class="companion-title">Urbit Companion App</div>
+  <div class="companion-wrapper">
+    {#each urbitKeys as p}
+      <div class="wifi-toggle">
+          <div class="companion-text">{p}</div>
+          {#if installed}
+            <ToggleButton
+              on:click={()=>status=!status}
+              on={status}
+              />
+          {:else}
+            <button class="connect">Install</button>
+          {/if}
+      </div>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -81,13 +90,31 @@
     display: flex;
     flex-direction: column;
   }
-  .wifi-text {
+  .companion-title {
     flex: 1;
     color: var(--NP_Black, #161D17);
     leading-trim: both;
     text-edge: cap;
     font-family: Inter;
     font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
+    margin-bottom: 32px;
+  }
+  .companion-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .companion-text {
+    flex: 1;
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
     font-style: normal;
     font-weight: 300;
     line-height: 48px; /* 200% */
@@ -189,6 +216,7 @@
     margin-top: 20px;
     display: flex;
     gap: 24px;
+    margin-bottom: 56px;
   }
   button {
     border-radius: 16px;
