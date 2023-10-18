@@ -83,6 +83,22 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"id":    payload.Token.ID,
 		"token": tokenContent,
 	}
+	conf := config.Conf()
+	// send setup broadcast if we're not done setting up
+	if conf.Setup != "complete" {
+		resp := structs.SetupBroadcast{
+			Type:      "structure",
+			AuthLevel: "setup",
+			Stage:     conf.Setup,
+			Page:      setup.Stages[conf.Setup],
+			Regions:   startram.Regions,
+		}
+		respJSON, err := json.Marshal(resp)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
+		}
+		MuCon.Write(respJSON)
+	}
 	if !authed {
 		var ack string
 		token, err = auth.CreateToken(conn, r, false)
@@ -164,7 +180,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		ack := "ack"
-		conf := config.Conf()
 		// handle c2c stuff before auth checks
 		if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
 			var payload structs.C2CPayload
@@ -179,21 +194,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			MuCon.Write(resp)
 			continue
-		}
-		// send setup broadcast if we're not done setting up
-		if conf.Setup != "complete" {
-			resp := structs.SetupBroadcast{
-				Type:      "structure",
-				AuthLevel: "setup",
-				Stage:     conf.Setup,
-				Page:      setup.Stages[conf.Setup],
-				Regions:   startram.Regions,
-			}
-			respJSON, err := json.Marshal(resp)
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
-			}
-			MuCon.Write(respJSON)
 		}
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
@@ -358,7 +358,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					"id":    payload.Token.ID,
 					"token": tokenContent,
 				}
-				logger.Logger.Debug(fmt.Sprintf("Verify %v check result: %v",payload.Token.ID,authed))
+				logger.Logger.Debug(fmt.Sprintf("Verify %v check result: %v", payload.Token.ID, authed))
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {
