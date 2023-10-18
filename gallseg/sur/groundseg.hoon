@@ -1,19 +1,17 @@
 |%
 ::
-::  State
-::
-+$  versioned-state  $%  state-0
-                     ==
-+$  state-0  $:  %0
-               =session
-               =policy
-               =pending
-               =token
-               =session
-               =broadcast
-             ==
-::
 ::  Types
+::
++$  blob          @t
+
++$  do
+  $%  [%json =blob]
+  ==
++$  did
+  $%  [%post =blob]
+  ==
+::
+::  Old GS stuff
 ::
 +$  id            @t
 +$  session       ?(%active %inactive)
