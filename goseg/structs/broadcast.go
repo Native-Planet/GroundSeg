@@ -10,6 +10,20 @@ type AuthBroadcast struct {
 	System    System           `json:"system"`
 	Profile   Profile          `json:"profile"`
 	Urbits    map[string]Urbit `json:"urbits"`
+	Apps      Apps             `json:"apps"`
+}
+
+// third party integrations
+type Apps struct {
+	Penpai PenpaiBroadcast `json:"penpai"`
+}
+
+type PenpaiBroadcast struct {
+	Info struct {
+		Models          []string
+		ActiveModel     string
+		CompanionStatus map[string]string
+	} `json:info`
 }
 
 // new ship

@@ -21,14 +21,7 @@
 </script>
 
 <div class="container">
-  <div class="sys-title">
-    PENPAI 
-    <span 
-      style="float:right;font-family:var(--regular-font);font-size:16px;background:black;color:white;padding:8px 24px;border-radius:16px;cursor:pointer;user-select:none;" 
-      on:click={()=>installed=!installed}>
-      Dev Toggle
-    </span>
-  </div>
+  <div class="sys-title">PENPAI</div>
 
   <div class="wifi-options">
       <div class="active">
