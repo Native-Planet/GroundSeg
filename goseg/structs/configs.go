@@ -23,19 +23,27 @@ type SysConfig struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	} `json:"linuxUpdates"`
-	DockerData     string `json:"dockerData"`
-	WgOn           bool   `json:"wgOn"`
-	WgRegistered   bool   `json:"wgRegistered"`
-	PwHash         string `json:"pwHash"`
-	C2cInterval    int    `json:"c2cInterval"`
-	FirstBoot      bool   `json:"firstBoot"`
-	GsVersion      string `json:"gsVersion"`
-	CfgDir         string `json:"CFG_DIR"`
-	UpdateInterval int    `json:"updateInterval"`
-	BinHash        string `json:"binHash"`
-	Pubkey         string `json:"pubkey"`
-	Privkey        string `json:"privkey"`
-	Salt           string `json:"salt"`
+	DockerData     string   `json:"dockerData"`
+	WgOn           bool     `json:"wgOn"`
+	WgRegistered   bool     `json:"wgRegistered"`
+	PwHash         string   `json:"pwHash"`
+	C2cInterval    int      `json:"c2cInterval"`
+	FirstBoot      bool     `json:"firstBoot"`
+	GsVersion      string   `json:"gsVersion"`
+	CfgDir         string   `json:"CFG_DIR"`
+	UpdateInterval int      `json:"updateInterval"`
+	BinHash        string   `json:"binHash"`
+	Pubkey         string   `json:"pubkey"`
+	Privkey        string   `json:"privkey"`
+	Salt           string   `json:"salt"`
+	PenpaiModels   []Penpai `json:"penpaiModels"`
+	PenpaiActive   string   `json:"penpaiActive"`
+}
+
+type Penpai struct {
+	ModelTitle string `json:"modelTitle"`
+	ModelName  string `json:"modelName"`
+	ModelUrl   string `json:"modelUrl"`
 }
 
 // authenticated browser sessions

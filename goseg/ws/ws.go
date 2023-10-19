@@ -197,6 +197,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
+			case "penpai":
+				if err = handler.PenpaiHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "new_ship":
 				if err = handler.NewShipHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))

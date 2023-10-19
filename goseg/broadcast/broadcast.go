@@ -98,6 +98,11 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.Profile = profileInfo
 	mu.Unlock()
+	// update with apps state
+	appsInfo := constructAppsInfo()
+	mu.Lock()
+	broadcastState.Apps = appsInfo
+	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
@@ -242,6 +247,24 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		updates[pier] = urbit
 	}
 	return updates, nil
+}
+
+func constructAppsInfo() structs.Apps {
+	var apps structs.Apps
+	conf := config.Conf()
+
+	// penpai
+	var modelTitles []string
+	activeModel := conf.PenpaiActive
+	// Iterate through penpais to extract modelTitle
+	for _, penpaiInfo := range conf.PenpaiModels {
+		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
+	}
+	apps.Penpai.Info.Models = modelTitles
+	apps.Penpai.Info.Allowed = true // todo: allow if envvar set
+	apps.Penpai.Info.ActiveModel = activeModel
+	//apps.Penpai.CompanionStatus map[string]string
+	return apps
 }
 
 func constructProfileInfo() structs.Profile {

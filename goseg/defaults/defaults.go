@@ -129,6 +129,18 @@ func SysConfig(basePath string) structs.SysConfig {
 		Pubkey:         "",
 		Privkey:        "",
 		Salt:           "",
+		PenpaiModels: []structs.Penpai{
+			{
+				ModelTitle: "Llama 2 7B",
+				ModelName:  "llama-2-7b-chat.bin",
+				ModelUrl:   "https://huggingface.co/TheBloke/Nous-Hermes-Llama-2-7B-GGML/resolve/main/nous-hermes-llama-2-7b.ggmlv3.q4_0.bin",
+			},
+			{
+				ModelTitle: "Llama 2 13B",
+				ModelName:  "llama-2-13b-chat.bin",
+				ModelUrl:   "https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGML/resolve/main/nous-hermes-llama2-13b.ggmlv3.q4_0.bin",
+			},
+		},
 	}
 	return sysConfig
 }

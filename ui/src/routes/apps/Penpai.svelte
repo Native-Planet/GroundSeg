@@ -1,78 +1,88 @@
 <script>
+  import { onMount } from 'svelte'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure } from '$lib/stores/websocket'
+  import  { structure, setPenpaiModel } from '$lib/stores/websocket'
 
-  let selectedModel = "Llama 7B"
-  let models = ["Llama 7B","Llama 12B","Llama 32B"]
   let showModels = false
 
   // debug
   let status = false
   let installed = false
 
+  $: urbits = ($structure?.urbits) || {}
+  $: urbitKeys = Object.keys(urbits)
+  $: penpai = ($structure?.apps?.penpai?.info) || {}
+  $: models = (penpai?.models) || []
+  $: activeModel = (penpai?.activeModel) || ""
+  $: penpaiAllowed = (penpai?.allowed) || false
+
+  let selectedModel = ""
+  onMount(()=>selectedModel = activeModel)
+
   const selectModel = model => {
+    showModels = false
     selectedModel = model
   }
 
-  $: urbits = ($structure?.urbits) || {}
-  $: urbitKeys = Object.keys(urbits)
+  const handleChangeModel = () => {
+    setPenpaiModel(selectedModel)
+  }
+
 </script>
 
 <div class="container">
-  <div class="sys-title">
-    PENPAI 
-    <span 
-      style="float:right;font-family:var(--regular-font);font-size:16px;background:black;color:white;padding:8px 24px;border-radius:16px;cursor:pointer;user-select:none;" 
-      on:click={()=>installed=!installed}>
-      Dev Toggle
-    </span>
-  </div>
+  <div class="sys-title">PENPAI {!penpaiAllowed ? "(DISABLED)" : ""}</div>
 
-  <div class="wifi-options">
-      <div class="active">
-        <div class="active-title">Model</div>
-        <div class="active-selector" on:click={()=>showModels = !showModels}>
-          <div class="active-text">{selectedModel}</div>
-          <div class="active-arrow">
-            {#if showModels}
-              <Fa icon={faAngleUp} size="1x" />
-            {:else}
-              <Fa icon={faAngleDown} size="1x" />
-            {/if}
+  {#if penpaiAllowed}
+    <div class="wifi-options">
+        <div class="active">
+          <div class="active-title">Model</div>
+          <div class="active-selector" on:click={()=>showModels = !showModels}>
+            <div class="active-text">{selectedModel.length < 1 ? "Select a model" : selectedModel}</div>
+            <div class="active-arrow">
+              {#if showModels}
+                <Fa icon={faAngleUp} size="1x" />
+              {:else}
+                <Fa icon={faAngleDown} size="1x" />
+              {/if}
+            </div>
           </div>
         </div>
-      </div>
 
-      {#if showModels}
-        <div class="networks">
-          {#each models as n}
-            <div class="network" on:click={()=>{selectModel(n)}}>{n}</div>
-          {/each}
-        </div>
+        {#if showModels}
+          <div class="networks">
+            {#each models as n}
+              <div class="network" on:click={()=>{selectModel(n)}}>{n}</div>
+            {/each}
+          </div>
+        {/if}
+    </div>
+
+    <div class="submit-buttons">
+      {#if selectedModel != activeModel}
+        <button class="connect" on:click={handleChangeModel}>Change Model</button>
       {/if}
-  </div>
-  <div class="submit-buttons">
-   <button class="connect">Change Model</button>
-  </div>
+    </div>
 
-  <div class="companion-title">Urbit Companion App</div>
-  <div class="companion-wrapper">
-    {#each urbitKeys as p}
-      <div class="wifi-toggle">
-          <div class="companion-text">{p}</div>
-          {#if installed}
-            <ToggleButton
-              on:click={()=>status=!status}
-              on={status}
-              />
-          {:else}
-            <button class="connect">Install</button>
-          {/if}
-      </div>
-    {/each}
-  </div>
+    <div class="companion-title">Urbit Companion App</div>
+    <div class="companion-wrapper">
+      {#each urbitKeys as p}
+        <div class="wifi-toggle">
+            <div class="companion-text">{p}</div>
+            {#if installed}
+              <ToggleButton
+                on:click={()=>status=!status}
+                on={status}
+                />
+            {:else}
+              <button class="connect">Install</button>
+            {/if}
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
