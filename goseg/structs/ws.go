@@ -258,6 +258,19 @@ type WsUrbitPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type WsPenpaiPayload struct {
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Payload WsPenpaiAction `json:"payload"`
+	Token   WsTokenStruct  `json:"token"`
+}
+
+type WsPenpaiAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
+	Model  string `json:"model"`
+}
+
 type WsUrbitAction struct {
 	Type         string `json:"type"`
 	Action       string `json:"action"`

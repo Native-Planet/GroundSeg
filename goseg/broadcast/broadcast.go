@@ -98,10 +98,16 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.Profile = profileInfo
 	mu.Unlock()
+	// update with apps state
+	appsInfo := constructAppsInfo()
+	mu.Lock()
+	broadcastState.Apps = appsInfo
+	mu.Unlock()
 	// start looping info refreshes
 	go hostStatusLoop()
 	go shipStatusLoop()
 	go profileStatusLoop()
+	go appsStatusLoop()
 	return nil
 }
 
@@ -244,6 +250,24 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	return updates, nil
 }
 
+func constructAppsInfo() structs.Apps {
+	var apps structs.Apps
+	conf := config.Conf()
+
+	// penpai
+	var modelTitles []string
+	activeModel := conf.PenpaiActive
+	// Iterate through penpais to extract modelTitle
+	for _, penpaiInfo := range conf.PenpaiModels {
+		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
+	}
+	apps.Penpai.Info.Models = modelTitles
+	apps.Penpai.Info.Allowed = true // todo: allow if envvar set
+	apps.Penpai.Info.ActiveModel = activeModel
+	//apps.Penpai.CompanionStatus map[string]string
+	return apps
+}
+
 func constructProfileInfo() structs.Profile {
 	// Build startram struct
 	var startramInfo structs.Startram
@@ -382,6 +406,22 @@ func shipStatusLoop() {
 			mu.RUnlock()
 			updates = PreserveUrbitsTransitions(newState, updates)
 			newState.Urbits = updates
+			UpdateBroadcast(newState)
+			BroadcastToClients()
+		}
+	}
+}
+
+func appsStatusLoop() {
+	ticker := time.NewTicker(hostInfoInterval)
+	for {
+		select {
+		case <-ticker.C:
+			updates := constructAppsInfo()
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
+			newState.Apps = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}

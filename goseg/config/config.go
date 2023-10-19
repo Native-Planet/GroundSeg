@@ -113,6 +113,8 @@ func init() {
 	if err = decoder.Decode(&globalConfig); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
 	}
+	// add mising fields
+	globalConfig = mergeConfigs(defaults.SysConfig(BasePath), globalConfig)
 	// wipe the sessions on each startup
 	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
@@ -356,4 +358,198 @@ func getSHA256(filePath string) (string, error) {
 	hashString := hex.EncodeToString(hashValue)
 
 	return hashString, nil
+}
+
+// MergeConfigs merges a default and a custom SysConfig, with custom values taking precedence.
+func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConfig {
+	mergedConfig := structs.SysConfig{}
+
+	// Setup
+	if customConfig.Setup != "" {
+		mergedConfig.Setup = customConfig.Setup
+	} else {
+		mergedConfig.Setup = defaultConfig.Setup
+	}
+
+	// EndpointUrl
+	if customConfig.EndpointUrl != "" {
+		mergedConfig.EndpointUrl = customConfig.EndpointUrl
+	} else {
+		mergedConfig.EndpointUrl = defaultConfig.EndpointUrl
+	}
+
+	// ApiVersion
+	if customConfig.ApiVersion != "" {
+		mergedConfig.ApiVersion = customConfig.ApiVersion
+	} else {
+		mergedConfig.ApiVersion = defaultConfig.ApiVersion
+	}
+
+	// Piers
+	if len(customConfig.Piers) > 0 {
+		mergedConfig.Piers = customConfig.Piers
+	} else {
+		mergedConfig.Piers = defaultConfig.Piers
+	}
+
+	// NetCheck
+	if customConfig.NetCheck != "" {
+		mergedConfig.NetCheck = customConfig.NetCheck
+	} else {
+		mergedConfig.NetCheck = defaultConfig.NetCheck
+	}
+
+	// UpdateMode
+	if customConfig.UpdateMode != "" {
+		mergedConfig.UpdateMode = customConfig.UpdateMode
+	} else {
+		mergedConfig.UpdateMode = defaultConfig.UpdateMode
+	}
+
+	// UpdateUrl
+	if customConfig.UpdateUrl != "" {
+		mergedConfig.UpdateUrl = customConfig.UpdateUrl
+	} else {
+		mergedConfig.UpdateUrl = defaultConfig.UpdateUrl
+	}
+
+	// UpdateBranch
+	if customConfig.UpdateBranch != "" {
+		mergedConfig.UpdateBranch = customConfig.UpdateBranch
+	} else {
+		mergedConfig.UpdateBranch = defaultConfig.UpdateBranch
+	}
+
+	// SwapVal
+	if customConfig.SwapVal != 0 {
+		mergedConfig.SwapVal = customConfig.SwapVal
+	} else {
+		mergedConfig.SwapVal = defaultConfig.SwapVal
+	}
+
+	// SwapFile
+	if customConfig.SwapFile != "" {
+		mergedConfig.SwapFile = customConfig.SwapFile
+	} else {
+		mergedConfig.SwapFile = defaultConfig.SwapFile
+	}
+
+	// KeyFile
+	if customConfig.KeyFile != "" {
+		mergedConfig.KeyFile = customConfig.KeyFile
+	} else {
+		mergedConfig.KeyFile = defaultConfig.KeyFile
+	}
+
+	// Sessions
+	if customConfig.Sessions.Authorized != nil {
+		mergedConfig.Sessions.Authorized = customConfig.Sessions.Authorized
+	} else {
+		mergedConfig.Sessions.Authorized = defaultConfig.Sessions.Authorized
+	}
+
+	if customConfig.Sessions.Unauthorized != nil {
+		mergedConfig.Sessions.Unauthorized = customConfig.Sessions.Unauthorized
+	} else {
+		mergedConfig.Sessions.Unauthorized = defaultConfig.Sessions.Unauthorized
+	}
+
+	// LinuxUpdates
+	if customConfig.LinuxUpdates.Value != 0 {
+		mergedConfig.LinuxUpdates.Value = customConfig.LinuxUpdates.Value
+	} else {
+		mergedConfig.LinuxUpdates.Value = defaultConfig.LinuxUpdates.Value
+	}
+
+	if customConfig.LinuxUpdates.Interval != "" {
+		mergedConfig.LinuxUpdates.Interval = customConfig.LinuxUpdates.Interval
+	} else {
+		mergedConfig.LinuxUpdates.Interval = defaultConfig.LinuxUpdates.Interval
+	}
+	// DockerData
+	if customConfig.DockerData != "" {
+		mergedConfig.DockerData = customConfig.DockerData
+	} else {
+		mergedConfig.DockerData = defaultConfig.DockerData
+	}
+
+	// WgOn
+	mergedConfig.WgOn = customConfig.WgOn || defaultConfig.WgOn
+
+	// WgRegistered
+	mergedConfig.WgRegistered = customConfig.WgRegistered || defaultConfig.WgRegistered
+
+	// PwHash
+	if customConfig.PwHash != "" {
+		mergedConfig.PwHash = customConfig.PwHash
+	} else {
+		mergedConfig.PwHash = defaultConfig.PwHash
+	}
+
+	// C2cInterval
+	if customConfig.C2cInterval != 0 {
+		mergedConfig.C2cInterval = customConfig.C2cInterval
+	} else {
+		mergedConfig.C2cInterval = defaultConfig.C2cInterval
+	}
+
+	// FirstBoot
+	mergedConfig.FirstBoot = customConfig.FirstBoot || defaultConfig.FirstBoot
+
+	// GsVersion
+	if customConfig.GsVersion != "" {
+		mergedConfig.GsVersion = customConfig.GsVersion
+	} else {
+		mergedConfig.GsVersion = defaultConfig.GsVersion
+	}
+
+	// CfgDir
+	if customConfig.CfgDir != "" {
+		mergedConfig.CfgDir = customConfig.CfgDir
+	} else {
+		mergedConfig.CfgDir = defaultConfig.CfgDir
+	}
+
+	// UpdateInterval
+	if customConfig.UpdateInterval != 0 {
+		mergedConfig.UpdateInterval = customConfig.UpdateInterval
+	} else {
+		mergedConfig.UpdateInterval = defaultConfig.UpdateInterval
+	}
+
+	// BinHash
+	if customConfig.BinHash != "" {
+		mergedConfig.BinHash = customConfig.BinHash
+	} else {
+		mergedConfig.BinHash = defaultConfig.BinHash
+	}
+
+	// Pubkey
+	if customConfig.Pubkey != "" {
+		mergedConfig.Pubkey = customConfig.Pubkey
+	} else {
+		mergedConfig.Pubkey = defaultConfig.Pubkey
+	}
+
+	// Privkey
+	if customConfig.Privkey != "" {
+		mergedConfig.Privkey = customConfig.Privkey
+	} else {
+		mergedConfig.Privkey = defaultConfig.Privkey
+	}
+
+	// Salt
+	if customConfig.Salt != "" {
+		mergedConfig.Salt = customConfig.Salt
+	} else {
+		mergedConfig.Salt = defaultConfig.Salt
+	}
+
+	// PenpaiModels
+	if len(customConfig.PenpaiModels) > 0 {
+		mergedConfig.PenpaiModels = customConfig.PenpaiModels
+	} else {
+		mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
+	}
+	return mergedConfig
 }
