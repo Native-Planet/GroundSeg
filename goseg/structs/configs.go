@@ -37,6 +37,7 @@ type SysConfig struct {
 	Privkey        string   `json:"privkey"`
 	Salt           string   `json:"salt"`
 	PenpaiModels   []Penpai `json:"penpaiModels"`
+	PenpaiActive   string   `json:"penpaiActive"`
 }
 
 type Penpai struct {

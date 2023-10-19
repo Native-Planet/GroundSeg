@@ -615,6 +615,18 @@ export const submitNetwork = (ssid,password) => {
 }
 
 //
+// Penpai
+//
+export const setPenpaiModel = model => {
+  let payload = {
+    "type":"penpai",
+    "action": "set-model",
+    "model": model
+  }
+  send(payload)
+}
+
+//
 //  Dev
 //   
 

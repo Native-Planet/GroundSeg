@@ -20,10 +20,11 @@ type Apps struct {
 
 type PenpaiBroadcast struct {
 	Info struct {
-		Models          []string
-		ActiveModel     string
-		CompanionStatus map[string]string
-	} `json:info`
+		Allowed         bool              `json:"allowed"`
+		Models          []string          `json:"models"`
+		ActiveModel     string            `json:"activeModel"`
+		CompanionStatus map[string]string `json:"companionStatus"`
+	} `json:"info"`
 }
 
 // new ship
