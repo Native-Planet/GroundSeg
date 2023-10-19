@@ -52,7 +52,6 @@
     position: absolute;
     height: 150px;
     width: calc(1173px - 150px);
-    max-width: calc(100vw - 150px);
     left: 150px;
     border-radius: 16px 16px 0 0;
     position: relative;

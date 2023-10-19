@@ -21,7 +21,6 @@
 <style>
   .wide {
     width: 1104px;
-    max-width: 100vw;
   }
   .slim {
     width: calc(100vw - 40px);

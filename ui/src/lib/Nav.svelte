@@ -46,6 +46,12 @@
         </div>
       </div>
       <div
+        class:highlight={$page.route.id != "/apps"}
+        on:click={()=>goto("/apps")}
+        class="btn option"
+        >APPS
+      </div>
+      <div
         class:highlight={$page.route.id != "/profile"}
         on:click={()=>goto("/profile")}
         class="btn option"

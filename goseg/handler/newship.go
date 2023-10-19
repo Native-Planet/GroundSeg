@@ -155,6 +155,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 			}
 			config.UpdateContainerState(patp, info)
 		}
+		startram.Retrieve()
 		docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
 		return
 	}

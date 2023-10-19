@@ -2,10 +2,8 @@ package noun
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"github.com/Native-Planet/go-bitstream"
-	"github.com/spaolacci/murmur3"
 	"math/big"
 	"math/bits"
 )
@@ -15,66 +13,12 @@ type Noun interface{}
 type Cell struct {
 	Head Noun
 	Tail Noun
-	Mug  uint32
-}
-
-func byteLength(i uint64) int {
-	return (bits.Len64(i) + 7) / 8
-}
-
-func intBytes(i uint64) []byte {
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, i)
-	return buf.Bytes()[:byteLength(i)]
-}
-
-func mum(syd uint32, fal uint32, key uint64) uint32 {
-	k := intBytes(key)
-	for s := syd; s < syd+8; s++ {
-		haz := murmur3.Sum32WithSeed(k, s)
-		ham := (haz >> 31) ^ (haz & 0x7FFFFFFF)
-		if ham != 0 {
-			return ham
-		}
-	}
-	return fal
-}
-
-func mugBoth(one uint32, two uint32) uint32 {
-	return mum(0xdeadbeef, 0xfffe, uint64(two)<<32|uint64(one))
 }
 
 func deep(n Noun) bool {
 	_, ok := n.(Cell)
 	return ok
 }
-
-func (c *Cell) Hash() int {
-	if c.Mug == 0 {
-		c.Mug = mugBoth(uint32(mug(c.Head)), uint32(mug(c.Tail)))
-	}
-	return int(c.Mug)
-}
-
-func mug(n Noun) uint64 {
-	if deep(n) {
-		switch v := n.(type) {
-		case Cell:
-			return uint64(v.Hash())
-		case *Cell:
-			return uint64(v.Hash())
-		}
-	}
-	switch v := n.(type) {
-	case uint64:
-		return uint64(mum(0xcafebabe, 0x7fff, v))
-	case int:
-		return uint64(mum(0xcafebabe, 0x7fff, uint64(v)))
-	default:
-		// Handle other types or panic with a more descriptive message
-		panic(fmt.Sprintf("Unsupported type for mug: %T", n))
-	}
-} // ... [previous code]
 
 func pretty(n Noun, tailPos bool) string {
 	if deep(n) {
@@ -85,7 +29,7 @@ func pretty(n Noun, tailPos bool) string {
 		}
 		return "[" + content + "]"
 	}
-	return fmt.Sprintf("%d", n)
+	return fmt.Sprintf("%v", n)
 }
 
 func translate(seq []Noun) Noun {
@@ -94,7 +38,7 @@ func translate(seq []Noun) Noun {
 	}
 	tail := seq[len(seq)-1]
 	for i := len(seq) - 2; i >= 0; i-- {
-		tail = Cell{seq[i], tail, 0}
+		tail = Cell{seq[i], tail}
 	}
 	return tail
 }
@@ -120,9 +64,14 @@ func jamToStream(n Noun, out *bytes.Buffer) {
 		bit(true)
 	}
 
-	rBits := func(num uint64, count int) {
+	bigIntegerIsNotZero := func(bi *big.Int) bool {
+		return bi.Sign() != 0
+	}
+
+	rBits := func(num *big.Int, count int) {
 		for i := 0; i < count; i++ {
-			bit(0 != (num & (1 << i)))
+			bitValue := new(big.Int).And(num, new(big.Int).Lsh(big.NewInt(1), uint(i)))
+			bit(bigIntegerIsNotZero(bitValue))
 		}
 	}
 
@@ -130,25 +79,31 @@ func jamToStream(n Noun, out *bytes.Buffer) {
 		refs[a] = cur
 	}
 
-	mat := func(i int) {
-		if i == 0 {
+	mat := func(i *big.Int) {
+		if i.Sign() == 0 {
 			one()
 		} else {
-			a := bits.Len(uint(i))
+			a := i.BitLen()
 			b := bits.Len(uint(a))
 			above := b + 1
 			below := b - 1
 
-			rBits(uint64(1<<b), above)
-			rBits(uint64(a&((1<<below)-1)), below)
-			rBits(uint64(i), a)
+			oneVal := big.NewInt(1)
+			rBits(new(big.Int).Lsh(oneVal, uint(b)), above)
+			bigA := new(big.Int).SetInt64(int64(a))
+			temp := new(big.Int).Lsh(oneVal, uint(below)) // 1 << below
+			temp.Sub(temp, oneVal)                        // (1 << below) - 1
+			result := new(big.Int).And(bigA, temp)        // i & ((1 << below) - 1)
+			rBits(result, below)
+
+			rBits(i, a)
 		}
 	}
 
 	back := func(ref int) {
 		one()
 		one()
-		mat(ref)
+		mat(new(big.Int).SetInt64(int64(ref)))
 	}
 
 	var r func(a Noun)
@@ -166,18 +121,26 @@ func jamToStream(n Noun, out *bytes.Buffer) {
 				r(cell.Tail)
 			}
 		} else if exists {
-			isize := bits.Len(uint(a.(int)))
+			bi, isBigInt := a.(*big.Int)
+			if !isBigInt {
+				panic("Expected a *big.Int value but got something else")
+			}
+			isize := bi.BitLen()
 			dsize := bits.Len(uint(dupe))
 			if isize < dsize {
 				zero()
-				mat(a.(int))
+				mat(bi)
 			} else {
 				back(dupe)
 			}
 		} else {
 			save(a)
 			zero()
-			mat(a.(int))
+			if bi, ok := a.(*big.Int); ok {
+				mat(bi)
+			} else {
+				panic("Expected a *big.Int value but got something else")
+			}
 		}
 	}
 	r(n)
@@ -187,43 +150,47 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 	refs := make(map[int]Noun)
 	var cur int
 
-	readBits := func(n int) uint64 {
-		result := 0
+	// Helper function to create a big int from int64 value
+	newBigInt := func(val int64) *big.Int {
+		return new(big.Int).SetInt64(val)
+	}
+
+	readBits := func(n int) *big.Int {
+		result := newBigInt(0)
+		one := newBigInt(1)
 		for i := 0; i < n; i++ {
 			bit, err := s.ReadBit()
 			if err != nil {
 				panic("oh shit")
 			}
 			if bit == bitstream.One {
-				result |= 1 << i
-			} else {
-				result |= 0 << i
+				result.Or(result, new(big.Int).Lsh(one, uint(i)))
 			}
 		}
-		return uint64(result)
+		return result
 	}
 
 	one := func() bool {
 		val, _ := s.ReadBit()
 		cur++
 		return val == bitstream.One
-
 	}
 
-	rub := func() uint64 {
+	rub := func() *big.Int {
 		z := 0
 		for !one() {
 			z++
 		}
 		if z == 0 {
-			return 0
+			return newBigInt(0)
 		}
 
 		below := z - 1
 		lbits := readBits(below)
 
-		bex := uint64(1 << below)
-		val := readBits(int(bex ^ lbits))
+		oneInt := newBigInt(1)
+		bex := new(big.Int).Lsh(oneInt, uint(below))
+		val := readBits(int(new(big.Int).Xor(bex, lbits).Int64()))
 		return val
 	}
 
@@ -232,12 +199,12 @@ func cueFromStream(s *bitstream.BitReader) Noun {
 		var ret Noun
 		if one() {
 			if one() {
-				refValue := int(rub())
+				refValue := int(rub().Int64())
 				ret = refs[refValue]
 			} else {
 				head, newCur := r(cur)
 				tail, newCur := r(newCur)
-				ret = Cell{head, tail, 0}
+				ret = Cell{head, tail}
 				cur = newCur
 			}
 		} else {
@@ -264,14 +231,14 @@ func readInt(length int, s *bytes.Buffer) *big.Int {
 	return &r
 }
 
-func jam(n Noun) *big.Int {
+func Jam(n Noun) *big.Int {
 	out := new(bytes.Buffer)
 	jamToStream(n, out)
 	//fmt.Println(out.Bytes())
 	return readInt(out.Len(), out)
 }
 
-func cue(i *big.Int) Noun {
+func Cue(i *big.Int) Noun {
 	var buf bytes.Buffer
 	w := bitstream.NewWriter(&buf)
 
@@ -316,7 +283,17 @@ func cue(i *big.Int) Noun {
 	return cueFromStream(r)
 }
 
-// func main() {
+// Function to reverse a byte slice
+func reverse(data []byte) []byte {
+	length := len(data)
+	reversed := make([]byte, length)
+	for i := 0; i < length; i++ {
+		reversed[i] = data[length-1-i]
+	}
+	return reversed
+}
+
+//func main() {
 /*
 	// Test byteLength
 	fmt.Println(byteLength(0))                 // Expected: 0
@@ -350,12 +327,27 @@ func cue(i *big.Int) Noun {
 //fmt.Println(jam(1234567890987654321))
 //fmt.Println(jam(Cell{0, 0, 0}))          // Expected: [1 [2 3]]
 
-//   i := new(big.Int)
-//   i.SetString("1569560238373119425266963811040232206341",10)
-// 	fmt.Println(pretty(cue(i),false))
-
-//jtest := Cell{Cell{1234567890987654321, 1234567890987654321, 0}, Cell{1234567890987654321, 1234567890987654321, 0}, 0}
+//i := new(big.Int)
+//i.SetString("1569560238373119425266963811040232206341", 10)
+//fmt.Print("cue big int: ")
+//fmt.Println(pretty(cue(i), false))
+//
+//str := "thisisalong piece of text. it should be a huge int I hope its bigger than 65 bits. keep going and oing anf going and going"
+//
+//// Convert string to bytes.Buffer
+//bytes := []byte(str)
+//bigI := new(big.Int).SetBytes(reverse(bytes))
+////fmt.Println("bigI: ", bigI)
+//fmt.Print("jam Hello, World!: ")
+//fmt.Println(jam(bigI))
+//
+//j := new(big.Int)
+//j.SetString("123456789012345678909876543210987654321", 10)
+//jtest := Cell{Cell{j, j}, Cell{j, j}}
+//fmt.Println("jtest: ", pretty(jtest, false))
+//fmt.Print("jam jtest: ")
 //fmt.Println(jam(jtest))
+//fmt.Print("cue jam jtest: ")
 //fmt.Println(pretty(cue(jam(jtest)), false))
 
 // Test pretty
@@ -392,4 +384,4 @@ func cue(i *big.Int) Noun {
 	fmt.Println(pretty(x, false))              // Expected: [0 0]
 	fmt.Println(pretty(x, true))               // Expected: 0 0
 */
-// }
+//}

@@ -1,109 +1,78 @@
 <script>
-  import { afterUpdate } from 'svelte'
-  import { structure, toggleWifi, connectWifi } from '$lib/stores/websocket'
   import ToggleButton from '$lib/ToggleButton.svelte'
-
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+  import  { structure } from '$lib/stores/websocket'
 
-  let showNetworks = false
-  let toChange = false
-  let selectedNetwork = ""
-  let password = ''
+  let selectedModel = "Llama 7B"
+  let models = ["Llama 7B","Llama 12B","Llama 32B"]
+  let showModels = false
 
-  $: wifi = ($structure?.system?.info?.wifi) || {}
-  $: status = (wifi?.status) || false
-  $: active = (wifi?.active) || ""
-  $: networks = (wifi?.networks) || []
+  // debug
+  let status = false
+  let installed = false
 
-  $: tWifiConnect = ($structure?.system?.transition?.wifiConnect) || ""
-
-  afterUpdate(()=>{
-    if (!status) {
-      if (showNetworks) {
-        showNetworks = false
-      }
-    }
-    if (selectedNetwork == active) {
-      toChange = false
-    }
-    if (!toChange) {
-      password = ''
-    }
-  })
-
-  // select new network
-  const selectNetwork = network => {
-    toChange = true
-    selectedNetwork = network
-    showNetworks = false
+  const selectModel = model => {
+    selectedModel = model
   }
+
+  $: urbits = ($structure?.urbits) || {}
+  $: urbitKeys = Object.keys(urbits)
 </script>
 
 <div class="container">
-  <div class="sys-title">CONNECTION</div>
-
-  <div class="wifi-toggle">
-    <div class="wifi-text">Wi-Fi</div>
-    <ToggleButton
-      on:click={toggleWifi}
-      on={status}
-      />
+  <div class="sys-title">
+    PENPAI 
+    <span 
+      style="float:right;font-family:var(--regular-font);font-size:16px;background:black;color:white;padding:8px 24px;border-radius:16px;cursor:pointer;user-select:none;" 
+      on:click={()=>installed=!installed}>
+      Dev Toggle
+    </span>
   </div>
 
   <div class="wifi-options">
-    {#if status}
       <div class="active">
-        <div class="active-title">Network Name</div>
-        <div class="active-selector" class:disabled={tWifiConnect.length > 0} on:click={()=>showNetworks = !showNetworks}>
-          {#if toChange}
-            <div class="active-text">{selectedNetwork}</div>
-          {:else}
-            <div class="active-text">{active == null ? "Select a wireless network" : active}</div>
-          {/if}
-
+        <div class="active-title">Model</div>
+        <div class="active-selector" on:click={()=>showModels = !showModels}>
+          <div class="active-text">{selectedModel}</div>
           <div class="active-arrow">
-            {#if showNetworks}
+            {#if showModels}
               <Fa icon={faAngleUp} size="1x" />
             {:else}
               <Fa icon={faAngleDown} size="1x" />
             {/if}
           </div>
         </div>
-
       </div>
 
-      {#if showNetworks}
-        <div class="networks" class:disabled={tWifiConnect.length > 0}>
-          {#each networks as n}
-            <div class="network" on:click={()=>{selectNetwork(n)}}>{n}</div>
+      {#if showModels}
+        <div class="networks">
+          {#each models as n}
+            <div class="network" on:click={()=>{selectModel(n)}}>{n}</div>
           {/each}
         </div>
       {/if}
-
-      {#if toChange}
-        <div class="submit">
-          <input disabled={tWifiConnect.length > 0} type="password" placeholder="Wi-Fi Password" bind:value={password} />
-          <div class="submit-buttons">
-            <button class="cancel" on:click={()=>toChange = false} disabled={tWifiConnect.length > 0}>Cancel</button>
-            <button disabled={(password.length < 1) || tWifiConnect.length > 0} class="connect" on:click={()=>connectWifi(selectedNetwork,password)}>
-              {#if tWifiConnect.length < 1}
-                Connect
-              {:else if tWifiConnect == "connecting"}
-                Attempting to connect..
-              {:else if tWifiConnect == "success"}
-                Connected!
-              {:else if tWifiConnect == "error"}
-                Failed due to invalid credentials!
-              {/if}
-            </button>
-          </div>
-        </div>
-      {/if}
-
-    {/if}
+  </div>
+  <div class="submit-buttons">
+   <button class="connect">Change Model</button>
   </div>
 
+  <div class="companion-title">Urbit Companion App</div>
+  <div class="companion-wrapper">
+    {#each urbitKeys as p}
+      <div class="wifi-toggle">
+          <div class="companion-text">{p}</div>
+          {#if installed}
+            <ToggleButton
+              on:click={()=>status=!status}
+              on={status}
+              />
+          {:else}
+            <button class="connect">Install</button>
+          {/if}
+      </div>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -121,13 +90,31 @@
     display: flex;
     flex-direction: column;
   }
-  .wifi-text {
+  .companion-title {
     flex: 1;
     color: var(--NP_Black, #161D17);
     leading-trim: both;
     text-edge: cap;
     font-family: Inter;
     font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
+    margin-bottom: 32px;
+  }
+  .companion-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .companion-text {
+    flex: 1;
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
     font-style: normal;
     font-weight: 300;
     line-height: 48px; /* 200% */
@@ -157,6 +144,7 @@
     flex: 1;
     font-size: 13px;
     font-weight: 600;
+    user-select: none;
 
     color: var(--NP_Black, #161D17);
     leading-trim: both;
@@ -189,6 +177,7 @@
     font-weight: 300;
     letter-spacing: -1.44px;
     padding: 10px 20px;
+    user-select: none;
   }
   .network:hover {
     background: var(--bg-card);
@@ -227,6 +216,7 @@
     margin-top: 20px;
     display: flex;
     gap: 24px;
+    margin-bottom: 56px;
   }
   button {
     border-radius: 16px;

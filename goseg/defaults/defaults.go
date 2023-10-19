@@ -100,7 +100,7 @@ func SysConfig(basePath string) structs.SysConfig {
 		UpdateUrl:    "https://version.groundseg.app",
 		UpdateBranch: "latest",
 		SwapVal:      16,
-		SwapFile:     filepath.Join(basePath, "settings", "swapfile"),
+		SwapFile:     filepath.Join(basePath, "swapfile"),
 		KeyFile:      filepath.Join(basePath, "settings", "session.key"),
 		Sessions: struct {
 			Authorized   map[string]structs.SessionInfo `json:"authorized"`

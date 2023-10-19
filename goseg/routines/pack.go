@@ -84,7 +84,6 @@ func queuePack() error {
 				continue
 			}
 		}
-		logger.Logger.Warn(fmt.Sprintf("next meld %+v", meldNext))
 		if err := broadcast.UpdateScheduledPack(patp, meldNext); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
 		}

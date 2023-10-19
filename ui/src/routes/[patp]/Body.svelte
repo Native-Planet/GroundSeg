@@ -110,7 +110,7 @@
     background-color: var(--bg-card);
     width: calc(100% - 40px);
     padding: 20px 20px 0 20px;
-    max-width: 100vw;
+    min-width: 700px;
     border-radius: 16px 0 120px 16px;
     color: var(--text-card-color);
     display: flex;

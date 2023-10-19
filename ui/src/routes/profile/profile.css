@@ -2,6 +2,7 @@
   background-color: var(--bg-base);
   color: var(--text-color);
   border-radius: 16px;
+  min-width: 700px;
   backdrop-filter: blur(2px);
   -moz-backdrop-filter: blur(2px);
   -o-backdrop-filter: blur(2px);

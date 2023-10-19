@@ -7,8 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"goseg/broadcast"
 	"goseg/config"
+	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
 	"io"
@@ -31,9 +31,9 @@ const (
 
 // handle bug report requests
 func SupportHandler(msg []byte, payload structs.WsPayload) error {
-	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "loading"}
+	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "loading"}
 	handleError := func(err error) error {
-		broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReportError", BugReportError: fmt.Sprintf("%v", err)}
+		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: fmt.Sprintf("%v", err)}
 		return err
 	}
 	var supportPayload structs.WsSupportPayload
@@ -68,11 +68,11 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	if err := sendBugReport(zipPath, contact, description); err != nil {
 		return handleError(fmt.Errorf("Couldn't submit bug report: %v", err))
 	}
-	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "success"}
+	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "success"}
 	time.Sleep(3 * time.Second)
-	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: "done"}
+	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "done"}
 	time.Sleep(1 * time.Second)
-	broadcast.SysTransBus <- structs.SystemTransitionBroadcast{Type: "bugReport", BugReport: ""}
+	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: ""}
 	return nil
 }
 

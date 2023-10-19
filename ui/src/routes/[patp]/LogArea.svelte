@@ -6,6 +6,7 @@
   export let container
   let div
 	let autoscroll
+  let isLatest = true
   let copied = false
 
   // minio and ship
@@ -31,6 +32,9 @@
 	})
 	afterUpdate(() => {
 		if (autoscroll) div.scrollTo(0, div.scrollHeight);
+    if (isLatest) {
+      toLatest()
+    }
 	})
 
   const toLatest = () => {

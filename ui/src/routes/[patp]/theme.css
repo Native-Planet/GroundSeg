@@ -6,6 +6,7 @@
 .section {
   display: flex;
   align-items: center;
+  min-width: 700px;
 }
 .section-left {
   flex: 1;
