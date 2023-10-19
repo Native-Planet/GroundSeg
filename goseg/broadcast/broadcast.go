@@ -107,6 +107,7 @@ func bootstrapBroadcastState() error {
 	go hostStatusLoop()
 	go shipStatusLoop()
 	go profileStatusLoop()
+	go appsStatusLoop()
 	return nil
 }
 
@@ -405,6 +406,22 @@ func shipStatusLoop() {
 			mu.RUnlock()
 			updates = PreserveUrbitsTransitions(newState, updates)
 			newState.Urbits = updates
+			UpdateBroadcast(newState)
+			BroadcastToClients()
+		}
+	}
+}
+
+func appsStatusLoop() {
+	ticker := time.NewTicker(hostInfoInterval)
+	for {
+		select {
+		case <-ticker.C:
+			updates := constructAppsInfo()
+			mu.RLock()
+			newState := broadcastState
+			mu.RUnlock()
+			newState.Apps = updates
 			UpdateBroadcast(newState)
 			BroadcastToClients()
 		}
