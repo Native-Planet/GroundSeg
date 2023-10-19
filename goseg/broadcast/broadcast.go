@@ -11,6 +11,7 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
