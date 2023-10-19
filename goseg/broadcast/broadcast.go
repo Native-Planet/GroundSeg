@@ -262,7 +262,11 @@ func constructAppsInfo() structs.Apps {
 		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
 	}
 	apps.Penpai.Info.Models = modelTitles
-	apps.Penpai.Info.Allowed = true // todo: allow if envvar set
+	if os.Getenv("GS_LLAMA") == "true" {
+		apps.Penpai.Info.Allowed = true
+	} else {
+		apps.Penpai.Info.Allowed = false
+	}
 	apps.Penpai.Info.ActiveModel = activeModel
 	//apps.Penpai.CompanionStatus map[string]string
 	return apps
