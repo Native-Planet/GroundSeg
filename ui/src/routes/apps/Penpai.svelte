@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte'
+  import { afterUpdate } from 'svelte'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
@@ -19,7 +19,11 @@
   $: penpaiAllowed = (penpai?.allowed) || false
 
   let selectedModel = ""
-  onMount(()=>selectedModel = activeModel)
+  afterUpdate(()=>{
+    if (selectedModel.length < 1) {
+      selectedModel = activeModel
+    }
+  })
 
   const selectModel = model => {
     showModels = false
@@ -33,9 +37,22 @@
 </script>
 
 <div class="container">
-  <div class="sys-title">PENPAI {!penpaiAllowed ? "(DISABLED)" : ""}</div>
+      <div class="sys-toggle">
+        <div class="sys-title">PENPAI {!penpaiAllowed ? "(DISABLED)" : ""}</div>
+        {#if penpaiAllowed}
+            <ToggleButton
+              on:click={()=>status=!status}
+              on={status}
+              />
+        {/if}
+      </div>
 
   {#if penpaiAllowed}
+    <div class="wifi-toggle">
+      <div class="install-text">Allocate CPU Cores</div>
+      <div>Slider here</div>
+    </div>
+
     <div class="wifi-options">
         <div class="active">
           <div class="active-title">Model</div>
@@ -60,28 +77,22 @@
         {/if}
     </div>
 
-    <div class="submit-buttons">
-      {#if selectedModel != activeModel}
-        <button class="connect" on:click={handleChangeModel}>Change Model</button>
-      {/if}
-    </div>
+    {#if selectedModel != activeModel}
+      <div class="submit-buttons">
+          <button class="connect" on:click={handleChangeModel}>Change Model</button>
+      </div>
+    {/if}
 
-    <div class="companion-title">Urbit Companion App</div>
+    <div class="companion-title">Install Companion App</div>
     <div class="companion-wrapper">
       {#each urbitKeys as p}
         <div class="wifi-toggle">
-            <div class="companion-text">{p}</div>
-            {#if installed}
-              <ToggleButton
-                on:click={()=>status=!status}
-                on={status}
-                />
-            {:else}
-              <button class="connect">Install</button>
-            {/if}
+          <div class="checkbox"></div>
+          <div class="companion-text">{p}</div>
         </div>
       {/each}
     </div>
+    <button class="remove">Delete Penpai Local Data</button>
   {/if}
 </div>
 
@@ -90,11 +101,19 @@
     margin: 0;
   }
   .sys-title {
-    margin-bottom: 56px;
+    flex: 1;
+  }
+  .sys-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 55px;
   }
   .wifi-toggle {
     display: flex;
     align-items: center;
+    gap: 24px;
   }
   .wifi-options {
     display: flex;
@@ -111,20 +130,37 @@
     font-weight: 300;
     line-height: 48px; /* 200% */
     letter-spacing: -1.44px;
-    margin-bottom: 32px;
+    margin-top: 32px;
   }
   .companion-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 8px;
   }
-  .companion-text {
+  .install-text {
     flex: 1;
     color: var(--NP_Black, #161D17);
     leading-trim: both;
     text-edge: cap;
     font-family: Inter;
-    font-size: 18px;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 48px; /* 200% */
+    letter-spacing: -1.44px;
+  }
+  .checkbox {
+    width: 24px;
+    height: 24px;
+    border: solid 2px var(--text-color);
+    border-radius: 8px;
+  }
+  .companion-text {
+    color: var(--NP_Black, #161D17);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 21px;
     font-style: normal;
     font-weight: 300;
     line-height: 48px; /* 200% */
@@ -247,8 +283,9 @@
     opacity: .6;
     pointer-events: none;
   }
-  .cancel {
-    background-color: var(--btn-secondary);
+  .remove {
+    margin-top: 32px;
+    background-color: black;
   }
   .connect {
     background-color: var(--btn-primary);

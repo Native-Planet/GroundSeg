@@ -129,6 +129,7 @@ func SysConfig(basePath string) structs.SysConfig {
 		Pubkey:         "",
 		Privkey:        "",
 		Salt:           "",
+		PenpaiActive:   "Llama 2 7B",
 		PenpaiModels: []structs.Penpai{
 			{
 				ModelTitle: "Llama 2 7B",
