@@ -551,5 +551,12 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	} else {
 		mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
 	}
+
+	// PenpaiActive
+	if customConfig.PenpaiActive != "" {
+		mergedConfig.PenpaiActive = customConfig.PenpaiActive
+	} else {
+		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
+	}
 	return mergedConfig
 }
