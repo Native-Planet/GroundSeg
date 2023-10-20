@@ -75,7 +75,7 @@
     width: 992px;
     height: calc(100vh - 240px);
     margin-top: 60px;
-    max-width: 98vw;
+    max-width: 100vw;
   }
   .slim {
     width: 100vw;
@@ -100,6 +100,7 @@
     border: none;
     height: 30px;
     width: 480px;
+    max-width: 80vw;
     text-align: center;
   }
   input:focus {

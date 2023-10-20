@@ -2,7 +2,7 @@
   import { afterUpdate } from 'svelte'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
-  import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+  import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
   import  { structure, setPenpaiModel } from '$lib/stores/websocket'
 
   let showModels = false
@@ -17,8 +17,11 @@
   $: models = (penpai?.models) || []
   $: activeModel = (penpai?.activeModel) || ""
   $: penpaiAllowed = (penpai?.allowed) || false
+  $: minCores = 1
+  $: maxCores = 11
 
   let selectedModel = ""
+  let selectedCores = 1
   afterUpdate(()=>{
     if (selectedModel.length < 1) {
       selectedModel = activeModel
@@ -50,7 +53,15 @@
   {#if penpaiAllowed}
     <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
-      <div>Slider here</div>
+      <div class="right">
+        <button class="btn">
+          <Fa icon={faMinus} size="1x" />
+        </button>
+        <div class="val">{selectedCores} Core{selectedCores > 1 ? "s" : ""}</div>
+        <button class="btn">
+          <Fa icon={faPlus} size="1x" />
+        </button>
+      </div>
     </div>
 
     <div class="wifi-options">
@@ -114,6 +125,9 @@
     display: flex;
     align-items: center;
     gap: 24px;
+  }
+  input[type="range"] {
+    flex: 1;
   }
   .wifi-options {
     display: flex;
@@ -293,5 +307,35 @@
   .disabled {
     opacity:.6;
     pointer-events: none;
+  }
+  .right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  .btn {
+    background: var(--btn-secondary);
+    color: var(--text-card-color);
+    text-align: center;
+    height: 56px;
+    line-height: 38px;
+    border-radius: 16px;
+    font-size: 20px;
+    cursor: pointer;
+    padding-bottom: 4px;
+  }
+  .btn:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .val {
+    color: #000;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: 24px; /* 100% */
+    letter-spacing: -1.44px;
   }
 </style>
