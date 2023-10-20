@@ -192,7 +192,7 @@ var (
 		echo "Developer mode: $devMode"
 		echo "No logs will display"
 		# Run urbit inside a tmux pane (no logs)
-		tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom $dirname' /dev/null"
+		tmux new -d -s urbit "script -q -c 'exec urbit -p $amesPort --http-port $httpPort --loom $loom --snap-time 60 $dirname' /dev/null"
 		tmux_pid=$(tmux list-panes -t urbit -F "#{pane_pid}")
 		while kill -0 "$tmux_pid" 2> /dev/null; do
 			sleep 3
@@ -200,8 +200,8 @@ var (
 		tmux kill-session -t urbit
 		exit 0
 	else
-		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname"
-		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom $dirname
+		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time 60 $dirname"
+		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time 60  $dirname
 	fi`
 
 	PackScript = `#!/bin/bash
