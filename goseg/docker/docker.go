@@ -615,8 +615,8 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	res = make(map[string]string)
 	if containerType == "llama-api" {
 		res["tag"] = "latest"
-		res["hash"] = "b6d21ff8c4d9baad65e1fa741a0f8c898d68735fff3f3cd777e3f0c6a1839dd4"
-		res["repo"] = "ghcr.io/abetlen/llama-cpp-python"
+		res["hash"] = "c8b5efc675e4069d88279195d6fca63c8aacb23d9ce15e3c68481e87c6751eb5"
+		res["repo"] = "nativeplanet/llama-gpt"
 		return res, nil
 	} else if containerType == "llama-ui" {
 		res["tag"] = "latest"
