@@ -33,7 +33,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "nativeplanet/llama-gpt:latest@sha256:c47ee031309dc0680e0a7cea41cc6df72fc1f99baad043af3b7dcbd7a8accba7"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:08126b795acddbbea0621f900a567c1df4f891292988d02e2c1e74009e1df51b"
 	lessCores := runtime.NumCPU() - 1
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
