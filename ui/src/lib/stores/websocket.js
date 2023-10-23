@@ -644,6 +644,23 @@ export const setPenpaiCores = cores => {
   send(payload)
 }
 
+export const removePenpai = () => {
+  let payload = {
+    "type":"penpai",
+    "action": "remove"
+  }
+  send(payload)
+}
+
+export const togglePenpaiCompanion = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-penpai-companion",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 //
 //  Dev
 //   
