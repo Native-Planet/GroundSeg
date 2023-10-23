@@ -31,6 +31,10 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	case "toggle-penpai-companion":
+		// |install
+		logger.Logger.Debug(fmt.Sprintf("Todo: click toggle |install %%penpai for %v", patp))
+		return nil
 	case "pack":
 		// error handling
 		packError := func(err error) error {

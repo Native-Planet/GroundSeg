@@ -269,6 +269,7 @@ type WsPenpaiAction struct {
 	Type   string `json:"type"`
 	Action string `json:"action"`
 	Model  string `json:"model"`
+	Cores  int    `json:"cores"`
 }
 
 type WsUrbitAction struct {

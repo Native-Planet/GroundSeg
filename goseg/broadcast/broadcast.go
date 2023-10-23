@@ -269,6 +269,7 @@ func constructAppsInfo() structs.Apps {
 		apps.Penpai.Info.Allowed = false
 	}
 	apps.Penpai.Info.ActiveModel = activeModel
+	//apps.Penpai.Info.Running =
 	//apps.Penpai.CompanionStatus map[string]string
 	return apps
 }

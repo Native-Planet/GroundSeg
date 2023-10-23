@@ -3,7 +3,7 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, setPenpaiModel } from '$lib/stores/websocket'
+  import  { structure, togglePenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
 
   let showModels = false
 
@@ -21,7 +21,7 @@
   $: maxCores = 11
 
   let selectedModel = ""
-  let selectedCores = 1
+  let selectedCores = 4
   afterUpdate(()=>{
     if (selectedModel.length < 1) {
       selectedModel = activeModel
@@ -44,7 +44,7 @@
         <div class="sys-title">PENPAI {!penpaiAllowed ? "(DISABLED)" : ""}</div>
         {#if penpaiAllowed}
             <ToggleButton
-              on:click={()=>status=!status}
+              on:click={togglePenpai}
               on={status}
               />
         {/if}
@@ -54,11 +54,11 @@
     <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
       <div class="right">
-        <button class="btn">
+        <button class="btn" on:click={()=>setPenpaiCores(selectedCores - 1)}>
           <Fa icon={faMinus} size="1x" />
         </button>
         <div class="val">{selectedCores} Core{selectedCores > 1 ? "s" : ""}</div>
-        <button class="btn">
+        <button class="btn" on:click={()=>setPenpaiCores(selectedCores + 1)}>
           <Fa icon={faPlus} size="1x" />
         </button>
       </div>
@@ -98,12 +98,12 @@
     <div class="companion-wrapper">
       {#each urbitKeys as p}
         <div class="wifi-toggle">
-          <div class="checkbox"></div>
+          <div class="checkbox" on:click={()=>togglePenpaiCompanion(p)}></div>
           <div class="companion-text">{p}</div>
         </div>
       {/each}
     </div>
-    <button class="remove">Delete Penpai Local Data</button>
+    <button class="remove" on:click={removePenpai}>Delete Penpai Local Data</button>
   {/if}
 </div>
 
