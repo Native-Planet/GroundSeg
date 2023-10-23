@@ -617,11 +617,29 @@ export const submitNetwork = (ssid,password) => {
 //
 // Penpai
 //
+
+export const togglePenpai = () => {
+  let payload = {
+    "type":"penpai",
+    "action": "toggle",
+  }
+  send(payload)
+}
+
 export const setPenpaiModel = model => {
   let payload = {
     "type":"penpai",
     "action": "set-model",
     "model": model
+  }
+  send(payload)
+}
+
+export const setPenpaiCores = cores => {
+  let payload = {
+    "type":"penpai",
+    "action": "set-cores",
+    "cores": cores
   }
   send(payload)
 }

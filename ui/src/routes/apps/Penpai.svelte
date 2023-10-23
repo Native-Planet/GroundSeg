@@ -3,7 +3,7 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, setPenpaiModel } from '$lib/stores/websocket'
+  import  { structure, setPenpaiModel, setPenpaiCores, togglePenpai } from '$lib/stores/websocket'
 
   let showModels = false
 
@@ -44,7 +44,7 @@
         <div class="sys-title">PENPAI {!penpaiAllowed ? "(DISABLED)" : ""}</div>
         {#if penpaiAllowed}
             <ToggleButton
-              on:click={()=>status=!status}
+              on:click={togglePenpai}
               on={status}
               />
         {/if}
@@ -54,11 +54,11 @@
     <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
       <div class="right">
-        <button class="btn">
+        <button class="btn" on:click={()=>setPenpaiCores(selectedCores - 1)}>
           <Fa icon={faMinus} size="1x" />
         </button>
         <div class="val">{selectedCores} Core{selectedCores > 1 ? "s" : ""}</div>
-        <button class="btn">
+        <button class="btn" on:click={()=>setPenpaiCores(selectedCores + 1)}>
           <Fa icon={faPlus} size="1x" />
         </button>
       </div>
