@@ -43,6 +43,7 @@ var (
 	LogsEventBus  = make(chan structs.LogsEvent, 100)
 	DockerDir     = "/var/lib/docker/volumes/"
 	confPath      = filepath.Join(BasePath, "settings", "system.json")
+	keyPath       = filepath.Join(BasePath, "settings", "session.key")
 	confMutex     sync.Mutex
 	contMutex     sync.Mutex
 	versMutex     sync.Mutex
@@ -83,13 +84,8 @@ func init() {
 			panic("")
 		}
 		// generate and insert aes & wireguard keys
-		keyPath := filepath.Join(BasePath, "settings", "session.key")
-		keyfile, err := os.Stat(keyPath)
-		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
-			}
+		if err := createKeyfile(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't create keyfile: %v", err))
 		}
 		file, _ = os.Open(confPath)
 		salt := RandString(32)
@@ -156,23 +152,10 @@ func init() {
 		logger.Logger.Error(errmsg)
 	}
 	// create a keyfile if you dont have one (gs1)
-	conf := Conf()
-	if conf.KeyFile == "" {
-		keyPath := filepath.Join(BasePath, "settings", "session.key")
-		keyfile, err := os.Stat(keyPath)
-		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
-			}
-		}
-		file, _ = os.Open(confPath)
-		if err = UpdateConf(map[string]interface{}{
-			"keyfile": keyPath,
-		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
-		}
+	if err := createKeyfile(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't create keyfile: %v", err))
 	}
+	conf := Conf()
 	if conf.Setup == "" {
 		var update string
 		if conf.FirstBoot == true {
@@ -186,6 +169,26 @@ func init() {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
+}
+
+// create a keyfile for token crypto
+func createKeyfile() error {
+	keyfile, err := os.Stat(keyPath)
+	if err != nil || keyfile.Size() == 0 {
+		keyContent := RandString(32)
+		if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+			return fmt.Errorf(fmt.Sprintf("Couldn't write keyfile! %v", err))
+		}
+	}
+	conf := Conf()
+	if conf.KeyFile != keyPath {
+		if err = UpdateConf(map[string]interface{}{
+			"keyfile": keyPath,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // return the global conf var
