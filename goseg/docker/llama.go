@@ -33,7 +33,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "nativeplanet/llama-gpt:latest@sha256:526320882c4b263ccf82abdec4f6b8188a16e233aebed15a52be33adb4f34c52"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:08126b795acddbbea0621f900a567c1df4f891292988d02e2c1e74009e1df51b"
 	lessCores := runtime.NumCPU() - 1
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
@@ -44,12 +44,12 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
-	exists, err = volumeExists(apiContainerName + "_app")
+	exists, err = volumeExists(apiContainerName + "_api")
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
 	}
 	if !exists {
-		if err = CreateVolume(apiContainerName + "_app"); err != nil {
+		if err = CreateVolume(apiContainerName + "_api"); err != nil {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
@@ -57,20 +57,18 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
 	}
-	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_app", "_data", "run.sh")
+	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: apiContainerName,
-		Cmd:      []string{"/bin/sh", "/app/run.sh"},
+		Cmd:      []string{"/bin/sh", "/api/run.sh"},
 		Env: []string{
-			"MODEL=/models/code-llama-7b-chat.gguf",
-			"MODEL_DOWNLOAD_URL=https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF/resolve/main/codellama-7b-instruct.Q4_K_M.gguf",
+			"MODEL=/models/llama-2-7b-chat.bin",
+			"MODEL_DOWNLOAD_URL=https://huggingface.co/TheBloke/Nous-Hermes-Llama-2-7B-GGML/resolve/main/nous-hermes-llama-2-7b.ggmlv3.q4_0.bin",
 			"N_GQA=1",
-			"DEFAULT_SYSTEM_PROMPT=\"You are a helpful coding assistant. Use markdown when responding with code.\"",
-			"WAIT_TIMEOUT=3600",
 			"USE_MLOCK=1",
 		},
 		ExposedPorts: nat.PortSet{
@@ -115,8 +113,8 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			},
 			{
 				Type:   mount.TypeVolume,
-				Source: apiContainerName + "_app",
-				Target: "/app",
+				Source: apiContainerName + "_api",
+				Target: "/api",
 			},
 		},
 		Binds: binds,
@@ -141,8 +139,8 @@ func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
 		Env: []string{
 			"OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXX",
 			"OPENAI_API_HOST=http://llama-gpt-api:8000",
-			"DEFAULT_MODEL=/models/code-llama-7b-chat.gguf",
-			`NEXT_PUBLIC_DEFAULT_SYSTEM_PROMPT=You are a helpful coding assistant. Use markdown when responding with code.`,
+			"DEFAULT_MODEL=/models/llama-2-7b-chat.bin",
+			`NEXT_PUBLIC_DEFAULT_SYSTEM_PROMPT=You are a helpful and friendly AI assistant. Respond very concisely.`,
 			"WAIT_HOSTS=llama-gpt-api:8000",
 			"WAIT_TIMEOUT=3600",
 		},
