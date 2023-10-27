@@ -69,6 +69,7 @@ func init() {
 	}
 	logger.Logger.Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath := filepath.Join(BasePath, "settings", "system.json")
+	keyPath := filepath.Join(BasePath, "settings", "session.key")
 	file, err := os.Open(confPath)
 	if err != nil {
 		// create a default if it doesn't exist
@@ -81,15 +82,6 @@ func init() {
 			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
 			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 			panic("")
-		}
-		// generate and insert aes & wireguard keys
-		keyPath := filepath.Join(BasePath, "settings", "session.key")
-		keyfile, err := os.Stat(keyPath)
-		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
-			}
 		}
 		file, _ = os.Open(confPath)
 		salt := RandString(32)
@@ -108,6 +100,17 @@ func init() {
 		}
 	}
 	defer file.Close()
+	_, err = os.Open(keyPath)
+	if err != nil {
+		// generate and insert aes & wireguard keys
+		keyfile, err := os.Stat(keyPath)
+		if err != nil || keyfile.Size() == 0 {
+			keyContent := RandString(32)
+			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+			}
+		}
+	}
 	// read the sysconfig to memory
 	decoder := json.NewDecoder(file)
 	if err = decoder.Decode(&globalConfig); err != nil {
@@ -545,12 +548,22 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 		mergedConfig.Salt = defaultConfig.Salt
 	}
 
+	// PenpaiCores
+	if customConfig.PenpaiCores != 0 {
+		mergedConfig.PenpaiCores = customConfig.PenpaiCores
+	} else {
+		mergedConfig.PenpaiCores = defaultConfig.PenpaiCores
+	}
+
 	// PenpaiModels
 	if len(customConfig.PenpaiModels) > 0 {
 		mergedConfig.PenpaiModels = customConfig.PenpaiModels
 	} else {
 		mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
 	}
+
+	// PenpaiRunning
+	mergedConfig.PenpaiRunning = customConfig.PenpaiRunning
 
 	// PenpaiActive
 	if customConfig.PenpaiActive != "" {

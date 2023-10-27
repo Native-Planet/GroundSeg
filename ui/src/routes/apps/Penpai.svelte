@@ -8,7 +8,6 @@
   let showModels = false
 
   // debug
-  let status = false
   let installed = false
 
   $: urbits = ($structure?.urbits) || {}
@@ -17,11 +16,13 @@
   $: models = (penpai?.models) || []
   $: activeModel = (penpai?.activeModel) || ""
   $: penpaiAllowed = (penpai?.allowed) || false
+  $: penpaiRunning = (penpai?.running) || false
   $: minCores = 1
-  $: maxCores = 11
+  $: maxCores = (penpai?.maxCores) || 1
+  $: activeCores = (penpai?.activeCores) || 1
 
   let selectedModel = ""
-  let selectedCores = 4
+
   afterUpdate(()=>{
     if (selectedModel.length < 1) {
       selectedModel = activeModel
@@ -45,7 +46,7 @@
         {#if penpaiAllowed}
             <ToggleButton
               on:click={togglePenpai}
-              on={status}
+              on={penpaiRunning}
               />
         {/if}
       </div>
@@ -54,11 +55,11 @@
     <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
       <div class="right">
-        <button class="btn" on:click={()=>setPenpaiCores(selectedCores - 1)}>
+        <button disabled={activeCores == minCores} class="btn" on:click={()=>setPenpaiCores(activeCores - 1)}>
           <Fa icon={faMinus} size="1x" />
         </button>
-        <div class="val">{selectedCores} Core{selectedCores > 1 ? "s" : ""}</div>
-        <button class="btn" on:click={()=>setPenpaiCores(selectedCores + 1)}>
+        <div class="val">{activeCores} Core{activeCores > 1 ? "s" : ""}</div>
+        <button disabled={activeCores == maxCores} class="btn" on:click={()=>setPenpaiCores(activeCores + 1)}>
           <Fa icon={faPlus} size="1x" />
         </button>
       </div>
@@ -94,16 +95,20 @@
       </div>
     {/if}
 
-    <div class="companion-title">Install Companion App</div>
-    <div class="companion-wrapper">
-      {#each urbitKeys as p}
-        <div class="wifi-toggle">
-          <div class="checkbox" on:click={()=>togglePenpaiCompanion(p)}></div>
-          <div class="companion-text">{p}</div>
-        </div>
-      {/each}
-    </div>
+    {#if urbitKeys.length > 0}
+      <div class="companion-title">Install Companion App</div>
+      <div class="companion-wrapper">
+        {#each urbitKeys as p}
+          <div class="wifi-toggle">
+            <div class="checkbox" on:click={()=>togglePenpaiCompanion(p)}></div>
+            <div class="companion-text">{p}</div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+    <!--
     <button class="remove" on:click={removePenpai}>Delete Penpai Local Data</button>
+    -->
   {/if}
 </div>
 

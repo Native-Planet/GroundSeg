@@ -12,6 +12,7 @@ import (
 	"goseg/structs"
 	"goseg/system"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -257,19 +258,16 @@ func constructAppsInfo() structs.Apps {
 
 	// penpai
 	var modelTitles []string
-	activeModel := conf.PenpaiActive
 	// Iterate through penpais to extract modelTitle
 	for _, penpaiInfo := range conf.PenpaiModels {
 		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
 	}
 	apps.Penpai.Info.Models = modelTitles
-	if os.Getenv("GS_LLAMA") == "true" {
-		apps.Penpai.Info.Allowed = true
-	} else {
-		apps.Penpai.Info.Allowed = false
-	}
-	apps.Penpai.Info.ActiveModel = activeModel
-	//apps.Penpai.Info.Running =
+	apps.Penpai.Info.Allowed = os.Getenv("GS_LLAMA") == "true"
+	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
+	apps.Penpai.Info.Running = conf.PenpaiRunning
+	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
+	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
 	//apps.Penpai.CompanionStatus map[string]string
 	return apps
 }

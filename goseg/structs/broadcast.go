@@ -21,6 +21,9 @@ type Apps struct {
 type PenpaiBroadcast struct {
 	Info struct {
 		Allowed         bool              `json:"allowed"`
+		Running         bool              `json:"running"`
+		ActiveCores     int               `json:"activeCores"`
+		MaxCores        int               `json:"maxCores"`
 		Models          []string          `json:"models"`
 		ActiveModel     string            `json:"activeModel"`
 		CompanionStatus map[string]string `json:"companionStatus"`
