@@ -5,9 +5,9 @@ import (
 	"goseg/config"
 	"goseg/defaults"
 	"goseg/logger"
+	"goseg/structs"
 	"io/ioutil"
 	"path/filepath"
-	"runtime"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -16,6 +16,18 @@ import (
 
 func LoadLlama() error {
 	logger.Logger.Info("Loading Llama GPT")
+	conf := config.Conf()
+	if !conf.PenpaiRunning {
+		err := StopContainerByName("llama-gpt-api")
+		if err != nil {
+			return fmt.Errorf(fmt.Sprint("Failed to kill Llama API: %v", err))
+		}
+		err = StopContainerByName("llama-gpt-ui")
+		if err != nil {
+			return fmt.Errorf(fmt.Sprint("Failed to kill Llama UI: %v", err))
+		}
+		return nil
+	}
 	info, err := StartContainer("llama-gpt-api", "llama-api")
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
@@ -30,11 +42,12 @@ func LoadLlama() error {
 }
 
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
+	conf := config.Conf()
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
 	desiredImage := "nativeplanet/llama-gpt:latest@sha256:08126b795acddbbea0621f900a567c1df4f891292988d02e2c1e74009e1df51b"
-	lessCores := runtime.NumCPU() - 1
+	lessCores := conf.PenpaiCores
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
@@ -61,13 +74,20 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
+	var found *structs.Penpai
+	for _, item := range conf.PenpaiModels {
+		if item.ModelTitle == conf.PenpaiActive {
+			found = &item
+			break
+		}
+	}
 	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: apiContainerName,
 		Cmd:      []string{"/bin/sh", "/api/run.sh"},
 		Env: []string{
-			"MODEL=/models/llama-2-7b-chat.bin",
-			"MODEL_DOWNLOAD_URL=https://huggingface.co/TheBloke/Nous-Hermes-Llama-2-7B-GGML/resolve/main/nous-hermes-llama-2-7b.ggmlv3.q4_0.bin",
+			fmt.Sprintf("MODEL=/models/%v", found.ModelName),
+			fmt.Sprintf("MODEL_DOWNLOAD_URL=%v", found.ModelUrl),
 			"N_GQA=1",
 			"USE_MLOCK=1",
 		},
@@ -75,7 +95,6 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			"8000/tcp": struct{}{},
 		},
 	}
-	conf := config.Conf()
 	var piers []string
 	for _, pier := range conf.Piers {
 		if config.UrbitsConfig[pier].BootStatus == "boot" {
