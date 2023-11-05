@@ -8,6 +8,7 @@ export const logs = writable({})
 export const wsPort = writable("3000")
 export const isC2CMode = writable(false)
 export const ssids = writable([])
+export const firstLoad = writable(true)
 
 let PENDING = new Set();
 let SESSION;
@@ -88,6 +89,7 @@ export const handleMessage = data => {
   } else {
     console.log("server alive")
   }
+  firstLoad.set(false)
 }
 
 // Activity Handler

@@ -6,10 +6,11 @@
   import { goto } from '$app/navigation';
 
   // Websocket
-  import { isC2CMode, wsPort, connect, structure, connected } from '$lib/stores/websocket'
+  import { firstLoad, isC2CMode, wsPort, connect, structure, connected } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
 
   import ApiSpinner from './ApiSpinner.svelte'
+  import FirstLoad from './FirstLoad.svelte'
 
   // Style
   import "../theme.css"
@@ -23,9 +24,6 @@
   $: authLevel = ($structure?.auth_level) || "unauthorized"
   $: stage = ($structure?.stage) || null
   $: pageRouteID = $page.route.id
-
-  // debug
-  //let stage = "start"
 
   let count = 0
   const redirector = () => {
@@ -77,5 +75,9 @@
 </script>
 
 <!--svelte:window bind:innerWidth bind:innerHeight /-->
-<slot/>
-<ApiSpinner />
+{#if $firstLoad}
+  <FirstLoad />
+{:else}
+  <slot/>
+  <ApiSpinner />
+{/if}
