@@ -31,37 +31,42 @@ func CheckVersionLoop() {
 	ticker := time.NewTicker(checkInterval)
 	releaseChannel := conf.UpdateBranch
 	if conf.UpdateMode == "auto" {
+		callUpdater(releaseChannel)
 		for {
 			select {
 			case <-ticker.C:
-				// Get latest information
-				latestVersion, _ := config.CheckVersion()
-				currentChannelVersion := config.VersionInfo
-				latestChannelVersion := latestVersion
-				// check docker updates
-				if latestChannelVersion != currentChannelVersion {
-					config.VersionInfo = latestVersion
-					updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
-				}
-				// Check for gs binary updates based on hash
-				binPath := filepath.Join(config.BasePath, "groundseg")
-				currentHash, err := getSha256(binPath)
-				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't hash binary: %v", err))
-					continue
-				}
-				latestHash := latestVersion.Groundseg.Amd64Sha256
-				if config.Architecture != "amd64" {
-					latestHash = latestVersion.Groundseg.Arm64Sha256
-				}
-				if currentHash != latestHash {
-					logger.Logger.Info("GroundSeg Binary update!")
-					// updateBinary will likely restart the program, so
-					// we don't have to care about the docker updates.
-					updateBinary(releaseChannel, latestVersion)
-				}
+				callUpdater(releaseChannel)
 			}
 		}
+	}
+}
+
+func callUpdater(releaseChannel string) {
+	// Get latest information
+	latestVersion, _ := config.CheckVersion()
+	currentChannelVersion := config.VersionInfo
+	latestChannelVersion := latestVersion
+	// check docker updates
+	if latestChannelVersion != currentChannelVersion {
+		config.VersionInfo = latestVersion
+		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+	}
+	// Check for gs binary updates based on hash
+	binPath := filepath.Join(config.BasePath, "groundseg")
+	currentHash, err := getSha256(binPath)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't hash binary: %v", err))
+		return
+	}
+	latestHash := latestVersion.Groundseg.Amd64Sha256
+	if config.Architecture != "amd64" {
+		latestHash = latestVersion.Groundseg.Arm64Sha256
+	}
+	if currentHash != latestHash {
+		logger.Logger.Info("GroundSeg Binary update!")
+		// updateBinary will likely restart the program, so
+		// we don't have to care about the docker updates.
+		updateBinary(releaseChannel, latestVersion)
 	}
 }
 
