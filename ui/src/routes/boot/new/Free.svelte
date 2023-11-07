@@ -1,6 +1,6 @@
 <script>
   import KeyDropper from './KeyDropper.svelte';
-  import { bootShip } from '$lib/stores/websocket';
+  import { structure, bootShip } from '$lib/stores/websocket';
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
@@ -11,6 +11,9 @@
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
+
+  $: registered = ($structure?.profile?.startram?.info?.registered) || false
+  $: running = ($structure?.profile?.startram?.info?.running) || false
 
 </script>
 
@@ -25,12 +28,14 @@
   <div class="label">Bootfile</div>
   <KeyDropper on:change={e=> key = e.detail} />
   <div class="check-wrapper" on:click={()=>remote = !remote}>
-    <div class="checkbox">
-      {#if remote}
-        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
-      {/if}
-    </div>
-    <div class="check-label">Set to remote</div>
+    {#if registered && running}
+      <div class="checkbox">
+        {#if remote}
+          <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+        {/if}
+      </div>
+      <div class="check-label">Set to remote</div>
+    {/if}
   </div>
   <div class="buttons">
     <button class="btn back" on:click={()=>goto('/boot')}>Back</button>
