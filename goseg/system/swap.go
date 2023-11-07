@@ -22,6 +22,7 @@ func ConfigureSwap(file string, val int) error {
 		if err := stopSwap(file); err != nil {
 			return fmt.Errorf("Couldn't remove swap: %v", err)
 		}
+		return nil
 	}
 	if _, err := os.Stat(file); os.IsNotExist(err) {
 		if err := makeSwap(file, val); err != nil {
