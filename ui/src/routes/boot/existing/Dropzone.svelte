@@ -131,7 +131,7 @@
         <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
       {/if}
     </div>
-    <div class="check-label">Set to remote</div>
+      <div class="check-label">Set to remote</div>
   </div>
   {/if}
   <div class="check-wrapper" on:click={handleFix}>
