@@ -12,7 +12,7 @@
   $: usage = ($structure?.system?.info?.usage) || {}
   $: swap = (usage?.swap) || 0
   $: ram = (usage?.ram) || [0,0]
-  $: disk = (usage?.disk) || [0,0,0]
+  $: disk = (usage?.disk) || {};
   $: cpu = (usage?.cpu) || 0
   $: cpuTemp = (usage?.cpu_temp) || 0
 
