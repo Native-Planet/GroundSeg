@@ -184,12 +184,31 @@ func handleStartramEndpoint(endpoint string) {
 	startram.EventBus <- structs.Event{Type: "endpoint", Data: nil}
 }
 
+// cancel subscription with reg code
 func handleStartramCancel(key string, reset bool) {
-	// cancel subscription
-	// if reset is true
-	// unregister startram services
-	// reset wg keys
-	handleNotImplement("cancel")
+	handleError := func(errmsg string) {
+		msg := fmt.Sprintf("Error: %s", errmsg)
+		logger.Logger.Error(errmsg)
+		startram.EventBus <- structs.Event{Type: "cancelSub", Data: msg}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "cancelSub", Data: nil}
+	}
+	if reset {
+		for _, svc := range config.StartramConfig.Subdomains {
+			if err := startram.SvcDelete(svc.URL, svc.SvcType); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't delete service %v: %v", svc.URL, err))
+			}
+		}
+	}
+	if err := startram.CancelSub(key); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't cancel subscription: %v", err))
+		return
+	}
+	if err := config.CycleWgKey(); err != nil {
+		handleError(fmt.Sprintf("%v", err))
+		return
+	}
+	return
 }
 
 // temp
