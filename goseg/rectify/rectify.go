@@ -163,7 +163,9 @@ func RectifyUrbit() {
 				// check if existing ship was not created
 				found := false
 				for _, remote := range startramConfig.Subdomains {
-					if patp+"."+conf.EndpointUrl == remote.URL {
+					endpointUrl := strings.Split(conf.EndpointUrl, ".")
+					rootUrl := strings.Join(endpointUrl[1:len(endpointUrl)], ".")
+					if patp+"."+rootUrl == remote.URL {
 						found = true
 						break
 					}
