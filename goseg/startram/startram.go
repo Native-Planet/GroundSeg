@@ -375,3 +375,34 @@ func RegisterNewShip(ship string) error {
 	}
 	return nil
 }
+
+// cancel a startram subscription with reg code
+func CancelSub(key string) error {
+	logger.Logger.Info(fmt.Sprintf("Cancelling StarTram registration"))
+	conf := config.Conf()
+	var respObj structs.CancelStartramSub
+	url := "https://" + conf.EndpointUrl + "/v1/stripe/cancel"
+	cancelObj := map[string]interface{}{
+		"reg_key": key,
+	}
+	cancelJSON, err := json.Marshal(cancelObj)
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Couldn't marshal registration: %v", err))
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(cancelJSON))
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
+	}
+	if err = json.Unmarshal(body, &respObj); err != nil {
+		return fmt.Errorf(fmt.Sprintf("Error unmarshalling response: %v", err))
+	}
+	if respObj.Error == 1 {
+		return fmt.Errorf(fmt.Sprintf("Couldn't cancel subscription: %v", &respObj.Message))
+	}
+	return nil
+}
