@@ -5,7 +5,9 @@ package defaults
 
 import (
 	"goseg/structs"
+	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -88,6 +90,25 @@ var (
 	}
 )
 
+func DockerData(pathType string) string {
+	var dockerVolDirs = []string{
+		"/media/data/docker/volumes",
+		"/var/lib/docker/volumes",
+	}
+	for _, dir := range dockerVolDirs {
+		if _, err := os.Stat(dir); err == nil {
+			if pathType == "volumes" {
+				return dir
+			} else {
+				splitPath := strings.Split(dir, "/")
+				basePath := "/" + strings.Join(splitPath[:len(splitPath)-1], "/")
+				return basePath
+			}
+		}
+	}
+	return ""
+}
+
 // this one needs params from config so we use a func
 func SysConfig(basePath string) structs.SysConfig {
 	sysConfig := structs.SysConfig{
@@ -116,7 +137,7 @@ func SysConfig(basePath string) structs.SysConfig {
 			Value:    1,
 			Interval: "month",
 		},
-		DockerData:     "/var/lib/docker",
+		DockerData:     DockerData("basePath"),
 		WgOn:           false,
 		WgRegistered:   false,
 		PwHash:         "",

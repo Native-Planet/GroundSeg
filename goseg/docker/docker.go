@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/config"
+	"goseg/defaults"
 	"goseg/logger"
 	"goseg/structs"
 	"io"
@@ -23,7 +24,7 @@ import (
 )
 
 var (
-	VolumeDir          = "/var/lib/docker/volumes"
+	VolumeDir          = defaults.DockerData("volumes")
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
 	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
