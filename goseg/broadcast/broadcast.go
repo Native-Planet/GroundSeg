@@ -297,14 +297,16 @@ func constructProfileInfo() structs.Profile {
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
 	var ramObj []uint64
-	var diskObj []uint64
 	var sysInfo structs.System
 	usedRam, totalRam := system.GetMemory()
 	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
 	sysInfo.Info.Usage.CPU = system.GetCPU()
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	usedDisk, freeDisk := system.GetDisk()
-	sysInfo.Info.Usage.Disk = append(diskObj, usedDisk, freeDisk)
+	diskUsage, err := system.GetDisk()
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting disk usage: %v", err))
+	}
+	sysInfo.Info.Usage.Disk = diskUsage
 	conf := config.Conf()
 	sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	sysInfo.Info.Updates = system.SystemUpdates

@@ -60,11 +60,11 @@ type SystemTransitionBroadcast struct {
 
 // broadcast payload subobject
 type SystemUsage struct {
-	RAM      []uint64 `json:"ram"`
-	CPU      int      `json:"cpu"`
-	CPUTemp  float64  `json:"cpu_temp"`
-	Disk     []uint64 `json:"disk"`
-	SwapFile int      `json:"swap"`
+	RAM      []uint64             `json:"ram"`
+	CPU      int                  `json:"cpu"`
+	CPUTemp  float64              `json:"cpu_temp"`
+	Disk     map[string][2]uint64 `json:"disk"`
+	SwapFile int                  `json:"swap"`
 }
 
 // broadcast payload subobject

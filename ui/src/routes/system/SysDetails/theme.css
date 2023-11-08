@@ -30,3 +30,6 @@
   border-radius: 12px;
   transition: width 500ms;
 }
+.volume-info + .volume-info {
+  margin-top: 1em;
+}
