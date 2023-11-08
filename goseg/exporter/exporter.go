@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"goseg/defaults"
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/structs"
@@ -127,7 +128,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// compress volume transition compressed %
-	volumeDirectory := "/var/lib/docker/volumes"
+	volumeDirectory := defaults.DockerData("volumes")
 	var memoryFile bytes.Buffer
 	filePath := filepath.Join(volumeDirectory, container, "_data")
 	// Create new zip archive in memory
