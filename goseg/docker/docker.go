@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	VolumeDir          = "/var/lib/docker/volumes"
+	VolumeDir          = config.DockerDir
 	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
 	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
 	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus

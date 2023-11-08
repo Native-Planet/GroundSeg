@@ -41,7 +41,7 @@ var (
 	GSContainers = make(map[string]structs.ContainerState)
 	// channel for log stream requests
 	LogsEventBus  = make(chan structs.LogsEvent, 100)
-	DockerDir     = "/var/lib/docker/volumes/"
+	DockerDir     = defaults.DockerData("volumes") + "/"
 	confPath      = filepath.Join(BasePath, "settings", "system.json")
 	confMutex     sync.Mutex
 	contMutex     sync.Mutex
