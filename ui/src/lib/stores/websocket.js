@@ -9,6 +9,7 @@ export const wsPort = writable("3000")
 export const isC2CMode = writable(false)
 export const ssids = writable([])
 export const firstLoad = writable(true)
+export const loginError = writable('')
 
 let PENDING = new Set();
 let SESSION;
@@ -75,6 +76,11 @@ export const handleMessage = data => {
     structure.set(data)
     ssids.set([])
     isC2CMode.set(false)
+  } else if (data.type == 'login-failed') {
+    loginError.set(data.message);
+    setTimeout(() => {
+      loginError.set('');
+    }, 2000);
   } else if (data.hasOwnProperty('log')) {
     logs.update(l=>{
       let containerID = data.log.container_id
@@ -128,6 +134,7 @@ export const verify = async () => {
 
 // Login
 export const login = async password => {
+  loginError.set('');
   let payload = {
     "type":"login",
     "password":password
