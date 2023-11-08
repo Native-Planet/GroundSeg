@@ -126,3 +126,8 @@ type StartramAliasResp struct {
 	Pubkey    string `json:"pubkey"`
 	Lease     string `json:"lease"`
 }
+
+type CancelStartramSub struct {
+        Message string `json:"message"`
+        Error   int    `json:"error"`
+}
