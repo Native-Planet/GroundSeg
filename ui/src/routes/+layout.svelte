@@ -52,7 +52,8 @@
           if (authLevel === "setup") {
             if (count > 2) {
               count = 0
-              if (stage) {
+              const currentStage = "/setup/" + stage
+              if (currentStage != $page.route.id) {
                 goto("/setup/" + stage)
               }
             } else {
