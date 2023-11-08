@@ -3,6 +3,7 @@ package system
 // for retrieving hw info and managing host
 
 import (
+	"bufio"
 	"fmt"
 	"goseg/defaults"
 	"goseg/logger"
@@ -13,10 +14,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 )
 
@@ -36,10 +37,37 @@ func GetCPU() int {
 	return int(percent[0])
 }
 
-// get used/avail disk in bytes
-func GetDisk() (uint64, uint64) {
-	d, _ := disk.Usage("/")
-	return d.Total, d.Used
+// get used/avail disk in bytes with labels
+func GetDisk() (map[string][2]uint64, error) {
+	diskUsageMap := make(map[string][2]uint64)
+	file, err := os.Open("/proc/mounts")
+	if err != nil {
+		return diskUsageMap, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) >= 2 {
+			device := fields[0]
+			mountPoint := fields[1]
+			if !strings.HasPrefix(device, "/dev/") {
+				continue
+			}
+			var stat syscall.Statfs_t
+			if err := syscall.Statfs(mountPoint, &stat); err != nil {
+				return diskUsageMap, err
+			}
+			all := stat.Blocks * uint64(stat.Bsize)
+			free := stat.Bfree * uint64(stat.Bsize)
+			used := all - free
+			diskUsageMap[device] = [2]uint64{used, free}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return diskUsageMap, err
+	}
+	return diskUsageMap, nil
 }
 
 // get cpu temp (may not work on some devices)
