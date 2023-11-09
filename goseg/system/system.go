@@ -50,7 +50,8 @@ func GetDisk() (map[string][2]uint64, error) {
 		if len(fields) >= 2 {
 			device := fields[0]
 			mountPoint := fields[1]
-			if !strings.HasPrefix(device, "/dev/") {
+			// ignore fake filesystems
+			if !strings.HasPrefix(device, "/dev/") || strings.HasPrefix(device, "/dev/loop") {
 				continue
 			}
 			var stat syscall.Statfs_t
