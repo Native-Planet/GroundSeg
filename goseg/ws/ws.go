@@ -345,11 +345,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
-					loginError, _ := json.Marshal(map[string]string{
-						"type":    "login-failed",
-						"message": "Login failed. Please try again.",
-					})
-					MuCon.Write(loginError)
 				} else {
 					token = newToken
 				}
