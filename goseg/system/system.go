@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -70,38 +69,46 @@ func GetDisk() (map[string][2]uint64, error) {
 	return diskUsageMap, nil
 }
 
-// get cpu temp (may not work on some devices)
+// get cpu temp (may not work on non-intel devices)
 func GetTemp() float64 {
-	// Run the 'sensors' command
-	cmd := exec.Command("sensors")
-	// Capture stdout
-	out, err := cmd.Output()
+	basePath := "/sys/class/hwmon/"
+	hwmons, err := ioutil.ReadDir(basePath)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to get sensor data: %v", err))
+		fmt.Printf("Error reading the hwmon directory: %v\n", err)
 		return 0
 	}
-	keyword := "Package id 0:"
-	for _, ln := range strings.Split(string(out), "\n") {
-		if strings.Contains(ln, keyword) {
-			// Use regex to find the first temperature
-			re := regexp.MustCompile(`\+([0-9]+\.[0-9]+)`)
-			match := re.FindStringSubmatch(ln)
-
-			// Convert to float
-			if len(match) > 1 {
-				temp, err := strconv.ParseFloat(match[1], 64)
-				if err == nil {
-					return temp
-				} else {
-					logger.Logger.Error(fmt.Sprintf("Unable to parse float for CPU temperature: %v", err))
-					return 0
+	var totalTemp float64
+	var tempCount int
+	for _, hwmon := range hwmons {
+		path := filepath.Join(basePath, hwmon.Name())
+		devicePath := filepath.Join(path, "name")
+		device, err := ioutil.ReadFile(devicePath)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(string(device)), "coretemp") {
+			tempInputs, _ := filepath.Glob(filepath.Join(path, "temp*_input"))
+			for _, tempInput := range tempInputs {
+				temp, err := ioutil.ReadFile(tempInput)
+				if err != nil {
+					fmt.Printf("Error reading temperature from %s: %v\n", tempInput, err)
+					continue
 				}
-			} else {
-				return 0
+				tempValue, err := strconv.Atoi(strings.TrimSpace(string(temp)))
+				if err != nil {
+					fmt.Printf("Error converting temperature: %s\n", temp)
+					continue
+				}
+				totalTemp += float64(tempValue)
+				tempCount++
 			}
 		}
 	}
-	return 0
+	if tempCount > 0 {
+		return totalTemp / float64(tempCount) / 1000.0
+	} else {
+		return 0
+	}
 }
 
 func IsNPBox(basePath string) bool {
