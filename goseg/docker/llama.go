@@ -18,15 +18,12 @@ func LoadLlama() error {
 	logger.Logger.Info("Loading Llama GPT")
 	conf := config.Conf()
 	if !conf.PenpaiRunning {
-		err := StopContainerByName("llama-gpt-api")
-		if err != nil {
-			return fmt.Errorf(fmt.Sprint("Failed to kill Llama API: %v", err))
+		if err := StopContainerByName("llama-gpt-api"); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
 		}
-		err = StopContainerByName("llama-gpt-ui")
-		if err != nil {
-			return fmt.Errorf(fmt.Sprint("Failed to kill Llama UI: %v", err))
+		if err := StopContainerByName("llama-gpt-ui"); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama UI: %v", err))
 		}
-		return nil
 	}
 	info, err := StartContainer("llama-gpt-api", "llama-api")
 	if err != nil {
