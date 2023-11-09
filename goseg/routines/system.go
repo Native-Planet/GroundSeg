@@ -102,6 +102,7 @@ func mDNSDiscovery() ([]string, error) {
 	go func() {
 		defer wg.Done()
 		for entry := range entriesChan {
+			fmt.Println("entry:", entry)
 			hosts = append(hosts, entry.ServiceInstanceName())
 		}
 	}()
