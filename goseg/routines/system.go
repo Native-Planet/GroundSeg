@@ -64,7 +64,7 @@ func mDNSServer() {
 	for {
 		ips, err := getAllIPs()
 		if err != nil {
-			fmt.Println("Error:", err)
+			logger.Logger.Error(fmt.Sprintf("Error getting IPs: %v", err))
 			return
 		}
 		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
@@ -102,8 +102,8 @@ func mDNSDiscovery() ([]string, error) {
 	go func() {
 		defer wg.Done()
 		for entry := range entriesChan {
-			fmt.Println("entry:", entry)
 			hosts = append(hosts, entry.ServiceInstanceName())
+			logger.Logger.Debug("Discovered mDNS: %v", entry.ServiceInstanceName())
 		}
 	}()
 	err = resolver.Browse(ctx, "_http._tcp", "local.", entriesChan)
