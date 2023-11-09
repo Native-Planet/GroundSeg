@@ -93,7 +93,7 @@ func mDNSDiscovery() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries := make(chan *zeroconf.ServiceEntry)
+	entriesChan := make(chan *zeroconf.ServiceEntry)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	var hosts []string
@@ -101,16 +101,17 @@ func mDNSDiscovery() ([]string, error) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for entry := range entries {
+		for entry := range entriesChan {
 			hosts = append(hosts, entry.ServiceInstanceName())
 		}
 	}()
-	err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
+	err = resolver.Browse(ctx, "_http._tcp", "local.", entriesChan)
 	if err != nil {
+		cancel()
+		wg.Wait()
 		return nil, err
 	}
 	<-ctx.Done()
-	close(entries)
 	wg.Wait()
 	return hosts, nil
 }
