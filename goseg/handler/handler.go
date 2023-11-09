@@ -85,6 +85,11 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 		if failedLogins >= MaxFailedLogins && remainder == 0 {
 			go enforceLockout()
 		}
+		loginError, _ := json.Marshal(map[string]string{
+			"type":    "login-failed",
+			"message": "Login failed. Please try again.",
+		})
+		conn.Write(loginError)
 		return map[string]string{"id": loginPayload.Token.ID, "token": loginPayload.Token.Token}, nil
 	}
 }
