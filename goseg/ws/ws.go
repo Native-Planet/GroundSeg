@@ -216,6 +216,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err = handler.PwHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
+				} else {
+					resp, err := handler.UnauthHandler()
+					if err != nil {
+						logger.Logger.Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
+					}
+					MuCon.Write(resp)
 				}
 			case "system":
 				if err = handler.SystemHandler(msg); err != nil {
@@ -265,7 +271,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			case "verify":
 				logger.Logger.Debug("Handling verify for auth")
 				authed := true
-				if conf.FirstBoot {
+				if conf.Setup != "complete" {
 					authed = false
 				}
 				if err := auth.AddToAuthMap(conn, token, authed); err != nil {

@@ -142,7 +142,6 @@ func SysConfig(basePath string) structs.SysConfig {
 		WgRegistered:   false,
 		PwHash:         "",
 		C2cInterval:    0,
-		FirstBoot:      true,
 		GsVersion:      "v2.0.0",
 		CfgDir:         basePath,
 		UpdateInterval: 3600,
