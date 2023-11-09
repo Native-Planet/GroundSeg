@@ -1,6 +1,6 @@
 <script>
   //import { login, structure, loginStatus } from '$lib/stores/websocket'
-  import { login, structure } from '$lib/stores/websocket'
+  import { login, structure, loginError } from '$lib/stores/websocket'
   import { wide } from '$lib/stores/display'
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
@@ -12,6 +12,10 @@
   let inView = false
   let loginPassword = ''
   let buttonStatus = 'standard'
+
+  $: if ($loginError) {
+    showModal($loginError);
+  }
 
   $: loginModule = ($structure?.login) || null
   $: remainder = (loginModule?.remainder) || 0
@@ -28,6 +32,11 @@
     login(loginPassword)
   }
 
+  function showModal(message) {
+    setTimeout(() => {
+      loginError.set('');
+    }, 2000);
+  }
 </script>
 
 <!--svelte:head><script src="/jsencrypt.min.js"></script></svelte:head-->
@@ -55,6 +64,11 @@
     {:else}
       <div class="locked-icon"><Fa icon={faLock} size="8x" /></div>
       <div class="locked-text">{hours > 0 ? hours + " HOURS" : ""} {minutes > 0 ? minutes + " MINUTES" : ""} {seconds} SECONDS</div>
+    {/if}
+    {#if $loginError}
+      <div class="modal">
+        {$loginError}
+      </div>
     {/if}
   </div>
 {/if}
@@ -141,5 +155,21 @@
   .locked-text {
     font-size: 42px;
     font-family: var(--title-font);
+  } 
+  .modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    animation: fadeInOut 0.2s ease-in-out;
+  }
+  @keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 1; }
   }
 </style>

@@ -61,7 +61,7 @@ func GetDisk() (map[string][2]uint64, error) {
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
-			diskUsageMap[device] = [2]uint64{used, free}
+			diskUsageMap[device] = [2]uint64{used, all}
 		}
 	}
 	if err := scanner.Err(); err != nil {
