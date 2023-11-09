@@ -8,6 +8,7 @@ import (
 	"goseg/system"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grandcat/zeroconf"
@@ -95,16 +96,22 @@ func mDNSDiscovery() ([]string, error) {
 	entries := make(chan *zeroconf.ServiceEntry)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
+	var hosts []string
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
-		if err != nil {
-			close(entries)
+		defer wg.Done()
+		for entry := range entries {
+			hosts = append(hosts, entry.ServiceInstanceName())
 		}
 	}()
-	var hosts []string
-	for entry := range entries {
-		hosts = append(hosts, entry.ServiceInstanceName())
+	err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
+	if err != nil {
+		return nil, err
 	}
+	<-ctx.Done()
+	close(entries)
+	wg.Wait()
 	return hosts, nil
 }
 
