@@ -59,8 +59,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 				return fmt.Errorf("Failed registration: %v", err)
 			}
 			if err = config.UpdateConf(map[string]interface{}{
-				"setup":     "complete",
-				"firstBoot": false,
+				"setup": "complete",
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}
@@ -69,8 +68,7 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 			}
 		case "skip":
 			if err = config.UpdateConf(map[string]interface{}{
-				"setup":     "complete",
-				"firstBoot": false,
+				"setup": "complete",
 			}); err != nil {
 				return fmt.Errorf("Unable to update config: %v", err)
 			}

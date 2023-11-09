@@ -28,7 +28,6 @@ type SysConfig struct {
 	WgRegistered   bool     `json:"wgRegistered"`
 	PwHash         string   `json:"pwHash"`
 	C2cInterval    int      `json:"c2cInterval"`
-	FirstBoot      bool     `json:"firstBoot"`
 	GsVersion      string   `json:"gsVersion"`
 	CfgDir         string   `json:"CFG_DIR"`
 	UpdateInterval int      `json:"updateInterval"`

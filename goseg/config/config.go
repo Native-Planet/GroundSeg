@@ -176,19 +176,6 @@ func init() {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
-	if conf.Setup == "" {
-		var update string
-		if conf.FirstBoot == true {
-			update = "start"
-		} else {
-			update = "complete"
-		}
-		if err = UpdateConf(map[string]interface{}{
-			"setup": update,
-		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
-		}
-	}
 }
 
 // return the global conf var
@@ -368,10 +355,23 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	mergedConfig := structs.SysConfig{}
 
 	// Setup
-	if customConfig.Setup != "" {
-		mergedConfig.Setup = customConfig.Setup
+
+	// if pwhash is empty:
+	//    "setup" is "start" (new install)
+	// if pwhash not empty:
+	// 		if setup is empty:
+	//			"setup" is "complete" (migration case)
+	//    if setup not empty:
+	//      "setup" remains (standard)
+	if customConfig.PwHash == "" {
+		mergedConfig.Setup = "start"       // new install
+		mergedConfig.Salt = RandString(32) // reset salt
 	} else {
-		mergedConfig.Setup = defaultConfig.Setup
+		if customConfig.Setup == "" {
+			mergedConfig.Setup = "complete" // migration case
+		} else {
+			mergedConfig.Setup = customConfig.Setup // standard
+		}
 	}
 
 	// EndpointUrl
@@ -496,9 +496,6 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 		mergedConfig.C2cInterval = defaultConfig.C2cInterval
 	}
 
-	// FirstBoot
-	mergedConfig.FirstBoot = customConfig.FirstBoot || defaultConfig.FirstBoot
-
 	// GsVersion
 	if customConfig.GsVersion != "" {
 		mergedConfig.GsVersion = customConfig.GsVersion
@@ -542,10 +539,8 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	}
 
 	// Salt
-	if customConfig.Salt != "" {
+	if mergedConfig.Salt == "" {
 		mergedConfig.Salt = customConfig.Salt
-	} else {
-		mergedConfig.Salt = defaultConfig.Salt
 	}
 
 	// PenpaiCores
