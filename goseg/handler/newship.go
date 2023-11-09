@@ -157,6 +157,10 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 		}
 		startram.Retrieve()
 		docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
+		// restart llama if it's enabled to reload avail ships
+		if os.Getenv("GS_LLAMA") == "true" {
+			docker.StartContainer("llama-gpt-api", "llama-api")
+		}
 		return
 	}
 }

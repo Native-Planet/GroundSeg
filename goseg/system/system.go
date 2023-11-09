@@ -50,7 +50,8 @@ func GetDisk() (map[string][2]uint64, error) {
 		if len(fields) >= 2 {
 			device := fields[0]
 			mountPoint := fields[1]
-			if !strings.HasPrefix(device, "/dev/") {
+			// ignore fake filesystems
+			if !strings.HasPrefix(device, "/dev/") || strings.HasPrefix(device, "/dev/loop") {
 				continue
 			}
 			var stat syscall.Statfs_t
@@ -91,12 +92,12 @@ func GetTemp() float64 {
 			for _, tempInput := range tempInputs {
 				temp, err := ioutil.ReadFile(tempInput)
 				if err != nil {
-					fmt.Printf("Error reading temperature from %s: %v\n", tempInput, err)
+					logger.Logger.Warn(fmt.Sprintf("Error reading temperature from %s: %v\n", tempInput, err))
 					continue
 				}
 				tempValue, err := strconv.Atoi(strings.TrimSpace(string(temp)))
 				if err != nil {
-					fmt.Printf("Error converting temperature: %s\n", temp)
+					logger.Logger.Warn(fmt.Sprintf("Error converting temperature: %s\n", temp))
 					continue
 				}
 				totalTemp += float64(tempValue)
