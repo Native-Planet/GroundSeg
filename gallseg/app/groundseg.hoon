@@ -1,6 +1,10 @@
 /-  gs=groundseg
 /+  default-agent, dbug, lib=groundseg, m=macro
 |%
++$  versioned-state
+  $%  state-0
+  ==
++$  state-0  [%0 =blob connected=?]
 +$  card  card:agent:gall
 --
 %-  agent:dbug
@@ -20,77 +24,28 @@
   =.  policy.state.this  policy
   =.  last-contact.policy   [~]
   :_  this
-  (reconnect-cards:lib our.bowl now.bowl state.this)
+  :~  [%pass / %arvo %l %spin /'groundseg.sock']
+  ==
 ::
 ++  on-save  !>(state)
 ::
 ++  on-load
-  |=  old-state=vase
+  |=  old-vase=vase
   ^-  (quip card _this)
-  =/  old  !<(versioned-state:gs old-state)
-  ?-    -.old
-      %0  
-    :_  this(state old)
-    (reconnect-cards:lib our.bowl now.bowl old)
-
-  ==
+  [~ this(state !<(state-0 old-vase))]
 ::
 ++  on-poke
   |=  [=mark =vase]
   ?>  =(our.bowl src.bowl)
   ^-  (quip card _this)
-  ?+    mark  (on-poke:def mark vase)
-    ::
-    ::  configure the agent
-    ::
-      %admin
-    =/  act  !<(admin:gs vase)
-    ?-    -.act
-      ::
-        %valve
-      ?:  =(%open +.act)
-        [~[[%pass / %arvo %l %spin /api]] this]
-      [~[[%pass / %arvo %l %shut /api]] this]
-      ::
-        %retry
-      =.  retry.policy.state.this  +.act
-      `this
-      ::
-        %interval
-      =.  interval.policy.state.this  +.act
-      `this
-      ::
-        %limit
-      =.  limit.policy.state.this  +.act
-      `this
-      ::
-    ==
-    ::
-    ::  high level mark to interact with groundseg
-    ::
-      %macro
-    =/  act  !<(macro:gs vase)
-    ?-    -.act
-      ::
-        %verify
-      :_  this
-      (verify:m bowl token.state.this)
-      ::
-        %login
-      :_  this
-      (login:m bowl token.state.this password.act)
-      ::
-    ==
-    ::
-    ::  low level mark. No reason to use this
-    ::
-      %raw
-    =/  act  !<(raw:gs vase)
-    ?-    -.act
-        %send
-      :_  this
-      (send:m our.bowl action.act)
-    ==
+  ?>  ?=(%penpai-do mark)
+  ?>  =(our.bol src.bol)
+  =+  !<(=do vase)
+  ?-    -.do
+      %post
+  ?.  connected  !!
+  :_  this
+  :~  [%pass /spit %arvo %l %spit /'groundseg.sock' %json +.do]
   ==
 ::
 ++  on-watch
@@ -117,32 +72,26 @@
 ::==
 ::
 ++  on-arvo
-  |=  [=wire =sign-arvo]
+  |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
-  ::
-  ?+    -.sign-arvo  ~&  >>>  -.sign-arvo  `this
-      %behn
-    ?>  =(/reconnect wire)
-    :_  this
-    (reconnect-cards:lib our.bowl now.bowl state.this)
-    ::
-      %lick
-    =+  gift=+.sign-arvo
-    ?+  -.gift  ~&  >>>  gift  `this
-        %soak
-      =.  last-contact.policy.state.this  [~ now.bowl]
-      ?+    mark.gift  ~&  >>>  mark.gift  `this
-          %connect
-        :_  this(session %active)
-        (verify:m bowl token.state.this)
-        ::
-          %disconnect
-        `this(session %inactive)
-      ==
-      ::
+  ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
+  ?+    mark.sign  (on-arvo:def +<)
+      %connect     
+    ~&  'socket connected'
+    :-  ~
+    this(connected %.y)
+      %disconnect
+    ~&  'socket disconnected'
+    :-  ~
+    this(connected %.n)
+      %error       ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
+      %json
+    =+  ;;(in-blob=blob noun.sign)
+    :_  this(blob blob)
+    :~  (fact:io groundseg-did+!>(`did`[%json in-blob]) /all ~)
     ==
-    ::
   ==
+
   ::
 ::
 ++  on-leave  on-leave:def
