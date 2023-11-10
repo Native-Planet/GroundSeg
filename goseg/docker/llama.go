@@ -43,7 +43,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "nativeplanet/llama-gpt:latest@sha256:fef89f09c505d5a3e8b01cd55d67a50865e74bf297999148b208e9c72ae1989e"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:72923134b83c755da917f5d790f8c3cb90dd3ce55bcdc0fe347c092bd93b2469"
 	lessCores := conf.PenpaiCores
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
@@ -81,7 +81,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: apiContainerName,
-		Cmd:      []string{"/bin/sh", "/api/run.sh"},
+		Cmd:      []string{"/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"},
 		Env: []string{
 			fmt.Sprintf("MODEL=/models/%v", found.ModelName),
 			fmt.Sprintf("MODEL_DOWNLOAD_URL=%v", found.ModelUrl),
