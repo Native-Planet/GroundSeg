@@ -51,10 +51,12 @@ func mDNSServer() {
 	} else {
 		// check if there's already a nativeplanet.local
 		counter := 2
-		for contains(domains, strings.Split(LocalDomain, ".")[0]) {
+		domainBase := strings.Split(LocalDomain, ".")[0]
+		for contains(domains, domainBase) {
 			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
 			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
 			counter++
+			domainBase = strings.Split(LocalDomain, ".")[0]
 		}
 	}
 	system.LocalUrl = LocalDomain
@@ -103,7 +105,10 @@ func mDNSDiscovery() ([]string, error) {
 	}()
 	var hosts []string
 	for entry := range entries {
-		hosts = append(hosts, entry.ServiceInstanceName())
+		domainParts := strings.Split(entry.ServiceInstanceName(), ".")
+		if len(domainParts) > 0 {
+			hosts = append(hosts, domainParts[0])
+		}
 	}
 	return hosts, nil
 }
