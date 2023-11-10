@@ -81,7 +81,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: apiContainerName,
-		Cmd:      []string{"/bin/sh", "/api/run.sh"},
+		Cmd:      []string{"/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"},
 		Env: []string{
 			fmt.Sprintf("MODEL=/models/%v", found.ModelName),
 			fmt.Sprintf("MODEL_DOWNLOAD_URL=%v", found.ModelUrl),
