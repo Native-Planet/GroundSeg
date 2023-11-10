@@ -2,9 +2,8 @@
 /+  default-agent, dbug, lib=groundseg, m=macro
 |%
 +$  versioned-state
-  $%  state-0
+  $%  state-0:gs
   ==
-+$  state-0  [%0 =blob connected=?]
 +$  card  card:agent:gall
 --
 %-  agent:dbug
@@ -43,9 +42,11 @@
   =+  !<(=do vase)
   ?-    -.do
       %post
-  ?.  connected  !!
-  :_  this
-  :~  [%pass /spit %arvo %l %spit /'groundseg.sock' %json +.do]
+    ?.  connected
+      !!
+    :_  this
+    :~  [%pass /spit %arvo %l %spit /'groundseg.sock' %json +.do]
+    ==
   ==
 ::
 ++  on-watch

@@ -2,8 +2,8 @@
 ::
 ::  Types
 ::
++$  state-0  [%0 =blob connected=? =policy =session]
 +$  blob          @t
-
 +$  do
   $%  [%json =blob]
   ==
