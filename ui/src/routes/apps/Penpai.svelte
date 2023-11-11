@@ -5,6 +5,8 @@
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
   import  { structure, togglePenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
 
+  // TODO: onMount check desks, bypassing flood control
+
   let showModels = false
 
   // debug
@@ -99,8 +101,12 @@
       <div class="companion-title">Install Companion App</div>
       <div class="companion-wrapper">
         {#each urbitKeys as p}
-          <div class="wifi-toggle">
-            <div class="checkbox" on:click={()=>togglePenpaiCompanion(p)}></div>
+          <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>togglePenpaiCompanion(p)}>
+            <div class="checkbox">
+              {#if urbits?.[p]?.info?.penpaiCompanion}
+                <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+              {/if}
+            </div>
             <div class="companion-text">{p}</div>
           </div>
         {/each}
@@ -173,6 +179,7 @@
     height: 24px;
     border: solid 2px var(--text-color);
     border-radius: 8px;
+    cursor: pointer;
   }
   .companion-text {
     color: var(--NP_Black, #161D17);
@@ -184,6 +191,8 @@
     font-weight: 300;
     line-height: 48px; /* 200% */
     letter-spacing: -1.44px;
+    cursor: pointer;
+    user-select: none;
   }
   .active-title {
     color: var(--NP_Black, #161D17);
@@ -342,5 +351,14 @@
     font-weight: 300;
     line-height: 24px; /* 100% */
     letter-spacing: -1.44px;
+  }
+  .checkmark {
+    width: 16px;
+    height: 16px;
+    padding: 4px;
+  }
+  .disable {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

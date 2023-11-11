@@ -7,3 +7,9 @@ type ClickLusCode struct {
 	LastFetch time.Time
 	LusCode   string
 }
+
+type ClickLusVats struct {
+	LastError time.Time
+	LastFetch time.Time
+	Desks     []string
+}

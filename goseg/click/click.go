@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +17,9 @@ import (
 
 var (
 	lusCodes  = make(map[string]structs.ClickLusCode)
+	shipDesks = make(map[string]structs.ClickLusVats)
 	codeMutex sync.Mutex
+	vatsMutex sync.Mutex
 )
 
 func SendPack(patp string) error {
@@ -31,7 +34,7 @@ func SendPack(patp string) error {
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		return fmt.Errorf("Click |pack failed to get exec: %v", err)
 	}
@@ -44,6 +47,57 @@ func SendPack(patp string) error {
 		return fmt.Errorf("Click |pack poke failed")
 	}
 	return nil
+}
+
+func GetDesk(patp, desk string) (string, error) {
+	/*
+		proceedWithRequest := allowLusVatsRequest(patp)
+		if !proceedWithRequest {
+			vatsMutex.Lock()
+			defer vatsMutex.Unlock()
+			listDesks, exists := shipDesks[patp]
+			if !exists {
+				return "", fmt.Errorf("Click +vats failed to fetch desks from memory for %v", patp)
+			}
+			logger.Logger.Warn(fmt.Sprintf("listDesks: %v", listDesks))
+			logger.Logger.Warn(fmt.Sprintf("desk: %v", desk))
+		}
+	*/
+	/*
+		if err != nil {
+			return "", fmt.Errorf("failed to get desks for %v: %v", patp, err)
+		}
+	*/
+
+	// <file>.hoon
+	file := "vats"
+	// actual hoon
+	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  (pure:m !>((crip ~(ram re [%rose [~ ~ ~] (report-vats our now [%" + desk + " %kids ~] %$ |)]))))"
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return "", fmt.Errorf("Click +vats failed to create hoon: %v", err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	if err != nil {
+		/*
+			storeLusCodeError(patp)
+			return "", fmt.Errorf("Click +code failed to get exec: %v", err)
+		*/
+		logger.Logger.Warn(fmt.Sprintf("error %v", err)) // temp
+		return "", err
+	}
+	// retrieve +vats
+	vats, _, err := filterResponse("vats", response)
+	if err != nil {
+		//storeLusCodeError(patp)
+		return "", fmt.Errorf("Click +vats failed to get exec: %v", err)
+	}
+	//storeLusCode(patp, code)
+	//return code, nil
+	return vats, nil
 }
 
 // Get +code from Urbit
@@ -71,7 +125,7 @@ func GetLusCode(patp string) (string, error) {
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
@@ -103,6 +157,32 @@ func storeLusCode(patp, code string) {
 		LastFetch: time.Now(),
 		LusCode:   code,
 	}
+}
+
+func allowLusVatsRequest(patp string) bool {
+	vatsMutex.Lock()
+	defer vatsMutex.Unlock()
+	// if patp doesn't exist
+	data, exists := shipDesks[patp]
+	if !exists {
+		return true
+	}
+	// flood control
+	if time.Since(data.LastError) < 1*time.Second {
+		return false
+	}
+	/*
+		// if +vats not legit
+		if len(data.LusCode) != 27 {
+			return true
+		}
+	*/
+	// if it has been 2 minutes
+	if time.Since(data.LastFetch) > 2*time.Minute {
+		return true
+	}
+	// use the +vats stored
+	return false
 }
 
 func allowLusCodeRequest(patp string) bool {
@@ -146,7 +226,7 @@ func deleteHoon(patp, file string) {
 	}
 }
 
-func clickExec(patp, file string) (string, error) {
+func clickExec(patp, file, dependency string) (string, error) {
 	execCommand := []string{
 		"click",
 		"-b",
@@ -155,6 +235,7 @@ func clickExec(patp, file string) (string, error) {
 		"-i",
 		fmt.Sprintf("%s.hoon", file),
 		patp,
+		dependency,
 	}
 	res, err := docker.ExecDockerCommand(patp, execCommand)
 	if err != nil {
@@ -192,6 +273,27 @@ func filterResponse(resType string, response string) (string, bool, error) {
 			}
 		}
 		return "", false, nil
+	case "vats":
+		for _, line := range responseSlice {
+			if strings.Contains(line, "%avow") {
+				if strings.Contains(line, "does not yet exist") {
+					return "not-found", false, nil
+				}
+				// Define a regular expression to match "app status" and capture it
+				regex := regexp.MustCompile(`app status:\s+([^\s]+)`)
+				// Find the first match in the input string
+				match := regex.FindStringSubmatch(line)
+				// Check if a match was found
+				if len(match) >= 2 {
+					appStatus := match[1]
+					return appStatus, false, nil
+				} else {
+					return "not-found", false, nil
+				}
+				return "not found", false, nil
+				//}
+			}
+		}
 	case "default":
 		return "", false, fmt.Errorf("Unknown poke response")
 	}

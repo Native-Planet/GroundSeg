@@ -32,7 +32,8 @@ func UrbitHandler(msg []byte) error {
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "toggle-penpai-companion":
-		// |install
+		// TODO: instead of toggle, when install is called, if not-found, |install, if suspended, |revive
+		// TODO: uninstall, do a |uninstall
 		logger.Logger.Debug(fmt.Sprintf("Todo: click toggle |install %%penpai for %v", patp))
 		return nil
 	case "pack":

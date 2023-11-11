@@ -45,7 +45,7 @@ func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		return fmt.Errorf("Click link storage failed to get exec: %v", err)
 	}

@@ -28,7 +28,7 @@ func FixAcme(patp string) error {
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		return fmt.Errorf("Click acme reset cert failed to get exec: %v", err)
 	}

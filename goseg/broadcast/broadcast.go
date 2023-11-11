@@ -201,6 +201,15 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			lusCode, _ = click.GetLusCode(pier)
 		}
 
+		var penpaiCompanionInstalled bool
+		if strings.Contains(pierStatus[pier], "Up") {
+			deskStatus, err := click.GetDesk(pier, "penpai")
+			if err != nil {
+				penpaiCompanionInstalled = false
+			}
+			penpaiCompanionInstalled = deskStatus == "running"
+		}
+
 		// pack day
 		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
@@ -242,6 +251,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.NextPack = strconv.FormatInt(GetScheduledPack(pier).Unix(), 10)
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
+		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
@@ -268,7 +278,6 @@ func constructAppsInfo() structs.Apps {
 	apps.Penpai.Info.Running = conf.PenpaiRunning
 	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
 	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
-	//apps.Penpai.CompanionStatus map[string]string
 	return apps
 }
 
