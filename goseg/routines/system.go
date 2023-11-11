@@ -8,7 +8,6 @@ import (
 	"goseg/system"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/grandcat/zeroconf"
@@ -52,10 +51,12 @@ func mDNSServer() {
 	} else {
 		// check if there's already a nativeplanet.local
 		counter := 2
-		for contains(domains, strings.Split(LocalDomain, ".")[0]) {
+		domainBase := strings.Split(LocalDomain, ".")[0]
+		for contains(domains, domainBase) {
 			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
 			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
 			counter++
+			domainBase = strings.Split(LocalDomain, ".")[0]
 		}
 	}
 	system.LocalUrl = LocalDomain
@@ -64,7 +65,7 @@ func mDNSServer() {
 	for {
 		ips, err := getAllIPs()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error getting IPs: %v", err))
+			fmt.Println("Error:", err)
 			return
 		}
 		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
@@ -81,8 +82,8 @@ func mDNSServer() {
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		}
-		server.Shutdown()
 		time.Sleep(120 * time.Second)
+		server.Shutdown()
 	}
 	// reannounce every 2 minutes
 }
@@ -93,27 +94,22 @@ func mDNSDiscovery() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	entriesChan := make(chan *zeroconf.ServiceEntry)
+	entries := make(chan *zeroconf.ServiceEntry)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	var hosts []string
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		for entry := range entriesChan {
-			hosts = append(hosts, entry.ServiceInstanceName())
-			logger.Logger.Debug("Discovered mDNS: %v", entry.ServiceInstanceName())
+		err = resolver.Browse(ctx, "_http._tcp", "local.", entries)
+		if err != nil {
+			close(entries)
 		}
 	}()
-	err = resolver.Browse(ctx, "_http._tcp", "local.", entriesChan)
-	if err != nil {
-		cancel()
-		wg.Wait()
-		return nil, err
+	var hosts []string
+	for entry := range entries {
+		domainParts := strings.Split(entry.ServiceInstanceName(), ".")
+		if len(domainParts) > 0 {
+			hosts = append(hosts, domainParts[0])
+		}
 	}
-	<-ctx.Done()
-	wg.Wait()
 	return hosts, nil
 }
 
