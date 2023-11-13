@@ -60,7 +60,7 @@ func GetDisk() (map[string][2]uint64, error) {
 			}
 		}
 		return device
-    }
+	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
@@ -73,13 +73,13 @@ func GetDisk() (map[string][2]uint64, error) {
 			}
 			var stat syscall.Statfs_t
 			if err := syscall.Statfs(mountPoint, &stat); err != nil {
-				return diskUsageMap, fmt.Errorf(mountPoint,err)
+				return diskUsageMap, fmt.Errorf(mountPoint, err)
 			}
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
 			label := getDiskLabel(device)
-            diskUsageMap[label] = [2]uint64{used, all}
+			diskUsageMap[label] = [2]uint64{used, all}
 		}
 	}
 	if err := scanner.Err(); err != nil {
