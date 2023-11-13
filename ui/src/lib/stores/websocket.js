@@ -627,6 +627,14 @@ export const submitNetwork = (ssid,password) => {
 // Penpai
 //
 
+export const toggleExperimentalPenpai = () => {
+  let payload = {
+    "type":"system",
+    "action": "toggle-penpai-feature",
+  }
+  send(payload)
+}
+
 export const togglePenpai = () => {
   let payload = {
     "type":"penpai",

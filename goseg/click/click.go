@@ -53,7 +53,7 @@ func InstallDesk(patp, ship, desk string) error {
 	// <file>.hoon
 	file := "install-desk"
 	// actual hoon
-	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-install !>([%%desk %v %%%v]))  (pure:m !>('success'))", ship, desk)
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-install !>([%%%v %v %%%v]))  (pure:m !>('success'))", desk, ship, desk)
 	// create hoon file
 	if err := createHoon(patp, file, hoon); err != nil {
 		return fmt.Errorf("Click |install %v %%%v failed to create hoon: %v", ship, desk, err)
@@ -86,6 +86,16 @@ func SetPenpaiDeskLoading(patp string, loading bool) error {
 	penpaiInfo.Loading = loading
 	shipDesks[patp] = penpaiInfo
 	return nil
+}
+
+func GetPenpaiInstalling(patp string) bool {
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	penpaiInfo, exists := shipDesks[patp]
+	if !exists {
+		return false
+	}
+	return penpaiInfo.Loading
 }
 
 func GetDesk(patp, desk string, bypass bool) (string, error) {
@@ -201,9 +211,16 @@ func storePenpaiDesk(patp, deskStatus string) {
 	logger.Logger.Info(fmt.Sprintf("Storing penpai desk status for %s", patp))
 	penpaiMutex.Lock()
 	defer penpaiMutex.Unlock()
-	shipDesks[patp] = structs.ClickPenpaiDesk{
-		LastFetch: time.Now(),
-		Status:    deskStatus,
+	deskInfo, exists := shipDesks[patp]
+	if !exists {
+		shipDesks[patp] = structs.ClickPenpaiDesk{
+			LastFetch: time.Now(),
+			Status:    deskStatus,
+		}
+	} else {
+		deskInfo.Status = deskStatus
+		deskInfo.LastFetch = time.Now()
+		shipDesks[patp] = deskInfo
 	}
 }
 

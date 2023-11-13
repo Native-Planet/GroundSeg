@@ -110,11 +110,15 @@
       <div class="companion-wrapper">
         {#each urbitKeys as p}
           <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>handlePenpaiCompanion(p)}>
-            <div class="checkbox">
-              {#if urbits?.[p]?.info?.penpaiCompanion}
-                <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
-              {/if}
-            </div>
+            {#if urbits?.[p]?.info?.penpaiInstalling}
+              <div class="loading-box"></div>
+            {:else}
+              <div class="checkbox">
+                {#if urbits?.[p]?.info?.penpaiCompanion}
+                  <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+                {/if}
+              </div>
+            {/if}
             <div class="companion-text">{p}</div>
           </div>
         {/each}
@@ -188,6 +192,17 @@
     border: solid 2px var(--text-color);
     border-radius: 8px;
     cursor: pointer;
+  }
+  .loading-box {
+    width: 18px;
+    height: 18px;
+    border-top: solid 4px var(--text-color);
+    border-bottom: solid 4px var(--text-color);
+    border-left: solid 4px #00000000;
+    border-right: solid 4px #00000000;
+    border-radius: 50%;
+    cursor: pointer;
+    animation: rotate 1s linear infinite;
   }
   .companion-text {
     color: var(--NP_Black, #161D17);
@@ -368,5 +383,9 @@
   .disable {
     opacity: .6;
     pointer-events: none;
+  }
+  @keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 </style>

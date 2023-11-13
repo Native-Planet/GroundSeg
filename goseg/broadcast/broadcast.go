@@ -11,7 +11,6 @@ import (
 	"goseg/startram"
 	"goseg/structs"
 	"goseg/system"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -202,6 +201,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 
 		var penpaiCompanionInstalled bool
+		penpaiCompanionInstalling := click.GetPenpaiInstalling(pier)
 		if strings.Contains(pierStatus[pier], "Up") {
 			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
@@ -253,6 +253,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
+		urbit.Info.PenpaiInstalling = penpaiCompanionInstalling
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
@@ -274,7 +275,7 @@ func constructAppsInfo() structs.Apps {
 		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
 	}
 	apps.Penpai.Info.Models = modelTitles
-	apps.Penpai.Info.Allowed = os.Getenv("GS_LLAMA") == "true"
+	apps.Penpai.Info.Allowed = conf.PenpaiAllow
 	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
 	apps.Penpai.Info.Running = conf.PenpaiRunning
 	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1

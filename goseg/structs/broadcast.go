@@ -136,6 +136,7 @@ type Urbit struct {
 		PackDay            string `json:"packDay"`
 		PackDate           int    `json:"packDate"`
 		PenpaiCompanion    bool   `json:"penpaiCompanion"`
+		PenpaiInstalling   bool   `json:"penpaiInstalling"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

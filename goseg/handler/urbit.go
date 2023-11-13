@@ -45,7 +45,17 @@ func UrbitHandler(msg []byte) error {
 			}
 		}
 		// else if status == "suspended"
-
+		for {
+			time.Sleep(5 * time.Second)
+			status, err := click.GetDesk(patp, "penpai", true)
+			if err != nil {
+				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
+			}
+			if status == "running" {
+				click.SetPenpaiDeskLoading(patp, false)
+				break
+			}
+		}
 		return nil
 	case "uninstall-penpai-companion":
 		// uninstall
