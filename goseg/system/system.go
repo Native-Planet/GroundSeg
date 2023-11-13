@@ -8,6 +8,7 @@ import (
 	"goseg/defaults"
 	"goseg/logger"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +45,22 @@ func GetDisk() (map[string][2]uint64, error) {
 		return diskUsageMap, err
 	}
 	defer file.Close()
+	getDiskLabel := func(device string) string {
+		labelDir := "/dev/disk/by-label/"
+		files, _ := ioutil.ReadDir(labelDir)
+		for _, f := range files {
+			fullPath := filepath.Join(labelDir, f.Name())
+			resolvedPath, _ := os.Readlink(fullPath)
+			if strings.HasSuffix(resolvedPath, device) {
+				label, err := url.QueryUnescape(f.Name())
+				if err != nil {
+					return device
+				}
+				return label
+			}
+		}
+		return device
+	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
@@ -56,12 +73,13 @@ func GetDisk() (map[string][2]uint64, error) {
 			}
 			var stat syscall.Statfs_t
 			if err := syscall.Statfs(mountPoint, &stat); err != nil {
-				return diskUsageMap, err
+				return diskUsageMap, fmt.Errorf(mountPoint, err)
 			}
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
-			diskUsageMap[device] = [2]uint64{used, all}
+			label := getDiskLabel(device)
+			diskUsageMap[label] = [2]uint64{used, all}
 		}
 	}
 	if err := scanner.Err(); err != nil {
