@@ -11,12 +11,20 @@
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
+
+  function decodeLabel(label) {
+    try {
+      return decodeURIComponent(label);
+    } catch (e) {
+      return label;
+    }
+  }
 </script>
 
 {#each Object.entries(disk) as [volume, [used, total]]}
   <div class="volume-info">
     <div class="info-wrapper">
-      <div class="info-title">{volume}</div>
+      <div class="info-title">{decodeLabel(volume)}</div>
       <div class="info-text">
         {formatBytes(used)} used / {formatBytes(total)} total
       </div>
