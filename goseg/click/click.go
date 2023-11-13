@@ -9,14 +9,17 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	lusCodes  = make(map[string]structs.ClickLusCode)
-	codeMutex sync.Mutex
+	lusCodes    = make(map[string]structs.ClickLusCode)
+	shipDesks   = make(map[string]structs.ClickPenpaiDesk)
+	codeMutex   sync.Mutex
+	penpaiMutex sync.Mutex
 )
 
 func SendPack(patp string) error {
@@ -31,7 +34,7 @@ func SendPack(patp string) error {
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		return fmt.Errorf("Click |pack failed to get exec: %v", err)
 	}
@@ -44,6 +47,96 @@ func SendPack(patp string) error {
 		return fmt.Errorf("Click |pack poke failed")
 	}
 	return nil
+}
+
+func InstallDesk(patp, ship, desk string) error {
+	// <file>.hoon
+	file := "install-desk"
+	// actual hoon
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-install !>([%%%v %v %%%v]))  (pure:m !>('success'))", desk, ship, desk)
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click |install %v %%%v failed to create hoon: %v", ship, desk, err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "")
+	if err != nil {
+		return fmt.Errorf("Click |install %v %%%v failed to get exec: %v", ship, desk, err)
+	}
+	// retrieve code
+	_, success, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click |install %v %%%v failed to get exec: %v", ship, desk, err)
+	}
+	if !success {
+		return fmt.Errorf("Click |install %v %%%v poke failed", ship, desk)
+	}
+	return nil
+}
+
+func SetPenpaiDeskLoading(patp string, loading bool) error {
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	penpaiInfo, exists := shipDesks[patp]
+	if !exists {
+		return fmt.Errorf("Click penpai desk request failed to fetch desks from memory for %v", patp)
+	}
+	penpaiInfo.Loading = loading
+	shipDesks[patp] = penpaiInfo
+	return nil
+}
+
+func GetPenpaiInstalling(patp string) bool {
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	penpaiInfo, exists := shipDesks[patp]
+	if !exists {
+		return false
+	}
+	return penpaiInfo.Loading
+}
+
+func GetDesk(patp, desk string, bypass bool) (string, error) {
+	if !bypass {
+		proceedWithRequest := allowPenpaiDeskRequest(patp)
+		if !proceedWithRequest {
+			penpaiMutex.Lock()
+			defer penpaiMutex.Unlock()
+			penpaiInfo, exists := shipDesks[patp]
+			if !exists {
+				return "", fmt.Errorf("Click penpai desk request failed to fetch desks from memory for %v", patp)
+			}
+			return penpaiInfo.Status, nil
+		}
+	}
+	// <file>.hoon
+	file := "penpai"
+	// actual hoon
+	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  (pure:m !>((crip ~(ram re [%rose [~ ~ ~] (report-vats our now [%" + desk + " %kids ~] %$ |)]))))"
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return "", fmt.Errorf("Click +vats failed to create hoon: %v", err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	if err != nil {
+		storePenpaiDeskError(patp)
+		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
+		logger.Logger.Warn(fmt.Sprintf("error %v", err)) // temp
+		return "", err
+	}
+	// retrieve +vats
+	vats, _, err := filterResponse("desk", response)
+	if err != nil {
+		storePenpaiDeskError(patp)
+		return "", fmt.Errorf("Click penpai desk info failed to get exec: %v", err)
+	}
+	storePenpaiDesk(patp, vats)
+	return vats, nil
 }
 
 // Get +code from Urbit
@@ -71,7 +164,7 @@ func GetLusCode(patp string) (string, error) {
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file)
+	response, err := clickExec(patp, file, "")
 	if err != nil {
 		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
@@ -95,6 +188,15 @@ func storeLusCodeError(patp string) {
 	}
 }
 
+func storePenpaiDeskError(patp string) {
+	logger.Logger.Debug(fmt.Sprintf("Recording penpai desk info failure for %s", patp))
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	shipDesks[patp] = structs.ClickPenpaiDesk{
+		LastError: time.Now(),
+	}
+}
+
 func storeLusCode(patp, code string) {
 	logger.Logger.Info(fmt.Sprintf("Storing +code for %s", patp))
 	codeMutex.Lock()
@@ -103,6 +205,43 @@ func storeLusCode(patp, code string) {
 		LastFetch: time.Now(),
 		LusCode:   code,
 	}
+}
+
+func storePenpaiDesk(patp, deskStatus string) {
+	logger.Logger.Info(fmt.Sprintf("Storing penpai desk status for %s", patp))
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	deskInfo, exists := shipDesks[patp]
+	if !exists {
+		shipDesks[patp] = structs.ClickPenpaiDesk{
+			LastFetch: time.Now(),
+			Status:    deskStatus,
+		}
+	} else {
+		deskInfo.Status = deskStatus
+		deskInfo.LastFetch = time.Now()
+		shipDesks[patp] = deskInfo
+	}
+}
+
+func allowPenpaiDeskRequest(patp string) bool {
+	penpaiMutex.Lock()
+	defer penpaiMutex.Unlock()
+	// if patp doesn't exist
+	data, exists := shipDesks[patp]
+	if !exists {
+		return true
+	}
+	// flood control
+	if time.Since(data.LastError) < 1*time.Second {
+		return false
+	}
+	// if it has been 2 minutes
+	if time.Since(data.LastFetch) > 2*time.Minute {
+		return true
+	}
+	// use the penpai desk status stored
+	return false
 }
 
 func allowLusCodeRequest(patp string) bool {
@@ -146,7 +285,7 @@ func deleteHoon(patp, file string) {
 	}
 }
 
-func clickExec(patp, file string) (string, error) {
+func clickExec(patp, file, dependency string) (string, error) {
 	execCommand := []string{
 		"click",
 		"-b",
@@ -155,6 +294,7 @@ func clickExec(patp, file string) (string, error) {
 		"-i",
 		fmt.Sprintf("%s.hoon", file),
 		patp,
+		dependency,
 	}
 	res, err := docker.ExecDockerCommand(patp, execCommand)
 	if err != nil {
@@ -171,6 +311,13 @@ func filterResponse(resType string, response string) (string, bool, error) {
 		_, ack, err := filterResponse("pack",[]string{"pack","response"})
 	*/
 	switch resType {
+	case "success": // use this if no value need to be returned
+		for _, line := range responseSlice {
+			if strings.Contains(line, "[0 %avow 0 %noun %success]") {
+				return "", true, nil
+			}
+		}
+		return "", false, nil
 	case "code":
 		for _, line := range responseSlice {
 			if strings.Contains(line, "%avow") {
@@ -185,13 +332,27 @@ func filterResponse(resType string, response string) (string, bool, error) {
 				}
 			}
 		}
-	case "success": // use this if no value need to be returned
+	case "desk":
 		for _, line := range responseSlice {
-			if strings.Contains(line, "[0 %avow 0 %noun %success]") {
-				return "", true, nil
+			if strings.Contains(line, "%avow") {
+				if strings.Contains(line, "does not yet exist") {
+					return "not-found", false, nil
+				}
+				// Define a regular expression to match "app status" and capture it
+				regex := regexp.MustCompile(`app status:\s+([^\s]+)`)
+				// Find the first match in the input string
+				match := regex.FindStringSubmatch(line)
+				// Check if a match was found
+				if len(match) >= 2 {
+					appStatus := match[1]
+					return appStatus, false, nil
+				} else {
+					return "not-found", false, nil
+				}
+				return "not found", false, nil
+				//}
 			}
 		}
-		return "", false, nil
 	case "default":
 		return "", false, fmt.Errorf("Unknown poke response")
 	}

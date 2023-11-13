@@ -9,7 +9,6 @@ import (
 	"goseg/shipcreator"
 	"goseg/startram"
 	"goseg/structs"
-	"os"
 	"strings"
 	"time"
 )
@@ -96,7 +95,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		// Register Services
 		go newShipRegisterService(patp)
 	}
-	if os.Getenv("GS_LLAMA") == "true" {
+	if conf.PenpaiAllow {
 		if err := docker.StopContainerByName("llama"); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
 		}
@@ -158,7 +157,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 		startram.Retrieve()
 		docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "completed"}
 		// restart llama if it's enabled to reload avail ships
-		if os.Getenv("GS_LLAMA") == "true" {
+		if conf.PenpaiAllow {
 			docker.StartContainer("llama-gpt-api", "llama-api")
 		}
 		return

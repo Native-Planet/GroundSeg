@@ -7,3 +7,10 @@ type ClickLusCode struct {
 	LastFetch time.Time
 	LusCode   string
 }
+
+type ClickPenpaiDesk struct {
+	LastError time.Time
+	LastFetch time.Time
+	Status    string
+	Loading   bool
+}

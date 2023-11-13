@@ -22,6 +22,32 @@ func SystemHandler(msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal system payload: %v", err)
 	}
 	switch systemPayload.Payload.Action {
+	case "toggle-penpai-feature":
+		conf := config.Conf()
+		if conf.PenpaiAllow {
+			err := docker.StopContainerByName("llama-gpt-api")
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop Llama API: %v", err))
+			}
+			err = docker.StopContainerByName("llama-gpt-ui")
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop Llama UI: %v", err))
+			}
+			if err = config.UpdateConf(map[string]interface{}{
+				"penpaiAllow": false,
+			}); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't toggle penpai feature: %v", err))
+			}
+		} else {
+			if err = config.UpdateConf(map[string]interface{}{
+				"penpaiAllow": true,
+			}); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't toggle penpai feature: %v", err))
+			}
+			if err := docker.LoadLlama(); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to load llama docker: %v", err))
+			}
+		}
 	case "groundseg":
 		logger.Logger.Info(fmt.Sprintf("Device shutdown requested"))
 		switch systemPayload.Payload.Command {

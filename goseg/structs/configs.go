@@ -35,6 +35,7 @@ type SysConfig struct {
 	Pubkey         string   `json:"pubkey"`
 	Privkey        string   `json:"privkey"`
 	Salt           string   `json:"salt"`
+	PenpaiAllow    bool     `json:"penpaiAllow"`
 	PenpaiRunning  bool     `json:"penpaiRunning"`
 	PenpaiCores    int      `json:"penpaiCores"`
 	PenpaiModels   []Penpai `json:"penpaiModels"`

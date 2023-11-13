@@ -10,6 +10,7 @@
   import SystemDetails from './SystemDetails.svelte'
   import Power from './Power.svelte'
   import Logs from './Logs.svelte'
+  import Penpai from './Penpai.svelte'
   import Support from './Support.svelte'
 
   $: state = ($structure?.system?.updates?.linux?.state) || "updated"
@@ -23,6 +24,7 @@
   <SystemDetails />
   <Power />
   <Logs />
+  <Penpai />
   <Support />
 </div>
 

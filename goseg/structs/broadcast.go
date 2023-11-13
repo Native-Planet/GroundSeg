@@ -20,13 +20,12 @@ type Apps struct {
 
 type PenpaiBroadcast struct {
 	Info struct {
-		Allowed         bool              `json:"allowed"`
-		Running         bool              `json:"running"`
-		ActiveCores     int               `json:"activeCores"`
-		MaxCores        int               `json:"maxCores"`
-		Models          []string          `json:"models"`
-		ActiveModel     string            `json:"activeModel"`
-		CompanionStatus map[string]string `json:"companionStatus"`
+		Allowed     bool     `json:"allowed"`
+		Running     bool     `json:"running"`
+		ActiveCores int      `json:"activeCores"`
+		MaxCores    int      `json:"maxCores"`
+		Models      []string `json:"models"`
+		ActiveModel string   `json:"activeModel"`
 	} `json:"info"`
 }
 
@@ -136,6 +135,8 @@ type Urbit struct {
 		PackTime           string `json:"packTime"`
 		PackDay            string `json:"packDay"`
 		PackDate           int    `json:"packDate"`
+		PenpaiCompanion    bool   `json:"penpaiCompanion"`
+		PenpaiInstalling   bool   `json:"penpaiInstalling"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

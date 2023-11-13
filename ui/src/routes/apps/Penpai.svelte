@@ -3,7 +3,9 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, togglePenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { structure, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+
+  // TODO: onMount check desks, bypassing flood control
 
   let showModels = false
 
@@ -36,6 +38,14 @@
 
   const handleChangeModel = () => {
     setPenpaiModel(selectedModel)
+  }
+
+  const handlePenpaiCompanion = p => {
+    if (urbits?.[p]?.info?.penpaiCompanion) {
+      uninstallPenpaiCompanion(p)
+    } else {
+      installPenpaiCompanion(p)
+    }
   }
 
 </script>
@@ -99,8 +109,16 @@
       <div class="companion-title">Install Companion App</div>
       <div class="companion-wrapper">
         {#each urbitKeys as p}
-          <div class="wifi-toggle">
-            <div class="checkbox" on:click={()=>togglePenpaiCompanion(p)}></div>
+          <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>handlePenpaiCompanion(p)}>
+            {#if urbits?.[p]?.info?.penpaiInstalling}
+              <div class="loading-box"></div>
+            {:else}
+              <div class="checkbox">
+                {#if urbits?.[p]?.info?.penpaiCompanion}
+                  <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+                {/if}
+              </div>
+            {/if}
             <div class="companion-text">{p}</div>
           </div>
         {/each}
@@ -173,6 +191,18 @@
     height: 24px;
     border: solid 2px var(--text-color);
     border-radius: 8px;
+    cursor: pointer;
+  }
+  .loading-box {
+    width: 18px;
+    height: 18px;
+    border-top: solid 4px var(--text-color);
+    border-bottom: solid 4px var(--text-color);
+    border-left: solid 4px #00000000;
+    border-right: solid 4px #00000000;
+    border-radius: 50%;
+    cursor: pointer;
+    animation: rotate 1s linear infinite;
   }
   .companion-text {
     color: var(--NP_Black, #161D17);
@@ -184,6 +214,8 @@
     font-weight: 300;
     line-height: 48px; /* 200% */
     letter-spacing: -1.44px;
+    cursor: pointer;
+    user-select: none;
   }
   .active-title {
     color: var(--NP_Black, #161D17);
@@ -342,5 +374,18 @@
     font-weight: 300;
     line-height: 24px; /* 100% */
     letter-spacing: -1.44px;
+  }
+  .checkmark {
+    width: 16px;
+    height: 16px;
+    padding: 4px;
+  }
+  .disable {
+    opacity: .6;
+    pointer-events: none;
+  }
+  @keyframes rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 </style>
