@@ -8,8 +8,9 @@ type ClickLusCode struct {
 	LusCode   string
 }
 
-type ClickLusVats struct {
+type ClickPenpaiDesk struct {
 	LastError time.Time
 	LastFetch time.Time
-	Desks     []string
+	Status    string
+	Loading   bool
 }

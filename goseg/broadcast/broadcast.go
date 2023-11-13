@@ -203,9 +203,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 
 		var penpaiCompanionInstalled bool
 		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "penpai")
+			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
 				penpaiCompanionInstalled = false
+				logger.Logger.Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
 			}
 			penpaiCompanionInstalled = deskStatus == "running"
 		}

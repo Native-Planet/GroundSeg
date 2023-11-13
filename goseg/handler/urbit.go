@@ -31,10 +31,25 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
-	case "toggle-penpai-companion":
-		// TODO: instead of toggle, when install is called, if not-found, |install, if suspended, |revive
-		// TODO: uninstall, do a |uninstall
-		logger.Logger.Debug(fmt.Sprintf("Todo: click toggle |install %%penpai for %v", patp))
+	case "install-penpai-companion":
+		click.SetPenpaiDeskLoading(patp, true)
+		// if not-found, |install, if suspended, |revive
+		status, err := click.GetDesk(patp, "penpai", true)
+		if err != nil {
+			return fmt.Errorf("Handler failed to get penpai desk info for %v: %v", patp, err)
+		}
+		if status == "not-found" {
+			err := click.InstallDesk(patp, "~nattyv", "penpai")
+			if err != nil {
+				return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
+			}
+		}
+		// else if status == "suspended"
+
+		return nil
+	case "uninstall-penpai-companion":
+		// uninstall
+		//click.InstallDesk(patp,"penpai")
 		return nil
 	case "pack":
 		// error handling

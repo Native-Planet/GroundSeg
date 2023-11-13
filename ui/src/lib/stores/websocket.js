@@ -661,11 +661,19 @@ export const removePenpai = () => {
   send(payload)
 }
 
-// TODO: modify to have install or uninstall, instead of toggle
-export const togglePenpaiCompanion = patp => {
+export const installPenpaiCompanion = patp => {
   let payload = {
     "type":"urbit",
-    "action":"toggle-penpai-companion",
+    "action":"install-penpai-companion",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const uninstallPenpaiCompanion = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"uninstall-penpai-companion",
     "patp":patp,
   }
   send(payload)

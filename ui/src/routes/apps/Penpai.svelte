@@ -3,7 +3,7 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, togglePenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { structure, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
 
   // TODO: onMount check desks, bypassing flood control
 
@@ -38,6 +38,14 @@
 
   const handleChangeModel = () => {
     setPenpaiModel(selectedModel)
+  }
+
+  const handlePenpaiCompanion = p => {
+    if (urbits?.[p]?.info?.penpaiCompanion) {
+      uninstallPenpaiCompanion(p)
+    } else {
+      installPenpaiCompanion(p)
+    }
   }
 
 </script>
@@ -101,7 +109,7 @@
       <div class="companion-title">Install Companion App</div>
       <div class="companion-wrapper">
         {#each urbitKeys as p}
-          <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>togglePenpaiCompanion(p)}>
+          <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>handlePenpaiCompanion(p)}>
             <div class="checkbox">
               {#if urbits?.[p]?.info?.penpaiCompanion}
                 <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
