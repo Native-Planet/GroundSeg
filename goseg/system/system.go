@@ -56,7 +56,7 @@ func GetDisk() (map[string][2]uint64, error) {
 			}
 			var stat syscall.Statfs_t
 			if err := syscall.Statfs(mountPoint, &stat); err != nil {
-				return diskUsageMap, err
+				return diskUsageMap, fmt.Errorf(mountPoint,err)
 			}
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
