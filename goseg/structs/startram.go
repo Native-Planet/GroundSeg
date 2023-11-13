@@ -128,6 +128,6 @@ type StartramAliasResp struct {
 }
 
 type CancelStartramSub struct {
-        Message string `json:"message"`
-        Error   int    `json:"error"`
+	Message string `json:"message"`
+	Error   int    `json:"error"`
 }
