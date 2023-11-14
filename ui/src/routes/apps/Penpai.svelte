@@ -196,10 +196,10 @@
   .loading-box {
     width: 18px;
     height: 18px;
-    border-top: solid 4px var(--text-color);
-    border-bottom: solid 4px var(--text-color);
-    border-left: solid 4px #00000000;
-    border-right: solid 4px #00000000;
+    border-top: solid 5px var(--text-color);
+    border-bottom: solid 5px var(--text-color);
+    border-left: solid 5px #00000000;
+    border-right: solid 5px #00000000;
     border-radius: 50%;
     cursor: pointer;
     animation: rotate 1s linear infinite;

@@ -49,6 +49,60 @@ func SendPack(patp string) error {
 	return nil
 }
 
+func ReviveDesk(patp, desk string) error {
+	// <file>.hoon
+	file := "revive-desk"
+	// actual hoon
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-revive !>(%%%v))  (pure:m !>('success'))", desk)
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click |revive %%%v failed to create hoon: %v", desk, err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "")
+	if err != nil {
+		return fmt.Errorf("Click |revive %%%v failed to get exec: %v", desk, err)
+	}
+	// retrieve code
+	_, success, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click |revive %%%v failed to get exec: %v", desk, err)
+	}
+	if !success {
+		return fmt.Errorf("Click |revive %%%v poke failed", desk)
+	}
+	return nil
+}
+
+func UninstallDesk(patp, desk string) error {
+	// <file>.hoon
+	file := "uninstall-desk"
+	// actual hoon
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-uninstall !>(%%%v))  (pure:m !>('success'))", desk)
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click |uninstall %%%v failed to create hoon: %v", desk, err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "")
+	if err != nil {
+		return fmt.Errorf("Click |uninstall %%%v failed to get exec: %v", desk, err)
+	}
+	// retrieve code
+	_, success, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click |uninstall %%%v failed to get exec: %v", desk, err)
+	}
+	if !success {
+		return fmt.Errorf("Click |uninstall %%%v poke failed", desk)
+	}
+	return nil
+}
+
 func InstallDesk(patp, ship, desk string) error {
 	// <file>.hoon
 	file := "install-desk"
