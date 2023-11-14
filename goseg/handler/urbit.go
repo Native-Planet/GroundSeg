@@ -43,8 +43,12 @@ func UrbitHandler(msg []byte) error {
 			if err != nil {
 				return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
 			}
+		} else if status == "suspended" {
+			err := click.ReviveDesk(patp, "penpai")
+			if err != nil {
+				return fmt.Errorf("Handler failed to revive penpai desk for %v: %v", patp, err)
+			}
 		}
-		// else if status == "suspended"
 		for {
 			time.Sleep(5 * time.Second)
 			status, err := click.GetDesk(patp, "penpai", true)
@@ -58,8 +62,23 @@ func UrbitHandler(msg []byte) error {
 		}
 		return nil
 	case "uninstall-penpai-companion":
+		click.SetPenpaiDeskLoading(patp, true)
 		// uninstall
-		//click.InstallDesk(patp,"penpai")
+		err := click.UninstallDesk(patp, "penpai")
+		if err != nil {
+			return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
+		}
+		for {
+			time.Sleep(5 * time.Second)
+			status, err := click.GetDesk(patp, "penpai", true)
+			if err != nil {
+				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
+			}
+			if status != "running" {
+				click.SetPenpaiDeskLoading(patp, false)
+				break
+			}
+		}
 		return nil
 	case "pack":
 		// error handling
