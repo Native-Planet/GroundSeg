@@ -5,6 +5,7 @@
   import { onMount, createEventDispatcher } from 'svelte'
   import CustomUrbitDomain from './CustomUrbitDomain.svelte'
   import { toggleUrbitAlias } from '$lib/stores/websocket'
+  import { page } from '$app/stores'
 
   import Fa from 'svelte-fa'
   import { faRepeat } from '@fortawesome/free-solid-svg-icons'
@@ -16,8 +17,12 @@
   export let lusCode = ""
   export let running = false
   export let startramRegistered = false
+  export let remote = false
 
-  $: displayedUrl = (showUrbAlias ? "https://"+urbitAlias : url)
+  $: urlType = new URL(url)
+  $: urlStripped = `${urlType.hostname}`
+  $: urlFixed = remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port
+  $: displayedUrl = (showUrbAlias ? "https://"+urbitAlias : urlFixed)
 
   const dispatch = createEventDispatcher()
   let copied = false
