@@ -67,23 +67,23 @@ func GetDisk() (map[string][2]uint64, error) {
 		if len(fields) >= 2 {
 			device := fields[0]
 			mountPoint := fields[1]
-			// ignore fake filesystems
 			if !strings.HasPrefix(device, "/dev/") || strings.HasPrefix(device, "/dev/loop") {
 				continue
 			}
 			var stat syscall.Statfs_t
 			if err := syscall.Statfs(mountPoint, &stat); err != nil {
-				return diskUsageMap, fmt.Errorf(mountPoint, err)
+				return diskUsageMap, fmt.Errorf("%s: %w", mountPoint, err)
 			}
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
-			device, label := getDiskLabel(device)
-			if label != "" {
-				diskUsageMap[label] = [2]uint64{used, all}
-			} else {
-				diskUsageMap[device] = [2]uint64{used, all}
+
+			_, label := getDiskLabel(device)
+			key := label
+			if label == "" {
+				key = device
 			}
+			diskUsageMap[key] = [2]uint64{used, all}
 		}
 	}
 	if err := scanner.Err(); err != nil {
