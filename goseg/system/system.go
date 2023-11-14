@@ -45,7 +45,7 @@ func GetDisk() (map[string][2]uint64, error) {
 		return diskUsageMap, err
 	}
 	defer file.Close()
-	getDiskLabel := func(device string) string {
+	getDiskLabel := func(device string) (string, string) {
 		labelDir := "/dev/disk/by-label/"
 		files, _ := ioutil.ReadDir(labelDir)
 		for _, f := range files {
@@ -54,12 +54,12 @@ func GetDisk() (map[string][2]uint64, error) {
 			if strings.HasSuffix(resolvedPath, device) {
 				label, err := url.QueryUnescape(f.Name())
 				if err != nil {
-					return device
+					return device, ""
 				}
-				return label
+				return device, label
 			}
 		}
-		return device
+		return device, ""
 	}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -78,8 +78,12 @@ func GetDisk() (map[string][2]uint64, error) {
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
-			label := getDiskLabel(device)
-			diskUsageMap[label] = [2]uint64{used, all}
+			device, label := getDiskLabel(device)
+			if label != "" {
+				diskUsageMap[label] = [2]uint64{used, all}
+			} else {
+				diskUsageMap[device] = [2]uint64{used, all}
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
