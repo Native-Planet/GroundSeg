@@ -155,7 +155,10 @@ func UrbitHandler(msg []byte) error {
 		if isRunning {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
 			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+				logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
+				if err = docker.StopContainerByName(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+				}
 			}
 		}
 		// start ship as pack
@@ -498,6 +501,9 @@ func UrbitHandler(msg []byte) error {
 			err := click.BarExit(patp)
 			if err != nil {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
+				if err := docker.StopContainerByName(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+				}
 			}
 		}
 		return nil
@@ -520,7 +526,10 @@ func UrbitHandler(msg []byte) error {
 		}
 		// stop container
 		if err := click.BarExit(patp); err != nil {
-			return err
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+			if err := docker.StopContainerByName(patp); err != nil {
+				return err
+			}
 		}
 		// whitelist the patp token pair
 		if err := exporter.WhitelistContainer(patp, urbitPayload.Token); err != nil {
@@ -539,7 +548,10 @@ func UrbitHandler(msg []byte) error {
 		contConf[patp] = patpConf
 		config.UpdateContainerState(patp, patpConf)
 		if err := click.BarExit(patp); err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+			if err := docker.StopContainerByName(patp); err != nil {
+				return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
+			}
 		}
 		if err := docker.DeleteContainer(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
