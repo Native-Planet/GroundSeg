@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"goseg/broadcast"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
+	"strings"
 	"time"
 )
 
@@ -30,7 +32,7 @@ func StartramHandler(msg []byte) error {
 	case "toggle":
 		go handleStartramToggle()
 	case "restart":
-		go handleNotImplement(startramPayload.Payload.Action)
+		go handleStartramRestart()
 	case "cancel":
 		key := startramPayload.Payload.Key
 		reset := startramPayload.Payload.Reset
@@ -47,6 +49,66 @@ func StartramHandler(msg []byte) error {
 
 func handleStartramRegions() {
 	go broadcast.LoadStartramRegions()
+}
+
+func handleStartramRestart() {
+	logger.Logger.Info("Restarting StarTram")
+	startram.EventBus <- structs.Event{Type: "restart", Data: "startram"}
+	conf := config.Conf()
+	// only restart if startram is on
+	if conf.WgOn {
+		// record all remote ships
+		wgShips := map[string]bool{}
+		piers := conf.Piers
+		pierStatus, err := docker.GetShipStatus(piers)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+		}
+		for pier, status := range pierStatus {
+			dockerConfig := config.UrbitConf(pier)
+			if dockerConfig.Network == "wireguard" {
+				wgShips[pier] = (status == "Up" || strings.HasPrefix(status, "Up "))
+			}
+		}
+		logger.Logger.Debug(fmt.Sprintf("Containers: %+v", wgShips))
+		// restart wireguard container
+		if err := docker.RestartContainer("wireguard"); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+		}
+		// operate on urbit ships
+		logger.Logger.Info("Recreating containers")
+		for patp, isRunning := range wgShips {
+			if isRunning {
+				if err := click.BarExit(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+				}
+			}
+			// delete container
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+			}
+			minio := fmt.Sprintf("minio_%s", patp)
+			if err := docker.DeleteContainer(minio); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+			}
+
+		}
+		// create startram containers
+		startram.EventBus <- structs.Event{Type: "restart", Data: "urbits"}
+		if err := docker.LoadUrbits(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
+		}
+		startram.EventBus <- structs.Event{Type: "restart", Data: "minios"}
+		if err := docker.LoadMC(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+		}
+		if err := docker.LoadMinIOs(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
+		}
+		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "restart", Data: ""}
+	}
 }
 
 func handleStartramToggle() {

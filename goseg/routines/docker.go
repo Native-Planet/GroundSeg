@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"goseg/broadcast"
+	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/logger"
@@ -178,8 +179,51 @@ func Check502Loop() {
 					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if _, found := status[pier]; found {
 						// found = 2x in a row
+
+						// record all remote ships
+						wgShips := map[string]bool{}
+						piers := conf.Piers
+						pierStatus, err := docker.GetShipStatus(piers)
+						if err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+						}
+						for pier, status := range pierStatus {
+							dockerConfig := config.UrbitConf(pier)
+							if dockerConfig.Network == "wireguard" {
+								wgShips[pier] = (status == "Up" || strings.HasPrefix(status, "Up "))
+							}
+						}
+
+						// restart wireguard container
 						if err := docker.RestartContainer("wireguard"); err != nil {
 							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+						}
+						// operate on urbit ships
+						for patp, isRunning := range wgShips {
+							if isRunning {
+								if err := click.BarExit(patp); err != nil {
+									logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+								}
+							}
+							// delete container
+							if err := docker.DeleteContainer(patp); err != nil {
+								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+							}
+							minio := fmt.Sprintf("minio_%s", patp)
+							if err := docker.DeleteContainer(minio); err != nil {
+								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+							}
+
+						}
+						// create startram containers
+						if err := docker.LoadUrbits(); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
+						}
+						if err := docker.LoadMC(); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+						}
+						if err := docker.LoadMinIOs(); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
 						}
 						// remove from map after restart
 						delete(status, pier)

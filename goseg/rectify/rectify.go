@@ -100,6 +100,15 @@ func RectifyUrbit() {
 	for {
 		event := <-startram.EventBus
 		switch event.Type {
+		case "restart":
+			// startram - restarting wireguard container
+			// urbits - recreating urbit containers
+			// minios - recreating minio containers
+			// done - completed
+			current := broadcast.GetState()
+			current.Profile.Startram.Transition.Restart = fmt.Sprintf("%v", event.Data)
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
 		case "endpoint":
 			//init - started
 			// unregistering - startram services unregistering
