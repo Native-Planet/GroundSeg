@@ -89,9 +89,12 @@ func handleStartramRestart() {
 			}
 			minio := fmt.Sprintf("minio_%s", patp)
 			if err := docker.DeleteContainer(minio); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
 			}
-
+		}
+		// delete mc
+		if err := docker.DeleteContainer("mc"); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete minio client: %v", err))
 		}
 		// create startram containers
 		startram.EventBus <- structs.Event{Type: "restart", Data: "urbits"}
@@ -124,6 +127,27 @@ func handleStartramToggle() {
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
+		// toggle ships back to local
+		for _, patp := range conf.Piers {
+			dockerConfig := config.UrbitConf(patp)
+			if dockerConfig.Network == "wireguard" {
+				payload := structs.WsUrbitPayload{
+					Payload: structs.WsUrbitAction{
+						Type:   "urbit",
+						Action: "toggle-network",
+						Patp:   patp,
+					},
+				}
+				jsonData, err := json.Marshal(payload)
+				if err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error marshalling JSON for %v:", patp, err))
+					continue
+				}
+				if err := UrbitHandler(jsonData); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error sending action to UrbitHandler for %v:", patp, err))
+				}
+			}
+		}
 	} else {
 		if err := config.UpdateConf(map[string]interface{}{
 			"wgOn": true,
@@ -134,6 +158,25 @@ func handleStartramToggle() {
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
+	}
+	// delete mc
+	if err := docker.DeleteContainer("mc"); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to delete minio client: %v", err))
+	}
+	// load mc
+	if err := docker.LoadMC(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+	}
+	for _, patp := range conf.Piers {
+		// delete minio
+		minio := fmt.Sprintf("minio_%s", patp)
+		if err := docker.DeleteContainer(minio); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+		}
+	}
+	// load minio
+	if err := docker.LoadMinIOs(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
 	}
 	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
 }
