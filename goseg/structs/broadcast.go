@@ -106,6 +106,7 @@ type StartramTransition struct {
 	Endpoint string `json:"endpoint"`
 	Register any    `json:"register"`
 	Toggle   any    `json:"toggle"`
+	Restart  string `json:"restart"`
 }
 
 // broadcast payload subobject
