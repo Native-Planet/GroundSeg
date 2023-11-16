@@ -24,7 +24,7 @@
 <div class="text">Boot Complete</div>
 <div class="buttons">
   <button class="btn" on:click={handleClick}>Settings</button>
-  <a class="btn" href={url} on:click={handleReset} target="_blank">Visit URL</a>
+  <a class="btn" href={url} on:click={handleClick} target="_blank">Visit URL</a>
 </div>
 <div class="reset" on:click={handleReset}>Boot Another Ship</div>
 
