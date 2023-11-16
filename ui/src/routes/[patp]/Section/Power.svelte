@@ -23,7 +23,9 @@
       {/if}
       </div>
       <div class="check-text" on:click={()=>toggleBootStatus(patp)}>Remember boot status after restart</div>
+      <!--
       <div class="what">?</div>
+      -->
     </div>
   </div>
   <div class="section-right">

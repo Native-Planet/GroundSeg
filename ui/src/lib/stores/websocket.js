@@ -627,6 +627,14 @@ export const submitNetwork = (ssid,password) => {
 // Penpai
 //
 
+export const toggleExperimentalPenpai = () => {
+  let payload = {
+    "type":"system",
+    "action": "toggle-penpai-feature",
+  }
+  send(payload)
+}
+
 export const togglePenpai = () => {
   let payload = {
     "type":"penpai",
@@ -661,10 +669,19 @@ export const removePenpai = () => {
   send(payload)
 }
 
-export const togglePenpaiCompanion = patp => {
+export const installPenpaiCompanion = patp => {
   let payload = {
     "type":"urbit",
-    "action":"toggle-penpai-companion",
+    "action":"install-penpai-companion",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const uninstallPenpaiCompanion = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"uninstall-penpai-companion",
     "patp":patp,
   }
   send(payload)

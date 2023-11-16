@@ -265,9 +265,8 @@ func main() {
 	loadService(docker.LoadNetdata, "Unable to load Netdata!")
 	// Load Urbits
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
-	if os.Getenv("GS_LLAMA") == "true" {
-		loadService(docker.LoadLlama, "Unable to load Llama GPT!")
-	}
+	// Load Penpai
+	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
 
 	startServer()
 }

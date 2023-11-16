@@ -31,9 +31,54 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
-	case "toggle-penpai-companion":
-		// |install
-		logger.Logger.Debug(fmt.Sprintf("Todo: click toggle |install %%penpai for %v", patp))
+	case "install-penpai-companion":
+		click.SetPenpaiDeskLoading(patp, true)
+		// if not-found, |install, if suspended, |revive
+		status, err := click.GetDesk(patp, "penpai", true)
+		if err != nil {
+			return fmt.Errorf("Handler failed to get penpai desk info for %v: %v", patp, err)
+		}
+		if status == "not-found" {
+			err := click.InstallDesk(patp, "~nattyv", "penpai")
+			if err != nil {
+				return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
+			}
+		} else if status == "suspended" {
+			err := click.ReviveDesk(patp, "penpai")
+			if err != nil {
+				return fmt.Errorf("Handler failed to revive penpai desk for %v: %v", patp, err)
+			}
+		}
+		for {
+			time.Sleep(5 * time.Second)
+			status, err := click.GetDesk(patp, "penpai", true)
+			if err != nil {
+				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
+			}
+			if status == "running" {
+				click.SetPenpaiDeskLoading(patp, false)
+				break
+			}
+		}
+		return nil
+	case "uninstall-penpai-companion":
+		click.SetPenpaiDeskLoading(patp, true)
+		// uninstall
+		err := click.UninstallDesk(patp, "penpai")
+		if err != nil {
+			return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
+		}
+		for {
+			time.Sleep(5 * time.Second)
+			status, err := click.GetDesk(patp, "penpai", true)
+			if err != nil {
+				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
+			}
+			if status != "running" {
+				click.SetPenpaiDeskLoading(patp, false)
+				break
+			}
+		}
 		return nil
 	case "pack":
 		// error handling
@@ -109,8 +154,11 @@ func UrbitHandler(msg []byte) error {
 		// stop ship
 		if isRunning {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
-			if err := docker.StopContainerByName(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+			if err := click.BarExit(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
+				if err = docker.StopContainerByName(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+				}
 			}
 		}
 		// start ship as pack
@@ -450,9 +498,12 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
-			err := docker.StopContainerByName(patp)
+			err := click.BarExit(patp)
 			if err != nil {
 				logger.Logger.Error(fmt.Sprintf("%v", err))
+				if err := docker.StopContainerByName(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+				}
 			}
 		}
 		return nil
@@ -474,8 +525,11 @@ func UrbitHandler(msg []byte) error {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		// stop container
-		if err := docker.StopContainerByName(patp); err != nil {
-			return err
+		if err := click.BarExit(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+			if err := docker.StopContainerByName(patp); err != nil {
+				return err
+			}
 		}
 		// whitelist the patp token pair
 		if err := exporter.WhitelistContainer(patp, urbitPayload.Token); err != nil {
@@ -493,8 +547,11 @@ func UrbitHandler(msg []byte) error {
 		patpConf.DesiredStatus = "stopped"
 		contConf[patp] = patpConf
 		config.UpdateContainerState(patp, patpConf)
-		if err := docker.StopContainerByName(patp); err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
+		if err := click.BarExit(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("%v", err))
+			if err := docker.StopContainerByName(patp); err != nil {
+				return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
+			}
 		}
 		if err := docker.DeleteContainer(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))

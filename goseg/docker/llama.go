@@ -15,8 +15,12 @@ import (
 )
 
 func LoadLlama() error {
-	logger.Logger.Info("Loading Llama GPT")
 	conf := config.Conf()
+	if !conf.PenpaiAllow {
+		logger.Logger.Info("Llama GPT disabled!")
+		return nil
+	}
+	logger.Logger.Info("Loading Llama GPT")
 	if !conf.PenpaiRunning {
 		if err := StopContainerByName("llama-gpt-api"); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))

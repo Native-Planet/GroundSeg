@@ -543,6 +543,9 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 		mergedConfig.Salt = customConfig.Salt
 	}
 
+	// PenpaiAllow
+	mergedConfig.PenpaiAllow = customConfig.PenpaiAllow || defaultConfig.PenpaiAllow
+
 	// PenpaiCores
 	if customConfig.PenpaiCores != 0 {
 		mergedConfig.PenpaiCores = customConfig.PenpaiCores

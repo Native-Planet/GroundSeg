@@ -59,6 +59,7 @@
   <Urbit
     {showUrbAlias}
     {urbitAlias}
+    {remote}
     {url}
     {patp}
     {lusCode}
