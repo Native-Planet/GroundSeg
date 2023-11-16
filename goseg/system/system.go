@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -56,6 +57,11 @@ func GetDisk() (map[string][2]uint64, error) {
 				if err != nil {
 					return device, ""
 				}
+				label, err = octalToAscii(label)
+				if err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Couldn't decode octal in disk label: %v", err))
+					return device, ""
+				}
 				return device, label
 			}
 		}
@@ -77,7 +83,6 @@ func GetDisk() (map[string][2]uint64, error) {
 			all := stat.Blocks * uint64(stat.Bsize)
 			free := stat.Bfree * uint64(stat.Bsize)
 			used := all - free
-
 			_, label := getDiskLabel(device)
 			key := label
 			if label == "" {
@@ -90,6 +95,18 @@ func GetDisk() (map[string][2]uint64, error) {
 		return diskUsageMap, err
 	}
 	return diskUsageMap, nil
+}
+
+func octalToAscii(s string) (string, error) {
+	re := regexp.MustCompile(`\\[0-7]{3}`)
+	replaceFunc := func(match string) string {
+		i, err := strconv.ParseInt(match[1:], 8, 64)
+		if err != nil {
+			return match
+		}
+		return string(rune(i))
+	}
+	return re.ReplaceAllStringFunc(s, replaceFunc), nil
 }
 
 // get cpu temp (may not work on non-intel devices)
