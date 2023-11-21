@@ -86,25 +86,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conf := config.Conf()
 	// if in c2cmode
 	isC2C := system.IsC2CMode()
-	// handle c2c stuff before auth checks
+	result := map[string]interface{}{
+		"type":  "c2c",
+		"ssids": system.C2CStoredSSIDs,
+	}
+	respJson, err := json.Marshal(result)
+	if err != nil {
+		errmsg := fmt.Sprintf("Error marshalling c2c SSIDs: %v", err)
+		logger.Logger.Error(errmsg)
+	}
+	MuCon.Write(respJson)
 	if isC2C {
-		var msgType structs.WsType
-		err = json.Unmarshal(msg, &msgType)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error marshalling token (else): %v", err))
-			return
-		}
-		//if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
-		var payload structs.C2CPayload
-		if err := json.Unmarshal(msg, &payload); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
-		}
-		resp, err := handler.C2CHandler(payload)
-		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
-		}
-		MuCon.Write(resp)
-		//}
 		// send setup broadcast if we're not done setting up
 	} else if conf.Setup != "complete" {
 		resp := structs.SetupBroadcast{
@@ -200,6 +192,22 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		ack := "ack"
+		if msgType.Payload.Type == "c2c" && isC2C {
+			/*
+				var payload structs.C2CPayload
+				if err := json.Unmarshal(msg, &payload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
+					continue
+				}
+			*/
+			resp, err := handler.C2CHandler(msg)
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
+				continue
+			}
+			MuCon.Write(resp)
+			continue
+		}
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "penpai":

@@ -132,21 +132,28 @@ func LogoutHandler(msg []byte) error {
 }
 
 // return the c2c payload
-func C2CHandler(payload structs.C2CPayload) ([]byte, error) {
+func C2CHandler(msg []byte) ([]byte, error) {
+	var c2cPayload structs.WsC2cPayload
+	err := json.Unmarshal(msg, &c2cPayload)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't unmarshal c2c payload: %v", err)
+	}
 	var resp []byte
-	var err error
-	switch payload.Type {
+	switch c2cPayload.Payload.Type {
 	case "c2c":
-		system.C2CConnect(payload.SSID, payload.Password)
+		system.C2CConnect(c2cPayload.Payload.SSID, c2cPayload.Payload.Password)
 	default:
-		blob := structs.C2CBroadcast{
-			Type:  "c2c",
-			SSIDS: system.C2CStoredSSIDs,
-		}
-		resp, err = json.Marshal(blob)
-		if err != nil {
-			return nil, fmt.Errorf("Error unmarshalling message: %v", err)
-		}
+		return nil, fmt.Errorf("Invalid c2c request")
+		/*
+			blob := structs.C2CBroadcast{
+				Type:  "c2c",
+				SSIDS: system.C2CStoredSSIDs,
+			}
+			resp, err = json.Marshal(blob)
+			if err != nil {
+				return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+			}
+		*/
 	}
 	return resp, nil
 }
