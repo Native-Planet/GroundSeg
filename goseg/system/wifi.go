@@ -150,7 +150,7 @@ func C2CConnect(ssid, password string) {
 	if err != nil {
 		C2CMode()
 	} else {
-		cmd := exec.Command("systemctl", "restart", "groundseg")
+		cmd := exec.Command("systemctl", "restart", "docker", "groundseg")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Logger.Debug(fmt.Sprintf("Failed to restart groundseg: %v", err))
