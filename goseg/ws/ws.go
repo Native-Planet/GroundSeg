@@ -84,8 +84,29 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"token": tokenContent,
 	}
 	conf := config.Conf()
-	// send setup broadcast if we're not done setting up
-	if conf.Setup != "complete" {
+	// if in c2cmode
+	isC2C := system.IsC2CMode()
+	// handle c2c stuff before auth checks
+	if isC2C {
+		var msgType structs.WsType
+		err = json.Unmarshal(msg, &msgType)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error marshalling token (else): %v", err))
+			return
+		}
+		//if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
+		var payload structs.C2CPayload
+		if err := json.Unmarshal(msg, &payload); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
+		}
+		resp, err := handler.C2CHandler(payload)
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
+		}
+		MuCon.Write(resp)
+		//}
+		// send setup broadcast if we're not done setting up
+	} else if conf.Setup != "complete" {
 		resp := structs.SetupBroadcast{
 			Type:      "structure",
 			AuthLevel: "setup",
@@ -98,8 +119,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
 		}
 		MuCon.Write(respJSON)
-	}
-	if !authed {
+	} else if !authed {
 		var ack string
 		token, err = auth.CreateToken(conn, r, false)
 		if err != nil {
@@ -180,21 +200,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		ack := "ack"
-		// handle c2c stuff before auth checks
-		if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
-			var payload structs.C2CPayload
-			if err := json.Unmarshal(msg, &payload); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
-				continue
-			}
-			resp, err := handler.C2CHandler(payload)
-			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
-				continue
-			}
-			MuCon.Write(resp)
-			continue
-		}
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "penpai":
