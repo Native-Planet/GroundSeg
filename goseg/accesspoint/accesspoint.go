@@ -15,7 +15,7 @@ var (
 	inet              = ""
 	ip                = "192.168.45.1"
 	netmask           = "255.255.255.0"
-	ssid              = "NativePlanet"
+	ssid              = "NativePlanetConnect"
 	password          = "nativeplanet"
 	rootDir           = "/etc/accesspoint/"
 	hostapdConfigPath = filepath.Join(rootDir, "hostapd.config")

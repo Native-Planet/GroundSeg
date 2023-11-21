@@ -84,8 +84,21 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"token": tokenContent,
 	}
 	conf := config.Conf()
-	// send setup broadcast if we're not done setting up
-	if conf.Setup != "complete" {
+	// if in c2cmode
+	isC2C := system.IsC2CMode()
+	result := map[string]interface{}{
+		"type":  "c2c",
+		"ssids": system.C2CStoredSSIDs,
+	}
+	respJson, err := json.Marshal(result)
+	if err != nil {
+		errmsg := fmt.Sprintf("Error marshalling c2c SSIDs: %v", err)
+		logger.Logger.Error(errmsg)
+	}
+	MuCon.Write(respJson)
+	if isC2C {
+		// send setup broadcast if we're not done setting up
+	} else if conf.Setup != "complete" {
 		resp := structs.SetupBroadcast{
 			Type:      "structure",
 			AuthLevel: "setup",
@@ -98,8 +111,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Logger.Error(fmt.Sprintf("Couldn't marshal startram regions: %v", err))
 		}
 		MuCon.Write(respJSON)
-	}
-	if !authed {
+	} else if !authed {
 		var ack string
 		token, err = auth.CreateToken(conn, r, false)
 		if err != nil {
@@ -180,14 +192,15 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		ack := "ack"
-		// handle c2c stuff before auth checks
-		if msgType.Payload.Type == "c2c" && system.IsC2CMode() {
-			var payload structs.C2CPayload
-			if err := json.Unmarshal(msg, &payload); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
-				continue
-			}
-			resp, err := handler.C2CHandler(payload)
+		if msgType.Payload.Type == "c2c" && isC2C {
+			/*
+				var payload structs.C2CPayload
+				if err := json.Unmarshal(msg, &payload); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Error unmarshalling C2C payload: %v", err))
+					continue
+				}
+			*/
+			resp, err := handler.C2CHandler(msg)
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
 				continue
