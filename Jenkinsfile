@@ -87,7 +87,7 @@ pipeline {
             steps {
                 /* unstash arm binary on master server */
                 script {
-                    if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {  
+                    if( "${channel}" != "nobuild" ) {  
                         sh 'echo "debug: post-build actions"'
                         sh '''#!/bin/bash -x
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin

@@ -66,7 +66,8 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 			Name: "unless-stopped",
 		},
 		Resources: container.Resources{
-			NanoCPUs: 1e8,
+			NanoCPUs: 1e8,               // 1cpu
+			Memory:   200 * 1024 * 1024, // 200mb
 		},
 		SecurityOpt: []string{"apparmor=unconfined"},
 		PortBindings: nat.PortMap{
