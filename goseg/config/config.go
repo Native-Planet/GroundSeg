@@ -123,7 +123,7 @@ func init() {
 	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
 
 	// get hash of groundseg binary
-	hash, err := getSHA256(filepath.Join(BasePath, "groundseg"))
+	hash, err := GetSHA256(filepath.Join(BasePath, "groundseg"))
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting binary sha256 hash: %v", err)
 		logger.Logger.Error(errmsg)
@@ -325,7 +325,7 @@ func RandString(length int) string {
 	return base64.URLEncoding.EncodeToString(randBytes)
 }
 
-func getSHA256(filePath string) (string, error) {
+func GetSHA256(filePath string) (string, error) {
 	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
