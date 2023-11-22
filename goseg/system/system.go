@@ -181,6 +181,8 @@ func FixerScript(basePath string) error {
 			if err != nil {
 				return err
 			}
+		} else {
+			logger.Logger.Info("Fixer cron found. Doing nothing")
 		}
 	}
 	return nil
@@ -191,7 +193,8 @@ func cronExists(fixerPath string) bool {
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(out), fixerPath)
+	outStr := string(out)
+	return strings.Contains(outStr, fixerPath) && strings.Contains(outStr, "/bin/bash")
 }
 
 func addCron(job string) error {
