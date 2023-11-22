@@ -65,7 +65,7 @@ export const handleMessage = data => {
   // it from pending
   if (data.type === "c2c") {
     console.log(data)
-    if (data.ssids.length > 0) {
+    if (Array.isArray(data.ssids)) {
       ssids.set(data.ssids)
       isC2CMode.set(true)
     }
