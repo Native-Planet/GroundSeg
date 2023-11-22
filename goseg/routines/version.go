@@ -105,6 +105,10 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		logger.Logger.Error(fmt.Sprintf("Failed to download new GroundSeg binary: %v", err))
 		return
 	}
+	if resp.StatusCode != 200 {
+		logger.Logger.Error(fmt.Sprintf("Couldn't download binary: %v", resp.StatusCode))
+		return
+	}
 	defer resp.Body.Close()
 
 	// Create a new file to save the downloaded content
@@ -126,6 +130,19 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	logger.Logger.Info("Modifying groundseg_new permissions")
 	if err := os.Chmod(filepath.Join(config.BasePath, "groundseg_new"), 0755); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to write contents: %v", err))
+		return
+	}
+	newVersionHash := versionInfo.Groundseg.Arm64Sha256
+	if config.Architecture == "amd64" {
+		url = versionInfo.Groundseg.Amd64Sha256
+	}
+	newBinHash, err := config.GetSHA256(filepath.Join(config.BasePath, "groundseg_new"))
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't get SHA for new binary: %v", err))
+		return
+	}
+	if newVersionHash != newBinHash {
+		logger.Logger.Error(fmt.Sprintf("New binary hash does not match downloaded file:\n%v\n%v", newVersionHash, newBinHash))
 		return
 	}
 	// delete groundseg binary if exists
