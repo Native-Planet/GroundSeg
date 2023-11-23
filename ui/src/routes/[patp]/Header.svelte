@@ -1,4 +1,6 @@
 <script>
+  import Clipboard from 'clipboard'
+  import { onMount } from 'svelte'
   import { structure, registerServiceAgain } from '$lib/stores/websocket';
   import { devShipClass } from '$lib/stores/devclass'
   export let patp
@@ -14,6 +16,16 @@
   $: chars = (patp.replace(/-/g,"").length) || 0
   $: shipClass = (chars == 3 ? "GALAXY" : chars == 6 ? "STAR" : chars == 12 ? "PLANET" : chars > 12 ? "MOON" : "UNKNOWN") || "ERROR"
 
+  let copy
+  let copied = false
+
+  onMount(()=>{
+    copy = new Clipboard('#patp');
+    copy.on("success", ()=> {
+      copied = true;
+      setTimeout(()=> copied = false, 1000)
+    })
+  })
 
 </script>
 
@@ -22,14 +34,18 @@
     <div class="ship-class">{shipClass}
       <sup>{vere.toUpperCase()}</sup>
     </div>
-    <div class="patp">
-      <!-- dev modification -->
-      {#if $devShipClass == "star"}
-        {patp.slice(0,6).toUpperCase()}
-      {:else if $devShipClass == "planet"}
-        {patp.slice(0,13).toUpperCase()}
+    <div class="patp" id="patp" data-clipboard-text={patp}>
+      {#if copied}
+        COPIED!
       {:else}
-        {patp.toUpperCase()}
+        <!-- dev modification -->
+        {#if $devShipClass == "star"}
+          {patp.slice(0,6).toUpperCase()}
+        {:else if $devShipClass == "planet"}
+          {patp.slice(0,13).toUpperCase()}
+        {:else}
+          {patp.toUpperCase()}
+        {/if}
       {/if}
     </div>
   </div>
@@ -71,6 +87,7 @@
     font-size: 18px;
   }
   .patp {
+    cursor: pointer;
     font-family: var(--title-font);
     margin-left: 20px;
     font-size: 32px;

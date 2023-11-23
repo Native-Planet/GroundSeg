@@ -117,10 +117,15 @@ func C2CMode() error {
 	// todo: start wifi if not started
 	// store ssids
 	C2CStoredSSIDs = ListWifiSSIDs(dev[0])
-
-	// stop systemd-resolved
-	cmd := exec.Command("systemctl", "stop", "systemd-resolved")
+	// disable systemd-resolved
+	cmd := exec.Command("systemctl", "disable", "systemd-resolved")
 	_, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Logger.Debug(fmt.Sprintf("Failed to disable systemd-resolved: %v", err))
+	}
+	// stop systemd-resolved
+	cmd = exec.Command("systemctl", "stop", "systemd-resolved")
+	_, err = cmd.CombinedOutput()
 	if err != nil {
 		logger.Logger.Debug(fmt.Sprintf("Failed to stop systemd-resolved: %v", err))
 	}
@@ -145,7 +150,7 @@ func C2CConnect(ssid, password string) {
 	if err != nil {
 		C2CMode()
 	} else {
-		cmd := exec.Command("systemctl", "restart", "groundseg")
+		cmd := exec.Command("systemctl", "restart", "docker", "groundseg")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Logger.Debug(fmt.Sprintf("Failed to restart groundseg: %v", err))

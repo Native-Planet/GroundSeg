@@ -15,7 +15,7 @@ func startRouter() bool {
 	cmd := "ip link set " + wlan + " up"
 	res, err = executeShell(cmd)
 	logger.Logger.Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-	cmd = "ip addr add " + ip + "/24 " + wlan
+	cmd = "ip addr add " + ip + "/24 dev " + wlan
 	res, err = executeShell(cmd)
 	logger.Logger.Debug(fmt.Sprintf("res: %s, err: %v", res, err))
 	logger.Logger.Debug("created interface")

@@ -6,7 +6,7 @@
   export let diskUsage = 0
   export let loom = 2048
 
-  $: memPercent = ((memUsage / (1024 * 1024))/loom).toFixed(1)
+  $: memPercent = ((memUsage / (1024 * 1024))/loom * 100).toFixed(1)
   $: memBlocks = Math.ceil(memPercent / 10)
   $: diskMB = (diskUsage / (1024 * 1024)).toFixed(2)
 </script>
