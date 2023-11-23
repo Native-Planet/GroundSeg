@@ -134,7 +134,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	newVersionHash := versionInfo.Groundseg.Arm64Sha256
 	if config.Architecture == "amd64" {
-		url = versionInfo.Groundseg.Amd64Sha256
+		newVersionHash = versionInfo.Groundseg.Amd64Sha256
 	}
 	newBinHash, err := config.GetSHA256(filepath.Join(config.BasePath, "groundseg_new"))
 	if err != nil {
@@ -142,7 +142,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		return
 	}
 	if newVersionHash != newBinHash {
-		logger.Logger.Error(fmt.Sprintf("New binary hash does not match downloaded file:\n%v\n%v", newVersionHash, newBinHash))
+		logger.Logger.Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
 		return
 	}
 	// delete groundseg binary if exists
