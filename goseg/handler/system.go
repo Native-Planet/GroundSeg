@@ -57,7 +57,7 @@ func SystemHandler(msg []byte) error {
 				os.Exit(0)
 			} else {
 				logger.Logger.Info(fmt.Sprintf("Restarting GroundSeg.."))
-				cmd := exec.Command("sytemctl", "restart", "groundseg")
+				cmd := exec.Command("systemctl", "restart", "groundseg")
 				cmd.Run()
 			}
 		default:
