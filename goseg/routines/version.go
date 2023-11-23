@@ -58,9 +58,9 @@ func callUpdater(releaseChannel string) {
 		logger.Logger.Error(fmt.Sprintf("Couldn't hash binary: %v", err))
 		return
 	}
-	latestHash := latestVersion.Groundseg.Amd64Sha256
+	latestHash := latestVersion.Groundseg.Arm64Sha256
 	if config.Architecture != "amd64" {
-		latestHash = latestVersion.Groundseg.Arm64Sha256
+		latestHash = latestVersion.Groundseg.Amd64Sha256
 	}
 	if currentHash != latestHash {
 		logger.Logger.Info("GroundSeg Binary update!")
@@ -142,7 +142,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		return
 	}
 	if newVersionHash != newBinHash {
-		logger.Logger.Error(fmt.Sprintf("New binary hash does not match downloaded file:\n%v\n%v", newVersionHash, newBinHash))
+		logger.Logger.Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
 		return
 	}
 	// delete groundseg binary if exists
