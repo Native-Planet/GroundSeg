@@ -370,32 +370,61 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 		return nil
 	case "toggle-minio-link":
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
 		// todo: scry for actual info
-		isLinked := false
+		isLinked := shipConf.MinIOLinked
 		if isLinked {
-			// todo: unlink
-			return nil
+			// unlink from urbit
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "unlinking"}
+			if err := click.UnlinkStorage(patp); err != nil {
+				return fmt.Errorf("Failed to unlink MinIO information %s: %v", patp, err)
+			}
+
+			// Update config
+			update := make(map[string]structs.UrbitDocker)
+			shipConf.MinIOLinked = false
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+
+			// Success
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "unlink-success"}
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: ""}
+		} else {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "linking"}
+			// create service account
+			svcAccount, err := docker.CreateMinIOServiceAccount(patp)
+			if err != nil {
+				return fmt.Errorf("Failed to create MinIO service account for %s: %v", patp, err)
+			}
+			// get minio endpoint
+			var endpoint string
+			endpoint = shipConf.CustomS3Web
+			if endpoint == "" {
+				endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
+			}
+			// link to urbit
+			if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
+				return fmt.Errorf("Failed to link MinIO information %s: %v", patp, err)
+			}
+
+			// Update config
+			update := make(map[string]structs.UrbitDocker)
+			shipConf.MinIOLinked = true
+			update[patp] = shipConf
+			if err := config.UpdateUrbitConfig(update); err != nil {
+				return fmt.Errorf("Couldn't update urbit config: %v", err)
+			}
+
+			// Success
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "success"}
+			time.Sleep(1 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: ""}
 		}
-		// create service account
-		svcAccount, err := docker.CreateMinIOServiceAccount(patp)
-		if err != nil {
-			return fmt.Errorf("Failed to create MinIO service account for %s: %v", patp, err)
-		}
-		// get minio endpoint
-		var endpoint string
-		endpoint = shipConf.CustomS3Web
-		if endpoint == "" {
-			endpoint = fmt.Sprintf("s3.%s", shipConf.WgURL)
-		}
-		// link to urbit
-		if err := click.LinkStorage(patp, endpoint, svcAccount); err != nil {
-			return fmt.Errorf("Failed to link MinIO information %s: %v", patp, err)
-		}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: "success"}
-		time.Sleep(1 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleMinIOLink", Event: ""}
+
 		return nil
+
 	case "toggle-boot-status":
 		if shipConf.BootStatus == "ignore" {
 			statusMap, err := docker.GetShipStatus([]string{patp})
