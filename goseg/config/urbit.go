@@ -24,6 +24,12 @@ func UrbitConf(pier string) structs.UrbitDocker {
 	return UrbitsConfig[pier]
 }
 
+// this should eventually be a click/conn.c command
+func GetMinIOLinkedStatus(patp string) bool {
+	urbConf := UrbitConf(patp)
+	return urbConf.MinIOLinked
+}
+
 // retrieve map of urbit config structs
 func UrbitConfAll() map[string]structs.UrbitDocker {
 	urbitMutex.Lock()
