@@ -151,7 +151,6 @@ func UrbitHandler(msg []byte) error {
 			return packMeldError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
 		}
 		isRunning := strings.Contains(status, "Up")
-		// stop ship
 		if isRunning {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
 			if err := click.BarExit(patp); err != nil {
@@ -161,6 +160,7 @@ func UrbitHandler(msg []byte) error {
 				}
 			}
 		}
+		// stop ship
 		// start ship as pack
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
 		logger.Logger.Info(fmt.Sprintf("Attempting to urth pack %s", patp))

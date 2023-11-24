@@ -596,14 +596,15 @@ export const urbitChop = patp => {
 //  Support
 //
 
-export const submitReport = (contact,description,ships,cpuProfile) => {
+export const submitReport = (contact,description,ships,cpuProfile,penpai) => {
   let payload = {
     "type":"support",
     "action":"bug-report",
     "contact":contact,
     "description":description,
     "ships":ships,
-    "cpu_profile":cpuProfile
+    "cpu_profile":cpuProfile,
+    "penpai":penpai
   }
   send(payload)
 }
