@@ -453,6 +453,7 @@ type WsSupportAction struct {
 	Description string   `json:"description"`
 	Ships       []string `json:"ships"`
 	CPUProfile  bool     `json:"cpu_profile"`
+	Penpai      bool     `json:"penpai"`
 }
 
 type WsC2cPayload struct {
