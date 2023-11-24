@@ -372,6 +372,15 @@ export const resetImportShip = () => {
 //  Boot New Ship
 //
 
+export const cancelNewShip = patp => {
+  let payload = {
+    "type":"new_ship",
+    "action":"cancel",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 export const bootShip = (patp,key,remote) => {
   let payload = {
     "type":"new_ship",

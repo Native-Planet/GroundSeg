@@ -303,6 +303,8 @@ func UrbitHandler(msg []byte) error {
 		_, err := docker.StartContainer(patp, "vere")
 		if err != nil {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "error"}
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
 			return fmt.Errorf("Failed to rebuild container %s: %v", patp, err)
 		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "success"}
@@ -613,6 +615,9 @@ func UrbitHandler(msg []byte) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "success"}
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "done"}
+
+		// TODO: reset boot new page
+
 		time.Sleep(1 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: ""}
 		// remove from broadcast

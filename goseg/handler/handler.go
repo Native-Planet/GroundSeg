@@ -48,6 +48,9 @@ func NewShipHandler(msg []byte) error {
 		if err != nil {
 			return err
 		}
+	case "cancel":
+		// send to UrbitHandler's delete-ship
+		return nil
 	default:
 		return fmt.Errorf("Unknown NewShip action: %v", shipPayload.Payload.Action)
 	}
