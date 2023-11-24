@@ -616,8 +616,6 @@ func UrbitHandler(msg []byte) error {
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "done"}
 
-		// TODO: reset boot new page
-
 		time.Sleep(1 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: ""}
 		// remove from broadcast

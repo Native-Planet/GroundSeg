@@ -4,15 +4,25 @@
     cancelNewShip,
   } from '$lib/stores/websocket'
 
+  import { afterUpdate } from 'svelte'
+
   // Modal
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
 
-  import { afterUpdate } from 'svelte'
   import { page } from '$app/stores'
 
   export let patp
   export let isOpen
+
+  $: transition = ($structure?.urbits?.[patp]?.transition) || {}
+  $: tDeleteShip = (transition?.deleteShip) || ""
+
+  afterUpdate(()=>{
+    if (tDeleteShip == "done") {
+      closeModal()
+    }
+  })
 </script>
 
 <Modal>
@@ -24,8 +34,19 @@
     <div class="button-wrapper">
       <button
         class="abort"
+        disabled={tDeleteShip.length > 0}
         on:click={()=>cancelNewShip(patp)}>
-        Yes, Abort
+        {#if tDeleteShip.length < 1}
+          Yes, Abort
+        {:else if tDeleteShip == "stopping"}
+          Stopping boot process
+        {:else if tDeleteShip == "removing-services"}
+          Removing registered services
+        {:else if tDeleteShip == "deleting"}
+          Deleting local data
+        {:else if tDeleteShip == "success"}
+          {patp} boot aborted!
+        {/if}
       </button>
     </div>
   </div>
