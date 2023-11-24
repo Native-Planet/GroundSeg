@@ -23,6 +23,8 @@
       Rebuilding
     {:else if t == "success"}
       Success!
+    {:else if t == "error"}
+      Error
     {/if}
   </div>
   <button 

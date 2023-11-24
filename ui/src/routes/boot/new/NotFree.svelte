@@ -12,6 +12,10 @@
   import Completed from './Completed.svelte'
   import Aborted from './Aborted.svelte'
 
+  import LogsDrawer from './LogsDrawer.svelte'
+  import CancelModal from './CancelModal.svelte'
+  import { openModal } from 'svelte-modals'
+
   export let tBootStage
   let coverage = 0
   $: name = ($structure?.newShip?.transition?.patp) || ""
@@ -37,8 +41,32 @@
     <CreatePier {name} on:emit={()=>coverage = 20} /> 
   {:else if tBootStage == "booting"}
     <BootingShip {name} on:emit={()=>coverage = 42} /> 
+      <div class="small-button-wrapper">
+        <div
+          class="small-button cancel"
+          on:click={()=>openModal(CancelModal,{"patp":name})}>
+          Cancel
+        </div>
+        <div 
+          class="small-button"
+          on:click={()=>openModal(LogsDrawer,{"patp":name})}>
+          View Logs
+        </div>
+      </div>
   {:else if tBootStage == "remote"}
     <SettingRemote {name} on:emit={()=>coverage = 86} /> 
+      <div class="small-button-wrapper">
+        <div
+          class="small-button cancel"
+          on:click={()=>openModal(CancelModal,{"patp":name})}>
+          Cancel
+        </div>
+        <div 
+          class="small-button"
+          on:click={()=>openModal(LogsDrawer,{"patp":name})}>
+          View Logs
+        </div>
+      </div>
   {:else if tBootStage == "completed"}
     <Completed {name} on:emit={()=>coverage = 100} /> 
   {:else if tBootStage == "aborted"}
@@ -75,5 +103,27 @@
     font-size: 42px;
     margin-top: 12px;
     font-family: var(--title-font);
+  }
+  .small-button-wrapper {
+    margin: auto;
+    max-width: 240px;
+    margin-top: 64px;
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    color: var(--text-color);
+  }
+  .small-button:hover {
+    cursor: pointer;
+  }
+  .small-button {
+    text-decoration: underline;
+    font-weight: 600;
+  }
+  .cancel {
+    font-weight: 300;
+  }
+  .cancel:hover {
+    color: red;
   }
 </style>
