@@ -9,10 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
 func LoadNetdata() error {
@@ -100,7 +100,7 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 // write edited conf
 func WriteNDConf() error {
 	newConf := "[plugins]\n     apps = no\n"
-	filePath := filepath.Join(config.DockerDir, "netdata", "_data", "netdata.conf")
+	filePath := filepath.Join(config.DockerDir, "netdataconfig", "_data", "netdata.conf")
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
