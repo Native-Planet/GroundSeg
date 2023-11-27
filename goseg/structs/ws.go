@@ -7,6 +7,7 @@ package structs
 // 🐝 Careful! ❤️
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -466,4 +467,9 @@ type WsC2cAction struct {
 	Action   string `json:"action"`
 	SSID     string `json:"ssid"`
 	Password string `json:"password"`
+}
+
+type CtxWithCancel struct {
+    Ctx    context.Context
+    Cancel context.CancelFunc
 }
