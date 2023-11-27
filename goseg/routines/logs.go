@@ -13,8 +13,8 @@ import (
 	// "io/ioutil"
 	"os"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	logsMap = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
+	logsMap          = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
 	wsLogMessagePool = sync.Pool{
 		New: func() interface{} {
 			return new(structs.WsLogMessage)
@@ -31,25 +31,24 @@ var (
 )
 
 func cleanupLogsMap() {
-    for MuCon, conMap := range logsMap {
-        if len(conMap) == 0 {
-            delete(logsMap, MuCon)
-        } else {
-            for containerID, ctxCancel := range conMap {
-                select {
-                case <-ctxCancel.Ctx.Done():
-                    delete(conMap, containerID)
-                default:
-                    // context is not done yet
-                }
-            }
-            if len(conMap) == 0 {
-                delete(logsMap, MuCon)
-            }
-        }
-    }
+	for MuCon, conMap := range logsMap {
+		if len(conMap) == 0 {
+			delete(logsMap, MuCon)
+		} else {
+			for containerID, ctxCancel := range conMap {
+				select {
+				case <-ctxCancel.Ctx.Done():
+					delete(conMap, containerID)
+				default:
+					// context is not done yet
+				}
+			}
+			if len(conMap) == 0 {
+				delete(logsMap, MuCon)
+			}
+		}
+	}
 }
-
 
 // manage log streams
 func LogEvent() {
@@ -143,64 +142,64 @@ func removeDockerHeaders(logData []byte) string {
 }
 
 func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) {
-    if containerID != "system" {
-        dockerClient, err := client.NewClientWithOpts(client.FromEnv)
-        if err != nil {
-            logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-            return
-        }
-        defer dockerClient.Close()
-        options := types.ContainerLogsOptions{
-            ShowStdout: true,
-            ShowStderr: true,
-            Timestamps: true,
-            Tail:       "1000",
-        }
-        existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
-        if err != nil {
-            logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
-            return
-        }
-        defer existingLogs.Close()
-        const logChunkSize = 4096
-        buf := make([]byte, logChunkSize)
-        for {
-            n, err := existingLogs.Read(buf)
-            if n > 0 {
-                sendChunkedLogs(ctx, MuCon, containerID, buf[:n])
-            }
-            if err != nil {
-                if err != io.EOF {
-                    logger.Logger.Error(fmt.Sprintf("Error reading log chunk: %v", err))
-                }
-                break
-            }
-        }
-        lastTimestamp, _ := extractTimestamp(getLastLogLine(buf))
-        skipForward := time.Millisecond
-        adjustedTimestamp := lastTimestamp.Add(skipForward)
-        sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
-        options = types.ContainerLogsOptions{
-            ShowStdout: true,
-            ShowStderr: true,
-            Timestamps: true,
-            Follow:     true,
-            Since:      sinceTimestamp,
-        }
-        streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
-        if err != nil {
-            logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
-            return
-        }
-        defer streamingLogs.Close()
-        sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
+	if containerID != "system" {
+		dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			return
+		}
+		defer dockerClient.Close()
+		options := types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Timestamps: true,
+			Tail:       "1000",
+		}
+		existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
+			return
+		}
+		defer existingLogs.Close()
+		const logChunkSize = 4096
+		buf := make([]byte, logChunkSize)
+		for {
+			n, err := existingLogs.Read(buf)
+			if n > 0 {
+				sendChunkedLogs(ctx, MuCon, containerID, buf[:n])
+			}
+			if err != nil {
+				if err != io.EOF {
+					logger.Logger.Error(fmt.Sprintf("Error reading log chunk: %v", err))
+				}
+				break
+			}
+		}
+		lastTimestamp, _ := extractTimestamp(getLastLogLine(buf))
+		skipForward := time.Millisecond
+		adjustedTimestamp := lastTimestamp.Add(skipForward)
+		sinceTimestamp := adjustedTimestamp.Format(time.RFC3339Nano)
+		options = types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Timestamps: true,
+			Follow:     true,
+			Since:      sinceTimestamp,
+		}
+		streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			return
+		}
+		defer streamingLogs.Close()
+		sendLogs(ctx, MuCon, containerID, streamingLogs, lastTimestamp)
 
-    } else {
-        err := tailLogs(ctx, MuCon, logger.SysLogfile())
-        if err != nil {
-            logger.Logger.Error(fmt.Sprintf("Error streaming system logs: %v", err))
-        }
-    }
+	} else {
+		err := tailLogs(ctx, MuCon, logger.SysLogfile())
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error streaming system logs: %v", err))
+		}
+	}
 }
 
 // send a big chunk of log history
@@ -287,35 +286,35 @@ func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
 
 // send an individual container log line
 func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, logs io.Reader, lastTimestamp time.Time) {
-    reader := bufio.NewReader(logs)
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        default:
-            line, err := reader.ReadBytes('\n')
-            if err != nil && err != io.EOF {
-                break
-            }
-            if len(line) > 0 {
-                logString := extractLogMessage(line)
-                message := wsLogMessagePool.Get().(*structs.WsLogMessage)
-                message.Log.ContainerID = containerID
-                message.Log.Line = logString
-                message.Type = "log"
-                logJSON, err := json.Marshal(message)
-                if err != nil {
-                    logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
-                    break
-                }
-                MuCon.Write(logJSON)
-                wsLogMessagePool.Put(message) // return message to the pool
-            }
-            if err == io.EOF {
-                break
-            }
-        }
-    }
+	reader := bufio.NewReader(logs)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			line, err := reader.ReadBytes('\n')
+			if err != nil && err != io.EOF {
+				break
+			}
+			if len(line) > 0 {
+				logString := extractLogMessage(line)
+				message := wsLogMessagePool.Get().(*structs.WsLogMessage)
+				message.Log.ContainerID = containerID
+				message.Log.Line = logString
+				message.Type = "log"
+				logJSON, err := json.Marshal(message)
+				if err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+					break
+				}
+				MuCon.Write(logJSON)
+				wsLogMessagePool.Put(message) // return message to the pool
+			}
+			if err == io.EOF {
+				break
+			}
+		}
+	}
 }
 
 // send individual system log line

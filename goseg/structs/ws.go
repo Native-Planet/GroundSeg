@@ -470,6 +470,6 @@ type WsC2cAction struct {
 }
 
 type CtxWithCancel struct {
-    Ctx    context.Context
-    Cancel context.CancelFunc
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }

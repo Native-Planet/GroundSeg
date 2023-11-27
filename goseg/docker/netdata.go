@@ -1,13 +1,17 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"goseg/config"
 	"goseg/logger"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -24,6 +28,10 @@ func LoadNetdata() error {
 			logger.Logger.Error(errmsg)
 			panic(errmsg)
 		}
+	}
+	err = WriteNDConf()
+	if err != nil {
+		return err
 	}
 	logger.Logger.Info("Running NetData")
 	info, err := StartContainer("netdata", "netdata")
@@ -87,4 +95,95 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 		},
 	}
 	return containerConfig, hostConfig, nil
+}
+
+// write edited conf
+func WriteNDConf() error {
+	newConf := "[plugins]\n     apps = no\n"
+	filePath := filepath.Join(config.DockerDir, "netdata", "_data", "netdata.conf")
+	existingConf, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		// assume it doesn't exist, so write the current config
+		logger.Logger.Info("Creating ND config")
+		return writeNDConfToFile(filePath, newConf)
+	}
+	if string(existingConf) != newConf {
+		// If they differ, overwrite
+		logger.Logger.Info("Writing ND config")
+		return writeNDConfToFile(filePath, newConf)
+	}
+	return nil
+}
+
+// either write directly or create volumes
+func writeNDConfToFile(filePath string, content string) error {
+	// try writing
+	err := ioutil.WriteFile(filePath, []byte(content), 0644)
+	if err == nil {
+		return nil
+	}
+	// ensure the directory structure exists
+	dir := filepath.Dir(filePath)
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	// try writing again
+	err = ioutil.WriteFile(filePath, []byte(content), 0644)
+	if err != nil {
+		err = copyNDFileToVolume(filePath, "/etc/netdata/", "netdata")
+		// otherwise create the volume
+		if err != nil {
+			return fmt.Errorf("Failed to copy ND config file to volume: %v", err)
+		}
+	}
+	return nil
+}
+
+// write ND conf to volume
+func copyNDFileToVolume(filePath string, targetPath string, volumeName string) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	containerInfo, err := GetLatestContainerInfo("netdata")
+	if err != nil {
+		return err
+	}
+	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
+	// temp container to mount
+	resp, err := cli.ContainerCreate(ctx, &container.Config{
+		Image: desiredImage,
+	}, &container.HostConfig{
+		Binds: []string{volumeName + ":" + targetPath},
+	}, nil, nil, "nd_writer")
+	if err != nil {
+		return err
+	}
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		return err
+	}
+	file, err := os.Open(filepath.Join(filePath))
+	if err != nil {
+		return fmt.Errorf("failed to open netdata.config file: %v", err)
+	}
+	defer file.Close()
+	// Copy the file to the volume via the temporary container
+	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, types.CopyToContainerOptions{})
+	if err != nil {
+		return err
+	}
+	// remove temporary container
+	if err := StopContainerByName("nd_writer"); err != nil {
+		return err
+	}
+	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); err != nil {
+		return err
+	}
+	defer func() {
+		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
+			logger.Logger.Error("Failed to remove temporary container: ", removeErr)
+		}
+	}()
+	return nil
 }
