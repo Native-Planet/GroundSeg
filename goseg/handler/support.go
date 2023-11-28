@@ -45,11 +45,12 @@ func SupportHandler(msg []byte, payload structs.WsPayload) error {
 	description := supportPayload.Payload.Description
 	ships := supportPayload.Payload.Ships
 	cpuProfile := supportPayload.Payload.CPUProfile
+	penpai := supportPayload.Payload.Penpai
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
 		return handleError(fmt.Errorf("Error creating bug-report dir: %v", err))
 	}
-	if err := dumpBugReport(timestamp, contact, description, ships); err != nil {
+	if err := dumpBugReport(timestamp, contact, description, ships, penpai); err != nil {
 		return handleError(fmt.Errorf("Failed to dump logs: %v", err))
 	}
 	if cpuProfile {
@@ -125,13 +126,18 @@ func dumpDockerLogs(containerID string, path string) error {
 	return nil
 }
 
-func dumpBugReport(timestamp, contact, description string, piers []string) error {
+func dumpBugReport(timestamp, contact, description string, piers []string, llama bool) error {
 	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
 	descPath := filepath.Join(bugReportDir, "description.txt")
 	// description.txt
 	if err := ioutil.WriteFile(descPath, []byte(fmt.Sprintf("Contact:\n%s\nDetails:\n%s", contact, description)), 0644); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't write details.txt"))
 		return err
+	}
+	if llama {
+		if err := dumpDockerLogs("llama-gpt-api", bugReportDir+"/"+"llama.log"); err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Couldn't dump llama logs: %v", err))
+		}
 	}
 	// selected pier logs
 	for _, pier := range piers {

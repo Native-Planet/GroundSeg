@@ -68,7 +68,7 @@
         <button disabled={activeCores == minCores} class="btn" on:click={()=>setPenpaiCores(activeCores - 1)}>
           <Fa icon={faMinus} size="1x" />
         </button>
-        <div class="val">{activeCores} Core{activeCores > 1 ? "s" : ""}</div>
+        <div class="val">{activeCores} / {maxCores} Core{activeCores > 1 ? "s" : ""}</div>
         <button disabled={activeCores == maxCores} class="btn" on:click={()=>setPenpaiCores(activeCores + 1)}>
           <Fa icon={faPlus} size="1x" />
         </button>

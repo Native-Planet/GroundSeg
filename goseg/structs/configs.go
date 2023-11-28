@@ -89,6 +89,7 @@ type UrbitDocker struct {
 	ShowUrbitWeb     string `json:"show_urbit_web"`
 	DevMode          bool   `json:"dev_mode"`
 	Click            bool   `json:"click"`
+	MinIOLinked      bool   `json:"minio_linked"`
 }
 
 // Define the interface
@@ -129,6 +130,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 	}
 	for k, v := range raw {
 		switch k {
+		case "minio_linked":
+			u.MinIOLinked = v.(bool)
 		case "pier_name":
 			u.PierName, _ = v.(string)
 		case "http_port":

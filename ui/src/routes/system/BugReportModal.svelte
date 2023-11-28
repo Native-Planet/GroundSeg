@@ -7,14 +7,20 @@
   let contact = ''
   let description = ''
   let cpuProfile = false
+  let penpaiSelect = false
   let all = false
   const selectedShips = new Set()
+
+  $: penpai = ($structure?.apps?.penpai?.info) || {}
+  $: penpaiAllowed = (penpai?.allowed) || false
+
   $: urbits = ($structure?.urbits) || {}
   $: urbitKeys = Object.keys(urbits)
 
   $: tBugReport = ($structure?.system?.transition?.bugReport) || ""
   $: tBugReportError = ($structure?.system?.transition?.bugReportError) || ""
   $: sendCondition = (contact.length == 0) || (description.length == 0) || (tBugReport == "loading")
+
 
   const toggleShipLog = patp => {
     if (selectedShips.has(patp)) {
@@ -46,11 +52,11 @@
     <div class="wrapper">
       <h1>Report Bug</h1>
       <p>Submit a bug with your logs and we will contact you within 48 hours.</p>
-      <h2>Contact Info</h2>
+      <h2>Contact Info - required</h2>
       <input placeholder="Email or Urbit Ship Name" bind:value={contact} />
-      <h2>Describe Issue</h2>
+      <h2>Describe Issue - required</h2>
       <textarea placeholder="Type here" bind:value={description} />
-      <h2>Pier Logs(Optional)</h2>
+      <h2>Pier Logs</h2>
       {#if urbitKeys.length > 0}
         <div class="ship-logs">
           {#each urbitKeys as p}
@@ -75,21 +81,33 @@
           {/if}
         </div>
       {/if}
-      <h2>GroundSeg Deep Profile (Takes additional 30 Seconds)</h2>
-      <div class="check-wrapper" on:click={()=>cpuProfile=!cpuProfile}>
-        <div class="checkbox">
-          {#if cpuProfile}
-            <img class="checkmark" src="/checkmark.svg" alt="checkmark"  />
-          {/if}
+      <h2>Addtional Information</h2>
+      <div class="extra-check-wrapper">
+        {#if penpaiAllowed}
+          <div class="check-wrapper extra" on:click={()=>penpaiSelect=!penpaiSelect}>
+            <div class="checkbox">
+              {#if penpaiSelect}
+                <img class="checkmark" src="/checkmark.svg" alt="checkmark"  />
+              {/if}
+            </div>
+            <div class="check-label">Send Penpai Container Logs</div>
+          </div>
+        {/if}
+        <div class="check-wrapper extra" on:click={()=>cpuProfile=!cpuProfile}>
+          <div class="checkbox">
+            {#if cpuProfile}
+              <img class="checkmark" src="/checkmark.svg" alt="checkmark"  />
+            {/if}
+          </div>
+          <div class="check-label">Get GroundSeg Deep Profile (takes additional 30 seconds)</div>
         </div>
-        <div class="check-label">Get GroundSeg Deep Profile</div>
       </div>
       {#if tBugReportError.length > 0}
         <div class="error">{tBugReportError}</div>
       {:else}
         <button
           disabled={sendCondition}
-          on:click={()=>submitReport(contact,description,Array.from(selectedShips),cpuProfile)}
+          on:click={()=>submitReport(contact,description,Array.from(selectedShips),cpuProfile,penpaiSelect)}
           >
           {#if tBugReport == "success"}
             Success!
@@ -179,7 +197,7 @@
     padding: 16px 24px 18px 24px;
     border: none;
     width: calc(100% - 48px);
-    height: 120px;
+    height: 80px;
     resize: none;
   }
   textarea:focus {
@@ -212,6 +230,10 @@
     flex-wrap: wrap;
     gap: 16px;
   }
+  .extra-check-wrapper {
+    display: flex;
+    gap: 64px;
+  }
   .check-wrapper {
     display: flex;
     gap: 16px;
@@ -221,6 +243,9 @@
     -webkit-user-select: none; /* Safari */
     -moz-user-select: none; /* Firefox */
     -ms-user-select: none; /* IE/Edge */
+  }
+  .extra {
+    width: auto;
   }
   .checkbox {
     width: 16px;

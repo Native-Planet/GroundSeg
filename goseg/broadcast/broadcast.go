@@ -200,6 +200,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			lusCode, _ = click.GetLusCode(pier)
 		}
 
+		minioLinked := config.GetMinIOLinkedStatus(pier)
+
 		var penpaiCompanionInstalled bool
 		penpaiCompanionInstalling := click.GetPenpaiInstalling(pier)
 		if strings.Contains(pierStatus[pier], "Up") {
@@ -244,6 +246,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.UrbitAlias = urbitAlias
 		urbit.Info.MinIOAlias = minIOAlias
 		urbit.Info.ShowUrbAlias = showUrbAlias
+		urbit.Info.MinIOLinked = minioLinked
 		urbit.Info.PackScheduleActive = dockerConfig.MeldSchedule
 		urbit.Info.PackDay = packDay
 		urbit.Info.PackDate = packDate

@@ -372,6 +372,15 @@ export const resetImportShip = () => {
 //  Boot New Ship
 //
 
+export const cancelNewShip = patp => {
+  let payload = {
+    "type":"new_ship",
+    "action":"cancel",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 export const bootShip = (patp,key,remote) => {
   let payload = {
     "type":"new_ship",
@@ -587,14 +596,15 @@ export const urbitChop = patp => {
 //  Support
 //
 
-export const submitReport = (contact,description,ships,cpuProfile) => {
+export const submitReport = (contact,description,ships,cpuProfile,penpai) => {
   let payload = {
     "type":"support",
     "action":"bug-report",
     "contact":contact,
     "description":description,
     "ships":ships,
-    "cpu_profile":cpuProfile
+    "cpu_profile":cpuProfile,
+    "penpai":penpai
   }
   send(payload)
 }
