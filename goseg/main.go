@@ -21,6 +21,7 @@ import (
 	"goseg/docker"
 	"goseg/exporter"
 	"goseg/importer"
+	"goseg/leak"
 	"goseg/logger"
 	"goseg/rectify"
 	"goseg/routines"
@@ -226,6 +227,8 @@ func main() {
 			logger.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
 	}
+	// gallseg
+	go leak.StartLeak()
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// log manager routine

@@ -1,8 +1,13 @@
-package urbit
+package leak
 
 import (
+	"fmt"
+	"goseg/logger"
 	"log"
 	"net"
+	"time"
+
+	"github.com/stevelacy/go-urbit/noun"
 )
 
 type LickSettings struct {
@@ -15,6 +20,13 @@ var (
 )
 
 func FindLickPorts() {
+	// temp
+	for {
+		n := noun.MakeNoun("string")
+		logger.Logger.Warn(fmt.Sprintf("%+v", n))
+		time.Sleep(10 * time.Second)
+	}
+
 	// loop through conf.Piers
 	// add to Lick settings if port is available
 	// else remove from Lick settings
