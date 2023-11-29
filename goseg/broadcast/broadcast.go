@@ -385,8 +385,6 @@ func BroadcastToClients() error {
 		}
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
-	} else {
-		logger.Logger.Debug("No session / no broadcast")
 	}
 	return nil
 }
@@ -425,18 +423,21 @@ func shipStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			updates, err := ConstructPierInfo()
-			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
-				continue
+			cm := auth.GetClientManager()
+			if cm.HasAuthSession() {
+				updates, err := ConstructPierInfo()
+				if err != nil {
+					logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
+					continue
+				}
+				mu.RLock()
+				newState := broadcastState
+				mu.RUnlock()
+				updates = PreserveUrbitsTransitions(newState, updates)
+				newState.Urbits = updates
+				UpdateBroadcast(newState)
+				BroadcastToClients()
 			}
-			mu.RLock()
-			newState := broadcastState
-			mu.RUnlock()
-			updates = PreserveUrbitsTransitions(newState, updates)
-			newState.Urbits = updates
-			UpdateBroadcast(newState)
-			BroadcastToClients()
 		}
 	}
 }
@@ -446,13 +447,16 @@ func appsStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			updates := constructAppsInfo()
-			mu.RLock()
-			newState := broadcastState
-			mu.RUnlock()
-			newState.Apps = updates
-			UpdateBroadcast(newState)
-			BroadcastToClients()
+			cm := auth.GetClientManager()
+			if cm.HasAuthSession() {
+				updates := constructAppsInfo()
+				mu.RLock()
+				newState := broadcastState
+				mu.RUnlock()
+				newState.Apps = updates
+				UpdateBroadcast(newState)
+				BroadcastToClients()
+			}
 		}
 	}
 }
@@ -462,14 +466,17 @@ func profileStatusLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			updates := constructProfileInfo()
-			mu.RLock()
-			newState := broadcastState
-			mu.RUnlock()
-			updates = PreserveProfileTransitions(newState, updates)
-			newState.Profile = updates
-			UpdateBroadcast(newState)
-			BroadcastToClients()
+			cm := auth.GetClientManager()
+			if cm.HasAuthSession() {
+				updates := constructProfileInfo()
+				mu.RLock()
+				newState := broadcastState
+				mu.RUnlock()
+				updates = PreserveProfileTransitions(newState, updates)
+				newState.Profile = updates
+				UpdateBroadcast(newState)
+				BroadcastToClients()
+			}
 		}
 	}
 }
