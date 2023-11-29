@@ -399,10 +399,10 @@ func UnauthBroadcast(input []byte) error {
 func hostStatusLoop() {
 	ticker := time.NewTicker(hostInfoInterval)
 	for {
-		cm := auth.GetClientManager()
-		if cm.HasAuthSession() {
-			select {
-			case <-ticker.C:
+		select {
+		case <-ticker.C:
+			cm := auth.GetClientManager()
+			if cm.HasAuthSession() {
 				update := constructSystemInfo()
 				mu.RLock()
 				newState := broadcastState
