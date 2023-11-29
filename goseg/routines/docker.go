@@ -172,9 +172,7 @@ func Check502Loop() {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
 					continue
 				}
-				if resp.Body != nil {
-					defer resp.Body.Close()
-				}
+				resp.Body.Close()
 				if resp.StatusCode == http.StatusBadGateway {
 					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if _, found := status[pier]; found {

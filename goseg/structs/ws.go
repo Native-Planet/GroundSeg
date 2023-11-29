@@ -233,6 +233,26 @@ func (cm *ClientManager) CleanupStaleSessions(timeout time.Duration) {
 	}
 }
 
+func (cm *ClientManager) HasAuthSession() bool {
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, clients := range cm.AuthClients {
+		for _, client := range clients {
+			if client != InactiveSession && client.Active {
+				return true
+			}
+		}
+	}
+	for _, clients := range cm.UnauthClients {
+		for _, client := range clients {
+			if client != InactiveSession && client.Active {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 type WsType struct {
 	Payload struct {
 		Type string `json:"type"`

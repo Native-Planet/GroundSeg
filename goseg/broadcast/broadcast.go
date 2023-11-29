@@ -377,11 +377,15 @@ func GetStateJson() ([]byte, error) {
 
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
-	authJson, err := GetStateJson()
-	if err != nil {
-		return err
+	cm := auth.GetClientManager()
+	if cm.HasAuthSession() {
+		authJson, err := GetStateJson()
+		if err != nil {
+			return err
+		}
+		auth.ClientManager.BroadcastAuth(authJson)
+		return nil
 	}
-	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
 
@@ -395,16 +399,19 @@ func UnauthBroadcast(input []byte) error {
 func hostStatusLoop() {
 	ticker := time.NewTicker(hostInfoInterval)
 	for {
-		select {
-		case <-ticker.C:
-			update := constructSystemInfo()
-			mu.RLock()
-			newState := broadcastState
-			mu.RUnlock()
-			update = PreserveSystemTransitions(newState, update)
-			newState.System = update
-			UpdateBroadcast(newState)
-			BroadcastToClients()
+		cm := auth.GetClientManager()
+		if cm.HasAuthSession() {
+			select {
+			case <-ticker.C:
+				update := constructSystemInfo()
+				mu.RLock()
+				newState := broadcastState
+				mu.RUnlock()
+				update = PreserveSystemTransitions(newState, update)
+				newState.System = update
+				UpdateBroadcast(newState)
+				BroadcastToClients()
+			}
 		}
 	}
 }
