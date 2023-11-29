@@ -385,6 +385,8 @@ func BroadcastToClients() error {
 		}
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
+	} else {
+		logger.Logger.Debug("No session / no broadcast")
 	}
 	return nil
 }
