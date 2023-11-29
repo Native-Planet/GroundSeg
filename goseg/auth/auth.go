@@ -80,6 +80,10 @@ func NewClientManager() *structs.ClientManager {
 	}
 }
 
+func GetClientManager() *structs.ClientManager {
+	return ClientManager
+}
+
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
 	ClientManager.Mu.RLock()
