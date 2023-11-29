@@ -243,13 +243,6 @@ func (cm *ClientManager) HasAuthSession() bool {
 			}
 		}
 	}
-	for _, clients := range cm.UnauthClients {
-		for _, client := range clients {
-			if client != InactiveSession && client.Active {
-				return true
-			}
-		}
-	}
 	return false
 }
 
