@@ -7,6 +7,8 @@ package structs
 // 🐝 Careful! ❤️
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -33,17 +35,22 @@ type WsChanEvent struct {
 
 // mutexed ws write
 func (ws *MuConn) Write(data []byte) error {
-	ws.Mu.Lock()
-	if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+	if ws.Active {
+		ws.Mu.Lock()
+		if err := ws.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			ws.Mu.Unlock()
+			return err
+		}
 		ws.Mu.Unlock()
-		return err
 	}
-	ws.Mu.Unlock()
 	return nil
 }
 
 // mutexed ws read
 func (ws *MuConn) Read(cm *ClientManager) (int, []byte, error) {
+	if !ws.Active {
+		return 0, nil, fmt.Errorf("invalid or inactive websocket connection")
+	}
 	ws.Mu.RLock()
 	messageType, data, err := ws.Conn.ReadMessage()
 	ws.Mu.RUnlock()
@@ -230,6 +237,19 @@ func (cm *ClientManager) CleanupStaleSessions(timeout time.Duration) {
 			delete(cm.UnauthClients, token)
 		}
 	}
+}
+
+func (cm *ClientManager) HasAuthSession() bool {
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, clients := range cm.AuthClients {
+		for _, client := range clients {
+			if client != InactiveSession && client.Active {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type WsType struct {
@@ -467,4 +487,9 @@ type WsC2cAction struct {
 	Action   string `json:"action"`
 	SSID     string `json:"ssid"`
 	Password string `json:"password"`
+}
+
+type CtxWithCancel struct {
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
