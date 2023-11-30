@@ -7,7 +7,6 @@ import (
 	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
-	"goseg/leak"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -398,12 +397,12 @@ func BroadcastToClients() error {
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
 	}
-/*
-	leak.LeakChan <- authJson
-	auth.ClientManager.BroadcastAuth(authJson)
+	/*
+	   leak.LeakChan <- authJson
+	   auth.ClientManager.BroadcastAuth(authJson)
+	*/
 	return nil
 }
-*/
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
