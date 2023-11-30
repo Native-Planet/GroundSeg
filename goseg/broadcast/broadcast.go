@@ -7,6 +7,7 @@ import (
 	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/leak"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -213,6 +214,16 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			penpaiCompanionInstalled = deskStatus == "running"
 		}
 
+		var gallsegInstalled bool
+		if strings.Contains(pierStatus[pier], "Up") {
+			deskStatus, err := click.GetDesk(pier, "groundseg", false)
+			if err != nil {
+				gallsegInstalled = false
+				logger.Logger.Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
+			}
+			gallsegInstalled = deskStatus == "running"
+		}
+
 		// pack day
 		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
@@ -257,6 +268,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.PenpaiInstalling = penpaiCompanionInstalling
+		urbit.Info.Gallseg = gallsegInstalled
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
@@ -386,8 +398,12 @@ func BroadcastToClients() error {
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
 	}
+/*
+	leak.LeakChan <- authJson
+	auth.ClientManager.BroadcastAuth(authJson)
 	return nil
 }
+*/
 
 // broadcast to unauth clients
 func UnauthBroadcast(input []byte) error {
