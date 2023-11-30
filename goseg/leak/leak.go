@@ -6,14 +6,21 @@ import (
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync"
 )
 
 var (
 	LeakChan = make(chan []byte)
+	patpChan = make(map[string]chan structs.AuthBroadcast)
+	ports    = make(map[string]PortStatus)
+	portsMu  sync.RWMutex
 )
 
 func StartLeak() {
+	//go handleGallseg()
 	oldBroadcast := structs.AuthBroadcast{}
 	for {
 		var newBroadcast structs.AuthBroadcast
@@ -52,13 +59,66 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	for _, patp := range conf.Piers {
 		// get ship info
 		urbit, exists := newBroadcast.Urbits[patp]
-		if !exists {
+		// urbit info doesn't exist
+		// gallseg not installed
+		// ipc not connected
+		if !exists || !urbit.Info.Gallseg || !ipcIsConnected(patp) {
 			continue
 		}
-		// check if Gallseg is installed
-		if !urbit.Info.Gallseg {
-			continue
+		patpChan[patp] <- newBroadcast
+	}
+	return newBroadcast, nil
+}
+
+func ipcIsConnected(patp string) bool {
+	portsMu.Lock()
+	defer portsMu.Unlock()
+	var port PortStatus
+	port, exists := ports[patp]
+	if !exists {
+		port.Connected = false
+	}
+	if !port.Connected {
+		if port.Location == "" {
+			dockerDir := config.DockerDir
+			sock := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "groundseg", "groundseg")
+			_, err := os.Stat(sock)
+			// Check if error is due to the file not existing
+			if err != nil {
+				logger.Logger.Debug("port doesn't exist")
+				return false
+			}
+			logger.Logger.Debug(fmt.Sprintf("port for %v exists", patp))
+			/*
+				if connected := connect(patp,sock) {
+				//port.Location = dir
+				//port.Connected = true
+				}
+			*/
+			// ports[patp] = port
 		}
+	}
+	return false
+}
+
+/*
+// connects to IPC port
+// func connect(patp, socketPath string) (net.Conn) {
+func connect(patp, socketPath string) bool {
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		//logger.Logger.Error(fmt.Sprintf("
+		return nil
+	}
+	return false
+	//return conn
+}
+*/
+
+/*
+func handleGallseg() {
+	for {
+		patp := <-patpChan
 		// check if IPC is connected from map
 		// if no, spin up a routine with oldBroadcast, newBroadcast and patp
 		// in the routine:
@@ -70,19 +130,10 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		// if ship, deepEqual, if same, continue
 		// else, send up only the ship stuff
 	}
-	return newBroadcast, nil
 }
+*/
 
 /*
-func connectedToIPC(patp string) bool {
-	socketPath := fmt.Sprintf("/var/lib/docker/volumes/%s/_data/%s/.urb/dev/groundseg.sock") // temporary
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return false
-	}
-
-}
-
 func handleIPC(patp, loc string) {
 	conn, err := connectToIPC(loc)
 	if err != nil {
