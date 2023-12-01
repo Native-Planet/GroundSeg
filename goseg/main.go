@@ -270,6 +270,5 @@ func main() {
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 	// Load Penpai
 	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
-
 	startServer()
 }

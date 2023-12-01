@@ -7,6 +7,7 @@ import (
 	"goseg/click"
 	"goseg/config"
 	"goseg/docker"
+	"goseg/leak"
 	"goseg/logger"
 	"goseg/startram"
 	"goseg/structs"
@@ -203,7 +204,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		minioLinked := config.GetMinIOLinkedStatus(pier)
 
 		var penpaiCompanionInstalled bool
-		penpaiCompanionInstalling := click.GetPenpaiInstalling(pier)
+		penpaiCompanionInstalling := click.GetDeskInstalling(pier, "penpai")
 		if strings.Contains(pierStatus[pier], "Up") {
 			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
@@ -371,8 +372,7 @@ func GetState() structs.AuthBroadcast {
 }
 
 // return json string of current broadcast state
-func GetStateJson() ([]byte, error) {
-	bState := GetState()
+func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 	//temp
 	bState.Type = "structure"
 	bState.AuthLevel = "authorized"
@@ -390,17 +390,16 @@ func GetStateJson() ([]byte, error) {
 func BroadcastToClients() error {
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {
-		authJson, err := GetStateJson()
+		bState := GetState()
+		leak.LeakChan <- bState
+		authJson, err := GetStateJson(bState)
+		auth.ClientManager.BroadcastAuth(authJson)
 		if err != nil {
 			return err
 		}
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
 	}
-	/*
-	   leak.LeakChan <- authJson
-	   auth.ClientManager.BroadcastAuth(authJson)
-	*/
 	return nil
 }
 

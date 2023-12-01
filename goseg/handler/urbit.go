@@ -32,7 +32,7 @@ func UrbitHandler(msg []byte) error {
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "install-penpai-companion":
-		click.SetPenpaiDeskLoading(patp, true)
+		click.SetDeskLoading(patp, "penpai", true)
 		// if not-found, |install, if suspended, |revive
 		status, err := click.GetDesk(patp, "penpai", true)
 		if err != nil {
@@ -56,13 +56,13 @@ func UrbitHandler(msg []byte) error {
 				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
 			}
 			if status == "running" {
-				click.SetPenpaiDeskLoading(patp, false)
+				click.SetDeskLoading(patp, "penpai", false)
 				break
 			}
 		}
 		return nil
 	case "uninstall-penpai-companion":
-		click.SetPenpaiDeskLoading(patp, true)
+		click.SetDeskLoading(patp, "penpai", true)
 		// uninstall
 		err := click.UninstallDesk(patp, "penpai")
 		if err != nil {
@@ -75,7 +75,7 @@ func UrbitHandler(msg []byte) error {
 				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
 			}
 			if status != "running" {
-				click.SetPenpaiDeskLoading(patp, false)
+				click.SetDeskLoading(patp, "penpai", false)
 				break
 			}
 		}

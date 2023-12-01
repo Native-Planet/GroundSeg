@@ -10,10 +10,19 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
+
+	"github.com/stevelacy/go-urbit/noun"
 )
 
+// needs to stop disconnecting at every broaddcast
+// check for auth
+// urbit checker for ui
+// install app from ui
+// frequency slider
+// shut
+
 var (
-	LeakChan = make(chan []byte)
+	LeakChan = make(chan structs.AuthBroadcast)
 	patpChan = make(map[string]chan structs.AuthBroadcast)
 	ports    = make(map[string]PortStatus)
 	portsMu  sync.RWMutex
@@ -22,14 +31,10 @@ var (
 func StartLeak() {
 	//go handleGallseg()
 	oldBroadcast := structs.AuthBroadcast{}
+	var err error
 	for {
 		var newBroadcast structs.AuthBroadcast
-		broadcastBytes := <-LeakChan
-		err := json.Unmarshal(broadcastBytes, &newBroadcast)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to unmarshal broadcastBytes from leakChan"))
-			continue
-		}
+		newBroadcast = <-LeakChan
 		// result of broadcastUpdate becomes the new-oldBroadcast
 		oldBroadcast, err = updateBroadcast(oldBroadcast, newBroadcast)
 		if err != nil {
@@ -55,6 +60,12 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	if reflect.DeepEqual(oldBroadcast, newBroadcast) {
 		return oldBroadcast, nil
 	}
+	newBroadcastBytes, err := json.Marshal(newBroadcast)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
+		return oldBroadcast, nil
+	}
+
 	conf := config.Conf()
 	for _, patp := range conf.Piers {
 		// get ship info
@@ -62,43 +73,40 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		// urbit info doesn't exist
 		// gallseg not installed
 		// ipc not connected
-		if !exists || !urbit.Info.Gallseg || !ipcIsConnected(patp) {
+		ipcLocation, ipcExists := checkIPCExists(patp)
+		if !exists || !urbit.Info.Gallseg || !ipcExists {
 			continue
 		}
-		patpChan[patp] <- newBroadcast
+		handleIPC(patp, ipcLocation, string(newBroadcastBytes))
+		/*
+			patpChan[patp] <- newBroadcast
+		*/
 	}
 	return newBroadcast, nil
 }
 
-func ipcIsConnected(patp string) bool {
-	portsMu.Lock()
-	defer portsMu.Unlock()
-	var port PortStatus
-	port, exists := ports[patp]
-	if !exists {
-		port.Connected = false
-	}
-	if !port.Connected {
-		if port.Location == "" {
-			dockerDir := config.DockerDir
-			sock := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "groundseg", "groundseg")
-			_, err := os.Stat(sock)
-			// Check if error is due to the file not existing
-			if err != nil {
-				logger.Logger.Debug("port doesn't exist")
-				return false
-			}
-			logger.Logger.Debug(fmt.Sprintf("port for %v exists", patp))
-			/*
-				if connected := connect(patp,sock) {
-				//port.Location = dir
-				//port.Connected = true
-				}
-			*/
-			// ports[patp] = port
+/*
+	func ipcIsConnected(patp string) bool {
+		portsMu.Lock()
+		defer portsMu.Unlock()
+		var port PortStatus
+		port, exists := ports[patp]
+		if !exists {
+			port.Connected = false
 		}
+		if !port.Connected {
+			if port.Location == "" {
+*/
+func checkIPCExists(patp string) (string, bool) {
+	dockerDir := config.DockerDir
+	sockLocation := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "groundseg")
+	sock := filepath.Join(sockLocation, "groundseg.sock")
+	_, err := os.Stat(sock)
+	// Check if error is due to the file not existing
+	if err != nil {
+		return "", false
 	}
-	return false
+	return sockLocation, true
 }
 
 /*
@@ -133,26 +141,72 @@ func handleGallseg() {
 }
 */
 
-/*
-func handleIPC(patp, loc string) {
-	conn, err := connectToIPC(loc)
+func createSymlink(shortPath, symlink, original, patp string) {
+	err := os.MkdirAll(shortPath, 0755)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%s: err: %v", loc, err))
+		logger.Logger.Error(fmt.Sprintf("Failed to create directory: %v : %v", shortPath, err))
+	}
+	// Check if the symlink already exists
+	info, err := os.Lstat(symlink)
+	if err == nil {
+		// If it's a symlink
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(symlink)
+			if err != nil {
+				logger.Logger.Debug(fmt.Sprintf("Error reading the symlink: %v", err))
+				return
+			}
+
+			// Check if it points to the desired target
+			if target == original {
+				//logger.Logger.Error(fmt.Sprintf("Symlink already exists."))
+				return
+			}
+		}
+
+		// Remove if it's a different symlink or a file
+		err = os.Remove(symlink)
+		if err != nil {
+			logger.Logger.Debug(fmt.Sprintf("Error removing existing file or symlink: %v", err))
+			return
+		}
+	} else if !os.IsNotExist(err) {
+		logger.Logger.Debug(fmt.Sprintf("Error checking symlink: %v", err))
 		return
 	}
-	nounContents := <-LeakChan
+
+	// Create the symlink
+	err = os.Symlink(original, symlink)
+	if err != nil {
+		logger.Logger.Debug(fmt.Sprintf("Failed to symlink %v to %v: %v", original, symlink, err))
+	} else {
+		logger.Logger.Info(fmt.Sprintf("Gallseg Symlink created successfully for %v", patp))
+	}
+}
+
+func handleIPC(patp, original, broadcast string) {
+	shortPath := "/np/d/gs"
+	symlink := filepath.Join(shortPath, patp)
+	createSymlink(shortPath, symlink, original, patp)
+	conn, err := connectToIPC(filepath.Join(symlink, "groundseg.sock"))
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("err: %v", err))
+		return
+	}
+	//nounContents := <-LeakChan
 	nounType := noun.Cell{
 		Head: noun.MakeNoun("broadcast"),
-		Tail: noun.MakeNoun(nounContents),
+		Tail: noun.MakeNoun(broadcast),
 	}
 	n := noun.MakeNoun(nounType)
 	jBytes := toBytes(noun.Jam(n))
 	_, err = conn.Write(jBytes)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%s: err: %v", loc, err))
+		logger.Logger.Error(fmt.Sprintf("%s: err: %v", symlink, err))
 	}
 }
 
+/*
 func deepCopy() map[string]*PortStatus {
 	statusMu.Lock()
 	defer statusMu.Unlock()
