@@ -191,7 +191,9 @@ func TailLogs(filename string, n int) ([]string, error) {
 	}
 	defer file.Close()
 	var lines []string
+	buf := make([]byte, 0, 64*1024)
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(buf, bufio.MaxScanTokenSize)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 		if len(lines) > n {

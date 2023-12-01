@@ -50,12 +50,18 @@
     <button
       class="btn"
       on:click={()=>toggleMinIOLink(patp)}
-      disabled={(tToggleMinIOLink == "linking") || !startramRunning || !running}
+      disabled={(tToggleMinIOLink == "linking") || !startramRunning || !running || (tToggleMinIOLink == "unlinking")}
       >
-      {#if tToggleMinIOLink == "success"}
+      {#if tToggleMinIOLink == "linking"}
+        Linking..
+      {:else if tToggleMinIOLink == "unlinking"}
+        Unlinking..
+      {:else if tToggleMinIOLink == "success"}
         MinIO connected!
+      {:else if tToggleMinIOLink == "unlink-success"}
+        MinIO disconnected!
       {:else}
-        {minioLinked ? "Disconnect" : "Connect to Urbit"}
+        {minioLinked ? "Disconnect from Urbit" : "Connect to Urbit"}
       {/if}
     </button>
     <div class="spacer"></div>

@@ -134,7 +134,7 @@ func writeWgConfToFile(filePath string, content string) error {
 	// try writing again
 	err = ioutil.WriteFile(filePath, []byte(content), 0644)
 	if err != nil {
-		err = copyFileToVolume(filePath, "/etc/wireguard/", "wireguard")
+		err = copyWGFileToVolume(filePath, "/etc/wireguard/", "wireguard")
 		// otherwise create the volume
 		if err != nil {
 			return fmt.Errorf("Failed to copy WG config file to volume: %v", err)
@@ -144,7 +144,7 @@ func writeWgConfToFile(filePath string, content string) error {
 }
 
 // write wg conf to volume
-func copyFileToVolume(filePath string, targetPath string, volumeName string) error {
+func copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {

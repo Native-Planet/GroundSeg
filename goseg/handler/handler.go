@@ -48,6 +48,26 @@ func NewShipHandler(msg []byte) error {
 		if err != nil {
 			return err
 		}
+	case "cancel":
+		// send to UrbitHandler's delete-ship
+		patp := shipPayload.Payload.Patp
+		deletePayload := structs.WsUrbitPayload{
+			Payload: structs.WsUrbitAction{
+				Type:   "urbit",
+				Action: "delete-ship",
+				Patp:   patp,
+			},
+		}
+		deleteMsg, err := json.Marshal(deletePayload)
+		if err != nil {
+			return fmt.Errorf("Failed to marshall payload for newly create %v for deletion: %v: %+v", err, deletePayload)
+		}
+		if err := UrbitHandler(deleteMsg); err != nil {
+			return fmt.Errorf("Failed to delete newly created %v: %v", patp, err)
+		}
+		if err := resetNewShip(); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("Unknown NewShip action: %v", shipPayload.Payload.Action)
 	}
