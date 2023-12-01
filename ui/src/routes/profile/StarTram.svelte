@@ -6,7 +6,8 @@
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
   // Websocket
-  import { startramRestart, startramToggle, structure } from '$lib/stores/websocket'
+  import { startramRestart, startramToggle } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   // Components
   import ToggleButton from '$lib/ToggleButton.svelte'
   import StarTramInfo from './StarTramInfo.svelte'

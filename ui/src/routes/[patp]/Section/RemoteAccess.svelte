@@ -3,7 +3,7 @@
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
 

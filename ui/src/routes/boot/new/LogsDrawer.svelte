@@ -1,7 +1,7 @@
 <script>
   import Fa from 'svelte-fa'
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import Drawer from '$lib/Drawer.svelte'
   import LogArea from './LogArea.svelte'
   export let patp

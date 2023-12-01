@@ -1,10 +1,12 @@
 <script>
-  import { structure,
+  import { 
     toggleDevMode,
     toggleAutoBoot,
     toggleNetwork,
     toggleUrbitPower
   } from '$lib/stores/websocket'
+
+  import { structure } from '$lib/stores/data'
 
   import Power from './Section/Power.svelte'
   import Urbit from './Section/Urbit.svelte'

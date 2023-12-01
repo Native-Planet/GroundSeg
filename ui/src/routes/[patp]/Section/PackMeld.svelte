@@ -3,7 +3,8 @@
   import "../theme.css"
   import { openModal } from 'svelte-modals'
   import PackScheduleModal from '../PackScheduleModal.svelte'
-  import { structure, urthPackMeld, marsPack } from '$lib/stores/websocket'
+  import { urthPackMeld, marsPack } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { createEventDispatcher } from 'svelte'
 
   export let patp

@@ -388,10 +388,10 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
+	bState := GetState()
+	leak.LeakChan <- bState
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {
-		bState := GetState()
-		leak.LeakChan <- bState
 		authJson, err := GetStateJson(bState)
 		auth.ClientManager.BroadcastAuth(authJson)
 		if err != nil {

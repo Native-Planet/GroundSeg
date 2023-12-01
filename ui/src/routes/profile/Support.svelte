@@ -1,5 +1,5 @@
 <script>
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   export let wide
 </script>
 

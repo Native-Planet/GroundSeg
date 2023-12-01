@@ -17,6 +17,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"goseg/broadcast"
 	"goseg/config"
 	"goseg/docker"
 	"goseg/exporter"
@@ -229,6 +230,12 @@ func main() {
 	}
 	// gallseg
 	go leak.StartLeak()
+	go func() {
+		for {
+			broadcast.BroadcastToClients()
+			time.Sleep(2 * time.Second)
+		}
+	}()
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// log manager routine

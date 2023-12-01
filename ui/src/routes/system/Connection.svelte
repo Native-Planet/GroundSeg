@@ -1,6 +1,7 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { structure, toggleWifi, connectWifi } from '$lib/stores/websocket'
+  import { toggleWifi, connectWifi } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import ToggleButton from '$lib/ToggleButton.svelte'
 
   import Fa from 'svelte-fa'

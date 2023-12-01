@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores'
   import { wide, version } from '$lib/stores/display'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   // Temp dev mode
   import DevToggle from '$lib/DevToggle.svelte'

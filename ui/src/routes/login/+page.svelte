@@ -1,6 +1,6 @@
 <script>
-  //import { login, structure, loginStatus } from '$lib/stores/websocket'
-  import { login, structure, loginError } from '$lib/stores/websocket'
+  import { login, loginError } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'

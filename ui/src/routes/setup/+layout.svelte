@@ -1,6 +1,7 @@
 <script>
   import { wide } from '$lib/stores/display'
-  import { connect, structure, connected } from '$lib/stores/websocket'
+  import { connect, connected } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   let steps = [0,1,2]
   $: page = ($structure?.page) || 0

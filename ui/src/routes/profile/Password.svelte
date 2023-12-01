@@ -5,7 +5,8 @@
   // Styling
   export let wide
   // Websocket
-  import { structure, logout } from '$lib/stores/websocket'
+  import { logout } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   let clicked = false
   const handleLogout = () => {

@@ -1,106 +1,106 @@
-/-  gs=groundseg
-/+  default-agent, dbug, lib=groundseg, m=macro
+/-  *groundseg
+/+  default-agent, dbug
 |%
 +$  versioned-state
-  $%  state-0:gs
+  $%  state-0
   ==
++$  state-0  [%0 @ud]
 +$  card  card:agent:gall
 --
-%-  agent:dbug
-=|  state-0:gs
+=|  state-0
 =*  state  -
+%-  agent:dbug
 ^-  agent:gall
 |_  =bowl:gall
 +*  this  .
-  def   ~(. (default-agent this %.n) bowl)
+    def   ~(. (default-agent this %.n) bowl)
 ::
 ++  on-init
   ^-  (quip card _this)
-  =+  policy=policy.state.this
-  =.  retry.policy       %allow 
-  =.  limit.policy           10
-  =.  interval.policy      ~s30
-  =.  policy.state.this  policy
-  =.  last-contact.policy   [~]
-  :_  this
-  :~  [%pass / %arvo %l %spin /'groundseg.sock']
-  ==
+  `this
+::  
+++  on-save   on-save:def
 ::
-++  on-save  !>(state)
-::
-++  on-load
-  |=  old-vase=vase
-  ^-  (quip card _this)
-  [~ this(state !<(state-0 old-vase))]
+++  on-load   on-load:def
 ::
 ++  on-poke
   |=  [=mark =vase]
-  ?>  =(our.bowl src.bowl)
   ^-  (quip card _this)
-  ?>  ?=(%penpai-do mark)
-  ?>  =(our.bol src.bol)
-  =+  !<(=do vase)
-  ?-    -.do
-      %post
-    ?.  connected
-      !!
+  |^
+  ?>  =(src.bowl our.bowl)
+  ?+    mark  (on-poke:def mark vase)
+      %port
+    =^  cards  state
+      (handle-poke !<(power vase))
+    [cards this]
+      %action
+      =^  cards  state
+      (handle-action !<(action vase))
+    [cards this]
+  ==
+  ::
+  +$  power  ?(%on %off)
+  ++  handle-poke
+    |=  p=power
+    ^-  (quip card _state)
+    ?-    p
+        %on
+      :_  state
+      :~  [%pass /lick %arvo %l %spin /'groundseg.sock']
+      ==
+    ::
+        %off
+      :_  state
+      :~  [%pass /lick %arvo %l %shut /'groundseg.sock']
+      ==
+    ==
+  ++  handle-action
+    |=  act=action
+    ^-  (quip card _state)
+    ~&  >  'handle action'
+    :: check if port is running
+    :: send to port
+    `state
+  --
+++  on-watch  ::  on-watch:def
+  |=  =path
+  ^-  (quip card _this)
+  ?+    path  (on-watch:def path)
+      [%broadcast ~]
     :_  this
-    :~  [%pass /spit %arvo %l %spit /'groundseg.sock' %json +.do]
+    :~  
+      [%give %fact ~ %broadcast !>(`broadcast`'{"type":"init"}')]
+      [%pass /lick %arvo %l %spin /'groundseg.sock']
     ==
   ==
 ::
-++  on-watch
-  ::  You are able to subscribe to:
-  ::  1. entire broadcast
-  ::  2. a category
-  ::  3. a module
-  ::  4. a ship
-  ::  eg:
-  ::  [%receive %system %startram %container ~]
-  ::  [%receive ~]
-  ::  [%receive %zod %container %status ~]
-  on-watch:def
-::  |=  =path
-::  ^-  (quip card _this)
-::  ?+    path  (on-watch:def path)
-::      [%receive ~]
-::    ?:  =(session %inactive)
-::
-::    ?>  =(our.bowl src.bowl)
-::    :_  this
-::    :~  [%give %fact ~ %todo-update !>(`update:todo`initial+tasks)]
-::==
-::==
+++  on-leave  on-leave:def
+++  on-peek   on-peek:def
+++  on-agent  on-agent:def
 ::
 ++  on-arvo
   |=  [=wire sign=sign-arvo]
   ^-  (quip card _this)
   ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
-  ?+    mark.sign  (on-arvo:def +<)
-      %connect     
-    ~&  'socket connected'
-    :-  ~
-    this(connected %.y)
-      %disconnect
-    ~&  'socket disconnected'
-    :-  ~
-    this(connected %.n)
-      %error       ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
-      %json
-    =+  ;;(in-blob=blob noun.sign)
-    :_  this(blob blob)
-    :~  (fact:io groundseg-did+!>(`did`[%json in-blob]) /all ~)
+  ?+    [mark noun]:sign        (on-arvo:def +<)
+      [%connect ~]
+    ((slog 'socket connected' ~) `this)
+    ::
+      [%disconnect ~]
+    ((slog 'socket disconnected' ~) `this)
+    ::
+      [%error *]
+    ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
+    ::
+      [%broadcast *]
+    ?.  ?=(@ noun.sign)
+      ((slog 'invalid broadcast' ~) `this)
+    %-  (slog 'message' ~)
+    :_  this
+    ~&  >  `broadcast`noun.sign
+    :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
     ==
   ==
-
-  ::
-::
-++  on-leave  on-leave:def
-::
-++  on-peek   on-peek:def
-::
-++  on-agent  on-agent:def
 ::
 ++  on-fail   on-fail:def
-::
 --

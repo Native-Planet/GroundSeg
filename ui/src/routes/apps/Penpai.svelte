@@ -3,7 +3,8 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   // TODO: onMount check desks, bypassing flood control
 

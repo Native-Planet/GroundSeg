@@ -2,7 +2,8 @@
 	"name": "GroundSeg UI",
 	"version": "2.0.0",
 	"scripts": {
-		"dev": "vite dev",
+		"go": "vite dev --config vite.config.js",
+		"urbit": "vite dev --config vite.config.urbit.js",
 		"build": "vite build",
 		"preview": "vite preview"
 	},
@@ -16,6 +17,7 @@
 		"@sveltejs/adapter-static": "^2.0.3",
 		"@sveltejs/kit": "^1.0.0-next.589",
 		"@tlon/sigil-js": "^1.4.5",
+		"@urbit/http-api": "^2.3.0",
 		"clipboard": "^2.0.11",
 		"dropzone": "^6.0.0-beta.2",
 		"svelte": "^3.56.0",

@@ -6,6 +6,7 @@ import (
 	"goseg/config"
 	"goseg/logger"
 	"goseg/structs"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -32,27 +33,18 @@ func StartLeak() {
 	//go handleGallseg()
 	oldBroadcast := structs.AuthBroadcast{}
 	var err error
+
 	for {
 		var newBroadcast structs.AuthBroadcast
 		newBroadcast = <-LeakChan
+		newBroadcast.Type = "structure"
+		newBroadcast.AuthLevel = "authorized"
 		// result of broadcastUpdate becomes the new-oldBroadcast
 		oldBroadcast, err = updateBroadcast(oldBroadcast, newBroadcast)
 		if err != nil {
 			logger.Logger.Error(fmt.Sprintf("Failed to update leak broadcast: %v", err))
 		}
 	}
-	/*
-		fakeLoc := "/home/nal/NP/fakezods/"
-		portsCopy := deepCopy()
-		for {
-			for patp, status := range portsCopy {
-				loc := fakeLoc + patp + "/.urb/dev/leak/leak.sock"
-				logger.Logger.Warn(fmt.Sprintf("%s: status: %+v", loc, status))
-				go handleIPC(patp, loc)
-			}
-			time.Sleep(10 * time.Second)
-		}
-	*/
 }
 
 func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.AuthBroadcast, error) {
@@ -65,7 +57,15 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
 		return oldBroadcast, nil
 	}
-
+	// dev broadcast
+	devLocation, devExists := checkIPCExists("dev")
+	if devExists {
+		conn, err := handleIPC("dev", devLocation)
+		if err != nil {
+			logger.Logger.Debug(fmt.Sprintf("Dev socket %v failed: %v", devLocation, err))
+		}
+		sendBroadcast(conn, "dev", string(newBroadcastBytes))
+	}
 	conf := config.Conf()
 	for _, patp := range conf.Piers {
 		// get ship info
@@ -77,29 +77,23 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		if !exists || !urbit.Info.Gallseg || !ipcExists {
 			continue
 		}
-		handleIPC(patp, ipcLocation, string(newBroadcastBytes))
-		/*
-			patpChan[patp] <- newBroadcast
-		*/
+		conn, err := handleIPC(patp, ipcLocation)
+		if err != nil {
+		}
+		sendBroadcast(conn, patp, string(newBroadcastBytes))
 	}
 	return newBroadcast, nil
 }
 
-/*
-	func ipcIsConnected(patp string) bool {
-		portsMu.Lock()
-		defer portsMu.Unlock()
-		var port PortStatus
-		port, exists := ports[patp]
-		if !exists {
-			port.Connected = false
-		}
-		if !port.Connected {
-			if port.Location == "" {
-*/
 func checkIPCExists(patp string) (string, bool) {
 	dockerDir := config.DockerDir
 	sockLocation := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "groundseg")
+	if patp == "dev" {
+		value, exists := os.LookupEnv("SHIP")
+		if exists {
+			sockLocation = value
+		}
+	}
 	sock := filepath.Join(sockLocation, "groundseg.sock")
 	_, err := os.Stat(sock)
 	// Check if error is due to the file not existing
@@ -108,38 +102,6 @@ func checkIPCExists(patp string) (string, bool) {
 	}
 	return sockLocation, true
 }
-
-/*
-// connects to IPC port
-// func connect(patp, socketPath string) (net.Conn) {
-func connect(patp, socketPath string) bool {
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		//logger.Logger.Error(fmt.Sprintf("
-		return nil
-	}
-	return false
-	//return conn
-}
-*/
-
-/*
-func handleGallseg() {
-	for {
-		patp := <-patpChan
-		// check if IPC is connected from map
-		// if no, spin up a routine with oldBroadcast, newBroadcast and patp
-		// in the routine:
-		// try connecting to IPC
-		// if succeed
-		// create a channel
-		// check if admin
-		// if admin send full
-		// if ship, deepEqual, if same, continue
-		// else, send up only the ship stuff
-	}
-}
-*/
 
 func createSymlink(shortPath, symlink, original, patp string) {
 	err := os.MkdirAll(shortPath, 0755)
@@ -184,15 +146,19 @@ func createSymlink(shortPath, symlink, original, patp string) {
 	}
 }
 
-func handleIPC(patp, original, broadcast string) {
+func handleIPC(patp, original string) (net.Conn, error) {
 	shortPath := "/np/d/gs"
 	symlink := filepath.Join(shortPath, patp)
 	createSymlink(shortPath, symlink, original, patp)
 	conn, err := connectToIPC(filepath.Join(symlink, "groundseg.sock"))
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("err: %v", err))
-		return
+		return conn, err
 	}
+	return conn, nil
+}
+
+func sendBroadcast(conn net.Conn, patp, broadcast string) {
 	//nounContents := <-LeakChan
 	nounType := noun.Cell{
 		Head: noun.MakeNoun("broadcast"),
@@ -200,62 +166,8 @@ func handleIPC(patp, original, broadcast string) {
 	}
 	n := noun.MakeNoun(nounType)
 	jBytes := toBytes(noun.Jam(n))
-	_, err = conn.Write(jBytes)
+	_, err := conn.Write(jBytes)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%s: err: %v", symlink, err))
+		logger.Logger.Error(fmt.Sprintf("Send broadcast to %s: err: %v", patp, err))
 	}
 }
-
-/*
-func deepCopy() map[string]*PortStatus {
-	statusMu.Lock()
-	defer statusMu.Unlock()
-	newMap := make(map[string]*PortStatus)
-	for key, value := range ports {
-		newMap[key] = &PortStatus{
-			Connected: value.Connected,
-		}
-	}
-	return newMap
-}
-
-func int64ToLittleEndianBytes(num int64) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	// uint32 for 4 bytes
-	err := binary.Write(buf, binary.LittleEndian, uint32(num))
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func toBytes(num *big.Int) []byte {
-	var padded []byte
-	// version: 0
-	version := []byte{0}
-
-	// length: 4 bytes
-	length := noun.ByteLen(num)
-	lenBytes, err := int64ToLittleEndianBytes(length)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("%v", err))
-	}
-	fmt.Println(fmt.Sprintf("%v", lenBytes))
-
-	bytes := makeBytes(num)
-	padded = append(padded, version...)
-	padded = append(padded, lenBytes...)
-	padded = append(padded, bytes...)
-
-	return padded
-}
-
-func makeBytes(num *big.Int) []byte {
-	byteSlice := num.Bytes()
-	// Reverse the slice for little-endian
-	for i, j := 0, len(byteSlice)-1; i < j; i, j = i+1, j-1 {
-		byteSlice[i], byteSlice[j] = byteSlice[j], byteSlice[i]
-	}
-	return byteSlice
-}
-*/

@@ -3,7 +3,7 @@
   import { openModal } from 'svelte-modals'
   import PowerModal from './PowerModal.svelte'
   // Websocket
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 </script>
 
 <div class="container">

@@ -1,14 +1,12 @@
 import { writable } from 'svelte/store'
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
+import { connected, structure, firstLoad } from './data.js'
 
-export const structure = writable({})
 export const ready = writable(false)
-export const connected = writable(false)
 export const logs = writable({})
 export const wsPort = writable("3000")
 export const isC2CMode = writable(false)
 export const ssids = writable([])
-export const firstLoad = writable(true)
 export const loginError = writable('')
 
 let PENDING = new Set();
