@@ -204,7 +204,7 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 			if err := ConnectToWifi(payload.Payload.SSID, payload.Payload.Password); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
-				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
+				if _, err := runCommand("systemctl", "restart", "groundseg"); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
 				}
 			}
