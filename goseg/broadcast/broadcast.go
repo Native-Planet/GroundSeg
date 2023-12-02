@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	hostInfoInterval  = 1 * time.Second // how often we refresh system info
-	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
+	broadcastInterval = 1 * time.Second // how often we refresh system info
 	broadcastState    structs.AuthBroadcast
 	scheduledPacks    = make(map[string]time.Time)
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
@@ -106,10 +105,7 @@ func bootstrapBroadcastState() error {
 	broadcastState.Apps = appsInfo
 	mu.Unlock()
 	// start looping info refreshes
-	go hostStatusLoop()
-	go shipStatusLoop()
-	go profileStatusLoop()
-	go appsStatusLoop()
+	go BroadcastLoop()
 	return nil
 }
 
@@ -408,115 +404,6 @@ func UnauthBroadcast(input []byte) error {
 	auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
-
-// refresh loop for host info
-func hostStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				update := constructSystemInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				update = PreserveSystemTransitions(newState, update)
-				newState.System = update
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-// refresh loop for ship info
-// for reasons beyond my iq we can't do this through the normal update func
-func shipStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates, err := ConstructPierInfo()
-				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
-					continue
-				}
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				updates = PreserveUrbitsTransitions(newState, updates)
-				newState.Urbits = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func appsStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates := constructAppsInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				newState.Apps = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func profileStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates := constructProfileInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				updates = PreserveProfileTransitions(newState, updates)
-				newState.Profile = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
-	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
-	return newProfile
-}
-
-func PreserveSystemTransitions(oldState structs.AuthBroadcast, newSystem structs.System) structs.System {
-	newSystem.Transition = oldState.System.Transition
-	return newSystem
-}
-
-func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[string]structs.Urbit) map[string]structs.Urbit {
-	for k, v := range oldState.Urbits {
-		urbitStruct, exists := newUrbits[k]
-		if !exists {
-			urbitStruct = structs.Urbit{}
-		}
-		urbitStruct.Transition = v.Transition
-		newUrbits[k] = urbitStruct
-	}
-	return newUrbits
-}
-
 func ReloadUrbits() error {
 	logger.Logger.Info("Reloading ships in broadcast")
 	urbits, err := ConstructPierInfo()
