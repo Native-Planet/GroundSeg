@@ -1,6 +1,6 @@
 <script>
   // set to true when running with vite.config.urbit.js
-  const URBIT_MODE = true
+  const URBIT_MODE = false
   // Urbit
   import { broadcast, subscribe } from '$lib/stores/urbit.js'
   // Svelte
