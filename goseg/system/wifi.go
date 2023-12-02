@@ -167,8 +167,8 @@ func UnaliveC2C() error {
 	if err != nil {
 		return fmt.Errorf("Failed to enable systemd-resolved: %v", err)
 	}
-	cmd := exec.Command("systemctl", "start", "systemd-resolved")
-	_, err := cmd.CombinedOutput()
+	cmd = exec.Command("systemctl", "start", "systemd-resolved")
+	_, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to start systemd-resolved: %v", err)
 	}
