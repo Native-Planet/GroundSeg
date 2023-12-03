@@ -100,14 +100,14 @@ pipeline {
                                     curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
                                     ./zod/.run -d
                                     dojo () {
-                                        curl -s --data '{"source":{"dojo":"'"work/gallseg-$tag"'"},"sink":{"stdout":null}}' http://localhost:12321    
+                                        curl -s --data '{"source":{"dojo":"'"\$1"'"},"sink":{"stdout":null}}' http://localhost:12321    
                                     }
                                     hood () {
-                                        curl -s --data '{"source":{"dojo":"+hood/'"work/gallseg-$tag"'"},"sink":{"app":"hood"}}' http://localhost:12321    
+                                        curl -s --data '{"source":{"dojo":"+hood/'"\$1"'"},"sink":{"app":"hood"}}' http://localhost:12321    
                                     }
                                     mv web zod/work/gallseg-${tag}
                                     hood "commit %work"
-                                    dojo "-garden!make-glob %work ${tagdir}"
+                                    dojo "-garden!make-glob %work /gallseg-${tag}"
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     hood "exit"
                                     sleep 5s
