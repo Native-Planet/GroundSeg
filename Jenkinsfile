@@ -88,7 +88,6 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            def GLOBBER_PATP = env.GLOBBER_PATP
                             if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                                 sh '''#!/bin/bash -x
                                     git checkout ${tag}
@@ -99,22 +98,22 @@ pipeline {
                                     tagdir="/opt/groundseg/pier/landscape/gallseg-${tag}"
                                     rm -rf /opt/groundseg/pier/landscape/gallseg*
                                     mv web ${tagdir}
-                                    # |commit %landscape
-                                    # -landscape!make-glob %landscape ${tagdir}
-                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>([%landscape %.y]))  (pure:m !>('success'))" > /opt/groundseg/pier/commit.hoon
-                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %glob] %glob-make !>(/landscape/gallseg-${tag}))  (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
-                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/commit.hoon ${GLOBBER_PATP}
-                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/glob.hoon ${GLOBBER_PATP}
-                                    while true; do
-                                        if ls /opt/groundseg/pier/.urb/*.glob 1> /dev/null 2>&1; then
-                                            echo "Glob created"
-                                            mv /opt/groundseg/pier/.urb/*.glob /opt/groundseg/version/glob/gallseg-${tag}_${channel}.glob
-                                            break
-                                        else
-                                            echo "No glob, sleeping..."
-                                        fi
-                                        sleep 1
-                                    done
+                                    curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
+                                    ./zod/.run -d
+                                    dojo () {
+                                        curl -s --data '{"source":{"dojo":"'"${tagdir}"'"},"sink":{"stdout":null}}' http://localhost:12321    
+                                    }
+                                    hood () {
+                                        curl -s --data '{"source":{"dojo":"+hood/'"${tagdir}"'"},"sink":{"app":"hood"}}' http://localhost:12321    
+                                    }
+                                    docker cp $container_id:/webui/build ./web
+                                    mv ${tagdir} zod/work/
+                                    hood "commit %work"
+                                    dojo "-garden!make-glob %work ${tagdir}"
+                                    hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                                    hood "exit"
+                                    sleep 5s
+                                    rm -rf zod
                                 '''
                             }
                             /* production releases get promoted from edge */
