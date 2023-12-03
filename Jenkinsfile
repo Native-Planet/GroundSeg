@@ -95,8 +95,6 @@ pipeline {
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
-                                    tagdir="/opt/groundseg/pier/work/gallseg-${tag}"
-                                    rm -rf /opt/groundseg/pier/work/gallseg*
                                     curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
                                     ./zod/.run -d
                                     dojo () {
