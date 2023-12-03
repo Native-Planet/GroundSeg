@@ -107,7 +107,7 @@ pipeline {
                                     hood "commit %work"
                                     dojo "-garden!make-glob %work /gallseg-${tag}"
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
-                                    echo "hash=${hash}" > globhash.env
+                                    echo "hash=${hash}" \> globhash.env
                                     hood "exit"
                                     sleep 5s
                                     mv zod/.urb/put/*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
