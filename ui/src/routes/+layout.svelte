@@ -22,7 +22,7 @@
   const isUrbitMode = process.env.GS_URBIT_MODE;
 
   onMount(()=> {
-    console.log(isUrbitMode)
+    URBIT_MODE.set(isUrbitMode)
     const hostname = $page.url.hostname
     if ($URBIT_MODE) {
       subscribe(window.ship)
