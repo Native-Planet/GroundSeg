@@ -61,9 +61,9 @@ pipeline {
         }
         stage('build') {
             steps {
-                if (params.XSEG == 'Goseg') {
                     /* build binaries and move to web dir */
-                    script {
+                script {
+                    if (params.XSEG == 'Goseg') {
                         if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
                             sh '''
                                 git checkout ${tag}
@@ -86,23 +86,23 @@ pipeline {
                             '''
                         }
                     }
-                }
-                if (params.XSEG == 'Gallseg') {
-                    script {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                            sh '''
-                                git checkout ${tag}
-                                cd ./ui
-                                DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
-                                container_id=$(docker create web-builder)
-                                docker cp $container_id:/webui/build ./web
-                            '''
-                        }
-                        /* production releases get promoted from edge */
-                        if( "${channel}" == "latest" ) {
-                            sh '''
-                                echo "todo: promote existing glob"
-                            '''
+                    if (params.XSEG == 'Gallseg') {
+                        script {
+                            if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                                sh '''
+                                    git checkout ${tag}
+                                    cd ./ui
+                                    DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
+                                    container_id=$(docker create web-builder)
+                                    docker cp $container_id:/webui/build ./web
+                                '''
+                            }
+                            /* production releases get promoted from edge */
+                            if( "${channel}" == "latest" ) {
+                                sh '''
+                                    echo "todo: promote existing glob"
+                                '''
+                            }
                         }
                     }
                 }
@@ -110,9 +110,9 @@ pipeline {
         }
         stage('move binaries') {
             steps {
-                if (params.XSEG == 'Goseg') {
+                script {
                     /* unstash arm binary on master server */
-                    script {
+                    if (params.XSEG == 'Goseg') {
                         if( "${channel}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
                             sh '''#!/bin/bash -x
@@ -120,16 +120,16 @@ pipeline {
                             rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                             '''
                         }
-                    }
-                }
-                if (params.XSEG == 'Gallseg') {
-                    /* unstash arm binary on master server */
-                    script {
-                        if( "${channel}" != "nobuild" ) {  
-                            sh 'echo "debug: post-build actions"'
-                            sh '''#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel} r2:groundseg/glob
-                            '''
+                        if (params.XSEG == 'Gallseg') {
+                            /* unstash arm binary on master server */
+                            script {
+                                if( "${channel}" != "nobuild" ) {  
+                                    sh 'echo "debug: post-build actions"'
+                                    sh '''#!/bin/bash -x
+                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel} r2:groundseg/glob
+                                    '''
+                                }
+                            }
                         }
                     }
                 }
