@@ -104,7 +104,7 @@ pipeline {
                                         curl -s --data '{"source":{"dojo":"'"${tagdir}"'"},"sink":{"stdout":null}}' http://localhost:12321    
                                     }
                                     hood () {
-                                        curl -s --data '{"source":{"dojo":"+hood/'"${tagdir}"'"},"sink":{"app":"hood"}}' http://localhost:12321    
+                                        curl -s --data '{"source":{"dojo":"+hood'"${tagdir}"'"},"sink":{"app":"hood"}}' http://localhost:12321    
                                     }
                                     docker cp $container_id:/webui/build ./web
                                     mv ${tagdir} zod/work/
