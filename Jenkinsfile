@@ -102,7 +102,7 @@ pipeline {
                                     # |commit %landscape
                                     # -landscape!make-glob %landscape ${tagdir}
                                     echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>([%landscape %.y]))  (pure:m !>('success'))" > /opt/groundseg/pier/commit.hoon
-                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %landscape] %glob-find !>(/landscape/bundle-dir))  (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
+                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %landscape] %glob-make !>(/landscape/gallseg_${tag}))  (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
                                     docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/commit.hoon ${GLOBBER_PATP}
                                     docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/glob.hoon ${GLOBBER_PATP}
                                     while true; do
