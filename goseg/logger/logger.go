@@ -18,6 +18,8 @@ var (
 	Logger         *slog.Logger
 	dynamicHandler *DynamicLevelHandler
 	ErrBus         = make(chan string, 100)
+	currentLog     string
+	loggerChan     = make(chan struct{})
 )
 
 const (
@@ -108,6 +110,8 @@ func init() {
 		basePath = "/opt/nativeplanet/groundseg/"
 	}
 	logPath = basePath + "logs/"
+	currentTime := time.Now()
+	currentLog = fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
@@ -117,23 +121,8 @@ func init() {
 		fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 		panic("")
 	}
-	logFile, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open log file: %v", err))
-	}
-	multiWriter = muMultiWriter(os.Stdout, logFile)
-	jsonHandler := slog.NewJSONHandler(multiWriter, nil)
-	var level slog.Level
-	for _, arg := range os.Args[1:] {
-		if arg == "dev" {
-			level = LevelDebug
-		} else {
-			level = LevelInfo
-		}
-	}
-	dynamicHandler = NewDynamicLevelHandler(level, jsonHandler)
-	customHandler := NewErrorChannelHandler(dynamicHandler)
-	Logger = slog.New(customHandler)
+	go logger()
+	go logTicker()
 }
 
 func ToggleDebugLogging(enable bool) {
@@ -145,8 +134,7 @@ func ToggleDebugLogging(enable bool) {
 }
 
 func SysLogfile() string {
-	currentTime := time.Now()
-	return fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
+	return currentLog
 }
 
 func PrevSysLogfile() string {
@@ -201,4 +189,50 @@ func TailLogs(filename string, n int) ([]string, error) {
 		}
 	}
 	return lines, scanner.Err()
+}
+
+func logger() {
+	for {
+		select {
+		case <-loggerChan:
+			startLogger()
+		}
+	}
+}
+
+func startLogger() {
+	if logFile != nil {
+		if err := logFile.Close(); err != nil {
+			Logger.Error(fmt.Sprintf("failed to close log file: %v", err))
+		}
+	}
+	logFile, err := os.OpenFile(currentLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to open log file: %v", err))
+	}
+	multiWriter = muMultiWriter(os.Stdout, logFile)
+	jsonHandler := slog.NewJSONHandler(multiWriter, nil)
+	var level slog.Level
+	for _, arg := range os.Args[1:] {
+		if arg == "dev" {
+			level = LevelDebug
+		} else {
+			level = LevelInfo
+		}
+	}
+	dynamicHandler = NewDynamicLevelHandler(level, jsonHandler)
+	customHandler := NewErrorChannelHandler(dynamicHandler)
+	Logger = slog.New(customHandler)
+}
+
+func logTicker() {
+	for {
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
+		duration := time.Until(next)
+		time.Sleep(duration)
+		currentTime := time.Now()
+		currentLog = fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
+		loggerChan <- struct{}{}
+	}
 }
