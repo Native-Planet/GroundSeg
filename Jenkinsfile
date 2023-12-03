@@ -95,6 +95,9 @@ pipeline {
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
+                                    curl -O https://raw.githubusercontent.com/urbit/tools/4c9e5f4ac8081f6250374a2c360cd756d44ec31b/pkg/click/click
+                                    curl -O https://raw.githubusercontent.com/urbit/tools/4c9e5f4ac8081f6250374a2c360cd756d44ec31b/pkg/click/click-format
+                                    chmod +x click click-format
                                 '''
                             }
                             /* production releases get promoted from edge */
@@ -111,7 +114,7 @@ pipeline {
         stage('move binaries') {
             steps {
                 script {
-                    /* unstash arm binary on master server */
+                    /* copy to r2 */
                     if (params.XSEG == 'Goseg') {
                         if( "${channel}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
@@ -121,7 +124,6 @@ pipeline {
                             '''
                         }
                         if (params.XSEG == 'Gallseg') {
-                            /* unstash arm binary on master server */
                             script {
                                 if( "${channel}" != "nobuild" ) {  
                                     sh 'echo "debug: post-build actions"'
