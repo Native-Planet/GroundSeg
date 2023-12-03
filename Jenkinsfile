@@ -88,7 +88,7 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                            if( "${channel}" != "nobuild" ) {
                                 sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
@@ -107,16 +107,11 @@ pipeline {
                                     hood "commit %work"
                                     dojo "-garden!make-glob %work /gallseg-${tag}"
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                                    echo "hash=${hash}" > globhash.env
                                     hood "exit"
                                     sleep 5s
-                                    mv zod/.urb/put/*.glob /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob
+                                    mv zod/.urb/put/*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                                     rm -rf zod
-                                '''
-                            }
-                            /* production releases get promoted from edge */
-                            if( "${channel}" == "latest" ) {
-                                sh '''#!/bin/bash -x
-                                    cp /opt/groundseg/version/glob/gallseg-${tag}-edge.glob cp /opt/groundseg/version/glob/gallseg-${tag}-latest.glob
                                 '''
                             }
                         }
@@ -142,7 +137,8 @@ pipeline {
                             if( "${channel}" != "nobuild" ) {  
                                 sh 'echo "debug: post-build actions"'
                                 sh '''#!/bin/bash -x
-                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob r2:groundseg/glob
+                                source globhash.env
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
                                 '''
                             }
                         }
