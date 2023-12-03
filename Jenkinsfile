@@ -96,7 +96,6 @@ pipeline {
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
-                                    chmod +x click click-format
                                     tagdir="/opt/groundseg/pier/landscape/gallseg_${tag}"
                                     rm -rf /opt/groundseg/pier/landscape/gallseg*
                                     mv web ${tagdir}
