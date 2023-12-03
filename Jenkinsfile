@@ -97,14 +97,14 @@ pipeline {
                                     docker cp $container_id:/webui/build ./web
                                     tagdir="/opt/groundseg/pier/work/gallseg-${tag}"
                                     rm -rf /opt/groundseg/pier/work/gallseg*
-                                    mv web ${tagdir}
+                                    mv web /opt/groundseg/pier/work
                                     curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
                                     ./zod/.run -d
                                     dojo () {
-                                        curl -s --data '{"source":{"dojo":"'"${tagdir}"'"},"sink":{"stdout":null}}' http://localhost:12321    
+                                        curl -s --data '{"source":{"dojo":"'"work/gallseg-$tag"'"},"sink":{"stdout":null}}' http://localhost:12321    
                                     }
                                     hood () {
-                                        curl -s --data '{"source":{"dojo":"+hood'"${tagdir}"'"},"sink":{"app":"hood"}}' http://localhost:12321    
+                                        curl -s --data '{"source":{"dojo":"+hood/'"work/gallseg-$tag"'"},"sink":{"app":"hood"}}' http://localhost:12321    
                                     }
                                     docker cp $container_id:/webui/build ./web
                                     mv ${tagdir} zod/work/
