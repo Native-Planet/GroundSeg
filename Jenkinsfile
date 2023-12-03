@@ -65,7 +65,7 @@ pipeline {
                 script {
                     if (params.XSEG == 'Goseg') {
                         if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                            sh '''
+                            sh '''#!/bin/bash -x
                                 git checkout ${tag}
                                 cd ./ui
                                 DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
@@ -80,7 +80,7 @@ pipeline {
                         }
                         /* production releases get promoted from edge */
                         if( "${channel}" == "latest" ) {
-                            sh '''
+                            sh '''#!/bin/bash -x
                                 cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
                                 cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
                             '''
@@ -88,22 +88,40 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
+                            def GLOBBER_PATP = env.GLOBBER_PATP
                             if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
-                                sh '''
+                                sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
-                                    curl -O https://raw.githubusercontent.com/urbit/tools/4c9e5f4ac8081f6250374a2c360cd756d44ec31b/pkg/click/click
-                                    curl -O https://raw.githubusercontent.com/urbit/tools/4c9e5f4ac8081f6250374a2c360cd756d44ec31b/pkg/click/click-format
                                     chmod +x click click-format
+                                    tagdir="/opt/groundseg/pier/landscape/gallseg_${tag}"
+                                    rm -rf /opt/groundseg/pier/landscape/gallseg*
+                                    mv web ${tagdir}
+                                    # |commit %landscape
+                                    # -landscape!make-glob %landscape ${tagdir}
+                                    echo "=/ m (strand ,vase) ;< our=@p bind:m get-our ;< ~ bind:m (poke [our %hood] %kiln-commit !>(%landscape)) (pure:m !>('success'))" > /opt/groundseg/pier/commit.hoon
+                                    echo "=/ m (strand ,vase) ;< our=@p bind:m get-our ;< ~ bind:m (poke [our %landscape] %glob-find !>(/landscape/bundle-dir)) (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
+                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/commit.hoon ${GLOBBER_PATP}
+                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/glob.hoon ${GLOBBER_PATP}
+                                    while true; do
+                                        if ls /opt/groundseg/pier/.urb/*.glob 1> /dev/null 2>&1; then
+                                            echo "Glob created"
+                                            mv /opt/groundseg/pier/.urb/*.glob /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob
+                                            break
+                                        else
+                                            echo "No glob, sleeping..."
+                                        fi
+                                        sleep 1
+                                    done
                                 '''
                             }
                             /* production releases get promoted from edge */
                             if( "${channel}" == "latest" ) {
-                                sh '''
-                                    echo "todo: promote existing glob"
+                                sh '''#!/bin/bash -x
+                                    cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge.glob cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest.glob
                                 '''
                             }
                         }
@@ -128,7 +146,7 @@ pipeline {
                                 if( "${channel}" != "nobuild" ) {  
                                     sh 'echo "debug: post-build actions"'
                                     sh '''#!/bin/bash -x
-                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel} r2:groundseg/glob
+                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob r2:groundseg/glob
                                     '''
                                 }
                             }
