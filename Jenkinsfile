@@ -189,8 +189,8 @@ pipeline {
                 amdbin = "https://files.native.computer/bin/groundseg_amd64_${tag}_${channel}"
             }
             steps {
-                if (params.XSEG == 'Goseg') {
-                    script {
+                script {
+                    if (params.XSEG == 'Goseg') {
                         def to_canary = "${params.TO_CANARY}".toLowerCase()
                         if( "${channel}" == "latest" ) {
                             sh '''#!/bin/bash -x
