@@ -111,13 +111,14 @@ pipeline {
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     hood "exit"
                                     sleep 5s
+                                    zod/.urb/put/*.glob /opt/groundseg/version/glob/
                                     rm -rf zod
                                 '''
                             }
                             /* production releases get promoted from edge */
                             if( "${channel}" == "latest" ) {
                                 sh '''#!/bin/bash -x
-                                    cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge.glob cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest.glob
+                                    cp /opt/groundseg/version/glob/groundseg_amd64_${tag}_edge.glob cp /opt/groundseg/version/glob/groundseg_amd64_${tag}_latest.glob
                                 '''
                             }
                         }
