@@ -111,14 +111,14 @@ pipeline {
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     hood "exit"
                                     sleep 5s
-                                    mv zod/.urb/put/*.glob /opt/groundseg/version/glob/
+                                    mv zod/.urb/put/*.glob /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob
                                     rm -rf zod
                                 '''
                             }
                             /* production releases get promoted from edge */
                             if( "${channel}" == "latest" ) {
                                 sh '''#!/bin/bash -x
-                                    cp /opt/groundseg/version/glob/groundseg_amd64_${tag}_edge.glob cp /opt/groundseg/version/glob/groundseg_amd64_${tag}_latest.glob
+                                    cp /opt/groundseg/version/glob/gallseg-${tag}-edge.glob cp /opt/groundseg/version/glob/gallseg-${tag}-latest.glob
                                 '''
                             }
                         }
@@ -143,7 +143,7 @@ pipeline {
                                 if( "${channel}" != "nobuild" ) {  
                                     sh 'echo "debug: post-build actions"'
                                     sh '''#!/bin/bash -x
-                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}_${channel}.glob r2:groundseg/glob
+                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob r2:groundseg/glob
                                     '''
                                 }
                             }
