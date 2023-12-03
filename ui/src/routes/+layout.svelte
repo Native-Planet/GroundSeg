@@ -5,6 +5,7 @@
   import { onMount } from 'svelte'
   import { get } from 'svelte/store'
   import { page } from '$app/stores'
+
   import { goto } from '$app/navigation';
 
   // Websocket
@@ -18,7 +19,10 @@
   // Style
   import "../theme.css"
 
+  const isUrbitMode = process.env.GS_URBIT_MODE;
+
   onMount(()=> {
+    console.log(isUrbitMode)
     const hostname = $page.url.hostname
     if ($URBIT_MODE) {
       subscribe(window.ship)
