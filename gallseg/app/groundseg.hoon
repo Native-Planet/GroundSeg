@@ -31,7 +31,7 @@
   ?+    mark  (on-poke:def mark vase)
       %port
     =^  cards  state
-      (handle-poke !<(power vase))
+      (handle-port !<(? vase))
     [cards this]
       %action
       =^  cards  state
@@ -39,28 +39,21 @@
     [cards this]
   ==
   ::
-  +$  power  ?(%on %off)
-  ++  handle-poke
-    |=  p=power
+  ++  handle-port
+    |=  open=?
     ^-  (quip card _state)
-    ?-    p
-        %on
-      :_  state
-      :~  [%pass /lick %arvo %l %spin /'groundseg.sock']
-      ==
-    ::
-        %off
-      :_  state
-      :~  [%pass /lick %arvo %l %shut /'groundseg.sock']
-      ==
+    :_  state
+    :~  
+      ?:  open
+        [%pass /lick %arvo %l %spin /'groundseg.sock']
+      [%pass /lick %arvo %l %shut /'groundseg.sock']
     ==
+  ::
   ++  handle-action
     |=  act=action
     ^-  (quip card _state)
-    ~&  >  'handle action'
-    :: check if port is running
-    :: send to port
-    `state
+    :_  state
+    ~[[%pass /lick %arvo %l %spit /'groundseg.sock' %action '{"test":"json-string"}']]
   --
 ++  on-watch  ::  on-watch:def
   |=  =path
@@ -95,9 +88,7 @@
       [%broadcast *]
     ?.  ?=(@ noun.sign)
       ((slog 'invalid broadcast' ~) `this)
-    %-  (slog 'message' ~)
     :_  this
-    ~&  >  `broadcast`noun.sign
     :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
     ==
   ==

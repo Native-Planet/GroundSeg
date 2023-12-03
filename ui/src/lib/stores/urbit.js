@@ -8,6 +8,24 @@ const urbit = new Urbit("")
 // broadcast json string
 export const broadcast = writable("")
 
+export const sendPoke = payload => {
+  urbit.poke({
+    app: "groundseg",
+    mark: "json-string",
+    json: {"action":JSON.stringify(payload)},
+    onSuccess: handlePokeSuccess,
+    onError: handlePokeError
+  })
+}
+
+const handlePokeSuccess = event => {
+  console.log(event)
+}
+
+const handlePokeError = event => {
+  console.log(event)
+}
+
 // subscribe to path
 export const subscribe = ship => {
   urbit.ship = ship
@@ -22,8 +40,8 @@ export const subscribe = ship => {
     err: handleErr
   })
 }
+
 const handleEvent = event => {
-  console.log(typeof event.cord)
   if (typeof event.cord === 'string') {
     let broadcast
     try {

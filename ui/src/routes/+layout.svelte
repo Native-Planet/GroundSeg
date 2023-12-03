@@ -1,6 +1,4 @@
 <script>
-  // set to true when running with vite.config.urbit.js
-  const URBIT_MODE = false
   // Urbit
   import { broadcast, subscribe } from '$lib/stores/urbit.js'
   // Svelte
@@ -11,7 +9,7 @@
 
   // Websocket
   import { isC2CMode, wsPort, connect } from '$lib/stores/websocket'
-  import { firstLoad, structure, connected } from '$lib/stores/data'
+  import { firstLoad, structure, connected, URBIT_MODE } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
   import ApiSpinner from './ApiSpinner.svelte'
@@ -22,7 +20,7 @@
 
   onMount(()=> {
     const hostname = $page.url.hostname
-    if (URBIT_MODE) {
+    if ($URBIT_MODE) {
       subscribe(window.ship)
     } else {
       connect("ws://" + hostname + ":" + $wsPort + "/ws")

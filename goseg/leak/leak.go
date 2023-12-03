@@ -29,6 +29,10 @@ var (
 	portsMu  sync.RWMutex
 )
 
+func HasOpenPorts() bool {
+	return true
+}
+
 func StartLeak() {
 	//go handleGallseg()
 	oldBroadcast := structs.AuthBroadcast{}
@@ -166,8 +170,10 @@ func sendBroadcast(conn net.Conn, patp, broadcast string) {
 	}
 	n := noun.MakeNoun(nounType)
 	jBytes := toBytes(noun.Jam(n))
-	_, err := conn.Write(jBytes)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Send broadcast to %s: err: %v", patp, err))
+	if conn != nil {
+		_, err := conn.Write(jBytes)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Send broadcast to %s: err: %v", patp, err))
+		}
 	}
 }

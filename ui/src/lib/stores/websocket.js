@@ -1,6 +1,7 @@
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
-import { connected, structure, firstLoad } from './data.js'
+import { URBIT_MODE, connected, structure, firstLoad } from './data.js'
+import { sendPoke } from './urbit.js'
 
 export const ready = writable(false)
 export const logs = writable({})
@@ -23,21 +24,25 @@ export const connect = async url => {
 
 // WebSocket send wrapper
 export const send = async payload => {
-  // generate an ID
-  let id = await generateRandom(16)
-  // add the ID to pending
-  PENDING.add(id)
-  // Grab token if exists
-  let token = await loadSession()
-  // Create the request
-  let data = {"id":id,"payload":payload}
-  // Add token to request if available
-  if (token) {
-    data['token'] = token
+  if (get(URBIT_MODE)) {
+    sendPoke(payload)
+  } else {
+    // generate an ID
+    let id = await generateRandom(16)
+    // add the ID to pending
+    PENDING.add(id)
+    // Grab token if exists
+    let token = await loadSession()
+    // Create the request
+    let data = {"id":id,"payload":payload}
+    // Add token to request if available
+    if (token) {
+      data['token'] = token
+    }
+    // Send the request
+    console.log(id + ":" + payload.type + " sent")
+    SESSION.send(JSON.stringify(data));
   }
-  // Send the request
-  console.log(id + ":" + payload.type + " sent")
-  SESSION.send(JSON.stringify(data));
 }
 
 // Reconnection

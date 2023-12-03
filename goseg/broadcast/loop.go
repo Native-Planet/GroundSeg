@@ -3,6 +3,7 @@ package broadcast
 import (
 	"fmt"
 	"goseg/auth"
+	"goseg/leak"
 	"goseg/logger"
 	"goseg/structs"
 	"time"
@@ -17,7 +18,7 @@ func BroadcastLoop() {
 			//logger.Logger.Warn(fmt.Sprintf("broadcast loop %v", n))
 			//n = n + 1
 			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
+			if cm.HasAuthSession() || leak.HasOpenPorts() {
 				// refresh loop for host info
 				systemInfo := constructSystemInfo()
 
