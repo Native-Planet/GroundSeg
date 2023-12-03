@@ -97,7 +97,6 @@ pipeline {
                                     docker cp $container_id:/webui/build ./web
                                     tagdir="/opt/groundseg/pier/work/gallseg-${tag}"
                                     rm -rf /opt/groundseg/pier/work/gallseg*
-                                    mv web /opt/groundseg/pier/work
                                     curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
                                     ./zod/.run -d
                                     dojo () {
@@ -106,7 +105,7 @@ pipeline {
                                     hood () {
                                         curl -s --data '{"source":{"dojo":"+hood/'"work/gallseg-$tag"'"},"sink":{"app":"hood"}}' http://localhost:12321    
                                     }
-                                    docker cp $container_id:/webui/build ./web
+                                    mv web /opt/groundseg/pier/work/gallseg-${tag}
                                     mv ${tagdir} zod/work/
                                     hood "commit %work"
                                     dojo "-garden!make-glob %work ${tagdir}"
