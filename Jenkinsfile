@@ -138,14 +138,14 @@ pipeline {
                             rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                             '''
                         }
-                        if (params.XSEG == 'Gallseg') {
-                            script {
-                                if( "${channel}" != "nobuild" ) {  
-                                    sh 'echo "debug: post-build actions"'
-                                    sh '''#!/bin/bash -x
-                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob r2:groundseg/glob
-                                    '''
-                                }
+                    }
+                    if (params.XSEG == 'Gallseg') {
+                        script {
+                            if( "${channel}" != "nobuild" ) {  
+                                sh 'echo "debug: post-build actions"'
+                                sh '''#!/bin/bash -x
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${channel}.glob r2:groundseg/glob
+                                '''
                             }
                         }
                     }
