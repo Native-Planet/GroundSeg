@@ -96,19 +96,19 @@ pipeline {
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
-                                    tagdir="/opt/groundseg/pier/landscape/gallseg_${tag}"
+                                    tagdir="/opt/groundseg/pier/landscape/gallseg-${tag}"
                                     rm -rf /opt/groundseg/pier/landscape/gallseg*
                                     mv web ${tagdir}
                                     # |commit %landscape
                                     # -landscape!make-glob %landscape ${tagdir}
                                     echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>([%landscape %.y]))  (pure:m !>('success'))" > /opt/groundseg/pier/commit.hoon
-                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %landscape] %glob-make !>(/landscape/gallseg_${tag}))  (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
+                                    echo "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %landscape] %glob-make !>(/landscape/gallseg-${tag}))  (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
                                     docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/commit.hoon ${GLOBBER_PATP}
                                     docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/glob.hoon ${GLOBBER_PATP}
                                     while true; do
                                         if ls /opt/groundseg/pier/.urb/*.glob 1> /dev/null 2>&1; then
                                             echo "Glob created"
-                                            mv /opt/groundseg/pier/.urb/*.glob /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob
+                                            mv /opt/groundseg/pier/.urb/*.glob /opt/groundseg/version/glob/gallseg-${tag}_${channel}.glob
                                             break
                                         else
                                             echo "No glob, sleeping..."
@@ -145,7 +145,7 @@ pipeline {
                                 if( "${channel}" != "nobuild" ) {  
                                     sh 'echo "debug: post-build actions"'
                                     sh '''#!/bin/bash -x
-                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob r2:groundseg/glob
+                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}_${channel}.glob r2:groundseg/glob
                                     '''
                                 }
                             }
