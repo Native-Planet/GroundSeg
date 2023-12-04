@@ -162,8 +162,13 @@ func UnaliveC2C() error {
 	// stop AP
 	accesspoint.Stop()
 	// start systemd-resolved
-	cmd := exec.Command("systemctl", "start", "systemd-resolved")
+	cmd := exec.Command("systemctl", "enable", "systemd-resolved")
 	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to enable systemd-resolved: %v", err)
+	}
+	cmd = exec.Command("systemctl", "start", "systemd-resolved")
+	_, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Failed to start systemd-resolved: %v", err)
 	}
@@ -204,7 +209,7 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 			if err := ConnectToWifi(payload.Payload.SSID, payload.Payload.Password); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
-				if _, err := runCommand("systemclt", "restart", "groundseg"); err != nil {
+				if _, err := runCommand("systemctl", "restart", "groundseg"); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
 				}
 			}
