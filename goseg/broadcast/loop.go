@@ -18,7 +18,7 @@ func BroadcastLoop() {
 			//logger.Logger.Warn(fmt.Sprintf("broadcast loop %v", n))
 			//n = n + 1
 			cm := auth.GetClientManager()
-			if cm.HasAuthSession() || leak.HasOpenPorts() {
+			if cm.HasAuthSession() || len(leak.GetLickStatuses()) > 0 {
 				// refresh loop for host info
 				systemInfo := constructSystemInfo()
 

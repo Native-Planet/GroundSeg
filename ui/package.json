@@ -2,8 +2,7 @@
 	"name": "GroundSeg UI",
 	"version": "2.0.0",
 	"scripts": {
-		"go": "vite dev --config vite.config.js",
-		"urbit": "vite dev --config vite.config.urbit.js",
+		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview"
 	},

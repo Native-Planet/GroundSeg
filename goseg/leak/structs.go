@@ -1,6 +1,13 @@
 package leak
 
-type PortStatus struct {
-	Connected bool
-	Location  string
+import (
+	"net"
+	"sync"
+)
+
+type LickStatus struct {
+	Conn    net.Conn
+	Symlink string
+	Auth    bool
+	Mu      sync.RWMutex
 }
