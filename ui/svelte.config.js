@@ -17,8 +17,10 @@ const makeKit = () => {
       }),
     }
   }
-  kit.kit["paths"] = { 
-    base: '/apps/groundseg',
+  if (gsUrbitMode) {
+    kit.kit["paths"] = { 
+      base: '/apps/groundseg',
+    }
   }
   return kit
 }
