@@ -9,9 +9,10 @@ const urbit = new Urbit("")
 export const broadcast = writable("")
 
 export const sendPoke = payload => {
+  console.log(payload)
   urbit.poke({
     app: "groundseg",
-    mark: "json-string",
+    mark: "action",
     json: {"action":JSON.stringify(payload)},
     onSuccess: handlePokeSuccess,
     onError: handlePokeError
@@ -69,4 +70,14 @@ const handleBroadcast = broadcast => {
     structure.set(broadcast)
     firstLoad.set(false)
   }
+}
+
+export const sendHeartbeat = () => {
+  urbit.poke({
+    app: "groundseg",
+    mark: "heartbeat",
+    json: {"action":""},
+    onSuccess: handlePokeSuccess,
+    onError: handlePokeError
+  })
 }

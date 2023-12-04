@@ -13,26 +13,56 @@ import (
 
 func listener(patp string, conn net.Conn, info LickStatus) {
 	BytesChan[patp] = make(chan string)
-	// put in map
+	readChan := make(chan []byte)
 	lickMu.Lock()
+	// put in status map
 	lickStatuses[patp] = info
 	lickMu.Unlock()
-	// defer remove from map
 	defer func() {
+		logger.Logger.Info(fmt.Sprintf("Closing lick channel for %s", patp))
 		lickMu.Lock()
+		// remove from status map
 		delete(lickStatuses, patp)
 		lickMu.Unlock()
+		// remove from channel map
 		delete(BytesChan, patp)
-		conn.Close()
+		// close connection
+		if conn != nil {
+			conn.Close()
+		}
+		logger.Logger.Info(fmt.Sprintf("Closed lick channel for %s", patp))
+	}()
+	// Goroutine to read from connection
+	go func() {
+		buf := make([]byte, 1024) // buffer size can be adjusted
+		for {
+			n, err := conn.Read(buf)
+			if err != nil {
+				// handle error or end of read
+				close(readChan)
+				return
+			}
+			readData := make([]byte, n)
+			copy(readData, buf[:n])
+			readChan <- readData
+		}
 	}()
 	for {
-		// listen and send until end
-		broadcast := <-BytesChan[patp]
-		c, err := sendBroadcast(conn, broadcast)
-		if err != nil {
-			return
+		select {
+		// listen to broadcast and send
+		case broadcast := <-BytesChan[patp]:
+			c, err := sendBroadcast(conn, broadcast)
+			if err != nil {
+				return
+			}
+			conn = c
+		// listen to lick port
+		case action, ok := <-readChan:
+			if !ok {
+				return
+			}
+			go handleAction(action)
 		}
-		conn = c
 	}
 }
 

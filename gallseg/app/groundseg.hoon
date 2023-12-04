@@ -4,7 +4,7 @@
 +$  versioned-state
   $%  state-0
   ==
-+$  state-0  [%0 @ud]
++$  state-0  [%0 =alive]
 +$  card  card:agent:gall
 --
 =|  state-0
@@ -19,9 +19,17 @@
   ^-  (quip card _this)
   `this
 ::  
-++  on-save   on-save:def
+++  on-save
+  ^-  vase
+  !>(state)
 ::
-++  on-load   on-load:def
+++  on-load
+  |=  old-state=vase
+  ^-  (quip card _this)
+  =/  old  !<(versioned-state old-state)
+  ?-  -.old
+    %0  `this(state old)
+  ==
 ::
 ++  on-poke
   |=  [=mark =vase]
@@ -29,13 +37,19 @@
   |^
   ?>  =(src.bowl our.bowl)
   ?+    mark  (on-poke:def mark vase)
+  ::  toggle lick port
       %port
     =^  cards  state
       (handle-port !<(? vase))
     [cards this]
+   ::  spit cord
       %action
-      =^  cards  state
+    =^  cards  state
       (handle-action !<(action vase))
+    [cards this]
+      %heartbeat
+    =^  cards  state
+      (handle-heartbeat !<(@ vase))
     [cards this]
   ==
   ::
@@ -52,15 +66,19 @@
   ++  handle-action
     |=  act=action
     ^-  (quip card _state)
-    :_  state
-    ~[[%pass /lick %arvo %l %spit /'groundseg.sock' %action '{"test":"json-string"}']]
+    :_  state(alive now.bowl)
+    ~[[%pass /lick %arvo %l %spit /'groundseg.sock' %action act]]
+  ++  handle-heartbeat
+    |=  b=@
+    ^-  (quip card _state)
+    `state(alive now.bowl)
   --
 ++  on-watch  ::  on-watch:def
   |=  =path
   ^-  (quip card _this)
   ?+    path  (on-watch:def path)
       [%broadcast ~]
-    :_  this
+    :_  this(alive now.bowl)
     :~  
       [%give %fact ~ %broadcast !>(`broadcast`'{"type":"init"}')]
       [%pass /lick %arvo %l %spin /'groundseg.sock']
@@ -77,10 +95,10 @@
   ?.  ?=([%lick %soak *] sign)  (on-arvo:def +<)
   ?+    [mark noun]:sign        (on-arvo:def +<)
       [%connect ~]
-    ((slog 'socket connected' ~) `this)
+    ((slog 'groundseg socket connected' ~) `this)
     ::
       [%disconnect ~]
-    ((slog 'socket disconnected' ~) `this)
+    ((slog 'groundseg socket disconnected' ~) `this)
     ::
       [%error *]
     ((slog leaf+"socket {(trip ;;(@t noun.sign))}" ~) `this)
@@ -88,6 +106,12 @@
       [%broadcast *]
     ?.  ?=(@ noun.sign)
       ((slog 'invalid broadcast' ~) `this)
+    ?:  (gte `@dr`(sub now.bowl alive.state) ~s15)
+      :_  this
+      ~&  >>>  'SHUT LICK PORT. TEMPORARILY DISABLED'
+      ~ 
+      :::~  [%pass /lick %arvo %l %shut /'groundseg.sock']
+      ::==
     :_  this
     :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
     ==

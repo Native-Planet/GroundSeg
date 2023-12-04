@@ -43,10 +43,6 @@ func StartLeak() {
 }
 
 func LookForPorts() bool {
-	// start dev
-	if devSocketPath, exists := os.LookupEnv("SHIP"); exists {
-		go connectDevSocket(devSocketPath)
-	}
 	// symlink path
 	symlinkPath := "/np/d/gs"
 	// socket file name
@@ -55,10 +51,17 @@ func LookForPorts() bool {
 	for {
 		conf := config.Conf()
 		dockerDir := config.DockerDir
+		// get statuses
+		statuses := GetLickStatuses()
+		// start dev
+		if _, exists := statuses["dev"]; !exists {
+			if devSocketPath, exists := os.LookupEnv("SHIP"); exists {
+				go connectDevSocket(devSocketPath)
+			}
+		}
 		// check for every ship that exists in groundseg
 		for _, patp := range conf.Piers {
 			// decide based on existence of info
-			statuses := GetLickStatuses()
 			info, exists := statuses[patp]
 			if exists {
 				continue
@@ -81,6 +84,7 @@ func LookForPorts() bool {
 			info.Auth = false
 
 			// attempt connection to socket
+			logger.Logger.Info(fmt.Sprintf("Opening lick channel for %s", patp))
 			conn := makeConnection(filepath.Join(info.Symlink, sockFile))
 			if conn == nil {
 				continue

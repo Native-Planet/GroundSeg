@@ -14,6 +14,7 @@
   import { wide } from '$lib/stores/display'
 
   import ApiSpinner from './ApiSpinner.svelte'
+  import KeepAlive from './KeepAlive.svelte'
   import FirstLoad from './FirstLoad.svelte'
 
   // Style
@@ -92,4 +93,7 @@
 {:else}
   <slot/>
   <ApiSpinner />
+{/if}
+{#if $URBIT_MODE}
+  <KeepAlive />
 {/if}
