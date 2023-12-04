@@ -11,15 +11,9 @@ import (
 	"time"
 )
 
-// needs to stop disconnecting at every broaddcast
-// check for auth
-// urbit checker for ui
-// install app from ui
-// frequency slider
-// shut
-
 var (
 	LeakChan     = make(chan structs.AuthBroadcast)
+	BytesChan    = make(map[string]chan string)
 	lickStatuses = make(map[string]LickStatus)
 	lickMu       sync.RWMutex
 )
@@ -30,14 +24,29 @@ func GetLickStatuses() map[string]LickStatus {
 	return lickStatuses
 }
 
-func SetLickStatus(patp string, newStatus LickStatus) error {
-	lickMu.Lock()
-	defer lickMu.Unlock()
-	lickStatuses[patp] = newStatus
-	return nil
+func StartLeak() {
+	go LookForPorts()
+	oldBroadcast := structs.AuthBroadcast{}
+	var err error
+
+	for {
+		var newBroadcast structs.AuthBroadcast
+		newBroadcast = <-LeakChan
+		newBroadcast.Type = "structure"
+		newBroadcast.AuthLevel = "authorized"
+		// result of broadcastUpdate becomes the new-oldBroadcast
+		oldBroadcast, err = updateBroadcast(oldBroadcast, newBroadcast)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to update leak broadcast: %v", err))
+		}
+	}
 }
 
 func LookForPorts() bool {
+	// start dev
+	if devSocketPath, exists := os.LookupEnv("SHIP"); exists {
+		go connectDevSocket(devSocketPath)
+	}
 	// symlink path
 	symlinkPath := "/np/d/gs"
 	// socket file name
@@ -76,35 +85,19 @@ func LookForPorts() bool {
 			if conn == nil {
 				continue
 			}
-			go listener(patp, conn)
-			/*
-				info.Conn = conn
-				if err := SetLickStatus(patp, info); err != nil {
-					continue
-				}
-			*/
+			go listener(patp, conn, info)
 		}
 		time.Sleep(1 * time.Second) // interval
 	}
 }
 
-func StartLeak() {
-	go LookForPorts()
-	oldBroadcast := structs.AuthBroadcast{}
-	var err error
-
-	for {
-		var newBroadcast structs.AuthBroadcast
-		newBroadcast = <-LeakChan
-		for patp, status := range GetLickStatuses() {
-			logger.Logger.Warn(fmt.Sprintf("patp: %v, status: %+v", patp, status))
-		}
-		newBroadcast.Type = "structure"
-		newBroadcast.AuthLevel = "authorized"
-		// result of broadcastUpdate becomes the new-oldBroadcast
-		oldBroadcast, err = updateBroadcast(oldBroadcast, newBroadcast)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to update leak broadcast: %v", err))
-		}
+func connectDevSocket(socketPath string) {
+	var info LickStatus
+	info.Auth = true
+	info.Symlink = socketPath
+	conn := makeConnection(filepath.Join(info.Symlink, "groundseg.sock"))
+	if conn == nil {
+		return
 	}
+	go listener("dev", conn, info)
 }

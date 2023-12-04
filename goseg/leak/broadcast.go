@@ -1,24 +1,38 @@
 package leak
 
 import (
+	"encoding/json"
 	"fmt"
 	"goseg/logger"
 	"goseg/structs"
 	"net"
 	"reflect"
-	"time"
 
 	"github.com/stevelacy/go-urbit/noun"
 )
 
-func listener(patp string, conn net.Conn) {
-	logger.Logger.Warn(fmt.Sprintf("%v", patp)) // temp
-	logger.Logger.Warn(fmt.Sprintf("%v", conn)) // temp
+func listener(patp string, conn net.Conn, info LickStatus) {
+	BytesChan[patp] = make(chan string)
 	// put in map
+	lickMu.Lock()
+	lickStatuses[patp] = info
+	lickMu.Unlock()
 	// defer remove from map
+	defer func() {
+		lickMu.Lock()
+		delete(lickStatuses, patp)
+		lickMu.Unlock()
+		delete(BytesChan, patp)
+		conn.Close()
+	}()
 	for {
 		// listen and send until end
-		time.Sleep(1 * time.Hour) // temp
+		broadcast := <-BytesChan[patp]
+		c, err := sendBroadcast(conn, broadcast)
+		if err != nil {
+			return
+		}
+		conn = c
 	}
 }
 
@@ -27,27 +41,19 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	if reflect.DeepEqual(oldBroadcast, newBroadcast) {
 		return oldBroadcast, nil
 	}
-	//newBroadcastBytes, err := json.Marshal(newBroadcast)
-	/*
-		_, err := json.Marshal(newBroadcast)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
-			return oldBroadcast, nil
-		}
-	*/
+	newBroadcastBytes, err := json.Marshal(newBroadcast)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
+		return oldBroadcast, nil
+	}
+	for patp, _ := range GetLickStatuses() {
+		// TODO: check auth here
+		BytesChan[patp] <- string(newBroadcastBytes)
+	}
 	return newBroadcast, nil
 }
 
-/*
-	if patp == "dev" {
-		value, exists := os.LookupEnv("SHIP")
-		if exists {
-			sockLocation = value
-		}
-*/
-
-func sendBroadcast(conn net.Conn, patp, broadcast string) {
-	//nounContents := <-LeakChan
+func sendBroadcast(conn net.Conn, broadcast string) (net.Conn, error) {
 	nounType := noun.Cell{
 		Head: noun.MakeNoun("broadcast"),
 		Tail: noun.MakeNoun(broadcast),
@@ -57,7 +63,9 @@ func sendBroadcast(conn net.Conn, patp, broadcast string) {
 	if conn != nil {
 		_, err := conn.Write(jBytes)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Send broadcast to %s: err: %v", patp, err))
+			logger.Logger.Error(fmt.Sprintf("Send broadcast error: %v", err))
+			return nil, err
 		}
 	}
+	return conn, nil
 }

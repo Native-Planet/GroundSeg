@@ -11,12 +11,9 @@ import (
 
 func BroadcastLoop() {
 	ticker := time.NewTicker(broadcastInterval)
-	//n := 0
 	for {
 		select {
 		case <-ticker.C:
-			//logger.Logger.Warn(fmt.Sprintf("broadcast loop %v", n))
-			//n = n + 1
 			cm := auth.GetClientManager()
 			if cm.HasAuthSession() || len(leak.GetLickStatuses()) > 0 {
 				// refresh loop for host info
@@ -25,7 +22,7 @@ func BroadcastLoop() {
 				// pier info
 				pierInfo, err := ConstructPierInfo()
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
+					logger.Logger.Error(fmt.Sprintf("Unable to build pier info: %v", err))
 				}
 
 				// apps info
