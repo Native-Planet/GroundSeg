@@ -88,40 +88,30 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            def GLOBBER_PATP = env.GLOBBER_PATP
-                            if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                            if( "${channel}" != "nobuild" ) {
                                 sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
                                     docker cp $container_id:/webui/build ./web
-                                    chmod +x click click-format
-                                    tagdir="/opt/groundseg/pier/landscape/gallseg_${tag}"
-                                    rm -rf /opt/groundseg/pier/landscape/gallseg*
-                                    mv web ${tagdir}
-                                    # |commit %landscape
-                                    # -landscape!make-glob %landscape ${tagdir}
-                                    echo "=/ m (strand ,vase) ;< our=@p bind:m get-our ;< ~ bind:m (poke [our %hood] %kiln-commit !>(%landscape)) (pure:m !>('success'))" > /opt/groundseg/pier/commit.hoon
-                                    echo "=/ m (strand ,vase) ;< our=@p bind:m get-our ;< ~ bind:m (poke [our %landscape] %glob-find !>(/landscape/bundle-dir)) (pure:m !>('success'))" > /opt/groundseg/pier/glob.hoon
-                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/commit.hoon ${GLOBBER_PATP}
-                                    docker exec globber click -b urbit -kp -i /urbit/${GLOBBER_PATP}/glob.hoon ${GLOBBER_PATP}
-                                    while true; do
-                                        if ls /opt/groundseg/pier/.urb/*.glob 1> /dev/null 2>&1; then
-                                            echo "Glob created"
-                                            mv /opt/groundseg/pier/.urb/*.glob /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob
-                                            break
-                                        else
-                                            echo "No glob, sleeping..."
-                                        fi
-                                        sleep 1
-                                    done
-                                '''
-                            }
-                            /* production releases get promoted from edge */
-                            if( "${channel}" == "latest" ) {
-                                sh '''#!/bin/bash -x
-                                    cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge.glob cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_latest.glob
+                                    curl https://bootstrap.urbit.org/globberv3.tgz | tar xzk
+                                    ./zod/.run -d
+                                    dojo () {
+                                        curl -s --data '{"source":{"dojo":"'"\$1"'"},"sink":{"stdout":null}}' http://localhost:12321    
+                                    }
+                                    hood () {
+                                        curl -s --data '{"source":{"dojo":"+hood/'"\$1"'"},"sink":{"app":"hood"}}' http://localhost:12321    
+                                    }
+                                    mv web zod/work/gallseg-${tag}
+                                    hood "commit %work"
+                                    dojo "-garden!make-glob %work /gallseg-${tag}"
+                                    hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                                    echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
+                                    hood "exit"
+                                    sleep 5s
+                                    mv zod/.urb/put/*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
+                                    rm -rf zod
                                 '''
                             }
                         }
@@ -141,14 +131,15 @@ pipeline {
                             rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
                             '''
                         }
-                        if (params.XSEG == 'Gallseg') {
-                            script {
-                                if( "${channel}" != "nobuild" ) {  
-                                    sh 'echo "debug: post-build actions"'
-                                    sh '''#!/bin/bash -x
-                                    rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg_${tag}_${channel}.glob r2:groundseg/glob
-                                    '''
-                                }
+                    }
+                    if (params.XSEG == 'Gallseg') {
+                        script {
+                            if( "${channel}" != "nobuild" ) {  
+                                sh 'echo "debug: post-build actions"'
+                                sh '''#!/bin/bash -x
+                                source /opt/groundseg/version/glob/globhash.env
+                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
+                                '''
                             }
                         }
                     }

@@ -181,7 +181,16 @@ func GetPenpaiInstalling(patp string) bool {
 
 func GetDesk(patp, desk string, bypass bool) (string, error) {
 	if !bypass {
-		proceedWithRequest := allowPenpaiDeskRequest(patp)
+		proceedWithRequest := true
+		switch desk {
+		case "penpai":
+			proceedWithRequest = allowPenpaiDeskRequest(patp)
+		case "groundseg":
+			//proceedWithRequest = true
+			return "running", nil
+		default:
+			logger.Logger.Warn(fmt.Sprintf("Desk %%%v information is not stored in groundseg. Proceeding with request by default"))
+		}
 		if !proceedWithRequest {
 			penpaiMutex.Lock()
 			defer penpaiMutex.Unlock()
@@ -193,7 +202,7 @@ func GetDesk(patp, desk string, bypass bool) (string, error) {
 		}
 	}
 	// <file>.hoon
-	file := "penpai"
+	file := "desk-" + desk
 	// actual hoon
 	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  (pure:m !>((crip ~(ram re [%rose [~ ~ ~] (report-vats our now [%" + desk + " %kids ~] %$ |)]))))"
 	// create hoon file

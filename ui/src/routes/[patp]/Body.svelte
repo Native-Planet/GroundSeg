@@ -14,6 +14,7 @@
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import Chop from './Section/Chop.svelte'
+  import Gallseg from './Section/Gallseg.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -21,6 +22,7 @@
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   export let patp
 
+  // info
   $: ship = ($structure?.urbits?.[patp]?.info)
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
@@ -35,13 +37,17 @@
   $: minioUrl = (ship?.minioUrl) || "#"
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
+  $: gallseg = (ship?.gallseg)
 
+  // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
+  $: tGallsegInstalling = tShip?.gallsegInstalling || ""
 
+  // profile > startram
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
   $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
 </script>
@@ -94,6 +100,8 @@
 
   <!-- Loom -->
   <Loom {patp} {loomSize} />
+
+  <Gallseg {gallseg} {tGallsegInstalling} />
 
   <!-- Chop --
   <Chop
