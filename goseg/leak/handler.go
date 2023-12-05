@@ -1,8 +1,11 @@
 package leak
 
 import (
+	"encoding/json"
 	"fmt"
+	"goseg/leakchannel"
 	"goseg/logger"
+	"goseg/structs"
 	"reflect"
 
 	"math/big"
@@ -16,36 +19,45 @@ func handleAction(result []byte) {
 	jam := new(big.Int).SetBytes(reversed)
 	res := noun.Cue(jam)
 	if reflect.TypeOf(res) == reflect.TypeOf(noun.Cell{}) {
-		mark, err := decodeAtom(noun.Snag(res, 0).String())
+		err := decodeAtom(noun.Slag(res, 1).String())
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to decode mark: %v", err))
+			logger.Logger.Error(fmt.Sprintf("Failed to decode payload: %v", err))
+			return
 		}
-		payload, err := decodeAtom(noun.Slag(res, 1).String())
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to payload mark: %v", err))
-		}
-		logger.Logger.Warn(fmt.Sprintf("mark: %v, payload: %v", mark, payload))
 	}
 }
 
-func decodeAtom(atom string) (string, error) {
+func decodeAtom(atom string) error {
 	// Convert string to big.Int
 	bigInt := new(big.Int)
 	bigInt, ok := bigInt.SetString(atom, 10)
 	if !ok {
-		return "", fmt.Errorf("error converting string to big.Int")
+		return fmt.Errorf("error converting string to big.Int")
 	}
 
 	// Convert big.Int to byte array
 	byteArray := reverseLittleEndian(bigInt.Bytes())
 
-	// Convert bytes to ASCII characters and concatenate
-	var asciiStr string
-	for _, b := range byteArray {
-		asciiStr += string(b)
+	var payload structs.GallsegPayload
+	if err := json.Unmarshal(byteArray, &payload); err != nil {
+		return fmt.Errorf("error unmarshalling payload: %v", err)
+	}
+	logger.Logger.Warn(fmt.Sprintf("%+v", payload))
+	leakchannel.LeakAction <- leakchannel.ActionChannel{
+		Type:    payload.Payload.Type,
+		Content: byteArray,
 	}
 
-	return asciiStr, nil
+	/*
+		// Convert bytes to ASCII characters and concatenate
+		var asciiStr string
+		for _, b := range byteArray {
+			asciiStr += string(b)
+		}
+
+		return asciiStr, nil
+	*/
+	return nil
 }
 
 func reverseLittleEndian(byteSlice []byte) []byte {

@@ -26,6 +26,10 @@ const (
 	LockoutDuration = 2 * time.Minute
 )
 
+func init() {
+	go HandleLeakAction()
+}
+
 func NewShipHandler(msg []byte) error {
 	logger.Logger.Info("New ship")
 	// Unmarshal JSON

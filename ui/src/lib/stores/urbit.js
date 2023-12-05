@@ -9,11 +9,12 @@ const urbit = new Urbit("")
 export const broadcast = writable("")
 
 export const sendPoke = payload => {
-  console.log(payload)
+  let wrapped = {"payload":payload}
+  console.log(wrapped)
   urbit.poke({
     app: "groundseg",
     mark: "action",
-    json: {"action":JSON.stringify(payload)},
+    json: {"action":JSON.stringify(wrapped)},
     onSuccess: handlePokeSuccess,
     onError: handlePokeError
   })

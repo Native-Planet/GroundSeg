@@ -30,7 +30,7 @@ const (
 )
 
 // handle bug report requests
-func SupportHandler(msg []byte, payload structs.WsPayload) error {
+func SupportHandler(msg []byte) error {
 	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "loading"}
 	handleError := func(err error) error {
 		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: fmt.Sprintf("%v", err)}

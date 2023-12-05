@@ -271,6 +271,12 @@ type WsPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type GallsegPayload struct {
+	Payload struct {
+		Type string `json:"type"`
+	} `json:"payload"`
+}
+
 type WsUrbitPayload struct {
 	ID      string        `json:"id"`
 	Type    string        `json:"type"`
