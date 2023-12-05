@@ -2,21 +2,22 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores'
   import { wide, version } from '$lib/stores/display'
-  import { structure } from '$lib/stores/data'
+  import { structure, URBIT_MODE } from '$lib/stores/data'
 
   // Temp dev mode
   import DevToggle from '$lib/DevToggle.svelte'
 
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   const handleBack = () => {
     const bootExist = $page.route.id.includes("new")
     const bootNew = $page.route.id.includes("existing")
     if (bootExist || bootNew) {
-      goto("/boot")
+      goto(pfx+"/boot")
     } else {
-      goto("/")
+      goto(pfx+"/")
     }
   }
 
@@ -39,27 +40,27 @@
     <div class="nav">
       <div class="ships">
         <div
-          class:highlight={$page.route.id != "/(home)"}
-          on:click={()=>goto("/")}
+          class:highlight={$page.route.id != (pfx+"/(home)")}
+          on:click={()=>goto(pfx+"/")}
           class="btn option"
           >SHIPS
         </div>
       </div>
       <div
-        class:highlight={$page.route.id != "/apps"}
-        on:click={()=>goto("/apps")}
+        class:highlight={$page.route.id != (pfx+"/apps")}
+        on:click={()=>goto(pfx+"/apps")}
         class="btn option"
         >APPS
       </div>
       <div
-        class:highlight={$page.route.id != "/profile"}
-        on:click={()=>goto("/profile")}
+        class:highlight={$page.route.id != (pfx+"/profile")}
+        on:click={()=>goto(pfx+"/profile")}
         class="btn option"
         >PROFILE
       </div>
       <div
-        class:highlight={$page.route.id != "/system"}
-        on:click={()=>goto("/system")}
+        class:highlight={$page.route.id != (pfx+"/system")}
+        on:click={()=>goto(pfx+"/system")}
         class="btn option"
         >SYSTEM
       </div>

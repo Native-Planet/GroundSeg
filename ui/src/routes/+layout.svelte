@@ -39,23 +39,27 @@
 
   let count = 0
   const redirector = () => {
+    let p = "" // prefix
+    if ($URBIT_MODE) {
+      p = "/apps/groundseg"
+    }
     if ($connected) {
       if ($isC2CMode) {
-        if (pageRouteID !== "/captive") {
-          goto("/captive")
+        if (pageRouteID !== (p + "/captive")) {
+          goto(p+"/captive")
         }
       } else {
         const auth = (authLevel === "authorized")
         if (auth) {
-          if ((pageRouteID === "/login") || ($page.route.id.includes("setup"))) {
-            goto("/")
+          if ((pageRouteID === (p+"/login")) || ($page.route.id.includes("setup"))) {
+            goto(p+"/")
           }
         } else {
           if (authLevel === "unauthorized") {
-            if (pageRouteID !== "/login") {
+            if (pageRouteID !== (p+"/login")) {
               if (count > 2) {
                 count = 0
-                goto("/login")
+                goto(p+"/login")
               } else {
                 count += 1 
               }

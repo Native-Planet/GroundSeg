@@ -1,14 +1,16 @@
 <script>
-  import { goto } from '$app/navigation';
+  import { goto } from '$app/navigation'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 </script>
 
 
 <div class="wrapper">
-  <div class="ship" on:click={()=>goto("/boot")}>
+  <div class="ship" on:click={()=>goto(pfx+"/boot")}>
     <div class="sigil"></div>
     <div class="bg"></div>
   </div>
-  <div class="add" on:click={()=>goto("/boot")}>+</div>
+  <div class="add" on:click={()=>goto(pfx+"/boot")}>+</div>
 </div>
 
 <style>

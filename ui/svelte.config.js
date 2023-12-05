@@ -17,13 +17,11 @@ const makeKit = () => {
       }),
     }
   }
-  /*
   if (gsUrbitMode) {
     kit.kit["paths"] = { 
       base: '/apps/groundseg',
     }
   }
-  */
   return kit
 }
 const config = makeKit();

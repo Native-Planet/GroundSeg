@@ -1,10 +1,9 @@
 <script>
+  import nplogo from './nplogo.svg'
 </script>
 
 <div class="bg">
-  <!--
-  <img src="./nplogo.svg" alt="native planet" />
-  -->
+  <img src={nplogo} alt="native planet" />
   <div class="text">LOADING</div>
 </div>
 
