@@ -6,7 +6,7 @@
     toggleUrbitPower
   } from '$lib/stores/websocket'
 
-  import { structure } from '$lib/stores/data'
+  import { structure, URBIT_MODE } from '$lib/stores/data'
 
   import Power from './Section/Power.svelte'
   import Urbit from './Section/Urbit.svelte'
@@ -103,7 +103,9 @@
   <!-- Loom -->
   <Loom {patp} {loomSize} />
 
-  <Gallseg {gallseg} {tGallsegInstalling} />
+  {#if !$URBIT_MODE}
+    <Gallseg {gallseg} {tGallsegInstalling} />
+  {/if}
 
   <!-- Chop --
   <Chop

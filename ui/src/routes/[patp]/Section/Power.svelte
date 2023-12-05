@@ -5,10 +5,14 @@
   import { createEventDispatcher } from 'svelte'
   import { toggleBootStatus } from '$lib/stores/websocket'
 
+  import { URBIT_MODE } from '$lib/stores/data'
+
   export let patp
   export let running
   export let detectBootStatus
   export let tTogglePower
+
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   const dispatch = createEventDispatcher()
 </script>
@@ -19,7 +23,7 @@
     <div class="check-wrapper">
       <div class="checkbox" on:click={()=>toggleBootStatus(patp)}>
       {#if detectBootStatus}
-        <img class="checkmark" src="/checkmark-white.svg" alt="checkmark"/>
+        <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
       {/if}
       </div>
       <div class="check-text" on:click={()=>toggleBootStatus(patp)}>Remember boot status after restart</div>

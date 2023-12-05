@@ -108,7 +108,7 @@
       ((slog 'invalid broadcast' ~) `this)
     ?:  (gte `@dr`(sub now.bowl alive.state) ~s15)
       :_  this
-      ~&  >>>  'SHUT LICK PORT. TEMPORARILY DISABLED'
+      ~&  >>>  'SHUT LICK PORT TEMPORARILY DISABLED. BROADCAST CONTINUES'
       ~ 
       :::~  [%pass /lick %arvo %l %shut /'groundseg.sock']
       ::==

@@ -6,6 +6,8 @@
   import { urthPackMeld, marsPack } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { createEventDispatcher } from 'svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let patp
 
@@ -60,7 +62,7 @@
         {/if}
       </button>
       <button class="calendar" on:click={handleModal}>
-        <img src="/calendar.svg" alt="calendar icon" width="20px" height="20px"/>
+        <img src={pfx+"/calendar.svg"} alt="calendar icon" width="20px" height="20px"/>
       </button>
     </div>
   </div>

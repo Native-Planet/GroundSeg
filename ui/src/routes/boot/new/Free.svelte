@@ -5,6 +5,8 @@
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
   let name = '';
@@ -32,14 +34,14 @@
     {#if registered && running}
       <div class="checkbox">
         {#if remote}
-          <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+          <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
         {/if}
       </div>
       <div class="check-label">Set to remote</div>
     {/if}
   </div>
   <div class="buttons">
-    <button class="btn back" on:click={()=>goto('/boot')}>Back</button>
+    <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn boot"
       on:click={()=>bootShip(noSig,key,remote)}
