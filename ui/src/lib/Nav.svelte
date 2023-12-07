@@ -35,7 +35,7 @@
       -->
   </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
-    {#if !$URBIT_MODE && (authLevel != "authorized")}
+    {#if authLevel == "authorized"}
       <div class="back" on:click={handleBack}></div>
     {/if}
   {:else}

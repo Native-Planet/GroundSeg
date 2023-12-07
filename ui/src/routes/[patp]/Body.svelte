@@ -41,6 +41,7 @@
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
+  $: authLevel = ($structure?.auth_level) || "unauthorized"
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
@@ -108,7 +109,7 @@
     <Gallseg {gallseg} {tGallsegInstalling} />
   {/if}
 
-  {#if $URBIT_MODE}
+  {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
 

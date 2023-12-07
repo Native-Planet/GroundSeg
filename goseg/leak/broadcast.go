@@ -61,7 +61,7 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 			if !ok {
 				return
 			}
-			go handleAction(action)
+			go handleAction(patp, action)
 		}
 	}
 }

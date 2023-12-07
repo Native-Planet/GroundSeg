@@ -25,13 +25,13 @@
   }
 
   const urbitRedirect = () => {
-    if (authLevel != "authorized") {
+    if (authLevel == "authorized") {
+      wsRedirect()
+    } else if (authLevel != "unauthorized") {
       if (pageRouteID != "/[patp]") {
         goto(pfx + "/" + authLevel)
       }
-    } //else {
-      // do something
-    //}
+    }
   }
 
   const wsRedirect = () => {

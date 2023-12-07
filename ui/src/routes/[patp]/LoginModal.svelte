@@ -1,11 +1,16 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { login, loginError } from '$lib/stores/websocket'
+  import { login } from '$lib/stores/websocket'
+  import { URBIT_MODE } from '$lib/stores/data'
+  import { gallsegLoginInfo } from '$lib/stores/urbit'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
+  import { goto } from '$app/navigation';
 
   export let isOpen
   let pwd = ''
+  let errMsg = ''
+
   /*
   afterUpdate(()=>{
     if (tRegister == "done") {
@@ -13,6 +18,32 @@
     }
   })
   */
+
+  let clicked = false
+
+  $: listenLogin($gallsegLoginInfo)
+
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+
+  const listenLogin = info => {
+    if (clicked) {
+      if (info.error.length > 0) {
+        errMsg = info.error
+        setTimeout(()=>clicked=false,3000)
+      } else {
+        errMsg = "success"
+        setTimeout(()=>{
+          closeModal()
+          goto(pfx+"/")
+        }, 3000)
+      }
+    }
+  }
+
+  const handleLogin = () => {
+    clicked = true
+    login(pwd)
+  }
 </script>
 
 {#if isOpen}
@@ -21,9 +52,14 @@
       <div class="title">Admin Password</div>
       <input type="password" bind:value={pwd} />
       <button
-        disabled={pwd.length < 1}
-        on:click={()=>login(pwd)}
-        >Login
+        disabled={(pwd.length < 1) || clicked}
+        on:click={handleLogin}>
+        {
+          !clicked ? "Login" :
+          (errMsg.length < 1) ? "Logging you in..." :
+          (errMsg == "success") ? "Success!" :
+          errMsg
+        }
       </button>
     </div>
   </Modal>

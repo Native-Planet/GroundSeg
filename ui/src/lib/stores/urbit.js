@@ -8,9 +8,11 @@ const urbit = new Urbit("")
 // broadcast json string
 export const broadcast = writable("")
 
+// login string
+export const gallsegLoginInfo = writable({})
+
 export const sendPoke = payload => {
   let wrapped = {"payload":payload}
-  console.log(wrapped)
   urbit.poke({
     app: "groundseg",
     mark: "action",
@@ -20,8 +22,8 @@ export const sendPoke = payload => {
   })
 }
 
-const handlePokeSuccess = event => {
-  console.log(event)
+const handlePokeSuccess = () => {
+  console.log("poke succeeded")
 }
 
 const handlePokeError = event => {
@@ -70,6 +72,14 @@ const handleBroadcast = broadcast => {
   } else if (broadcast.type == "structure") {
     structure.set(broadcast)
     firstLoad.set(false)
+  } else if (broadcast.type == "urbit-activity") {
+    handleUrbitActivity(broadcast)
+  }
+}
+
+const handleUrbitActivity = broadcast => {
+  if (broadcast.payloadType == "login") {
+    gallsegLoginInfo.set(broadcast)
   }
 }
 
