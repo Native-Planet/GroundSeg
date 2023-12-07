@@ -3,16 +3,14 @@
   import { broadcast, subscribe } from '$lib/stores/urbit.js'
   // Svelte
   import { onMount } from 'svelte'
-  import { get } from 'svelte/store'
   import { page } from '$app/stores'
 
-  import { goto } from '$app/navigation';
-
   // Websocket
-  import { isC2CMode, wsPort, connect } from '$lib/stores/websocket'
-  import { firstLoad, structure, connected, URBIT_MODE } from '$lib/stores/data'
+  import { wsPort, connect } from '$lib/stores/websocket'
+  import { firstLoad, URBIT_MODE } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
+  import Redirector from './Redirector.svelte'
   import ApiSpinner from './ApiSpinner.svelte'
   import KeepAlive from './KeepAlive.svelte'
   import FirstLoad from './FirstLoad.svelte'
@@ -30,57 +28,7 @@
     } else {
       connect("ws://" + hostname + ":" + $wsPort + "/ws")
     }
-    redirector()
   })
-
-  $: authLevel = ($structure?.auth_level) || "unauthorized"
-  $: stage = ($structure?.stage) || null
-  $: pageRouteID = $page.route.id
-
-  let count = 0
-  const redirector = () => {
-    let p = "" // prefix
-    if ($URBIT_MODE) {
-      p = "/apps/groundseg"
-    }
-    if ($connected) {
-      if ($isC2CMode) {
-        if (pageRouteID !== (p + "/captive")) {
-          goto(p+"/captive")
-        }
-      } else {
-        const auth = (authLevel === "authorized")
-        if (auth) {
-          if ((pageRouteID === (p+"/login")) || ($page.route.id.includes("setup"))) {
-            goto(p+"/")
-          }
-        } else {
-          if (authLevel === "unauthorized") {
-            if (pageRouteID !== (p+"/login")) {
-              if (count > 2) {
-                count = 0
-                goto(p+"/login")
-              } else {
-                count += 1 
-              }
-            }
-          }
-          if (authLevel === "setup") {
-            if (count > 2) {
-              count = 0
-              const currentStage = "/setup/" + stage
-              if (currentStage != $page.route.id) {
-                goto("/setup/" + stage)
-              }
-            } else {
-              count += 1 
-            }
-          }
-        }
-      }
-    }
-    setTimeout(redirector,500)
-  }
 
 	const vert = (h,w) => {
 	  let r = h / w
@@ -92,6 +40,7 @@
 </script>
 
 <!--svelte:window bind:innerWidth bind:innerHeight /-->
+<Redirector />
 {#if $firstLoad}
   <FirstLoad />
 {:else}

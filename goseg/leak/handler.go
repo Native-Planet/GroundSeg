@@ -42,22 +42,22 @@ func decodeAtom(atom string) error {
 	if err := json.Unmarshal(byteArray, &payload); err != nil {
 		return fmt.Errorf("error unmarshalling payload: %v", err)
 	}
-	logger.Logger.Warn(fmt.Sprintf("%+v", payload))
-	leakchannel.LeakAction <- leakchannel.ActionChannel{
-		Type:    payload.Payload.Type,
-		Content: byteArray,
+	// handle special cases here, and send everything else to
+	// LeakChannel for handler package to process
+	switch payload.Payload.Type {
+	case "login":
+		urbitLogin(byteArray)
+	default:
+		sendToLeakChannel(payload.Payload.Type, byteArray)
 	}
-
-	/*
-		// Convert bytes to ASCII characters and concatenate
-		var asciiStr string
-		for _, b := range byteArray {
-			asciiStr += string(b)
-		}
-
-		return asciiStr, nil
-	*/
 	return nil
+}
+
+func sendToLeakChannel(payloadType string, content []byte) {
+	leakchannel.LeakAction <- leakchannel.ActionChannel{
+		Type:    payloadType,
+		Content: content,
+	}
 }
 
 func reverseLittleEndian(byteSlice []byte) []byte {
@@ -66,4 +66,15 @@ func reverseLittleEndian(byteSlice []byte) []byte {
 		byteSlice[i], byteSlice[j] = byteSlice[j], byteSlice[i]
 	}
 	return byteSlice
+}
+
+// login from urbit
+func urbitLogin(loginPayload []byte) {
+	var payload structs.WsLoginPayload
+	err := json.Unmarshal(loginPayload, &payload)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Urbit Login failed to unmarshal: %v", err))
+		return
+	}
+	logger.Logger.Warn(fmt.Sprintf("Login Payload:::: %+v", payload))
 }

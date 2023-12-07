@@ -10,6 +10,7 @@
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+  $: authLevel = ($structure?.auth_level) || "unauthorized"
 
   const handleBack = () => {
     const bootExist = $page.route.id.includes("new")
@@ -34,8 +35,9 @@
       -->
   </div>
   {#if ($page.route.id == '/[patp]') || ($page.route.id.includes('/boot'))}
-    <div class="back" on:click={handleBack}>
-    </div>
+    {#if !$URBIT_MODE && (authLevel != "authorized")}
+      <div class="back" on:click={handleBack}></div>
+    {/if}
   {:else}
     <div class="nav">
       <div class="ships">

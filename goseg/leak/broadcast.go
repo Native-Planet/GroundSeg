@@ -76,9 +76,30 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
 		return oldBroadcast, nil
 	}
-	for patp, _ := range GetLickStatuses() {
-		// TODO: check auth here
-		BytesChan[patp] <- string(newBroadcastBytes)
+	for patp, status := range GetLickStatuses() {
+		if status.Auth {
+			BytesChan[patp] <- string(newBroadcastBytes)
+		} else {
+			go func() {
+				shipInfo, exists := newBroadcast.Urbits[patp]
+				if exists {
+					urbits := make(map[string]structs.Urbit)
+					urbits[patp] = shipInfo
+					wrappedUrbit := structs.AuthBroadcast{
+						Type:      "structure",
+						AuthLevel: patp,
+						Urbits:    urbits,
+					}
+					wrappedUrbit.Profile.Startram.Info.Registered = newBroadcast.Profile.Startram.Info.Registered
+					wrappedUrbit.Profile.Startram.Info.Running = newBroadcast.Profile.Startram.Info.Running
+
+					wrapperUrbitBytes, err := json.Marshal(wrappedUrbit)
+					if err == nil {
+						BytesChan[patp] <- string(wrapperUrbitBytes)
+					}
+				}
+			}()
+		}
 	}
 	return newBroadcast, nil
 }

@@ -17,6 +17,7 @@
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import Chop from './Section/Chop.svelte'
   import Gallseg from './Section/Gallseg.svelte'
+  import AdminLogin from './Section/AdminLogin.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -106,6 +107,11 @@
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallsegInstalling} />
   {/if}
+
+  {#if $URBIT_MODE}
+    <AdminLogin />
+  {/if}
+
 
   <!-- Chop --
   <Chop
