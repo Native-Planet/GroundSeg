@@ -101,7 +101,9 @@
   <!-- Loom -->
   <Loom {patp} {loomSize} />
 
+  <!-- Gallseg --
   <Gallseg {gallseg} {tGallsegInstalling} />
+  -->
 
   <!-- Chop --
   <Chop
