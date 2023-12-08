@@ -50,30 +50,28 @@ function padPatp(patp) {
   return patp;
 }
 
-/** remove patp padding */
+/** Remove patp padding */
 function unpadPatp(patp) {
   return patp.replace(/^0+/, '');
 }
 
-
-/** reverses patp, in chunks of 3 IE Aaa-BbbCcc-DddEee -> EeeDdd-CccBbb-Aaa */
+/** Reverses patp, in chunks of 3 */
 function reversePatp(patp) {
-  const chunks = patp.split('-')
-  const reversed = chunks.map(chunk => chunk.slice(3) + chunk.slice(0, 3))
-  return reversed.reverse().join('-')
+  const chunks = patp.match(/.{1,3}/g) || []; // Split into chunks of 3 characters
+  return chunks.reverse().join('-'); // Reverse the chunks and join with hyphens
 }
 
 /** Sort alphabetical but put higher tiers first (IE planets above moons) */
 function tieredAlphabeticalSort(ships) {
-  return ships.map(padPatp).sort().map(unpadPatp)
+  return ships.map(padPatp).sort().map(unpadPatp);
 }
 
-/** Sort hierarchically so moons are immediately below their planets etc */
+/** Sort hierarchically so moons are immediately below their planets, etc */
 function hierarchicalSort(ships) {
   return ships
-    .map(ship => reversePatp(padPatp(ship)))
+    .map(ship => reversePatp(padPatp(ship))) // Pad and then reverse
     .sort()
-    .map(ship => reversePatp(unpadPatp(ship)))
+    .map(ship => unpadPatp(reversePatp(ship))); // Reverse back and then unpad
 }
 
 export const sortModes = {
