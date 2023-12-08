@@ -42,19 +42,23 @@ export const checkPatp = patp => {
   return true;
 }
 
-/** pad patp to moon length with 0 **/
+/** Pad patp to moon length with 0 and - */
 function padPatp(patp) {
   const originalLength = patp.length;
+  const moonLength = 27;
   let padding = '';
-  if (originalLength <= 3) {
-    padding = '000-000-000-000-000-000-000-'.slice(0, 27 - originalLength);
-  } else if (originalLength <= 7) {
-    padding = '000-000-000-000-000-000-'.slice(0, 27 - originalLength);
-  } else if (originalLength <= 13) {
-    padding = '000-000-000-000-'.slice(0, 27 - originalLength);
+  let totalHyphensNeeded = 3;
+  let existingHyphens = (patp.match(/-/g) || []).length;
+  let paddingZerosNeeded = moonLength - originalLength - (totalHyphensNeeded - existingHyphens);
+  while (padding.length < paddingZerosNeeded) {
+    padding += '0';
+  }
+  for (let i = 0; i < totalHyphensNeeded - existingHyphens; i++) {
+    padding += '-';
   }
   return padding + patp;
 }
+
 
 /** remove patp padding */
 function unpadPatp(patp) {
