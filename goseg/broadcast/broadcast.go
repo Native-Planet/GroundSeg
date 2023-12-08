@@ -181,6 +181,15 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
+		remoteReady := false
+		for _, subdomain := range config.StartramConfig.Subdomains {
+			if subdomain.URL == pier {
+				if subdomain.Status == "ok" {
+					remoteReady = true
+				}
+				break
+			}
+		}
 		urbitAlias := dockerConfig.CustomUrbitWeb
 		minIOAlias := dockerConfig.CustomS3Web
 		showUrbAlias := false
@@ -250,6 +259,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
+		urbit.Info.RemoteReady = remoteReady
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.MinIOUrl = minIOUrl
 		urbit.Info.MinIOPwd = minIOPwd

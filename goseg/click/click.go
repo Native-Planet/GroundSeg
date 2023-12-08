@@ -46,6 +46,9 @@ func BarExit(patp string) error {
 	if !success {
 		return fmt.Errorf("Click |exit for %v poke failed", patp)
 	}
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	delete(lusCodes, patp)
 	return nil
 }
 
