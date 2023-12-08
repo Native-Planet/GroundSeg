@@ -159,7 +159,7 @@ func Check502Loop() {
 			shipConf := config.UrbitConf(pier)
 			pierNetwork, err := docker.GetContainerNetwork(pier)
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v", pier))
+				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 				continue
 			}
 			turnedOn := false
