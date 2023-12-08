@@ -44,20 +44,23 @@ export const checkPatp = patp => {
 
 /** pad patp to moon length with 0 **/
 function padPatp(patp) {
-  const moonLength = 23;
-  let padLength = moonLength - patp.length;
+  const originalLength = patp.length;
   let padding = '';
-  while (padLength > 0) {
-    padding += '0';
-    padLength--;
+  if (originalLength <= 3) {
+    padding = '000-000-000-000-000-000-000-'.slice(0, 27 - originalLength);
+  } else if (originalLength <= 7) {
+    padding = '000-000-000-000-000-000-'.slice(0, 27 - originalLength);
+  } else if (originalLength <= 13) {
+    padding = '000-000-000-000-'.slice(0, 27 - originalLength);
   }
-  return `${padding}${patp}`;
+  return padding + patp;
 }
 
 /** remove patp padding */
 function unpadPatp(patp) {
-  return patp.replace(/^0+/, '');
+  return patp.replace(/^0+|-+0/g, '').replace(/-$/, '');
 }
+
 
 /** reverses patp, in chunks of 3 IE Aaa-BbbCcc-DddEee -> EeeDdd-CccBbb-Aaa */
 function reversePatp(patp) {
