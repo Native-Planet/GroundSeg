@@ -166,7 +166,13 @@ func Check502Loop() {
 			if strings.Contains(pierStatus[pier], "Up") {
 				turnedOn = true
 			}
-			wgContId, err := docker.GetContainerIDByName("wireguard")
+			ctx := context.Background()
+			cli, err := client.NewClientWithOpts(client.FromEnv)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't create client: %v", err))
+				continue
+			}
+			wgContId, err := docker.GetContainerIDByName(ctx, cli, "wireguard")
 			if err != nil {
 				logger.Logger.Debug("No WG container, skipping 502 check")
 				continue

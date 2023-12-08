@@ -223,8 +223,8 @@ func GetContainerNetwork(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for networkName := range containerJSON.HostConfig.NetworkMode {
-		return networkName, nil
+	if containerJSON.HostConfig.NetworkMode != "" {
+		return string(containerJSON.HostConfig.NetworkMode), nil
 	}
 	return "", fmt.Errorf("container is not attached to any network: %v", name)
 }
