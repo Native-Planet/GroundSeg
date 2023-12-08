@@ -167,6 +167,10 @@ func Check502Loop() {
 				turnedOn = true
 			}
 			if turnedOn && pierNetwork != "default" && conf.WgOn {
+				if _, err := click.GetLusCode(pier); err != nil {
+					logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
+					continue
+				}
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
