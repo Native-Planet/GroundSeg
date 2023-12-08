@@ -42,39 +42,33 @@ export const checkPatp = patp => {
   return true;
 }
 
-/** Pad patp to moon length with 0 and - */
-function padPatp(patp) {
-  while (patp.length < 27) {
-    patp = '0' + patp;
+function getClass(ship) {
+  const hyphens = (ship.match(/-/g) || []).length;
+  switch (hyphens) {
+    case 0: return ship.length === 3 ? 1 : 2; // Galaxy or Star
+    case 1: return 3; // Planet
+    case 3: return 4; // Moon
+    default: return 5; // Unknown or malformed
   }
-  return patp;
 }
 
-/** Remove patp padding */
-function unpadPatp(patp) {
-  return patp.replace(/^0+/, '');
-}
-
-/** Reverses patp, in chunks of 3 */
-function reversePatp(patp) {
-  const chunks = patp.match(/.{1,3}/g) || []; // Split into chunks of 3 characters
-  return chunks.reverse().join('-'); // Reverse the chunks and join with hyphens
-}
-
-/** Sort alphabetical but put higher tiers first (IE planets above moons) */
 function tieredAlphabeticalSort(ships) {
-  return ships.map(padPatp).sort().map(unpadPatp);
+  return ships.sort((a, b) => {
+    const classA = getClass(a);
+    const classB = getClass(b);
+    if (classA === classB) {
+      return a.localeCompare(b);
+    }
+    return classA - classB;
+  });
 }
 
-/** Sort hierarchically so moons are immediately below their planets, etc */
 function hierarchicalSort(ships) {
-  return ships
-    .map(ship => reversePatp(padPatp(ship))) // Pad and then reverse
-    .sort()
-    .map(ship => unpadPatp(reversePatp(ship))); // Reverse back and then unpad
+  // In this case, hierarchical sorting is the same as tiered alphabetical sorting
+  return tieredAlphabeticalSort(ships);
 }
 
 export const sortModes = {
   alphabetical: tieredAlphabeticalSort,
   hierarchical: hierarchicalSort,
-}
+};
