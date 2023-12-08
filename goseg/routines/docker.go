@@ -166,7 +166,12 @@ func Check502Loop() {
 			if strings.Contains(pierStatus[pier], "Up") {
 				turnedOn = true
 			}
-			if turnedOn && pierNetwork == "wireguard" && conf.WgOn {
+			wgContId, err := docker.GetContainerIDByName("wireguard")
+			if err != nil {
+				logger.Logger.Debug("No WG container, skipping 502 check")
+				continue
+			}
+			if turnedOn && pierNetwork == fmt.Sprintf("container:%s", wgContId) && conf.WgOn {
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
