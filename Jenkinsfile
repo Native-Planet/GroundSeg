@@ -207,7 +207,7 @@ pipeline {
                             sh '''#!/bin/bash -x
                                 cp ./release/standard_install.sh /opt/groundseg/get/install.sh
                                 cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
-                                sed -i "s/v2.0.0-79/${tag}/g" /opt/groundseg/get/only.sh
+                                sed -i '11s/.*/TAG=${tag}/' /opt/groundseg/get/only.sh
                                 webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
                                 webui_arm64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.arm64_sha256'`
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
