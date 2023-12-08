@@ -183,7 +183,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 		remoteReady := false
 		for _, subdomain := range config.StartramConfig.Subdomains {
-			if subdomain.URL == pier {
+			if subdomain.URL == dockerConfig.WgURL {
 				if subdomain.Status == "ok" {
 					remoteReady = true
 				}
