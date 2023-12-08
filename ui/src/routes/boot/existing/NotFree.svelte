@@ -1,7 +1,8 @@
 <script>
   /*
   import KeyDropper from './KeyDropper.svelte';
-  import { bootShip, structure } from '$lib/stores/websocket';
+  import { bootShip } from '$lib/stores/websocket';
+  import { structure } from '$lib/stores/data'
   import { sigRemove, checkPatp } from '$lib/stores/patp';
   import { goto } from '$app/navigation';
 

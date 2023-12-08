@@ -1,6 +1,7 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { structure, submitReport } from '$lib/stores/websocket'
+  import { submitReport } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let isOpen

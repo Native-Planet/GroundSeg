@@ -1,5 +1,6 @@
 <script>
-  import { structure, submitReport } from '$lib/stores/websocket'
+  import { submitReport } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import PierCheck from './PierCheck.svelte'
 
   let contact = ''

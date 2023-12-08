@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   const dispatch = createEventDispatcher()
   export let patp
 

@@ -2,7 +2,7 @@
   import './system.css'
   import { showLogs } from './store'
 
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
   import LinuxUpdate from './LinuxUpdate.svelte'

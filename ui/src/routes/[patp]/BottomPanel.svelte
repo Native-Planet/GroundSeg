@@ -1,5 +1,6 @@
 <script>
-  import { structure, rebuildContainer } from '$lib/stores/websocket'
+  import { rebuildContainer } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import LogsDrawer from './LogsDrawer.svelte'
   import DeleteModal from './DeleteModal.svelte'
   import ExportModal from './ExportModal.svelte'

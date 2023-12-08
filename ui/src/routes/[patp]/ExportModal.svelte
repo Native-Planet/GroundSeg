@@ -1,11 +1,12 @@
 <script>
   import { 
     wsPort,
-    structure,
     exportUrbitShip,
     exportUrbitBucket
   } from '$lib/stores/websocket'
   import { loadSession } from '$lib/stores/gs-crypto'
+
+  import { structure } from '$lib/stores/data'
 
   // Modal
   import Modal from '$lib/Modal.svelte'

@@ -1,10 +1,12 @@
 <script>
-  import { structure,
+  import { 
     toggleDevMode,
     toggleAutoBoot,
     toggleNetwork,
     toggleUrbitPower
   } from '$lib/stores/websocket'
+
+  import { structure, URBIT_MODE } from '$lib/stores/data'
 
   import Power from './Section/Power.svelte'
   import Urbit from './Section/Urbit.svelte'
@@ -15,6 +17,7 @@
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import Chop from './Section/Chop.svelte'
   import Gallseg from './Section/Gallseg.svelte'
+  import AdminLogin from './Section/AdminLogin.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -39,6 +42,7 @@
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
+  $: authLevel = ($structure?.auth_level) || "unauthorized"
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
@@ -101,9 +105,15 @@
 
   <!-- Loom -->
   <Loom {patp} {loomSize} />
+  
+  <!--
+  {#if !$URBIT_MODE}
+    <Gallseg {gallseg} {tGallsegInstalling} />
+  {/if}
 
-  <!-- Gallseg --
-  <Gallseg {gallseg} {tGallsegInstalling} />
+  {#if $URBIT_MODE && (authLevel != "authorized")}
+    <AdminLogin />
+  {/if}
   -->
 
   <!-- Chop --

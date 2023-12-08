@@ -3,7 +3,8 @@
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
 
-  import { structure, setPackSchedule, pausePackSchedule } from '$lib/stores/websocket'
+  import { setPackSchedule, pausePackSchedule } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import Selector from './Selector.svelte'
   import Clock from './Clock.svelte'
 

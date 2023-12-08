@@ -4,7 +4,7 @@
   import EndpointModal from './EndpointModal.svelte'
   import RegisterModal from './RegisterModal.svelte'
 
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   $: info = ($structure?.profile?.startram?.info) || {}
   $: endpoint = (info?.endpoint) || ""

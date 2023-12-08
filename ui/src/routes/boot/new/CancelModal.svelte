@@ -1,9 +1,6 @@
 <script>
-  import { 
-    structure,
-    cancelNewShip,
-  } from '$lib/stores/websocket'
-
+  import { cancelNewShip } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { afterUpdate } from 'svelte'
 
   // Modal

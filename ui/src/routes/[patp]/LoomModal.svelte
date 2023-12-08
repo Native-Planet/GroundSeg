@@ -1,6 +1,7 @@
 <script>
   import { afterUpdate } from 'svelte'
-  import { setUrbitLoom, structure } from '$lib/stores/websocket'
+  import { setUrbitLoom } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let patp

@@ -1,6 +1,7 @@
 <script>
+  import { structure, connected } from '$lib/stores/data'
   import { afterUpdate } from 'svelte'
-  import { shutdownDevice, restartDevice, structure, connected } from '$lib/stores/websocket'
+  import { shutdownDevice, restartDevice } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let info

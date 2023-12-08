@@ -1,5 +1,5 @@
 <script>
-  import { connected, structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   export let wide
 
   $: logs =($structure?.logs?.containers?.wireguard?.logs) || []

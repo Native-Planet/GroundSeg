@@ -1,7 +1,8 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte'
   import { goto } from '$app/navigation';
-  import { structure, resetImportShip } from '$lib/stores/websocket'
+  import { resetImportShip } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
 
   export let name = ""
 

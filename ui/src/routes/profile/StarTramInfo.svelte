@@ -1,5 +1,6 @@
 <script>
-  import { structure,  startramRestart } from '$lib/stores/websocket'
+  import { startramRestart } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   export let renew
   export let expiry
   export let registered

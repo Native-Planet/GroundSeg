@@ -1,14 +1,18 @@
 <script>
   import { goto } from '$app/navigation'
+  import { URBIT_MODE } from '$lib/stores/data'
 
   export let patp
   export let url
+
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+
 </script>
 <div class="outer">
   <a href={url} target="_blank">
     <div class="ext-icon"></div>
   </a>
-  <button on:click={()=>goto(patp)}>
+  <button on:click={()=>goto(pfx+"/"+patp)}>
     <div class="settings-icon"></div>
   </button>
 </div>

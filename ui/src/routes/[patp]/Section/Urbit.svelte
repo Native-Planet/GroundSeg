@@ -9,6 +9,8 @@
 
   import Fa from 'svelte-fa'
   import { faRepeat } from '@fortawesome/free-solid-svg-icons'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let urbitAlias
   export let showUrbAlias
@@ -43,7 +45,7 @@
   <div class="wrapper">
     <button disabled={!running || lusCode.length < 27} id="lus-code" class="btn" data-clipboard-text={lusCode}>
       <img
-        src="/clipboard.svg"
+        src={pfx+"/clipboard.svg"}
         width="24px"
         height="24px" />
       {#if copied}
