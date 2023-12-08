@@ -138,6 +138,7 @@ type Urbit struct {
 		PackDate           int    `json:"packDate"`
 		PenpaiCompanion    bool   `json:"penpaiCompanion"`
 		PenpaiInstalling   bool   `json:"penpaiInstalling"`
+		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
