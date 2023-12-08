@@ -44,25 +44,15 @@ export const checkPatp = patp => {
 
 /** Pad patp to moon length with 0 and - */
 function padPatp(patp) {
-  const originalLength = patp.length;
-  const moonLength = 27;
-  let padding = '';
-  let totalHyphensNeeded = 3;
-  let existingHyphens = (patp.match(/-/g) || []).length;
-  let paddingZerosNeeded = moonLength - originalLength - (totalHyphensNeeded - existingHyphens);
-  while (padding.length < paddingZerosNeeded) {
-    padding += '0';
+  while (patp.length < 27) {
+    patp = '0' + patp;
   }
-  for (let i = 0; i < totalHyphensNeeded - existingHyphens; i++) {
-    padding += '-';
-  }
-  return padding + patp;
+  return patp;
 }
-
 
 /** remove patp padding */
 function unpadPatp(patp) {
-  return patp.replace(/^0+|-+0/g, '').replace(/-$/, '');
+  return patp.replace(/^0+/, '');
 }
 
 
