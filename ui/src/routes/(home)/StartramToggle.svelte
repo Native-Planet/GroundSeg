@@ -2,10 +2,11 @@
   import { createEventDispatcher } from 'svelte'
   const dispatch = createEventDispatcher()
   export let on
+  export let remoteReady
 </script>
 <div class="wrapper" class:on={on}>
   <div class="title">StarTram</div>
-  <div on:click={()=>dispatch('click')} class="outer">
+  <div on:click={()=>dispatch('click')} class="outer" class:disabled={!remoteReady} >
     <div class="inner" style="margin-left:{on ? 20 : 4}px"></div>
   </div>
 </div>
@@ -56,5 +57,9 @@
     border-radius: 4px;
     background: #161D17;
     transition: margin-left 0.2s ease;
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>
