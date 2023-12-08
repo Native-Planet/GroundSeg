@@ -143,7 +143,7 @@ func Check502Loop() {
 	status := make(map[string]bool)
 	time.Sleep(180 * time.Second)
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(120 * time.Second)
 		conf := config.Conf()
 		pierStatus, err := docker.GetShipStatus(conf.Piers)
 		if err != nil {
