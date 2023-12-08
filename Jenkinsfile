@@ -103,9 +103,9 @@ pipeline {
                                     hood () {
                                         curl -s --data '{"source":{"dojo":"+hood/'"\$1"'"},"sink":{"app":"hood"}}' http://localhost:12321    
                                     }
-                                    mv web zod/work/gallseg-${tag}
+                                    mv web zod/work/gallseg
                                     hood "commit %work"
-                                    dojo "-garden!make-glob %work /gallseg-${tag}"
+                                    dojo "-garden!make-glob %work /gallseg"
                                     hash=$(ls -1 -c zod/.urb/put | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
                                     hood "exit"

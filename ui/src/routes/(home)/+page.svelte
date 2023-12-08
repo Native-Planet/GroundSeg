@@ -3,12 +3,9 @@
   import NewShipCard from "./NewShipCard.svelte"
   import { wide } from '$lib/stores/display'
   import { structure } from '$lib/stores/websocket'
-  import { sortModes } from '$lib/stores/patp'
 
-  const sortMode = 'hierarchical'
-  
   $: urbits = ($structure?.urbits) || {}
-  $: ships = sortModes[sortMode](Object.keys(urbits))
+  $: ships = Object.keys(urbits)
 
 </script>
 
