@@ -24,6 +24,9 @@ func createHoon(patp, file, hoon string) error {
 	if err := ioutil.WriteFile(hoonFile, []byte(hoon), 0644); err != nil {
 		return err
 	}
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	delete(lusCodes, patp)
 	return nil
 }
 

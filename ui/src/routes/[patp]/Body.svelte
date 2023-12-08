@@ -30,6 +30,7 @@
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
   $: remote = (ship?.remote) || false
+  $: remoteReady = (ship?.remoteReady) || false
   $: running = (ship?.running) || false
   $: loomSize = (ship?.loomSize)
   $: lusCode = (ship?.lusCode) || ""
@@ -97,14 +98,15 @@
     />
 
   <!-- Remote Access -->
-  <RemoteAccess {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess {remoteReady} {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
 
   <!-- Dev Mode -->
   <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
 
   <!-- Loom -->
   <Loom {patp} {loomSize} />
-
+  
+  <!--
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallsegInstalling} />
   {/if}
@@ -112,7 +114,7 @@
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
-
+  -->
 
   <!-- Chop --
   <Chop

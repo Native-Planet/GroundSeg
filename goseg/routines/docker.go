@@ -143,7 +143,7 @@ func Check502Loop() {
 	status := make(map[string]bool)
 	time.Sleep(180 * time.Second)
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(120 * time.Second)
 		conf := config.Conf()
 		pierStatus, err := docker.GetShipStatus(conf.Piers)
 		if err != nil {
@@ -159,14 +159,18 @@ func Check502Loop() {
 			shipConf := config.UrbitConf(pier)
 			pierNetwork, err := docker.GetContainerNetwork(pier)
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v", pier))
+				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 				continue
 			}
 			turnedOn := false
 			if strings.Contains(pierStatus[pier], "Up") {
 				turnedOn = true
 			}
-			if turnedOn && pierNetwork == "wireguard" && conf.WgOn {
+			if turnedOn && pierNetwork != "default" && conf.WgOn {
+				if _, err := click.GetLusCode(pier); err != nil {
+					logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
+					continue
+				}
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))

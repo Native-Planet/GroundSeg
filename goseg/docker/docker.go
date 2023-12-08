@@ -223,8 +223,8 @@ func GetContainerNetwork(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for networkName := range containerJSON.NetworkSettings.Networks {
-		return networkName, nil
+	if containerJSON.HostConfig.NetworkMode != "" {
+		return string(containerJSON.HostConfig.NetworkMode), nil
 	}
 	return "", fmt.Errorf("container is not attached to any network: %v", name)
 }
@@ -769,7 +769,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	ctx := context.Background()
 
 	// Get container ID by name
-	containerID, err := getContainerIDByName(ctx, cli, containerName)
+	containerID, err := GetContainerIDByName(ctx, cli, containerName)
 	if err != nil {
 		return "", err
 	}
@@ -796,7 +796,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 }
 
 // Function to get container ID by name
-func getContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
+func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return "", err
@@ -819,7 +819,7 @@ func RestartContainer(name string) error {
 		return fmt.Errorf("Couldn't create client: %v", err)
 	}
 	defer cli.Close()
-	containerID, err := getContainerIDByName(ctx, cli, name)
+	containerID, err := GetContainerIDByName(ctx, cli, name)
 	if err != nil {
 		return fmt.Errorf("Couldn't get ID: %v", err)
 	}

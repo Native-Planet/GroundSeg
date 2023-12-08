@@ -41,3 +41,34 @@ export const checkPatp = patp => {
   }
   return true;
 }
+
+function getClass(ship) {
+  const hyphens = (ship.match(/-/g) || []).length;
+  switch (hyphens) {
+    case 0: return ship.length === 3 ? 1 : 2; // Galaxy or Star
+    case 1: return 3; // Planet
+    case 3: return 4; // Moon
+    default: return 5; // Unknown or malformed
+  }
+}
+
+function tieredAlphabeticalSort(ships) {
+  return ships.sort((a, b) => {
+    const classA = getClass(a);
+    const classB = getClass(b);
+    if (classA === classB) {
+      return a.localeCompare(b);
+    }
+    return classA - classB;
+  });
+}
+
+function hierarchicalSort(ships) {
+  // In this case, hierarchical sorting is the same as tiered alphabetical sorting
+  return tieredAlphabeticalSort(ships);
+}
+
+export const sortModes = {
+  alphabetical: tieredAlphabeticalSort,
+  hierarchical: hierarchicalSort,
+};
