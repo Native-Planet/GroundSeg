@@ -3,7 +3,7 @@ package defaults
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/structs"
+	"groundseg/structs"
 	"log/slog"
 	"os"
 )

@@ -2,7 +2,7 @@ package accesspoint
 
 import (
 	"fmt"
-	"goseg/logger"
+	"groundseg/logger"
 	"io/ioutil"
 )
 

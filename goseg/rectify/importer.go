@@ -2,9 +2,9 @@ package rectify
 
 import (
 	"fmt"
-	"goseg/broadcast"
-	"goseg/docker"
-	"goseg/logger"
+	"groundseg/broadcast"
+	"groundseg/docker"
+	"groundseg/logger"
 )
 
 func ImportShipTransitionHandler() {

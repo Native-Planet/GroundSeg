@@ -3,9 +3,9 @@ package routines
 import (
 	"context"
 	"fmt"
-	"goseg/config"
-	"goseg/logger"
-	"goseg/system"
+	"groundseg/config"
+	"groundseg/logger"
+	"groundseg/system"
 	"net"
 	"strings"
 	"time"

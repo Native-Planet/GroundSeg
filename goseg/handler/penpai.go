@@ -3,10 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/structs"
 	"runtime"
 )
 
