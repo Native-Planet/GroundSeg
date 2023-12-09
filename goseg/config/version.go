@@ -3,9 +3,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/defaults"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/defaults"
+	"groundseg/logger"
+	"groundseg/structs"
 	"io/ioutil"
 	"net/http"
 	"os"

@@ -2,13 +2,13 @@ package handler
 
 import (
 	"fmt"
-	"goseg/click"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/shipcreator"
-	"goseg/startram"
-	"goseg/structs"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/shipcreator"
+	"groundseg/startram"
+	"groundseg/structs"
 	"strings"
 	"time"
 )

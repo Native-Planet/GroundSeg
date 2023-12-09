@@ -2,10 +2,10 @@ package click
 
 import (
 	"fmt"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/structs"
 	"io/ioutil"
 	"os"
 	"path/filepath"

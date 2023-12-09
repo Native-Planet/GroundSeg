@@ -2,9 +2,9 @@ package shipcreator
 
 import (
 	"fmt"
-	"goseg/config"
-	"goseg/defaults"
-	"goseg/logger"
+	"groundseg/config"
+	"groundseg/defaults"
+	"groundseg/logger"
 )
 
 func CreateUrbitConfig(patp string) error {

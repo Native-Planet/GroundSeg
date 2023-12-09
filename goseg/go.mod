@@ -1,4 +1,4 @@
-module goseg
+module groundseg
 
 go 1.21
 

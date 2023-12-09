@@ -6,12 +6,12 @@ package rectify
 
 import (
 	"fmt"
-	"goseg/broadcast"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/startram"
-	"goseg/structs"
+	"groundseg/broadcast"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/startram"
+	"groundseg/structs"
 	"strings"
 	"time"
 )
