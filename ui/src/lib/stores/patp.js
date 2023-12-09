@@ -63,9 +63,25 @@ function tieredAlphabeticalSort(ships) {
   });
 }
 
+function tierSplit(ship) {
+  const galaxy = ship.slice(-3);
+  const starPart = ship.slice(-6, -3);
+  const planetPart = ship.slice(-13, -7);
+  const moonPart = ship.slice(0, -14);
+  return [ moonPart, planetPart, starPart, galaxy ];
+}
+
+function tierJoin(parts) {
+  const [ moonPart, planetPart, starPart, galaxy ] = parts;
+  return `${moonPart}-${planetPart}-${starPart}${galaxy}`.replace(/^-*/, '');
+}
+
 function hierarchicalSort(ships) {
-  // In this case, hierarchical sorting is the same as tiered alphabetical sorting
-  return tieredAlphabeticalSort(ships);
+  const reversed = ships.map(ship => {
+    return tierSplit(ship).reverse().join('.');
+  });
+  const sorted = reversed.sort()
+  return sorted.map(string => tierJoin(string.split('.').reverse()));
 }
 
 export const sortModes = {
