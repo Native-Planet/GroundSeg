@@ -1,6 +1,6 @@
 @font-face {
   font-family: BPdotsUnicase;
-  src: url('/BPdotsUnicaseBold.otf');
+  src: url('/font/BPdotsUnicaseBold.otf');
 }
 @font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.otf"); }
 @font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.otf"); }
@@ -14,7 +14,7 @@
 
 @font-face {
   font-family: Source;
-  src: url('/SourceCodePro-Regular.otf');
+  src: url('/font/SourceCodePro-Regular.otf');
 }
 body {
   margin: 0;

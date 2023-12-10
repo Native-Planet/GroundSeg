@@ -106,7 +106,6 @@
   <!-- Loom -->
   <Loom {patp} {loomSize} />
   
-  <!--
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallsegInstalling} />
   {/if}
@@ -114,7 +113,6 @@
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
-  -->
 
   <!-- Chop --
   <Chop
