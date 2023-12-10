@@ -192,7 +192,11 @@ func RectifyUrbit() {
 					subd := strings.Split(remote.URL, ".")[0]
 					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
 						// update alias
-						if remote.Alias != "null" && remote.Alias != local.CustomUrbitWeb {
+						if remote.Alias == "null" && local.CustomUrbitWeb != "" {
+							logger.Logger.Debug(fmt.Sprintf("Retrieve: Resetting %v alias", patp))
+							local.CustomUrbitWeb = ""
+							modified = true
+						} else if remote.Alias != local.CustomUrbitWeb {
 							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v alias to %v", patp, remote.Alias))
 							local.CustomUrbitWeb = remote.Alias
 							modified = true
