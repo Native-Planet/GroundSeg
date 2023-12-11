@@ -28,10 +28,10 @@
 
   const handleKey = file => {
     const [_matched, name, extension] = file.name.match(/(.*)\.([^.]*)$/) || [];
-    if (checkPatp(name)) {
-      patp = name;
-    }
     if (extension == 'key') {
+      if (checkPatp(name)) {
+        patp = name;
+      }
       reader.readAsText(file)
       reader.onload = event => key = event.target.result;
     } else {
