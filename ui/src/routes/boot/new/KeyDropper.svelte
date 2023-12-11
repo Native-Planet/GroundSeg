@@ -1,11 +1,8 @@
 <script>
-  import Dropzone from "dropzone"
-  import { afterUpdate, createEventDispatcher, onMount } from "svelte"
+  import { afterUpdate, createEventDispatcher, onMount } from 'svelte';
+  import { checkPatp } from '../../../lib/stores/patp';
 
-  import Fa from 'svelte-fa'
-  import { faFileArrowUp } from '@fortawesome/free-solid-svg-icons'
-
-  let key = '', viewKey = false, error = false, files
+  let key = '', patp = '', viewKey = false, error = false, files
 
   $: if (files) {
     handleKey(files[0])
@@ -30,19 +27,23 @@
   }
 
   const handleKey = file => {
-    if (file.name.split('.').splice(-1)[0] == 'key') {
+    const [_matched, name, extension] = file.name.match(/(.*)\.([^.]*)$/) || [];
+    if (checkPatp(name)) {
+      patp = name;
+    }
+    if (extension == 'key') {
       reader.readAsText(file)
-      reader.onload = event =>  key = event.target.result
+      reader.onload = event => key = event.target.result;
     } else {
-      error = true
-      setTimeout(()=> error = false, 1000)
+      error = true;
+      setTimeout(()=> error = false, 1000);
     }
   }
 
   afterUpdate(()=> {
-    dispatch("change", key)
-  })
-
+    dispatch("changeKey", key);
+    dispatch("changePatp", patp);
+  });
 </script>
 
 <div class="pass-wrapper">
