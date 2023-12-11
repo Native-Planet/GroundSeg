@@ -104,6 +104,9 @@ func DockerSubscriptionHandler() {
 				containerState.ActualStatus = "died"
 				// we don't want infinite restart loop
 				containerState.DesiredStatus = "died"
+				if containerState.Type == "vere" {
+					click.ClearLusCode(contName)
+				}
 				config.UpdateContainerState(contName, containerState)
 				makeBroadcast(contName, dockerEvent.Action)
 			}
