@@ -2,10 +2,10 @@ package docker
 
 import (
 	"fmt"
-	"goseg/config"
-	"goseg/defaults"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/config"
+	"groundseg/defaults"
+	"groundseg/logger"
+	"groundseg/structs"
 	"io/ioutil"
 	"path/filepath"
 

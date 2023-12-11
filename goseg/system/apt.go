@@ -2,8 +2,8 @@ package system
 
 import (
 	"fmt"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/logger"
+	"groundseg/structs"
 	"os/exec"
 	"regexp"
 )

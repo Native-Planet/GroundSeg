@@ -1,6 +1,6 @@
 package main
 
-// NativePlanet GroundSeg: Go Edition (goseg)
+// NativePlanet GroundSeg: Go Edition (groundseg)
 // 🄯 2023 ~nallux-dozryl & ~sitful-hatred
 // This is a Golang rewrite of GroundSeg that serves the v2 json
 // object via websocket.
@@ -17,18 +17,18 @@ package main
 import (
 	"embed"
 	"fmt"
-	"goseg/broadcast"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/exporter"
-	"goseg/importer"
-	"goseg/leak"
-	"goseg/logger"
-	"goseg/rectify"
-	"goseg/routines"
-	"goseg/startram"
-	"goseg/system"
-	"goseg/ws"
+	"groundseg/broadcast"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/exporter"
+	"groundseg/importer"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/rectify"
+	"groundseg/routines"
+	"groundseg/startram"
+	"groundseg/system"
+	"groundseg/ws"
 	"io/fs"
 	"mime"
 	"net/http"

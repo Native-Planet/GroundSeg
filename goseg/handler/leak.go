@@ -3,9 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/leakchannel"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/leakchannel"
+	"groundseg/logger"
+	"groundseg/structs"
 )
 
 func HandleLeakAction() {

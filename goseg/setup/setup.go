@@ -3,11 +3,11 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/auth"
-	"goseg/config"
-	"goseg/logger"
-	"goseg/startram"
-	"goseg/structs"
+	"groundseg/auth"
+	"groundseg/config"
+	"groundseg/logger"
+	"groundseg/startram"
+	"groundseg/structs"
 )
 
 var (

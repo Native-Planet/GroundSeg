@@ -5,7 +5,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/structs"
+	"groundseg/structs"
 	"io/ioutil"
 	"os"
 	"path/filepath"

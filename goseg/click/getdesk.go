@@ -2,8 +2,8 @@ package click
 
 import (
 	"fmt"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/logger"
+	"groundseg/structs"
 	"time"
 )
 

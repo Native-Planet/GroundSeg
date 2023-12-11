@@ -2,9 +2,9 @@ package leak
 
 import (
 	"fmt"
-	"goseg/config"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/config"
+	"groundseg/logger"
+	"groundseg/structs"
 	"os"
 	"path/filepath"
 	"sync"

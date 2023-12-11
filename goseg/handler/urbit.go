@@ -3,14 +3,14 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/broadcast"
-	"goseg/click"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/exporter"
-	"goseg/logger"
-	"goseg/startram"
-	"goseg/structs"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/exporter"
+	"groundseg/logger"
+	"groundseg/startram"
+	"groundseg/structs"
 	"net"
 	"strconv"
 	"strings"
@@ -594,6 +594,9 @@ func UrbitHandler(msg []byte) error {
 			}
 			if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
+			}
+			if err := docker.DeleteContainer("minio_" + patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't delete minio docker container for %v: %v", patp, err))
 			}
 		}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "deleting"}

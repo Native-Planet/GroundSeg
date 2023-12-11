@@ -3,10 +3,10 @@ package leak
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/auth"
-	"goseg/leakchannel"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/auth"
+	"groundseg/leakchannel"
+	"groundseg/logger"
+	"groundseg/structs"
 	"reflect"
 
 	"math/big"

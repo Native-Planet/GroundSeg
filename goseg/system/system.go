@@ -5,8 +5,8 @@ package system
 import (
 	"bufio"
 	"fmt"
-	"goseg/defaults"
-	"goseg/logger"
+	"groundseg/defaults"
+	"groundseg/logger"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -72,7 +72,7 @@ func GetDisk() (map[string][2]uint64, error) {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) >= 2 {
 			device := fields[0]
-			mountPoint := fields[1]
+			mountPoint, _ := octalToAscii(fields[1])
 			if !strings.HasPrefix(device, "/dev/") || strings.HasPrefix(device, "/dev/loop") {
 				continue
 			}

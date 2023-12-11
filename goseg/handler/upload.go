@@ -3,9 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/importer"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/importer"
+	"groundseg/logger"
+	"groundseg/structs"
 )
 
 func UploadHandler(msg []byte) error {

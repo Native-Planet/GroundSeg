@@ -2,12 +2,12 @@ package routines
 
 import (
 	"fmt"
-	"goseg/broadcast"
-	"goseg/click"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/structs"
 	"strconv"
 	"strings"
 	"time"

@@ -2,10 +2,10 @@ package broadcast
 
 import (
 	"fmt"
-	"goseg/auth"
-	"goseg/leak"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/auth"
+	"groundseg/leak"
+	"groundseg/logger"
+	"groundseg/structs"
 	"time"
 )
 

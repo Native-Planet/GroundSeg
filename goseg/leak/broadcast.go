@@ -3,8 +3,8 @@ package leak
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/logger"
+	"groundseg/structs"
 	"net"
 	"reflect"
 

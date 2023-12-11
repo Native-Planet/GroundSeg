@@ -21,9 +21,16 @@
   export let startramRegistered = false
   export let remote = false
 
-  $: urlType = new URL(url)
-  $: urlStripped = `${urlType.hostname}`
-  $: urlFixed = remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port
+  let urlType;
+  $: {
+    try {
+      urlType = new URL(url);
+    } catch (error) {
+      urlType = null;
+    }
+  }
+  $: urlStripped = urlType == null ? url : `${urlType?.hostname}`
+  $: urlFixed = urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port 
   $: displayedUrl = (showUrbAlias ? "https://"+urbitAlias : urlFixed)
 
   const dispatch = createEventDispatcher()

@@ -3,7 +3,7 @@ package accesspoint
 import (
 	"bytes"
 	"fmt"
-	"goseg/logger"
+	"groundseg/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
