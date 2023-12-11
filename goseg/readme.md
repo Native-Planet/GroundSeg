@@ -3,7 +3,7 @@
 ```mermaid
 stateDiagram-v2
     direction TB
-    accTitle: Goseg package diagram
+    accTitle: groundseg package diagram
     accDescr: Interactions between packages in Groundseg Go rewrite
     classDef bcase fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
     Broadcast-->WS_mux: broadcast latest update

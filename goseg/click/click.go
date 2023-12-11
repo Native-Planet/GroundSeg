@@ -2,10 +2,10 @@ package click
 
 import (
 	"fmt"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/structs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -46,6 +46,9 @@ func BarExit(patp string) error {
 	if !success {
 		return fmt.Errorf("Click |exit for %v poke failed", patp)
 	}
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	delete(lusCodes, patp)
 	return nil
 }
 

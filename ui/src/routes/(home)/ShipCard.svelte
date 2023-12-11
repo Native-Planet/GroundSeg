@@ -13,6 +13,8 @@
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: running = (ship?.running) || false
   $: remote = (ship?.remote) || false
+  $: remoteReady = (ship?.remoteReady) || false
+
   $: url = (ship?.url) || "#"
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
@@ -33,7 +35,7 @@
   </div>
   <div class="bg"></div>
   <div class="toggle">
-    <StartramToggle on={remote} on:click={()=>toggleNetwork(patp)} />
+    <StartramToggle {remoteReady} on={remote} on:click={()=>toggleNetwork(patp)} />
     <!-- Debug
     <StartramToggle on={on} />
     -->

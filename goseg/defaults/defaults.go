@@ -4,7 +4,7 @@ package defaults
 // these get written to disk in absence of version server
 
 import (
-	"goseg/structs"
+	"groundseg/structs"
 	"os"
 	"path/filepath"
 	"strings"

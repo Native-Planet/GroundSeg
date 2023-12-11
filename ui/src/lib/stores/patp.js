@@ -42,39 +42,49 @@ export const checkPatp = patp => {
   return true;
 }
 
-/** pad patp to moon length with 0 and - */
-function padPatp(patp) {
-  const padding = '000000-000000-000000-000000'
-  const padlength = padding.length - patp.length
-  return `${padding.slice(0, padlength)}${patp}`
+function getClass(ship) {
+  const hyphens = (ship.match(/-/g) || []).length;
+  switch (hyphens) {
+    case 0: return ship.length === 3 ? 1 : 2; // Galaxy or Star
+    case 1: return 3; // Planet
+    case 3: return 4; // Moon
+    default: return 5; // Unknown or malformed
+  }
 }
 
-/** remove patp padding */
-function unpadPatp(patp) {
-  return patp.replace(/^[0-]*/, '')
-}
-
-/** reverses patp, in chunks of 3 IE Aaa-BbbCcc-DddEee -> EeeDdd-CccBbb-Aaa */
-function reversePatp(patp) {
-  const chunks = patp.split('-')
-  const reversed = chunks.map(chunk => chunk.slice(3) + chunk.slice(0, 3))
-  return reversed.reverse().join('-')
-}
-
-/** Sort alphabetical but put higher tiers first (IE planets above moons) */
 function tieredAlphabeticalSort(ships) {
-  return ships.map(padPatp).sort().map(unpadPatp)
+  return ships.sort((a, b) => {
+    const classA = getClass(a);
+    const classB = getClass(b);
+    if (classA === classB) {
+      return a.localeCompare(b);
+    }
+    return classA - classB;
+  });
 }
 
-/** Sort hierarchically so moons are immediately below their planets etc */
+function tierSplit(ship) {
+  const galaxy = ship.slice(-3);
+  const starPart = ship.slice(-6, -3);
+  const planetPart = ship.slice(-13, -7);
+  const moonPart = ship.slice(0, -14);
+  return [ moonPart, planetPart, starPart, galaxy ];
+}
+
+function tierJoin(parts) {
+  const [ moonPart, planetPart, starPart, galaxy ] = parts;
+  return `${moonPart}-${planetPart}-${starPart}${galaxy}`.replace(/^-*/, '');
+}
+
 function hierarchicalSort(ships) {
-  return ships
-    .map(ship => reversePatp(padPatp(ship)))
-    .sort()
-    .map(ship => reversePatp(unpadPatp(ship)))
+  const reversed = ships.map(ship => {
+    return tierSplit(ship).reverse().join('.');
+  });
+  const sorted = reversed.sort()
+  return sorted.map(string => tierJoin(string.split('.').reverse()));
 }
 
 export const sortModes = {
   alphabetical: tieredAlphabeticalSort,
   hierarchical: hierarchicalSort,
-}
+};

@@ -3,8 +3,8 @@ package docker
 import (
 	"context"
 	"fmt"
-	"goseg/config"
-	"goseg/logger"
+	"groundseg/config"
+	"groundseg/logger"
 	"io/ioutil"
 	"os"
 	"path/filepath"

@@ -125,6 +125,7 @@ type Urbit struct {
 		DevMode            bool   `json:"devMode"`
 		DetectBootStatus   bool   `json:"detectBootStatus"`
 		Remote             bool   `json:"remote"`
+		RemoteReady        bool   `json:"remoteReady"` // remote reg is ready
 		Vere               any    `json:"vere"`
 		MinIOUrl           string `json:"minioUrl"`
 		MinIOPwd           string `json:"minioPwd"`

@@ -5,8 +5,8 @@ package system
 import (
 	"bufio"
 	"fmt"
-	"goseg/defaults"
-	"goseg/logger"
+	"groundseg/defaults"
+	"groundseg/logger"
 	"io/ioutil"
 	"net/url"
 	"os"

@@ -2,8 +2,8 @@ package config
 
 import (
 	"encoding/json"
-	"goseg/defaults"
-	"goseg/structs"
+	"groundseg/defaults"
+	"groundseg/structs"
 	"os"
 	"path/filepath"
 )

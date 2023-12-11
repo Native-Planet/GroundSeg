@@ -2,7 +2,7 @@ package leak
 
 import (
 	"fmt"
-	"goseg/logger"
+	"groundseg/logger"
 	"log"
 	"net"
 	"time"

@@ -3,12 +3,12 @@ package routines
 import (
 	"context"
 	"fmt"
-	"goseg/broadcast"
-	"goseg/click"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/structs"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/structs"
 	"net/http"
 	"strings"
 	"time"
@@ -143,7 +143,7 @@ func Check502Loop() {
 	status := make(map[string]bool)
 	time.Sleep(180 * time.Second)
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(120 * time.Second)
 		conf := config.Conf()
 		pierStatus, err := docker.GetShipStatus(conf.Piers)
 		if err != nil {
@@ -167,6 +167,10 @@ func Check502Loop() {
 				turnedOn = true
 			}
 			if turnedOn && pierNetwork != "default" && conf.WgOn {
+				if _, err := click.GetLusCode(pier); err != nil {
+					logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
+					continue
+				}
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
 					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))

@@ -3,14 +3,14 @@ package broadcast
 import (
 	"encoding/json"
 	"fmt"
-	"goseg/auth"
-	"goseg/click"
-	"goseg/config"
-	"goseg/docker"
-	"goseg/logger"
-	"goseg/startram"
-	"goseg/structs"
-	"goseg/system"
+	"groundseg/auth"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/logger"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
 	"runtime"
 	"strconv"
 	"strings"
@@ -181,6 +181,15 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 			setRemote = true
 		}
+		remoteReady := false
+		for _, subdomain := range config.StartramConfig.Subdomains {
+			if subdomain.URL == dockerConfig.WgURL {
+				if subdomain.Status == "ok" {
+					remoteReady = true
+				}
+				break
+			}
+		}
 		urbitAlias := dockerConfig.CustomUrbitWeb
 		minIOAlias := dockerConfig.CustomS3Web
 		showUrbAlias := false
@@ -250,6 +259,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.DetectBootStatus = bootStatus
 		urbit.Info.Remote = setRemote
+		urbit.Info.RemoteReady = remoteReady
 		urbit.Info.Vere = dockerConfig.UrbitVersion
 		urbit.Info.MinIOUrl = minIOUrl
 		urbit.Info.MinIOPwd = minIOPwd

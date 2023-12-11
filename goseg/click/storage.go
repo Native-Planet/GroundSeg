@@ -2,7 +2,7 @@ package click
 
 import (
 	"fmt"
-	"goseg/structs"
+	"groundseg/structs"
 )
 
 /*
