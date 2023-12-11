@@ -345,6 +345,20 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 				return
 			}
 			logger.Logger.Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
+			statuses, err := docker.GetShipStatus([]string{patp})
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
+			}
+			status, exists := statuses[patp]
+			if !exists {
+				logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
+			}
+			isRunning := strings.Contains(status, "Up")
+			if isRunning {
+				if err := click.BarExit(patp); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
+				}
+			}
 			if err := docker.DeleteContainer(patp); err != nil {
 				errmsg := fmt.Sprintf("Failed to delete local container for imported ship: %v", err)
 				logger.Logger.Error(errmsg)
