@@ -1,6 +1,6 @@
 @font-face {
   font-family: BPdotsUnicase;
-  src: url('/font/Inter-Black.otf');
+  src: url("/font/Inter-Black.otf");
   /*src: url('/font/BPdotsUnicaseBold.otf');*/
   font-display: swap;
 }
