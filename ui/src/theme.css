@@ -1,6 +1,7 @@
 @font-face {
   font-family: BPdotsUnicase;
   src: url('/font/BPdotsUnicaseBold.otf');
+  font-display: swap;
 }
 @font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.otf"); }
 @font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.otf"); }
