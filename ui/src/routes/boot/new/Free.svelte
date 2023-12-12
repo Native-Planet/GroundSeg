@@ -26,7 +26,10 @@
 </div>
 <div class="input-wrapper">
   <div class="label">Bootfile</div>
-  <KeyDropper on:change={e=> key = e.detail} />
+  <KeyDropper
+    on:changeKey={e => key = e.detail}
+    on:changePatp={e => name = e.detail}
+  />
   <div class="check-wrapper" on:click={()=>remote = !remote}>
     {#if registered && running}
       <div class="checkbox">
