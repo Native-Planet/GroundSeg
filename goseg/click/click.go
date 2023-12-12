@@ -50,7 +50,7 @@ func BarExit(patp string) error {
 	return nil
 }
 
-func ClearLusCode(patp) {
+func ClearLusCode(patp string) {
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	delete(lusCodes, patp)
