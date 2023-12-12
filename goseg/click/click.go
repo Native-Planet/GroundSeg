@@ -24,10 +24,14 @@ func createHoon(patp, file, hoon string) error {
 	if err := ioutil.WriteFile(hoonFile, []byte(hoon), 0644); err != nil {
 		return err
 	}
+	ClearLusCode(patp)
+	return nil
+}
+
+func ClearLusCode(patp string) {
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	delete(lusCodes, patp)
-	return nil
 }
 
 func deleteHoon(patp, file string) {

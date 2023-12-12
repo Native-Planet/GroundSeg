@@ -1,5 +1,4 @@
 <script>
-  import KeyDropper from './KeyDropper.svelte';
   import { bootShip } from '$lib/stores/websocket';
   import { structure } from '$lib/stores/data'
   import { sigRemove, checkPatp } from '$lib/stores/patp';
