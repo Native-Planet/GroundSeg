@@ -28,7 +28,7 @@
 
   const handleKey = file => {
     const [_matched, name, extension] =
-      file.name.match(/(.*)(?:-[0-9]*)?\.([^.]*)$/) || [];
+      file.name.match(/(\D*)(?:-\d*)?\.([^.]*)$/) || [];
     if (extension == 'key') {
       if (checkPatp(name)) {
         patp = name;
