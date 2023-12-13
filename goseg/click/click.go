@@ -23,6 +23,7 @@ var (
 )
 
 func BarExit(patp string) error {
+	defer ClearLusCode(patp)
 	// <file>.hoon
 	file := "exit"
 	// actual hoon
@@ -46,7 +47,6 @@ func BarExit(patp string) error {
 	if !success {
 		return fmt.Errorf("Click |exit for %v poke failed", patp)
 	}
-	ClearLusCode(patp)
 	return nil
 }
 
