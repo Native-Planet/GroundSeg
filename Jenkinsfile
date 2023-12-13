@@ -40,6 +40,7 @@ pipeline {
         ).trim()
         /* version server auth header */
         versionauth = credentials('VersionAuth')
+        ghToken = credentials('Github token')
         /* release tag to be built*/
         tag = "${params.RELEASE_TAG}"
         /* staging or production version server */
@@ -242,6 +243,14 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
+                                REPO_REMOTE=$(git config --get remote.origin.url)
+                                REPO_NAME=$(basename -s .git $REPO_REMOTE)
+                                REPO_OWNER=$(git config --get user.name)
+                                MESSAGE="Release ${tag}"
+                                VERSION=$(echo "${tag}"|sed "s/v//g")
+                                API_JSON=$(printf '{"tag_name": "${tag}","target_commitish": "%s","name": "v%s","body": "%s","draft": false,"prerelease": false}' "$VERSION" "$BRANCH" "$VERSION" "$MESSAGE" )
+                                API_RESPONSE_STATUS=$(curl --data "$API_JSON" -s -i "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases?access_token=${ghToken}")
+                                echo "Release: ${API_RESPONSE_STATUS}"
                             '''
                         }
                         if( "${channel}" == "edge" ) {
