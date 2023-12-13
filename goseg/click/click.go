@@ -295,7 +295,7 @@ func storePenpaiDeskError(patp string) {
 }
 
 func storeLusCode(patp, code string) {
-	logger.Logger.Info(fmt.Sprintf("Storing +code for %s", patp))
+	logger.Logger.Debug(fmt.Sprintf("Storing +code for %s", patp))
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	lusCodes[patp] = structs.ClickLusCode{
@@ -305,7 +305,7 @@ func storeLusCode(patp, code string) {
 }
 
 func storePenpaiDesk(patp, deskStatus string) {
-	logger.Logger.Info(fmt.Sprintf("Storing penpai desk status for %s", patp))
+	logger.Logger.Debug(fmt.Sprintf("Storing penpai desk status for %s", patp))
 	penpaiMutex.Lock()
 	defer penpaiMutex.Unlock()
 	deskInfo, exists := shipDesks[patp]
