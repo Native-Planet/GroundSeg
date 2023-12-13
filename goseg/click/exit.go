@@ -4,6 +4,7 @@ import "fmt"
 
 // |exit
 func BarExit(patp string) error {
+	defer ClearLusCode(patp)
 	// <file>.hoon
 	file := "exit"
 	// actual hoon
