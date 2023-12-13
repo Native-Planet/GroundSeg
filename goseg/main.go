@@ -165,6 +165,10 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 func main() {
+	// make sure resolved was reenabled
+	if err := system.EnableResolved(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
+	}
 	// push error messages to fe
 	go rectify.ErrorMessageHandler()
 	// global SysConfig var is managed through config package
