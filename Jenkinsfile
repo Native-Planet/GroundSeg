@@ -341,15 +341,15 @@ pipeline {
                 }
             }
         }
-        post {
-            always {
-                cleanWs(cleanWhenNotBuilt: true,
-                    deleteDirs: true,
-                    disableDeferredWipeout: false,
-                    notFailBuild: true,
-                    patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
-                               [pattern: '.propsfile', type: 'EXCLUDE']])
-            }
+    }
+    post {
+        always {
+            cleanWs(cleanWhenNotBuilt: true,
+                deleteDirs: true,
+                disableDeferredWipeout: false,
+                notFailBuild: true,
+                patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
+                            [pattern: '.propsfile', type: 'EXCLUDE']])
         }
     }
 }
