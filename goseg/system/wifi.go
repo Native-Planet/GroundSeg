@@ -162,6 +162,10 @@ func UnaliveC2C() error {
 	// stop AP
 	accesspoint.Stop()
 	// start systemd-resolved
+	return EnableResolved()
+}
+
+func EnableResolved() error {
 	cmd := exec.Command("systemctl", "enable", "systemd-resolved")
 	_, err := cmd.CombinedOutput()
 	if err != nil {
