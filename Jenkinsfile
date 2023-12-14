@@ -44,11 +44,11 @@ pipeline {
                     env.channel = sh(script: '''
                         #!/bin/bash -x
                         environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
-                        if [ "${params.PROMOTE}" = "promote" ]; then
+                        if [[ "${params.PROMOTE}" = "promote" ]]; then
                             echo "latest"
-                        elif [ "${params.PROMOTE}" = "build" ]; then
+                        elif [[ "${params.PROMOTE}" = "build" ]]; then
                             echo "edge"
-                        elif [ "$environ" != "master" ]; then
+                        elif [[ "$environ" != "master" ]]; then
                             echo "nobuild"
                         else
                             echo "nobuild"
