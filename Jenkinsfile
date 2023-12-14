@@ -41,18 +41,31 @@ pipeline {
         stage('determine channel') {
             steps {
                 script {
-                    env.channel = sh(script: '''#!/bin/bash -x
-                        environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
-                        if [ "${PROMOTE}" = "promote" ]; then
-                            echo "latest"
-                        elif [ "${PROMOTE}" = "build" ]; then
-                            echo "edge"
-                        elif [ "$environ" != "master" ]; then
-                            echo "nobuild"
-                        else
-                            echo "nobuild"
-                        fi
-                    ''', returnStdout: true).trim()
+                    env.channel = sh(
+                        script: '''#!/bin/bash -x
+                            environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
+                            if [ "${PROMOTE}" = "promote" ]; then
+                                echo "latest"
+                            elif [ "${PROMOTE}" = "build" ]; then
+                                echo "edge"
+                            elif [ "$environ" != "master" ]; then
+                                echo "nobuild"
+                            else
+                                echo "nobuild"
+                            fi
+                        ''', 
+                        returnStdout: true
+                    ).trim()
+                    env.binTag = sh(
+                        script: '''#!/bin/bash -x
+                            if [ "${channel}" = "latest" ]; then
+                                echo ${tag%%-*}
+                            else
+                                echo ${tag}
+                            fi
+                        ''',
+                        returnStdout: true
+                    ).trim()
                 }
             }
         }
@@ -166,18 +179,6 @@ pipeline {
             }
         }
         stage('move binaries') {
-            environment {
-                binTag = sh(
-                    script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
-                            echo ${tag%%-*}
-                        else
-                            echo ${tag}
-                        fi
-                    ''',
-                    returnStdout: true
-                ).trim()
-            }
             steps {
                 script {
                     /* copy to r2 */
@@ -206,16 +207,6 @@ pipeline {
         }
         stage('version update') {
             environment {
-                binTag = sh(
-                    script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
-                            echo ${tag%%-*}
-                        else
-                            echo ${tag}
-                        fi
-                    ''',
-                    returnStdout: true
-                ).trim()
                 /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
@@ -264,8 +255,8 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://files.native.computer/bin/groundseg_arm64_${binTag}_${env.channel}"
-                amdbin = "https://files.native.computer/bin/groundseg_amd64_${binTag}_${env.channel}"
+                armbin = "https://files.native.computer/bin/groundseg_arm64_${env.binTag}_${env.channel}"
+                amdbin = "https://files.native.computer/bin/groundseg_amd64_${env.binTag}_${env.channel}"
             }
             steps {
                 script {
@@ -388,18 +379,6 @@ pipeline {
             }
         }
         stage('github release') {
-            environment {
-                binTag = sh(
-                    script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
-                            echo ${tag%%-*}
-                        else
-                            echo ${tag}
-                        fi
-                    ''',
-                    returnStdout: true
-                ).trim()
-            }
             steps {
                 script {
                     if( "${env.channel}" == "latest" ) {
