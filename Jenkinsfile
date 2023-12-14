@@ -327,13 +327,10 @@ pipeline {
                     if( "${channel}" == "latest" ) {
 			            sh (
                             script: '''#!/bin/bash -x
-                                REPO_REMOTE=$(git config --get remote.origin.url)
-                                REPO_NAME=$(basename -s .git $REPO_REMOTE)
-                                REPO_OWNER=$(git config --get user.name)
                                 MESSAGE="Release ${tag}"
                                 VERSION=$(echo "${tag}"|sed "s/v//g")
                                 API_JSON=$(printf '{"tag_name": "${tag}","target_commitish": "%s","name": "v%s","body": "%s","draft": false,"prerelease": false}' "$VERSION" "$BRANCH" "$VERSION" "$MESSAGE" )
-                                API_RESPONSE_STATUS=$(curl -H "Authorization: token ${ghToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases")
+                                API_RESPONSE_STATUS=$(curl -H "Authorization: token ${ghToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
                                 echo "Release: ${API_RESPONSE_STATUS}"
                             '''
                         )
