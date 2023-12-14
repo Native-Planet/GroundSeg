@@ -81,6 +81,16 @@ func handleStartramRestart() {
 			if isRunning {
 				if err := click.BarExit(patp); err != nil {
 					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+				} else {
+					for {
+						exited, err := shipExited(patp)
+						if err == nil {
+							if !exited {
+								continue
+							}
+						}
+						break
+					}
 				}
 			}
 			// delete container
@@ -319,4 +329,21 @@ func handleStartramCancel(key string, reset bool) {
 // temp
 func handleNotImplement(action string) {
 	logger.Logger.Error(fmt.Sprintf("temp error: %v not implemented", action))
+}
+
+func shipExited(patp string) (bool, error) {
+	for {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return false, fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return false, fmt.Errorf("%s status doesn't exist", patp)
+		}
+		if strings.Contains(status, "Up") {
+			continue
+		}
+		return true, nil
+	}
 }

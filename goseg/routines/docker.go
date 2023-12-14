@@ -208,6 +208,16 @@ func Check502Loop() {
 							if isRunning {
 								if err := click.BarExit(patp); err != nil {
 									logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+								} else {
+									for {
+										exited, err := shipExited(patp)
+										if err == nil {
+											if !exited {
+												continue
+											}
+										}
+										break
+									}
 								}
 							}
 							// delete container
@@ -218,7 +228,6 @@ func Check502Loop() {
 							if err := docker.DeleteContainer(minio); err != nil {
 								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 							}
-
 						}
 						// create startram containers
 						if err := docker.LoadUrbits(); err != nil {
@@ -242,5 +251,22 @@ func Check502Loop() {
 				}
 			}
 		}
+	}
+}
+
+func shipExited(patp string) (bool, error) {
+	for {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return false, fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return false, fmt.Errorf("%s status doesn't exist", patp)
+		}
+		if strings.Contains(status, "Up") {
+			continue
+		}
+		return true, nil
 	}
 }
