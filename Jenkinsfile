@@ -111,10 +111,12 @@ pipeline {
                                     exit 1
                                 fi
                                 git checkout ${tag}
+                                git checkout -b ${binTag}
+                                git config --global user.email "mgmt@nativeplanet.io"
+                                git config --global user.name "Native Planet CICD"
                                 git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
-                                newTag=${tag%%-*}
-                                sed -i "4s/.*/export const version = writable(\\"${newTag}\\")" ./ui/src/lib/stores/display.js
-                                sed -i "11s/.*/TAG=${newTag}/" ./release/groundseg_install.sh
+                                sed -i "4s/.*/export const version = writable(\\"${binTag}\\")" ./ui/src/lib/stores/display.js
+                                sed -i "11s/.*/TAG=${binTag}/" ./release/groundseg_install.sh
                                 version_defaults="./goseg/defaults/version.go"
                                 json_blob=$(curl -s https://version.groundseg.app)
                                 formatted_json_blob=$(echo "$json_blob" | jq '.')
@@ -136,12 +138,12 @@ pipeline {
                                 cd ../goseg
                                 go fmt ./...
                                 cd ..
-                                git commit -am "Promoting ${newTag} for release"
-                                git tag ${newTag}
-                                git push
+                                git commit -am "Promoting ${binTag} for release"
+                                git tag ${binTag}
+                                git push --set-upstream origin ${binTag}
                                 git push --tags
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}
                             '''
                         }
                     }
