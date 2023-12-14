@@ -59,9 +59,9 @@ pipeline {
                     env.binTag = sh(
                         script: '''#!/bin/bash -x
                             if [ "${channel}" = "latest" ]; then
-                                echo ${tag%%-*}
+                                echo "${tag%%-*}"
                             else
-                                echo ${tag}
+                                echo "${tag}"
                             fi
                         ''',
                         returnStdout: true
