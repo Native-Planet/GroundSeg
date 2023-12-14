@@ -40,6 +40,7 @@ pipeline {
         ).trim()
         /* version server auth header */
         versionauth = credentials('VersionAuth')
+        npGhToken = credentials('NPJenkinsGH')
         /* release tag to be built*/
         tag = "${params.RELEASE_TAG}"
         /* staging or production version server */
@@ -308,27 +309,44 @@ pipeline {
                 script {
                     if(( "${channel}" == "latest" ) && ( "${params.MERGE}" == "yes" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
-			    sh (
-                                script: '''
+			                sh (
+                                script: '''#!/bin/bash -x
                                     git checkout master
                                     git merge ${tag} -m "Merged ${tag}"
                                     git push
                                 '''
                             )
-			}
+			            }
+                    }
+                }
+            }
+        }
+        stage('github release') {
+            steps {
+                script {
+                    if( "${channel}" == "latest" ) {
+			            sh (
+                            script: '''#!/bin/bash -x
+                                MESSAGE="Release ${tag}"
+                                VERSION=$(echo "${tag}"|sed "s/v//g")
+                                API_JSON="{\\"tag_name\\": \\"${tag}\\",\\"target_commitish\\": \\"master\\",\\"name\\": \\"${tag}\\",\\"body\\": \\"${MESSAGE}\\",\\"draft\\": false,\\"prerelease\\": false}"
+                                API_RESPONSE_STATUS=$(curl -H "Authorization: token ${npGhToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
+                                echo "Release: ${API_RESPONSE_STATUS}"
+                            '''
+                        )
                     }
                 }
             }
         }
     }
-        post {
-            always {
-                cleanWs(cleanWhenNotBuilt: true,
-                    deleteDirs: true,
-                    disableDeferredWipeout: false,
-                    notFailBuild: true,
-                    patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
-                               [pattern: '.propsfile', type: 'EXCLUDE']])
-            }
+    post {
+        always {
+            cleanWs(cleanWhenNotBuilt: true,
+                deleteDirs: true,
+                disableDeferredWipeout: false,
+                notFailBuild: true,
+                patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
+                            [pattern: '.propsfile', type: 'EXCLUDE']])
         }
+    }
 }
