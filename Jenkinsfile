@@ -329,7 +329,7 @@ pipeline {
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${tag}"
                                 VERSION=$(echo "${tag}"|sed "s/v//g")
-                                API_JSON=$(printf '{"tag_name": "%s","target_commitish": "master","name": "%s","body": "%s","draft": false,"prerelease": false}' "%{tag}" "${tag}" "${MESSAGE}")
+                                API_JSON="{\"tag_name\": \"${tag}\",\"target_commitish\": \"master\",\"name\": \"${tag}\",\"body\": \"${MESSAGE}\",\"draft\": false,\"prerelease\": false}"
                                 API_RESPONSE_STATUS=$(curl -H "Authorization: token ${npGhToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
                                 echo "Release: ${API_RESPONSE_STATUS}"
                             '''
