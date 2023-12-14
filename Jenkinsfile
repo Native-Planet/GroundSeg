@@ -27,7 +27,7 @@ pipeline {
     }
     environment {
         /* choose release channel based on params */
-        env.promote = "${params.PROMOTE}"
+        promote = "${params.PROMOTE}"
         /* version server auth header */
         versionauth = credentials('VersionAuth')
         npGhToken = credentials('NPJenkinsGH')
@@ -44,9 +44,9 @@ pipeline {
                     env.channel = sh(script: '''
                         #!/bin/bash -x
                         environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
-                        if [ "$env.promote" = "promote" ]; then
+                        if [ "${params.PROMOTE}" = "promote" ]; then
                             echo "latest"
-                        elif [ "$env.promote" = "build" ]; then
+                        elif [ "${params.PROMOTE}" = "build" ]; then
                             echo "edge"
                         elif [ "$environ" != "master" ]; then
                             echo "nobuild"
