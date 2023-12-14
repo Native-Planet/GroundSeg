@@ -41,12 +41,11 @@ pipeline {
         stage('determine channel') {
             steps {
                 script {
-                    env.channel = sh(script: '''
-                        #!/bin/bash -x
+                    env.channel = sh(script: '''#!/bin/bash -x
                         environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
-                        if [[ "${params.PROMOTE}" = "promote" ]]; then
+                        if [[ "${promote}" = "promote" ]]; then
                             echo "latest"
-                        elif [[ "${params.PROMOTE}" = "build" ]]; then
+                        elif [[ "${promote}" = "build" ]]; then
                             echo "edge"
                         elif [[ "$environ" != "master" ]]; then
                             echo "nobuild"
