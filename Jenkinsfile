@@ -169,7 +169,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${env.channel}" = "latest" ]; then
+                        if [ "${channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
@@ -208,7 +208,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${env.channel}" = "latest" ]; then
+                        if [ "${channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
@@ -391,7 +391,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${env.channel}" = "latest" ]; then
+                        if [ "${channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
