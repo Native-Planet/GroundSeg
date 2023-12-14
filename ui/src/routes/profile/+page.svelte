@@ -1,8 +1,8 @@
 <script>
   import './profile.css'
   import { wide } from '$lib/stores/display'
-  import Password from './Password.svelte'
-  import StarTram from './StarTram.svelte'
+  import Password from './password.svelte'
+  import StarTram from './startram.svelte'
 </script>
 
 <style>

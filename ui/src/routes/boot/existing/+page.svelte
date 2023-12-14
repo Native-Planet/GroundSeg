@@ -4,8 +4,8 @@
   import { goto } from '$app/navigation';
   import { structure } from '$lib/stores/data'
 
-  import Dropzone from './Dropzone.svelte';
-  import NotFree from './NotFree.svelte';
+  import Dropzone from './dropzone.svelte';
+  import NotFree from './notfree.svelte';
 
   let showPrompt = false
   let confirmed = false

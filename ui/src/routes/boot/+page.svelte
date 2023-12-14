@@ -2,7 +2,7 @@
   import { wide } from '$lib/stores/display';
   import { goto } from '$app/navigation';
 
-  import Option from './Option.svelte';
+  import Option from './option.svelte';
 
 </script>
 

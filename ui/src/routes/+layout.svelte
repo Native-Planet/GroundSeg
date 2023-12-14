@@ -10,10 +10,10 @@
   import { firstLoad, URBIT_MODE } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
-  import Redirector from './Redirector.svelte'
-  import ApiSpinner from './ApiSpinner.svelte'
-  import KeepAlive from './KeepAlive.svelte'
-  import FirstLoad from './FirstLoad.svelte'
+  import Redirector from './redirector.svelte'
+  import ApiSpinner from './apispinner.svelte'
+  import KeepAlive from './keepalive.svelte'
+  import FirstLoad from './firstload.svelte'
 
   // Style
   import "../theme.css"

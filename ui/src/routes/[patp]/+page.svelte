@@ -1,9 +1,9 @@
 <script>
 	import { page } from '$app/stores'
-  import Header from './Header.svelte'
-  import Body from './Body.svelte'
-  import DeleteModal from './DeleteModal.svelte'
-  import Sigil from './Sigil.svelte'
+  import Header from './header.svelte'
+  import Body from './body.svelte'
+  import DeleteModal from './deletemodal.svelte'
+  import Sigil from './sigil.svelte'
   $: patp = $page.params.patp
 </script>
 

@@ -1,6 +1,6 @@
 <script>
-  import ShipCard from "./ShipCard.svelte"
-  import NewShipCard from "./NewShipCard.svelte"
+  import ShipCard from "./shipcard.svelte"
+  import NewShipCard from "./newshipcard.svelte"
   import { wide } from '$lib/stores/display'
   import { structure } from '$lib/stores/data'
   import { sortModes } from '$lib/stores/patp'

@@ -1,8 +1,8 @@
 <script>
   import { wide } from '$lib/stores/display';
   import { structure } from '$lib/stores/data'
-  import Free from './Free.svelte'
-  import NotFree from './NotFree.svelte'
+  import Free from './free.svelte'
+  import NotFree from './notfree.svelte'
 
   $: tBootStage = ($structure?.newShip?.transition?.bootStage) || ""
 </script>

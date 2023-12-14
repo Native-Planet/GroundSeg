@@ -5,13 +5,13 @@
   import { structure } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
-  import LinuxUpdate from './LinuxUpdate.svelte'
-  import Connection from './Connection.svelte'
-  import SystemDetails from './SystemDetails.svelte'
-  import Power from './Power.svelte'
-  import Logs from './Logs.svelte'
-  import Penpai from './Penpai.svelte'
-  import Support from './Support.svelte'
+  import LinuxUpdate from './linuxupdate.svelte'
+  import Connection from './connection.svelte'
+  import SystemDetails from './systemdetails.svelte'
+  import Power from './power.svelte'
+  import Logs from './logs.svelte'
+  import Penpai from './penpai.svelte'
+  import Support from './support.svelte'
 
   $: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>

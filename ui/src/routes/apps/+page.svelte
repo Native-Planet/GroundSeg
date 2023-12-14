@@ -1,7 +1,7 @@
 <script>
   import './apps.css'
   import { structure } from '$lib/stores/data'
-  import Penpai from './Penpai.svelte'
+  import Penpai from './penpai.svelte'
 </script>
 
 <div class="panel">
