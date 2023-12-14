@@ -86,7 +86,7 @@ pipeline {
                         /* production releases get promoted from edge */
                         if( "${channel}" == "latest" ) {
                             sh '''#!/bin/bash -x
-                                tagRegex='^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$'
+                                tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
                                 if [[ ${tag} =~ $tagRegex ]]; then
                                     echo "Valid pre-production release tag: ${tag}"
                                 else
