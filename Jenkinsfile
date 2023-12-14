@@ -9,29 +9,33 @@ pipeline {
             choices: ['Goseg', 'Gallseg'],
             description: 'Publish goseg bin or gallseg glob',
             name: 'XSEG')
-        choice(
-            choices: ['no' , 'yes'],
-            description: 'Merge tag into master branch (doesn\'t do anything in dev)',
-            name: 'MERGE')
         booleanParam(
             name: 'TO_CANARY',
             defaultValue: false,
             description: 'Also push build to canary channel (if edge)'
         )
         choice(
+            choices: ['build','promote'],
+            description: 'Build a release candidate tag for edge or promote an existing RC to latest (only works with `v2.X.X-rcX` tags)',
+            name: 'PROMOTE'
+        )
+        choice(
             choices: ['staging.version.groundseg.app' , 'version.groundseg.app'],
             description: 'Choose version server',
-            name: 'VERSION_SERVER')
+            name: 'VERSION_SERVER'
+        )
     }
     environment {
-        /* translate git branch to release channel */
+        /* choose release channel based on params */
         channel = sh ( 
             script: '''
                 environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
-                if [ "${environ}" = "master" ]; then
+                if [ "${params.PROMOTE}" = "promote" ]; then
                     echo "latest"
-                elif [ "${environ}" = "dev" ]; then
+                elif [ "${params.PROMOTE}" = "build" ]; then
                     echo "edge"
+                elif [ "${environ}" != "master" ]; then
+                    echo "nobuild"
                 else
                     echo "nobuild"
                 fi
@@ -82,8 +86,45 @@ pipeline {
                         /* production releases get promoted from edge */
                         if( "${channel}" == "latest" ) {
                             sh '''#!/bin/bash -x
-                                cp /opt/groundseg/version/bin/groundseg_amd64_${tag}_edge /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                cp /opt/groundseg/version/bin/groundseg_arm64_${tag}_edge /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                                tagRegex='^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$'
+                                if [[ ${tag} =~ $tagRegex ]]; then
+                                    echo "Valid pre-production release tag: ${tag}"
+                                else
+                                    echo "Invalid tag for production release promotion: ${tag} -- should match format 'v2.1.52-rc2' etc"
+                                    exit 1
+                                fi
+                                git checkout ${tag}
+                                git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
+                                newTag=${tag%%-*}
+                                sed -i "4s/.*/export const version = writable(\\"${newTag}\\")" ./ui/src/lib/stores/display.js
+                                sed -i "11s/.*/TAG=${newTag}/" ./release/groundseg_install.sh
+                                version_defaults="./goseg/defaults/version.go"
+                                json_blob=$(curl -s https://version.groundseg.app)
+                                formatted_json_blob=$(echo "$json_blob" | jq '.')
+                                start_line=$(grep -n 'DefaultVersionText =' "$version_defaults" | cut -d ':' -f1)
+                                end_line=$(grep -n 'VersionInfo' "$version_defaults" | cut -d ':' -f1)
+                                temp_file=$(mktemp)
+                                head -n $((start_line-1)) "$version_defaults" > "$temp_file"
+                                echo "  DefaultVersionText = \\`" >> "$temp_file"
+                                echo "$formatted_json_blob" >> "$temp_file"
+                                echo "\\`" >> "$temp_file"
+                                tail -n +$end_line -q "$version_defaults" >> "$temp_file"
+                                mv "$temp_file" "$version_defaults"
+                                cd ./ui
+                                DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                                container_id=$(docker create web-builder)
+                                docker cp $container_id:/webui/build ./web
+                                rm -rf ../goseg/web
+                                mv web ../goseg/
+                                cd ../goseg
+                                go fmt ./...
+                                cd ..
+                                git commit -am "Promoting ${newTag} for release"
+                                git tag ${newTag}
+                                git push
+                                git push --tags
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${channel}
                             '''
                         }
                     }
@@ -121,6 +162,18 @@ pipeline {
             }
         }
         stage('move binaries') {
+            environment {
+                binTag = sh(
+                    script: '''#!/bin/bash -x
+                        if [ "${channel}" = "latest" ]; then
+                            echo ${tag%%-*}
+                        else
+                            echo ${tag}
+                        fi
+                    ''',
+                    returnStdout: true
+                ).trim()
+            }
             steps {
                 script {
                     /* copy to r2 */
@@ -128,8 +181,8 @@ pipeline {
                         if( "${channel}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
                             sh '''#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel} r2:groundseg/bin
                             '''
                         }
                     }
@@ -149,17 +202,27 @@ pipeline {
         }
         stage('version update') {
             environment {
+                binTag = sh(
+                    script: '''#!/bin/bash -x
+                        if [ "${channel}" = "latest" ]; then
+                            echo ${tag%%-*}
+                        else
+                            echo ${tag}
+                        fi
+                    ''',
+                    returnStdout: true
+                ).trim()
                 /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 amdsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
@@ -197,8 +260,8 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://files.native.computer/bin/groundseg_arm64_${tag}_${channel}"
-                amdbin = "https://files.native.computer/bin/groundseg_amd64_${tag}_${channel}"
+                armbin = "https://files.native.computer/bin/groundseg_arm64_${binTag}_${channel}"
+                amdbin = "https://files.native.computer/bin/groundseg_amd64_${binTag}_${channel}"
             }
             steps {
                 script {
@@ -208,7 +271,6 @@ pipeline {
                             sh '''#!/bin/bash -x
                                 cp ./release/standard_install.sh /opt/groundseg/get/install.sh
                                 cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
-                                sed -i "11s/.*/TAG=${tag}/" /opt/groundseg/get/only.sh
                                 webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
                                 webui_arm64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.arm64_sha256'`
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
@@ -303,33 +365,27 @@ pipeline {
                 }
             }
         }
-        stage('merge to master') {
-            steps {
-                /* merge tag changes into master if deploying to master */
-                script {
-                    if(( "${channel}" == "latest" ) && ( "${params.MERGE}" == "yes" )) {
-                        withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
-			                sh (
-                                script: '''#!/bin/bash -x
-                                    git checkout master
-                                    git merge ${tag} -m "Merged ${tag}"
-                                    git push
-                                '''
-                            )
-			            }
-                    }
-                }
-            }
-        }
         stage('github release') {
+            environment {
+                binTag = sh(
+                    script: '''#!/bin/bash -x
+                        if [ "${channel}" = "latest" ]; then
+                            echo ${tag%%-*}
+                        else
+                            echo ${tag}
+                        fi
+                    ''',
+                    returnStdout: true
+                ).trim()
+            }
             steps {
                 script {
                     if( "${channel}" == "latest" ) {
 			            sh (
                             script: '''#!/bin/bash -x
-                                MESSAGE="Release ${tag}"
-                                VERSION=$(echo "${tag}"|sed "s/v//g")
-                                API_JSON="{\\"tag_name\\": \\"${tag}\\",\\"target_commitish\\": \\"master\\",\\"name\\": \\"${tag}\\",\\"body\\": \\"${MESSAGE}\\",\\"draft\\": false,\\"prerelease\\": false}"
+                                MESSAGE="Release ${binTag}"
+                                VERSION=$(echo "${binTag}"|sed "s/v//g")
+                                API_JSON="{\\"tag_name\\": \\"${binTag}\\",\\"target_commitish\\": \\"master\\",\\"name\\": \\"${binTag}\\",\\"body\\": \\"${MESSAGE}\\",\\"draft\\": false,\\"prerelease\\": false}"
                                 API_RESPONSE_STATUS=$(curl -H "Authorization: token ${npGhToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
                                 echo "Release: ${API_RESPONSE_STATUS}"
                             '''
