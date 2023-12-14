@@ -297,22 +297,8 @@ func UrbitHandler(msg []byte) error {
 		return nil
 	case "rebuild-container":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "loading"}
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
-		}
-		isRunning := strings.Contains(status, "Up")
-		if isRunning {
-			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-			}
-		}
-		if err := docker.DeleteContainer(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to delete container %s", patp))
+		if err := urbitCleanDelete(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 		}
 		_, err = docker.StartContainer(patp, "vere")
 		if err != nil {
@@ -371,22 +357,8 @@ func UrbitHandler(msg []byte) error {
 			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
-		}
-		isRunning := strings.Contains(status, "Up")
-		if isRunning {
-			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-			}
-		}
-		if err := docker.DeleteContainer(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+		if err := urbitCleanDelete(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 		}
 		if shipConf.BootStatus == "boot" {
 			if _, err := docker.StartContainer(patp, "vere"); err != nil {
@@ -492,22 +464,8 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
-			statuses, err := docker.GetShipStatus([]string{patp})
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-			}
-			status, exists := statuses[patp]
-			if !exists {
-				logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
-			}
-			isRunning := strings.Contains(status, "Up")
-			if isRunning {
-				if err := click.BarExit(patp); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-				}
-			}
-			if err := docker.DeleteContainer(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+			if err := urbitCleanDelete(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 			}
 		} else if currentNetwork != "wireguard" && conf.WgRegistered == true {
 			shipConf.Network = "wireguard"
@@ -516,22 +474,8 @@ func UrbitHandler(msg []byte) error {
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				return fmt.Errorf("Couldn't update urbit config: %v", err)
 			}
-			statuses, err := docker.GetShipStatus([]string{patp})
-			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-			}
-			status, exists := statuses[patp]
-			if !exists {
-				logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
-			}
-			isRunning := strings.Contains(status, "Up")
-			if isRunning {
-				if err := click.BarExit(patp); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-				}
-			}
-			if err := docker.DeleteContainer(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+			if err := urbitCleanDelete(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 			}
 		} else {
 			return fmt.Errorf("No remote registration")
@@ -555,22 +499,8 @@ func UrbitHandler(msg []byte) error {
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
-		}
-		isRunning := strings.Contains(status, "Up")
-		if isRunning {
-			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-			}
-		}
-		if err := docker.DeleteContainer(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to delete container: %v", err))
+		if err := urbitCleanDelete(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 		}
 		_, err = docker.StartContainer(patp, "vere")
 		if err != nil {
@@ -755,4 +685,42 @@ func waitComplete(patp string) {
 			return
 		}
 	}
+}
+
+func urbitCleanDelete(patp string) error {
+	getShipRunningStatus := func(patp string) (string, error) {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return "", fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return "", fmt.Errorf("%s status doesn't exist", patp)
+		}
+		return status, nil
+	}
+	status, err := getShipRunningStatus(patp)
+	if err == nil {
+		isRunning := strings.Contains(status, "Up")
+		if isRunning {
+			if err := click.BarExit(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit: %v", patp, err))
+			}
+		}
+		for {
+			status, err := getShipRunningStatus(patp)
+			if err != nil {
+				break
+			}
+			logger.Logger.Warn(fmt.Sprintf("%s", status))
+			if !strings.Contains(status, "Up") {
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}
+	if err := docker.DeleteContainer(patp); err != nil {
+		return fmt.Errorf("Failed to delete container %s", patp)
+	}
+	return nil
 }
