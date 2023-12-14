@@ -27,22 +27,7 @@ pipeline {
     }
     environment {
         /* choose release channel based on params */
-        promote = "${params.PROMOTE}"
-        channel = sh ( 
-            script: '''#!/bin/bash -x
-                environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
-                if [ "${promote}" = "promote" ]; then
-                    echo "latest"
-                elif [ "${promote}" = "build" ]; then
-                    echo "edge"
-                elif [ "${environ}" != "master" ]; then
-                    echo "nobuild"
-                else
-                    echo "nobuild"
-                fi
-            ''',
-            returnStdout: true
-        ).trim()
+        env.promote = "${params.PROMOTE}"
         /* version server auth header */
         versionauth = credentials('VersionAuth')
         npGhToken = credentials('NPJenkinsGH')
@@ -53,6 +38,26 @@ pipeline {
         to_canary = "${params.TO_CANARY}"
     }
     stages {
+stages {
+        stage('determine channel') {
+            steps {
+                script {
+                    env.channel = sh(script: '''
+                        #!/bin/bash -x
+                        environ=$(echo $BRANCH_NAME | sed 's@origin/@@g')
+                        if [ "$env.promote" = "promote" ]; then
+                            echo "latest"
+                        elif [ "$env.promote" = "build" ]; then
+                            echo "edge"
+                        elif [ "$environ" != "master" ]; then
+                            echo "nobuild"
+                        else
+                            echo "nobuild"
+                        fi
+                    ''', returnStdout: true).trim()
+                }
+            }
+        }
         stage('checkout') {
             steps {
                 checkout([$class: 'GitSCM',
@@ -70,7 +75,7 @@ pipeline {
                     /* build binaries and move to web dir */
                 script {
                     if (params.XSEG == 'Goseg') {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                        if(( "${env.channel}" != "nobuild" ) && ( "${env.channel}" != "latest" )) {
                             sh '''#!/bin/bash -x
                                 git checkout ${tag}
                                 cd ./ui
@@ -80,12 +85,12 @@ pipeline {
                                 rm -rf ../goseg/web
                                 mv web ../goseg/
                                 cd ../goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${env.channel}
                             '''
                         }
                         /* production releases get promoted from edge */
-                        if( "${channel}" == "latest" ) {
+                        if( "${env.channel}" == "latest" ) {
                             sh '''#!/bin/bash -x
                                 tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
                                 if [[ ${tag} =~ $tagRegex ]]; then
@@ -124,14 +129,14 @@ pipeline {
                                 git tag ${newTag}
                                 git push
                                 git push --tags
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${env.channel}
                             '''
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            if( "${channel}" != "nobuild" ) {
+                            if( "${env.channel}" != "nobuild" ) {
                                 sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
@@ -166,7 +171,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
+                        if [ "${env.channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
@@ -179,17 +184,17 @@ pipeline {
                 script {
                     /* copy to r2 */
                     if (params.XSEG == 'Goseg') {
-                        if( "${channel}" != "nobuild" ) {  
+                        if( "${env.channel}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
                             sh '''#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${env.channel} r2:groundseg/bin
                             '''
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            if( "${channel}" != "nobuild" ) {  
+                            if( "${env.channel}" != "nobuild" ) {  
                                 sh 'echo "debug: post-build actions"'
                                 sh '''#!/bin/bash -x
                                 source /opt/groundseg/version/glob/globhash.env
@@ -205,7 +210,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
+                        if [ "${env.channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
@@ -216,14 +221,14 @@ pipeline {
                 /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 amdsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${env.channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
@@ -261,14 +266,14 @@ pipeline {
                     ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://files.native.computer/bin/groundseg_arm64_${binTag}_${channel}"
-                amdbin = "https://files.native.computer/bin/groundseg_amd64_${binTag}_${channel}"
+                armbin = "https://files.native.computer/bin/groundseg_arm64_${binTag}_${env.channel}"
+                amdbin = "https://files.native.computer/bin/groundseg_amd64_${binTag}_${env.channel}"
             }
             steps {
                 script {
                     if (params.XSEG == 'Goseg') {
                         def to_canary = "${params.TO_CANARY}".toLowerCase()
-                        if( "${channel}" == "latest" ) {
+                        if( "${env.channel}" == "latest" ) {
                             sh '''#!/bin/bash -x
                                 cp ./release/standard_install.sh /opt/groundseg/get/install.sh
                                 cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
@@ -308,7 +313,7 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
                             '''
                         }
-                        if( "${channel}" == "edge" ) {
+                        if( "${env.channel}" == "edge" ) {
                             sh '''#!/bin/bash -x
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
@@ -358,7 +363,7 @@ pipeline {
             }
             steps {
                 script {
-                    if( "${channel}" == "edge" ) {
+                    if( "${env.channel}" == "edge" ) {
                         withSonarQubeEnv('SonarQube') {
                             sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.sources=./goseg"
                         }
@@ -370,7 +375,7 @@ pipeline {
             steps {
                 /* merge tag changes into master if deploying to master */
                 script {
-                    if(( "${channel}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
+                    if(( "${env.channel}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			                sh (
                                 script: '''#!/bin/bash -x
@@ -388,7 +393,7 @@ pipeline {
             environment {
                 binTag = sh(
                     script: '''#!/bin/bash -x
-                        if [ "${channel}" = "latest" ]; then
+                        if [ "${env.channel}" = "latest" ]; then
                             echo ${tag%%-*}
                         else
                             echo ${tag}
@@ -399,7 +404,7 @@ pipeline {
             }
             steps {
                 script {
-                    if( "${channel}" == "latest" ) {
+                    if( "${env.channel}" == "latest" ) {
 			            sh (
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${binTag}"
