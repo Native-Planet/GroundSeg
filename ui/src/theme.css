@@ -1,47 +1,15 @@
-/*
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("/font/Inter-Light.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/font/Inter-Regular.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/font/Inter-Medium.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/font/Inter-SemiBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/font/Inter-Bold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/font/Inter-ExtraBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/font/Inter-Black.otf"); }
+@font-face { font-family: 'bpdotsunicase'; src: url("/font/bpdotsunicasebold.woff2") format('woff2'); }
+@font-face { font-family: Source; font-display: swap; src: url("/font/sourcecodepro-regular.woff2") format('woff2'); }
 
-/*
- @font-face { font-family: BPdotsUnicase; font-display: swap; src: url("/font/BPdotsUnicaseBold.otf"); }
-@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodePro-Regular.otf");}
-
-*/
-@font-face { font-family: 'BPdotsUnicase'; src: url("/font/BPdotsUnicaseBold.woff2") format('woff2'); }
-@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodePro-Regular.woff2") format('woff2'); }
-
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("/font/Inter-Light.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/font/Inter-Regular.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/font/Inter-Medium.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/font/Inter-SemiBold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/font/Inter-Bold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/font/Inter-ExtraBold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/font/Inter-Black.woff2") format('woff2'); }
-
-
-/*
-@font-face { font-family: BPdotsUnicase; font-display: swap; src: url("https://files.native.computer/font/BPdotsUnicaseBold.otf"); }
-@font-face { font-family: Source; src: url("https://files.native.computer/font/SourceCodePro-Regular.otf"); font-display: swap; }
-
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("https://files.native.computer/font/Inter-Thin.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("https://files.native.computer/font/Inter-ExtraLight.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("https://files.native.computer/font/Inter-Light.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("https://files.native.computer/font/Inter-Regular.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("https://files.native.computer/font/Inter-Medium.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("https://files.native.computer/font/Inter-SemiBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("https://files.native.computer/font/Inter-Bold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("https://files.native.computer/font/Inter-ExtraBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("https://files.native.computerfont/Inter-Black.otf"); }
-*/
+@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/inter-thin.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/inter-extraLight.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("/font/inter-light.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/font/inter-regular.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/font/inter-medium.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/font/inter-semibold.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/font/inter-bold.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/font/inter-extrabold.woff2") format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/font/inter-black.woff2") format('woff2'); }
 
 body {
   margin: 0;
@@ -54,7 +22,7 @@ body {
 :root {
   --log-font: Source;
   --regular-font: Inter;
-  --title-font: BPdotsUnicase;
+  --title-font: bpdotsunicase;
   --bg-base: #E8E8E3CD;
   --bg-card: #161D17;
   --bg-modal: #DDE3DF;
