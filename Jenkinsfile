@@ -38,7 +38,6 @@ pipeline {
         to_canary = "${params.TO_CANARY}"
     }
     stages {
-stages {
         stage('determine channel') {
             steps {
                 script {
