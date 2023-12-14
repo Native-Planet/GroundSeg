@@ -365,6 +365,24 @@ pipeline {
                 }
             }
         }
+        stage('merge to master') {
+            steps {
+                /* merge tag changes into master if deploying to master */
+                script {
+                    if(( "${channel}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
+                        withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
+			                sh (
+                                script: '''#!/bin/bash -x
+                                    git checkout master
+                                    git merge ${tag} -m "Merged ${tag}"
+                                    git push
+                                '''
+                            )
+			            }
+                    }
+                }
+            }
+        }
         stage('github release') {
             environment {
                 binTag = sh(
