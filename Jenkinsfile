@@ -83,8 +83,8 @@ pipeline {
                                 rm -rf ../goseg/web
                                 mv web ../goseg/
                                 cd ../goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${env.channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
                             '''
                         }
                         /* production releases get promoted from edge */
@@ -127,8 +127,8 @@ pipeline {
                                 git tag ${newTag}
                                 git push
                                 git push --tags
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${env.channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${newTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${newTag}_${channel}
                             '''
                         }
                     }
@@ -185,8 +185,8 @@ pipeline {
                         if( "${env.channel}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
                             sh '''#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${env.channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel} r2:groundseg/bin
                             '''
                         }
                     }
@@ -219,14 +219,14 @@ pipeline {
                 /* update versions and hashes on public version server */
                 armsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
                 ).trim()
                 amdsha = sh(
                     script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${env.channel}|awk '{print \$1}'`
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}|awk '{print \$1}'`
                         echo ${val}
                     ''',
                     returnStdout: true
