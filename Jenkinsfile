@@ -28,7 +28,7 @@ pipeline {
     environment {
         /* choose release channel based on params */
         channel = sh ( 
-            script: '''
+            script: '''#!/bin/bash -x
                 environ=`echo $BRANCH_NAME|sed 's@origin/@@g'`
                 if [ "${params.PROMOTE}" = "promote" ]; then
                     echo "latest"
