@@ -40,7 +40,7 @@ pipeline {
         ).trim()
         /* version server auth header */
         versionauth = credentials('VersionAuth')
-        ghToken = credentials('Github token')
+        npGhToken = credentials('NPJenkinsGH')
         /* release tag to be built*/
         tag = "${params.RELEASE_TAG}"
         /* staging or production version server */
@@ -329,8 +329,8 @@ pipeline {
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${tag}"
                                 VERSION=$(echo "${tag}"|sed "s/v//g")
-                                API_JSON=$(printf '{"tag_name": "${tag}","target_commitish": "%s","name": "v%s","body": "%s","draft": false,"prerelease": false}' "$VERSION" "$BRANCH" "$VERSION" "$MESSAGE" )
-                                API_RESPONSE_STATUS=$(curl -H "Authorization: token ${ghToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
+                                API_JSON=$(printf '{"tag_name": "%s","target_commitish": "master","name": "${tag}","body": "%s","draft": false,"prerelease": false}' "${tag}" "${MESSAGE}")
+                                API_RESPONSE_STATUS=$(curl -H "Authorization: token ${npGhToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
                                 echo "Release: ${API_RESPONSE_STATUS}"
                             '''
                         )
