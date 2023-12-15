@@ -137,7 +137,6 @@ pipeline {
                                 mv web ../goseg/
                                 cd ../goseg
                                 go fmt ./...
-                                cd ..
                                 git commit -am "Promoting ${binTag} for release"
                                 git tag ${binTag}
                                 git push --set-upstream origin ${binTag}
