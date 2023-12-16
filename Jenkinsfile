@@ -159,6 +159,7 @@ pipeline {
                                     cd globber
                                     ./glob.sh ../web
                                     mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
+                                    cd ..
                                     rm -rf globber
                                 '''
                             }
