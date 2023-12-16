@@ -410,7 +410,7 @@ pipeline {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
                     echo "Glob URL: ${env.glob_url}"
-                    addBadge(icon: "info.svg", text: "Artifact URL: ${env.glob_url}")
+                    addBadge(icon: "info.svg", text: "Glob URL: ${env.glob_url}")
                 }
             }
         }
