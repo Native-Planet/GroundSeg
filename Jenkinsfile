@@ -158,6 +158,8 @@ pipeline {
                                     git clone https://github.com/Native-Planet/globber
                                     cd globber
                                     ./glob.sh ../web
+                                    hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                                    echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
                                     mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                                     cd ..
                                     rm -rf globber
