@@ -156,6 +156,7 @@ pipeline {
                                     container_id=$(docker create web-builder)
                                     git clone https://github.com/Native-Planet/globber
                                     cd globber
+                                    git checkout dev
                                     docker cp $container_id:/webui/build ./web
                                     ./glob.sh web
                                     hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
