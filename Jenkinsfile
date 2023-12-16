@@ -403,7 +403,7 @@ pipeline {
         success {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
-                    def glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
+                    glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
                     addBadge(icon: "info.svg", text: "Glob URL: ${glob_url}")
                 }
             }
