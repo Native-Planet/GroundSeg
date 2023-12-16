@@ -150,7 +150,7 @@ pipeline {
                     if (params.XSEG == 'Gallseg') {
                         script {
                             if( "${env.channel}" != "nobuild" ) {
-                                def scriptOutput = sh(script: '''#!/bin/bash -x
+                                sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
@@ -161,19 +161,12 @@ pipeline {
                                     ./glob.sh web
                                     hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
+                                    echo "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob" > /opt/groundseg/version/glob/globurl.txt
                                     mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                                     cd ..
                                     rm -rf globber
                                     echo "HASH=${hash}"
-                                ''', returnStdout: true).trim()
-                                def hash = scriptOutput.readLines().find { it.startsWith('HASH=') }?.split('=')[1]
-                                if (hash) {
-                                    glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
-                                    env.glob_url = glob_url
-                                    echo "Glob URL: ${glob_url}"
-                                } else {
-                                    echo "Hash not found in script output"
-                                }
+                                '''
                             }
                         }
                     }
@@ -410,8 +403,7 @@ pipeline {
         success {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
-                    echo "Glob URL: ${env.glob_url}"
-                    echo "Glob URL: ${glob_url}"
+                    def glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
                     addBadge(icon: "info.svg", text: "Glob URL: ${glob_url}")
                 }
             }
