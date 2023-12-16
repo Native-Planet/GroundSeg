@@ -168,8 +168,8 @@ pipeline {
                                 ''', returnStdout: true).trim()
                                 def hash = scriptOutput.readLines().find { it.startsWith('HASH=') }?.split('=')[1]
                                 if (hash) {
-                                    glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
-                                    echo "Glob URL: ${glob_url}"
+                                    env.glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
+                                    echo "Glob URL: ${env.glob_url}"
                                 } else {
                                     echo "Hash not found in script output"
                                 }
