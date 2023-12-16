@@ -36,6 +36,7 @@ pipeline {
         /* staging or production version server */
         version_server = "${params.VERSION_SERVER}"
         to_canary = "${params.TO_CANARY}"
+        glob_url = ""
     }
     stages {
         stage('determine channel') {
@@ -163,7 +164,15 @@ pipeline {
                                     mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                                     cd ..
                                     rm -rf globber
-                                '''
+                                    echo "HASH=${hash}"
+                                ''', returnStdout: true).trim()
+                                def hash = scriptOutput.readLines().find { it.startsWith('HASH=') }?.split('=')[1]
+                                if (hash) {
+                                    glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
+                                    echo "Glob URL: ${glob_url}"
+                                } else {
+                                    echo "Hash not found in script output"
+                                }
                             }
                         }
                     }
@@ -396,6 +405,12 @@ pipeline {
                 notFailBuild: true,
                 patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
                             [pattern: '.propsfile', type: 'EXCLUDE']])
+        }
+        success {
+            if( "${params.XSEG}" == "Gallseg" ) {
+                echo "Glob URL: ${env.glob_url}"
+                addBadge(icon: "info.svg", text: "Artifact URL: ${env.glob_url}")
+            }
         }
     }
 }
