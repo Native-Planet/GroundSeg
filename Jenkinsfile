@@ -404,7 +404,7 @@ pipeline {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
                     glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
-                    echo "Description set: ${glob_url}"
+                    currentBuild.description = "Glob URL: ${glob_url}"
                 }
             }
         }
