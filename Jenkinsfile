@@ -150,7 +150,7 @@ pipeline {
                     if (params.XSEG == 'Gallseg') {
                         script {
                             if( "${env.channel}" != "nobuild" ) {
-                                sh '''#!/bin/bash -x
+                                def scriptOutput = sh(script: '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
