@@ -1,3 +1,4 @@
+def glob_url = ''
 pipeline {
     agent any
     parameters {
@@ -36,7 +37,6 @@ pipeline {
         /* staging or production version server */
         version_server = "${params.VERSION_SERVER}"
         to_canary = "${params.TO_CANARY}"
-        glob_url = ""
     }
     stages {
         stage('determine channel') {
@@ -168,8 +168,8 @@ pipeline {
                                 ''', returnStdout: true).trim()
                                 def hash = scriptOutput.readLines().find { it.startsWith('HASH=') }?.split('=')[1]
                                 if (hash) {
-                                    env.glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
-                                    echo "Glob URL: ${env.glob_url}"
+                                    glob_url = "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
+                                    echo "Glob URL: ${glob_url}"
                                 } else {
                                     echo "Hash not found in script output"
                                 }
@@ -410,7 +410,7 @@ pipeline {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
                     echo "Glob URL: ${env.glob_url}"
-                    addBadge(icon: "info.svg", text: "Glob URL: ${env.glob_url}")
+                    addBadge(icon: "info.svg", text: "Glob URL: ${glob_url}")
                 }
             }
         }
