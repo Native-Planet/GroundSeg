@@ -404,7 +404,7 @@ pipeline {
             script {
                 if( "${params.XSEG}" == "Gallseg" ) {
                     glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
-                    addBadge(icon: "info.svg", text: "Glob URL: ${glob_url}")
+                    echo "Description set: ${glob_url}"
                 }
             }
         }
