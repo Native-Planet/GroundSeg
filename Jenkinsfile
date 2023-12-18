@@ -1,3 +1,4 @@
+def glob_url = ''
 pipeline {
     agent any
     parameters {
@@ -154,15 +155,17 @@ pipeline {
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                                     container_id=$(docker create web-builder)
-                                    docker cp $container_id:/webui/build ./web
                                     git clone https://github.com/Native-Planet/globber
                                     cd globber
-                                    ./glob.sh ../web
+                                    docker cp $container_id:/webui/build ./web
+                                    ./glob.sh web
                                     hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                                     echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
+                                    echo "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob" > /opt/groundseg/version/glob/globurl.txt
                                     mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                                     cd ..
                                     rm -rf globber
+                                    echo "HASH=${hash}"
                                 '''
                             }
                         }
@@ -396,6 +399,14 @@ pipeline {
                 notFailBuild: true,
                 patterns: [[pattern: '.gitignore', type: 'INCLUDE'],
                             [pattern: '.propsfile', type: 'EXCLUDE']])
+        }
+        success {
+            script {
+                if( "${params.XSEG}" == "Gallseg" ) {
+                    glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
+                    currentBuild.description = "Glob URL: ${glob_url}"
+                }
+            }
         }
     }
 }
