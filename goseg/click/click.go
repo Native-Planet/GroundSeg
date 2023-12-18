@@ -174,34 +174,3 @@ func GetDesk(patp, desk string, bypass bool) (string, error) {
 	storeDesk(patp, desk, vats)
 	return vats, nil
 }
-
-func SetDeskLoading(patp, desk string, loading bool) error {
-	desksMutex.Lock()
-	defer desksMutex.Unlock()
-	desksInfo, exists := shipDesks[patp]
-	if !exists {
-		desksInfo = make(map[string]structs.ClickDesks)
-	}
-	data, exists := desksInfo[desk]
-	if !exists {
-		desksInfo[desk] = structs.ClickDesks{}
-	}
-	data.Loading = loading
-	desksInfo[desk] = data
-	shipDesks[patp] = desksInfo
-	return nil
-}
-
-func GetDeskInstalling(patp, desk string) bool {
-	desksMutex.Lock()
-	defer desksMutex.Unlock()
-	desksInfo, exists := shipDesks[patp]
-	if !exists {
-		return false
-	}
-	data, exists := desksInfo[desk]
-	if !exists {
-		return false
-	}
-	return data.Loading
-}

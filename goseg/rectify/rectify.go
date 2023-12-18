@@ -53,6 +53,10 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.DeleteShip = event.Event
 			case "toggleMinIOLink":
 				urbitStruct.Transition.ToggleMinIOLink = event.Event
+			case "penpaiCompanion":
+				urbitStruct.Transition.PenpaiCompanion = event.Event
+			case "gallseg":
+				urbitStruct.Transition.Gallseg = event.Event
 			default:
 				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue

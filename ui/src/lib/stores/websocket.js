@@ -702,6 +702,24 @@ export const uninstallPenpaiCompanion = patp => {
   send(payload)
 }
 
+export const installGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"install-gallseg",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const uninstallGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"uninstall-gallseg",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 //
 //  Dev
 //   

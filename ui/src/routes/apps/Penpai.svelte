@@ -113,10 +113,14 @@
       <div class="companion-wrapper">
         {#each urbitKeys as p}
           <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>handlePenpaiCompanion(p)}>
-            {#if urbits?.[p]?.info?.penpaiInstalling}
+            {#if urbits?.[p]?.transition?.penpaiCompanion == "loading"}
               <div class="loading-box"></div>
             {:else}
-              <div class="checkbox">
+              <div
+                class="checkbox"
+                class:error={ urbits?.[p]?.transition?.penpaiCompanion == "error" }
+                class:success={ urbits?.[p]?.transition?.penpaiCompanion == "success" }
+                >
                 {#if urbits?.[p]?.info?.penpaiCompanion}
                   <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
                 {/if}
@@ -391,4 +395,7 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+  .error { border-color: red; }
+  .success { border-color: lime; }
+
 </style>

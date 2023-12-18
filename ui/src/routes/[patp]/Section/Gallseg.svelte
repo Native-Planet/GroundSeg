@@ -5,7 +5,7 @@
   import { createEventDispatcher } from 'svelte'
 
   export let gallseg
-  export let tGallsegInstalling = ""
+  export let tGallseg = ""
 
   const dispatch = createEventDispatcher()
 </script>
@@ -18,7 +18,7 @@
   <div class="section-right">
     <ToggleButton
       on:click={()=>dispatch("click")}
-      loading={tGallsegInstalling.length > 0}
+      loading={tGallseg.length > 0}
       on={gallseg}
       />
   </div>

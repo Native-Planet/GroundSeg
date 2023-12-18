@@ -110,12 +110,12 @@
     letter-spacing: -1.44px;
     border-radius: 16px;
     background: var(--Gray-100, #DDE3DF);
-    padding: 16px 24px 18px 24px;
     border: none;
     height: 30px;
     width: 480px;
     max-width: 80vw;
     text-align: center;
+    padding: 32px 24px 36px 24px;
   }
   input:focus {
     outline: none;

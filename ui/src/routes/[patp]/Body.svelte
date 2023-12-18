@@ -3,7 +3,9 @@
     toggleDevMode,
     toggleAutoBoot,
     toggleNetwork,
-    toggleUrbitPower
+    toggleUrbitPower,
+    installGallseg,
+    uninstallGallseg
   } from '$lib/stores/websocket'
 
   import { structure, URBIT_MODE } from '$lib/stores/data'
@@ -50,11 +52,20 @@
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
-  $: tGallsegInstalling = tShip?.gallsegInstalling || ""
+  $: tGallseg = tShip?.gallseg || ""
 
   // profile > startram
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
   $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
+
+  const handleGallseg = p => {
+    if (gallseg) {
+      uninstallGallseg(p)
+    } else {
+      installGallseg(p)
+    }
+  }
+
 </script>
 <div class="body">
   <!-- Power -->
@@ -107,7 +118,7 @@
   <Loom {patp} {loomSize} />
   
   {#if !$URBIT_MODE}
-    <Gallseg {gallseg} {tGallsegInstalling} />
+    <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
   {/if}
 
   {#if $URBIT_MODE && (authLevel != "authorized")}

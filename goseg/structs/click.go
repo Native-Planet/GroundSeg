@@ -12,5 +12,4 @@ type ClickDesks struct {
 	LastError time.Time
 	LastFetch time.Time
 	Status    string
-	Loading   bool
 }

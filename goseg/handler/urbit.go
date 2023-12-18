@@ -32,54 +32,13 @@ func UrbitHandler(msg []byte) error {
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
 	case "install-penpai-companion":
-		click.SetDeskLoading(patp, "penpai", true)
-		// if not-found, |install, if suspended, |revive
-		status, err := click.GetDesk(patp, "penpai", true)
-		if err != nil {
-			return fmt.Errorf("Handler failed to get penpai desk info for %v: %v", patp, err)
-		}
-		if status == "not-found" {
-			err := click.InstallDesk(patp, "~nattyv", "penpai")
-			if err != nil {
-				return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
-			}
-		} else if status == "suspended" {
-			err := click.ReviveDesk(patp, "penpai")
-			if err != nil {
-				return fmt.Errorf("Handler failed to revive penpai desk for %v: %v", patp, err)
-			}
-		}
-		for {
-			time.Sleep(5 * time.Second)
-			status, err := click.GetDesk(patp, "penpai", true)
-			if err != nil {
-				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
-			}
-			if status == "running" {
-				click.SetDeskLoading(patp, "penpai", false)
-				break
-			}
-		}
-		return nil
+		return installPenpaiCompanion(patp, shipConf)
 	case "uninstall-penpai-companion":
-		click.SetDeskLoading(patp, "penpai", true)
-		// uninstall
-		err := click.UninstallDesk(patp, "penpai")
-		if err != nil {
-			return fmt.Errorf("Handler failed to install penpai desk for %v: %v", patp, err)
-		}
-		for {
-			time.Sleep(5 * time.Second)
-			status, err := click.GetDesk(patp, "penpai", true)
-			if err != nil {
-				return fmt.Errorf("Handler failed to get penpai desk info for %v after installation succeeded: %v", patp, err)
-			}
-			if status != "running" {
-				click.SetDeskLoading(patp, "penpai", false)
-				break
-			}
-		}
-		return nil
+		return uninstallPenpaiCompanion(patp, shipConf)
+	case "install-gallseg":
+		return installGallseg(patp, shipConf)
+	case "uninstall-gallseg":
+		return uninstallGallseg(patp, shipConf)
 	case "pack":
 		// error handling
 		packError := func(err error) error {
@@ -721,6 +680,174 @@ func urbitCleanDelete(patp string) error {
 	}
 	if err := docker.DeleteContainer(patp); err != nil {
 		return fmt.Errorf("Failed to delete container %s", patp)
+	}
+	return nil
+}
+
+func installPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// if not-found, |install, if suspended, |revive
+	status, err := click.GetDesk(patp, "penpai", true)
+	if err != nil {
+		return handleError(patp, "Handler failed to get penpai desk info", err)
+	}
+	if status == "not-found" {
+		err := click.InstallDesk(patp, "~nattyv", "penpai")
+		if err != nil {
+			return handleError(patp, "Handler failed to get install penpai desk", err)
+		}
+	} else if status == "suspended" {
+		err := click.ReviveDesk(patp, "penpai")
+		if err != nil {
+			return handleError(patp, "Handler failed to revive penpai desk", err)
+		}
+	}
+	// wait for complete
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "penpai", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get penpai desk info after installation succeeded", err)
+		}
+		if status == "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+	return nil
+}
+
+func uninstallPenpaiCompanion(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// uninstall
+	err := click.UninstallDesk(patp, "penpai")
+	if err != nil {
+		return handleError(patp, "Handler failed to install uninstall the penpai desk", err)
+	}
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "penpai", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get penpai desk info after uninstallation succeeded", err)
+		}
+		if status != "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "penpaiCompanion", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+	return nil
+}
+
+func installGallseg(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// if not-found, |install, if suspended, |revive
+	status, err := click.GetDesk(patp, "groundseg", true)
+	if err != nil {
+		return handleError(patp, "Handler failed to get groundseg desk info", err)
+	}
+	if status == "not-found" {
+		err := click.InstallDesk(patp, "~tadwer-pilbud-nallux-dozryl", "groundseg")
+		if err != nil {
+			return handleError(patp, "Handler failed to get install groundseg desk", err)
+		}
+	} else if status == "suspended" {
+		err := click.ReviveDesk(patp, "groundseg")
+		if err != nil {
+			return handleError(patp, "Handler failed to revive groundseg desk", err)
+		}
+	}
+	// wait for complete
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "groundseg", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get groundseg desk info after installation succeeded", err)
+		}
+		if status == "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+	return nil
+}
+
+func uninstallGallseg(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// uninstall
+	err := click.UninstallDesk(patp, "groundseg")
+	if err != nil {
+		return handleError(patp, "Handler failed to install uninstall the groundseg desk", err)
+	}
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "groundseg", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get groundseg desk info after uninstallation succeeded", err)
+		}
+		if status != "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "gallseg", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
 	}
 	return nil
 }

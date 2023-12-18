@@ -209,7 +209,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		minioLinked := config.GetMinIOLinkedStatus(pier)
 
 		var penpaiCompanionInstalled bool
-		penpaiCompanionInstalling := click.GetDeskInstalling(pier, "penpai")
 		if strings.Contains(pierStatus[pier], "Up") {
 			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
@@ -273,7 +272,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
-		urbit.Info.PenpaiInstalling = penpaiCompanionInstalling
 		urbit.Info.Gallseg = gallsegInstalled
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
