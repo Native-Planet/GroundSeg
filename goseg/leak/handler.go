@@ -93,6 +93,7 @@ func urbitLogout(patp string) {
 
 // login from urbit
 func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
+	logger.Logger.Warn(fmt.Sprintf("%+v", isAuth))
 	var payload structs.WsLoginPayload
 	err := json.Unmarshal(loginPayload, &payload)
 	if err != nil {

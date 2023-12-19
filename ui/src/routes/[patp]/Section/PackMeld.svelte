@@ -1,4 +1,5 @@
 <script>
+  import UnplugWarning from './UnplugWarning.svelte';
   // Style
   import "../theme.css"
   import { openModal } from 'svelte-modals'
@@ -10,6 +11,7 @@
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let patp
+  export let ownShip
 
   const dispatch = createEventDispatcher()
 
@@ -33,23 +35,25 @@
   <div class="section-right">
     <div class="btn-wrapper">
       <div class="spacer"></div>
-      <button disabled={tPackMeld.length > 0} class="start urth" on:click={()=>urthPackMeld(patp)}>
-        {#if tPackMeld.length < 1}
-          Pack & Meld
-        {:else if tPackMeld == "stopping"}
-          Getting ready
-        {:else if tPackMeld == "packing"}
-          Packing..
-        {:else if tPackMeld == "melding"}
-          Melding..
-        {:else if tPackMeld == "starting"}
-          Starting ship
-        {:else if tPackMeld == "success"}
-          Success!
-        {:else}
-          Failed :(
-        {/if}
-      </button>
+      <UnplugWarning component={"meld"} {ownShip}>
+        <button disabled={tPackMeld.length > 0} class="start urth" on:click={()=>urthPackMeld(patp)}>
+          {#if tPackMeld.length < 1}
+            Pack & Meld
+          {:else if tPackMeld == "stopping"}
+            Getting ready
+          {:else if tPackMeld == "packing"}
+            Packing..
+          {:else if tPackMeld == "melding"}
+            Melding..
+          {:else if tPackMeld == "starting"}
+            Starting ship
+          {:else if tPackMeld == "success"}
+            Success!
+          {:else}
+            Failed :(
+          {/if}
+        </button>
+      </UnplugWarning>
       <button disabled={tPack.length > 0} class="start" on:click={()=>marsPack(patp)}>
         {#if tPack.length < 1}
           Pack
@@ -69,6 +73,12 @@
 </div>
 
 <style>
+  .section-left {
+    flex: 3;
+  }
+  .section-right {
+    flex: 4;
+  }
   .btn-wrapper {
     display: flex; 
     gap: 8px;

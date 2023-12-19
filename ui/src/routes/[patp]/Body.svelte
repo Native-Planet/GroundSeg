@@ -1,4 +1,5 @@
 <script>
+  import { afterUpdate } from 'svelte'
   import { 
     toggleDevMode,
     toggleAutoBoot,
@@ -26,6 +27,14 @@
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   export let patp
+
+  let ownShip = false
+
+  afterUpdate(()=>{
+    if ($URBIT_MODE) {
+      ownShip = (window.ship == patp)
+    }
+  })
 
   // info
   $: ship = ($structure?.urbits?.[patp]?.info)
@@ -74,6 +83,7 @@
     {running}
     {detectBootStatus}
     {tTogglePower}
+    {ownShip}
     on:click={()=>toggleUrbitPower(patp)} 
     />
 
@@ -106,16 +116,32 @@
   <!-- Pack & Meld -->
   <PackMeld
     {patp}
+    {ownShip}
     />
 
   <!-- Remote Access -->
-  <RemoteAccess {remoteReady} {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess
+    on:click={()=>toggleNetwork(patp)}
+    {remoteReady}
+    {remote}
+    {tToggleNetwork}
+    {ownShip}
+    />
 
   <!-- Dev Mode -->
-  <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
+  <DevMode
+    on:click={()=>toggleDevMode(patp)}
+    {devMode}
+    {tToggleDevMode}
+    {ownShip}
+    />
 
   <!-- Loom -->
-  <Loom {patp} {loomSize} />
+  <Loom
+    {patp}
+    {loomSize} 
+    {ownShip}
+    />
   
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />

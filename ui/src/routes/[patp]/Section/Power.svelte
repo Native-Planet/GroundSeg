@@ -1,5 +1,6 @@
 <script>
   import ToggleButton from '$lib/ToggleButton.svelte'
+  import UnplugWarning from './UnplugWarning.svelte';
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
@@ -8,6 +9,7 @@
   import { URBIT_MODE } from '$lib/stores/data'
 
   export let patp
+  export let ownShip
   export let running
   export let detectBootStatus
   export let tTogglePower
@@ -33,11 +35,13 @@
     </div>
   </div>
   <div class="section-right">
-    <ToggleButton
-      on:click={()=>dispatch("click")}
-      on={running}
-      loading={tTogglePower}
-      />
+    <UnplugWarning component={"power"} {ownShip}>
+      <ToggleButton
+        on:click={()=>dispatch("click")}
+        on={running}
+        loading={tTogglePower}
+        />
+    </UnplugWarning>
   </div>
 </div>
 
