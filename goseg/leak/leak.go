@@ -29,9 +29,15 @@ func StartLeak() {
 	oldBroadcast := structs.AuthBroadcast{}
 	var err error
 
+	lastRcv := time.Now()
 	for {
 		var newBroadcast structs.AuthBroadcast
 		newBroadcast = <-LeakChan
+		currentTime := time.Now()
+		if currentTime.Sub(lastRcv) < time.Second {
+			continue
+		}
+		lastRcv = currentTime
 		newBroadcast.Type = "structure"
 		newBroadcast.AuthLevel = "authorized"
 		// result of broadcastUpdate becomes the new-oldBroadcast
