@@ -144,7 +144,7 @@ func makeBroadcast(contName string, status string) {
 // loop to make sure ships are reachable
 // if 502 2x in 2 min, restart wg container
 func Check502Loop() {
-	status := make(map[string]bool)
+	badCheck := false
 	time.Sleep(180 * time.Second)
 	for {
 		time.Sleep(120 * time.Second)
@@ -183,72 +183,19 @@ func Check502Loop() {
 				resp.Body.Close()
 				if resp.StatusCode == http.StatusBadGateway {
 					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
-					if _, found := status[pier]; found {
-						// found = 2x in a row
-
-						// record all remote ships
-						wgShips := map[string]bool{}
-						piers := conf.Piers
-						pierStatus, err := docker.GetShipStatus(piers)
-						if err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+					// if we have 502'd twice in a row, restart docker daemon and rebuild
+					if badCheck {
+						if err := GracefulDaemonRestart(); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Error reloading Docker daemon: %v", err))
 						}
-						for pier, status := range pierStatus {
-							dockerConfig := config.UrbitConf(pier)
-							if dockerConfig.Network == "wireguard" {
-								wgShips[pier] = (status == "Up" || strings.HasPrefix(status, "Up "))
-							}
-						}
-
-						// restart wireguard container
-						if err := docker.RestartContainer("wireguard"); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
-						}
-						// operate on urbit ships
-						for patp, isRunning := range wgShips {
-							if isRunning {
-								if err := click.BarExit(patp); err != nil {
-									logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
-								} else {
-									for {
-										exited, err := shipExited(patp)
-										if err == nil {
-											if !exited {
-												continue
-											}
-										}
-										break
-									}
-								}
-							}
-							// delete container
-							if err := docker.DeleteContainer(patp); err != nil {
-								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
-							}
-							minio := fmt.Sprintf("minio_%s", patp)
-							if err := docker.DeleteContainer(minio); err != nil {
-								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
-							}
-						}
-						// create startram containers
-						if err := docker.LoadUrbits(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
-						}
-						if err := docker.LoadMC(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
-						}
-						if err := docker.LoadMinIOs(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
-						}
-						// remove from map after restart
-						delete(status, pier)
+						badCheck = false
 					} else {
 						// first 502
-						status[pier] = true
+						badCheck = true
 					}
-				} else if _, found := status[pier]; found {
-					// if not 502 and pier is in status map, remove it
-					delete(status, pier)
+				} else if badCheck {
+					// if not 502 and previously had bad check, reset
+					badCheck = false
 				}
 			}
 		}
@@ -290,10 +237,8 @@ func GracefulDaemonRestart() error {
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
 	}
-	runningShips := []string{}
 	for patp, status := range pierStatus {
 		if status == "Up" || strings.HasPrefix(status, "Up ") {
-			runningShips = append(runningShips, patp)
 			if err := click.BarExit(patp); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
 				continue
@@ -303,15 +248,19 @@ func GracefulDaemonRestart() error {
 				if err != nil {
 					break
 				}
-				logger.Logger.Warn(fmt.Sprintf("%s", status))
+				logger.Logger.Debug(fmt.Sprintf("%s", status))
 				if !strings.Contains(status, "Up") {
 					break
 				}
 				time.Sleep(1 * time.Second)
 			}
-			if err := docker.DeleteContainer(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
-			}
+		}
+		if err := docker.DeleteContainer(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+		}
+		minio := fmt.Sprintf("minio_%s", patp)
+		if err := docker.DeleteContainer(minio); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 		}
 	}
 	cmd := exec.Command("systemctl", "restart", "docker.socket", "docker")
@@ -319,11 +268,18 @@ func GracefulDaemonRestart() error {
 	if err != nil {
 		return fmt.Errorf("Failed to restart Docker daemon: %v", err)
 	}
-	for _, ship := range runningShips {
-		_, err := docker.StartContainer(ship, "vere")
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error recreating %v: %v", ship, err))
-		}
+	_, err = docker.StartContainer("wireguard", "wireguard")
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Error recreating wireguard: %v", err))
+	}
+	if err := docker.LoadUrbits(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
+	}
+	if err := docker.LoadMC(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+	}
+	if err := docker.LoadMinIOs(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
 	}
 	return nil
 }
