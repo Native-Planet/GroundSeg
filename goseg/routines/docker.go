@@ -146,15 +146,15 @@ func makeBroadcast(contName string, status string) {
 // if 502 2x in 2 min, restart wg container
 func Check502Loop() {
 	badCheck := false
-	time.Sleep(18 * time.Second)
+	time.Sleep(180 * time.Second)
 	for {
-		time.Sleep(12 * time.Second)
+		time.Sleep(120 * time.Second)
 		conf := config.Conf()
-		// pierStatus, err := docker.GetShipStatus(conf.Piers)
-		// if err != nil {
-		// 	logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
-		// 	continue
-		// }
+		pierStatus, err := docker.GetShipStatus(conf.Piers)
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
+			continue
+		}
 		for _, pier := range conf.Piers {
 			err := config.LoadUrbitConfig(pier)
 			if err != nil {
@@ -168,11 +168,10 @@ func Check502Loop() {
 					logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 					continue
 				}
-				// turnedOn := false
-				// if strings.Contains(pierStatus[pier], "Up") {
-				// 	turnedOn = true
-				// }
-				turnedOn := true // for debug
+				turnedOn := false
+				if strings.Contains(pierStatus[pier], "Up") {
+					turnedOn = true
+				}
 				if turnedOn && pierNetwork != "default" && conf.WgOn {
 					if _, err := click.GetLusCode(pier); err != nil {
 						logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
