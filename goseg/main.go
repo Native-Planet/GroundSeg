@@ -94,13 +94,11 @@ func C2cLoop() {
 					cmd.Run()
 				}
 			}
-		} else if internetAvailable {
-			if conf.C2cInterval == 0 {
-				if err := config.UpdateConf(map[string]interface{}{
-					"c2cInterval": 600,
-				}); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
-				}
+		} else if internetAvailable && conf.C2cInterval == 0 {
+			if err := config.UpdateConf(map[string]interface{}{
+				"c2cInterval": 600,
+			}); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
 			}
 		}
 		time.Sleep(60 * time.Second)
