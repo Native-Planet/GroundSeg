@@ -124,7 +124,7 @@ func makeBroadcast(contName string, status string) {
 	case "wireguard":
 		var wgOn bool
 		// set wgOn to false
-		if status == "die" {
+		if status == "die" || status == "stop" {
 			wgOn = false
 		}
 		// set wgOn to true
