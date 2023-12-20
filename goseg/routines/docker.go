@@ -146,9 +146,9 @@ func makeBroadcast(contName string, status string) {
 // if 502 2x in 2 min, restart wg container
 func Check502Loop() {
 	badCheck := false
-	time.Sleep(180 * time.Second)
+	time.Sleep(18 * time.Second)
 	for {
-		time.Sleep(120 * time.Second)
+		time.Sleep(12 * time.Second)
 		conf := config.Conf()
 		pierStatus, err := docker.GetShipStatus(conf.Piers)
 		if err != nil {
@@ -195,6 +195,8 @@ func Check502Loop() {
 							// first 502
 							badCheck = true
 						}
+					} else {
+						logger.Logger.Debug(fmt.Sprintf("502 loop: %v: %v", pier, resp.StatusCode))
 					}
 				}
 			}
