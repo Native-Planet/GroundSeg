@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	eventBus = make(chan structs.Event, 100)
+	eventBus           = make(chan structs.Event, 100)
+	DisableShipRestart = false
 )
 
 func init() {
@@ -69,7 +70,7 @@ func DockerSubscriptionHandler() {
 				containerState.ActualStatus = "stopped"
 				config.UpdateContainerState(contName, containerState)
 				// start it again if this isn't what the user wants
-				if containerState.DesiredStatus != "stopped" {
+				if containerState.DesiredStatus != "stopped" && !DisableShipRestart {
 					docker.StartContainer(contName, containerState.Type)
 				}
 				makeBroadcast(contName, dockerEvent.Action)
@@ -161,41 +162,43 @@ func Check502Loop() {
 				continue
 			}
 			shipConf := config.UrbitConf(pier)
-			pierNetwork, err := docker.GetContainerNetwork(pier)
-			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
-				continue
-			}
-			turnedOn := false
-			if strings.Contains(pierStatus[pier], "Up") {
-				turnedOn = true
-			}
-			if turnedOn && pierNetwork != "default" && conf.WgOn {
-				if _, err := click.GetLusCode(pier); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
-					continue
-				}
-				resp, err := http.Get("https://" + shipConf.WgURL)
+			if shipConf.BootStatus != "noboot" && shipConf.BootStatus != "ignore" {
+				pierNetwork, err := docker.GetContainerNetwork(pier)
 				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+					logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 					continue
 				}
-				resp.Body.Close()
-				if resp.StatusCode == http.StatusBadGateway {
-					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
-					// if we have 502'd twice in a row, restart docker daemon and rebuild
-					if badCheck {
-						if err := GracefulDaemonRestart(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Error reloading Docker daemon: %v", err))
-						}
-						badCheck = false
-					} else {
-						// first 502
-						badCheck = true
+				turnedOn := false
+				if strings.Contains(pierStatus[pier], "Up") {
+					turnedOn = true
+				}
+				if turnedOn && pierNetwork != "default" && conf.WgOn {
+					if _, err := click.GetLusCode(pier); err != nil {
+						logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
+						continue
 					}
-				} else if badCheck {
-					// if not 502 and previously had bad check, reset
-					badCheck = false
+					resp, err := http.Get("https://" + shipConf.WgURL)
+					if err != nil {
+						logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+						continue
+					}
+					resp.Body.Close()
+					if resp.StatusCode == http.StatusBadGateway {
+						logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
+						// if we have 502'd twice in a row, restart docker daemon and rebuild
+						if badCheck {
+							if err := GracefulDaemonRestart(); err != nil {
+								logger.Logger.Error(fmt.Sprintf("Error reloading Docker daemon: %v", err))
+							}
+							badCheck = false
+						} else {
+							// first 502
+							badCheck = true
+						}
+					} else if badCheck {
+						// if not 502 and previously had bad check, reset
+						badCheck = false
+					}
 				}
 			}
 		}
@@ -220,6 +223,10 @@ func shipExited(patp string) (bool, error) {
 }
 
 func GracefulDaemonRestart() error {
+	DisableShipRestart = true
+	defer func() {
+		DisableShipRestart = false
+	}()
 	getShipRunningStatus := func(patp string) (string, error) {
 		statuses, err := docker.GetShipStatus([]string{patp})
 		if err != nil {
@@ -280,6 +287,50 @@ func GracefulDaemonRestart() error {
 	}
 	if err := docker.LoadMinIOs(); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
+	}
+	return nil
+}
+
+func GracefulShipExit() error {
+	DisableShipRestart = true
+	defer func() {
+		DisableShipRestart = false
+	}()
+	getShipRunningStatus := func(patp string) (string, error) {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return "", fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return "", fmt.Errorf("%s status doesn't exist", patp)
+		}
+		return status, nil
+	}
+	conf := config.Conf()
+	piers := conf.Piers
+	pierStatus, err := docker.GetShipStatus(piers)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+	}
+	for patp, status := range pierStatus {
+		if status == "Up" || strings.HasPrefix(status, "Up ") {
+			if err := click.BarExit(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
+				continue
+			}
+			for {
+				status, err := getShipRunningStatus(patp)
+				if err != nil {
+					break
+				}
+				logger.Logger.Debug(fmt.Sprintf("%s", status))
+				if !strings.Contains(status, "Up") {
+					break
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}
 	}
 	return nil
 }

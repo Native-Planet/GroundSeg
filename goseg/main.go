@@ -1,6 +1,6 @@
 package main
 
-// NativePlanet GroundSeg: Go Edition (groundseg)
+// NativePlanet GroundSeg: Go Edition (goseg)
 // 🄯 2023 ~nallux-dozryl & ~sitful-hatred
 // This is a Golang rewrite of GroundSeg that serves the v2 json
 // object via websocket.
@@ -33,6 +33,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -59,16 +60,22 @@ var (
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func C2cLoop() {
+	conf := config.Conf()
+	isNPBox := system.IsNPBox(config.BasePath)
 	c2cActive := false
 	for {
 		internetAvailable := connCheck()
-		if !internetAvailable && !c2cActive && system.Device != "" {
+		if !internetAvailable && !c2cActive && system.Device != "" && isNPBox {
 			if err := system.C2CMode(); err != nil {
 				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
 			} else {
 				logger.Logger.Info("No connection -- entering C2C mode")
 				c2cActive = true
 				system.SetC2CMode(true)
+				// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
+				if conf.C2cInterval > 0 {
+					go killSwitch()
+				}
 			}
 		} else if internetAvailable && c2cActive {
 			if err := system.UnaliveC2C(); err != nil {
@@ -77,9 +84,43 @@ func C2cLoop() {
 				logger.Logger.Info("Connection detected -- exiting C2C mode")
 				c2cActive = false
 				system.SetC2CMode(false)
+				routines.GracefulShipExit()
+				if config.DebugMode {
+					logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+					os.Exit(0)
+				} else {
+					logger.Logger.Info(fmt.Sprintf("Rebooting device.."))
+					cmd := exec.Command("reboot")
+					cmd.Run()
+				}
+			}
+		} else if internetAvailable {
+			if conf.C2cInterval == 0 {
+				if err := config.UpdateConf(map[string]interface{}{
+					"c2cInterval": 600,
+				}); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
+				}
 			}
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(60 * time.Second)
+	}
+}
+
+func killSwitch() {
+	for {
+		conf := config.Conf()
+		time.Sleep(time.Duration(conf.C2cInterval) * time.Second)
+		logger.Logger.Info("Graceful reboot from C2C mode...")
+		routines.GracefulShipExit()
+		if config.DebugMode {
+			logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+			os.Exit(0)
+		} else {
+			logger.Logger.Info(fmt.Sprintf("Rebooting device.."))
+			cmd := exec.Command("reboot")
+			cmd.Run()
+		}
 	}
 }
 

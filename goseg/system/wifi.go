@@ -118,14 +118,14 @@ func C2CMode() error {
 	// store ssids
 	C2CStoredSSIDs = ListWifiSSIDs(dev[0])
 	// disable systemd-resolved
-	cmd := exec.Command("systemctl", "disable", "systemd-resolved")
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Logger.Debug(fmt.Sprintf("Failed to disable systemd-resolved: %v", err))
-	}
+	// cmd := exec.Command("systemctl", "disable", "systemd-resolved")
+	// _, err := cmd.CombinedOutput()
+	// if err != nil {
+	// 	logger.Logger.Debug(fmt.Sprintf("Failed to disable systemd-resolved: %v", err))
+	// }
 	// stop systemd-resolved
-	cmd = exec.Command("systemctl", "stop", "systemd-resolved")
-	_, err = cmd.CombinedOutput()
+	cmd := exec.Command("systemctl", "stop", "systemd-resolved")
+	_, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Logger.Debug(fmt.Sprintf("Failed to stop systemd-resolved: %v", err))
 	}
