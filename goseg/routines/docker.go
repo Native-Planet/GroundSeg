@@ -195,9 +195,6 @@ func Check502Loop() {
 							// first 502
 							badCheck = true
 						}
-					} else if badCheck {
-						// if not 502 and previously had bad check, reset
-						badCheck = false
 					}
 				}
 			}
