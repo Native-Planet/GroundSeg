@@ -150,11 +150,11 @@ func Check502Loop() {
 	for {
 		time.Sleep(12 * time.Second)
 		conf := config.Conf()
-		pierStatus, err := docker.GetShipStatus(conf.Piers)
-		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
-			continue
-		}
+		// pierStatus, err := docker.GetShipStatus(conf.Piers)
+		// if err != nil {
+		// 	logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
+		// 	continue
+		// }
 		for _, pier := range conf.Piers {
 			err := config.LoadUrbitConfig(pier)
 			if err != nil {
