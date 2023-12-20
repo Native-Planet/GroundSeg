@@ -131,9 +131,6 @@ func makeBroadcast(contName string, status string) {
 		if status == "start" {
 			wgOn = true
 		}
-		if err := config.UpdateConf(map[string]interface{}{"wgOn": wgOn}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
-		}
 		// update profile
 		current := broadcast.GetState()
 		current.Profile.Startram.Info.Running = wgOn
