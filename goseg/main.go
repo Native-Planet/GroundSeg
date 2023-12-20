@@ -59,49 +59,27 @@ var (
 )
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
-func C2cLoop() {
+func C2cCheck() {
 	conf := config.Conf()
 	isNPBox := system.IsNPBox(config.BasePath)
-	c2cActive := false
-	for {
-		internetAvailable := connCheck()
-		if !internetAvailable && !c2cActive && system.Device != "" && isNPBox {
-			if err := system.C2CMode(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
-			} else {
-				logger.Logger.Info("No connection -- entering C2C mode")
-				c2cActive = true
-				system.SetC2CMode(true)
-				// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
-				if conf.C2cInterval > 0 {
-					go killSwitch()
-				}
-			}
-		} else if internetAvailable && c2cActive {
-			if err := system.UnaliveC2C(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error deactivating C2C mode: %v", err))
-			} else {
-				logger.Logger.Info("Connection detected -- exiting C2C mode")
-				c2cActive = false
-				system.SetC2CMode(false)
-				routines.GracefulShipExit()
-				if config.DebugMode {
-					logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
-					os.Exit(0)
-				} else {
-					logger.Logger.Info(fmt.Sprintf("Rebooting device.."))
-					cmd := exec.Command("reboot")
-					cmd.Run()
-				}
-			}
-		} else if internetAvailable && conf.C2cInterval == 0 {
-			if err := config.UpdateConf(map[string]interface{}{
-				"c2cInterval": 600,
-			}); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
+	internetAvailable := connCheck()
+	if !internetAvailable && system.Device != "" && isNPBox {
+		if err := system.C2CMode(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
+		} else {
+			logger.Logger.Info("No connection -- entering C2C mode")
+			system.SetC2CMode(true)
+			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
+			if conf.C2cInterval > 0 {
+				go killSwitch()
 			}
 		}
-		time.Sleep(60 * time.Second)
+	} else if internetAvailable && conf.C2cInterval == 0 {
+		if err := config.UpdateConf(map[string]interface{}{
+			"c2cInterval": 600,
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
+		}
 	}
 }
 
@@ -214,7 +192,7 @@ func main() {
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
 	// ongoing connectivity check
-	go C2cLoop()
+	go C2cCheck()
 	// async operation to retrieve version info if updates are on
 	versionUpdateChannel := make(chan bool)
 	remoteVersion := false
