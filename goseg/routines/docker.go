@@ -168,10 +168,11 @@ func Check502Loop() {
 					logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 					continue
 				}
-				turnedOn := false
-				if strings.Contains(pierStatus[pier], "Up") {
-					turnedOn = true
-				}
+				// turnedOn := false
+				// if strings.Contains(pierStatus[pier], "Up") {
+				// 	turnedOn = true
+				// }
+				turnedOn := true // for debug
 				if turnedOn && pierNetwork != "default" && conf.WgOn {
 					if _, err := click.GetLusCode(pier); err != nil {
 						logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
