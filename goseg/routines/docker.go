@@ -10,6 +10,7 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -269,4 +270,60 @@ func shipExited(patp string) (bool, error) {
 		}
 		return true, nil
 	}
+}
+
+func GracefulDaemonRestart() error {
+	getShipRunningStatus := func(patp string) (string, error) {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return "", fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return "", fmt.Errorf("%s status doesn't exist", patp)
+		}
+		return status, nil
+	}
+	conf := config.Conf()
+	piers := conf.Piers
+	pierStatus, err := docker.GetShipStatus(piers)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+	}
+	runningShips := []string{}
+	for patp, status := range pierStatus {
+		if status == "Up" || strings.HasPrefix(status, "Up ") {
+			runningShips = append(runningShips, patp)
+			if err := click.BarExit(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
+				continue
+			}
+			for {
+				status, err := getShipRunningStatus(patp)
+				if err != nil {
+					break
+				}
+				logger.Logger.Warn(fmt.Sprintf("%s", status))
+				if !strings.Contains(status, "Up") {
+					break
+				}
+				time.Sleep(1 * time.Second)
+			}
+			if err := docker.DeleteContainer(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+			}
+		}
+	}
+	cmd := exec.Command("systemctl", "restart", "docker.socket", "docker")
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to restart Docker daemon: %v", err)
+	}
+	for _, ship := range runningShips {
+		_, err := docker.StartContainer(ship, "vere")
+		if err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error recreating %v: %v", ship, err))
+		}
+	}
+	return nil
 }
