@@ -10,7 +10,7 @@
 {#if $URBIT_MODE && ownShip}
   <div class="rad-wrapper">
     <div class="spacer"></div>
-    <div class="rad" on:click={()=>openModal(UnplugModal, {"component":component})}>
+    <div class="rad" class:dead={component=="power"} on:click={()=>openModal(UnplugModal, {"component":component})}>
       <Fa icon={faPlugCircleExclamation} size="1.5x" />
     </div>
     <slot />
@@ -30,5 +30,8 @@
   .rad {
     cursor: pointer;
     color: orange;
+  }
+  .dead {
+    color: red;
   }
 </style>
