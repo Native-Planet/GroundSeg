@@ -48,6 +48,12 @@ pipeline {
         stage('determine channel') {
             steps {
                 script {
+                    env.channel = sh(
+                        script: '''#!/bin/bash -x
+                            echo "${params.CHANNEL}"
+                        ''', 
+                        returnStdout: true
+                    ).trim()
                     env.binTag = sh(
                         script: '''#!/bin/bash -x
                             if [ "${env.channel}" = "latest" ]; then
