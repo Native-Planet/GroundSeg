@@ -54,7 +54,8 @@ func Start(dev string) error {
 	return nil
 }
 
-func Stop() error {
+func Stop(dev string) error {
+	wlan = dev
 	// make sure params are set (maybe not needed)
 	if err := checkParameters(); err != nil {
 		return err

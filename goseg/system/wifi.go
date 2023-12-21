@@ -131,7 +131,7 @@ func C2CMode() error {
 		logger.Logger.Debug(fmt.Sprintf("Failed to stop systemd-resolved: %v", err))
 	}
 	// stop AP
-	accesspoint.Stop()
+	accesspoint.Stop(dev[0])
 	// start AP
 	if err := accesspoint.Start(dev[0]); err != nil {
 		return err
@@ -163,7 +163,8 @@ func C2CConnect(ssid, password string) {
 
 func UnaliveC2C() error {
 	// stop AP
-	accesspoint.Stop()
+	dev, _ := getWifiDevice()
+	accesspoint.Stop(dev[0])
 	// start systemd-resolved
 	return EnableResolved()
 }
