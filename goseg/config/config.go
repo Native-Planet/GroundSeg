@@ -176,6 +176,7 @@ func init() {
 			logger.Logger.Error(fmt.Sprintf("%v", err))
 		}
 	}
+	go ConfChannel()
 }
 
 // return the global conf var
@@ -201,6 +202,24 @@ func getBasePath() string {
 		return "/opt/nativeplanet/groundseg"
 	default:
 		return os.Getenv("GS_BASE_PATH")
+	}
+}
+
+// listen for events from imported packages
+func ConfChannel() {
+	for {
+		event := <-system.ConfChannel
+		switch event {
+		case "c2cInterval":
+			conf := Conf()
+			if conf.C2cInterval == 0 {
+				if err := UpdateConf(map[string]interface{}{
+					"c2cInterval": 600,
+				}); err != nil {
+					logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
+				}
+			}
+		}
 	}
 }
 

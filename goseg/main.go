@@ -74,12 +74,6 @@ func C2cCheck() {
 				go killSwitch()
 			}
 		}
-	} else if internetAvailable && conf.C2cInterval == 0 {
-		if err := config.UpdateConf(map[string]interface{}{
-			"c2cInterval": 600,
-		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
-		}
 	}
 }
 

@@ -34,9 +34,10 @@ var (
 		AllowedBypassPortal: false,
 		WebPath:             "c2c",
 	}
-	WifiInfo structs.SystemWifi
-	Device   string // wifi device name
-	LocalUrl string // eg nativeplanet.local
+	WifiInfo    structs.SystemWifi
+	Device      string // wifi device name
+	LocalUrl    string // eg nativeplanet.local
+	ConfChannel = make(chan string, 100)
 
 	c2cEnabled = false
 	c2cMu      sync.Mutex
@@ -150,6 +151,8 @@ func C2CConnect(ssid, password string) {
 	if err != nil {
 		C2CMode()
 	} else {
+		ConfChannel <- "c2cInterval"
+		time.Sleep(1 * time.Second)
 		cmd := exec.Command("systemctl", "restart", "docker", "groundseg")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
