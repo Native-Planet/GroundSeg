@@ -83,9 +83,10 @@ pipeline {
             steps {
                     /* build binaries and move to web dir */
                 script {
+                    def channel = "${params.CHANNEL}"
                     if (params.XSEG == 'Goseg') {
                         if(( "${params.CHANNEL}" != "nobuild" ) && ( "${params.CHANNEL}" != "latest" )) {
-                            sh """#!/bin/bash -x
+                            sh '''#!/bin/bash -x
                                 git checkout ${tag}
                                 cd ./ui
                                 DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
@@ -94,13 +95,13 @@ pipeline {
                                 rm -rf ../goseg/web
                                 mv web ../goseg/
                                 cd ../goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${params.CHANNEL}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${params.CHANNEL}
-                            """
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
+                            '''
                         }
                         /* production releases get promoted from edge */
                         if( "${params.CHANNEL}" == "latest" ) {
-                            sh """#!/bin/bash -x
+                            sh '''#!/bin/bash -x
                                 tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
                                 if [[ ${tag} =~ $tagRegex ]]; then
                                     echo "Valid pre-production release tag: ${tag}"
@@ -139,15 +140,15 @@ pipeline {
                                 git tag ${binTag}
                                 git push --set-upstream origin ${binTag}
                                 git push --tags
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${params.CHANNEL}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${params.CHANNEL}
-                            """
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}
+                            '''
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
                             if( "${params.CHANNEL}" != "nobuild" ) {
-                                sh """#!/bin/bash -x
+                                sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
                                     DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
@@ -163,7 +164,7 @@ pipeline {
                                     cd ..
                                     rm -rf globber
                                     echo "HASH=${hash}"
-                                """
+                                '''
                             }
                         }
                     }
@@ -173,24 +174,25 @@ pipeline {
         stage('move binaries') {
             steps {
                 script {
+                    def channel = "${params.CHANNEL}"
                     /* copy to r2 */
                     if (params.XSEG == 'Goseg') {
                         if( "${params.CHANNEL}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
-                            sh """#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${params.CHANNEL} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${params.CHANNEL} r2:groundseg/bin
-                            """
+                            sh '''#!/bin/bash -x
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel} r2:groundseg/bin
+                            '''
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
                             if( "${params.CHANNEL}" != "nobuild" ) {  
                                 sh 'echo "debug: post-build actions"'
-                                sh """#!/bin/bash -x
+                                sh '''#!/bin/bash -x
                                 source /opt/groundseg/version/glob/globhash.env
                                 rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
-                                """
+                                '''
                             }
                         }
                     }
@@ -201,61 +203,61 @@ pipeline {
             environment {
                 /* update versions and hashes on public version server */
                 armsha = sh(
-                    script: """#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${params.CHANNEL}|awk '{print \$1}'`
+                    script: '''#!/bin/bash -x
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel}|awk '{print \$1}'`
                         echo ${val}
-                    """,
+                    ''',
                     returnStdout: true
                 ).trim()
                 amdsha = sh(
-                    script: """#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${params.CHANNEL}|awk '{print \$1}'`
+                    script: '''#!/bin/bash -x
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${env.channel}|awk '{print \$1}'`
                         echo ${val}
-                    """,
+                    ''',
                     returnStdout: true
                 ).trim()
                 major = sh(
-                    script: """#!/bin/bash -x
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         major=`echo ${ver}|awk -F '.' '{print \$1}'|sed 's/v//g'`
                         echo ${major}
-                    """,
+                    ''',
                     returnStdout: true
                 ).trim()
                 minor = sh(
-                    script: """#!/bin/bash -x
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         minor=`echo ${ver}|awk -F '.' '{print \$2}'|sed 's/v//g'`
                         echo ${minor}
-                    """,
+                    ''',
                     returnStdout: true
                 ).trim()
                 patch = sh(
-                    script: """#!/bin/bash -x
+                    script: '''#!/bin/bash -x
                         ver=${tag}
                         if [[ "${tag}" == *"-"* ]]; then
                             ver=`echo ${tag}|awk -F '-' '{print \$1}'`
                         fi
                         patch=`echo ${ver}|awk -F '.' '{print \$3}'|sed 's/v//g'`
                         echo ${patch}
-                    """,
+                    ''',
                     returnStdout: true
                 ).trim()
-                armbin = "https://files.native.computer/bin/groundseg_arm64_${env.binTag}_${params.CHANNEL}"
-                amdbin = "https://files.native.computer/bin/groundseg_amd64_${env.binTag}_${params.CHANNEL}"
+                armbin = "https://files.native.computer/bin/groundseg_arm64_${env.binTag}_${channel}"
+                amdbin = "https://files.native.computer/bin/groundseg_amd64_${env.binTag}_${channel}"
             }
             steps {
                 script {
                     if (params.XSEG == 'Goseg') {
                         def to_canary = "${params.TO_CANARY}".toLowerCase()
                         if( "${params.CHANNEL}" == "latest" ) {
-                            sh """#!/bin/bash -x
+                            sh '''#!/bin/bash -x
                                 cp ./release/standard_install.sh /opt/groundseg/get/install.sh
                                 cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
                                 webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
@@ -292,10 +294,10 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
-                            """
+                            '''
                         }
                         if( "${params.CHANNEL}" == "edge" ) {
-                            sh """#!/bin/bash -x
+                            sh '''#!/bin/bash -x
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
                                     -d "{\\"value\\":\\"${amdbin}\\"}"
@@ -312,10 +314,10 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/minor/${minor}
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
-                            """
+                            '''
                         }
                         if( "${params.CHANNEL}" == "true" ) {
-                            sh """#!/bin/bash -x
+                            sh '''#!/bin/bash -x
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
                                     -d "{\\"value\\":\\"${amdbin}\\"}"
@@ -332,7 +334,7 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" \
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
-                            """
+                            '''
                         }
                     }
                 }
@@ -359,11 +361,11 @@ pipeline {
                     if(( "${params.CHANNEL}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			                sh (
-                                script: """#!/bin/bash -x
+                                script: '''#!/bin/bash -x
                                     git checkout master
                                     git merge ${tag} -m "Merged ${tag}"
                                     git push
-                                """
+                                '''
                             )
 			            }
                     }
@@ -375,13 +377,13 @@ pipeline {
                 script {
                     if( "${params.CHANNEL}" == "latest" ) {
 			            sh (
-                            script: """#!/bin/bash -x
+                            script: '''#!/bin/bash -x
                                 MESSAGE="Release ${binTag}"
                                 VERSION=$(echo "${binTag}"|sed "s/v//g")
                                 API_JSON="{\\"tag_name\\": \\"${binTag}\\",\\"target_commitish\\": \\"master\\",\\"name\\": \\"${binTag}\\",\\"body\\": \\"${MESSAGE}\\",\\"draft\\": false,\\"prerelease\\": false}"
                                 API_RESPONSE_STATUS=$(curl -H "Authorization: token ${npGhToken}" --data "$API_JSON" -s -i "https://api.github.com/repos/Native-Planet/GroundSeg/releases")
                                 echo "Release: ${API_RESPONSE_STATUS}"
-                            """
+                            '''
                         )
                     }
                 }
