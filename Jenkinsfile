@@ -203,18 +203,18 @@ pipeline {
             environment {
                 channel = "${params.CHANNEL}"
                 /* update versions and hashes on public version server */
-                armsha = sh(
-                    script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}|awk '{print \$1}'`
-                        echo ${val}
-                    ''',
+                def armsha = sh(
+                    script: """#!/bin/bash -x
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} | awk '{print \$1}'`
+                        echo \${val}
+                    """,
                     returnStdout: true
                 ).trim()
-                amdsha = sh(
-                    script: '''#!/bin/bash -x
-                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}|awk '{print \$1}'`
-                        echo ${val}
-                    ''',
+                def amdsha = sh(
+                    script: """#!/bin/bash -x
+                        val=`sha256sum /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} |awk '{print \$1}'`
+                        echo \${val}
+                    """,
                     returnStdout: true
                 ).trim()
                 major = sh(
