@@ -115,7 +115,7 @@ pipeline {
                                 git config --global user.email "mgmt@nativeplanet.io"
                                 git config --global user.name "Native Planet CICD"
                                 git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
-                                sed -i "4s/.*/export const version = writable(\\"${binTag}\\")" ./ui/src/lib/stores/display.js
+                                sed -i "4s/.*/export const version = writable(\\"${binTag}\\")/" ./ui/src/lib/stores/display.js
                                 sed -i "11s/.*/TAG=${binTag}/" ./release/groundseg_install.sh
                                 version_defaults="./goseg/defaults/version.go"
                                 json_blob=$(curl -s https://version.groundseg.app)
