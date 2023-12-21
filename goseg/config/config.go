@@ -246,6 +246,18 @@ func persistConf(configMap map[string]interface{}) error {
 	if err := ioutil.WriteFile(confPath, updatedJSON, 0644); err != nil {
 		return fmt.Errorf("Error writing to file: %v", err)
 	}
+	confPath := filepath.Join(BasePath, "settings", "system.json")
+	file, err := os.Open(confPath)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't open system.json: %v", err))
+	} else {
+		decoder := json.NewDecoder(file)
+		confMutex.Lock()
+		defer confMutex.Unlock()
+		if err = decoder.Decode(&globalConfig); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
+		}
+	}
 	return nil
 }
 
