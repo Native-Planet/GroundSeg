@@ -93,9 +93,9 @@ pipeline {
                                 docker cp $container_id:/webui/build ./web
                                 rm -rf ../goseg/web
                                 mv web ../goseg/
-                                cd ../goseg
                             '''
                             sh """#!/bin/bash -x
+                                cd ./goseg
                                 env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
                                 env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
                             """
@@ -143,6 +143,7 @@ pipeline {
                                 git push --tags
                             '''
                             sh """#!/bin/bash -x
+                                cd ./goseg
                                 env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
                                 env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
                             """
