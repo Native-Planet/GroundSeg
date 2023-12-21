@@ -103,6 +103,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	switch act {
 	case "boot":
 		scriptContent = defaults.StartScript
+	case "ignore":
+		scriptContent = defaults.StartScript
 	case "pack":
 		scriptContent = defaults.PackScript
 	case "meld":

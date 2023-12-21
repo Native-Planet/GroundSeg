@@ -201,7 +201,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if conf.WgRegistered && conf.WgOn {
 			minIOPwd, err = config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
 			if err != nil {
-				logger.Logger.Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+				//logger.Logger.Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
 			}
 		}
 		var lusCode string
