@@ -83,7 +83,6 @@ pipeline {
             steps {
                     /* build binaries and move to web dir */
                 script {
-                    def channel = "${params.CHANNEL}"
                     if (params.XSEG == 'Goseg') {
                         if(( "${params.CHANNEL}" != "nobuild" ) && ( "${params.CHANNEL}" != "latest" )) {
                             sh '''#!/bin/bash -x
@@ -95,9 +94,11 @@ pipeline {
                                 rm -rf ../goseg/web
                                 mv web ../goseg/
                                 cd ../goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${tag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${tag}_${channel}
                             '''
+                            sh """#!/bin/bash -x
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
+                            """
                         }
                         /* production releases get promoted from edge */
                         if( "${params.CHANNEL}" == "latest" ) {
