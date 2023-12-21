@@ -58,7 +58,7 @@ pipeline {
                         ''',
                         returnStdout: true
                     ).trim()
-                    env.channel = "${params.CHANNEL}"
+                    env.channel = ${params.CHANNEL}
                 }
             }
         }
