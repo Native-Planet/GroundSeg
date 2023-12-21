@@ -50,7 +50,7 @@ pipeline {
                 script {
                     env.channel = sh(
                         script: '''#!/bin/bash -x
-                            echo "${params.CHANNEL}"
+                            echo "${channel}"
                         ''', 
                         returnStdout: true
                     ).trim()
