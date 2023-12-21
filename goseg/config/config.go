@@ -252,8 +252,8 @@ func persistConf(configMap map[string]interface{}) error {
 		logger.Logger.Error(fmt.Sprintf("Couldn't open system.json: %v", err))
 	} else {
 		decoder := json.NewDecoder(file)
-		confMutex.Lock()
-		defer confMutex.Unlock()
+		// confMutex.Lock()
+		// defer confMutex.Unlock()
 		if err = decoder.Decode(&globalConfig); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
 		}
