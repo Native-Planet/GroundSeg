@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	eventBus = make(chan structs.Event, 100)
+	eventBus           = make(chan structs.Event, 100)
 	DisableShipRestart = false
 )
 

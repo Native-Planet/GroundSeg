@@ -67,7 +67,7 @@ func C2cCheck() {
 		if err := system.C2CMode(); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
 		} else {
-			logger.Logger.Info("No connection -- entering C2C mode")
+			logger.Logger.Info("GroundSeg is in C2C Mode")
 			system.SetC2CMode(true)
 			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
 			if conf.C2cInterval > 0 {
