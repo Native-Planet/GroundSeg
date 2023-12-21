@@ -50,13 +50,13 @@ pipeline {
                 script {
                     env.channel = sh(
                         script: '''#!/bin/bash -x
-                            echo "${channel}"
+                            echo "${params.CHANNEL}"
                         ''', 
                         returnStdout: true
                     ).trim()
                     env.binTag = sh(
                         script: '''#!/bin/bash -x
-                            if [ "${env.channel}" = "latest" ]; then
+                            if [ "${params.CHANNEL}" = "latest" ]; then
                                 echo "${tag%%-*}"
                             else
                                 echo "${tag}"
@@ -84,7 +84,7 @@ pipeline {
                     /* build binaries and move to web dir */
                 script {
                     if (params.XSEG == 'Goseg') {
-                        if(( "${channel}" != "nobuild" ) && ( "${channel}" != "latest" )) {
+                        if(( "${params.CHANNEL}" != "nobuild" ) && ( "${params.CHANNEL}" != "latest" )) {
                             sh '''#!/bin/bash -x
                                 git checkout ${tag}
                                 cd ./ui
@@ -99,7 +99,7 @@ pipeline {
                             '''
                         }
                         /* production releases get promoted from edge */
-                        if( "${channel}" == "latest" ) {
+                        if( "${params.CHANNEL}" == "latest" ) {
                             sh '''#!/bin/bash -x
                                 tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
                                 if [[ ${tag} =~ $tagRegex ]]; then
@@ -146,7 +146,7 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            if( "${channel}" != "nobuild" ) {
+                            if( "${params.CHANNEL}" != "nobuild" ) {
                                 sh '''#!/bin/bash -x
                                     git checkout ${tag}
                                     cd ./ui
@@ -175,7 +175,7 @@ pipeline {
                 script {
                     /* copy to r2 */
                     if (params.XSEG == 'Goseg') {
-                        if( "${channel}" != "nobuild" ) {  
+                        if( "${params.CHANNEL}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
                             sh '''#!/bin/bash -x
                             rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${env.channel} r2:groundseg/bin
@@ -185,7 +185,7 @@ pipeline {
                     }
                     if (params.XSEG == 'Gallseg') {
                         script {
-                            if( "${channel}" != "nobuild" ) {  
+                            if( "${params.CHANNEL}" != "nobuild" ) {  
                                 sh 'echo "debug: post-build actions"'
                                 sh '''#!/bin/bash -x
                                 source /opt/groundseg/version/glob/globhash.env
@@ -254,7 +254,7 @@ pipeline {
                 script {
                     if (params.XSEG == 'Goseg') {
                         def to_canary = "${params.TO_CANARY}".toLowerCase()
-                        if( "${channel}" == "latest" ) {
+                        if( "${params.CHANNEL}" == "latest" ) {
                             sh '''#!/bin/bash -x
                                 cp ./release/standard_install.sh /opt/groundseg/get/install.sh
                                 cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
@@ -294,7 +294,7 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
                             '''
                         }
-                        if( "${channel}" == "edge" ) {
+                        if( "${params.CHANNEL}" == "edge" ) {
                             sh '''#!/bin/bash -x
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
@@ -314,7 +314,7 @@ pipeline {
                                     https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
                             '''
                         }
-                        if( "${channel}" == "true" ) {
+                        if( "${params.CHANNEL}" == "true" ) {
                             sh '''#!/bin/bash -x
                                 curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
                                     https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
@@ -344,7 +344,7 @@ pipeline {
             }
             steps {
                 script {
-                    if( "${channel}" == "edge" ) {
+                    if( "${params.CHANNEL}" == "edge" ) {
                         withSonarQubeEnv('SonarQube') {
                             sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=Native-Planet_GroundSeg_AYZoKNgHuu12TOn3FQ6N -Dsonar.sources=./goseg"
                         }
@@ -356,7 +356,7 @@ pipeline {
             steps {
                 /* merge tag changes into master if deploying to master */
                 script {
-                    if(( "${channel}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
+                    if(( "${params.CHANNEL}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			                sh (
                                 script: '''#!/bin/bash -x
@@ -373,7 +373,7 @@ pipeline {
         stage('github release') {
             steps {
                 script {
-                    if( "${channel}" == "latest" ) {
+                    if( "${params.CHANNEL}" == "latest" ) {
 			            sh (
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${binTag}"
