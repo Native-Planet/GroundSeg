@@ -108,33 +108,29 @@ func ifCheck() bool {
 }
 
 func C2CMode() error {
-	logger.Logger.Debug(fmt.Sprintf("C2C Mode called"))
+	logger.Logger.Info(fmt.Sprintf("C2C Mode initializing"))
 	// make sure wifi is enabled
-	runCommand("nmcli", "radio", "wifi", "on")
+	_, err := runCommand("nmcli", "radio", "wifi", "on")
+	if err != nil {
+		return fmt.Errorf("Couldn't check interface: %v", err)
+	}
 	// this is necessary because it takes a while for the SSIDs to populate
 	time.Sleep(10 * time.Second)
 	// get wifi device
 	dev, _ := getWifiDevice()
-	// todo: start wifi if not started
 	// store ssids
 	C2CStoredSSIDs = ListWifiSSIDs(dev[0])
-	// disable systemd-resolved
-	// cmd := exec.Command("systemctl", "disable", "systemd-resolved")
-	// _, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	logger.Logger.Debug(fmt.Sprintf("Failed to disable systemd-resolved: %v", err))
-	// }
+	logger.Logger.Info(fmt.Sprintf("C2C retrieved available SSIDs: %v", C2CStoredSSIDs))
 	// stop systemd-resolved
-	cmd := exec.Command("systemctl", "stop", "systemd-resolved")
-	_, err := cmd.CombinedOutput()
+	_, err = runCommand("systemctl", "stop", "systemd-resolved")
 	if err != nil {
-		logger.Logger.Debug(fmt.Sprintf("Failed to stop systemd-resolved: %v", err))
+		return fmt.Errorf("Failed to stop resolved: %v", err)
 	}
 	// stop AP
-	accesspoint.Stop(dev[0])
+	//accesspoint.Stop(dev[0])
 	// start AP
 	if err := accesspoint.Start(dev[0]); err != nil {
-		return err
+		return fmt.Errorf("Failed to start accesspoint: %v", err)
 	}
 	return nil
 }
@@ -143,20 +139,27 @@ func C2CConnect(ssid, password string) {
 	logger.Logger.Debug("C2C Attempting to connect to ssid")
 	UnaliveC2C()
 	dev, _ := getWifiDevice()
-	runCommand("nmcli", "radio", "wifi", "on")
+	_, err := runCommand("nmcli", "radio", "wifi", "on")
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to start wifi device %v: %v", dev[0], err))
+	}
 	time.Sleep(5 * time.Second)
-	runCommand("sudo", "ip", "link", "set", dev[0], "up")
+	_, err = runCommand("sudo", "ip", "link", "set", dev[0], "up")
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to set ip link for device %v: %v", dev[0], err))
+	}
 	// attempt to connect
-	err := ConnectToWifi(ssid, password)
+	err = ConnectToWifi(ssid, password)
 	if err != nil {
 		C2CMode()
 	} else {
 		ConfChannel <- "c2cInterval"
 		time.Sleep(1 * time.Second)
-		cmd := exec.Command("systemctl", "restart", "docker", "groundseg")
+		//cmd := exec.Command("systemctl", "restart", "docker", "groundseg")
+		cmd := exec.Command("reboot")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Logger.Debug(fmt.Sprintf("Failed to restart groundseg: %v", err))
+			logger.Logger.Debug(fmt.Sprintf("Failed to reboot device: %v", err))
 		}
 	}
 }
