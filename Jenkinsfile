@@ -48,22 +48,27 @@ pipeline {
         stage('determine channel') {
             steps {
                 script {
-                    env.channel = sh(
-                        script: '''#!/bin/bash -x
+                    // Passing Jenkins parameter to shell script
+                    def channelValue = sh(
+                        script: """#!/bin/bash -x
                             echo "${params.CHANNEL}"
-                        ''', 
+                        """, 
                         returnStdout: true
                     ).trim()
-                    env.binTag = sh(
-                        script: '''#!/bin/bash -x
-                            if [ "${params.CHANNEL}" = "latest" ]; then
-                                echo "${tag%%-*}"
-                            else
-                                echo "${tag}"
-                            fi
-                        ''',
-                        returnStdout: true
-                    ).trim()
+                    echo "Channel Value: ${channelValue}" // Debugging
+
+                    // Determine binTag value based on the channel
+                    def binTagValue = ''
+                    if (channelValue == "latest") {
+                        binTagValue = env.tag.tokenize('-')[0]
+                    } else {
+                        binTagValue = env.tag
+                    }
+                    echo "Bin Tag Value: ${binTagValue}" // Debugging
+
+                    // Set environment variables
+                    env.channel = channelValue
+                    env.binTag = binTagValue
                 }
             }
         }
