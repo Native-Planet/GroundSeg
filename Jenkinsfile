@@ -366,8 +366,10 @@ pipeline {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
 			                sh (
                                 script: '''#!/bin/bash -x
-                                    git checkout master
-                                    git merge ${tag} -m "Merged ${tag}"
+                                    git remote update
+                                    git fetch
+                                    git checkout --track origin/master
+                                    git merge ${binTag} -m "Merged ${tag}"
                                     git push
                                 '''
                             )
