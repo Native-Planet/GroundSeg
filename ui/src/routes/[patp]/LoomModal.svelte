@@ -4,6 +4,7 @@
   import { structure } from '$lib/stores/data'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
   export let patp
   export let curLoomSize
   export let loomSize
@@ -24,6 +25,9 @@
   {#if isOpen}
   <div class="wrapper">
     <div class="header">Modify Urbit Loom</div>
+    {#if $URBIT_MODE}
+      <div class="sub">You are currently accesing GroundSeg through this ship. You will temporarily lose access if you continue.</div> 
+    {/if}
     <div class="name">You are about to change your Urbit loom size from {loomMB} MB to {curLoomMB} MB</div>
     <button disabled={tLoom.Length > 0} on:click={()=>setUrbitLoom(patp, curLoomSize)}>
       {#if tLoom.length < 1}
@@ -89,5 +93,17 @@
   button:disabled {
     opacity: .6;
     pointer-events: none;
+  }
+  .sub {
+    line-height: 32px;
+    font-size: 20px;
+    font-weight: 500;
+    margin-top: 32px;
+    color: var(--text-color);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-style: normal;
+    letter-spacing: -1.44px;
   }
 </style>

@@ -1,4 +1,5 @@
 <script>
+  import FinalModal from './Section/FinalModal.svelte';
   import UnplugWarning from './Section/UnplugWarning.svelte';
   import { afterUpdate } from 'svelte'
   import { rebuildContainer } from '$lib/stores/websocket'
@@ -20,6 +21,14 @@
     }
   })
 
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"rebuild","patp":patp})
+    } else {
+      rebuildContainer(patp)
+    }
+  }
+
 </script>
 <div class="bottom-panel">
   {#if !$URBIT_MODE}
@@ -30,8 +39,8 @@
     </button>
   {/if}
   <div class="spacer"></div>
-  <UnplugWarning component="rebuild">
-    <div class="btn rebuild" class:disabled={t.length > 0} on:click={()=>rebuildContainer(patp)}>
+  <UnplugWarning component="rebuild" {ownShip} >
+    <div class="btn rebuild" class:disabled={t.length > 0} on:click={handleClick}>
       {#if t.length < 1}
         Rebuild
       {:else if t == "loading"}

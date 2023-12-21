@@ -1,6 +1,8 @@
 <script>
   import ToggleButton from '$lib/ToggleButton.svelte'
-  import UnplugWarning from './UnplugWarning.svelte';
+  import { openModal } from 'svelte-modals'
+  import FinalModal from './FinalModal.svelte';
+  import UnplugWarning from './UnplugWarning.svelte'
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
@@ -17,6 +19,14 @@
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   const dispatch = createEventDispatcher()
+
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"power","patp":patp})
+    } else {
+      dispatch("click")
+    }
+  }
 </script>
 
 <div class="section">
@@ -37,7 +47,7 @@
   <div class="section-right">
     <UnplugWarning component={"power"} {ownShip}>
       <ToggleButton
-        on:click={()=>dispatch("click")}
+        on:click={handleClick}
         on={running}
         loading={tTogglePower}
         />

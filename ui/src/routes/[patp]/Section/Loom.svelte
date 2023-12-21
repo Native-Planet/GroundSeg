@@ -1,4 +1,6 @@
 <script>
+  import { openModal } from 'svelte-modals'
+  import FinalModal from './FinalModal.svelte';
   import UnplugWarning from './UnplugWarning.svelte';
   import Slider from './Slider.svelte'
   export let patp

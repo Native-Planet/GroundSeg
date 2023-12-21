@@ -122,6 +122,7 @@
   <!-- Remote Access -->
   <RemoteAccess
     on:click={()=>toggleNetwork(patp)}
+    {patp}
     {remoteReady}
     {remote}
     {tToggleNetwork}
@@ -131,6 +132,7 @@
   <!-- Dev Mode -->
   <DevMode
     on:click={()=>toggleDevMode(patp)}
+    {patp}
     {devMode}
     {tToggleDevMode}
     {ownShip}

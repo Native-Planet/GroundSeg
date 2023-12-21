@@ -1,5 +1,6 @@
 <script>
   import UnplugWarning from './UnplugWarning.svelte';
+  import FinalModal from './FinalModal.svelte';
   // Style
   import "../theme.css"
   import { openModal } from 'svelte-modals'
@@ -23,6 +24,14 @@
   $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
   $: tPackMeld = ($structure?.urbits?.[patp]?.transition?.packMeld) || ""
 
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"meld","patp":patp})
+    } else {
+      urthPackMeld(patp)
+    }
+  }
+
 </script>
 
 <div class="section">
@@ -36,7 +45,7 @@
     <div class="btn-wrapper">
       <div class="spacer"></div>
       <UnplugWarning component={"meld"} {ownShip}>
-        <button disabled={tPackMeld.length > 0} class="start urth" on:click={()=>urthPackMeld(patp)}>
+        <button disabled={tPackMeld.length > 0} class="start urth" on:click={handleClick}>
           {#if tPackMeld.length < 1}
             Pack & Meld
           {:else if tPackMeld == "stopping"}
