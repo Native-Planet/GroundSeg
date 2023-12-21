@@ -20,6 +20,7 @@ import (
 
 var (
 	eventBus = make(chan structs.Event, 100)
+	DisableShipRestart = false
 )
 
 func init() {
@@ -270,4 +271,48 @@ func shipExited(patp string) (bool, error) {
 		}
 		return true, nil
 	}
+}
+
+func GracefulShipExit() error {
+	DisableShipRestart = true
+	defer func() {
+		DisableShipRestart = false
+	}()
+	getShipRunningStatus := func(patp string) (string, error) {
+		statuses, err := docker.GetShipStatus([]string{patp})
+		if err != nil {
+			return "", fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
+		}
+		status, exists := statuses[patp]
+		if !exists {
+			return "", fmt.Errorf("%s status doesn't exist", patp)
+		}
+		return status, nil
+	}
+	conf := config.Conf()
+	piers := conf.Piers
+	pierStatus, err := docker.GetShipStatus(piers)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+	}
+	for patp, status := range pierStatus {
+		if status == "Up" || strings.HasPrefix(status, "Up ") {
+			if err := click.BarExit(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
+				continue
+			}
+			for {
+				status, err := getShipRunningStatus(patp)
+				if err != nil {
+					break
+				}
+				logger.Logger.Debug(fmt.Sprintf("%s", status))
+				if !strings.Contains(status, "Up") {
+					break
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}
+	return nil
 }
