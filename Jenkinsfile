@@ -1,12 +1,10 @@
-def glob_url = ''
 pipeline {
     agent any
     parameters {
         gitParameter(
             name: 'RELEASE_TAG',
             type: 'PT_BRANCH_TAG',
-            defaultValue: 'master'
-        )
+            defaultValue: 'master')
         choice(
             choices: ['Goseg', 'Gallseg'],
             description: 'Publish goseg bin or gallseg glob',
