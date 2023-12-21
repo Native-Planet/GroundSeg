@@ -28,6 +28,7 @@ func init() {
 }
 
 func Start(dev string) error {
+	logger.Logger.Info(fmt.Sprintf("Starting router on %v", dev))
 	wlan = dev
 	// make sure dependencies are met
 	if err := checkDependencies(); err != nil {
@@ -54,7 +55,9 @@ func Start(dev string) error {
 	return nil
 }
 
-func Stop() error {
+func Stop(dev string) error {
+	logger.Logger.Info(fmt.Sprintf("Stopping router on %v", dev))
+	wlan = dev
 	// make sure params are set (maybe not needed)
 	if err := checkParameters(); err != nil {
 		return err
@@ -64,11 +67,12 @@ func Stop() error {
 	if err != nil {
 		return err
 	}
-	if !running {
+	// stop the router
+	if running {
+		stopRouter()
+	} else {
 		logger.Logger.Info("Accesspoint already stopped")
 	}
-	// stop the router
-	stopRouter()
 	return nil
 }
 
