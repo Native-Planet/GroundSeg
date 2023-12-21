@@ -140,9 +140,11 @@ pipeline {
                                 git tag ${binTag}
                                 git push --set-upstream origin ${binTag}
                                 git push --tags
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel}
                             '''
+                            sh """#!/bin/bash -x
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
+                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
+                            """
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
@@ -174,15 +176,14 @@ pipeline {
         stage('move binaries') {
             steps {
                 script {
-                    def channel = "${params.CHANNEL}"
                     /* copy to r2 */
                     if (params.XSEG == 'Goseg') {
                         if( "${params.CHANNEL}" != "nobuild" ) {  
                             sh 'echo "debug: post-build actions"'
-                            sh '''#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${channel} r2:groundseg/bin
-                            '''
+                            sh """#!/bin/bash -x
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
+                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
+                            """
                         }
                     }
                     if (params.XSEG == 'Gallseg') {
