@@ -1,47 +1,54 @@
-/*
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("/font/Inter-Light.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/font/Inter-Regular.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/font/Inter-Medium.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/font/Inter-SemiBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/font/Inter-Bold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/font/Inter-ExtraBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/font/Inter-Black.otf"); }
-
-/*
- @font-face { font-family: BPdotsUnicase; font-display: swap; src: url("/font/BPdotsUnicaseBold.otf"); }
-@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodePro-Regular.otf");}
-
-*/
 @font-face { font-family: 'BPdotsUnicase'; src: url("/font/BPdotsUnicaseBold.woff2") format('woff2'); }
-@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodePro-Regular.woff2") format('woff2'); }
+@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodeProRegular.woff2") format('woff2'); }
 
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("/font/Inter-Thin.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("/font/Inter-ExtraLight.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("/font/Inter-Light.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/font/Inter-Regular.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/font/Inter-Medium.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/font/Inter-SemiBold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/font/Inter-Bold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/font/Inter-ExtraBold.woff2") format('woff2'); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/font/Inter-Black.woff2") format('woff2'); }
-
-
-/*
-@font-face { font-family: BPdotsUnicase; font-display: swap; src: url("https://files.native.computer/font/BPdotsUnicaseBold.otf"); }
-@font-face { font-family: Source; src: url("https://files.native.computer/font/SourceCodePro-Regular.otf"); font-display: swap; }
-
-@font-face { font-family: Inter; font-style: normal; font-weight: 100; font-display: swap; src: url("https://files.native.computer/font/Inter-Thin.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 200; font-display: swap; src: url("https://files.native.computer/font/Inter-ExtraLight.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 300; font-display: swap; src: url("https://files.native.computer/font/Inter-Light.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("https://files.native.computer/font/Inter-Regular.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("https://files.native.computer/font/Inter-Medium.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("https://files.native.computer/font/Inter-SemiBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("https://files.native.computer/font/Inter-Bold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("https://files.native.computer/font/Inter-ExtraBold.otf"); }
-@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("https://files.native.computerfont/Inter-Black.otf"); }
-*/
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/font/InterLight.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Light.woff2") format('woff2'); 
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/font/InterRegular.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Regular.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/font/InterMedium.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Medium.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/font/InterSemiBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-SemiBold.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/font/InterBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Bold.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/font/InterExtraBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-ExtraBold.woff2") format('woff2'); 
+ }
 
 body {
   margin: 0;

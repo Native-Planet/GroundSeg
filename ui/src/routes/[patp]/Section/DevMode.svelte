@@ -19,7 +19,6 @@
     if ($URBIT_MODE) {
       openModal(FinalModal, {"component":"dev","patp":patp})
     } else {
-      urthPackMeld(patp)
       dispatch("click")
     }
   }
