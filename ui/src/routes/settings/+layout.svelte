@@ -1,9 +1,7 @@
 <script>
-  import Nav from '$lib/Nav.svelte'
   import { Modals, closeModal } from 'svelte-modals'
 </script>
 
-<Nav />
 <slot />
 
 <Modals>

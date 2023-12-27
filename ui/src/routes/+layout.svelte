@@ -12,6 +12,8 @@
   import ApiSpinner from './ApiSpinner.svelte'
   import FirstLoad from './FirstLoad.svelte'
 
+  import Nav from '$lib/Nav/Nav.svelte'
+
   // Style
   import "../theme.css"
 
@@ -79,6 +81,7 @@
 {#if $firstLoad}
   <FirstLoad />
 {:else}
+  <Nav />
   <slot/>
   <ApiSpinner />
 {/if}
