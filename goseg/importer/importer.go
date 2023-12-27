@@ -264,8 +264,15 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 			errorCleanup(filename, patp, errmsg)
 			return
 		}
-	case ".tar.gz":
+	case ".tar.gz", ".tgz":
 		err := extractTarGz(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	case ".tar":
+		err := extractTar(compressedPath, volPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
 			errorCleanup(filename, patp, errmsg)
