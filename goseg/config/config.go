@@ -60,10 +60,7 @@ func init() {
 			DebugMode = true
 		}
 	}
-	if BasePath == "" {
-		// default base path
-		BasePath = "/opt/nativeplanet/groundseg"
-	}
+	BasePath = getBasePath()
 	if err := system.FixerScript(BasePath); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
 	}
@@ -248,10 +245,7 @@ func UpdateConf(values map[string]interface{}) error {
 }
 
 func persistConf(configMap map[string]interface{}) error {
-	if BasePath == "" {
-		// default base path
-		BasePath = "/opt/nativeplanet/groundseg"
-	}
+	BasePath = getBasePath()
 	// marshal and persist it
 	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
