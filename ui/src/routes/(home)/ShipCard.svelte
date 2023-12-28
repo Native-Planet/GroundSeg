@@ -8,14 +8,30 @@
   import NameBar from './NameBar.svelte'
   import ContainerInfo from './ContainerInfo.svelte'
   import ShipButtons from './ShipButtons.svelte'
+  import { page } from '$app/stores'
+
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: running = (ship?.running) || false
   $: remote = (ship?.remote) || false
   $: remoteReady = (ship?.remoteReady) || false
+  $: showUrbAlias = (ship?.showUrbAlias) || false
+  $: urbitAlias = (ship?.urbitAlias) || ""
 
   $: url = (ship?.url) || "#"
+  let urlType;
+  $: {
+    try {
+      urlType = new URL(url);
+    } catch (error) {
+      urlType = null;
+    }
+  }
+  $: urlStripped = urlType == null ? url : `${urlType?.hostname}`
+  $: urlFixed = urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port 
+  $: displayedUrl = (showUrbAlias && remote ? "https://"+urbitAlias : urlFixed)
+
   $: memUsage = (ship?.memUsage) || 0
   $: diskUsage = (ship?.diskUsage) || 0
   $: loom = (ship?.loomSize) || 0
@@ -47,7 +63,7 @@
     <ContainerInfo {memUsage} {diskUsage} loom={loomActual} />
   </div>
   <div class="buttons">
-    <ShipButtons {patp} {url}/>
+    <ShipButtons {patp} url={displayedUrl} />
   </div>
 </div>
 
