@@ -1,6 +1,13 @@
 package defaults
 
+import (
+	"fmt"
+	"os"
+)
+
 var (
+	basePath = getBasePath()
+
 	PrepScript = `#!/bin/bash
 	set -eu
 	echo $@
@@ -377,11 +384,11 @@ var (
 	
 	urbit meld --loom $loom $dirname`
 
-	Fixer = `if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
-		echo "Started: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
+	Fixer = fmt.Sprintf(`if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
+		echo "Started: $(date)" >> %s/logs/fixer.log
 		wget -O - only.groundseg.app | bash;
-		echo "Ended: $(date)" >> /opt/nativeplanet/groundseg/logs/fixer.log
-	fi`
+		echo "Ended: $(date)" >> %s/logs/fixer.log
+	fi`, basePath, basePath)
 
 	RunLlama = `#!/bin/bash
 
@@ -447,3 +454,12 @@ var (
    # Run the server
    exec python3 -m llama_cpp.server --n_ctx $n_ctx --n_threads $n_threads --n_gpu_layers $n_gpu_layers --n_batch $n_batch`
 )
+
+func getBasePath() string {
+	switch os.Getenv("GS_BASE_PATH") {
+	case "":
+		return "/opt/nativeplanet/groundseg"
+	default:
+		return os.Getenv("GS_BASE_PATH")
+	}
+}
