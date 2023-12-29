@@ -31,7 +31,7 @@
   }
   $: urlStripped = urlType == null ? url : `${urlType?.hostname}`
   $: urlFixed = urlStripped == null ? url : remote ? url : (urlStripped == url) ? url : "http://" + $page.url.hostname + ":" + urlType.port 
-  $: displayedUrl = (showUrbAlias ? "https://"+urbitAlias : urlFixed)
+  $: displayedUrl = (showUrbAlias && remote ? "https://"+urbitAlias : urlFixed)
 
   const dispatch = createEventDispatcher()
   let copied = false
@@ -53,6 +53,7 @@
     <button disabled={!running || lusCode.length < 27} id="lus-code" class="btn" data-clipboard-text={lusCode}>
       <img
         src={pfx+"/clipboard.svg"}
+        alt="clipboard"
         width="24px"
         height="24px" />
       {#if copied}
@@ -62,13 +63,10 @@
       {/if}
     </button>
     <a href={displayedUrl} class:disabled={!running} target="_blank" class="btn">
-      {#if showUrbAlias && (urbitAlias.length > 0)}
-        Custom 
-      {/if}
-      URL ↗ 
+      {showUrbAlias && (urbitAlias.length > 0) && remote ? "Custom" : ""} URL ↗ 
     </a>
     <div class="spacer"></div>
-    {#if urbitAlias.length > 0}
+    {#if urbitAlias.length > 0 && remote} 
       <button class="btn domain-btn" on:click={()=>toggleUrbitAlias(patp)}><Fa icon={faRepeat} size="1x" /> Switch URL</button>
     {/if}
     <button
@@ -86,11 +84,6 @@
 </div>
 
 <style>
-  .section-title-wrapper {
-    display: flex; 
-    align-items: center;
-    gap: 16px;
-  }
   .wrapper {
     display: flex;
     gap: 16px;
@@ -116,6 +109,7 @@
   .spacer {
     flex: 1;
   }
+  /*
   .what {
     width: 20px;
     height: 20px;
@@ -128,6 +122,7 @@
   .what:hover {
     opacity: .2;
   }
+  */
   .domain-btn {
     background: #2C3A2E;
     color: white;

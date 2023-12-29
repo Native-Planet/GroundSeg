@@ -103,11 +103,8 @@ func init() {
 		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
-	basePath := os.Getenv("BASE_PATH")
-	if basePath == "" {
-		basePath = "/opt/nativeplanet/groundseg/"
-	}
-	logPath = basePath + "logs/"
+	basePath := getBasePath()
+	logPath = basePath + "/logs/"
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
@@ -201,4 +198,13 @@ func TailLogs(filename string, n int) ([]string, error) {
 		}
 	}
 	return lines, scanner.Err()
+}
+
+func getBasePath() string {
+	switch os.Getenv("GS_BASE_PATH") {
+	case "":
+		return "/opt/nativeplanet/groundseg"
+	default:
+		return os.Getenv("GS_BASE_PATH")
+	}
 }

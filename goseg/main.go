@@ -36,6 +36,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +58,7 @@ var (
 	capFileServer = http.FileServer(capFs)
 	DevMode       = false
 	shutdownChan  = make(chan struct{})
+	HttpPort      = 80
 )
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
@@ -143,8 +145,9 @@ func startServer() { // *http.Server {
 	r := mux.NewRouter()
 	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
 	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(http.FS(webContent)))))
+	httpPort := fmt.Sprintf(":%d", HttpPort)
 	server := &http.Server{
-		Addr:    ":80",
+		Addr:    httpPort,
 		Handler: r,
 	}
 	w := mux.NewRouter()
@@ -193,10 +196,21 @@ func main() {
 	remoteVersion := false
 	// debug mode
 	for _, arg := range os.Args[1:] {
-		// trigger this with `./groundseg dev`
+		// trigger dev mode with `./groundseg dev`
 		if arg == "dev" {
 			logger.Logger.Info("Starting pprof (:6060)")
 			go http.ListenAndServe("0.0.0.0:6060", nil)
+		}
+		// set non-default port like `--http-port=8060`
+		if strings.HasPrefix(arg, "--http-port=") {
+			portStr := strings.TrimPrefix(arg, "--http-port=")
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("Invalid port number: %s -- defaulting to 80", portStr))
+			} else {
+				HttpPort = port
+			}
+			logger.Logger.Info(fmt.Sprintf("Running HTTP server on port %d", HttpPort))
 		}
 	}
 	// setup swap

@@ -255,7 +255,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 	// extract file to volume directory
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
 	volPath := filepath.Join(config.DockerDir, patp, "_data")
-	compressedPath := filepath.Join("/opt/nativeplanet/groundseg/uploads", filename)
+	compressedPath := filepath.Join(fmt.Sprintf("%s/uploads", config.BasePath), filename)
 	switch checkExtension(filename) {
 	case ".zip":
 		err := extractZip(compressedPath, volPath)
@@ -264,8 +264,15 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 			errorCleanup(filename, patp, errmsg)
 			return
 		}
-	case ".tar.gz":
+	case ".tar.gz", ".tgz":
 		err := extractTarGz(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	case ".tar":
+		err := extractTar(compressedPath, volPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
 			errorCleanup(filename, patp, errmsg)

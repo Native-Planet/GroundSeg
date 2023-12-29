@@ -79,7 +79,7 @@ func extractZip(src, dest string) error {
 	return nil
 }
 
-// extractTarGz extracts .tar.gz files and sends % extracted to channel
+// extractTarGz extracts .tar.gz  or .tgz files and sends % extracted to channel
 func extractTarGz(src, dest string) error {
 	// Open the tar.gz file
 	file, err := os.Open(src)
@@ -97,6 +97,62 @@ func extractTarGz(src, dest string) error {
 
 	// Create a tar reader
 	tr := tar.NewReader(gzr)
+
+	// Initialize total and extracted sizes
+	var totalSize int64 = 0
+	var extractedSize int64 = 0
+
+	// Loop through the tar archive
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// Update total size
+		totalSize += header.Size
+
+		// Define the path and create directories as needed
+		target := filepath.Join(dest, header.Name)
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			// Extract the file
+			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(file, tr); err != nil {
+				return err
+			}
+			file.Close()
+		}
+
+		// Update extracted size and send to the channel
+		extractedSize += header.Size
+		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
+		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
+	}
+	return nil
+}
+
+// extractTarGz extracts .tar files and sends % extracted to channel
+func extractTar(src, dest string) error {
+	// Open the tar.gz file
+	file, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Create a tar reader
+	tr := tar.NewReader(file)
 
 	// Initialize total and extracted sizes
 	var totalSize int64 = 0
