@@ -5,6 +5,7 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/logger"
+	"sort"
 )
 
 func CreateUrbitConfig(patp string) error {
@@ -26,25 +27,50 @@ func CreateUrbitConfig(patp string) error {
 }
 
 func getOpenUrbitPorts() (int, int) {
-	httpPort := 8080
-	amesPort := 34343
+	// default ports
+	// 8080 and 34343 is reserved
+	httpPort := 8081
+	amesPort := 34344
+
+	// get piers
 	conf := config.Conf()
 	piers := conf.Piers
+
+	// get used ports
+	var amesAll []int
+	var httpAll []int
 	for _, pier := range piers {
 		uConf := config.UrbitConf(pier)
-		uHTTP := uConf.HTTPPort
-		uAmes := uConf.AmesPort
-		if uHTTP >= httpPort {
-			httpPort = uHTTP
-		}
-		if uAmes >= amesPort {
-			amesPort = uAmes
-		}
+		httpAll = append(httpAll, uConf.HTTPPort)
+		amesAll = append(amesAll, uConf.AmesPort)
 	}
-	httpPort = httpPort + 1
-	amesPort = amesPort + 1
+
+	// sort them in ascending order
+	sort.Ints(amesAll)
+	sort.Ints(httpAll)
+
+	for _, uAmes := range amesAll {
+		// find lowest port that's available
+		if amesPort == uAmes {
+			amesPort = amesPort + 1
+		}
+		break
+	}
+
+	for _, uHTTP := range httpAll {
+		// find lowest port that's available
+		if httpPort == uHTTP {
+			httpPort = httpPort + 1
+		}
+		break
+	}
 	logger.Logger.Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
 	return httpPort, amesPort
+}
+
+func contains(sortedSlice []int, val int) bool {
+	index := sort.SearchInts(sortedSlice, val)
+	return index < len(sortedSlice) && sortedSlice[index] == val
 }
 
 func AppendSysConfigPier(patp string) error {
