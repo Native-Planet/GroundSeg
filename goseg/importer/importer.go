@@ -442,6 +442,9 @@ func restructureDirectory(patp string) error {
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
+	defer cli.Close()
 	volumes, err := cli.VolumeList(context.Background(), volume.ListOptions{})
 	if err != nil {
 		return err

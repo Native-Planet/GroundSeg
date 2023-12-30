@@ -48,6 +48,8 @@ func init() {
 		logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
 		return
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
@@ -67,6 +69,7 @@ func killContainerUsingPort(n uint16) error {
 	if err != nil {
 		return err
 	}
+	cli.NegotiateAPIVersion(ctx)
 
 	// Prepare filters to get only running containers
 	filters := filters.NewArgs()
@@ -161,6 +164,8 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 		logger.Logger.Error(errmsg)
 		return statuses, err
 	} else {
+		ctx := context.Background()
+		cli.NegotiateAPIVersion(ctx)
 		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
@@ -196,6 +201,8 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	// List containers
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	if err != nil {
@@ -218,6 +225,8 @@ func GetContainerNetwork(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	containerJSON, err := cli.ContainerInspect(context.Background(), name)
 	if err != nil {
@@ -241,6 +250,8 @@ func getContainerStats() (structs.ContainerStats, error) {
 				if err != nil {
 					return res, err
 				}
+				ctx := context.Background()
+				cli.NegotiateAPIVersion(ctx)
 				defer cli.Close()
 				inspect, err := cli.ContainerInspect(context.Background(), pier)
 				if err != nil {
@@ -296,6 +307,8 @@ func CreateVolume(name string) error {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 
 	// Create volume
 	vol, err := cli.VolumeCreate(context.Background(), volume.CreateOptions{Name: name})
@@ -315,6 +328,8 @@ func DeleteVolume(name string) error {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	// Remove the volume
 	err = cli.VolumeRemove(context.Background(), name, true)
@@ -333,6 +348,8 @@ func DeleteContainer(name string) error {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	// Force-remove the container
 	err = cli.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{Force: true})
@@ -352,6 +369,8 @@ func WriteFileToVolume(name string, file string, content string) error {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	// Inspect volume
 	vol, err := cli.VolumeInspect(context.Background(), name)
 	if err != nil {
@@ -444,6 +463,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	if err != nil {
 		return containerState, err
 	}
+	cli.NegotiateAPIVersion(ctx)
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
@@ -585,6 +605,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 	if err != nil {
 		return containerState, err
 	}
+	cli.NegotiateAPIVersion(ctx)
 	_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 	if err != nil {
 		return containerState, err
@@ -667,6 +688,7 @@ func StopContainerByName(containerName string) error {
 	if err != nil {
 		return err
 	}
+	cli.NegotiateAPIVersion(ctx)
 	// fetch all containers incl stopped
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 	if err != nil {
@@ -695,6 +717,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 	if err != nil {
 		return false, err
 	}
+	cli.NegotiateAPIVersion(ctx)
 	images, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		return false, err
@@ -721,6 +744,8 @@ func FindContainer(containerName string) (*types.Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	// Fetch list of running containers
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
@@ -759,14 +784,14 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	// Create an Exec configuration
 	execConfig := types.ExecConfig{
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          cmd,
 	}
-	// Context
-	ctx := context.Background()
 
 	// Get container ID by name
 	containerID, err := GetContainerIDByName(ctx, cli, containerName)
@@ -818,6 +843,7 @@ func RestartContainer(name string) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't create client: %v", err)
 	}
+	cli.NegotiateAPIVersion(ctx)
 	defer cli.Close()
 	containerID, err := GetContainerIDByName(ctx, cli, name)
 	if err != nil {
@@ -847,6 +873,8 @@ func volumeExists(volumeName string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("Failed to create client: %v", err)
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	volumeList, err := cli.VolumeList(context.Background(), volume.ListOptions{})
 	if err != nil {
 		return false, err
@@ -864,6 +892,8 @@ func addOrGetNetwork(networkName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Failed to create client: %v", err)
 	}
+	ctx := context.Background()
+	cli.NegotiateAPIVersion(ctx)
 	networks, err := cli.NetworkList(context.Background(), types.NetworkListOptions{})
 	if err != nil {
 		return "", fmt.Errorf("Failed to list networks: %v", err)

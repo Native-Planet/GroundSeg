@@ -10,6 +10,7 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
+
 	// "io/ioutil"
 	"os"
 	"strings"
@@ -148,6 +149,8 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
 			return
 		}
+		ctx := context.Background()
+		dockerClient.NegotiateAPIVersion(ctx)
 		defer dockerClient.Close()
 		options := types.ContainerLogsOptions{
 			ShowStdout: true,

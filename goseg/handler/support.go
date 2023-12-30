@@ -83,6 +83,8 @@ func dumpDockerLogs(containerID string, path string) error {
 	if err != nil {
 		return fmt.Errorf("Error creating Docker client: %v", err)
 	}
+	ctx := context.Background()
+	dockerClient.NegotiateAPIVersion(ctx)
 	defer dockerClient.Close()
 	// get previous 1k logs
 	options := types.ContainerLogsOptions{
@@ -91,7 +93,6 @@ func dumpDockerLogs(containerID string, path string) error {
 		Timestamps: true,
 		Tail:       "1000",
 	}
-	ctx := context.Background()
 	existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
 	if err != nil {
 		return fmt.Errorf("Error dumping %v logs: %v", containerID, err)

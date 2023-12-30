@@ -146,6 +146,7 @@ func copyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err != nil {
 		return err
 	}
+	cli.NegotiateAPIVersion(ctx)
 	containerInfo, err := GetLatestContainerInfo("netdata")
 	if err != nil {
 		return err

@@ -35,6 +35,7 @@ func DockerListener() {
 		logger.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return
 	}
+	cli.NegotiateAPIVersion(ctx)
 	messages, errs := cli.Events(ctx, types.EventsOptions{})
 	for {
 		select {
