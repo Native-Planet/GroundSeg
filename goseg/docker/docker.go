@@ -468,28 +468,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	}
 	cli.NegotiateAPIVersion(ctx)
 
-	// write start script to a tar
-	startScript, err := getShipStartScript(&containerConfig)
-	if err != nil {
-		return containerState, err
-	}
-	buf := new(bytes.Buffer)
-	tw := tar.NewWriter(buf)
-	hdr := &tar.Header{
-		Name: "start_urbit.sh",
-		Mode: 0600,
-		Size: int64(len(startScript)),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return containerState, err
-	}
-	if _, err := tw.Write([]byte(startScript)); err != nil {
-		return containerState, err
-	}
-	if err := tw.Close(); err != nil {
-		return containerState, err
-	}
-
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
@@ -497,13 +475,35 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
-		if err != nil {
-			return containerState, err
-		}
-		err = markScriptExec(ctr.ID)
-		if err != nil {
-			return containerState, err
+		if containerType == "vere" {
+			startScript, err := getShipStartScript(&containerConfig)
+			if err != nil {
+				return containerState, err
+			}
+			buf := new(bytes.Buffer)
+			tw := tar.NewWriter(buf)
+			hdr := &tar.Header{
+				Name: "start_urbit.sh",
+				Mode: 0600,
+				Size: int64(len(startScript)),
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return containerState, err
+			}
+			if _, err := tw.Write([]byte(startScript)); err != nil {
+				return containerState, err
+			}
+			if err := tw.Close(); err != nil {
+				return containerState, err
+			}
+			err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
+			if err != nil {
+				return containerState, err
+			}
+			err = markScriptExec(ctr.ID)
+			if err != nil {
+				return containerState, err
+			}
 		}
 		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
@@ -520,13 +520,36 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
-		if err != nil {
-			return containerState, err
-		}
-		err = markScriptExec(ctr.ID)
-		if err != nil {
-			return containerState, err
+
+		if containerType == "vere" {
+			startScript, err := getShipStartScript(&containerConfig)
+			if err != nil {
+				return containerState, err
+			}
+			buf := new(bytes.Buffer)
+			tw := tar.NewWriter(buf)
+			hdr := &tar.Header{
+				Name: "start_urbit.sh",
+				Mode: 0600,
+				Size: int64(len(startScript)),
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return containerState, err
+			}
+			if _, err := tw.Write([]byte(startScript)); err != nil {
+				return containerState, err
+			}
+			if err := tw.Close(); err != nil {
+				return containerState, err
+			}
+			err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
+			if err != nil {
+				return containerState, err
+			}
+			err = markScriptExec(ctr.ID)
+			if err != nil {
+				return containerState, err
+			}
 		}
 		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
@@ -552,13 +575,35 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
-			if err != nil {
-				return containerState, err
-			}
-			err = markScriptExec(ctr.ID)
-			if err != nil {
-				return containerState, err
+			if containerType == "vere" {
+				startScript, err := getShipStartScript(&containerConfig)
+				if err != nil {
+					return containerState, err
+				}
+				buf := new(bytes.Buffer)
+				tw := tar.NewWriter(buf)
+				hdr := &tar.Header{
+					Name: "start_urbit.sh",
+					Mode: 0600,
+					Size: int64(len(startScript)),
+				}
+				if err := tw.WriteHeader(hdr); err != nil {
+					return containerState, err
+				}
+				if _, err := tw.Write([]byte(startScript)); err != nil {
+					return containerState, err
+				}
+				if err := tw.Close(); err != nil {
+					return containerState, err
+				}
+				err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/", buf, types.CopyToContainerOptions{})
+				if err != nil {
+					return containerState, err
+				}
+				err = markScriptExec(ctr.ID)
+				if err != nil {
+					return containerState, err
+				}
 			}
 			err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 			if err != nil {
