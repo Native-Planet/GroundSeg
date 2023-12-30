@@ -207,6 +207,9 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--dirname=" + shipName,
 				"--devmode=" + devMode,
 			},
+			Labels: map[string]string{
+				"bootScript": bootScript,
+			},
 		}
 	}
 	mounts := []mount.Mount{
