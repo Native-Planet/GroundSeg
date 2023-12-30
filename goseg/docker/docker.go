@@ -1036,6 +1036,9 @@ func copyShipStartScript(containerConfig *container.Config, hostConfig *containe
 	if err != nil {
 		return err
 	}
-	// StartContainer will auto-stop + start the container
+	timeout := 0
+	if err := cli.ContainerStop(ctx, ctr.ID, container.StopOptions{Timeout: &timeout}); err != nil {
+		return fmt.Errorf("failed to stop container %s: %v", containerName, err)
+	}
 	return nil
 }
