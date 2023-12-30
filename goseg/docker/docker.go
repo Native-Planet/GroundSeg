@@ -480,6 +480,10 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				return containerState, err
 			}
 		}
+		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
 		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 		if err != nil {
 			return containerState, err
