@@ -1000,6 +1000,10 @@ func copyShipStartScript(containerConfig *container.Config, hostConfig *containe
 	if err != nil {
 		return err
 	}
+	err = cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
+	}
 	err = cli.ContainerStart(ctx, ctr.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
