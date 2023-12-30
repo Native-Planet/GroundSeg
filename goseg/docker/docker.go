@@ -480,10 +480,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				return containerState, err
 			}
 		}
-		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return containerState, err
-		}
 		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 		if err != nil {
 			return containerState, err
@@ -999,9 +995,12 @@ func copyShipStartScript(containerConfig *container.Config, hostConfig *containe
 		return err
 	}
 	ctx := context.Background()
-	err = cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
-	if err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
+	existingContainer, _ := FindContainer(containerName)
+	if existingContainer != nil {
+		err = cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
+		}
 	}
 	originalEntrypoint := containerConfig.Entrypoint
 	containerConfig.Entrypoint = []string{"sh", "-c", "while true; do sleep 1; done"}
