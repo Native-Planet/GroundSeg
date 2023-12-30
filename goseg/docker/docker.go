@@ -972,7 +972,7 @@ func getShipStartScript(contConf *container.Config) (string, error) {
 		return "", fmt.Errorf("bootScript label not found")
 	}
 	switch bootScript {
-	case "boot":
+	case "start":
 		return filepath.Join(config.BasePath, "scripts", "start.sh"), nil
 	case "ignore":
 		return filepath.Join(config.BasePath, "scripts", "start.sh"), nil
