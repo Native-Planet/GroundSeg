@@ -5,11 +5,8 @@ package docker
 import (
 	"fmt"
 	"groundseg/config"
-	"groundseg/defaults"
 	"groundseg/logger"
 	"groundseg/structs"
-	"io/ioutil"
-	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -54,7 +51,7 @@ func LoadUrbits() error {
 func urbitContainerConf(containerName string) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
-	var scriptContent string
+	// var scriptContent string
 	// construct the container metadata from version server info
 	containerInfo, err := GetLatestContainerInfo("vere")
 	if err != nil {
@@ -99,18 +96,22 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	// todo: this BootStatus doesnt actually have anythin to do with pack and meld right now
 	act := shipConf.BootStatus
+	bootScript := "start"
 	// get the correct startup script based on BootStatus val
 	switch act {
-	case "boot":
-		scriptContent = defaults.StartScript
-	case "ignore":
-		scriptContent = defaults.StartScript
+	// case "boot":
+	// scriptContent = defaults.StartScript
+	// case "ignore":
+	// scriptContent = defaults.StartScript
 	case "pack":
-		scriptContent = defaults.PackScript
+		// scriptContent = defaults.PackScript
+		bootScript = "pack"
 	case "meld":
-		scriptContent = defaults.MeldScript
+		// scriptContent = defaults.MeldScript
+		bootScript = "meld"
 	case "prep":
-		scriptContent = defaults.PrepScript
+		// scriptContent = defaults.PrepScript
+		bootScript = "prep"
 	case "noboot":
 		return containerConfig, hostConfig, fmt.Errorf("%s marked noboot!", containerName)
 	default:
@@ -137,12 +138,12 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		}
 		// this is only for offline ships, otherwise we send a click
 	}
-	// write the script
-	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
-	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
-	if err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
-	}
+	// write the script [old method, handing off via container label now]
+	// scriptPath := filepath.Join(config.BasePath, "scripts", "start_urbit.sh")
+	// err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	// if err != nil {
+	// 	return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
+	// }
 	// gather boot option values
 	shipName := shipConf.PierName
 	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
@@ -172,6 +173,9 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--devmode=" + devMode,
 				"--http-port=" + httpPort,
 				"--port=" + amesPort,
+			},
+			Labels: map[string]string{
+				"bootScript": bootScript,
 			},
 		}
 	} else {

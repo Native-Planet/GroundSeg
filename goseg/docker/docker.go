@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
+	"groundseg/defaults"
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
@@ -60,6 +61,22 @@ func init() {
 	}
 	go getContainerStats()
 	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
+	scriptContent := defaults.StartScript
+	scriptPath := filepath.Join(config.BasePath, "temp", "start.sh")
+	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	scriptContent = defaults.PackScript
+	scriptPath = filepath.Join(config.BasePath, "temp", "pack.sh")
+	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	scriptContent = defaults.MeldScript
+	scriptPath = filepath.Join(config.BasePath, "temp", "meld.sh")
+	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	scriptContent = defaults.PrepScript
+	scriptPath = filepath.Join(config.BasePath, "temp", "prep.sh")
+	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't write scripts to temp dir: %v", err))
+	}
+
 }
 
 func killContainerUsingPort(n uint16) error {
@@ -467,7 +484,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
-		_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		ctr, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		startScript, err := getShipStartScript(&containerConfig)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/start_urbit.sh", strings.NewReader(startScript), types.CopyToContainerOptions{})
+		if err != nil {
+			return containerState, err
+		}
+		err = markScriptExec(ctr.ID)
 		if err != nil {
 			return containerState, err
 		}
@@ -482,7 +511,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		ctr, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
+		}
+		startScript, err := getShipStartScript(&containerConfig)
+		if err != nil {
+			return containerState, err
+		}
+		err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/start_urbit.sh", strings.NewReader(startScript), types.CopyToContainerOptions{})
+		if err != nil {
+			return containerState, err
+		}
+		err = markScriptExec(ctr.ID)
 		if err != nil {
 			return containerState, err
 		}
@@ -506,7 +547,19 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 			}
-			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+			ctr, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+			if err != nil {
+				return containerState, err
+			}
+			startScript, err := getShipStartScript(&containerConfig)
+			if err != nil {
+				return containerState, err
+			}
+			err = cli.CopyToContainer(ctx, ctr.ID, "/urbit/start_urbit.sh", strings.NewReader(startScript), types.CopyToContainerOptions{})
+			if err != nil {
+				return containerState, err
+			}
+			err = markScriptExec(ctr.ID)
 			if err != nil {
 				return containerState, err
 			}
@@ -911,4 +964,44 @@ func addOrGetNetwork(networkName string) (string, error) {
 		return "", fmt.Errorf("Failed to create custom bridge network: %v", err)
 	}
 	return networkResponse.ID, nil
+}
+
+func getShipStartScript(contConf *container.Config) (string, error) {
+	bootScript, exists := contConf.Labels["bootScript"]
+	if !exists {
+		return "", fmt.Errorf("bootScript label not found")
+	}
+	switch bootScript {
+	case "start":
+		return filepath.Join(config.BasePath, "scripts", "start.sh"), nil
+	case "pack":
+		return filepath.Join(config.BasePath, "scripts", "pack.sh"), nil
+	case "meld":
+		return filepath.Join(config.BasePath, "scripts", "meld.sh"), nil
+	case "prep":
+		return filepath.Join(config.BasePath, "scripts", "prep.sh"), nil
+	default:
+		return "", fmt.Errorf(fmt.Sprintf("%v script not found", bootScript))
+	}
+}
+
+func markScriptExec(containerID string) error {
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return err
+	}
+	cli.NegotiateAPIVersion(ctx)
+	execConfig := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		// temporarily use chmod as the entrypoint
+		Cmd: []string{"chmod", "+x", "/urbit/start_urbit.sh"},
+	}
+	execID, err := cli.ContainerExecCreate(context.Background(), containerID, execConfig)
+	if err != nil {
+		return err
+	}
+	err = cli.ContainerExecStart(context.Background(), execID.ID, types.ExecStartCheck{})
+	return err
 }
