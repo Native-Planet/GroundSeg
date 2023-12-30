@@ -471,10 +471,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	switch {
 	case existingContainer == nil:
 		// if the container does not exist, create and start it
-		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-		if err != nil {
-			return containerState, err
-		}
 		if containerType == "vere" {
 			startScript, err := getShipStartScript(&containerConfig)
 			if err != nil {
@@ -483,6 +479,10 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err = copyShipStartScript(&containerConfig, &hostConfig, containerName, startScript); err != nil {
 				return containerState, err
 			}
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
 		}
 		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
@@ -491,14 +491,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		logger.Logger.Info(msg)
 	case existingContainer.State == "exited":
-		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return containerState, err
-		}
-		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-		if err != nil {
-			return containerState, err
-		}
 		if containerType == "vere" {
 			startScript, err := getShipStartScript(&containerConfig)
 			if err != nil {
@@ -507,6 +499,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err = copyShipStartScript(&containerConfig, &hostConfig, containerName, startScript); err != nil {
 				return containerState, err
 			}
+		}
+		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		if err != nil {
+			return containerState, err
+		}
+		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+		if err != nil {
+			return containerState, err
 		}
 		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
@@ -524,14 +524,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		if currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
-			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
-			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
-			}
-			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-			if err != nil {
-				return containerState, err
-			}
 			if containerType == "vere" {
 				startScript, err := getShipStartScript(&containerConfig)
 				if err != nil {
@@ -540,6 +532,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				if err = copyShipStartScript(&containerConfig, &hostConfig, containerName, startScript); err != nil {
 					return containerState, err
 				}
+			}
+			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
+			}
+			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+			if err != nil {
+				return containerState, err
 			}
 			err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 			if err != nil {
@@ -990,19 +990,19 @@ func markScriptExec(containerID string) error {
 }
 
 func copyShipStartScript(containerConfig *container.Config, hostConfig *container.HostConfig, containerName, startScript string) error {
-	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
+	}
+	ctx := context.Background()
+	err = cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 	}
 	containerConfig.Entrypoint = []string{"sh", "-c", "while true; do sleep 1; done"}
 	ctr, err := cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
 	if err != nil {
 		return err
-	}
-	err = cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
-	if err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 	}
 	err = cli.ContainerStart(ctx, ctr.ID, types.ContainerStartOptions{})
 	if err != nil {
