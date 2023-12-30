@@ -99,9 +99,9 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	bootScript := "start"
 	// get the correct startup script based on BootStatus val
 	switch act {
-	// case "boot":
+	case "boot":
 	// scriptContent = defaults.StartScript
-	// case "ignore":
+	case "ignore":
 	// scriptContent = defaults.StartScript
 	case "pack":
 		// scriptContent = defaults.PackScript
