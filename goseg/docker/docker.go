@@ -1003,6 +1003,7 @@ func copyShipStartScript(containerConfig *container.Config, hostConfig *containe
 	if err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 	}
+	originalEntrypoint := containerConfig.Entrypoint
 	containerConfig.Entrypoint = []string{"sh", "-c", "while true; do sleep 1; done"}
 	ctr, err := cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
 	if err != nil {
@@ -1040,5 +1041,6 @@ func copyShipStartScript(containerConfig *container.Config, hostConfig *containe
 	if err := cli.ContainerStop(ctx, ctr.ID, container.StopOptions{Timeout: &timeout}); err != nil {
 		return fmt.Errorf("failed to stop container %s: %v", containerName, err)
 	}
+	containerConfig.Entrypoint = originalEntrypoint
 	return nil
 }
