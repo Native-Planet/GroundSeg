@@ -1,8 +1,21 @@
 <script>
+  import Clipboard from 'clipboard'
+  import { onMount } from 'svelte'
   import { structure } from '$lib/stores/data'
   import { page } from '$app/stores'
   import { openModal } from 'svelte-modals'
   import BugReportModal from './BugReportModal.svelte'
+
+  let copy;
+  let copied = false
+
+  onMount(()=>{
+    copy = new Clipboard('#public-group');
+    copy.on("success", ()=> {
+      copied = true;
+      setTimeout(()=> copied = false, 1000)
+    })
+  })
 </script>
 
 <div class="container">
@@ -17,8 +30,8 @@
     <a href="http://{$page.url.hostname}:19999" target="_blank" class="link">Netdata</a>
     <span>|</span>
     <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Twitter</a>
-    <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Email</a>
-    <a href="https://twitter.com/NativePlanetIO" target="_blank" class="link">Urbit</a>
+    <a href="mailto:support@nativeplanet.io" target="_blank" class="link">Email</a>
+    <button class="link" id="public-group" data-clipboard-text="~nattyv/nativeplanet">{copied ? "Copied!" : "Urbit"}</button>
   </div>
 </div>
 
