@@ -479,10 +479,11 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err = copyShipStartScript(&containerConfig, &hostConfig, containerName, startScript); err != nil {
 				return containerState, err
 			}
-		}
-		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-		if err != nil {
-			return containerState, err
+		} else {
+			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
+			if err != nil {
+				return containerState, err
+			}
 		}
 		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
