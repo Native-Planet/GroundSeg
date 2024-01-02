@@ -4,6 +4,8 @@
   import { setUrbitDomain } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
+  import DocsModal from '$lib/DocsModal.svelte'
+  import { openModal } from 'svelte-modals'
   export let patp
   export let urbitAlias
   let domain = ""
@@ -12,6 +14,13 @@
 
   $: tUrbitDomain = ($structure?.urbits?.[patp]?.transition?.urbitDomain) || ""
   $: t = tUrbitDomain
+
+  let docsInfo = {
+    title: "Custom Urbit Domain",
+    description: "Access your Urbit ship via a custom domain.",
+    docName: "Custom StarTram Domains",
+    docURL: "https://manual.groundseg.app/guide/custom-domains.html"
+  }
 
   onMount(()=>domain = urbitAlias)
   afterUpdate(()=> {
@@ -24,7 +33,7 @@
 <div>
   <div class="section-title-wrapper">
     <div class="section-title">Custom Urbit Domain</div>
-    <div class="what">?</div>
+    <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">
     <input type="text" placeholder="ship.example.com" bind:value={domain} disabled={t.length > 0} />
