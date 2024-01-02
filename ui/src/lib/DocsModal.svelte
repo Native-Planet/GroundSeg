@@ -14,7 +14,7 @@
 
 <Modal>
   {#if isOpen}
-  <div class="wrapper">
+  <div class="guide-wrapper">
     <div class="header">{title}</div>
     <div class="name">{description}</div>
     <div class="documentation">
@@ -25,7 +25,7 @@
 </Modal>
 
 <style>
-  .wrapper {
+  .guide-wrapper {
     padding: 32px;
   }
   .header {
