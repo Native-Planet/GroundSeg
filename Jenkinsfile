@@ -370,6 +370,7 @@ pipeline {
                                     git fetch
                                     git checkout --track origin/master
                                     git merge ${binTag} -m "Merged ${tag}"
+                                    git config --global --add --bool push.autoSetupRemote true
                                     git push
                                 '''
                             )
