@@ -66,8 +66,8 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
+  console.log("alive")
   if (data.type === "c2c") {
-    console.log(data)
     if (Array.isArray(data.ssids)) {
       ssids.set(data.ssids)
       isC2CMode.set(true)
@@ -77,7 +77,6 @@ export const handleMessage = data => {
     ssids.set([])
     isC2CMode.set(false)
   } else if (data.type == "structure") {
-    console.log(data)
     structure.set(data)
     ssids.set([])
     isC2CMode.set(false)
