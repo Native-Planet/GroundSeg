@@ -138,7 +138,6 @@ type Urbit struct {
 		PackDay            string `json:"packDay"`
 		PackDate           int    `json:"packDate"`
 		PenpaiCompanion    bool   `json:"penpaiCompanion"`
-		PenpaiInstalling   bool   `json:"penpaiInstalling"`
 		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
 	} `json:"info"`
@@ -163,6 +162,8 @@ type UrbitTransitionBroadcast struct {
 	Loom                      string `json:"loom"`
 	UrbitDomain               string `json:"urbitDomain"`
 	MinIODomain               string `json:"minioDomain"`
+	PenpaiCompanion           string `json:"penpaiCompanion"`
+	Gallseg                   string `json:"gallseg"`
 }
 
 // used to construct broadcast pier info subobject

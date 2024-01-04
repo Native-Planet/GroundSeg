@@ -1,7 +1,7 @@
 <script>
   import Clipboard from 'clipboard'
   import { onMount } from 'svelte'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { page } from '$app/stores'
   import { openModal } from 'svelte-modals'
   import BugReportModal from './BugReportModal.svelte'

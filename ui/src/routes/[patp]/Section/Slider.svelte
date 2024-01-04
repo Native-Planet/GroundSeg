@@ -80,7 +80,7 @@
     left: 0;
     -webkit-appearance: none;
     background: none;
-    width: calc(100% - (38px * 2));
+    width: 100%;
     height: 64px;
     outline: none;
     -webkit-transition: .2s;

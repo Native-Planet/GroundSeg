@@ -1,7 +1,11 @@
 <script>
+  import { openModal } from 'svelte-modals'
+  import FinalModal from './FinalModal.svelte';
+  import UnplugWarning from './UnplugWarning.svelte';
   import Slider from './Slider.svelte'
   export let patp
   export let loomSize
+  export let ownShip
 </script>
 
 <div class="section">
@@ -12,10 +16,12 @@
     </div>
   </div>
   <div class="section-right">
-    <div class="slider">
-      <div class="spacer"></div>
-      <Slider {patp} {loomSize}/>
-    </div>
+    <UnplugWarning component={"loom"} {ownShip} >
+      <div class="slider">
+        <div class="spacer"></div>
+        <Slider {patp} {loomSize}/>
+      </div>
+    </UnplugWarning>
   </div>
 </div>
 

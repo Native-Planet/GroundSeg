@@ -21,7 +21,6 @@ import (
 	"groundseg/docker"
 	"groundseg/exporter"
 	"groundseg/importer"
-	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
@@ -257,7 +256,16 @@ func main() {
 		}
 	}
 	// gallseg
-	go leak.StartLeak()
+	/*
+		// temporarily disable gallseg
+		go leak.StartLeak()
+		go func() {
+			for {
+				broadcast.BroadcastToClients()
+				time.Sleep(2 * time.Second)
+			}
+		}()
+	*/
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// log manager routine
@@ -302,6 +310,5 @@ func main() {
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 	// Load Penpai
 	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
-
 	startServer()
 }

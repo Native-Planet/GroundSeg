@@ -1,14 +1,13 @@
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
+import { URBIT_MODE, connected, structure, firstLoad } from './data.js'
+import { sendPoke } from './urbit.js'
 
-export const structure = writable({})
 export const ready = writable(false)
-export const connected = writable(false)
 export const logs = writable({})
 export const wsPort = writable("3000")
 export const isC2CMode = writable(false)
 export const ssids = writable([])
-export const firstLoad = writable(true)
 export const loginError = writable('')
 
 let PENDING = new Set();
@@ -25,21 +24,25 @@ export const connect = async url => {
 
 // WebSocket send wrapper
 export const send = async payload => {
-  // generate an ID
-  let id = await generateRandom(16)
-  // add the ID to pending
-  PENDING.add(id)
-  // Grab token if exists
-  let token = await loadSession()
-  // Create the request
-  let data = {"id":id,"payload":payload}
-  // Add token to request if available
-  if (token) {
-    data['token'] = token
+  if (get(URBIT_MODE)) {
+    sendPoke(payload)
+  } else {
+    // generate an ID
+    let id = await generateRandom(16)
+    // add the ID to pending
+    PENDING.add(id)
+    // Grab token if exists
+    let token = await loadSession()
+    // Create the request
+    let data = {"id":id,"payload":payload}
+    // Add token to request if available
+    if (token) {
+      data['token'] = token
+    }
+    // Send the request
+    console.log(id + ":" + payload.type + " sent")
+    SESSION.send(JSON.stringify(data));
   }
-  // Send the request
-  console.log(id + ":" + payload.type + " sent")
-  SESSION.send(JSON.stringify(data));
 }
 
 // Reconnection
@@ -694,6 +697,24 @@ export const uninstallPenpaiCompanion = patp => {
   let payload = {
     "type":"urbit",
     "action":"uninstall-penpai-companion",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const installGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"install-gallseg",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const uninstallGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"uninstall-gallseg",
     "patp":patp,
   }
   send(payload)

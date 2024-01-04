@@ -1,12 +1,18 @@
 <script>
+  import UnplugWarning from './UnplugWarning.svelte';
+  import FinalModal from './FinalModal.svelte';
   // Style
   import "../theme.css"
   import { openModal } from 'svelte-modals'
   import PackScheduleModal from '../PackScheduleModal.svelte'
-  import { structure, urthPackMeld, marsPack } from '$lib/stores/websocket'
+  import { urthPackMeld, marsPack } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { createEventDispatcher } from 'svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let patp
+  export let ownShip
 
   const dispatch = createEventDispatcher()
 
@@ -17,6 +23,14 @@
 
   $: tPack = ($structure?.urbits?.[patp]?.transition?.pack) || ""
   $: tPackMeld = ($structure?.urbits?.[patp]?.transition?.packMeld) || ""
+
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"meld","patp":patp})
+    } else {
+      urthPackMeld(patp)
+    }
+  }
 
 </script>
 
@@ -30,23 +44,25 @@
   <div class="section-right">
     <div class="btn-wrapper">
       <div class="spacer"></div>
-      <button disabled={tPackMeld.length > 0} class="start urth" on:click={()=>urthPackMeld(patp)}>
-        {#if tPackMeld.length < 1}
-          Pack & Meld
-        {:else if tPackMeld == "stopping"}
-          Getting ready
-        {:else if tPackMeld == "packing"}
-          Packing..
-        {:else if tPackMeld == "melding"}
-          Melding..
-        {:else if tPackMeld == "starting"}
-          Starting ship
-        {:else if tPackMeld == "success"}
-          Success!
-        {:else}
-          Failed :(
-        {/if}
-      </button>
+      <UnplugWarning component={"meld"} {ownShip}>
+        <button disabled={tPackMeld.length > 0} class="start urth" on:click={handleClick}>
+          {#if tPackMeld.length < 1}
+            Pack & Meld
+          {:else if tPackMeld == "stopping"}
+            Getting ready
+          {:else if tPackMeld == "packing"}
+            Packing..
+          {:else if tPackMeld == "melding"}
+            Melding..
+          {:else if tPackMeld == "starting"}
+            Starting ship
+          {:else if tPackMeld == "success"}
+            Success!
+          {:else}
+            Failed :(
+          {/if}
+        </button>
+      </UnplugWarning>
       <button disabled={tPack.length > 0} class="start" on:click={()=>marsPack(patp)}>
         {#if tPack.length < 1}
           Pack
@@ -59,13 +75,19 @@
         {/if}
       </button>
       <button class="calendar" on:click={handleModal}>
-        <img src="/calendar.svg" alt="calendar icon" width="20px" height="20px"/>
+        <img src={pfx+"/calendar.svg"} alt="calendar icon" width="20px" height="20px"/>
       </button>
     </div>
   </div>
 </div>
 
 <style>
+  .section-left {
+    flex: 3;
+  }
+  .section-right {
+    flex: 4;
+  }
   .btn-wrapper {
     display: flex; 
     gap: 8px;

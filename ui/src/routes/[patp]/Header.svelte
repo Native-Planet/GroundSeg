@@ -1,7 +1,8 @@
 <script>
   import Clipboard from 'clipboard'
   import { onMount } from 'svelte'
-  import { structure, registerServiceAgain } from '$lib/stores/websocket';
+  import { registerServiceAgain } from '$lib/stores/websocket';
+  import { structure } from '$lib/stores/data'
   import { devShipClass } from '$lib/stores/devclass'
   export let patp
 

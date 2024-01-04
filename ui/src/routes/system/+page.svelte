@@ -2,7 +2,7 @@
   import './system.css'
   import { showLogs } from './store'
 
-  import { structure } from '$lib/stores/websocket'
+  import { structure, URBIT_MODE } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
 
   import LinuxUpdate from './LinuxUpdate.svelte'
@@ -23,7 +23,9 @@
   <Connection />
   <SystemDetails />
   <Power />
-  <Logs />
+  {#if !$URBIT_MODE}
+    <Logs />
+  {/if}
   <Penpai />
   <Support />
 </div>

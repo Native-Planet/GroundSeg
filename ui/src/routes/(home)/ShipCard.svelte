@@ -1,5 +1,6 @@
 <script>
-  import { structure, toggleNetwork } from '$lib/stores/websocket';
+  import { toggleNetwork } from '$lib/stores/websocket';
+  import { structure } from '$lib/stores/data'
 
   import { devShipClass } from '$lib/stores/devclass'
 

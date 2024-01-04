@@ -2,7 +2,7 @@
   import ShipCard from "./ShipCard.svelte"
   import NewShipCard from "./NewShipCard.svelte"
   import { wide } from '$lib/stores/display'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { sortModes } from '$lib/stores/patp'
 
   const sortMode = 'hierarchical'

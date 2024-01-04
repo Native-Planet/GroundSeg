@@ -8,9 +8,8 @@ type ClickLusCode struct {
 	LusCode   string
 }
 
-type ClickPenpaiDesk struct {
+type ClickDesks struct {
 	LastError time.Time
 	LastFetch time.Time
 	Status    string
-	Loading   bool
 }

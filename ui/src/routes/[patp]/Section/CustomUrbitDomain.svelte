@@ -1,7 +1,8 @@
 <script>
   // Style
   import "../theme.css"
-  import { setUrbitDomain, structure } from '$lib/stores/websocket'
+  import { setUrbitDomain } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
   import DocsModal from '$lib/DocsModal.svelte'
   import { openModal } from 'svelte-modals'

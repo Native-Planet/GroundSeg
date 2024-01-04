@@ -4,13 +4,17 @@
   import { checkPatp } from '$lib/stores/patp'
   import { generateRandom } from '$lib/stores/gs-crypto'
   import { warningDone } from './store'
-  import { wsPort, structure, modifyUploadEndpoint, openUploadEndpoint } from '$lib/stores/websocket'
+  import { wsPort, modifyUploadEndpoint, openUploadEndpoint } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import Sigil from './Sigil.svelte'
   import { page } from '$app/stores'
   import { goto } from '$app/navigation'
 
   import { openModal } from 'svelte-modals'
   import WarningPrompt from './WarningPrompt.svelte'
+
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   const endpoint = generateRandom(32)
   const dispatch = createEventDispatcher()
@@ -128,7 +132,7 @@
   <div class="check-wrapper" on:click={handleRemote}>
     <div class="checkbox">
       {#if remote}
-        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+        <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
       {/if}
     </div>
       <div class="check-label">Set to remote</div>
@@ -137,13 +141,13 @@
   <div class="check-wrapper" on:click={handleFix}>
     <div class="checkbox">
       {#if fix}
-        <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+        <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
       {/if}
     </div>
     <div class="check-label">Update configuration if needed </div>
   </div>
   <div class="buttons">
-    <button class="btn back" on:click={()=>goto('/boot')}>Back</button>
+    <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button class="btn action-btn" disabled={patp.length < 1} on:click={()=>openModal(WarningPrompt)}>Import</button>
   </div>
 </div>

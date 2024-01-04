@@ -1,5 +1,9 @@
 <script>
-  import { structure, rebuildContainer } from '$lib/stores/websocket'
+  import FinalModal from './Section/FinalModal.svelte';
+  import UnplugWarning from './Section/UnplugWarning.svelte';
+  import { afterUpdate } from 'svelte'
+  import { rebuildContainer } from '$lib/stores/websocket'
+  import { URBIT_MODE, structure } from '$lib/stores/data'
   import LogsDrawer from './LogsDrawer.svelte'
   import DeleteModal from './DeleteModal.svelte'
   import ExportModal from './ExportModal.svelte'
@@ -8,35 +12,58 @@
 
   $: tRebuildContainer = ($structure?.urbits?.[patp]?.transition?.rebuildContainer) || ""
   $: t = tRebuildContainer
+
+  let ownShip = false
+
+  afterUpdate(()=>{
+    if ($URBIT_MODE) {
+      ownShip = (window.ship == patp)
+    }
+  })
+
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"rebuild","patp":patp})
+    } else {
+      rebuildContainer(patp)
+    }
+  }
+
 </script>
 <div class="bottom-panel">
-  <button 
-    class="btn" 
-    on:click={()=>openModal(LogsDrawer,{"patp":patp})}>
-    Logs
-  </button>
+  {#if !$URBIT_MODE}
+    <button 
+      class="btn" 
+      on:click={()=>openModal(LogsDrawer,{"patp":patp})}>
+      Logs
+    </button>
+  {/if}
   <div class="spacer"></div>
-  <div class="btn rebuild" class:disabled={t.length > 0} on:click={()=>rebuildContainer(patp)}>
-    {#if t.length < 1}
-      Rebuild
-    {:else if t == "loading"}
-      Rebuilding
-    {:else if t == "success"}
-      Success!
-    {:else if t == "error"}
-      Error
-    {/if}
-  </div>
-  <button 
-    class="btn" 
-    on:click={()=>openModal(ExportModal,{"patp":patp})}>
-    Export
-  </button>
-  <button 
-    class="btn" 
-    on:click={()=>openModal(DeleteModal,{"patp":patp})}>
-    Delete
-  </button>
+  <UnplugWarning component="rebuild" {ownShip} >
+    <div class="btn rebuild" class:disabled={t.length > 0} on:click={handleClick}>
+      {#if t.length < 1}
+        Rebuild
+      {:else if t == "loading"}
+        Rebuilding
+      {:else if t == "success"}
+        Success!
+      {:else if t == "error"}
+        Error
+      {/if}
+    </div>
+  </UnplugWarning>
+  {#if !ownShip}
+    <button 
+      class="btn" 
+      on:click={()=>openModal(ExportModal,{"patp":patp})}>
+      Export
+    </button>
+    <button 
+      class="btn" 
+      on:click={()=>openModal(DeleteModal,{"patp":patp})}>
+      Delete
+    </button>
+  {/if}
 </div>
 <style>
   .bottom-panel {
