@@ -327,6 +327,16 @@ export const startramCancel = async (key,reset) => {
   }
   send(payload)
 }
+
+export const setAllStartramReminder = remind => {
+  let payload = {
+    "type":"startram",
+    "action":"reminder",
+    "remind": remind
+  }
+  send(payload)
+}
+
 //
 //  Upload Pier
 //
@@ -590,6 +600,16 @@ export const urbitChop = patp => {
     "type":"urbit",
     "action":"chop",
     "patp":patp,
+  }
+  send(payload)
+}
+
+export const setStartramReminder = (patp, remind) => {
+  let payload = {
+    "type":"urbit",
+    "action":"startram-reminder",
+    "patp":patp,
+    "remind": remind
   }
   send(payload)
 }

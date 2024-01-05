@@ -140,6 +140,7 @@ type Urbit struct {
 		PenpaiCompanion    bool   `json:"penpaiCompanion"`
 		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
+		StartramReminder   bool   `json:"startramReminder"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

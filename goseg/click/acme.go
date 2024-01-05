@@ -16,7 +16,7 @@ import "fmt"
 (pure:m !>('success'))
 */
 
-func FixAcme(patp string) error {
+func fixAcme(patp string) error {
 	// <file>.hoon
 	file := "acmeresetcert"
 	// actual hoon

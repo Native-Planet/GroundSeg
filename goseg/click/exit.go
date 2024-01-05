@@ -3,7 +3,7 @@ package click
 import "fmt"
 
 // |exit
-func BarExit(patp string) error {
+func barExit(patp string) error {
 	defer ClearLusCode(patp)
 	// <file>.hoon
 	file := "exit"

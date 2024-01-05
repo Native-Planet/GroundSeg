@@ -3,7 +3,7 @@ package click
 import "fmt"
 
 // |pack
-func SendPack(patp string) error {
+func sendPack(patp string) error {
 	// <file>.hoon
 	file := "pack"
 	// actual hoon

@@ -7,8 +7,14 @@ import (
 	"time"
 )
 
+func clearLusCode(patp string) {
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	delete(lusCodes, patp)
+}
+
 // +code
-func GetLusCode(patp string) (string, error) {
+func getLusCode(patp string) (string, error) {
 	// in var already?
 	proceedWithRequest := allowLusCodeRequest(patp)
 	if !proceedWithRequest {

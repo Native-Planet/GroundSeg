@@ -227,6 +227,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			gallsegInstalled = deskStatus == "running"
 		}
 
+		startramReminder := true
+		if dockerConfig.StartramReminder == false {
+			startramReminder = false
+		}
+
 		// pack day
 		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
@@ -272,6 +277,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.Gallseg = gallsegInstalled
+		urbit.Info.StartramReminder = startramReminder
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

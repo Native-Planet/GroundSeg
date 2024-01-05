@@ -13,3 +13,8 @@ type ClickDesks struct {
 	LastFetch time.Time
 	Status    string
 }
+
+type HarkNotification struct {
+	Type             string
+	StartramDaysLeft int
+}

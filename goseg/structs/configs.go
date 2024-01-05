@@ -56,40 +56,41 @@ type SessionInfo struct {
 
 // pier json struct
 type UrbitDocker struct {
-	PierName         string `json:"pier_name"`
-	HTTPPort         int    `json:"http_port"`
-	AmesPort         int    `json:"ames_port"`
-	LoomSize         int    `json:"loom_size"`
-	UrbitVersion     string `json:"urbit_version"`
-	MinioVersion     string `json:"minio_version"`
-	UrbitRepo        string `json:"urbit_repo"`
-	MinioRepo        string `json:"minio_repo"`
-	UrbitAmd64Sha256 string `json:"urbit_amd64_sha256"`
-	UrbitArm64Sha256 string `json:"urbit_arm64_sha256"`
-	MinioAmd64Sha256 string `json:"minio_amd64_sha256"`
-	MinioArm64Sha256 string `json:"minio_arm64_sha256"`
-	MinioPassword    string `json:"minio_password"`
-	Network          string `json:"network"`
-	WgURL            string `json:"wg_url"`
-	WgHTTPPort       int    `json:"wg_http_port"`
-	WgAmesPort       int    `json:"wg_ames_port"`
-	WgS3Port         int    `json:"wg_s3_port"`
-	WgConsolePort    int    `json:"wg_console_port"`
-	MeldSchedule     bool   `json:"meld_schedule"`
-	MeldScheduleType string `json:"meld_schedule_type"`
-	MeldDay          string `json:"meld_day"`
-	MeldDate         int    `json:"meld_date"`
-	MeldFrequency    int    `json:"meld_frequency"`
-	MeldTime         string `json:"meld_time"`
-	MeldLast         string `json:"meld_last"`
-	MeldNext         string `json:"meld_next"`
-	BootStatus       string `json:"boot_status"`
-	CustomUrbitWeb   string `json:"custom_urbit_web"`
-	CustomS3Web      string `json:"custom_s3_web"`
-	ShowUrbitWeb     string `json:"show_urbit_web"`
-	DevMode          bool   `json:"dev_mode"`
-	Click            bool   `json:"click"`
-	MinIOLinked      bool   `json:"minio_linked"`
+	PierName         string      `json:"pier_name"`
+	HTTPPort         int         `json:"http_port"`
+	AmesPort         int         `json:"ames_port"`
+	LoomSize         int         `json:"loom_size"`
+	UrbitVersion     string      `json:"urbit_version"`
+	MinioVersion     string      `json:"minio_version"`
+	UrbitRepo        string      `json:"urbit_repo"`
+	MinioRepo        string      `json:"minio_repo"`
+	UrbitAmd64Sha256 string      `json:"urbit_amd64_sha256"`
+	UrbitArm64Sha256 string      `json:"urbit_arm64_sha256"`
+	MinioAmd64Sha256 string      `json:"minio_amd64_sha256"`
+	MinioArm64Sha256 string      `json:"minio_arm64_sha256"`
+	MinioPassword    string      `json:"minio_password"`
+	Network          string      `json:"network"`
+	WgURL            string      `json:"wg_url"`
+	WgHTTPPort       int         `json:"wg_http_port"`
+	WgAmesPort       int         `json:"wg_ames_port"`
+	WgS3Port         int         `json:"wg_s3_port"`
+	WgConsolePort    int         `json:"wg_console_port"`
+	MeldSchedule     bool        `json:"meld_schedule"`
+	MeldScheduleType string      `json:"meld_schedule_type"`
+	MeldDay          string      `json:"meld_day"`
+	MeldDate         int         `json:"meld_date"`
+	MeldFrequency    int         `json:"meld_frequency"`
+	MeldTime         string      `json:"meld_time"`
+	MeldLast         string      `json:"meld_last"`
+	MeldNext         string      `json:"meld_next"`
+	BootStatus       string      `json:"boot_status"`
+	CustomUrbitWeb   string      `json:"custom_urbit_web"`
+	CustomS3Web      string      `json:"custom_s3_web"`
+	ShowUrbitWeb     string      `json:"show_urbit_web"`
+	DevMode          bool        `json:"dev_mode"`
+	Click            bool        `json:"click"`
+	MinIOLinked      bool        `json:"minio_linked"`
+	StartramReminder interface{} `json:"startram_reminder"`
 }
 
 // Define the interface
@@ -198,6 +199,12 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.DevMode, _ = v.(bool)
 		case "click":
 			u.Click, _ = v.(bool)
+		case "startram_reminder":
+			if v == nil {
+				u.StartramReminder = true
+			} else {
+				u.StartramReminder = v.(bool)
+			}
 		}
 	}
 	return nil

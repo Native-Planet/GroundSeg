@@ -25,7 +25,7 @@ import (
 (pure:m !>('success'))
 */
 
-func UnlinkStorage(patp string) error {
+func unlinkStorage(patp string) error {
 	// <file>.hoon
 	file := "unlinkstorage"
 	// actual hoon
@@ -58,7 +58,7 @@ func UnlinkStorage(patp string) error {
 	}
 	return nil
 }
-func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
+func linkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
 	// <file>.hoon
 	file := "linkstorage"
 	// actual hoon

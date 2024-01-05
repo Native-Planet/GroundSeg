@@ -43,6 +43,7 @@ var (
 		ShowUrbitWeb:     "",
 		DevMode:          false,
 		Click:            true,
+		StartramReminder: true,
 	}
 	NetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",
