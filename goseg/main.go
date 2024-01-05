@@ -266,6 +266,8 @@ func main() {
 			}
 		}()
 	*/
+	// startram reminder
+	go routines.StartramRenewalReminder()
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// log manager routine
