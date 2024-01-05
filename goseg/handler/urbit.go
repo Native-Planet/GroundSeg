@@ -39,6 +39,8 @@ func UrbitHandler(msg []byte) error {
 		return installGallseg(patp, shipConf)
 	case "uninstall-gallseg":
 		return uninstallGallseg(patp, shipConf)
+	case "startram-reminder":
+		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
 	case "pack":
 		// error handling
 		packError := func(err error) error {
@@ -848,6 +850,16 @@ func uninstallGallseg(patp string, shipConf structs.UrbitDocker) error {
 			time.Sleep(3 * time.Second)
 			break
 		}
+	}
+	return nil
+}
+
+func startramReminder(patp string, remind bool, shipConf structs.UrbitDocker) error {
+	update := make(map[string]structs.UrbitDocker)
+	shipConf.StartramReminder = remind
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
 	return nil
 }

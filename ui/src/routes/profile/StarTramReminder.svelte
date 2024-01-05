@@ -3,10 +3,12 @@
   import { setStartramReminder, setAllStartramReminder } from '$lib/stores/websocket'
   $: urbits = $structure?.urbits || {}
   $: urbitKeys = Object.keys(urbits)
-  $: selectAllCheck = () => {
+  $: selectAllCheck = selectSwitcher(urbits)
+   
+  const selectSwitcher = u => {
     let reminderStatus = [];
-    for (let patp in urbits) {
-      if (!urbits[patp].info.startramReminder) {
+    for (let patp in u) {
+      if (!u[patp].info.startramReminder) {
         return false
       }
     }

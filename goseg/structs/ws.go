@@ -309,6 +309,7 @@ type WsUrbitAction struct {
 	Time         string `json:"time"`
 	Day          string `json:"day"`
 	Date         int    `json:"date"`
+	Remind       bool   `json:"remind"`
 }
 
 type WsNewShipPayload struct {
@@ -440,6 +441,7 @@ type WsStartramAction struct {
 	Region   string `json:"region"`
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
+	Remind   bool   `json:"remind"`
 }
 
 type WsLogMessage struct {
