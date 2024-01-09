@@ -5,7 +5,7 @@
   export let type = ''
 </script>
 
-<div class="wrapper" on:click={()=>goto("boot/" + type)}>
+<div class="wrapper" on:click={()=>goto("boot/" + type)} class:disabled={$URBIT_MODE && (type == "existing")}>
   <div class="arrow">
   </div>
   {#if type == "new"}
@@ -83,5 +83,9 @@
     background-image: url('/arrow.svg');
     background-color: var(--text-color);
     cursor: pointer;
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

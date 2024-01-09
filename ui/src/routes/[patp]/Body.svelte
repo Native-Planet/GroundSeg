@@ -146,6 +146,7 @@
     />
   
   <!-- temporarily disabled
+  -->
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
   {/if}
@@ -153,7 +154,6 @@
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
-  -->
 
   <!-- Chop --
   <Chop
