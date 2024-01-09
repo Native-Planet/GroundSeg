@@ -6,6 +6,7 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
+	"groundseg/leakchannel"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
@@ -201,7 +202,7 @@ func UnauthHandler() ([]byte, error) {
 }
 
 // password reset handler
-func PwHandler(msg []byte) error {
+func PwHandler(msg []byte, urbitMode bool) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
@@ -217,6 +218,10 @@ func PwHandler(msg []byte) error {
 			}
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v", err)
+			}
+			if urbitMode {
+				leakchannel.Logout <- struct{}{}
+				return nil
 			}
 			LogoutHandler(msg)
 		}

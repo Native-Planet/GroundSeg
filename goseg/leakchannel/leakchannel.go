@@ -9,4 +9,5 @@ type ActionChannel struct {
 
 var (
 	LeakAction = make(chan ActionChannel)
+	Logout     = make(chan struct{})
 )
