@@ -7,6 +7,7 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -392,7 +393,7 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
 	bState := GetState()
-	//leak.LeakChan <- bState  // temporary
+	leak.LeakChan <- bState
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {
 		authJson, err := GetStateJson(bState)
