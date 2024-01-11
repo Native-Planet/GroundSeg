@@ -730,3 +730,11 @@ export const resetSetup = () => {
   }
   send(payload)
 }
+
+export const printMounts = () => {
+  let payload = {
+    "type":"dev",
+    "action":"print-mounts",
+  }
+  send(payload)
+}

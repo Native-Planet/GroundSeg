@@ -1,7 +1,6 @@
 package system
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"groundseg/accesspoint"
@@ -255,14 +254,6 @@ func announceNetworks(dev string) {
 			}
 		}
 	}
-}
-
-func runCommand(command string, args ...string) (string, error) {
-	cmd := exec.Command(command, args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	return out.String(), err
 }
 
 func getWifiDevice() ([]string, error) {
