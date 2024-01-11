@@ -139,6 +139,11 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	// write the script
 	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
+	if shipConf.CustomPierLocation != nil {
+		if str, ok := shipConf.CustomPierLocation.(string); ok {
+			scriptPath = filepath.Join(str, "start_urbit.sh")
+		}
+	}
 	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
@@ -205,13 +210,22 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 			},
 		}
 	}
+	mountType := mount.TypeVolume
+	sourceStr := shipName
+	if shipConf.CustomPierLocation != nil {
+		mountType = mount.TypeBind
+		if str, ok := shipConf.CustomPierLocation.(string); ok {
+			sourceStr = str
+		}
+	}
 	mounts := []mount.Mount{
 		{
-			Type:   mount.TypeVolume, // todo: use TypeBind if custom dir provided
-			Source: shipName,
+			Type:   mountType,
+			Source: sourceStr,
 			Target: "/urbit",
 		},
 	}
+
 	hostConfig = container.HostConfig{
 		NetworkMode:  container.NetworkMode(network),
 		Mounts:       mounts,
