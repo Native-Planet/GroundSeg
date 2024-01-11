@@ -19,7 +19,7 @@
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import Chop from './Section/Chop.svelte'
-  import Gallseg from './Section/Gallseg.svelte'
+  //import Gallseg from './Section/Gallseg.svelte'
   import AdminLogin from './Section/AdminLogin.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
@@ -146,7 +146,6 @@
     />
   
   <!-- temporarily disabled
-  -->
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
   {/if}
@@ -154,6 +153,7 @@
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
+  -->
 
   <!-- Chop --
   <Chop

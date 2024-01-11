@@ -17,12 +17,10 @@ package main
 import (
 	"embed"
 	"fmt"
-	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
 	"groundseg/importer"
-	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
@@ -259,15 +257,15 @@ func main() {
 	}
 	// gallseg
 	/*
-		// temporarily disable gallseg
+			// temporarily disable gallseg
+		go leak.StartLeak()
+		go func() {
+			for {
+				broadcast.BroadcastToClients()
+				time.Sleep(2 * time.Second)
+			}
+		}()
 	*/
-	go leak.StartLeak()
-	go func() {
-		for {
-			broadcast.BroadcastToClients()
-			time.Sleep(2 * time.Second)
-		}
-	}()
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// log manager routine
