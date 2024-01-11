@@ -90,11 +90,11 @@ func LookForPorts() bool {
 			info.Auth = false
 
 			// attempt connection to socket
-			logger.Logger.Info(fmt.Sprintf("Opening lick channel for %s", patp))
 			conn := makeConnection(filepath.Join(info.Symlink, sockFile))
 			if conn == nil {
 				continue
 			}
+			logger.Logger.Info(fmt.Sprintf("Opening lick channel for %s", patp))
 			go listener(patp, conn, info)
 		}
 		time.Sleep(1 * time.Second) // interval

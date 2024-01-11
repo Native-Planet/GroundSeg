@@ -8,6 +8,7 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"reflect"
+	"time"
 
 	"math/big"
 
@@ -59,6 +60,7 @@ func processAction(patp string, byteArray []byte) error {
 	if err := json.Unmarshal(byteArray, &payload); err != nil {
 		return fmt.Errorf("error unmarshalling payload: %v", err)
 	}
+	logger.Logger.Info(fmt.Sprintf("Received gallseg %s action from %s", payload.Payload.Type, patp))
 	// handle special cases here, and send everything else to
 	// LeakChannel for handler package to process
 	status := GetLickStatuses()
@@ -76,6 +78,16 @@ func processAction(patp string, byteArray []byte) error {
 		if isAuth {
 			urbitLogout(patp)
 		}
+	case "password":
+		go func() {
+			select {
+			case <-leakchannel.Logout:
+				urbitLogout(patp)
+			case <-time.After(2 * time.Minute):
+				logger.Logger.Error("Password change auto-logout timeout")
+			}
+		}()
+		sendToLeakChannel(patp, isAuth, payload.Payload.Type, byteArray)
 	default:
 		sendToLeakChannel(patp, isAuth, payload.Payload.Type, byteArray)
 	}

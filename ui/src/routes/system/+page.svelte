@@ -13,10 +13,15 @@
   import Penpai from './Penpai.svelte'
   import Support from './Support.svelte'
 
+  import { printMounts } from '$lib/stores/websocket'
+
   $: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>
 
 <div class="panel">
+  <!--
+  <button on:click={printMounts}>Print Mounts</button>
+  -->
   {#if state != "updated"}
     <LinuxUpdate />
   {/if}

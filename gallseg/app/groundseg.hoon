@@ -108,10 +108,8 @@
       ((slog 'invalid broadcast' ~) `this)
     ?:  (gte `@dr`(sub now.bowl alive.state) ~s15)
       :_  this
-      ~&  >>  'Rejecting'
-      ~ 
-      :::~  [%pass /lick %arvo %l %shut /'groundseg.sock']
-      ::==
+      :~  [%pass /lick %arvo %l %shut /'groundseg.sock']
+      ==
     :_  this
     :~  [%give %fact ~[/broadcast] %broadcast !>(`broadcast`noun.sign)]
     ==

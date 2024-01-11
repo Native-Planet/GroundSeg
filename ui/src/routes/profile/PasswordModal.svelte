@@ -1,5 +1,6 @@
 <script>
-  import { afterUpdate } from 'svelte'
+  import { page } from '$app/stores'
+  import { onMount, afterUpdate } from 'svelte'
   import { modifyPassword } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
@@ -9,14 +10,16 @@
   let cur = ''
   let pwd = ''
   let cfm = ''
+  let pageRoute;
 
-  /*
+  onMount(()=>{
+    pageRoute = $page.route.id
+  })
   afterUpdate(()=>{
-    if (tRegister == "done") {
+    if (pageRoute != $page.route.id) {
       closeModal()
     }
   })
-  */
 </script>
 
 {#if isOpen}

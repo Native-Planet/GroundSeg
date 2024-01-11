@@ -284,6 +284,13 @@ type WsUrbitPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type WsDevPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsDevAction   `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
 type WsPenpaiPayload struct {
 	ID      string         `json:"id"`
 	Type    string         `json:"type"`
@@ -310,6 +317,11 @@ type WsUrbitAction struct {
 	Day          string `json:"day"`
 	Date         int    `json:"date"`
 	Remind       bool   `json:"remind"`
+}
+
+type WsDevAction struct {
+	Type   string `json:"type"`
+	Action string `json:"action"`
 }
 
 type WsNewShipPayload struct {

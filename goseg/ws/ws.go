@@ -210,6 +210,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
+			case "dev":
+				if err = handler.DevHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "penpai":
 				if err = handler.PenpaiHandler(msg); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
@@ -226,7 +231,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "password":
-				if err = handler.PwHandler(msg); err != nil {
+				if err = handler.PwHandler(msg, false); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				} else {

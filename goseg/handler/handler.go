@@ -6,6 +6,7 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
+	"groundseg/leakchannel"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
@@ -74,6 +75,27 @@ func NewShipHandler(msg []byte) error {
 		}
 	default:
 		return fmt.Errorf("Unknown NewShip action: %v", shipPayload.Payload.Action)
+	}
+	return nil
+}
+
+func DevHandler(msg []byte) error {
+	var devPayload structs.WsDevPayload
+	err := json.Unmarshal(msg, &devPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal dev payload: %v", err)
+	}
+	switch devPayload.Payload.Action {
+	case "reset-setup":
+		logger.Logger.Warn("Dev reset-setup not allowed!")
+	case "print-mounts":
+		if blockDevices, err := system.ListHardDisks(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to print block mounts: %v", err))
+		} else {
+			logger.Logger.Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
+		}
+	default:
+		return fmt.Errorf("Unknown Dev action: %v", devPayload.Payload.Action)
 	}
 	return nil
 }
@@ -201,7 +223,7 @@ func UnauthHandler() ([]byte, error) {
 }
 
 // password reset handler
-func PwHandler(msg []byte) error {
+func PwHandler(msg []byte, urbitMode bool) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
@@ -217,6 +239,10 @@ func PwHandler(msg []byte) error {
 			}
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v", err)
+			}
+			if urbitMode {
+				leakchannel.Logout <- struct{}{}
+				return nil
 			}
 			LogoutHandler(msg)
 		}
