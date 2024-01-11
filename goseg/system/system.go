@@ -4,6 +4,7 @@ package system
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"groundseg/defaults"
 	"groundseg/logger"
@@ -209,4 +210,12 @@ func addCron(job string) error {
 	tmpfile.Close()
 	cmd := exec.Command("crontab", tmpfile.Name())
 	return cmd.Run()
+}
+
+func runCommand(command string, args ...string) (string, error) {
+	cmd := exec.Command(command, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	return out.String(), err
 }
