@@ -758,3 +758,11 @@ export const printMounts = () => {
   }
   send(payload)
 }
+
+export const devStartramReminder = () => {
+  let payload = {
+    "type":"dev",
+    "action":"startram-reminder",
+  }
+  send(payload)
+}

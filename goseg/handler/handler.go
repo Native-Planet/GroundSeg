@@ -79,27 +79,6 @@ func NewShipHandler(msg []byte) error {
 	return nil
 }
 
-func DevHandler(msg []byte) error {
-	var devPayload structs.WsDevPayload
-	err := json.Unmarshal(msg, &devPayload)
-	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal dev payload: %v", err)
-	}
-	switch devPayload.Payload.Action {
-	case "reset-setup":
-		logger.Logger.Warn("Dev reset-setup not allowed!")
-	case "print-mounts":
-		if blockDevices, err := system.ListHardDisks(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to print block mounts: %v", err))
-		} else {
-			logger.Logger.Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
-		}
-	default:
-		return fmt.Errorf("Unknown Dev action: %v", devPayload.Payload.Action)
-	}
-	return nil
-}
-
 // validate password and add to auth session map
 func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	loginMu.Lock()

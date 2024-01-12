@@ -23,9 +23,10 @@ func ClearLusCode(patp string)               { clearLusCode(patp) }
 func GetLusCode(patp string) (string, error) { return getLusCode(patp) }
 
 // desk.go
-func ReviveDesk(patp, desk string) error        { return reviveDesk(patp, desk) }
-func UninstallDesk(patp, desk string) error     { return uninstallDesk(patp, desk) }
-func InstallDesk(patp, ship, desk string) error { return installDesk(patp, ship, desk) }
+func ReviveDesk(patp, desk string) error                     { return reviveDesk(patp, desk) }
+func UninstallDesk(patp, desk string) error                  { return uninstallDesk(patp, desk) }
+func InstallDesk(patp, ship, desk string) error              { return installDesk(patp, ship, desk) }
+func GetDesk(patp, desk string, bypass bool) (string, error) { return getDesk(patp, desk, bypass) }
 
 // exit.go
 func BarExit(patp string) error { return barExit(patp) }
@@ -33,7 +34,7 @@ func BarExit(patp string) error { return barExit(patp) }
 // hark.go
 func SendNotification(patp string, payload structs.HarkNotification) error {
 	switch payload.Type {
-	case "startram":
+	case "startram-reminder":
 		return sendStartramReminder(patp, payload.StartramDaysLeft)
 	default:
 		return fmt.Errorf("invalid hark notification type: %s", payload.Type)
