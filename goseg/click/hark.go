@@ -6,17 +6,17 @@ import (
 
 /*
 		=/  m  (strand ,vase)
-		;<    our=@p
+		;<    =bowl:rand
 		    bind:m
 		  get-our
 		;<    ~
 		    bind:m
-			=+  id=0v0
+			=+  id=(end 7 (shas %startram-notification eny.bowl))
 	    =/  con=(list content:h)  ~[text text]
-	    =+  rope=[[~ our %nativeplanet] [~ %diary our %changelog] %groups /]
+	    =+  rope=[[~ our.bowl %nativeplanet] [~ %diary our.bowl %changelog] %groups /]
 	    =/  wer=path  /groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/changelog/note/'170141184506582040503264511680103579648'
 			=+  but=~
-		  (poke [our %hark] %hark-action !>([%add-yarn & & id rope con wer but])
+		  (poke [our.bowl %hark] %hark-action !>([%add-yarn & & id rope now.bowl con wer but])
 		(pure:m !>('success'))
 */
 func sendStartramReminder(patp string, daysLeft int) error {
@@ -24,15 +24,16 @@ func sendStartramReminder(patp string, daysLeft int) error {
 	// construct poke
 	text := fmt.Sprintf("'Your startram code is expiring in %v days. Click for more information.'", daysLeft)
 	con := fmt.Sprintf("~[%s %s]", text, text)
-	id := "0v14e.5p95b.d5mk5.vrqe0.oeu0m.3ghcb"
-	rope := "[[~ our %nativeplanet] [~ %diary our %changelog] %groups /]"                                                     // temp location
+	//id := "0v14e.5p95b.d5mk5.vrqe0.oeu0m.3ghcb"
+	id := "(end 7 (shas %startram-notification eny.bowl))"
+	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %changelog] %groups /]"                                           // temp location
 	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/changelog/note/'170141184506582040503264511680103579648'" //temp location
 	but := "~"
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
-		";<", "our=@p", "bind:m", "get-our",
+		";<", "=bowl:rand", "bind:m", "get-bowl",
 		";<", "~", "bind:m",
-		fmt.Sprintf("(poke [our %%hark] %%hark-action !>([%%add-yarn & & [%s %s %s %s %s]]))", id, rope, con, wer, but),
+		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
 		"(pure:m !>('success'))",
 	})
 

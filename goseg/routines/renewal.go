@@ -2,9 +2,11 @@ package routines
 
 import (
 	"fmt"
+	"groundseg/click"
 	"groundseg/config"
 	"groundseg/logger"
 	"groundseg/startram"
+	"groundseg/structs"
 	"time"
 )
 
@@ -62,10 +64,25 @@ func StartramRenewalReminder() {
 			logger.Logger.Warn("Send renew notification to hark for less than 7 days")
 		} else if daysUntil <= 1000 {
 			logger.Logger.Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
+			sendHarkNotification(daysUntil, conf.Piers)
 		}
 		// check again in 12 hours
 		logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 		time.Sleep(12 * time.Hour)
 		continue
+	}
+}
+
+func sendHarkNotification(daysLeft int, piers []string) {
+	noti := structs.HarkNotification{Type: "startram-reminder", StartramDaysLeft: daysLeft}
+	// Send notification
+	for _, patp := range piers {
+		logger.Logger.Warn(patp)
+		shipConf := config.UrbitConf(patp)
+		if shipConf.StartramReminder == true {
+			if err := click.SendNotification(patp, noti); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
+			}
+		}
 	}
 }
