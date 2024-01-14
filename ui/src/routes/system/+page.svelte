@@ -13,7 +13,12 @@
   import Penpai from './Penpai.svelte'
   import Support from './Support.svelte'
 
-  import { devStartramReminder, printMounts } from '$lib/stores/websocket'
+  import { 
+    // dev
+    devStartramReminder,
+    devStartramReminderToggle,
+    printMounts
+  } from '$lib/stores/websocket'
 
   $: state = ($structure?.system?.updates?.linux?.state) || "updated"
 </script>
@@ -22,6 +27,8 @@
   <!--
   <button on:click={printMounts}>Print Mounts</button>
   <button on:click={devStartramReminder}>Remind Startram</button>
+  <button on:click={()=>devStartramReminderToggle(true)}>Reminded</button>
+  <button on:click={()=>devStartramReminderToggle(false)}>Have not Reminded</button>
   -->
   {#if state != "updated"}
     <LinuxUpdate />

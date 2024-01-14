@@ -23,14 +23,17 @@ func StartramRenewalReminder() {
 		retrieve, err := startram.Retrieve()
 		if err != nil {
 			logger.Logger.Error("Failed to retrieve StarTram information: %v", err)
-			// check again in 60 minutes
 			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 60 minutes"))
+			// check again in 60 minutes
 			time.Sleep(60 * time.Minute)
 			continue
 		}
-		if retrieve.Ongoing != 0 {
+		if retrieve.Ongoing == 1 {
 			// check again in 12 hours
 			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
+			setReminder("one", false)
+			setReminder("three", false)
+			setReminder("seven", false)
 			time.Sleep(12 * time.Hour)
 			continue
 		}
@@ -56,20 +59,39 @@ func StartramRenewalReminder() {
 
 		// Round down the number of days
 		daysUntil := int(diff)
-		if daysUntil <= 1 {
-			logger.Logger.Warn("Send renew notification to hark for less than 1 day")
-		} else if daysUntil <= 3 {
-			logger.Logger.Warn("Send renew notification to hark for less than 3 days")
-		} else if daysUntil <= 7 {
-			logger.Logger.Warn("Send renew notification to hark for less than 7 days")
-		} else if daysUntil <= 1000 {
+
+		// the send function
+		send := func() {
 			logger.Logger.Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
 			sendHarkNotification(daysUntil, conf.Piers)
+		}
+
+		rem := conf.StartramSetReminder
+		if !rem.One && daysUntil <= 1 {
+			logger.Logger.Warn("Send renew notification to hark for less than 1 day")
+			send()
+			setReminder("one", true)
+		} else if !rem.Three && daysUntil <= 3 {
+			send()
+			setReminder("three", true)
+		} else if !rem.Seven && daysUntil <= 7 {
+			send()
+			setReminder("seven", true)
 		}
 		// check again in 12 hours
 		logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 		time.Sleep(12 * time.Hour)
 		continue
+	}
+}
+
+func setReminder(daysType string, reminded bool) {
+	if err := config.UpdateConf(map[string]interface{}{
+		"startramSetReminder": map[string]bool{
+			daysType: reminded,
+		},
+	}); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
 	}
 }
 

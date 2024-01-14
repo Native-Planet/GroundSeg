@@ -23,9 +23,16 @@ type SysConfig struct {
 		Value    int    `json:"value"`
 		Interval string `json:"interval"`
 	} `json:"linuxUpdates"`
-	DockerData     string   `json:"dockerData"`
-	WgOn           bool     `json:"wgOn"`
-	WgRegistered   bool     `json:"wgRegistered"`
+	DockerData          string `json:"dockerData"`
+	WgOn                bool   `json:"wgOn"`
+	WgRegistered        bool   `json:"wgRegistered"`
+	StartramSetReminder struct {
+		// true if reminder has been sent
+		// resets to false when ongoing == 1
+		One   bool `json:"one"`
+		Three bool `json:"three"`
+		Seven bool `json:"seven"`
+	} `json:"startramSetReminder"`
 	PwHash         string   `json:"pwHash"`
 	C2cInterval    int      `json:"c2cInterval"`
 	GsVersion      string   `json:"gsVersion"`

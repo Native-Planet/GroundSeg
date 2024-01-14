@@ -766,3 +766,12 @@ export const devStartramReminder = () => {
   }
   send(payload)
 }
+
+export const devStartramReminderToggle = b => {
+  let payload = {
+    "type":"dev",
+    "action":"startram-reminder-toggle",
+    "reminded": b
+  }
+  send(payload)
+}

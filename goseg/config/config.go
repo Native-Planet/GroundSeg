@@ -507,6 +507,11 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	// WgRegistered
 	mergedConfig.WgRegistered = customConfig.WgRegistered || defaultConfig.WgRegistered
 
+	// StartramSetReminder
+	mergedConfig.StartramSetReminder.One = customConfig.StartramSetReminder.One || defaultConfig.StartramSetReminder.One
+	mergedConfig.StartramSetReminder.Three = customConfig.StartramSetReminder.Three || defaultConfig.StartramSetReminder.Three
+	mergedConfig.StartramSetReminder.Seven = customConfig.StartramSetReminder.Seven || defaultConfig.StartramSetReminder.Seven
+
 	// PwHash
 	if customConfig.PwHash != "" {
 		mergedConfig.PwHash = customConfig.PwHash

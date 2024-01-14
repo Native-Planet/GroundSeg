@@ -320,8 +320,9 @@ type WsUrbitAction struct {
 }
 
 type WsDevAction struct {
-	Type   string `json:"type"`
-	Action string `json:"action"`
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Reminded bool   `json:"reminded"`
 }
 
 type WsNewShipPayload struct {

@@ -53,14 +53,30 @@ func DevHandler(msg []byte) error {
 		diff := expiryDate.Sub(currentTime).Hours() / 24
 		noti := structs.HarkNotification{Type: "startram-reminder", StartramDaysLeft: int(diff)}
 
-		// Send notification
-		for _, patp := range conf.Piers {
-			shipConf := config.UrbitConf(patp)
-			if shipConf.StartramReminder == true {
-				if err := click.SendNotification(patp, noti); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
+		rem := conf.StartramSetReminder
+		if !rem.One || !rem.Three || !rem.Seven {
+			// Send notification
+			for _, patp := range conf.Piers {
+				shipConf := config.UrbitConf(patp)
+				if shipConf.StartramReminder == true {
+					if err := click.SendNotification(patp, noti); err != nil {
+						logger.Logger.Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
+					}
 				}
 			}
+		} else {
+			logger.Logger.Debug("Dev not sending startram reminder. Already reminded!")
+		}
+	case "startram-reminder-toggle":
+		reminded := devPayload.Payload.Reminded
+		if err := config.UpdateConf(map[string]interface{}{
+			"startramSetReminder": map[string]bool{
+				"one":   reminded,
+				"three": reminded,
+				"seven": reminded,
+			},
+		}); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
 		}
 	default:
 		return fmt.Errorf("Unknown Dev action: %v", devPayload.Payload.Action)
