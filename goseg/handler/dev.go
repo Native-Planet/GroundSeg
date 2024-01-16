@@ -9,10 +9,26 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"os"
 	"time"
 )
 
+var isDev = checkDevMode()
+
+func checkDevMode() bool {
+	for _, arg := range os.Args[1:] {
+		// trigger dev mode with `./groundseg dev`
+		if arg == "dev" {
+			return true
+		}
+	}
+	return false
+}
+
 func DevHandler(msg []byte) error {
+	if !isDev {
+		return fmt.Errorf("Dev actions not allowed!")
+	}
 	var devPayload structs.WsDevPayload
 	err := json.Unmarshal(msg, &devPayload)
 	if err != nil {
