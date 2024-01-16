@@ -17,12 +17,14 @@
 
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
-
 </script>
 
+<!-- Sigil -->
 <div class="sigil-wrapper">
   <Sigil {name} reverse={true} />
 </div>
+
+<!-- Patp -->
 <div class="input-wrapper">
   <div class="label">Urbit ID</div>
   <input type="text" bind:value={name} placeholder="Ship Name" />
@@ -43,6 +45,21 @@
       <div class="check-label">Set to remote</div>
     {/if}
   </div>
+</div>
+
+<!-- Custom Settings -->
+<div class="input-wrapper">
+  <div class="label">Custom Settings</div>
+</div>
+
+<!-- Divider -->
+<div class="input-wrapper">
+  <div class="line">
+  </div>
+</div>
+
+<!-- Buttons  -->
+<div class="input-wrapper">
   <div class="buttons">
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
@@ -74,6 +91,13 @@
     align-items: flex-start;
     gap: 16px;
     margin-bottom: 16px;
+  }
+  .line {
+    margin-top: 32px;
+    height: 2px;
+    width: 100%;
+    background: var(--Gray-400, #5C7060);
+    opacity: 0.3;
   }
   .check-wrapper {
     display: flex;
