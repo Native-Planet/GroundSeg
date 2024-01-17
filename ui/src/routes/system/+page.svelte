@@ -24,8 +24,8 @@
 </script>
 
 <div class="panel">
-  <!--
   <button on:click={printMounts}>Print Mounts</button>
+  <!--
   <button on:click={devStartramReminder}>Remind Startram</button>
   <button on:click={()=>devStartramReminderToggle(true)}>Reminded</button>
   <button on:click={()=>devStartramReminderToggle(false)}>Have not Reminded</button>

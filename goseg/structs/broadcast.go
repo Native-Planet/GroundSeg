@@ -41,9 +41,10 @@ type NewShip struct {
 // broadcast payload subobject
 type System struct {
 	Info struct {
-		Usage   SystemUsage   `json:"usage"`
-		Updates SystemUpdates `json:"updates"`
-		Wifi    SystemWifi    `json:"wifi"`
+		Usage        SystemUsage   `json:"usage"`
+		Updates      SystemUpdates `json:"updates"`
+		Wifi         SystemWifi    `json:"wifi"`
+		BlockDevices []BlockDev    `json:"blockDevices"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
 }

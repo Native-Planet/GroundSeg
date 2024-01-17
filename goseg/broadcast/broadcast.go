@@ -331,22 +331,38 @@ func constructProfileInfo() structs.Profile {
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
+	// init
 	var ramObj []uint64
 	var sysInfo structs.System
+	conf := config.Conf()
+
+	// Linux update
+	sysInfo.Info.Updates = system.SystemUpdates
+
+	// Wifi
+	sysInfo.Info.Wifi = system.WifiInfo
+	// Sys details
 	usedRam, totalRam := system.GetMemory()
 	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
 	sysInfo.Info.Usage.CPU = system.GetCPU()
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	diskUsage, err := system.GetDisk()
-	if err != nil {
+	if diskUsage, err := system.GetDisk(); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting disk usage: %v", err))
+	} else {
+		sysInfo.Info.Usage.Disk = diskUsage
+		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
-	sysInfo.Info.Usage.Disk = diskUsage
-	conf := config.Conf()
-	sysInfo.Info.Usage.SwapFile = conf.SwapVal
-	sysInfo.Info.Updates = system.SystemUpdates
+
+	// Block Devices
+	if blockDevices, err := system.ListHardDisks(); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
+	} else {
+		sysInfo.Info.BlockDevices = blockDevices.BlockDevices
+	}
+
+	// Transition
 	sysInfo.Transition = SystemTransitions
-	sysInfo.Info.Wifi = system.WifiInfo
+
 	return sysInfo
 }
 

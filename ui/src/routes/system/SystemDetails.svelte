@@ -63,12 +63,14 @@
     <Ram {ram} />
   </div>
   <div class="item-wrapper">
-    <Storage {disk} />
-  </div>
-  <div class="item-wrapper">
     <CPULoad {cpu} />
   </div>
-  <CPUTemp {cpuTemp} />
+  <div class="item-wrapper">
+    <CPUTemp {cpuTemp} />
+  </div>
+  <div class="item-wrapper">
+    <Storage {disk} />
+  </div>
 </div>
 
 <style>
