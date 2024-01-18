@@ -603,6 +603,14 @@ export const urbitChop = patp => {
   }
   send(payload)
 }
+export const toggleChopAfterVereUpdate = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-chop-on-vere-update",
+    "patp":patp,
+  }
+  send(payload)
+}
 
 export const setStartramReminder = (patp, remind) => {
   let payload = {
