@@ -99,6 +99,7 @@ type UrbitDocker struct {
 	Click              bool        `json:"click"`
 	MinIOLinked        bool        `json:"minio_linked"`
 	StartramReminder   interface{} `json:"startram_reminder"`
+	ChopOnUpgrade      interface{} `json:"chop_on_upgrade"`
 }
 
 // Define the interface
@@ -218,6 +219,12 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 				u.CustomPierLocation = nil
 			} else {
 				u.CustomPierLocation = v.(string)
+			}
+		case "chop_on_upgrade":
+			if v == nil {
+				u.ChopOnUpgrade = true
+			} else {
+				u.ChopOnUpgrade = v.(bool)
 			}
 		}
 	}

@@ -232,6 +232,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			startramReminder = false
 		}
 
+		chopOnUpgrade := true
+		if dockerConfig.ChopOnUpgrade == false {
+			chopOnUpgrade = false
+		}
+
 		// pack day
 		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
@@ -278,6 +283,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.Gallseg = gallsegInstalled
 		urbit.Info.StartramReminder = startramReminder
+		urbit.Info.ChopOnUpgrade = chopOnUpgrade
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

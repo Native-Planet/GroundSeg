@@ -31,6 +31,15 @@ func UrbitHandler(msg []byte) error {
 	patp := urbitPayload.Payload.Patp
 	shipConf := config.UrbitConf(patp)
 	switch urbitPayload.Payload.Action {
+	// set custom domains
+	case "set-urbit-domain":
+		return setUrbitDomain(patp, urbitPayload, shipConf)
+	case "set-minio-domain":
+		return setMinIODomain(patp, urbitPayload, shipConf)
+		// set whether or not ship wants startram reminders
+	case "startram-reminder":
+		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
+		// urbit desks
 	case "install-penpai-companion":
 		return installPenpaiCompanion(patp, shipConf)
 	case "uninstall-penpai-companion":
@@ -39,223 +48,20 @@ func UrbitHandler(msg []byte) error {
 		return installGallseg(patp, shipConf)
 	case "uninstall-gallseg":
 		return uninstallGallseg(patp, shipConf)
-	case "startram-reminder":
-		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
+		// ship operations
+	case "chop":
+		return chopPier(patp, shipConf)
 	case "pack":
-		// error handling
-		packError := func(err error) error {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
-			return err
-		}
-		// clear transition after end
-		defer func() {
-			time.Sleep(3 * time.Second)
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""}
-		}()
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			return packError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			return packError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
-		}
-		// running
-		if strings.Contains(status, "Up") {
-			// send |pack
-			if err := click.SendPack(patp); err != nil {
-				return packError(fmt.Errorf("Failed to |pack to %s: %v", patp, err))
-			}
-			// not running
-		} else {
-			// switch boot status to pack
-			shipConf.BootStatus = "pack"
-			update := make(map[string]structs.UrbitDocker)
-			update[patp] = shipConf
-			err := config.UpdateUrbitConfig(update)
-			if err != nil {
-				return packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
-			}
-			_, err = docker.StartContainer(patp, "vere")
-			if err != nil {
-				return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
-			}
-		}
-		// set last meld
-		now := time.Now().Unix()
-		shipConf.MeldLast = strconv.FormatInt(now, 10)
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err = config.UpdateUrbitConfig(update)
-		if err != nil {
-			return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
-		}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
-		return nil
+		return packPier(patp, shipConf)
 	case "pack-meld":
-		packMeldError := func(err error) error {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "error"}
-			return err
-		}
-		// clear transition after end
-		defer func() {
-			time.Sleep(3 * time.Second)
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: ""}
-		}()
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			return packMeldError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
-		}
-		isRunning := strings.Contains(status, "Up")
-		if isRunning {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
-			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
-				if err = docker.StopContainerByName(patp); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
-				}
-			}
-		}
-		// stop ship
-		// start ship as pack
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
-		logger.Logger.Info(fmt.Sprintf("Attempting to urth pack %s", patp))
-		shipConf.BootStatus = "pack"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err = config.UpdateUrbitConfig(update)
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
-		}
-		_, err = docker.StartContainer(patp, "vere")
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
-		}
-
-		logger.Logger.Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
-		waitComplete(patp)
-
-		// start ship as meld
-		logger.Logger.Info(fmt.Sprintf("Attempting to urth meld %s", patp))
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "melding"}
-		shipConf.BootStatus = "meld"
-		update = make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err = config.UpdateUrbitConfig(update)
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
-		}
-		_, err = docker.StartContainer(patp, "vere")
-		if err != nil {
-			return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
-		}
-
-		logger.Logger.Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
-		waitComplete(patp)
-
-		// start ship if "boot"
-		if isRunning {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "starting"}
-			shipConf.BootStatus = "boot"
-			update := make(map[string]structs.UrbitDocker)
-			update[patp] = shipConf
-			err := config.UpdateUrbitConfig(update)
-			if err != nil {
-				return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
-			}
-			_, err = docker.StartContainer(patp, "vere")
-			if err != nil {
-				return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
-			}
-		}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "success"}
-		return nil
+		return packMeldPier(patp, shipConf)
+		// show custom domain for urbit ship in UI
 	case "toggle-alias":
-		if shipConf.ShowUrbitWeb == "custom" {
-			shipConf.ShowUrbitWeb = "default"
-		} else {
-			shipConf.ShowUrbitWeb = "custom"
-		}
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			return fmt.Errorf("Couldn't update urbit config: %v", err)
-		}
-		return nil
-	case "set-urbit-domain":
-		defer func() {
-			time.Sleep(1 * time.Second)
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
-		}()
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
-		// check if new domain is valid
-		alias := urbitPayload.Payload.Domain
-		oldDomain := shipConf.WgURL
-		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
-		if err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
-			return fmt.Errorf("Failed to check Urbit domain alias for %s: %v", patp, err)
-		}
-		if !areAliases {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
-			return fmt.Errorf("Invalid Urbit domain alias for %s", patp)
-		}
-		// Creae Alias
-		if err := startram.AliasCreate(patp, alias); err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
-			return err
-		}
-		shipConf.CustomUrbitWeb = alias
-		shipConf.ShowUrbitWeb = "custom" // or "default"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
-			return fmt.Errorf("Couldn't update urbit config: %v", err)
-		}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "success"}
-		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "done"}
-		return nil
-	case "set-minio-domain":
-		defer func() {
-			time.Sleep(1 * time.Second)
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
-		}()
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
-		// check if new domain is valid
-		alias := urbitPayload.Payload.Domain
-		oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
-		areAliases, err := AreSubdomainsAliases(alias, oldDomain)
-		if err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-			return fmt.Errorf("Failed to check MinIO domain alias for %s: %v", patp, err)
-		}
-		if !areAliases {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-			return fmt.Errorf("Invalid MinIO domain alias for %s", patp)
-		}
-		// Creae Alias
-		if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-			return err
-		}
-		shipConf.CustomS3Web = alias
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
-			return fmt.Errorf("Couldn't update urbit config: %v", err)
-		}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
-		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
-		return nil
+		return toggleAlias(patp, shipConf)
+		// config
+	case "toggle-chop-on-vere-update":
+		return toggleChopOnVereUpdate(patp, shipConf)
+		// to be continued
 	case "rebuild-container":
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "loading"}
 		if err := urbitCleanDelete(patp); err != nil {
@@ -857,6 +663,316 @@ func uninstallGallseg(patp string, shipConf structs.UrbitDocker) error {
 func startramReminder(patp string, remind bool, shipConf structs.UrbitDocker) error {
 	update := make(map[string]structs.UrbitDocker)
 	shipConf.StartramReminder = remind
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	return nil
+}
+
+func packPier(patp string, shipConf structs.UrbitDocker) error {
+	// error handling
+	packError := func(err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
+		return err
+	}
+	// clear transition after end
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return packError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return packError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+	}
+	// running
+	if strings.Contains(status, "Up") {
+		// send |pack
+		if err := click.SendPack(patp); err != nil {
+			return packError(fmt.Errorf("Failed to |pack to %s: %v", patp, err))
+		}
+		// not running
+	} else {
+		// switch boot status to pack
+		shipConf.BootStatus = "pack"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err := config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
+		}
+	}
+	// set last meld
+	now := time.Now().Unix()
+	shipConf.MeldLast = strconv.FormatInt(now, 10)
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
+	return nil
+}
+
+func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
+	packMeldError := func(err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "error"}
+		return err
+	}
+	// clear transition after end
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: ""}
+	}()
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return packMeldError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return packMeldError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+	}
+	isRunning := strings.Contains(status, "Up")
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
+		if err := click.BarExit(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
+			if err = docker.StopContainerByName(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+			}
+		}
+	}
+	// stop ship
+	// start ship as pack
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
+	logger.Logger.Info(fmt.Sprintf("Attempting to urth pack %s", patp))
+	shipConf.BootStatus = "pack"
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return packMeldError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
+	}
+	_, err = docker.StartContainer(patp, "vere")
+	if err != nil {
+		return packMeldError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
+	}
+
+	logger.Logger.Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
+	waitComplete(patp)
+
+	// start ship as meld
+	logger.Logger.Info(fmt.Sprintf("Attempting to urth meld %s", patp))
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "melding"}
+	shipConf.BootStatus = "meld"
+	update = make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
+	}
+	_, err = docker.StartContainer(patp, "vere")
+	if err != nil {
+		return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
+	}
+
+	logger.Logger.Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
+	waitComplete(patp)
+
+	// start ship if "boot"
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "starting"}
+		shipConf.BootStatus = "boot"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err := config.UpdateUrbitConfig(update)
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to update %s urbit config to meld: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
+		}
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "success"}
+	return nil
+}
+
+func toggleAlias(patp string, shipConf structs.UrbitDocker) error {
+	if shipConf.ShowUrbitWeb == "custom" {
+		shipConf.ShowUrbitWeb = "default"
+	} else {
+		shipConf.ShowUrbitWeb = "custom"
+	}
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	return nil
+}
+
+func setUrbitDomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	defer func() {
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "loading"}
+	// check if new domain is valid
+	alias := urbitPayload.Payload.Domain
+	oldDomain := shipConf.WgURL
+	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+	if err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+		return fmt.Errorf("Failed to check Urbit domain alias for %s: %v", patp, err)
+	}
+	if !areAliases {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+		return fmt.Errorf("Invalid Urbit domain alias for %s", patp)
+	}
+	// Creae Alias
+	if err := startram.AliasCreate(patp, alias); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+		return err
+	}
+	shipConf.CustomUrbitWeb = alias
+	shipConf.ShowUrbitWeb = "custom" // or "default"
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "error"}
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urbitDomain", Event: "done"}
+	return nil
+}
+
+func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	defer func() {
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: ""}
+	}()
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "loading"}
+	// check if new domain is valid
+	alias := urbitPayload.Payload.Domain
+	oldDomain := fmt.Sprintf("s3.%s", shipConf.WgURL)
+	areAliases, err := AreSubdomainsAliases(alias, oldDomain)
+	if err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Failed to check MinIO domain alias for %s: %v", patp, err)
+	}
+	if !areAliases {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Invalid MinIO domain alias for %s", patp)
+	}
+	// Creae Alias
+	if err := startram.AliasCreate(fmt.Sprintf("s3.%s", patp), alias); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return err
+	}
+	shipConf.CustomS3Web = alias
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"}
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"}
+	return nil
+}
+
+func chopPier(patp string, shipConf structs.UrbitDocker) error {
+	// error handling
+	chopError := func(err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "error"}
+		return err
+	}
+	// clear transition after end
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: ""}
+	}()
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return chopError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return chopError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+	}
+	isRunning := strings.Contains(status, "Up")
+	// stop ship
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "stopping"}
+		if err := click.BarExit(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for chop %s: %v", patp, err))
+			if err = docker.StopContainerByName(patp); err != nil {
+				return fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err)
+			}
+		}
+	}
+	// start ship as chop
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "chopping"}
+	logger.Logger.Info(fmt.Sprintf("Attempting to chop %s", patp))
+	shipConf.BootStatus = "chop"
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return chopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+	}
+	_, err = docker.StartContainer(patp, "vere")
+	if err != nil {
+		return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+	}
+
+	logger.Logger.Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
+	waitComplete(patp)
+
+	// start ship if "boot"
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "starting"}
+		shipConf.BootStatus = "boot"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err := config.UpdateUrbitConfig(update)
+		if err != nil {
+			return chopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+		}
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "success"}
+	return nil
+}
+
+func toggleChopOnVereUpdate(patp string, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chopOnUpgrade", Event: "loading"}
+	defer func() {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chopOnUpgrade", Event: ""}
+	}()
+	update := make(map[string]structs.UrbitDocker)
+	if shipConf.ChopOnUpgrade == false {
+		shipConf.ChopOnUpgrade = true
+	} else {
+		shipConf.ChopOnUpgrade = false
+	}
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)

@@ -141,6 +141,7 @@ type Urbit struct {
 		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
 		StartramReminder   bool   `json:"startramReminder"`
+		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -148,6 +149,7 @@ type Urbit struct {
 // broadcast payload subobject
 type UrbitTransitionBroadcast struct {
 	Pack                      string `json:"pack"`
+	Chop                      string `json:"chop"`
 	PackMeld                  string `json:"packMeld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
@@ -165,6 +167,7 @@ type UrbitTransitionBroadcast struct {
 	MinIODomain               string `json:"minioDomain"`
 	PenpaiCompanion           string `json:"penpaiCompanion"`
 	Gallseg                   string `json:"gallseg"`
+	ChopOnUpgrade             string `json:"chopOnUpgrade"`
 }
 
 // used to construct broadcast pier info subobject

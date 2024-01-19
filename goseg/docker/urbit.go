@@ -111,13 +111,15 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.MeldScript
 	case "prep":
 		scriptContent = defaults.PrepScript
+	case "chop":
+		scriptContent = defaults.ChopScript
 	case "noboot":
 		return containerConfig, hostConfig, fmt.Errorf("%s marked noboot!", containerName)
 	default:
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
 	// reset ship status to boot for next time
-	if act == "pack" || act == "meld" {
+	if act == "pack" || act == "meld" || act == "chop" {
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "noboot"
 		newConfig := make(map[string]structs.UrbitDocker)

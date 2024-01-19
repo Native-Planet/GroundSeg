@@ -2,40 +2,75 @@
   // Style
   import "../theme.css"
   import { urbitChop, toggleChopAfterVereUpdate } from '$lib/stores/websocket'
-  import { createEventDispatcher } from 'svelte'
-  import { URBIT_MODE } from '$lib/stores/data'
+  import {  afterUpdate } from 'svelte'
+  import { structure, URBIT_MODE } from '$lib/stores/data'
   import { openModal } from 'svelte-modals'
   import ChopModal from '../ChopModal.svelte'
 
   export let patp
 
-  const dispatch = createEventDispatcher()
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+
+  $: ship = ($structure?.urbits?.[patp]) || {}
+  $: chopOnUpgrade = ship?.info?.chopOnUpgrade == undefined || ship?.info?.chopOnUpgrade // true by default
+
+  $: tChopOnUpgrade = ship?.transition?.chopOnUpgrade || ""
+  $: tChop = (ship?.transition.chop) || ""
 
   const handleModal = () => {
     openModal(ChopModal,{"patp":patp})
   }
 
+  let loading = false
+  let awaitChange = false
+  let lastState = chopOnUpgrade
+
+  const handleToggleChop = () => {
+    loading = true
+    awaitChange = true
+    lastState = chopOnUpgrade
+    toggleChopAfterVereUpdate(patp)
+  }
+
+  afterUpdate(()=>{
+    if (awaitChange) {
+      if (lastState != chopOnUpgrade) {
+        loading = false
+      }
+    }
+  })
 </script>
 
 <div class="section">
   <div class="section-left">
     <div class="section-title">Chop</div>
     <div class="section-description">This function will trunctate your ship logs, freeing disk space. We recommend configuring automatic chop</div>
-    <div class="check-wrapper">
-      <div class="checkbox" on:click={()=>toggleChopAfterVereUpdate(patp)}>
-        {#if true}
+    <div class="check-wrapper" class:disabled={loading}>
+      <div class="checkbox" on:click={handleToggleChop}>
+        {#if chopOnUpgrade}
           <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
         {/if}
       </div>
-      <div class="check-text" on:click={()=>toggleChopAfterVereUpdate(patp)}>Chop after Vere Update</div>
+      <div class="check-text" on:click={handleToggleChop}>Chop after Vere Update</div>
     </div>
   </div>
   <div class="section-right">
     <div class="btn-wrapper">
       <div class="spacer"></div>
-      <button class="super" on:click={()=>urbitChop(patp)}>Chop</button>
-      <button class="super chop" on:click={handleModal}>Auto Chop</button> 
+      <button
+        class:disabled={tChop.length > 0}
+        class="super" on:click={()=>urbitChop(patp)}>
+        {#if tChop.length < 1 || tChop == "done"}
+          Chop
+        {:else if tChop == "success"}
+          Success!
+        {:else if tChop == "error"}
+          Error!
+        {:else}
+          {tChop.charAt(0).toUpperCase() + tChop.slice(1)}
+        {/if}
+      </button>
+      <button class="super chop" on:click={handleModal}>Set Auto</button> 
     </div>
   </div>
 </div>
@@ -105,5 +140,10 @@
     line-height: 24px; /* 150% */
     letter-spacing: -0.96px;
     cursor: pointer;
+  }
+  .error {color: red;}
+  .disabled {
+    pointer-events: none;
+    opacity: .6;
   }
 </style>
