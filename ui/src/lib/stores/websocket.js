@@ -463,6 +463,17 @@ export const setUrbitDomain = (patp, domain) => {
   send(payload)
 }
 
+
+export const setNewMaxPierSize = (patp, size) => {
+  let payload = {
+    "type":"urbit",
+    "action":"new-max-pier-size",
+    "patp":patp,
+    "value": size
+  }
+  send(payload)
+}
+
 export const toggleAutoBoot = patp => {
   let payload = {
     "type":"urbit",
@@ -603,6 +614,16 @@ export const urbitChop = patp => {
   }
   send(payload)
 }
+
+export const urbitRollChop = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"roll-chop",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const toggleChopAfterVereUpdate = patp => {
   let payload = {
     "type":"urbit",

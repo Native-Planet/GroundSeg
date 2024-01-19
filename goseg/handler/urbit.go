@@ -56,6 +56,8 @@ func UrbitHandler(msg []byte) error {
 		// ship operations
 	case "chop":
 		return chopPier(patp, shipConf)
+	case "roll-chop":
+		return rollChopPier(patp, shipConf)
 	case "pack":
 		return packPier(patp, shipConf)
 	case "pack-meld":
@@ -83,6 +85,8 @@ func UrbitHandler(msg []byte) error {
 		return deleteShip(patp, shipConf)
 	case "toggle-chop-on-vere-update":
 		return toggleChopOnVereUpdate(patp, shipConf)
+	case "new-max-pier-size":
+		return setNewMaxPierSize(patp, urbitPayload, shipConf)
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -1020,5 +1024,99 @@ func pausePackSchedule(patp string, urbitPayload structs.WsUrbitPayload, shipCon
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Failed to pause pack schedule: %v", err)
 	}
+	return nil
+}
+
+func setNewMaxPierSize(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	shipConf.SizeLimit = urbitPayload.Payload.Value
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Failed to set new size limit for %s: %v", patp, err)
+	}
+	return nil
+}
+
+func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
+	rollChopError := func(err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "error"}
+		return err
+	}
+	// clear transition after end
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: ""}
+	}()
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return rollChopError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return rollChopError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+	}
+	isRunning := strings.Contains(status, "Up")
+	// stop ship
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "stopping"}
+		if err := click.BarExit(patp); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for roll & chop %s: %v", patp, err))
+			if err = docker.StopContainerByName(patp); err != nil {
+				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
+			}
+		}
+	}
+	// start ship as roll
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "rolling"}
+	logger.Logger.Info(fmt.Sprintf("Attempting to roll %s", patp))
+	shipConf.BootStatus = "roll"
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return rollChopError(fmt.Errorf("Failed to update %s urbit config to roll: %v", patp, err))
+	}
+	_, err = docker.StartContainer(patp, "vere")
+	if err != nil {
+		return rollChopError(fmt.Errorf("Failed to roll %s: %v", patp, err))
+	}
+
+	logger.Logger.Info(fmt.Sprintf("Waiting for roll to complete for %s", patp))
+	waitComplete(patp)
+
+	// start ship as chop
+	logger.Logger.Info(fmt.Sprintf("Attempting to chop %s", patp))
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "chopping"}
+	shipConf.BootStatus = "chop"
+	update = make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	err = config.UpdateUrbitConfig(update)
+	if err != nil {
+		return rollChopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+	}
+	_, err = docker.StartContainer(patp, "vere")
+	if err != nil {
+		return rollChopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+	}
+
+	logger.Logger.Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
+	waitComplete(patp)
+
+	// start ship if "boot"
+	if isRunning {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "starting"}
+		shipConf.BootStatus = "boot"
+		update := make(map[string]structs.UrbitDocker)
+		update[patp] = shipConf
+		err := config.UpdateUrbitConfig(update)
+		if err != nil {
+			return rollChopError(fmt.Errorf("Failed to update %s urbit config to chop: %v", patp, err))
+		}
+		_, err = docker.StartContainer(patp, "vere")
+		if err != nil {
+			return rollChopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
+		}
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "success"}
 	return nil
 }

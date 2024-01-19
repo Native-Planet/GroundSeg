@@ -284,6 +284,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.Gallseg = gallsegInstalled
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
+		urbit.Info.SizeLimit = dockerConfig.SizeLimit
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

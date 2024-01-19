@@ -142,6 +142,7 @@ type Urbit struct {
 		MinIOLinked        bool   `json:"minioLinked"`
 		StartramReminder   bool   `json:"startramReminder"`
 		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
+		SizeLimit          int    `json:"sizeLimit"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -168,6 +169,7 @@ type UrbitTransitionBroadcast struct {
 	PenpaiCompanion           string `json:"penpaiCompanion"`
 	Gallseg                   string `json:"gallseg"`
 	ChopOnUpgrade             string `json:"chopOnUpgrade"`
+	RollChop                  string `json:"rollChop"`
 }
 
 // used to construct broadcast pier info subobject

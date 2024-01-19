@@ -100,6 +100,7 @@ type UrbitDocker struct {
 	MinIOLinked        bool        `json:"minio_linked"`
 	StartramReminder   interface{} `json:"startram_reminder"`
 	ChopOnUpgrade      interface{} `json:"chop_on_upgrade"`
+	SizeLimit          int         `json:"size_limit"`
 }
 
 // Define the interface
@@ -122,6 +123,10 @@ func (u *UrbitDocker) SetWgS3Port(port interface{}) {
 
 func (u *UrbitDocker) SetWgConsolePort(port interface{}) {
 	u.WgConsolePort = toInt(port)
+}
+
+func (u *UrbitDocker) SetSizeLimit(size interface{}) {
+	u.SizeLimit = toInt(size)
 }
 
 // Helper function to convert a value to int, returns 0 if not an int
@@ -226,6 +231,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			} else {
 				u.ChopOnUpgrade = v.(bool)
 			}
+		case "size_limit":
+			u.SetSizeLimit(v)
 		}
 	}
 	return nil

@@ -15,7 +15,7 @@
   $: chopOnUpgrade = ship?.info?.chopOnUpgrade == undefined || ship?.info?.chopOnUpgrade // true by default
 
   $: tChopOnUpgrade = ship?.transition?.chopOnUpgrade || ""
-  $: tChop = (ship?.transition.chop) || ""
+  $: tChop = (ship?.transition?.chop) || ""
 
   const handleModal = () => {
     openModal(ChopModal,{"patp":patp})

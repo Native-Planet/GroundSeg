@@ -113,6 +113,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.PrepScript
 	case "chop":
 		scriptContent = defaults.ChopScript
+	case "roll":
+		scriptContent = defaults.RollScript
 	case "noboot":
 		return containerConfig, hostConfig, fmt.Errorf("%s marked noboot!", containerName)
 	default:

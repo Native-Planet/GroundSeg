@@ -2,19 +2,30 @@
   // Modal
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'
-  //import { setPackSchedule, pausePackSchedule } from '$lib/stores/websocket'
+  import { setNewMaxPierSize, urbitRollChop } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
 
   export let isOpen
   export let patp
 
-  export let maxPierSize = 0
-  let newMaxPierSize = maxPierSize == 0 ? 81 : maxPierSize
+
+  $: info = ($structure?.urbits?.[patp]?.info)
+  $: transition = ($structure?.urbits?.[patp]?.transition)
+  $: sizeLimit = info?.sizeLimit || 0
+  $: diskUsage = (info?.diskUsage) || 0
+
+  $: tRollChop = transition?.rollChop || ""
+
+  $: newMaxPierSize = sizeLimit == 0 ? 81 : sizeLimit
   $: val = newMaxPierSize === 81 ? 'Unlimited' : newMaxPierSize
-  $: hasChanges = maxPierSize === newMaxPierSize
-    ? false : (maxPierSize % 81 == 0) && (newMaxPierSize % 81 == 0)
+  $: hasChanges = sizeLimit === newMaxPierSize
+    ? false : (sizeLimit % 81 == 0) && (newMaxPierSize % 81 == 0)
     ? false : true
 
+
+  const handleNewMaxPierSize = () => {
+    setNewMaxPierSize(patp, newMaxPierSize % 81)
+  }
 </script>
 
 <Modal width={640}>
@@ -24,14 +35,25 @@
       <div class="item-wrapper">
         <div class="title">Ship size limit</div>
         <div class="description">Automatically chops your ship when it exceeds the size limit</div>
-        <div class="display-val">{val}{typeof(val)==="string"?"":" GB"}</div>
+        <div class="display-val">{(diskUsage / 1024**3).toFixed(2)} GB / {val}{typeof(val)==="string"?"":" GB"}</div>
         <input type="range" min="20" max="81" bind:value={newMaxPierSize} step="1">
-        <button disabled={!hasChanges}>{hasChanges ? "Save Changes" : "No Changes"}</button>
+        <button disabled={!hasChanges} on:click={handleNewMaxPierSize}>{hasChanges ? "Save Changes" : "No Changes"}</button>
       </div>
       <div class="item-wrapper">
         <div class="title">Roll & Chop</div>
         <div class="description">Rolls your ship into a new epoch before chopping it</div>
-        <button>Roll & Chop</button>
+        <button 
+        class:disabled={tRollChop.length > 0}
+        class="super" on:click={()=>urbitRollChop(patp)}>
+        {#if tRollChop.length < 1 || tRollChop == "done"}
+          Roll & Chop
+        {:else if tRollChop == "success"}
+          Success!
+        {:else if tRollChop == "error"}
+          Error!
+        {:else}
+          {tRollChop.charAt(0).toUpperCase() + tRollChop.slice(1)}
+        {/if}
       </div>
     </div>
   {/if}
@@ -94,10 +116,6 @@
     letter-spacing: -1.44px;
 
   }
-  input[type="range"] {
-    width: 100%;
-    height: 64px;
-  }
   button {
     display: inline-flex;
     padding: 24px 48px;
@@ -122,5 +140,70 @@
   button:disabled {
     opacity: .6;
     pointer-events:none;
+  }
+  .disabled {
+    pointer-events: none;
+    opacity: .6;
+  }
+  input[type="range"] {
+    -webkit-appearance: none; /* Override default CSS styles */
+    appearance: none;
+    width: 100%;
+    margin: 16px 0;
+  }
+  /* Thumb */
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 62px; /* Width of the thumb */
+    height:62px; /* Height of the thumb */
+    background: var(--btn-secondary);
+    border-radius: 16px;
+    border: solid 1px black;
+    cursor: pointer; /* Cursor on hover */
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 62px; /* Width of the thumb */
+    height:62px; /* Height of the thumb */
+    background: var(--btn-secondary);
+    border-radius: 16px;
+    border: solid 1px black;
+    cursor: pointer; /* Cursor on hover */
+  }
+
+  input[type="range"]::-ms-thumb {
+    -webkit-appearance: none; /* Override default look */
+    appearance: none;
+    width: 62px; /* Width of the thumb */
+    height:62px; /* Height of the thumb */
+    background: var(--btn-secondary);
+    border-radius: 16px;
+    border: solid 1px black;
+    cursor: pointer; /* Cursor on hover */
+  }
+
+  /* Track */
+  input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%; /* Width of the track */
+    height: 64px; /* Height of the track */
+    background: var(--bg-base); /* Track background */
+    border-radius: 16px; /* Roundness of the track */
+  }
+
+  input[type="range"]::-moz-range-track {
+    width: 100%; /* Width of the track */
+    height: 64px; /* Height of the track */
+    background: var(--bg-base); /* Track background */
+    border-radius: 16px; /* Roundness of the track */
+  }
+
+  input[type="range"]::-ms-track {
+    width: 100%; /* Width of the track */
+    height: 64px; /* Height of the track */
+    background: var(--bg-base); /* Track background */
+    border-radius: 16px; /* Roundness of the track */
   }
 </style>
