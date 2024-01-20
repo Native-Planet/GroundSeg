@@ -270,6 +270,8 @@ func main() {
 	go routines.StartramRenewalReminder()
 	// pack scheduler
 	go routines.PackScheduleLoop()
+	// chop limiter
+	go routines.ChopAtLimit()
 	// log manager routine
 	go routines.LogEvent()
 	// block until version info returns

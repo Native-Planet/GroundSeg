@@ -32,18 +32,22 @@ func GetContainerStats(name string) structs.ContainerStats {
 		// Return the stats (either updated or as they were)
 		return stats
 	} else {
-		// Container not found in map, get new stats
-		memUsage := getMemoryUsage(name)
-		diskUsage := getDiskUsage(name) // assuming getDiskUsage(name) returns an int64
-		// Create new ContainerStats struct
-		newStats := structs.ContainerStats{
-			LastContact: time.Now(),
-			MemoryUsage: memUsage,
-			DiskUsage:   diskUsage,
-		}
-		containers[name] = newStats // add the new stats to the map
-		return newStats
+		return ForceUpdateContainerStats(name)
 	}
+}
+
+func ForceUpdateContainerStats(name string) structs.ContainerStats {
+	// Container not found in map, get new stats
+	memUsage := getMemoryUsage(name)
+	diskUsage := getDiskUsage(name) // assuming getDiskUsage(name) returns an int64
+	// Create new ContainerStats struct
+	newStats := structs.ContainerStats{
+		LastContact: time.Now(),
+		MemoryUsage: memUsage,
+		DiskUsage:   diskUsage,
+	}
+	containers[name] = newStats // add the new stats to the map
+	return newStats
 }
 
 // getMemoryUsage retrieves the memory usage of a container.

@@ -590,6 +590,7 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 }
 
 func ChopPier(patp string, shipConf structs.UrbitDocker) error {
+	logger.Logger.Info(fmt.Sprintf("Chop called for %s", patp))
 	// error handling
 	chopError := func(err error) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "error"}
@@ -599,6 +600,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	defer func() {
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: ""}
+		logger.Logger.Info(fmt.Sprintf("Chop for %s, ran defer", patp))
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
@@ -652,6 +654,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 			return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
 		}
 	}
+	docker.ForceUpdateContainerStats(patp)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "success"}
 	return nil
 }
