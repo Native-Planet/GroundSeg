@@ -1,5 +1,7 @@
 package structs
 
+import "time"
+
 // broadcast payload object struct
 type AuthBroadcast struct {
 	Type      string           `json:"type"`
@@ -176,6 +178,7 @@ type UrbitTransitionBroadcast struct {
 type ContainerStats struct {
 	MemoryUsage uint64
 	DiskUsage   int64
+	LastContact time.Time
 }
 
 // broadcast payload subobject

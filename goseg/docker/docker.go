@@ -9,7 +9,6 @@ import (
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -56,7 +55,7 @@ func init() {
 		}
 		return
 	}
-	go getContainerStats()
+	//go getContainerStats()
 	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
@@ -229,12 +228,15 @@ func GetContainerNetwork(name string) (string, error) {
 	return "", fmt.Errorf("container is not attached to any network: %v", name)
 }
 
+/*
 // return the disk and memory usage for a container
 func getContainerStats() (structs.ContainerStats, error) {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	for {
+		logger.Logger.Warn("hereeeeeeeeeeeeee")
 		select {
 		case <-ticker.C:
+			logger.Logger.Warn(fmt.Sprintf("CONTAINER STAT LIST: %+v", ContainerStatList))
 			for _, pier := range ContainerStatList {
 				var res structs.ContainerStats
 				cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -274,20 +276,7 @@ func getContainerStats() (structs.ContainerStats, error) {
 		}
 	}
 }
-
-func getDirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return err
-	})
-	return size, err
-}
+*/
 
 // creates a volume by name
 func CreateVolume(name string) error {

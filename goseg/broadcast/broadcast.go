@@ -156,11 +156,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 		dockerConfig := config.UrbitConf(pier)
 		// get container stats from docker
-		var dockerStats structs.ContainerStats
-		res, ok := docker.ContainerStats[pier]
-		if ok {
-			dockerStats = res
-		}
+
+		dockerStats := docker.GetContainerStats(pier)
 		urbit := structs.Urbit{}
 		if existingUrbit, exists := currentState.Urbits[pier]; exists {
 			// If the ship already exists in broadcastState, use its current state
