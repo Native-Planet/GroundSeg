@@ -22,7 +22,7 @@ func GetContainerStats(name string) structs.ContainerStats {
 	// Attempt to get the container stats from the map
 	if stats, exists := containers[name]; exists {
 		// Check if the LastContact was at least 1 minute ago
-		if time.Since(stats.LastContact) >= 10*time.Second {
+		if time.Since(stats.LastContact) >= time.Minute {
 			// More than 1 minute has passed, update stats
 			stats.MemoryUsage = getMemoryUsage(name)
 			stats.DiskUsage = getDiskUsage(name)
