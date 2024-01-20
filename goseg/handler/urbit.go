@@ -55,7 +55,7 @@ func UrbitHandler(msg []byte) error {
 		return uninstallGallseg(patp, shipConf)
 		// ship operations
 	case "chop":
-		return chopPier(patp, shipConf)
+		return ChopPier(patp, shipConf)
 	case "roll-chop":
 		return rollChopPier(patp, shipConf)
 	case "pack":
@@ -589,7 +589,7 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 	return nil
 }
 
-func chopPier(patp string, shipConf structs.UrbitDocker) error {
+func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	// error handling
 	chopError := func(err error) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "error"}
