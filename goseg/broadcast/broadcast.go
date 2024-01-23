@@ -320,6 +320,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Region = config.StartramConfig.Region
 	startramInfo.Info.Expiry = config.StartramConfig.Lease
 	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
+	startramInfo.Info.UrlID = config.StartramConfig.UrlID
 
 	// Get Regions
 	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions

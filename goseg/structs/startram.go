@@ -4,6 +4,7 @@ import "encoding/json"
 
 // blob from /retrieve path
 type StartramRetrieve struct {
+	UrlID      string      `json:"urlid"`
 	Action     string      `json:"action"`
 	Conf       string      `json:"conf"`
 	Debug      any         `json:"debug"`
