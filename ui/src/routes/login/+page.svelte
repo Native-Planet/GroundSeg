@@ -34,7 +34,7 @@
         console.log('Setting focus'); // Debugging
         passwordInput.focus();
       }
-    }, 0);
+    }, 100);
   });
   onDestroy(() => inView = false);
 
