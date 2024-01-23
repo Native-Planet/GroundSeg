@@ -9,6 +9,7 @@
   import Fa from 'svelte-fa'
   import { faLock } from '@fortawesome/free-solid-svg-icons'
 
+  let passwordInput;
   let inView = false
   let loginPassword = ''
   let buttonStatus = 'standard'
@@ -25,8 +26,15 @@
   $: minutes = Math.floor((remainder % 3600) / 60)
   $: seconds = Math.floor(remainder % 60)
 
-  onMount(()=> inView = true)
-	onDestroy(()=> inView = false)
+  onMount(() => {
+    inView = true;
+    setTimeout(() => {
+      if (passwordInput && unlocked) {
+        passwordInput.focus();
+      }
+    }, 100); // needs short timeout
+  });
+  onDestroy(() => inView = false);
 
   const handleLogin = async () => {
     login(loginPassword)
@@ -52,6 +60,7 @@
       <!-- Password Input -->
       <div class="pw-wrapper">
         <input
+          bind:this={passwordInput}
           type="password"
           disabled={!unlocked}
           bind:value={loginPassword}
