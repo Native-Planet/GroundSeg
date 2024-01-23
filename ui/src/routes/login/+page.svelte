@@ -28,13 +28,11 @@
 
   onMount(() => {
     inView = true;
-    console.log('Component mounted'); // Debugging
     setTimeout(() => {
       if (passwordInput && unlocked) {
-        console.log('Setting focus'); // Debugging
         passwordInput.focus();
       }
-    }, 100);
+    }, 100); // needs short timeout
   });
   onDestroy(() => inView = false);
 
