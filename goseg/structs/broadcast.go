@@ -96,6 +96,7 @@ type Startram struct {
 		Running    bool                      `json:"running"`
 		Region     any                       `json:"region"`
 		Expiry     any                       `json:"expiry"`
+		UrlID      string                    `json:"urlID"`
 		Renew      bool                      `json:"renew"`
 		Endpoint   string                    `json:"endpoint"`
 		Regions    map[string]StartramRegion `json:"regions"`
