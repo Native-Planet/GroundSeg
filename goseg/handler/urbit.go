@@ -832,12 +832,22 @@ func rebuildContainer(patp string, shipConf structs.UrbitDocker) error {
 	if err := urbitCleanDelete(patp); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 	}
-	_, err := docker.StartContainer(patp, "vere")
-	if err != nil {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "error"}
-		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
-		return fmt.Errorf("Failed to rebuild container %s: %v", patp, err)
+	if shipConf.BootStatus != "noboot" {
+		_, err := docker.StartContainer(patp, "vere")
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "error"}
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
+			return fmt.Errorf("Failed to start for rebuild container %s: %v", patp, err)
+		}
+	} else {
+		_, err := docker.CreateContainer(patp, "vere")
+		if err != nil {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "error"}
+			time.Sleep(3 * time.Second)
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: ""}
+			return fmt.Errorf("Failed to create for rebuild container %s: %v", patp, err)
+		}
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "success"}
 	time.Sleep(3 * time.Second)

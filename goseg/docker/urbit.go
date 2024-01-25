@@ -101,7 +101,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	act := shipConf.BootStatus
 	// get the correct startup script based on BootStatus val
 	switch act {
-	case "boot":
+	case "boot", "noboot":
+		// we'll still give it the start script if its noboot.
 		scriptContent = defaults.StartScript
 	case "ignore":
 		scriptContent = defaults.StartScript
@@ -115,13 +116,14 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		scriptContent = defaults.ChopScript
 	case "roll":
 		scriptContent = defaults.RollScript
-	case "noboot":
-		return containerConfig, hostConfig, fmt.Errorf("%s marked noboot!", containerName)
 	default:
 		return containerConfig, hostConfig, fmt.Errorf("Unknown action: %s", act)
 	}
 	// reset ship status to boot for next time
-	if act == "pack" || act == "meld" || act == "chop" {
+	switch act {
+	case "pack", "meld", "chop", "noboot":
+		// we'll set this to noboot because we want to manually control the boot
+		// status the next time handler (or other modules) decides to call this func
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "noboot"
 		newConfig := make(map[string]structs.UrbitDocker)
@@ -130,7 +132,8 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
-	} else if act != "boot" {
+	default:
+		// set everything else back to boot
 		updateUrbitConf := shipConf
 		updateUrbitConf.BootStatus = "boot"
 		newConfig := make(map[string]structs.UrbitDocker)
@@ -139,7 +142,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		if err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
-		// this is only for offline ships, otherwise we send a click
 	}
 	// write the script
 	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "start_urbit.sh")
