@@ -132,6 +132,7 @@
     background-color: var(--btn-secondary);
     border-radius: 16px 0;
     transform: rotate(180deg);
+    margin-top: 8px;
   }
   .back:hover {
     cursor: pointer;
