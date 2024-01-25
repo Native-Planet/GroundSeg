@@ -6,11 +6,14 @@
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
+  import Fa from 'svelte-fa'
+  import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
   let name = '';
   let remote = true;
+  let advanceOpen = false
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
@@ -33,6 +36,25 @@
     on:changeKey={e => key = e.detail}
     on:changePatp={e => name = e.detail}
   />
+</div>
+
+<!-- Advance settings from here! -->
+<div class="input-wrapper">
+  <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
+    Advance settings <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
+  </div>
+</div>
+{#if advanceOpen}
+<div class="input-wrapper">
+  <div class="label">Set Pier Location</div>
+  <!-- temp -->
+  <KeyDropper
+    on:changeKey={e => key = e.detail}
+    on:changePatp={e => name = e.detail}
+  />
+</div>
+<div class="input-wrapper">
+  <div class="label">Configuration</div>
   <div class="check-wrapper" on:click={()=>remote = !remote}>
     {#if registered && running}
       <div class="checkbox">
@@ -43,6 +65,9 @@
       <div class="check-label">Set to remote</div>
     {/if}
   </div>
+</div>
+{/if}
+<div class="input-wrapper">
   <div class="buttons">
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
@@ -119,6 +144,7 @@
     display: flex;
     gap: 16px;
     text-align: center;
+    margin-top: 16px;
   }
 
   .btn {
@@ -181,5 +207,17 @@
   }
   input::placeholder {
     color: var(--Gray-200, #ABBAAE);
+  }
+  .advance {
+    cursor: pointer;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 32px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding-top: 16px;
   }
 </style>
