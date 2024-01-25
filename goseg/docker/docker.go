@@ -472,6 +472,13 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
 		logger.Logger.Info(msg)
+	case existingContainer.State == "created":
+		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		if err != nil {
+			return containerState, err
+		}
+		msg := fmt.Sprintf("Started created container %s", containerName)
+		logger.Logger.Info(msg)
 	default:
 		// if container is running, check the image digest
 		currentImage := existingContainer.Image
