@@ -354,12 +354,31 @@ func constructSystemInfo() structs.System {
 		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
 
+	drives := make(map[string]structs.SystemDrive)
 	// Block Devices
 	if blockDevices, err := system.ListHardDisks(); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
 	} else {
-		sysInfo.Info.BlockDevices = blockDevices.BlockDevices
+		for _, dev := range blockDevices.BlockDevices {
+			// groundseg formatted drives do not have partitions
+			if len(dev.Children) < 1 {
+				// is the device mounted?
+				if system.IsDevMounted(dev) {
+					// check if mountpoint meets convention
+					if true {
+						drives[dev.Name] = structs.SystemDrive{
+							Empty: false,
+						}
+					} else {
+						drives[dev.Name] = structs.SystemDrive{
+							Empty: true,
+						}
+					}
+				}
+			}
+		}
 	}
+	sysInfo.Info.Drives = drives
 
 	// Transition
 	sysInfo.Transition = SystemTransitions

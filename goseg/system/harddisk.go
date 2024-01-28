@@ -18,3 +18,12 @@ func ListHardDisks() (structs.LSBLKDevice, error) {
 	}
 	return dev, nil
 }
+
+func IsDevMounted(dev structs.BlockDev) bool {
+	for _, t := range dev.Mountpoints {
+		if t != "" {
+			return true
+		}
+	}
+	return false
+}

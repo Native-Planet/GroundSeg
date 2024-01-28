@@ -38,20 +38,20 @@
   />
 </div>
 
-<!-- Advance settings from here! -->
+{JSON.stringify($structure?.system?.info)}
+
+<!-- Customize -->
 <div class="input-wrapper">
   <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
-    Advance settings <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
+    Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
   </div>
 </div>
 {#if advanceOpen}
 <div class="input-wrapper">
-  <div class="label">Set Pier Location</div>
-  <!-- temp -->
-  <KeyDropper
-    on:changeKey={e => key = e.detail}
-    on:changePatp={e => name = e.detail}
-  />
+  <div class="label">Select Drive</div>
+  <div class="mount">Use Empty Drive</div>
+  <div class="mount">Use Drive 1</div>
+  <div class="mount" style="background:var(--btn-secondary);color:white;">Use Current Drive</div>
 </div>
 <div class="input-wrapper">
   <div class="label">Configuration</div>
@@ -219,5 +219,12 @@
     font-weight: 300;
     letter-spacing: -1.44px;
     padding-top: 16px;
+  }
+  .mount {
+    padding: 16px;
+    border: solid 1px black;
+    border-radius: 16px;
+    width: 160px;
+    text-align: center;
   }
 </style>
