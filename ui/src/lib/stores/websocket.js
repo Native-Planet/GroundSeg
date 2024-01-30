@@ -394,13 +394,14 @@ export const cancelNewShip = patp => {
   send(payload)
 }
 
-export const bootShip = (patp,key,remote) => {
+export const bootShip = (patp,key,remote,selectedDrive) => {
   let payload = {
     "type":"new_ship",
     "action":"boot",
     "patp":patp,
     "key":key,
-    "remote":remote
+    "remote":remote,
+    "selectedDrive":selectedDrive
   }
   send(payload)
 }

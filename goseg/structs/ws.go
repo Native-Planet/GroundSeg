@@ -333,12 +333,13 @@ type WsNewShipPayload struct {
 }
 
 type WsNewShipAction struct {
-	Type    string `json:"type"`
-	Action  string `json:"action"`
-	Patp    string `json:"patp"`
-	Key     string `json:"key"`
-	Remote  bool   `json:"remote"`
-	Command string `json:"command"`
+	Type          string `json:"type"`
+	Action        string `json:"action"`
+	Patp          string `json:"patp"`
+	Key           string `json:"key"`
+	Remote        bool   `json:"remote"`
+	Command       string `json:"command"`
+	SelectedDrive string `json:"selectedDrive"`
 }
 
 type WsUploadPayload struct {

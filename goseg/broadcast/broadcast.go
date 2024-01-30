@@ -11,6 +11,7 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -365,14 +366,20 @@ func constructSystemInfo() structs.System {
 				// is the device mounted?
 				if system.IsDevMounted(dev) {
 					// check if mountpoint meets convention
-					if true {
-						drives[dev.Name] = structs.SystemDrive{
-							Empty: false,
+					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
+					matches := re.FindStringSubmatch(dev.Mountpoints[0])
+					if len(matches) > 1 {
+						n, err := strconv.Atoi(matches[1])
+						if err != nil {
+							continue
 						}
-					} else {
 						drives[dev.Name] = structs.SystemDrive{
-							Empty: true,
+							DriveID: n,
 						}
+					}
+				} else { // device not mounted
+					drives[dev.Name] = structs.SystemDrive{
+						DriveID: 0, // default value, only for empty
 					}
 				}
 			}

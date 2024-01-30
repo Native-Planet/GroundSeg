@@ -39,15 +39,36 @@ func NewShipHandler(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
 	}
+	// complete this golang code block
+	// do not create new cases, and do not have default
 	switch shipPayload.Payload.Action {
 	case "boot":
-		// Check if patp is valid
-		patp := sigRemove(shipPayload.Payload.Patp)
-		isValid := checkPatp(patp)
-		if !isValid {
-			return fmt.Errorf("Invalid @p provided: %v", patp)
+		// handle filesystem
+		sel := shipPayload.Payload.SelectedDrive //string
+		// if not using system-drive, that means custom location
+		if sel != "system-drive" {
+			// Check if 'sel' matches the structure "/groundseg-<number>"
+			matched, err := regexp.MatchString(`^/groundseg-\d+$`, sel)
+			if err != nil {
+				return fmt.Errorf("Regex match error: %v", err)
+			}
+
+			// 'sel' does not match, so it's a drive with no partitions and isn't mounted.
+			if !matched {
+				if err := system.CreateGroundSegFilesystem(sel); err != nil {
+					return err
+				}
+			}
 		}
-		go createUrbitShip(patp, shipPayload)
+		// Check if patp is valid
+		/*
+			patp := sigRemove(shipPayload.Payload.Patp)
+			isValid := checkPatp(patp)
+			if !isValid {
+				return fmt.Errorf("Invalid @p provided: %v", patp)
+			}
+			go createUrbitShip(patp, shipPayload)
+		*/
 	case "reset":
 		err := resetNewShip()
 		if err != nil {

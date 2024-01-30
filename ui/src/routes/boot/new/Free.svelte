@@ -14,12 +14,16 @@
   let name = '';
   let remote = true;
   let advanceOpen = false
+  let selectedDrive = "system-drive"
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
 
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
+
+  $: drives = $structure?.system?.info?.drives || {}
+  $: driveNames = Object.keys(drives)
 
 </script>
 
@@ -38,7 +42,6 @@
   />
 </div>
 
-{JSON.stringify($structure?.system?.info)}
 
 <!-- Customize -->
 <div class="input-wrapper">
@@ -46,12 +49,20 @@
     Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
   </div>
 </div>
-{#if advanceOpen}
+{#if !advanceOpen}
 <div class="input-wrapper">
   <div class="label">Select Drive</div>
-  <div class="mount">Use Empty Drive</div>
-  <div class="mount">Use Drive 1</div>
-  <div class="mount" style="background:var(--btn-secondary);color:white;">Use Current Drive</div>
+  <div class="mount-wrapper">
+    <div class="mount" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    {#each driveNames as name}
+      <div
+        class="mount"
+        class:active={selectedDrive==name}
+        on:click={()=>selectedDrive=name}
+        >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name}) (!)
+      </div>
+    {/each}
+  </div>
 </div>
 <div class="input-wrapper">
   <div class="label">Configuration</div>
@@ -72,7 +83,7 @@
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn boot"
-      on:click={()=>bootShip(noSig,key,remote)}
+      on:click={()=>bootShip(noSig,key,remote,selectedDrive)}
       disabled={
       (key.length < 1) || (name.length < 1) || (!validPatp)
       }>
@@ -220,11 +231,21 @@
     letter-spacing: -1.44px;
     padding-top: 16px;
   }
+  .mount-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
   .mount {
     padding: 16px;
     border: solid 1px black;
     border-radius: 16px;
-    width: 160px;
+    width: 200px;
     text-align: center;
+    cursor: pointer;
+  }
+  .active {
+    background: var(--btn-secondary);
+    color: white;
   }
 </style>

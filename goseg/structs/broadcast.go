@@ -86,7 +86,7 @@ type SystemWifi struct {
 }
 
 type SystemDrive struct {
-	Empty bool `json:"empty"` // empty drive
+	DriveID int `json:"driveID"` // 0 is empty
 	/*
 		System bool  `json:"system"` // system drive
 		Size   int64 `json:"size"`   // size bytes
