@@ -9,6 +9,11 @@ import (
 	"groundseg/shipcreator"
 	"groundseg/startram"
 	"groundseg/structs"
+	"groundseg/system"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -25,12 +30,46 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "patp", Event: patp}
 	// transition: starting
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "starting"}
+
+	// custom drive, leave empty if not on other drive
+	var customDrive string
+	sel := shipPayload.Payload.SelectedDrive //string
+	// user wants to install it on custom drive
+	if sel != "system-drive" {
+		blockDevices, err := system.ListHardDisks()
+		if err != nil {
+			logger.Logger.Warn(fmt.Sprintf("Failed to retrieve block devices: %v", err))
+			return
+		}
+		// we're looking for the drive the user specified
+		for _, dev := range blockDevices.BlockDevices {
+			// we have the drive
+			if dev.Name == sel {
+				for _, m := range dev.Mountpoints {
+					// check if mountpoint matches groundseg's expectations
+					matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
+					if err != nil {
+						logger.Logger.Error(fmt.Sprintf("Regex error for mountpoint: %v", m))
+						continue
+					}
+					// yes
+					if matched {
+						customDrive = m
+						// breaks inner loop, we've got our directory
+						break
+					}
+				}
+				// breaks outer loop after we finish getting the info we need
+				break
+			}
+		}
+	}
 	// create pier config
-	err := shipcreator.CreateUrbitConfig(patp)
+	err := shipcreator.CreateUrbitConfig(patp, customDrive)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(patp, errmsg)
+		errorCleanup(patp, errmsg, customDrive)
 		return
 	}
 	// update system.json
@@ -38,7 +77,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(patp, errmsg)
+		errorCleanup(patp, errmsg, customDrive)
 		return
 	}
 	// Prepare environment for pier
@@ -46,47 +85,69 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	// delete container if exists
 	err = docker.DeleteContainer(patp)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("delete container error: %v", err)
 		logger.Logger.Error(errmsg)
 	}
 	// delete volume if exists
 	err = docker.DeleteVolume(patp)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("delete volume error: %v", err)
 		logger.Logger.Error(errmsg)
 	}
-	// create new docker volume
-	err = docker.CreateVolume(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
-		errorCleanup(patp, errmsg)
-		return
-	}
-	// write key to volume
-	key := shipPayload.Payload.Key
-	err = docker.WriteFileToVolume(patp, patp+".key", key)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
-		errorCleanup(patp, errmsg)
-		return
+	// creating the volume for default settings
+	if customDrive == "" {
+		// create new docker volume
+		err = docker.CreateVolume(patp)
+		if err != nil {
+			errmsg := fmt.Sprintf("create volume error: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
+		// write key to volume
+		key := shipPayload.Payload.Key
+		err = docker.WriteFileToVolume(patp, patp+".key", key)
+		if err != nil {
+			errmsg := fmt.Sprintf("write file to volume error: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
+	} else { // now this is for custom drive
+		path := filepath.Join(customDrive, patp)
+		filename := patp + ".key"
+		key := shipPayload.Payload.Key
+		// Create directory with all its parents
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			errmsg := fmt.Sprintf("write file to volume error: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
+		// Write content to the file
+		filePath := path + "/" + filename
+		if err := ioutil.WriteFile(filePath, []byte(key), 0644); err != nil {
+			errmsg := fmt.Sprintf("Error writing to file: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(patp, errmsg, customDrive)
+			return
+		}
 	}
 	// start container
 	logger.Logger.Info(fmt.Sprintf("Creating Pier: %v", patp))
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "creating"}
 	info, err := docker.StartContainer(patp, "vere")
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("start container error: %v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(patp, errmsg)
+		errorCleanup(patp, errmsg, customDrive)
 		return
 	}
 	config.UpdateContainerState(patp, info)
 
 	// debug, force error
 	//errmsg := "Self induced error, for debugging purposes"
-	//errorCleanup(patp, errmsg)
+	//errorCleanup(patp, errmsg, customDrive)
 	//return
 
 	// if startram is registered
@@ -105,10 +166,10 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 		}
 	}
 	// check for +code
-	go waitForShipReady(shipPayload)
+	go waitForShipReady(shipPayload, customDrive)
 }
 
-func waitForShipReady(shipPayload structs.WsNewShipPayload) {
+func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) {
 	patp := shipPayload.Payload.Patp
 	remote := shipPayload.Payload.Remote
 	// transition: booting
@@ -137,7 +198,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 			update[patp] = shipConf
 			if err := config.UpdateUrbitConfig(update); err != nil {
 				errmsg := fmt.Sprintf("Failed to update urbit config for new ship: %v", err)
-				errorCleanup(patp, errmsg)
+				errorCleanup(patp, errmsg, customDrive)
 				return
 			}
 			if err := docker.DeleteContainer(patp); err != nil {
@@ -149,7 +210,7 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload) {
 			if err != nil {
 				errmsg := fmt.Sprintf("%v", err)
 				logger.Logger.Error(errmsg)
-				errorCleanup(patp, errmsg)
+				errorCleanup(patp, errmsg, customDrive)
 				return
 			}
 			config.UpdateContainerState(patp, info)
@@ -184,7 +245,7 @@ func newShipToggleRemote(patp string) {
 	}
 }
 
-func errorCleanup(patp string, errmsg string) {
+func errorCleanup(patp, errmsg, customDrive string) {
 	// send aborted transition
 	docker.NewShipTransBus <- structs.NewShipTransition{Type: "bootStage", Event: "aborted"}
 	// send error transition
@@ -210,6 +271,13 @@ func errorCleanup(patp string, errmsg string) {
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
+	}
+	if customDrive != "" {
+		drivePath := filepath.Join(customDrive, patp)
+		// Check if the directory exists
+		if _, err := os.Stat(drivePath); !os.IsNotExist(err) {
+			os.RemoveAll(drivePath)
+		}
 	}
 }
 

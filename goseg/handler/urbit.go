@@ -12,6 +12,7 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -570,6 +571,8 @@ func UrbitHandler(msg []byte) error {
 				logger.Logger.Error(fmt.Sprintf("Couldn't delete minio docker container for %v: %v", patp, err))
 			}
 		}
+		// get custom directory info before deleting config
+		shipConf := config.UrbitConf(patp)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "deleting"}
 		if err := config.RemoveUrbitConfig(patp); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
@@ -581,8 +584,17 @@ func UrbitHandler(msg []byte) error {
 		}); err != nil {
 			logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
 		}
-		if err := docker.DeleteVolume(patp); err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+		customLoc, ok := shipConf.CustomPierLocation.(string) // Type assertion to string
+		if ok {
+			if _, err := os.Stat(customLoc); !os.IsNotExist(err) {
+				if err := os.RemoveAll(customLoc); err != nil {
+					return fmt.Errorf("couldn't remove directory at %s: %v", customLoc, err)
+				}
+			}
+		} else {
+			if err := docker.DeleteVolume(patp); err != nil {
+				return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+			}
 		}
 		config.DeleteContainerState(patp)
 		logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))

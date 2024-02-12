@@ -215,7 +215,7 @@ func combineChunks(filename string, total int) error {
 func configureUploadedPier(filename, patp string, remote, fix bool) {
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
-	err := shipcreator.CreateUrbitConfig(patp)
+	err := shipcreator.CreateUrbitConfig(patp, "") // temp no custom dir support
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)

@@ -7,6 +7,8 @@ import (
 	"groundseg/structs"
 	"os"
 	"os/exec"
+
+	"github.com/google/uuid"
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
@@ -32,33 +34,41 @@ func IsDevMounted(dev structs.BlockDev) bool {
 }
 
 func CreateGroundSegFilesystem(sel string) error {
-	// Create an ext4 filesystem on this drive using it in its entirety.
-	devPath := "/dev/" + sel
-	blockDevices, err := ListHardDisks()
-	if err != nil {
-		return fmt.Errorf("Failed to retrieve block devices: %v", err)
-	}
-	cmd := exec.Command("mkfs.ext4", "-F", devPath)
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf("Failed to create ext4 filesystem: %v", err)
-	}
 	// Check for the existence of /groundseg-1 and increment if it exists
 	var dirName string
+	var dirPath string
 	for i := 1; ; i++ {
-		dirName = fmt.Sprintf("/groundseg-%d", i)
-		if _, err := os.Stat(dirName); os.IsNotExist(err) {
+		dirName = fmt.Sprintf("groundseg-%d", i)
+		dirPath = "/" + dirName
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 			break
 		}
 	}
 	// Create the directory since it doesn't exist
-	err = os.Mkdir(dirName, 0755)
+	err := os.Mkdir(dirPath, 0755)
 	if err != nil {
-		return fmt.Errorf("Failed to create directory %s: %v", dirName, err)
+		return fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
+	}
+	// Create an ext4 filesystem on this drive using it in its entirety.
+	devPath := "/dev/" + sel
+	uuid := uuid.NewString()
+	cmd := exec.Command("mkfs.ext4", "-U", uuid, "-F", devPath)
+
+	// Run the command and wait for it to complete
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Failed to create ext4 filesystem: %v", err)
+	}
+
+	// make sure to retrieve blockDevices AFTER creating the new fs!
+	// this is so that the UUID is updated
+	blockDevices, err := ListHardDisks()
+	if err != nil {
+		return fmt.Errorf("Failed to retrieve block devices: %v", err)
 	}
 	for _, dev := range blockDevices.BlockDevices {
 		if dev.Name == sel {
-			fstabEntry := fmt.Sprintf("UUID=%s %s %s %s %s %s\n", dev.UUID, dirName, "ext4", "defaults", "0", "2")
+			fstabEntry := fmt.Sprintf("UUID=%s %s %s %s %s %s\n", uuid, dirPath, "ext4", "defaults,nofail", "0", "2")
 			// Read the existing fstab file
 			file, err := os.Open("/etc/fstab")
 			if err != nil {

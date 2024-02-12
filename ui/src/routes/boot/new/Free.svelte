@@ -8,6 +8,10 @@
   import { URBIT_MODE } from '$lib/stores/data'
   import Fa from 'svelte-fa'
   import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+
+  import { openModal } from 'svelte-modals'
+  import WarningPrompt from './WarningPrompt.svelte'
+
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
@@ -25,6 +29,13 @@
   $: drives = $structure?.system?.info?.drives || {}
   $: driveNames = Object.keys(drives)
 
+  const handleBoot = () => {
+    if (selectedDrive == "system-drive") {
+      bootShip(noSig,key,remote,selectedDrive)
+    } else {
+      openModal(WarningPrompt)
+    }
+  }
 </script>
 
 <div class="sigil-wrapper">
@@ -59,7 +70,7 @@
         class="mount"
         class:active={selectedDrive==name}
         on:click={()=>selectedDrive=name}
-        >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name}) (!)
+        >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
       </div>
     {/each}
   </div>
@@ -83,7 +94,7 @@
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn boot"
-      on:click={()=>bootShip(noSig,key,remote,selectedDrive)}
+      on:click={handleBoot}
       disabled={
       (key.length < 1) || (name.length < 1) || (!validPatp)
       }>
@@ -238,7 +249,7 @@
   }
   .mount {
     padding: 16px;
-    border: solid 1px black;
+    border: solid 2px var(--btn-secondary);
     border-radius: 16px;
     width: 200px;
     text-align: center;

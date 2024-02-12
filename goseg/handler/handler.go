@@ -39,36 +39,44 @@ func NewShipHandler(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
 	}
-	// complete this golang code block
-	// do not create new cases, and do not have default
 	switch shipPayload.Payload.Action {
 	case "boot":
 		// handle filesystem
 		sel := shipPayload.Payload.SelectedDrive //string
 		// if not using system-drive, that means custom location
 		if sel != "system-drive" {
-			// Check if 'sel' matches the structure "/groundseg-<number>"
-			matched, err := regexp.MatchString(`^/groundseg-\d+$`, sel)
+			// get list of devices -- lsblk -f
+			blockDevices, err := system.ListHardDisks()
 			if err != nil {
-				return fmt.Errorf("Regex match error: %v", err)
+				return fmt.Errorf("Failed to retrieve block devices: %v", err)
 			}
-
-			// 'sel' does not match, so it's a drive with no partitions and isn't mounted.
-			if !matched {
-				if err := system.CreateGroundSegFilesystem(sel); err != nil {
-					return err
+			// we're looking for the drive the user specified
+			for _, dev := range blockDevices.BlockDevices {
+				if dev.Name == sel {
+					// lets see if its structured correctly
+					for _, m := range dev.Mountpoints {
+						matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
+						if err != nil {
+							return fmt.Errorf("Regex match error: %v", err)
+						}
+						// device provided in payload does not match groundseg's format
+						if !matched {
+							// we overwrite the fs
+							if err := system.CreateGroundSegFilesystem(sel); err != nil {
+								return err
+							}
+						}
+					}
 				}
 			}
 		}
 		// Check if patp is valid
-		/*
-			patp := sigRemove(shipPayload.Payload.Patp)
-			isValid := checkPatp(patp)
-			if !isValid {
-				return fmt.Errorf("Invalid @p provided: %v", patp)
-			}
-			go createUrbitShip(patp, shipPayload)
-		*/
+		patp := sigRemove(shipPayload.Payload.Patp)
+		isValid := checkPatp(patp)
+		if !isValid {
+			return fmt.Errorf("Invalid @p provided: %v", patp)
+		}
+		go createUrbitShip(patp, shipPayload)
 	case "reset":
 		err := resetNewShip()
 		if err != nil {
