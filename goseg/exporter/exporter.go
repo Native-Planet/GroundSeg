@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/docker"
 	"groundseg/logger"
@@ -131,6 +132,13 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	volumeDirectory := defaults.DockerData("volumes")
 	var memoryFile bytes.Buffer
 	filePath := filepath.Join(volumeDirectory, container, "_data")
+	shipConf := config.UrbitConf(container)
+
+	customLoc, ok := shipConf.CustomPierLocation.(string) // Type assertion to string
+	if ok {
+		filePath = filepath.Join(customLoc, container)
+	}
+
 	// Create new zip archive in memory
 	zipWriter := zip.NewWriter(&memoryFile)
 	// Walk through the file path
