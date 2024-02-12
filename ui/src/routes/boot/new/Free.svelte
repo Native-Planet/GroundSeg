@@ -254,9 +254,17 @@
     width: 200px;
     text-align: center;
     cursor: pointer;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    letter-spacing: -1.44px;
+    user-select: none;
   }
   .active {
     background: var(--btn-secondary);
     color: white;
+    pointer-events: none;
   }
 </style>
