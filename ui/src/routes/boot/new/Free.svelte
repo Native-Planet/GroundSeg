@@ -7,10 +7,10 @@
   import Sigil from './Sigil.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
   import Fa from 'svelte-fa'
-  import { faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+  import { faCircleExclamation, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
 
   import { openModal } from 'svelte-modals'
-  import WarningPrompt from './WarningPrompt.svelte'
+  import NewDriveWarning from './NewDriveWarning.svelte'
 
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
@@ -35,7 +35,7 @@
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
     } else {
-      openModal(WarningPrompt)
+      openModal(NewDriveWarning)
     }
     */
   }
@@ -67,14 +67,19 @@
 <div class="input-wrapper">
   <div class="label">Select Drive</div>
   <div class="mount-wrapper">
-    <div class="mount" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    <div class="mount-info" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
     {#each driveNames as name}
+      <div class="mount">
       <div
-        class="mount"
+        class="mount-info"
         class:active={selectedDrive==name}
         on:click={()=>selectedDrive=name}
         >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
       </div>
+      <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+        <Fa icon={faCircleExclamation} size="1.5x" />
+      </div>
+    </div>
     {/each}
   </div>
 </div>
@@ -251,6 +256,11 @@
     gap: 16px;
   }
   .mount {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .mount-info {
     padding: 16px;
     border: solid 2px var(--btn-secondary);
     border-radius: 16px;
@@ -264,6 +274,10 @@
     font-style: normal;
     letter-spacing: -1.44px;
     user-select: none;
+  }
+  .mount-icon {
+    color: orange;
+    cursor: pointer;
   }
   .active {
     background: var(--btn-secondary);

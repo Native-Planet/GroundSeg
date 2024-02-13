@@ -2,20 +2,16 @@
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
 
-  import { warningDone } from './store'
-
   export let isOpen
-
-  const kickstartUpload = () => {
-    warningDone.set(true)
-    closeModal()
-  }
+  export let driveName
 </script>
 {#if isOpen}
   <Modal>
     <div class="wrapper">
-      <h1>Is your pier offline?</h1>
-      <p>Confirm that your pier is offline before importing your pier. It will be corrupted if it is online somewhere else.</p>
+      <h1>This drive ({driveName}) requires formatting</h1>
+      <p>GroundSeg requires the drive to be formatted a specific way.</p>
+      <p><strong>If you choose to use this drive, everything currently on this drive will be deleted!</strong></p>
+      <!--
       <div class="buttons-wrapper">
         <button
           on:click={closeModal}
@@ -27,6 +23,7 @@
           >Yes, it is offline
         </button>
       </div>
+      -->
     </div>
   </Modal>
 {/if}
