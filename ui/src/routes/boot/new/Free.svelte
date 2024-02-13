@@ -30,11 +30,14 @@
   $: driveNames = Object.keys(drives)
 
   const handleBoot = () => {
+      bootShip(noSig,key,remote,selectedDrive) // temp
+    /*
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
     } else {
       openModal(WarningPrompt)
     }
+    */
   }
 </script>
 
@@ -60,7 +63,7 @@
     Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
   </div>
 </div>
-{#if !advanceOpen}
+{#if advanceOpen}
 <div class="input-wrapper">
   <div class="label">Select Drive</div>
   <div class="mount-wrapper">

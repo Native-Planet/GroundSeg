@@ -342,13 +342,14 @@ export const setAllStartramReminder = remind => {
 //  Upload Pier
 //
 
-export const openUploadEndpoint = (endpoint,remote,fix) => {
+export const openUploadEndpoint = (endpoint,remote,fix,selectedDrive) => {
   let payload = {
     "type":"pier_upload",
     "action":"open-endpoint",
     "endpoint": endpoint,
     "remote": remote,
-    "fix": fix
+    "fix": fix,
+    "selectedDrive":selectedDrive,
   }
   send(payload)
 }
