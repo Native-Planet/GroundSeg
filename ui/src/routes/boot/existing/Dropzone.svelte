@@ -164,9 +164,11 @@
           on:click={()=>handleDrive(name)}
           >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
         </div>
+        {#if drives[name].driveID == 0}
         <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
           <Fa icon={faCircleExclamation} size="1.5x" />
         </div>
+        {/if}
       </div>
     {/each}
   </div>
