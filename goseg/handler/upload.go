@@ -20,7 +20,6 @@ func UploadHandler(msg []byte) error {
 		if err := importer.SetUploadSession(uploadPayload); err != nil {
 			return fmt.Errorf("Failed to open upload endpoint: %v", uploadPayload.Payload.Endpoint)
 		}
-		logger.Logger.Warn(fmt.Sprintf("current upload configuratino: %+v", uploadPayload))
 	case "reset":
 		if err := importer.Reset(); err != nil {
 			return fmt.Errorf("Failed to reset importer: %v", err)

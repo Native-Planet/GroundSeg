@@ -67,7 +67,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	// create pier config
 	err := shipcreator.CreateUrbitConfig(patp, customDrive)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("failed to create urbit config: %v", err)
 		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg, customDrive)
 		return
@@ -75,7 +75,7 @@ func createUrbitShip(patp string, shipPayload structs.WsNewShipPayload) {
 	// update system.json
 	err = shipcreator.AppendSysConfigPier(patp)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("failed to add ship to system.json: %v", err)
 		logger.Logger.Error(errmsg)
 		errorCleanup(patp, errmsg, customDrive)
 		return

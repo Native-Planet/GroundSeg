@@ -117,7 +117,12 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 	// Modify checkboxes
 	existingSession.Remote = remote
 	existingSession.Fix = fix
+	existingSession.SelectedDrive = sel
+	existingSession.CustomDrive = customDrive
+	existingSession.NeedsFormatting = sel != "system-drive" && customDrive == ""
+
 	uploadSessions[endpoint] = existingSession
+	logger.Logger.Warn(fmt.Sprintf("current upload configuration: %+v", uploadPayload.Payload))
 	return nil
 }
 
@@ -281,7 +286,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	// create pier config
 	var customPath string
 	if dirPath != "" {
-		customPath = filepath.Join(dirPath, patp)
+		customPath = dirPath
 	}
 	err := shipcreator.CreateUrbitConfig(patp, customPath)
 	if err != nil {
@@ -334,7 +339,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	volPath := filepath.Join(config.DockerDir, patp, "_data")
 	// modify if custom path
 	if customPath != "" {
-		volPath = customPath
+		volPath = filepath.Join(customPath, patp)
 	}
 	compressedPath := filepath.Join(fmt.Sprintf("%s/uploads", config.BasePath), filename)
 	switch checkExtension(filename) {
@@ -517,6 +522,7 @@ func errorCleanup(filename, patp, errmsg string) {
 }
 
 func restructureDirectory(patp string) error {
+	logger.Logger.Info("Checking pier directory")
 	// get docker volume path for patp
 	volDir := ""
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -527,16 +533,24 @@ func restructureDirectory(patp string) error {
 	if err != nil {
 		return err
 	}
-	for _, vol := range volumes.Volumes {
-		if vol.Name == patp {
-			volDir = vol.Mountpoint
-			break
+	// if no customDir is set, check volume
+	shipConf := config.UrbitConf(patp)
+	customDir, ok := shipConf.CustomPierLocation.(string)
+	if ok {
+		logger.Logger.Info("Custom pier location found!")
+		volDir = customDir
+	} else {
+		for _, vol := range volumes.Volumes {
+			if vol.Name == patp {
+				volDir = vol.Mountpoint
+				break
+			}
 		}
 	}
 	if volDir == "" {
 		return fmt.Errorf("No docker volume for %d!", patp)
 	}
-	logger.Logger.Debug(fmt.Sprintf("%v volume path: %v", patp, volDir))
+	logger.Logger.Info(fmt.Sprintf("%v pier path: %v", patp, volDir))
 	// find .urb
 	var urbLoc []string
 	_ = filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
