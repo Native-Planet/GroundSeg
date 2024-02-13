@@ -62,7 +62,7 @@ func NewShipHandler(msg []byte) error {
 						// device provided in payload does not match groundseg's format
 						if !matched {
 							// we overwrite the fs
-							if err := system.CreateGroundSegFilesystem(sel); err != nil {
+							if _, err := system.CreateGroundSegFilesystem(sel); err != nil {
 								return err
 							}
 						}

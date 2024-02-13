@@ -33,7 +33,7 @@ func IsDevMounted(dev structs.BlockDev) bool {
 	return false
 }
 
-func CreateGroundSegFilesystem(sel string) error {
+func CreateGroundSegFilesystem(sel string) (string, error) {
 	// Check for the existence of /groundseg-1 and increment if it exists
 	var dirName string
 	var dirPath string
@@ -47,7 +47,7 @@ func CreateGroundSegFilesystem(sel string) error {
 	// Create the directory since it doesn't exist
 	err := os.Mkdir(dirPath, 0755)
 	if err != nil {
-		return fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
+		return "", fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
 	}
 	// Create an ext4 filesystem on this drive using it in its entirety.
 	devPath := "/dev/" + sel
@@ -57,14 +57,14 @@ func CreateGroundSegFilesystem(sel string) error {
 	// Run the command and wait for it to complete
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("Failed to create ext4 filesystem: %v", err)
+		return "", fmt.Errorf("Failed to create ext4 filesystem: %v", err)
 	}
 
 	// make sure to retrieve blockDevices AFTER creating the new fs!
 	// this is so that the UUID is updated
 	blockDevices, err := ListHardDisks()
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve block devices: %v", err)
+		return "", fmt.Errorf("Failed to retrieve block devices: %v", err)
 	}
 	for _, dev := range blockDevices.BlockDevices {
 		if dev.Name == sel {
@@ -72,7 +72,7 @@ func CreateGroundSegFilesystem(sel string) error {
 			// Read the existing fstab file
 			file, err := os.Open("/etc/fstab")
 			if err != nil {
-				return fmt.Errorf("Error opening fstab: %v", err)
+				return "", fmt.Errorf("Error opening fstab: %v", err)
 			}
 			defer file.Close()
 
@@ -82,7 +82,7 @@ func CreateGroundSegFilesystem(sel string) error {
 				lines = append(lines, scanner.Text())
 			}
 			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("Error reading fstab: %v", err)
+				return "", fmt.Errorf("Error reading fstab: %v", err)
 			}
 
 			// Append the new entry
@@ -91,7 +91,7 @@ func CreateGroundSegFilesystem(sel string) error {
 			// Write the updated content back to /etc/fstab
 			file, err = os.OpenFile("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
-				return fmt.Errorf("Error opening fstab for writing: %v", err)
+				return "", fmt.Errorf("Error opening fstab for writing: %v", err)
 			}
 			defer file.Close()
 
@@ -99,7 +99,7 @@ func CreateGroundSegFilesystem(sel string) error {
 			for _, line := range lines {
 				_, err := writer.WriteString(line + "\n")
 				if err != nil {
-					return fmt.Errorf("Error writing to fstab: %v", err)
+					return "", fmt.Errorf("Error writing to fstab: %v", err)
 				}
 			}
 			writer.Flush()
@@ -107,9 +107,9 @@ func CreateGroundSegFilesystem(sel string) error {
 			cmd = exec.Command("mount", "-a")
 			err = cmd.Run()
 			if err != nil {
-				return fmt.Errorf("Failed to mount filesystem: %v", err)
+				return "", fmt.Errorf("Failed to mount filesystem: %v", err)
 			}
 		}
 	}
-	return nil
+	return dirPath, nil
 }

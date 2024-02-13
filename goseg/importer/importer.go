@@ -11,11 +11,13 @@ import (
 	"groundseg/shipcreator"
 	"groundseg/startram"
 	"groundseg/structs"
+	"groundseg/system"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,9 +29,12 @@ import (
 )
 
 type uploadSession struct {
-	Token  structs.WsTokenStruct
-	Remote bool
-	Fix    bool
+	Token           structs.WsTokenStruct
+	Remote          bool
+	Fix             bool
+	SelectedDrive   string
+	CustomDrive     string
+	NeedsFormatting bool
 }
 
 var (
@@ -53,14 +58,54 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 	remote := uploadPayload.Payload.Remote
 	fix := uploadPayload.Payload.Fix
 
+	// check which drive the user wants us to keep the pier in
+	sel := uploadPayload.Payload.SelectedDrive
+
+	// custom drive, leave empty if not on other drive
+	var customDrive string
+
+	// we don't need to do anything for system-drive, only if its something else
+	if sel != "system-drive" {
+		blockDevices, err := system.ListHardDisks()
+		if err != nil {
+			return fmt.Errorf("Failed to retrieve block devices: %v", err)
+		}
+
+		// we're looking for the drive the user specified
+		for _, dev := range blockDevices.BlockDevices {
+			// we have the drive
+			if dev.Name == sel {
+				for _, m := range dev.Mountpoints {
+					// check if mountpoint matches groundseg's expectations
+					matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
+					if err != nil {
+						logger.Logger.Error(fmt.Sprintf("Regex error for mountpoint: %v", m))
+						continue
+					}
+					// yes
+					if matched {
+						customDrive = m
+						// breaks inner loop, we've got our directory
+						break
+					}
+				}
+				// breaks outer loop after we finish getting the info we need
+				break
+			}
+		}
+	}
+
 	// check if endpoint exists
 	existingSession, exists := uploadSessions[endpoint]
 	if !exists {
 		//build new configuration
 		sesh := uploadSession{
-			Token:  token,
-			Remote: remote,
-			Fix:    fix,
+			Token:           token,
+			Remote:          remote,
+			Fix:             fix,
+			SelectedDrive:   sel,
+			CustomDrive:     customDrive,
+			NeedsFormatting: sel != "system-drive" && customDrive == "",
 		}
 		uploadSessions[endpoint] = sesh
 		return nil
@@ -123,6 +168,33 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if validSession {
+		// get session info
+		sesh, exists := uploadSessions[session]
+		// debug
+		if exists {
+			logger.Logger.Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
+		} else {
+			logger.Logger.Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
+		}
+		// end debug
+
+		// we first make sure we know which drive the user wants the pier written on
+		//we skip this step if system-drive was selected
+		if sesh.SelectedDrive != "system-drive" {
+			// check if drive needs formatting
+			if sesh.NeedsFormatting {
+				if mountpoint, err := system.CreateGroundSegFilesystem(sesh.SelectedDrive); err != nil {
+					handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("failed to format and use custom drive"))
+					return
+				} else {
+					sesh.NeedsFormatting = false
+					sesh.CustomDrive = mountpoint
+					uploadSessions[session] = sesh
+				}
+			}
+		}
+
+		// we then handle upload
 		docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: patp}
 		docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
 		file, fileHeader, err := r.FormFile("file")
@@ -161,17 +233,9 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			handleSend(http.StatusOK, "success", "Upload successful")
 			uploadMu.Lock()
-			sesh, exists := uploadSessions[session]
-			// debug
-			if exists {
-				logger.Logger.Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
-			} else {
-				logger.Logger.Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
-			}
-			// end debug
 			uploadMu.Unlock()
 			ClearUploadSession(session)
-			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix)
+			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
 			return
 		}
 	} else {
@@ -212,12 +276,16 @@ func combineChunks(filename string, total int) error {
 	return nil
 }
 
-func configureUploadedPier(filename, patp string, remote, fix bool) {
+func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
-	err := shipcreator.CreateUrbitConfig(patp, "") // temp no custom dir support
+	var customPath string
+	if dirPath != "" {
+		customPath = filepath.Join(dirPath, patp)
+	}
+	err := shipcreator.CreateUrbitConfig(patp, customPath)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("Failed to create urbit config: %v", err)
 		logger.Logger.Error(errmsg)
 		errorCleanup(filename, patp, errmsg)
 		return
@@ -225,7 +293,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 	// update system.json
 	err = shipcreator.AppendSysConfigPier(patp)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
+		errmsg := fmt.Sprintf("Failed to update system.json: %v", err)
 		logger.Logger.Error(errmsg)
 		errorCleanup(filename, patp, errmsg)
 		return
@@ -241,20 +309,33 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 	// delete volume if exists
 	err = docker.DeleteVolume(patp)
 	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		errmsg := fmt.Sprintf("%v (harmless)", err)
+		logger.Logger.Info(errmsg)
 	}
-	// create new docker volume
-	err = docker.CreateVolume(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
-		return
+	if customPath == "" { // no custom path provided
+		// create new docker volume
+		err = docker.CreateVolume(patp)
+		if err != nil {
+			errmsg := fmt.Sprintf("failed to create volume: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	} else { // create custom directory for upload
+		if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
+			errmsg := fmt.Sprintf("create custom pier directory error: %v", err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
 	}
 	// extract file to volume directory
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
+	// set default path
 	volPath := filepath.Join(config.DockerDir, patp, "_data")
+	// modify if custom path
+	if customPath != "" {
+		volPath = customPath
+	}
 	compressedPath := filepath.Join(fmt.Sprintf("%s/uploads", config.BasePath), filename)
 	switch checkExtension(filename) {
 	case ".zip":
@@ -286,7 +367,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool) {
 	logger.Logger.Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
 	// run restructure
 	if err := restructureDirectory(patp); err != nil {
-		errorCleanup(filename, patp, fmt.Sprintf("%v", err))
+		errorCleanup(filename, patp, fmt.Sprintf("Failed to restructure directory: %v", err))
 		return
 	}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}

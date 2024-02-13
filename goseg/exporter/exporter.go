@@ -136,7 +136,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	customLoc, ok := shipConf.CustomPierLocation.(string) // Type assertion to string
 	if ok {
-		filePath = filepath.Join(customLoc, container)
+		filePath = customLoc
 	}
 
 	// Create new zip archive in memory
