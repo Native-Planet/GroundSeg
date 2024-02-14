@@ -11,6 +11,7 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -336,22 +337,63 @@ func constructProfileInfo() structs.Profile {
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
+	// init
 	var ramObj []uint64
 	var sysInfo structs.System
+	conf := config.Conf()
+
+	// Linux update
+	sysInfo.Info.Updates = system.SystemUpdates
+
+	// Wifi
+	sysInfo.Info.Wifi = system.WifiInfo
+	// Sys details
 	usedRam, totalRam := system.GetMemory()
 	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
 	sysInfo.Info.Usage.CPU = system.GetCPU()
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	diskUsage, err := system.GetDisk()
-	if err != nil {
+	if diskUsage, err := system.GetDisk(); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting disk usage: %v", err))
+	} else {
+		sysInfo.Info.Usage.Disk = diskUsage
+		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
-	sysInfo.Info.Usage.Disk = diskUsage
-	conf := config.Conf()
-	sysInfo.Info.Usage.SwapFile = conf.SwapVal
-	sysInfo.Info.Updates = system.SystemUpdates
+
+	drives := make(map[string]structs.SystemDrive)
+	// Block Devices
+	if blockDevices, err := system.ListHardDisks(); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
+	} else {
+		for _, dev := range blockDevices.BlockDevices {
+			// groundseg formatted drives do not have partitions
+			if len(dev.Children) < 1 {
+				// is the device mounted?
+				if system.IsDevMounted(dev) {
+					// check if mountpoint meets convention
+					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
+					matches := re.FindStringSubmatch(dev.Mountpoints[0])
+					if len(matches) > 1 {
+						n, err := strconv.Atoi(matches[1])
+						if err != nil {
+							continue
+						}
+						drives[dev.Name] = structs.SystemDrive{
+							DriveID: n,
+						}
+					}
+				} else { // device not mounted
+					drives[dev.Name] = structs.SystemDrive{
+						DriveID: 0, // default value, only for empty
+					}
+				}
+			}
+		}
+	}
+	sysInfo.Info.Drives = drives
+
+	// Transition
 	sysInfo.Transition = SystemTransitions
-	sysInfo.Info.Wifi = system.WifiInfo
+
 	return sysInfo
 }
 

@@ -6,11 +6,19 @@
   import { goto } from '$app/navigation';
   import Sigil from './Sigil.svelte'
   import { URBIT_MODE } from '$lib/stores/data'
+  import Fa from 'svelte-fa'
+  import { faCircleExclamation, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
+
+  import { openModal } from 'svelte-modals'
+  import NewDriveWarning from './NewDriveWarning.svelte'
+
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
   let name = '';
   let remote = true;
+  let advanceOpen = false
+  let selectedDrive = "system-drive"
 
   $: noSig = sigRemove(name)
   $: validPatp = checkPatp(noSig)
@@ -18,6 +26,19 @@
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
+  $: drives = $structure?.system?.info?.drives || {}
+  $: driveNames = Object.keys(drives)
+
+  const handleBoot = () => {
+      bootShip(noSig,key,remote,selectedDrive) // temp
+    /*
+    if (selectedDrive == "system-drive") {
+      bootShip(noSig,key,remote,selectedDrive)
+    } else {
+      openModal(NewDriveWarning)
+    }
+    */
+  }
 </script>
 
 <div class="sigil-wrapper">
@@ -33,6 +54,39 @@
     on:changeKey={e => key = e.detail}
     on:changePatp={e => name = e.detail}
   />
+</div>
+
+
+<!-- Customize -->
+<div class="input-wrapper">
+  <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
+    Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
+  </div>
+</div>
+{#if advanceOpen}
+<div class="input-wrapper">
+  <div class="label">Select Drive</div>
+  <div class="mount-wrapper">
+    <div class="mount-info" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    {#each driveNames as name}
+      <div class="mount">
+      <div
+        class="mount-info"
+        class:active={selectedDrive==name}
+        on:click={()=>selectedDrive=name}
+        >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
+      </div>
+      {#if drives[name].driveID == 0}
+      <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+        <Fa icon={faCircleExclamation} size="1.5x" />
+      </div>
+      {/if}
+    </div>
+    {/each}
+  </div>
+</div>
+<div class="input-wrapper">
+  <div class="label">Configuration</div>
   <div class="check-wrapper" on:click={()=>remote = !remote}>
     {#if registered && running}
       <div class="checkbox">
@@ -43,11 +97,14 @@
       <div class="check-label">Set to remote</div>
     {/if}
   </div>
+</div>
+{/if}
+<div class="input-wrapper">
   <div class="buttons">
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn boot"
-      on:click={()=>bootShip(noSig,key,remote)}
+      on:click={handleBoot}
       disabled={
       (key.length < 1) || (name.length < 1) || (!validPatp)
       }>
@@ -119,6 +176,7 @@
     display: flex;
     gap: 16px;
     text-align: center;
+    margin-top: 16px;
   }
 
   .btn {
@@ -181,5 +239,51 @@
   }
   input::placeholder {
     color: var(--Gray-200, #ABBAAE);
+  }
+  .advance {
+    cursor: pointer;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 32px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding-top: 16px;
+  }
+  .mount-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .mount {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .mount-info {
+    padding: 16px;
+    border: solid 2px var(--btn-secondary);
+    border-radius: 16px;
+    width: 200px;
+    text-align: center;
+    cursor: pointer;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    letter-spacing: -1.44px;
+    user-select: none;
+  }
+  .mount-icon {
+    color: orange;
+    cursor: pointer;
+  }
+  .active {
+    background: var(--btn-secondary);
+    color: white;
+    pointer-events: none;
   }
 </style>

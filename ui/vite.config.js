@@ -1,11 +1,13 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 
 const gsUrbitMode = process.env.GS_URBIT_MODE === 'true';
+const devPanel = process.env.GS_DEV_PANEL === 'true';
 
 const config = {
 	plugins: [sveltekit()],
   define: {
     'process.env.GS_URBIT_MODE': JSON.stringify(gsUrbitMode),
+    'process.env.GS_DEV_PANEL': JSON.stringify(devPanel),
   }
 };
 if (gsUrbitMode) {

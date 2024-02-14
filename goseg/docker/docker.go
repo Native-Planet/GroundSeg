@@ -250,7 +250,8 @@ func getContainerStats() (structs.ContainerStats, error) {
 				}
 				var totalSize int64
 				for _, mount := range inspect.Mounts {
-					if mount.Type == "volume" {
+					switch mount.Type {
+					case "volume", "bind":
 						size, err := getDirSize(mount.Source)
 						if err != nil {
 							return res, err

@@ -43,9 +43,11 @@ type NewShip struct {
 // broadcast payload subobject
 type System struct {
 	Info struct {
-		Usage   SystemUsage   `json:"usage"`
-		Updates SystemUpdates `json:"updates"`
-		Wifi    SystemWifi    `json:"wifi"`
+		Usage   SystemUsage            `json:"usage"`
+		Updates SystemUpdates          `json:"updates"`
+		Wifi    SystemWifi             `json:"wifi"`
+		Drives  map[string]SystemDrive `json:"drives"`
+		//BlockDevices []BlockDev    `json:"blockDevices"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
 }
@@ -83,6 +85,15 @@ type SystemWifi struct {
 	Status   bool     `json:"status"`
 	Active   string   `json:"active"`
 	Networks []string `json:"networks"`
+}
+
+type SystemDrive struct {
+	DriveID int `json:"driveID"` // 0 is empty
+	/*
+		System bool  `json:"system"` // system drive
+		Size   int64 `json:"size"`   // size bytes
+		Used   int64 `json:"used"`   // used bytes
+	*/
 }
 
 // broadcast payload subobject

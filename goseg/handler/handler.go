@@ -41,6 +41,35 @@ func NewShipHandler(msg []byte) error {
 	}
 	switch shipPayload.Payload.Action {
 	case "boot":
+		// handle filesystem
+		sel := shipPayload.Payload.SelectedDrive //string
+		// if not using system-drive, that means custom location
+		if sel != "system-drive" {
+			// get list of devices -- lsblk -f
+			blockDevices, err := system.ListHardDisks()
+			if err != nil {
+				return fmt.Errorf("Failed to retrieve block devices: %v", err)
+			}
+			// we're looking for the drive the user specified
+			for _, dev := range blockDevices.BlockDevices {
+				if dev.Name == sel {
+					// lets see if its structured correctly
+					for _, m := range dev.Mountpoints {
+						matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
+						if err != nil {
+							return fmt.Errorf("Regex match error: %v", err)
+						}
+						// device provided in payload does not match groundseg's format
+						if !matched {
+							// we overwrite the fs
+							if _, err := system.CreateGroundSegFilesystem(sel); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+		}
 		// Check if patp is valid
 		patp := sigRemove(shipPayload.Payload.Patp)
 		isValid := checkPatp(patp)

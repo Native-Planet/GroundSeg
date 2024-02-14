@@ -266,6 +266,8 @@ func main() {
 			}
 		}()
 	*/
+	// drive management
+	//go routines.GetDriveStatus()
 	// startram reminder
 	go routines.StartramRenewalReminder()
 	// pack scheduler
