@@ -51,8 +51,10 @@ func StartLeak() {
 func LookForPorts() bool {
 	// symlink path
 	symlinkPath := "/np/d/gs"
+	urttySymlinkPath := "/np/d/urtty"
 	// socket file name
 	sockFile := "groundseg.sock"
+	urttySockFile := "urtty.sock"
 	// always checking
 	for {
 		conf := config.Conf()
@@ -62,7 +64,7 @@ func LookForPorts() bool {
 		// start dev
 		if _, exists := statuses["dev"]; !exists {
 			if devSocketPath, exists := os.LookupEnv("SHIP"); exists {
-				go connectDevSocket(devSocketPath)
+				go connectDevGSSocket(devSocketPath)
 			}
 		}
 		// check for every ship that exists in groundseg
@@ -97,11 +99,43 @@ func LookForPorts() bool {
 			logger.Logger.Info(fmt.Sprintf("Opening lick channel for %s", patp))
 			go listener(patp, conn, info)
 		}
+		// check for urtty
+		for _, patp := range conf.Piers {
+			// decide based on existence of info
+			info, exists := statuses[patp]
+			if exists {
+				continue
+			}
+			// check if sock exists
+			urttySockLocation := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "urtty")
+			sock := filepath.Join(urttySockLocation, urttySockFile)
+			_, err := os.Stat(sock)
+			if err != nil {
+				// socket doesn't exist
+				continue
+			}
+			// socket exists, shorten path with symlink
+			info.Symlink, err = makeSymlink(patp, urttySockLocation, urttySymlinkPath)
+			if err != nil {
+				logger.Logger.Error(fmt.Sprintf("%v", err))
+				continue
+			}
+			// Auth is false by default
+			info.Auth = false
+
+			// attempt connection to socket
+			conn := makeConnection(filepath.Join(info.Symlink, urttySockFile))
+			if conn == nil {
+				continue
+			}
+			logger.Logger.Info(fmt.Sprintf("Opening urtty lick channel for %s", patp))
+			go listener(patp, conn, info)
+		}
 		time.Sleep(1 * time.Second) // interval
 	}
 }
 
-func connectDevSocket(socketPath string) {
+func connectDevGSSocket(socketPath string) {
 	var info LickStatus
 	info.Auth = true
 	info.Symlink = socketPath

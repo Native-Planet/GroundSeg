@@ -8,10 +8,12 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
+	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +41,12 @@ func UrbitHandler(msg []byte) error {
 		return installGallseg(patp, shipConf)
 	case "uninstall-gallseg":
 		return uninstallGallseg(patp, shipConf)
+	case "install-urtty":
+		return installUrtty(patp, shipConf)
+	case "uninstall-urtty":
+		return uninstallUrtty(patp, shipConf)
+	case "start-urtty":
+		return startUrtty(patp)
 	case "startram-reminder":
 		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
 	case "pack":
@@ -864,6 +872,90 @@ func uninstallGallseg(patp string, shipConf structs.UrbitDocker) error {
 	return nil
 }
 
+func installUrtty(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// if not-found, |install, if suspended, |revive
+	status, err := click.GetDesk(patp, "urtty", true)
+	if err != nil {
+		return handleError(patp, "Handler failed to get urtty desk info", err)
+	}
+	if status == "not-found" {
+		err := click.InstallDesk(patp, "~nattyv", "urtty")
+		if err != nil {
+			return handleError(patp, "Handler failed to get install urtty desk", err)
+		}
+	} else if status == "suspended" {
+		err := click.ReviveDesk(patp, "urtty")
+		if err != nil {
+			return handleError(patp, "Handler failed to revive urtty desk", err)
+		}
+	}
+	// wait for complete
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "urtty", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get urtty desk info after installation succeeded", err)
+		}
+		if status == "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+	return nil
+}
+
+func uninstallUrtty(patp string, shipConf structs.UrbitDocker) error {
+	// run after complete
+	defer func(patp string) {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: ""}
+	}(patp)
+
+	// initial transition
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "loading"}
+
+	// error handling
+	handleError := func(patp, errMsg string, err error) error {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "error"}
+		time.Sleep(3 * time.Second)
+		return fmt.Errorf("%s: %s: %v", patp, errMsg, err)
+	}
+
+	// uninstall
+	err := click.UninstallDesk(patp, "urtty")
+	if err != nil {
+		return handleError(patp, "Handler failed to install uninstall the urtty desk", err)
+	}
+	for {
+		time.Sleep(5 * time.Second)
+		status, err := click.GetDesk(patp, "urtty", true)
+		if err != nil {
+			return handleError(patp, "Handler failed to get urtty desk info after uninstallation succeeded", err)
+		}
+		if status != "running" {
+			docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "urtty", Event: "success"}
+			time.Sleep(3 * time.Second)
+			break
+		}
+	}
+	return nil
+}
+
 func startramReminder(patp string, remind bool, shipConf structs.UrbitDocker) error {
 	update := make(map[string]structs.UrbitDocker)
 	shipConf.StartramReminder = remind
@@ -871,5 +963,11 @@ func startramReminder(patp string, remind bool, shipConf structs.UrbitDocker) er
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
+	return nil
+}
+
+func startUrtty(patp string) error {
+	sockPath := filepath.Join(config.DockerDir, patp, "_data", patp, ".urb", "dev", "urtty", "urtty.sock")
+	go leak.ConnectUrtty(sockPath)
 	return nil
 }

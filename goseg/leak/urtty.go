@@ -37,8 +37,7 @@ func makeShell() error {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	err := makeShell()
-	if err != nil {
+	if err := makeShell(); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Error starting pty: %v", err))
 		return
 	}
@@ -124,11 +123,12 @@ func sendUrttyBroadcast(conn net.Conn, broadcast string) error {
 	return nil
 }
 
-func ConnectUrtty(sockPath string) {
+func ConnectUrtty(sockPath string) error {
 	conn, err := connectToIPC(sockPath)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Dial error: %v", err))
-		return
+		logger.Logger.Error(fmt.Sprintf("Dial error connecting to socket %s: %v", sockPath, err))
+		return err
 	}
 	handleConnection(conn)
+	return nil
 }
