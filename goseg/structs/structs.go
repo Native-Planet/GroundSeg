@@ -58,3 +58,10 @@ type ContainerState struct {
 	Config         container.Config
 	Host           container.HostConfig
 }
+
+type UrttyBroadcast struct {
+	Broadcast string `json:"broadcast"`
+}
+type UrttyAction struct {
+	Action string `json:"action"`
+}
