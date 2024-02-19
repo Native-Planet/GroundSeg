@@ -38,7 +38,7 @@
           <div class="bar-fg" style="width:{(100 * used / total).toFixed(2)}%"></div>
         </div>
       {/each}
-      <button on:click={()=>openModal(DiskModal)}>Manage Disks</button>
+      <!--button on:click={()=>openModal(DiskModal)}>Manage Disks</button-->
     </div>
   </div>
 
