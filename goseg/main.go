@@ -17,10 +17,12 @@ package main
 import (
 	"embed"
 	"fmt"
+	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
 	"groundseg/importer"
+	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
@@ -256,15 +258,15 @@ func main() {
 		}
 	}
 	// gallseg
+	go leak.StartLeak()
+	go func() {
+		for {
+			broadcast.BroadcastToClients()
+			time.Sleep(2 * time.Second)
+		}
+	}()
 	/*
-			// temporarily disable gallseg
-		go leak.StartLeak()
-		go func() {
-			for {
-				broadcast.BroadcastToClients()
-				time.Sleep(2 * time.Second)
-			}
-		}()
+		// temporarily disable gallseg
 	*/
 	// drive management
 	//go routines.GetDriveStatus()
