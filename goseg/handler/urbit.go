@@ -55,12 +55,12 @@ func UrbitHandler(msg []byte) error {
 				return installGallseg(patp, shipConf)
 			case "uninstall-gallseg":
 				return uninstallGallseg(patp, shipConf)
+			// ship operations
+			case "chop":
+				return ChopPier(patp, shipConf)
+			case "roll-chop":
+				return rollChopPier(patp, shipConf)
 		*/
-		// ship operations
-	case "chop":
-		return ChopPier(patp, shipConf)
-	case "roll-chop":
-		return rollChopPier(patp, shipConf)
 	case "pack":
 		return packPier(patp, shipConf)
 	case "pack-meld":

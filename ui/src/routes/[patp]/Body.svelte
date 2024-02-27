@@ -145,10 +145,10 @@
     {ownShip}
     />
   
-  <!-- Chop -->
+  <!-- temporarily disabled
+  <!-- Chop --
   <Chop {patp} />
 
-  <!-- temporarily disabled
   <!-- GallSeg
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
