@@ -50,10 +50,12 @@ func UrbitHandler(msg []byte) error {
 		return installPenpaiCompanion(patp, shipConf)
 	case "uninstall-penpai-companion":
 		return uninstallPenpaiCompanion(patp, shipConf)
-	case "install-gallseg":
-		return installGallseg(patp, shipConf)
-	case "uninstall-gallseg":
-		return uninstallGallseg(patp, shipConf)
+		/*
+			case "install-gallseg":
+				return installGallseg(patp, shipConf)
+			case "uninstall-gallseg":
+				return uninstallGallseg(patp, shipConf)
+		*/
 		// ship operations
 	case "chop":
 		return ChopPier(patp, shipConf)
