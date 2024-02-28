@@ -11,6 +11,7 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -156,11 +157,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 		dockerConfig := config.UrbitConf(pier)
 		// get container stats from docker
-		var dockerStats structs.ContainerStats
-		res, ok := docker.ContainerStats[pier]
-		if ok {
-			dockerStats = res
-		}
+
+		dockerStats := docker.GetContainerStats(pier)
 		urbit := structs.Urbit{}
 		if existingUrbit, exists := currentState.Urbits[pier]; exists {
 			// If the ship already exists in broadcastState, use its current state
@@ -232,6 +230,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			startramReminder = false
 		}
 
+		chopOnUpgrade := true
+		if dockerConfig.ChopOnUpgrade == false {
+			chopOnUpgrade = false
+		}
+
 		// pack day
 		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 		packDay := "Monday"
@@ -278,6 +281,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
 		urbit.Info.Gallseg = gallsegInstalled
 		urbit.Info.StartramReminder = startramReminder
+		urbit.Info.ChopOnUpgrade = chopOnUpgrade
+		urbit.Info.SizeLimit = dockerConfig.SizeLimit
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
@@ -332,22 +337,63 @@ func constructProfileInfo() structs.Profile {
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
+	// init
 	var ramObj []uint64
 	var sysInfo structs.System
+	conf := config.Conf()
+
+	// Linux update
+	sysInfo.Info.Updates = system.SystemUpdates
+
+	// Wifi
+	sysInfo.Info.Wifi = system.WifiInfo
+	// Sys details
 	usedRam, totalRam := system.GetMemory()
 	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
 	sysInfo.Info.Usage.CPU = system.GetCPU()
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	diskUsage, err := system.GetDisk()
-	if err != nil {
+	if diskUsage, err := system.GetDisk(); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting disk usage: %v", err))
+	} else {
+		sysInfo.Info.Usage.Disk = diskUsage
+		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
-	sysInfo.Info.Usage.Disk = diskUsage
-	conf := config.Conf()
-	sysInfo.Info.Usage.SwapFile = conf.SwapVal
-	sysInfo.Info.Updates = system.SystemUpdates
+
+	drives := make(map[string]structs.SystemDrive)
+	// Block Devices
+	if blockDevices, err := system.ListHardDisks(); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
+	} else {
+		for _, dev := range blockDevices.BlockDevices {
+			// groundseg formatted drives do not have partitions
+			if len(dev.Children) < 1 {
+				// is the device mounted?
+				if system.IsDevMounted(dev) {
+					// check if mountpoint meets convention
+					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
+					matches := re.FindStringSubmatch(dev.Mountpoints[0])
+					if len(matches) > 1 {
+						n, err := strconv.Atoi(matches[1])
+						if err != nil {
+							continue
+						}
+						drives[dev.Name] = structs.SystemDrive{
+							DriveID: n,
+						}
+					}
+				} else { // device not mounted
+					drives[dev.Name] = structs.SystemDrive{
+						DriveID: 0, // default value, only for empty
+					}
+				}
+			}
+		}
+	}
+	sysInfo.Info.Drives = drives
+
+	// Transition
 	sysInfo.Transition = SystemTransitions
-	sysInfo.Info.Wifi = system.WifiInfo
+
 	return sysInfo
 }
 
@@ -399,6 +445,7 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
 	bState := GetState()
+	// temporarily disable gallseg
 	//leak.LeakChan <- bState
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {

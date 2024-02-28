@@ -66,7 +66,8 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
-  console.log("alive")
+  //console.log("alive")
+  console.log(data)
   if (data.type === "c2c") {
     if (Array.isArray(data.ssids)) {
       ssids.set(data.ssids)
@@ -341,13 +342,14 @@ export const setAllStartramReminder = remind => {
 //  Upload Pier
 //
 
-export const openUploadEndpoint = (endpoint,remote,fix) => {
+export const openUploadEndpoint = (endpoint,remote,fix,selectedDrive) => {
   let payload = {
     "type":"pier_upload",
     "action":"open-endpoint",
     "endpoint": endpoint,
     "remote": remote,
-    "fix": fix
+    "fix": fix,
+    "selectedDrive":selectedDrive,
   }
   send(payload)
 }
@@ -393,13 +395,14 @@ export const cancelNewShip = patp => {
   send(payload)
 }
 
-export const bootShip = (patp,key,remote) => {
+export const bootShip = (patp,key,remote,selectedDrive) => {
   let payload = {
     "type":"new_ship",
     "action":"boot",
     "patp":patp,
     "key":key,
-    "remote":remote
+    "remote":remote,
+    "selectedDrive":selectedDrive
   }
   send(payload)
 }
@@ -459,6 +462,17 @@ export const setUrbitDomain = (patp, domain) => {
     "action":"set-urbit-domain",
     "patp":patp,
     "domain": domain
+  }
+  send(payload)
+}
+
+
+export const setNewMaxPierSize = (patp, size) => {
+  let payload = {
+    "type":"urbit",
+    "action":"new-max-pier-size",
+    "patp":patp,
+    "value": size
   }
   send(payload)
 }
@@ -599,6 +613,24 @@ export const urbitChop = patp => {
   let payload = {
     "type":"urbit",
     "action":"chop",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const urbitRollChop = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"roll-chop",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const toggleChopAfterVereUpdate = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-chop-on-vere-update",
     "patp":patp,
   }
   send(payload)

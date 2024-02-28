@@ -12,6 +12,10 @@
 
   import { openModal } from 'svelte-modals'
   import WarningPrompt from './WarningPrompt.svelte'
+  import NewDriveWarning from './NewDriveWarning.svelte'
+
+  import Fa from 'svelte-fa'
+  import { faCircleExclamation, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
 
   import { URBIT_MODE } from '$lib/stores/data'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -23,6 +27,13 @@
   |   DEFAULT VALUES    |
   **********************/
 
+  let advanceOpen = false
+  let selectedDrive = "system-drive"
+
+  $: drives = $structure?.system?.info?.drives || {}
+  $: driveNames = Object.keys(drives)
+
+
   let patp = ""
   let filename = ""
   let remote = true;
@@ -33,7 +44,6 @@
   $: addr = "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
-
 
   /*  Now, we intialize the dropzone during mount */
   onMount(()=> {
@@ -75,7 +85,7 @@
     if (valid) {
       patp = p 
     }
-    openUploadEndpoint(endpoint,remote,fix)
+    openUploadEndpoint(endpoint,remote,fix,selectedDrive)
     waitForWarning(done)
   }
 
@@ -104,17 +114,23 @@
     document.getElementById('dropper').click();
   }
 
+  const handleDrive = name => {
+    selectedDrive = name
+    if (patp.length > 0) {
+      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
+    }
+  }
   const handleRemote = () => {
     remote = !remote
     if (patp.length > 0) {
-      openUploadEndpoint(endpoint,remote,fix)
+      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
     }
   }
 
   const handleFix = () => {
     fix = !fix
     if (patp.length > 0) {
-      openUploadEndpoint(endpoint,remote,fix)
+      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
     }
   }
 
@@ -128,6 +144,37 @@
     <div on:click={selectDropper} class="select">{patp.length < 1 ? "Not chosen" : filename}</div>
     <button on:click={selectDropper} class="btn action-btn">Choose</button>
   </div>
+</div>
+<!-- Customize -->
+<div class="input-wrapper">
+  <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
+    Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
+  </div>
+</div>
+{#if advanceOpen}
+<div class="input-wrapper">
+  <div class="label">Select Drive</div>
+  <div class="mount-wrapper">
+    <div class="mount-info" on:click={()=>handleDrive("system-drive")} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    {#each driveNames as name}
+      <div class="mount">
+        <div
+          class="mount-info"
+          class:active={selectedDrive==name}
+          on:click={()=>handleDrive(name)}
+          >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
+        </div>
+        {#if drives[name].driveID == 0}
+        <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+          <Fa icon={faCircleExclamation} size="1.5x" />
+        </div>
+        {/if}
+      </div>
+    {/each}
+  </div>
+</div>
+<div class="input-wrapper">
+  <div class="label">Configuration</div>
   {#if registered && running}
   <div class="check-wrapper" on:click={handleRemote}>
     <div class="checkbox">
@@ -146,6 +193,9 @@
     </div>
     <div class="check-label">Update configuration if needed </div>
   </div>
+</div>
+{/if}
+<div class="input-wrapper">
   <div class="buttons">
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button class="btn action-btn" disabled={patp.length < 1} on:click={()=>openModal(WarningPrompt)}>Import</button>
@@ -156,46 +206,6 @@
   #dropper {
     display:none;
   }
-  /*
-  .ship {
-    display: flex;
-    width: 60%;
-  }
-  .info {
-    flex: 1;
-    margin: 40px;
-    display: flex;
-    flex-direction: column;
-  }
-  .item {
-    font-size: 24px;
-  }
-  .checkboxes {
-    display: flex;
-    gap: 48px;
-  }
-  .check-wrapper {
-    cursor: pointer;
-    user-select: none;
-    display: flex;
-    gap: 12px;
-    align-items: start;
-  }
-  .checkbox {
-    width: 20px;
-    height: 20px;
-    border: solid 1px var(--btn-secondary);
-    border-radius: 6px;
-  }
-  .highlight {
-    background-color: var(--btn-secondary);
-  }
-  .check-label {
-    line-height: 20px;
-    font-size: 12px;
-    margin-bottom: 24px;
-  }
-  */
   .input-wrapper {
     margin: auto;
     display: flex;
@@ -270,7 +280,8 @@
   }
   .buttons {
     display: flex;
-    gap: 16px
+    gap: 16px;
+    margin-top: 32px;
   }
   .btn {
     leading-trim: both;
@@ -309,6 +320,52 @@
   }
   .action-btn:disabled {
     opacity: .6;
+    pointer-events: none;
+  }
+  .advance {
+    cursor: pointer;
+    color: var(--Gray-400, #5C7060);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 32px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    padding-top: 16px;
+  }
+  .mount-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .mount {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .mount-info {
+    padding: 16px;
+    border: solid 2px var(--btn-secondary);
+    border-radius: 16px;
+    width: 200px;
+    text-align: center;
+    cursor: pointer;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    letter-spacing: -1.44px;
+    user-select: none;
+  }
+  .mount-icon {
+    color: orange;
+    cursor: pointer;
+  }
+  .active {
+    background: var(--btn-secondary);
+    color: white;
     pointer-events: none;
   }
 </style>

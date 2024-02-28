@@ -23,6 +23,12 @@ func UrbitTransitionHandler() {
 		urbitStruct, exists := current.Urbits[event.Patp]
 		if exists {
 			switch event.Type {
+			case "rollChop":
+				urbitStruct.Transition.RollChop = event.Event
+			case "chopOnUpgrade":
+				urbitStruct.Transition.ChopOnUpgrade = event.Event
+			case "chop":
+				urbitStruct.Transition.Chop = event.Event
 			case "pack":
 				urbitStruct.Transition.Pack = event.Event
 			case "packMeld":

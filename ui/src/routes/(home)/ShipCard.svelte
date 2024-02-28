@@ -61,7 +61,7 @@
     <NameBar {patp} {running} />
   </div>
   <div class="container-info">
-    <ContainerInfo {memUsage} {diskUsage} loom={loomActual} />
+    <ContainerInfo {running} {memUsage} {diskUsage} loom={loomActual} />
   </div>
   <div class="buttons">
     <ShipButtons {patp} url={displayedUrl} />

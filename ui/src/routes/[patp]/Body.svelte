@@ -146,6 +146,10 @@
     />
   
   <!-- temporarily disabled
+  <!-- Chop --
+  <Chop {patp} />
+
+  <!-- GallSeg
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
   {/if}
@@ -155,11 +159,6 @@
   {/if}
   -->
 
-  <!-- Chop --
-  <Chop
-    {patp}
-    />
-  -->
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>

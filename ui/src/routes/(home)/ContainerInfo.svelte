@@ -2,6 +2,7 @@
   import Fa from 'svelte-fa'
   import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
+  export let running = true
   export let memUsage = 0
   export let diskUsage = 0
   export let loom = 2048
@@ -19,7 +20,7 @@
   <div class="label">R</div>
   <div class="rects">
     {#each Array.from({ length: 10 }, (_, i) => i) as n}
-      <div class="rect" class:active={memBlocks > n}></div>
+      <div class="rect" class:active={memBlocks > n} class:offline={!running}></div>
     {/each}
   </div>
 </div>
@@ -55,5 +56,8 @@
   }
   .active {
     background: var(--text-card-color);
+  }
+  .offline {
+    opacity: .1;
   }
 </style>

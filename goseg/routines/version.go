@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/handler"
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
@@ -229,7 +230,17 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer(pier, "vere")
+								_, err := docker.StartContainer(pier, "vere")
+								if err != nil {
+									logger.Logger.Error(fmt.Sprintf("Failed to start %s after vere update: %v", err))
+								}
+								continue
+							}
+							// after starting (or not starting) the container,
+							// check if it wants a chop
+							urbConf := config.UrbitConf(pier)
+							if urbConf.ChopOnUpgrade == true {
+								go handler.ChopPier(pier, urbConf)
 							}
 						}
 					} else if sw == "minio" {
@@ -249,7 +260,17 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 							if isRunning {
-								docker.StartContainer(pier, "vere")
+								_, err := docker.StartContainer(pier, "vere")
+								if err != nil {
+									logger.Logger.Error(fmt.Sprintf("Failed to start %s after vere update: %v", err))
+								}
+								continue
+							}
+							// after starting (or not starting) the container,
+							// check if it wants a chop
+							urbConf := config.UrbitConf(pier)
+							if urbConf.ChopOnUpgrade == true {
+								go handler.ChopPier(pier, urbConf)
 							}
 						}
 					} else if sw == "minio" {

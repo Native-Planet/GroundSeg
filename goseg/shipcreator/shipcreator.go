@@ -5,10 +5,11 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/logger"
+	"path/filepath"
 	"sort"
 )
 
-func CreateUrbitConfig(patp string) error {
+func CreateUrbitConfig(patp, customDrive string) error {
 	// get unused http and ames ports
 	httpPort, amesPort := getOpenUrbitPorts()
 	// get default urbit config
@@ -17,6 +18,11 @@ func CreateUrbitConfig(patp string) error {
 	conf.PierName = patp
 	conf.HTTPPort = httpPort
 	conf.AmesPort = amesPort
+
+	// custom dir specified
+	if customDrive != "" {
+		conf.CustomPierLocation = filepath.Join(customDrive, patp)
+	}
 	// get urbit config map
 	urbConf := config.UrbitConfAll()
 	// add to map
@@ -49,21 +55,23 @@ func getOpenUrbitPorts() (int, int) {
 	sort.Ints(amesAll)
 	sort.Ints(httpAll)
 
-	for _, uAmes := range amesAll {
-		// find lowest port that's available
-		if amesPort == uAmes {
-			amesPort = amesPort + 1
+	findSmallestMissing := func(nums []int, defaultVal int) int {
+		// Check if the slice is empty and return the default value if so.
+		if len(nums) == 0 {
+			return defaultVal
 		}
-		break
-	}
-
-	for _, uHTTP := range httpAll {
-		// find lowest port that's available
-		if httpPort == uHTTP {
-			httpPort = httpPort + 1
+		// Assuming nums is already sorted.
+		for i := 0; i < len(nums)-1; i++ {
+			// Check if the next number is not the consecutive number.
+			if nums[i]+1 != nums[i+1] {
+				return nums[i] + 1
+			}
 		}
-		break
+		// If all numbers are consecutive, return the next number after the last element.
+		return nums[len(nums)-1] + 1
 	}
+	httpPort = findSmallestMissing(httpAll, httpPort)
+	amesPort = findSmallestMissing(amesAll, amesPort)
 	logger.Logger.Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
 	return httpPort, amesPort
 }

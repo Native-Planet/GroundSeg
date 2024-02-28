@@ -257,7 +257,7 @@ func main() {
 	}
 	// gallseg
 	/*
-			// temporarily disable gallseg
+		// temporarily disable gallseg
 		go leak.StartLeak()
 		go func() {
 			for {
@@ -266,10 +266,14 @@ func main() {
 			}
 		}()
 	*/
+	// drive management
+	//go routines.GetDriveStatus()
 	// startram reminder
 	go routines.StartramRenewalReminder()
 	// pack scheduler
 	go routines.PackScheduleLoop()
+	// chop limiter
+	//go routines.ChopAtLimit()
 	// log manager routine
 	go routines.LogEvent()
 	// block until version info returns

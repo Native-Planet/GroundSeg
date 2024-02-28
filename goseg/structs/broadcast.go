@@ -1,5 +1,7 @@
 package structs
 
+import "time"
+
 // broadcast payload object struct
 type AuthBroadcast struct {
 	Type      string           `json:"type"`
@@ -41,9 +43,11 @@ type NewShip struct {
 // broadcast payload subobject
 type System struct {
 	Info struct {
-		Usage   SystemUsage   `json:"usage"`
-		Updates SystemUpdates `json:"updates"`
-		Wifi    SystemWifi    `json:"wifi"`
+		Usage   SystemUsage            `json:"usage"`
+		Updates SystemUpdates          `json:"updates"`
+		Wifi    SystemWifi             `json:"wifi"`
+		Drives  map[string]SystemDrive `json:"drives"`
+		//BlockDevices []BlockDev    `json:"blockDevices"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
 }
@@ -81,6 +85,15 @@ type SystemWifi struct {
 	Status   bool     `json:"status"`
 	Active   string   `json:"active"`
 	Networks []string `json:"networks"`
+}
+
+type SystemDrive struct {
+	DriveID int `json:"driveID"` // 0 is empty
+	/*
+		System bool  `json:"system"` // system drive
+		Size   int64 `json:"size"`   // size bytes
+		Used   int64 `json:"used"`   // used bytes
+	*/
 }
 
 // broadcast payload subobject
@@ -142,6 +155,8 @@ type Urbit struct {
 		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
 		StartramReminder   bool   `json:"startramReminder"`
+		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
+		SizeLimit          int    `json:"sizeLimit"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -149,6 +164,7 @@ type Urbit struct {
 // broadcast payload subobject
 type UrbitTransitionBroadcast struct {
 	Pack                      string `json:"pack"`
+	Chop                      string `json:"chop"`
 	PackMeld                  string `json:"packMeld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
@@ -166,12 +182,15 @@ type UrbitTransitionBroadcast struct {
 	MinIODomain               string `json:"minioDomain"`
 	PenpaiCompanion           string `json:"penpaiCompanion"`
 	Gallseg                   string `json:"gallseg"`
+	ChopOnUpgrade             string `json:"chopOnUpgrade"`
+	RollChop                  string `json:"rollChop"`
 }
 
 // used to construct broadcast pier info subobject
 type ContainerStats struct {
 	MemoryUsage uint64
 	DiskUsage   int64
+	LastContact time.Time
 }
 
 // broadcast payload subobject
