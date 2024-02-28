@@ -1,19 +1,21 @@
 <script>
   import { goto } from '$app/navigation';
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
   export let type = ''
 </script>
 
-<div class="wrapper" on:click={()=>goto("boot/" + type)}>
+<div class="wrapper" on:click={()=>goto("boot/" + type)} class:disabled={$URBIT_MODE && (type == "existing")}>
   <div class="arrow">
   </div>
   {#if type == "new"}
-    <div class="icon"><img alt="import icon" src="/newship-icon.svg"/></div>
+    <div class="icon"><img alt="import icon" src={pfx+"/newship-icon.svg"} /></div>
     <div class="title">NEW SHIP</div>
     <div class="subtitle">
       Load a new moon, planet, star, or galaxy using your bootfile
     </div>
   {:else if type == "existing"}
-    <div class="icon"><img alt="import icon" src="/import-icon.svg"/></div>
+    <div class="icon"><img alt="import icon" src={pfx+"/import-icon.svg"} /></div>
     <div class="title">IMPORT PIER</div>
     <div class="subtitle">
       Import an existing pier of a ship
@@ -81,5 +83,9 @@
     background-image: url('/arrow.svg');
     background-color: var(--text-color);
     cursor: pointer;
+  }
+  .disabled {
+    opacity: .6;
+    pointer-events: none;
   }
 </style>

@@ -1,6 +1,7 @@
 <script>
   import { onMount, afterUpdate } from 'svelte'
-  import { structure, startramGetRegions, startramRegister } from '$lib/stores/websocket'
+  import { startramGetRegions, startramRegister } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let regionMode = false

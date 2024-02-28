@@ -1,16 +1,32 @@
 <script>
   import ToggleButton from '$lib/ToggleButton.svelte'
+  import { openModal } from 'svelte-modals'
+  import FinalModal from './FinalModal.svelte';
+  import UnplugWarning from './UnplugWarning.svelte'
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
   import { toggleBootStatus } from '$lib/stores/websocket'
 
+  import { URBIT_MODE } from '$lib/stores/data'
+
   export let patp
+  export let ownShip
   export let running
   export let detectBootStatus
   export let tTogglePower
 
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+
   const dispatch = createEventDispatcher()
+
+  function handleClick() {
+    if ($URBIT_MODE) {
+      openModal(FinalModal, {"component":"power","patp":patp})
+    } else {
+      dispatch("click")
+    }
+  }
 </script>
 
 <div class="section">
@@ -19,7 +35,7 @@
     <div class="check-wrapper">
       <div class="checkbox" on:click={()=>toggleBootStatus(patp)}>
       {#if detectBootStatus}
-        <img class="checkmark" src="/checkmark-white.svg" alt="checkmark"/>
+        <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
       {/if}
       </div>
       <div class="check-text" on:click={()=>toggleBootStatus(patp)}>Remember boot status after restart</div>
@@ -29,11 +45,13 @@
     </div>
   </div>
   <div class="section-right">
-    <ToggleButton
-      on:click={()=>dispatch("click")}
-      on={running}
-      loading={tTogglePower}
-      />
+    <UnplugWarning component={"power"} {ownShip}>
+      <ToggleButton
+        on:click={handleClick}
+        on={running}
+        loading={tTogglePower}
+        />
+    </UnplugWarning>
   </div>
 </div>
 

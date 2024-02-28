@@ -40,6 +40,8 @@ func StartramHandler(msg []byte) error {
 	case "endpoint":
 		endpoint := startramPayload.Payload.Endpoint
 		go handleStartramEndpoint(endpoint)
+	case "reminder":
+		go handleStartramReminder(startramPayload.Payload.Remind)
 
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
@@ -324,6 +326,19 @@ func handleStartramCancel(key string, reset bool) {
 		return
 	}
 	return
+}
+
+func handleStartramReminder(remind bool) {
+	conf := config.Conf()
+	for _, patp := range conf.Piers {
+		update := make(map[string]structs.UrbitDocker)
+		shipConf := config.UrbitConf(patp)
+		shipConf.StartramReminder = remind
+		update[patp] = shipConf
+		if err := config.UpdateUrbitConfig(update); err != nil {
+			logger.Logger.Error("Couldn't update urbit config: %v", err)
+		}
+	}
 }
 
 // temp

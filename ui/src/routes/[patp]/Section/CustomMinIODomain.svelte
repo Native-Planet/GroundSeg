@@ -1,8 +1,11 @@
 <script>
   // Style
   import "../theme.css"
-  import { setMinIODomain, structure } from '$lib/stores/websocket'
+  import { setMinIODomain } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { onMount, createEventDispatcher, afterUpdate } from 'svelte'
+  import DocsModal from '$lib/DocsModal.svelte'
+  import { openModal } from 'svelte-modals'
   export let patp
   export let minioAlias
   let domain = ""
@@ -18,12 +21,20 @@
       dispatch("done")
     }
   })
+
+  let docsInfo = {
+    title: "Custom MinIO Domain",
+    description: "Publish locally hosted media from custom domain.",
+    docName: "Custom StarTram Domains",
+    docURL: "https://manual.groundseg.app/guide/custom-domains.html"
+  }
+
 </script>
 
 <div>
   <div class="section-title-wrapper">
     <div class="section-title">Custom MinIO Domain</div>
-    <div class="what">?</div>
+    <div class="what" on:click={()=>openModal(DocsModal, {info:docsInfo})}>?</div>
   </div>
   <div class="wrapper">
     <input type="text" placeholder="minio.example.com" bind:value={domain} disabled={t.length > 0} />

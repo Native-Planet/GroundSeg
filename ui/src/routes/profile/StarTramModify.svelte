@@ -4,7 +4,9 @@
   import EndpointModal from './EndpointModal.svelte'
   import RegisterModal from './RegisterModal.svelte'
 
-  import { structure } from '$lib/stores/websocket'
+  import StarTramReminder from './StarTramReminder.svelte'
+
+  import { structure } from '$lib/stores/data'
 
   $: info = ($structure?.profile?.startram?.info) || {}
   $: endpoint = (info?.endpoint) || ""
@@ -37,6 +39,12 @@
       </div>
     </div>
   {/if}
+
+  <div class="item">
+    <div class="label">StarTram expiration reminder on Urbit</div>
+    <StarTramReminder />
+  </div>
+
 </div>
 
 <style>

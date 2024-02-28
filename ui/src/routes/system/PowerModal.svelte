@@ -1,6 +1,7 @@
 <script>
+  import { structure, connected } from '$lib/stores/data'
   import { afterUpdate } from 'svelte'
-  import { shutdownDevice, restartDevice, structure, connected } from '$lib/stores/websocket'
+  import { shutdownDevice, restartDevice } from '$lib/stores/websocket'
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
   export let info
@@ -48,11 +49,13 @@
     </div>
   {:else}
     <div class="wrapper transition-{info == "shutdown" ? "shutdown" : "restart"}">
-      {#if info == "shutdown"}
-        Device turned off
-      {:else if info == "restart"}
-        Restarting your device
+      {#if info == "restart"}
+        <div class="loader">
+        </div>
       {/if}
+      <div class="text">
+        {info == "shutdown" ? "Device turned off" : "Restarting your device"}
+      </div>
     </div>
   {/if}
 </Modal>
@@ -106,30 +109,75 @@
     cursor: pointer;
   }
   .transition-shutdown {
-    background: var(--bg-card);
     padding: 120px 0;
-    color: var(--text-card-color);
+    margin: auto;
+    text-align:center;
     font-size: 32px;
   }
   .transition-restart {
-    background: var(--bg-card);
+    display: flex;
     padding: 120px 0;
-    color: var(--text-card-color);
     font-size: 32px;
-    animation: breathe 5s infinite;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
   }
-  @keyframes breathe {
-    0% {
-      background-color: #FFFFFF00;
-      color: var(--text-color);
-    }
-    50% {
-      background-color: var(--bg-card);
-      color: var(--text-card-color);
-    }
-    100% {
-      background-color: #FFFFFF00;
-      color: var(--text-color);
-    }
+  .loading-icon {
+    width: 64px;
+    height: 64px;
   }
+  .loader {
+    font-size:48px;
+    color: var(--text-color);
+    width: 1em;
+    height: 1em;
+    box-sizing: border-box;
+    background-color: currentcolor;
+    position: relative;
+    border-radius: 50%;
+    transform: rotateX(-60deg) perspective(1000px);
+  }
+  .loader:before,
+  .loader:after {
+    content: '';
+    display: block;
+    position: absolute;
+    box-sizing: border-box;
+    top: 0;
+    left: 0;
+    width: inherit;
+    height: inherit;
+    border-radius: inherit;
+    animation: flowerFlow 1s ease-out infinite;
+  }
+.loader:after {
+  animation-delay: .4s;
+}
+
+@keyframes flowerFlow {
+  0% {
+    opacity: 1;
+    transform: rotate(0deg);
+    box-shadow: 0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor,
+    0 0 0 -.5em currentcolor;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(180deg);
+    box-shadow: -1em -1em 0 -.35em currentcolor,
+    0 -1.5em 0 -.35em currentcolor,
+    1em -1em 0 -.35em currentcolor,
+    -1.5em 0 0 -.35em currentcolor,
+    1.5em -0 0 -.35em currentcolor,
+    -1em 1em 0 -.35em currentcolor,
+    0 1.5em 0 -.35em currentcolor,
+    1em 1em 0 -.35em currentcolor;
+  }
+}
 </style>

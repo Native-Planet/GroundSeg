@@ -1,10 +1,15 @@
 <script>
-  import { structure,
+  import { afterUpdate } from 'svelte'
+  import { 
     toggleDevMode,
     toggleAutoBoot,
     toggleNetwork,
-    toggleUrbitPower
+    toggleUrbitPower,
+    installGallseg,
+    uninstallGallseg
   } from '$lib/stores/websocket'
+
+  import { structure, URBIT_MODE } from '$lib/stores/data'
 
   import Power from './Section/Power.svelte'
   import Urbit from './Section/Urbit.svelte'
@@ -14,13 +19,22 @@
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
   import Chop from './Section/Chop.svelte'
-  import Gallseg from './Section/Gallseg.svelte'
+  //import Gallseg from './Section/Gallseg.svelte'
+  import AdminLogin from './Section/AdminLogin.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
   import Fa from 'svelte-fa'
   import { faCheck } from '@fortawesome/free-solid-svg-icons'
   export let patp
+
+  let ownShip = false
+
+  afterUpdate(()=>{
+    if ($URBIT_MODE) {
+      ownShip = (window.ship == patp)
+    }
+  })
 
   // info
   $: ship = ($structure?.urbits?.[patp]?.info)
@@ -39,6 +53,7 @@
   $: minioPwd = (ship?.minioPwd) || ""
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
+  $: authLevel = ($structure?.auth_level) || "unauthorized"
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
@@ -46,11 +61,20 @@
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
-  $: tGallsegInstalling = tShip?.gallsegInstalling || ""
+  $: tGallseg = tShip?.gallseg || ""
 
   // profile > startram
   $: startramRegistered = ($structure?.profile?.startram?.info?.registered) || false
   $: startramRunning = ($structure?.profile?.startram?.info?.running) || false
+
+  const handleGallseg = p => {
+    if (gallseg) {
+      uninstallGallseg(p)
+    } else {
+      installGallseg(p)
+    }
+  }
+
 </script>
 <div class="body">
   <!-- Power -->
@@ -59,6 +83,7 @@
     {running}
     {detectBootStatus}
     {tTogglePower}
+    {ownShip}
     on:click={()=>toggleUrbitPower(patp)} 
     />
 
@@ -91,26 +116,49 @@
   <!-- Pack & Meld -->
   <PackMeld
     {patp}
+    {ownShip}
     />
 
   <!-- Remote Access -->
-  <RemoteAccess {remoteReady} {remote} {tToggleNetwork} on:click={()=>toggleNetwork(patp)} />
+  <RemoteAccess
+    on:click={()=>toggleNetwork(patp)}
+    {patp}
+    {remoteReady}
+    {remote}
+    {tToggleNetwork}
+    {ownShip}
+    />
 
   <!-- Dev Mode -->
-  <DevMode {devMode} {tToggleDevMode} on:click={()=>toggleDevMode(patp)} />
+  <DevMode
+    on:click={()=>toggleDevMode(patp)}
+    {patp}
+    {devMode}
+    {tToggleDevMode}
+    {ownShip}
+    />
 
   <!-- Loom -->
-  <Loom {patp} {loomSize} />
-
-  <!-- Gallseg --
-  <Gallseg {gallseg} {tGallsegInstalling} />
-  -->
-
-  <!-- Chop --
-  <Chop
+  <Loom
     {patp}
+    {loomSize} 
+    {ownShip}
     />
+  
+  <!-- temporarily disabled
+  <!-- Chop --
+  <Chop {patp} />
+
+  <!-- GallSeg
+  {#if !$URBIT_MODE}
+    <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
+  {/if}
+
+  {#if $URBIT_MODE && (authLevel != "authorized")}
+    <AdminLogin />
+  {/if}
   -->
+
 
   <!-- Bottom Panel -->
   <BottomPanel {patp}/>

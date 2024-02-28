@@ -1,24 +1,60 @@
+@font-face { font-family: 'BPdotsUnicase'; src: url("/font/BPdotsUnicaseBold.woff2") format('woff2'); }
+@font-face { font-family: Source; font-display: swap; src: url("/font/SourceCodeProRegular.woff2") format('woff2'); }
+
 @font-face {
-  font-family: BPdotsUnicase;
-  src: url('/BPdotsUnicaseBold.otf');
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/font/InterLight.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Light.woff2") format('woff2'); 
 }
 @font-face {
   font-family: Inter;
-  src: url('/Inter-V.ttf');
-}
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/font/InterRegular.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Regular.woff2") format('woff2'); 
+ }
 @font-face {
-  font-family: Source;
-  src: url('/SourceCodePro-Regular.otf');
-}
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/font/InterMedium.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Medium.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/font/InterSemiBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-SemiBold.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/font/InterBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-Bold.woff2") format('woff2'); 
+ }
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/font/InterExtraBold.woff2") format('woff2');
+  src: url("https://startram.nyc3.digitaloceanspaces.com/font/Inter-ExtraBold.woff2") format('woff2'); 
+ }
+
 body {
   margin: 0;
   /*
   background-position: cover;
   background-attachment: fixed;
-  background-image: url('https://wallpapercave.com/wp/wp5052793.jpg');
-  background-image: url('https://wallpaper-mania.com/wp-content/uploads/2018/09/High_resolution_wallpaper_background_ID_77701302686.jpg');
-  background-image: url('https://images.hdqwalls.com/download/best-nature-image-1920x1080.jpg');
-  background-image: url('https://r4.wallpaperflare.com/wallpaper/289/250/397/windows-xp-bliss-hd-wallpaper-e291b2c0dd269edbaa7802b51088d942.jpg');
   */
 }
 
@@ -39,6 +75,5 @@ body {
   --boot-selector-color: #F1F2EE;
   --bg-boot-arrow: #ABBAAE;
   --locked-color: #A31708;
-  font-family: var(--regular-font);
 }
 

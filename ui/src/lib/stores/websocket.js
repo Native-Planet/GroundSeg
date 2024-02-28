@@ -1,14 +1,13 @@
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import { loadSession, saveSession, generateRandom } from './gs-crypto'
+import { URBIT_MODE, connected, structure, firstLoad } from './data.js'
+import { sendPoke } from './urbit.js'
 
-export const structure = writable({})
 export const ready = writable(false)
-export const connected = writable(false)
 export const logs = writable({})
 export const wsPort = writable("3000")
 export const isC2CMode = writable(false)
 export const ssids = writable([])
-export const firstLoad = writable(true)
 export const loginError = writable('')
 
 let PENDING = new Set();
@@ -25,21 +24,25 @@ export const connect = async url => {
 
 // WebSocket send wrapper
 export const send = async payload => {
-  // generate an ID
-  let id = await generateRandom(16)
-  // add the ID to pending
-  PENDING.add(id)
-  // Grab token if exists
-  let token = await loadSession()
-  // Create the request
-  let data = {"id":id,"payload":payload}
-  // Add token to request if available
-  if (token) {
-    data['token'] = token
+  if (get(URBIT_MODE)) {
+    sendPoke(payload)
+  } else {
+    // generate an ID
+    let id = await generateRandom(16)
+    // add the ID to pending
+    PENDING.add(id)
+    // Grab token if exists
+    let token = await loadSession()
+    // Create the request
+    let data = {"id":id,"payload":payload}
+    // Add token to request if available
+    if (token) {
+      data['token'] = token
+    }
+    // Send the request
+    console.log(id + ":" + payload.type + " sent")
+    SESSION.send(JSON.stringify(data));
   }
-  // Send the request
-  console.log(id + ":" + payload.type + " sent")
-  SESSION.send(JSON.stringify(data));
 }
 
 // Reconnection
@@ -63,8 +66,9 @@ export const handleOpen = () => {
 export const handleMessage = data => {
   // Log the activity response and remove 
   // it from pending
+  //console.log("alive")
+  console.log(data)
   if (data.type === "c2c") {
-    console.log(data)
     if (Array.isArray(data.ssids)) {
       ssids.set(data.ssids)
       isC2CMode.set(true)
@@ -74,7 +78,6 @@ export const handleMessage = data => {
     ssids.set([])
     isC2CMode.set(false)
   } else if (data.type == "structure") {
-    console.log(data)
     structure.set(data)
     ssids.set([])
     isC2CMode.set(false)
@@ -325,17 +328,28 @@ export const startramCancel = async (key,reset) => {
   }
   send(payload)
 }
+
+export const setAllStartramReminder = remind => {
+  let payload = {
+    "type":"startram",
+    "action":"reminder",
+    "remind": remind
+  }
+  send(payload)
+}
+
 //
 //  Upload Pier
 //
 
-export const openUploadEndpoint = (endpoint,remote,fix) => {
+export const openUploadEndpoint = (endpoint,remote,fix,selectedDrive) => {
   let payload = {
     "type":"pier_upload",
     "action":"open-endpoint",
     "endpoint": endpoint,
     "remote": remote,
-    "fix": fix
+    "fix": fix,
+    "selectedDrive":selectedDrive,
   }
   send(payload)
 }
@@ -381,13 +395,14 @@ export const cancelNewShip = patp => {
   send(payload)
 }
 
-export const bootShip = (patp,key,remote) => {
+export const bootShip = (patp,key,remote,selectedDrive) => {
   let payload = {
     "type":"new_ship",
     "action":"boot",
     "patp":patp,
     "key":key,
-    "remote":remote
+    "remote":remote,
+    "selectedDrive":selectedDrive
   }
   send(payload)
 }
@@ -447,6 +462,17 @@ export const setUrbitDomain = (patp, domain) => {
     "action":"set-urbit-domain",
     "patp":patp,
     "domain": domain
+  }
+  send(payload)
+}
+
+
+export const setNewMaxPierSize = (patp, size) => {
+  let payload = {
+    "type":"urbit",
+    "action":"new-max-pier-size",
+    "patp":patp,
+    "value": size
   }
   send(payload)
 }
@@ -592,6 +618,34 @@ export const urbitChop = patp => {
   send(payload)
 }
 
+export const urbitRollChop = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"roll-chop",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const toggleChopAfterVereUpdate = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-chop-on-vere-update",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const setStartramReminder = (patp, remind) => {
+  let payload = {
+    "type":"urbit",
+    "action":"startram-reminder",
+    "patp":patp,
+    "remind": remind
+  }
+  send(payload)
+}
+
 //
 //  Support
 //
@@ -699,6 +753,24 @@ export const uninstallPenpaiCompanion = patp => {
   send(payload)
 }
 
+export const installGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"install-gallseg",
+    "patp":patp,
+  }
+  send(payload)
+}
+
+export const uninstallGallseg = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"uninstall-gallseg",
+    "patp":patp,
+  }
+  send(payload)
+}
+
 //
 //  Dev
 //   
@@ -707,6 +779,31 @@ export const resetSetup = () => {
   let payload = {
     "type":"dev",
     "action":"reset-setup",
+  }
+  send(payload)
+}
+
+export const printMounts = () => {
+  let payload = {
+    "type":"dev",
+    "action":"print-mounts",
+  }
+  send(payload)
+}
+
+export const devStartramReminder = () => {
+  let payload = {
+    "type":"dev",
+    "action":"startram-reminder",
+  }
+  send(payload)
+}
+
+export const devStartramReminderToggle = b => {
+  let payload = {
+    "type":"dev",
+    "action":"startram-reminder-toggle",
+    "reminded": b
   }
   send(payload)
 }

@@ -4,7 +4,8 @@
   import { goto } from '$app/navigation';
   import { checkPatp } from '$lib/stores/patp';
   import { toBase64 } from '$lib/stores/gs-crypto'
-  import { structure, freeUpload, uploadMetadata } from '$lib/stores/websocket'
+  import { freeUpload, uploadMetadata } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   //import { processFile /*, manifest*/ } from '$lib/stores/uploader'
 
   import Dropzone from "dropzone"

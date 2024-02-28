@@ -6,6 +6,8 @@
   import { onMount, createEventDispatcher } from 'svelte'
   import { toggleMinIOLink } from '$lib/stores/websocket'
   import CustomMinIODomain from './CustomMinIODomain.svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   export let running
   export let minioAlias
@@ -35,7 +37,7 @@
   <div class="wrapper">
     <button disabled={!startramRunning} id="copy" class="btn copy-btn" data-clipboard-text={minioPwd}>
       <img
-        src="/clipboard.svg"
+        src={pfx+"/clipboard.svg"}
         width="24px"
         height="24px" />
       {#if copied}

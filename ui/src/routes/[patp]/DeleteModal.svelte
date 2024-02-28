@@ -1,7 +1,8 @@
 <script>
   import { goto } from '$app/navigation'
   import { afterUpdate } from 'svelte'
-  import { structure, deleteUrbitShip } from '$lib/stores/websocket'
+  import { deleteUrbitShip } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import Sigil from './Sigil.svelte'
 
   import Modal from '$lib/Modal.svelte'

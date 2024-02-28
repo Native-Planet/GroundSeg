@@ -6,6 +6,7 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
+	"groundseg/leakchannel"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
@@ -26,6 +27,10 @@ const (
 	LockoutDuration = 2 * time.Minute
 )
 
+func init() {
+	go HandleLeakAction()
+}
+
 func NewShipHandler(msg []byte) error {
 	logger.Logger.Info("New ship")
 	// Unmarshal JSON
@@ -36,6 +41,35 @@ func NewShipHandler(msg []byte) error {
 	}
 	switch shipPayload.Payload.Action {
 	case "boot":
+		// handle filesystem
+		sel := shipPayload.Payload.SelectedDrive //string
+		// if not using system-drive, that means custom location
+		if sel != "system-drive" {
+			// get list of devices -- lsblk -f
+			blockDevices, err := system.ListHardDisks()
+			if err != nil {
+				return fmt.Errorf("Failed to retrieve block devices: %v", err)
+			}
+			// we're looking for the drive the user specified
+			for _, dev := range blockDevices.BlockDevices {
+				if dev.Name == sel {
+					// lets see if its structured correctly
+					for _, m := range dev.Mountpoints {
+						matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
+						if err != nil {
+							return fmt.Errorf("Regex match error: %v", err)
+						}
+						// device provided in payload does not match groundseg's format
+						if !matched {
+							// we overwrite the fs
+							if _, err := system.CreateGroundSegFilesystem(sel); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+		}
 		// Check if patp is valid
 		patp := sigRemove(shipPayload.Payload.Patp)
 		isValid := checkPatp(patp)
@@ -197,7 +231,7 @@ func UnauthHandler() ([]byte, error) {
 }
 
 // password reset handler
-func PwHandler(msg []byte) error {
+func PwHandler(msg []byte, urbitMode bool) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
@@ -213,6 +247,10 @@ func PwHandler(msg []byte) error {
 			}
 			if err := config.UpdateConf(update); err != nil {
 				return fmt.Errorf("Unable to update password: %v", err)
+			}
+			if urbitMode {
+				leakchannel.Logout <- struct{}{}
+				return nil
 			}
 			LogoutHandler(msg)
 		}

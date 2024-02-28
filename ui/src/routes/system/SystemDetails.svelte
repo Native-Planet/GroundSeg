@@ -1,5 +1,6 @@
 <script>
-  import { updateLinux, restartGroundSeg, setSwap, structure, connected } from '$lib/stores/websocket'
+  import { updateLinux, restartGroundSeg, setSwap } from '$lib/stores/websocket'
+  import { connected, structure } from '$lib/stores/data'
 
   import { afterUpdate } from 'svelte'
 
@@ -62,12 +63,14 @@
     <Ram {ram} />
   </div>
   <div class="item-wrapper">
-    <Storage {disk} />
-  </div>
-  <div class="item-wrapper">
     <CPULoad {cpu} />
   </div>
-  <CPUTemp {cpuTemp} />
+  <div class="item-wrapper">
+    <CPUTemp {cpuTemp} />
+  </div>
+  <div class="item-wrapper">
+    <Storage {disk} />
+  </div>
 </div>
 
 <style>

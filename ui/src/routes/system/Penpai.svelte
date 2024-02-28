@@ -1,5 +1,6 @@
 <script>
-  import { structure, toggleExperimentalPenpai } from '$lib/stores/websocket'
+  import { toggleExperimentalPenpai } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import ToggleButton from '$lib/ToggleButton.svelte'
 
   $: penpai = ($structure?.apps?.penpai?.info) || {}

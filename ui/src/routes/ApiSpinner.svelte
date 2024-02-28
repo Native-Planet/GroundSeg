@@ -1,5 +1,5 @@
 <script>
-  import { connected } from '$lib/stores/websocket';
+  import { connected } from '$lib/stores/data';
 </script>
 {#if !$connected}
   <div class="text">CONNECTING</div>

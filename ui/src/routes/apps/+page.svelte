@@ -1,6 +1,6 @@
 <script>
   import './apps.css'
-  import { structure } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import Penpai from './Penpai.svelte'
 </script>
 

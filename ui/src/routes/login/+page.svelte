@@ -1,6 +1,6 @@
 <script>
-  //import { login, structure, loginStatus } from '$lib/stores/websocket'
-  import { login, structure, loginError } from '$lib/stores/websocket'
+  import { login, loginError } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
   import { scale } from 'svelte/transition'
   import { onMount, onDestroy } from 'svelte'
@@ -9,6 +9,7 @@
   import Fa from 'svelte-fa'
   import { faLock } from '@fortawesome/free-solid-svg-icons'
 
+  let passwordInput;
   let inView = false
   let loginPassword = ''
   let buttonStatus = 'standard'
@@ -25,8 +26,15 @@
   $: minutes = Math.floor((remainder % 3600) / 60)
   $: seconds = Math.floor(remainder % 60)
 
-  onMount(()=> inView = true)
-	onDestroy(()=> inView = false)
+  onMount(() => {
+    inView = true;
+    setTimeout(() => {
+      if (passwordInput && unlocked) {
+        passwordInput.focus();
+      }
+    }, 100); // needs short timeout
+  });
+  onDestroy(() => inView = false);
 
   const handleLogin = async () => {
     login(loginPassword)
@@ -52,6 +60,7 @@
       <!-- Password Input -->
       <div class="pw-wrapper">
         <input
+          bind:this={passwordInput}
           type="password"
           disabled={!unlocked}
           bind:value={loginPassword}
@@ -110,12 +119,12 @@
     letter-spacing: -1.44px;
     border-radius: 16px;
     background: var(--Gray-100, #DDE3DF);
-    padding: 16px 24px 18px 24px;
     border: none;
     height: 30px;
     width: 480px;
     max-width: 80vw;
     text-align: center;
+    padding: 32px 24px 36px 24px;
   }
   input:focus {
     outline: none;

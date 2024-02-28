@@ -1,5 +1,7 @@
 package structs
 
+import "time"
+
 // broadcast payload object struct
 type AuthBroadcast struct {
 	Type      string           `json:"type"`
@@ -41,9 +43,11 @@ type NewShip struct {
 // broadcast payload subobject
 type System struct {
 	Info struct {
-		Usage   SystemUsage   `json:"usage"`
-		Updates SystemUpdates `json:"updates"`
-		Wifi    SystemWifi    `json:"wifi"`
+		Usage   SystemUsage            `json:"usage"`
+		Updates SystemUpdates          `json:"updates"`
+		Wifi    SystemWifi             `json:"wifi"`
+		Drives  map[string]SystemDrive `json:"drives"`
+		//BlockDevices []BlockDev    `json:"blockDevices"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
 }
@@ -83,6 +87,15 @@ type SystemWifi struct {
 	Networks []string `json:"networks"`
 }
 
+type SystemDrive struct {
+	DriveID int `json:"driveID"` // 0 is empty
+	/*
+		System bool  `json:"system"` // system drive
+		Size   int64 `json:"size"`   // size bytes
+		Used   int64 `json:"used"`   // used bytes
+	*/
+}
+
 // broadcast payload subobject
 type Profile struct {
 	Startram Startram `json:"startram"`
@@ -95,6 +108,7 @@ type Startram struct {
 		Running    bool                      `json:"running"`
 		Region     any                       `json:"region"`
 		Expiry     any                       `json:"expiry"`
+		UrlID      string                    `json:"urlID"`
 		Renew      bool                      `json:"renew"`
 		Endpoint   string                    `json:"endpoint"`
 		Regions    map[string]StartramRegion `json:"regions"`
@@ -138,9 +152,11 @@ type Urbit struct {
 		PackDay            string `json:"packDay"`
 		PackDate           int    `json:"packDate"`
 		PenpaiCompanion    bool   `json:"penpaiCompanion"`
-		PenpaiInstalling   bool   `json:"penpaiInstalling"`
 		Gallseg            bool   `json:"gallseg"`
 		MinIOLinked        bool   `json:"minioLinked"`
+		StartramReminder   bool   `json:"startramReminder"`
+		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
+		SizeLimit          int    `json:"sizeLimit"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -148,6 +164,7 @@ type Urbit struct {
 // broadcast payload subobject
 type UrbitTransitionBroadcast struct {
 	Pack                      string `json:"pack"`
+	Chop                      string `json:"chop"`
 	PackMeld                  string `json:"packMeld"`
 	ServiceRegistrationStatus string `json:"serviceRegistrationStatus"`
 	TogglePower               string `json:"togglePower"`
@@ -163,12 +180,17 @@ type UrbitTransitionBroadcast struct {
 	Loom                      string `json:"loom"`
 	UrbitDomain               string `json:"urbitDomain"`
 	MinIODomain               string `json:"minioDomain"`
+	PenpaiCompanion           string `json:"penpaiCompanion"`
+	Gallseg                   string `json:"gallseg"`
+	ChopOnUpgrade             string `json:"chopOnUpgrade"`
+	RollChop                  string `json:"rollChop"`
 }
 
 // used to construct broadcast pier info subobject
 type ContainerStats struct {
 	MemoryUsage uint64
 	DiskUsage   int64
+	LastContact time.Time
 }
 
 // broadcast payload subobject

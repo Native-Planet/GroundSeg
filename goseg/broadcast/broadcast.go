@@ -11,6 +11,7 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -19,8 +20,7 @@ import (
 )
 
 var (
-	hostInfoInterval  = 1 * time.Second // how often we refresh system info
-	shipInfoInterval  = 1 * time.Second // how often we refresh ship info
+	broadcastInterval = 1 * time.Second // how often we refresh system info
 	broadcastState    structs.AuthBroadcast
 	scheduledPacks    = make(map[string]time.Time)
 	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
@@ -105,10 +105,7 @@ func bootstrapBroadcastState() error {
 	broadcastState.Apps = appsInfo
 	mu.Unlock()
 	// start looping info refreshes
-	go hostStatusLoop()
-	go shipStatusLoop()
-	go profileStatusLoop()
-	go appsStatusLoop()
+	go BroadcastLoop()
 	return nil
 }
 
@@ -160,11 +157,8 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 		dockerConfig := config.UrbitConf(pier)
 		// get container stats from docker
-		var dockerStats structs.ContainerStats
-		res, ok := docker.ContainerStats[pier]
-		if ok {
-			dockerStats = res
-		}
+
+		dockerStats := docker.GetContainerStats(pier)
 		urbit := structs.Urbit{}
 		if existingUrbit, exists := currentState.Urbits[pier]; exists {
 			// If the ship already exists in broadcastState, use its current state
@@ -212,7 +206,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		minioLinked := config.GetMinIOLinkedStatus(pier)
 
 		var penpaiCompanionInstalled bool
-		penpaiCompanionInstalling := click.GetPenpaiInstalling(pier)
 		if strings.Contains(pierStatus[pier], "Up") {
 			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
@@ -230,6 +223,16 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 				logger.Logger.Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
 			}
 			gallsegInstalled = deskStatus == "running"
+		}
+
+		startramReminder := true
+		if dockerConfig.StartramReminder == false {
+			startramReminder = false
+		}
+
+		chopOnUpgrade := true
+		if dockerConfig.ChopOnUpgrade == false {
+			chopOnUpgrade = false
 		}
 
 		// pack day
@@ -276,8 +279,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
 		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
 		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
-		urbit.Info.PenpaiInstalling = penpaiCompanionInstalling
 		urbit.Info.Gallseg = gallsegInstalled
+		urbit.Info.StartramReminder = startramReminder
+		urbit.Info.ChopOnUpgrade = chopOnUpgrade
+		urbit.Info.SizeLimit = dockerConfig.SizeLimit
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
@@ -320,6 +325,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Region = config.StartramConfig.Region
 	startramInfo.Info.Expiry = config.StartramConfig.Lease
 	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
+	startramInfo.Info.UrlID = config.StartramConfig.UrlID
 
 	// Get Regions
 	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
@@ -331,22 +337,63 @@ func constructProfileInfo() structs.Profile {
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
+	// init
 	var ramObj []uint64
 	var sysInfo structs.System
+	conf := config.Conf()
+
+	// Linux update
+	sysInfo.Info.Updates = system.SystemUpdates
+
+	// Wifi
+	sysInfo.Info.Wifi = system.WifiInfo
+	// Sys details
 	usedRam, totalRam := system.GetMemory()
 	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
 	sysInfo.Info.Usage.CPU = system.GetCPU()
 	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	diskUsage, err := system.GetDisk()
-	if err != nil {
+	if diskUsage, err := system.GetDisk(); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Error getting disk usage: %v", err))
+	} else {
+		sysInfo.Info.Usage.Disk = diskUsage
+		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
-	sysInfo.Info.Usage.Disk = diskUsage
-	conf := config.Conf()
-	sysInfo.Info.Usage.SwapFile = conf.SwapVal
-	sysInfo.Info.Updates = system.SystemUpdates
+
+	drives := make(map[string]structs.SystemDrive)
+	// Block Devices
+	if blockDevices, err := system.ListHardDisks(); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
+	} else {
+		for _, dev := range blockDevices.BlockDevices {
+			// groundseg formatted drives do not have partitions
+			if len(dev.Children) < 1 {
+				// is the device mounted?
+				if system.IsDevMounted(dev) {
+					// check if mountpoint meets convention
+					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
+					matches := re.FindStringSubmatch(dev.Mountpoints[0])
+					if len(matches) > 1 {
+						n, err := strconv.Atoi(matches[1])
+						if err != nil {
+							continue
+						}
+						drives[dev.Name] = structs.SystemDrive{
+							DriveID: n,
+						}
+					}
+				} else { // device not mounted
+					drives[dev.Name] = structs.SystemDrive{
+						DriveID: 0, // default value, only for empty
+					}
+				}
+			}
+		}
+	}
+	sysInfo.Info.Drives = drives
+
+	// Transition
 	sysInfo.Transition = SystemTransitions
-	sysInfo.Info.Wifi = system.WifiInfo
+
 	return sysInfo
 }
 
@@ -381,8 +428,7 @@ func GetState() structs.AuthBroadcast {
 }
 
 // return json string of current broadcast state
-func GetStateJson() ([]byte, error) {
-	bState := GetState()
+func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 	//temp
 	bState.Type = "structure"
 	bState.AuthLevel = "authorized"
@@ -398,19 +444,19 @@ func GetStateJson() ([]byte, error) {
 
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
+	bState := GetState()
+	// temporarily disable gallseg
+	//leak.LeakChan <- bState
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {
-		authJson, err := GetStateJson()
+		authJson, err := GetStateJson(bState)
+		auth.ClientManager.BroadcastAuth(authJson)
 		if err != nil {
 			return err
 		}
 		auth.ClientManager.BroadcastAuth(authJson)
 		return nil
 	}
-	/*
-	   leak.LeakChan <- authJson
-	   auth.ClientManager.BroadcastAuth(authJson)
-	*/
 	return nil
 }
 
@@ -419,115 +465,6 @@ func UnauthBroadcast(input []byte) error {
 	auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
-
-// refresh loop for host info
-func hostStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				update := constructSystemInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				update = PreserveSystemTransitions(newState, update)
-				newState.System = update
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-// refresh loop for ship info
-// for reasons beyond my iq we can't do this through the normal update func
-func shipStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates, err := ConstructPierInfo()
-				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Unable to build pier info: %v", err))
-					continue
-				}
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				updates = PreserveUrbitsTransitions(newState, updates)
-				newState.Urbits = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func appsStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates := constructAppsInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				newState.Apps = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func profileStatusLoop() {
-	ticker := time.NewTicker(hostInfoInterval)
-	for {
-		select {
-		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() {
-				updates := constructProfileInfo()
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-				updates = PreserveProfileTransitions(newState, updates)
-				newState.Profile = updates
-				UpdateBroadcast(newState)
-				BroadcastToClients()
-			}
-		}
-	}
-}
-
-func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {
-	newProfile.Startram.Transition = oldState.Profile.Startram.Transition
-	return newProfile
-}
-
-func PreserveSystemTransitions(oldState structs.AuthBroadcast, newSystem structs.System) structs.System {
-	newSystem.Transition = oldState.System.Transition
-	return newSystem
-}
-
-func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[string]structs.Urbit) map[string]structs.Urbit {
-	for k, v := range oldState.Urbits {
-		urbitStruct, exists := newUrbits[k]
-		if !exists {
-			urbitStruct = structs.Urbit{}
-		}
-		urbitStruct.Transition = v.Transition
-		newUrbits[k] = urbitStruct
-	}
-	return newUrbits
-}
-
 func ReloadUrbits() error {
 	logger.Logger.Info("Reloading ships in broadcast")
 	urbits, err := ConstructPierInfo()

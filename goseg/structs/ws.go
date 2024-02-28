@@ -271,10 +271,23 @@ type WsPayload struct {
 	Token   WsTokenStruct `json:"token"`
 }
 
+type GallsegPayload struct {
+	Payload struct {
+		Type string `json:"type"`
+	} `json:"payload"`
+}
+
 type WsUrbitPayload struct {
 	ID      string        `json:"id"`
 	Type    string        `json:"type"`
 	Payload WsUrbitAction `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type WsDevPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload WsDevAction   `json:"payload"`
 	Token   WsTokenStruct `json:"token"`
 }
 
@@ -303,6 +316,13 @@ type WsUrbitAction struct {
 	Time         string `json:"time"`
 	Day          string `json:"day"`
 	Date         int    `json:"date"`
+	Remind       bool   `json:"remind"`
+}
+
+type WsDevAction struct {
+	Type     string `json:"type"`
+	Action   string `json:"action"`
+	Reminded bool   `json:"reminded"`
 }
 
 type WsNewShipPayload struct {
@@ -313,12 +333,13 @@ type WsNewShipPayload struct {
 }
 
 type WsNewShipAction struct {
-	Type    string `json:"type"`
-	Action  string `json:"action"`
-	Patp    string `json:"patp"`
-	Key     string `json:"key"`
-	Remote  bool   `json:"remote"`
-	Command string `json:"command"`
+	Type          string `json:"type"`
+	Action        string `json:"action"`
+	Patp          string `json:"patp"`
+	Key           string `json:"key"`
+	Remote        bool   `json:"remote"`
+	Command       string `json:"command"`
+	SelectedDrive string `json:"selectedDrive"`
 }
 
 type WsUploadPayload struct {
@@ -329,11 +350,12 @@ type WsUploadPayload struct {
 }
 
 type WsUploadAction struct {
-	Type     string `json:"type"`
-	Action   string `json:"action"`
-	Endpoint string `json:"endpoint"`
-	Remote   bool   `json:"remote"`
-	Fix      bool   `json:"fix"`
+	Type          string `json:"type"`
+	Action        string `json:"action"`
+	Endpoint      string `json:"endpoint"`
+	Remote        bool   `json:"remote"`
+	Fix           bool   `json:"fix"`
+	SelectedDrive string `json:"selectedDrive"`
 }
 
 type WsLogsPayload struct {
@@ -434,6 +456,7 @@ type WsStartramAction struct {
 	Region   string `json:"region"`
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
+	Remind   bool   `json:"remind"`
 }
 
 type WsLogMessage struct {

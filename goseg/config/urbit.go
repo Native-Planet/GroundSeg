@@ -5,6 +5,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"groundseg/defaults"
 	"groundseg/structs"
 	"io/ioutil"
 	"os"
@@ -54,6 +55,10 @@ func LoadUrbitConfig(pier string) error {
 	if err := json.Unmarshal(file, &targetStruct); err != nil {
 		errmsg := fmt.Sprintf("Error decoding %s JSON: %v", pier, err)
 		return fmt.Errorf(errmsg)
+	}
+	// set startram reminder
+	if targetStruct.StartramReminder == nil {
+		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
 	}
 	// Store in var
 	UrbitsConfig[pier] = targetStruct

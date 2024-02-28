@@ -3,7 +3,10 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { structure, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import { structure } from '$lib/stores/data'
+  import { URBIT_MODE } from '$lib/stores/data'
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   // TODO: onMount check desks, bypassing flood control
 
@@ -110,12 +113,16 @@
       <div class="companion-wrapper">
         {#each urbitKeys as p}
           <div class="wifi-toggle" class:disable={!urbits?.[p]?.info?.running} on:click={()=>handlePenpaiCompanion(p)}>
-            {#if urbits?.[p]?.info?.penpaiInstalling}
+            {#if urbits?.[p]?.transition?.penpaiCompanion == "loading"}
               <div class="loading-box"></div>
             {:else}
-              <div class="checkbox">
+              <div
+                class="checkbox"
+                class:error={ urbits?.[p]?.transition?.penpaiCompanion == "error" }
+                class:success={ urbits?.[p]?.transition?.penpaiCompanion == "success" }
+                >
                 {#if urbits?.[p]?.info?.penpaiCompanion}
-                  <img class="checkmark" src="/checkmark.svg" alt="checkmark"/>
+                  <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
                 {/if}
               </div>
             {/if}
@@ -161,7 +168,7 @@
     color: var(--NP_Black, #161D17);
     leading-trim: both;
     text-edge: cap;
-    font-family: Inter;
+    font-family: var(--regular-font);
     font-size: 24px;
     font-style: normal;
     font-weight: 300;
@@ -388,4 +395,7 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+  .error { border-color: red; }
+  .success { border-color: lime; }
+
 </style>
