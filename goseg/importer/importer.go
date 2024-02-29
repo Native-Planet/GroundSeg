@@ -351,7 +351,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	if customPath != "" {
 		volPath = filepath.Join(customPath, patp)
 	}
-	compressedPath := filepath.Join(fmt.Sprintf("%s/uploads", config.BasePath), filename)
+	compressedPath := filepath.Join(uploadDir, filename)
 	switch checkExtension(filename) {
 	case ".zip":
 		err := extractZip(compressedPath, volPath)
@@ -396,7 +396,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 		return
 	}
 	config.UpdateContainerState(patp, info)
-	os.Remove(filepath.Join(config.BasePath, "uploads", filename))
+	os.Remove(filepath.Join(uploadDir, filename))
 
 	// debug, force error
 	//errmsg := "Self induced error, for debugging purposes"
@@ -508,7 +508,7 @@ func errorCleanup(filename, patp, errmsg string) {
 	logger.Logger.Info(fmt.Sprintf("Running cleanup routine"))
 	//remove file
 	logger.Logger.Info(fmt.Sprintf("Removing %v", filename))
-	os.Remove(filepath.Join(config.BasePath, "uploads", filename))
+	os.Remove(filepath.Join(uploadDir, filename))
 	// remove <patp>.json
 	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
 	if err := config.RemoveUrbitConfig(patp); err != nil {
