@@ -45,6 +45,16 @@ var (
 )
 
 func init() {
+	conf := config.Conf()
+	if !strings.HasPrefix(conf.SwapFile, "/opt") {
+		var tempPath string
+		lastSlashIndex := strings.LastIndex(conf.SwapFile, "/")
+		if lastSlashIndex != -1 {
+			tempPath = conf.SwapFile[:lastSlashIndex]
+			tempDir = filepath.Join(tempPath, "temp")
+			uploadDir = filepath.Join(tempPath, "uploads")
+		}
+	}
 	os.MkdirAll(uploadDir, 0755)
 	os.MkdirAll(tempDir, 0755)
 }
