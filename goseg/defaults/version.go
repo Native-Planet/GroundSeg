@@ -15,13 +15,13 @@ var (
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "40a0afcddc9b0a89749ee4cf078abd5fd78eaa2e242e2a3d0a3b7fa977e26fef",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.12_latest",
-        "arm64_sha256": "ce97456b7ed9e9c1ed208405d84748ea6a6aac85f2ab45418082ba446ceb92a8",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.12_latest",
+        "amd64_sha256": "50e85443541695fbdd5ef532c3e42de0d706dc3e4fa8d567c63ce69aa927a9f2",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.14_latest",
+        "arm64_sha256": "0f318795d05bc5868319801dc4925d64b6282f74691ec1cad787350d461ec3ff",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.14_latest",
         "major": 2,
         "minor": 0,
-        "patch": 12
+        "patch": 14
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -68,13 +68,13 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "a7bcac2d699b0a77ec49d93e33a463f6927461e790f340260e4517cdd9a8d72d",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.13-rc10_edge",
-        "arm64_sha256": "380ba2bdb45fdd5dc080a97a1507a216521e71b65748229cf6c4c25823353799",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.13-rc10_edge",
+        "amd64_sha256": "2300bc31e7910ad75f4b2a84b2a9906b045925976ec2a50a8871af55598d9b16",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.15-rc0_edge",
+        "arm64_sha256": "ddcc233791f509c6863ee9eb804b2f2810fd7867f354c40354223feeea6f38cf",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.15-rc0_edge",
         "major": 2,
         "minor": 0,
-        "patch": 13
+        "patch": 15
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -121,13 +121,13 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "40a0afcddc9b0a89749ee4cf078abd5fd78eaa2e242e2a3d0a3b7fa977e26fef",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.12_latest",
-        "arm64_sha256": "ce97456b7ed9e9c1ed208405d84748ea6a6aac85f2ab45418082ba446ceb92a8",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.12_latest",
+        "amd64_sha256": "50e85443541695fbdd5ef532c3e42de0d706dc3e4fa8d567c63ce69aa927a9f2",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.14_latest",
+        "arm64_sha256": "0f318795d05bc5868319801dc4925d64b6282f74691ec1cad787350d461ec3ff",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.14_latest",
         "major": 2,
         "minor": 0,
-        "patch": 12
+        "patch": 14
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
