@@ -53,6 +53,9 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 				return fmt.Errorf("Unable to set password: %v", err)
 			}
 		case "startram":
+			if err := config.CycleWgKey(); err != nil {
+				return fmt.Errorf("Failed to reset registration key: %v", err)
+			}
 			key := setupPayload.Payload.Key
 			region := setupPayload.Payload.Region
 			if err = startram.Register(key, region); err != nil {
