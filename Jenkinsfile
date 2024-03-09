@@ -103,12 +103,9 @@ pipeline {
                             echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
                             echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
                             mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
-                            rm -rf globber
-
                             cd ..
-                            echo "hereeeee"
-                            ls -l
-                            pwd
+                            rm -rf globber
+                            cd ..
                             docketinfo="    glob-http+['${globurl}' ${hash}]"
                             sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
                             echo "~lablet-nallux-dozryl" > gallseg/desk.ship
