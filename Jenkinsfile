@@ -111,7 +111,7 @@ pipeline {
                             echo "~lablet-nallux-dozryl" > gallseg/desk.ship
                             rm -r /opt/groundseg/release-ships/edge/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/edge/groundseg
-                            /opt/groundseg/release-ships/click/click edge $'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
+                            /opt/groundseg/release-ships/click/click /opt/groundseg/release-ships/edge $'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
                         '''
                         sh """#!/bin/bash -x
                             cd ./goseg
@@ -177,7 +177,7 @@ pipeline {
                             
                             rm -r /opt/groundseg/release-ships/latest/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
-                            /opt/groundseg/release-ships/click/click latest $'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
+                            /opt/groundseg/release-ships/click/click /opt/groundseg/release-ships/latest $'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
 
                             cd ../goseg
                             go fmt ./...
