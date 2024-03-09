@@ -105,7 +105,8 @@ pipeline {
                             cd ..
                             rm -rf globber
 
-                            cd ../..
+                            cd ..
+                            ls -l
                             docketinfo="    glob-http+['${globurl}' ${hash}]"
                             sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
                             echo "~lablet-nallux-dozryl" > gallseg/desk.ship
