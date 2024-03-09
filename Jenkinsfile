@@ -98,21 +98,21 @@ pipeline {
                             docker cp $container_id:/webui/build ./web
                             ./glob.sh web
                             hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                            globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
                             echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
-                            echo "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob" > /opt/groundseg/version/glob/globurl.txt
+                            echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
                             mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                             cd ..
                             rm -rf globber
-                            echo "HASH=${hash}"
-                        '''
-                        /*
+
                             cd ..
-                            // todo: modify http-glob url in gallseg/desk.docket-0
+                            docketinfo="    glob-http+['${globurl'} ${hash}]"
+                            sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
+                            echo "~lablet-nallux-dozryl" > gallseg/desk.ship
                             rm -r /opt/groundseg/release-ships/edge/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/edge/groundseg
-                            // todo: |commit %groundseg
-                            
-                        */
+                            echo "|commit %groundseg"
+                        '''
                         sh """#!/bin/bash -x
                             cd ./goseg
                             env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
@@ -161,13 +161,23 @@ pipeline {
                             cd globber
                             docker cp $container_id:/webui/build ./web
                             ./glob.sh web
+
                             hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                            globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
                             echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
-                            echo "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob" > /opt/groundseg/version/glob/globurl.txt
+                            echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
+
                             mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                             cd ..
                             rm -rf globber
-                            echo "HASH=${hash}"
+                            cd ..
+                            docketinfo="    glob-http+['${globurl'} ${hash}]"
+                            sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
+                            echo "~nattyv" > gallseg/desk.ship
+                            
+                            rm -r /opt/groundseg/release-ships/latest/groundseg
+                            cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
+                            echo "|commit %groundseg"
 
                             cd ../goseg
                             go fmt ./...
@@ -176,14 +186,6 @@ pipeline {
                             git push --set-upstream origin ${binTag}
                             git push --tags
                         '''
-                        /*
-                            // this happens after echo "HASH=${hash}"
-                            cd ..
-                            // todo: modify http-glob url in gallseg/desk.docket-0
-                            rm -r /opt/groundseg/release-ships/latest/groundseg
-                            cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
-                            // todo: |commit %groundseg
-                        */
                         sh """#!/bin/bash -x
                             cd ./goseg
                             env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
