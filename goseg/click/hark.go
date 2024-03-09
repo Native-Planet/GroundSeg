@@ -26,8 +26,9 @@ func sendStartramReminder(patp string, daysLeft int) error {
 	con := fmt.Sprintf("~[%s %s]", text, text)
 	//id := "0v14e.5p95b.d5mk5.vrqe0.oeu0m.3ghcb"
 	id := "(end 7 (shas %startram-notification eny.bowl))"
-	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %changelog] %groups /]"                                           // temp location
-	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/changelog/note/'170141184506582040503264511680103579648'" //temp location
+	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"                                           // temp location
+	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'" //temp location
+
 	but := "~"
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
