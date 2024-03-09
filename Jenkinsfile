@@ -94,8 +94,12 @@ pipeline {
                             DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                             container_id=$(docker create web-builder)
                             git clone https://github.com/Native-Planet/globber
+                            echo "before cd"
+                            ls -l
                             cd globber
                             docker cp $container_id:/webui/build ./web
+                            echo "after cd"
+                            ls -l
                             ./glob.sh web
                             hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
                             globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
@@ -105,8 +109,6 @@ pipeline {
                             cd ..
                             rm -rf globber
 
-                            cd ..
-                            ls -l
                             docketinfo="    glob-http+['${globurl}' ${hash}]"
                             sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
                             echo "~lablet-nallux-dozryl" > gallseg/desk.ship
