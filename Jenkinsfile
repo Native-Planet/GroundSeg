@@ -203,11 +203,11 @@ pipeline {
                         sh 'echo "debug: post-build actions"'
                         sh """#!/bin/bash -x
                         source /opt/groundseg/version/glob/globhash.env
+                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${env.binTag}-${hash}.glob r2:groundseg/glob
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
                         """
                         /*
-                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
                         */
                     }
                 }
