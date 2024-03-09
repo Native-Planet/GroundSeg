@@ -91,9 +91,7 @@ pipeline {
                         '''
                         /* Gallseg */
                         sh '''#!/bin/bash -x
-                            echo "we're building here"
-                            pwd
-                            ls -l
+                            cd ./ui
                             DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                             container_id=$(docker create web-builder)
                             git clone https://github.com/Native-Planet/globber
