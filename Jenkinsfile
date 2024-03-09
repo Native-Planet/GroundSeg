@@ -200,14 +200,16 @@ pipeline {
                 script {
                     /* copy to r2 */
                       if( "${params.CHANNEL}" != "nobuild" ) {  
-                          //sh 'echo "debug: post-build actions"'
+                          /*sh 'echo "debug: post-build actions"'
                           sh """#!/bin/bash -x
-                          echo "hereeeee"
                           rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
                           rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
                           source /opt/groundseg/version/glob/globhash.env
                           rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
                           """
+                          */
+                          sh 'echo "yeet"'
+                          sh "echo yeeeeeeet"
                       }
                 }
             }
