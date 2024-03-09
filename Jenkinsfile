@@ -171,7 +171,7 @@ pipeline {
                             cd ..
                             rm -rf globber
                             cd ..
-                            docketinfo="    glob-http+['${globurl'} ${hash}]"
+                            docketinfo="    glob-http+['${globurl}' ${hash}]"
                             sed -i "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
                             echo "~nattyv" > gallseg/desk.ship
                             
