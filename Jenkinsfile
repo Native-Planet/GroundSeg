@@ -103,7 +103,13 @@ pipeline {
                             echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
                             echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
                             mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
+                            pwd
+                            ls -a
+                            echo "before up"
                             cd ..
+                            pwd
+                            ls -a
+                            echo "after up"
                             rm -rf globber
 
                             docketinfo="    glob-http+['${globurl}' ${hash}]"
