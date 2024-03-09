@@ -177,13 +177,12 @@ pipeline {
                               git push --tags
                           '''
                           /*
-                              this happens after echo "HASH=${hash}"
+                              // this happens after echo "HASH=${hash}"
                               cd ..
                               // todo: modify http-glob url in gallseg/desk.docket-0
                               rm -r /opt/groundseg/release-ships/latest/groundseg
                               cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
                               // todo: |commit %groundseg
-                              
                           */
                           sh """#!/bin/bash -x
                               cd ./goseg
@@ -198,26 +197,15 @@ pipeline {
             steps {
                 script {
                     /* copy to r2 */
-                    if (params.XSEG == 'Goseg') {
-                        if( "${params.CHANNEL}" != "nobuild" ) {  
-                            sh 'echo "debug: post-build actions"'
-                            sh """#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
-                            """
-                        }
-                    }
-                    if (params.XSEG == 'Gallseg') {
-                        script {
-                            if( "${params.CHANNEL}" != "nobuild" ) {  
-                                sh 'echo "debug: post-build actions"'
-                                sh '''#!/bin/bash -x
-                                source /opt/groundseg/version/glob/globhash.env
-                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
-                                '''
-                            }
-                        }
-                    }
+                      if( "${params.CHANNEL}" != "nobuild" ) {  
+                          sh 'echo "debug: post-build actions"'
+                          sh """#!/bin/bash -x
+                          rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
+                          rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
+                          source /opt/groundseg/version/glob/globhash.env
+                          rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
+                          '''
+                      }
                 }
             }
         }
