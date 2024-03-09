@@ -172,12 +172,12 @@ pipeline {
                             rm -rf globber
                             cd ..
                             docketinfo="    glob-http+['${globurl'} ${hash}]"
-                            sed "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
+                            sed -i "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
                             echo "~nattyv" > gallseg/desk.ship
                             
                             rm -r /opt/groundseg/release-ships/latest/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
-                            /opt/groundseg/release-ships/click/click /opt/groundseg/release-ships/latest $'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
+                            /opt/groundseg/release-ships/click/click /opt/groundseg/release-ships/latest \$'=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %kiln-commit !>(%groundseg))  (pure:m !>(\\\'success\\\'))'
 
                             cd ../goseg
                             go fmt ./...
