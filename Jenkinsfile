@@ -389,7 +389,7 @@ pipeline {
         stage('github release') {
             steps {
                 script {
-                    if( "${params.CHANNEL}" == "latest" ) {
+                    if(( "${params.CHANNEL}" == "latest" ) && ( "${params.VERSION_SERVER}" != "staging.version.groundseg.app")) {
 			            sh (
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${binTag}"
