@@ -102,6 +102,7 @@ pipeline {
                             globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
                             echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
                             echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
+                            echo "globtag=${tag}" > /opt/groundseg/version/glob/globtag.env
                             mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
                             cd ..
                             rm -rf globber
@@ -203,7 +204,8 @@ pipeline {
                         sh 'echo "debug: post-build actions"'
                         sh """#!/bin/bash -x
                         source /opt/groundseg/version/glob/globhash.env
-                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${env.binTag}-${hash}.glob r2:groundseg/glob
+                        source /opt/groundseg/version/glob/globtag.env
+                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${globtag}-${hash}.glob r2:groundseg/glob
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
                         rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
                         """
