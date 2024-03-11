@@ -447,6 +447,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
 			}
 		}
+		waitComplete(patp)
 	}
 	// stop ship
 	// start ship as pack
@@ -622,6 +623,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 				return fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err)
 			}
 		}
+		waitComplete(patp)
 	}
 	// start ship as chop
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "chopping"}
@@ -1090,6 +1092,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
 			}
 		}
+		waitComplete(patp)
 	}
 	// start ship as roll
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "rolling"}
