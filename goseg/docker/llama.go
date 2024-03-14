@@ -17,7 +17,7 @@ import (
 func LoadLlama() error {
 	conf := config.Conf()
 	if !conf.PenpaiAllow {
-		logger.Logger.Info("Llama GPT disabled!")
+		logger.Logger.Info("Llama GPT disabled")
 		return nil
 	}
 	logger.Logger.Info("Loading Llama GPT")
@@ -25,20 +25,12 @@ func LoadLlama() error {
 		if err := StopContainerByName("llama-gpt-api"); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
 		}
-		if err := StopContainerByName("llama-gpt-ui"); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama UI: %v", err))
-		}
 	}
 	info, err := StartContainer("llama-gpt-api", "llama-api")
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
 	}
 	config.UpdateContainerState("llama-api", info)
-	// info, err = StartContainer("llama-gpt-ui", "llama-ui")
-	// if err != nil {
-	// 	return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
-	// }
-	// config.UpdateContainerState("llama-ui", info)
 	return nil
 }
 
@@ -140,46 +132,6 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		Binds: binds,
 		CapAdd: []string{
 			"IPC_LOCK",
-		},
-	}
-	return containerConfig, hostConfig, nil
-}
-
-func llamaUIContainerConf() (container.Config, container.HostConfig, error) {
-	desiredImage := "nativeplanet/llama-gpt-ui:latest@sha256:bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
-	var containerConfig container.Config
-	var hostConfig container.HostConfig
-	llamaNet, err := addOrGetNetwork("llama")
-	if err != nil {
-		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
-	}
-	containerConfig = container.Config{
-		Image:    desiredImage,
-		Hostname: "llama-gpt-ui",
-		Env: []string{
-			"OPENAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXX",
-			"OPENAI_API_HOST=http://llama-gpt-api:8000",
-			"DEFAULT_MODEL=/models/llama-2-7b-chat.bin",
-			`NEXT_PUBLIC_DEFAULT_SYSTEM_PROMPT=You are a helpful and friendly AI assistant. Respond very concisely.`,
-			"WAIT_HOSTS=llama-gpt-api:8000",
-			"WAIT_TIMEOUT=3600",
-		},
-		ExposedPorts: nat.PortSet{
-			"3000/tcp": struct{}{},
-		},
-	}
-	hostConfig = container.HostConfig{
-		NetworkMode: container.NetworkMode(llamaNet),
-		RestartPolicy: container.RestartPolicy{
-			Name: "on-failure",
-		},
-		PortBindings: nat.PortMap{
-			"3000/tcp": []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: "3002",
-				},
-			},
 		},
 	}
 	return containerConfig, hostConfig, nil
