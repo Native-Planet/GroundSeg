@@ -77,7 +77,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	}
 	var found *structs.Penpai
 	for _, item := range conf.PenpaiModels {
-		if item.ModelTitle == conf.PenpaiActive {
+		if item.ModelName == conf.PenpaiActive {
 			found = &item
 			break
 		}
