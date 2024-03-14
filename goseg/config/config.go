@@ -584,11 +584,8 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	}
 
 	// PenpaiModels
-	if len(customConfig.PenpaiModels) > 0 {
-		mergedConfig.PenpaiModels = customConfig.PenpaiModels
-	} else {
-		mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
-	}
+	// always use defaults as newest
+	mergedConfig.PenpaiModels = defaultConfig.PenpaiModels
 
 	// PenpaiRunning
 	mergedConfig.PenpaiRunning = customConfig.PenpaiRunning
