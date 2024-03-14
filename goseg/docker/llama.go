@@ -34,11 +34,11 @@ func LoadLlama() error {
 		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
 	}
 	config.UpdateContainerState("llama-api", info)
-	info, err = StartContainer("llama-gpt-ui", "llama-ui")
-	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
-	}
-	config.UpdateContainerState("llama-ui", info)
+	// info, err = StartContainer("llama-gpt-ui", "llama-ui")
+	// if err != nil {
+	// 	return fmt.Errorf(fmt.Sprintf("Error starting Llama UI: %v", err))
+	// }
+	// config.UpdateContainerState("llama-ui", info)
 	return nil
 }
 

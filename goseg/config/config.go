@@ -591,7 +591,7 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	mergedConfig.PenpaiRunning = customConfig.PenpaiRunning
 
 	// PenpaiActive
-	if customConfig.PenpaiActive != "" {
+	if customConfig.PenpaiActive != "" && customConfig.PenpaiActive != "Llama 2 7B" {
 		mergedConfig.PenpaiActive = customConfig.PenpaiActive
 	} else {
 		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
