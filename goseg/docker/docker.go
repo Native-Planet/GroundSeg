@@ -406,11 +406,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-ui":
-		containerConfig, hostConfig, err = llamaUIContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	default:
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
@@ -555,11 +550,6 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		}
 	case "llama-api":
 		containerConfig, hostConfig, err = llamaApiContainerConf()
-		if err != nil {
-			return containerState, err
-		}
-	case "llama-ui":
-		containerConfig, hostConfig, err = llamaUIContainerConf()
 		if err != nil {
 			return containerState, err
 		}
