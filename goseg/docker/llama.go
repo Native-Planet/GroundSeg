@@ -40,7 +40,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
 	desiredImage := "nativeplanet/llama-gpt:dev@sha256:ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
-	lessCores := conf.PenpaiCores
+	// lessCores := conf.PenpaiCores
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
@@ -107,9 +107,9 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 		RestartPolicy: container.RestartPolicy{
 			Name: "on-failure",
 		},
-		Resources: container.Resources{
-			NanoCPUs: int64(lessCores) * 1e9,
-		},
+		// Resources: container.Resources{
+		// 	NanoCPUs: int64(lessCores) * 1e9,
+		// },
 		PortBindings: nat.PortMap{
 			"8000/tcp": []nat.PortBinding{
 				{
