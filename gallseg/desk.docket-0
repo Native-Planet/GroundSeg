@@ -7,5 +7,5 @@
   license+'MIT'
   base+'groundseg'
   image+'https://files.native.computer/groundseg-logo-2.svg'
-glob-http+['https://files.native.computer/glob/gallseg-v2.1.0-rc26-0v4.bgs68.02sfi.hgpln.tnl20.sug09.glob' 0v4.bgs68.02sfi.hgpln.tnl20.sug09]
+glob-http+['https://files.native.computer/glob/gallseg-v2.1.1-rc0-0v4.96h0o.gp9ei.j7ulk.ebma3.71ab7.glob' 0v4.96h0o.gp9ei.j7ulk.ebma3.71ab7]
 ==
