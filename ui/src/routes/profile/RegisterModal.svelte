@@ -63,7 +63,7 @@
         {/if}
         <button
           disabled={(key.length < 1) || (tRegister != null)}
-          on:click={()=>startramRegister(key,selected)}
+          on:click={()=>startramRegister(key.trim(),selected)}
           >Save
         </button>
       </div>

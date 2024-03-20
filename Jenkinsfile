@@ -6,11 +6,6 @@ pipeline {
             type: 'PT_BRANCH_TAG',
             defaultValue: 'master')
         choice(
-            choices: ['Goseg', 'Gallseg'],
-            description: 'Publish goseg bin or gallseg glob',
-            name: 'XSEG'
-        )
-        choice(
             choices: ['nobuild', 'edge', 'canary', 'latest'],
             description: 'Publish to release channel',
             name: 'CHANNEL'
@@ -81,96 +76,121 @@ pipeline {
         }
         stage('build') {
             steps {
-                    /* build binaries and move to web dir */
+                /* build binaries and move to web dir */
                 script {
-                    if (params.XSEG == 'Goseg') {
-                        if(( "${params.CHANNEL}" != "nobuild" ) && ( "${params.CHANNEL}" != "latest" )) {
-                            sh '''#!/bin/bash -x
-                                git checkout ${tag}
-                                cd ./ui
-                                DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
-                                container_id=$(docker create web-builder)
-                                docker cp $container_id:/webui/build ./web
-                                rm -rf ../goseg/web
-                                mv web ../goseg/
-                            '''
-                            sh """#!/bin/bash -x
-                                cd ./goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
-                            """
-                        }
-                        /* production releases get promoted from edge */
-                        if( "${params.CHANNEL}" == "latest" ) {
-                            sh '''#!/bin/bash -x
-                                tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
-                                if [[ ${tag} =~ $tagRegex ]]; then
-                                    echo "Valid pre-production release tag: ${tag}"
-                                else
-                                    echo "Invalid tag for production release promotion: ${tag} -- should match format 'v2.1.52-rc2' etc"
-                                    exit 1
-                                fi
-                                git checkout ${tag}
-                                git checkout -b ${binTag}
-                                git config --global user.email "mgmt@nativeplanet.io"
-                                git config --global user.name "Native Planet CICD"
-                                git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
-                                sed -i "4s/.*/export const version = writable(\\"${binTag}\\")/" ./ui/src/lib/stores/display.js
-                                sed -i "11s/.*/TAG=${binTag}/" ./release/groundseg_install.sh
-                                version_defaults="./goseg/defaults/version.go"
-                                json_blob=$(curl -s https://version.groundseg.app)
-                                formatted_json_blob=$(echo "$json_blob" | jq '.')
-                                start_line=$(grep -n 'DefaultVersionText =' "$version_defaults" | cut -d ':' -f1)
-                                end_line=$(grep -n 'VersionInfo' "$version_defaults" | cut -d ':' -f1)
-                                temp_file=$(mktemp)
-                                head -n $((start_line-1)) "$version_defaults" > "$temp_file"
-                                echo "  DefaultVersionText = \\`" >> "$temp_file"
-                                echo "$formatted_json_blob" >> "$temp_file"
-                                echo "\\`" >> "$temp_file"
-                                tail -n +$end_line -q "$version_defaults" >> "$temp_file"
-                                mv "$temp_file" "$version_defaults"
-                                cd ./ui
-                                DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
-                                container_id=$(docker create web-builder)
-                                docker cp $container_id:/webui/build ./web
-                                rm -rf ../goseg/web
-                                mv web ../goseg/
-                                cd ../goseg
-                                go fmt ./...
-                                git commit -am "Promoting ${binTag} for release"
-                                git tag ${binTag}
-                                git push --set-upstream origin ${binTag}
-                                git push --tags
-                            '''
-                            sh """#!/bin/bash -x
-                                cd ./goseg
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
-                                env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
-                            """
-                        }
+                    if(( "${params.CHANNEL}" != "nobuild" ) && ( "${params.CHANNEL}" != "latest" )) {
+                        /* Goseg */
+                        sh '''#!/bin/bash -x
+                            git checkout ${tag}
+                            cd ./ui
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            docker cp $container_id:/webui/build ./web
+                            rm -rf ../goseg/web
+                            mv web ../goseg/
+                        '''
+                        /* Gallseg */
+                        sh '''#!/bin/bash -x
+                            cd ./ui
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            git clone https://github.com/Native-Planet/globber
+                            cd globber
+                            docker cp $container_id:/webui/build ./web
+                            ./glob.sh web
+                            hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                            globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
+                            echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
+                            echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
+                            mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
+                            cd ..
+                            rm -rf globber
+                            cd ..
+                            docketinfo="    glob-http+['${globurl}' ${hash}]"
+                            sed -i "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
+                            echo "~lablet-nallux-dozryl" > gallseg/desk.ship
+                            rm -r /opt/groundseg/release-ships/edge/groundseg
+                            cp -r gallseg /opt/groundseg/release-ships/edge/groundseg
+                            /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/edge
+                        '''
+                        sh """#!/bin/bash -x
+                            cd ./goseg
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
+                        """
                     }
-                    if (params.XSEG == 'Gallseg') {
-                        script {
-                            if( "${params.CHANNEL}" != "nobuild" ) {
-                                sh '''#!/bin/bash -x
-                                    git checkout ${tag}
-                                    cd ./ui
-                                    DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
-                                    container_id=$(docker create web-builder)
-                                    git clone https://github.com/Native-Planet/globber
-                                    cd globber
-                                    docker cp $container_id:/webui/build ./web
-                                    ./glob.sh web
-                                    hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
-                                    echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
-                                    echo "https://files.native.computer/glob/gallseg-${tag}-${hash}.glob" > /opt/groundseg/version/glob/globurl.txt
-                                    mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
-                                    cd ..
-                                    rm -rf globber
-                                    echo "HASH=${hash}"
-                                '''
-                            }
-                        }
+                    /* production releases get promoted from edge */
+                    if( "${params.CHANNEL}" == "latest" ) {
+                        sh '''#!/bin/bash -x
+                            tagRegex='^v[0-9]+\\.[0-9]+\\.[0-9]+-rc[0-9]+$'
+                            if [[ ${tag} =~ $tagRegex ]]; then
+                                echo "Valid pre-production release tag: ${tag}"
+                            else
+                                echo "Invalid tag for production release promotion: ${tag} -- should match format 'v2.1.52-rc2' etc"
+                                exit 1
+                            fi
+                            git checkout ${tag}
+                            git checkout -b ${binTag}
+                            git config --global user.email "mgmt@nativeplanet.io"
+                            git config --global user.name "Native Planet CICD"
+                            git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
+                            sed -i "4s/.*/export const version = writable(\\"${binTag}\\")/" ./ui/src/lib/stores/display.js
+                            sed -i "11s/.*/TAG=${binTag}/" ./release/groundseg_install.sh
+                            version_defaults="./goseg/defaults/version.go"
+                            json_blob=$(curl -s https://version.groundseg.app)
+                            formatted_json_blob=$(echo "$json_blob" | jq '.')
+                            start_line=$(grep -n 'DefaultVersionText =' "$version_defaults" | cut -d ':' -f1)
+                            end_line=$(grep -n 'VersionInfo' "$version_defaults" | cut -d ':' -f1)
+                            temp_file=$(mktemp)
+                            head -n $((start_line-1)) "$version_defaults" > "$temp_file"
+                            echo "  DefaultVersionText = \\`" >> "$temp_file"
+                            echo "$formatted_json_blob" >> "$temp_file"
+                            echo "\\`" >> "$temp_file"
+                            tail -n +$end_line -q "$version_defaults" >> "$temp_file"
+                            mv "$temp_file" "$version_defaults"
+                            cd ./ui
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            docker cp $container_id:/webui/build ./web
+                            rm -rf ../goseg/web
+                            mv web ../goseg/
+
+                            DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
+                            container_id=$(docker create web-builder)
+                            git clone https://github.com/Native-Planet/globber
+                            cd globber
+                            docker cp $container_id:/webui/build ./web
+                            ./glob.sh web
+
+                            hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+                            globurl="https://files.native.computer/glob/gallseg-${tag}-${hash}.glob"
+                            echo "hash=${hash}" > /opt/groundseg/version/glob/globhash.env
+                            echo ${globurl} > /opt/groundseg/version/glob/globurl.txt
+
+                            mv ./*.glob /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob
+                            cd ..
+                            rm -rf globber
+                            cd ..
+                            docketinfo="    glob-http+['${globurl}' ${hash}]"
+                            sed -i "/glob-http/c\${docketinfo}" gallseg/desk.docket-0
+                            echo "~nattyv" > gallseg/desk.ship
+                            
+                            rm -r /opt/groundseg/release-ships/latest/groundseg
+                            cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
+                            /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
+
+                            cd ../goseg
+                            go fmt ./...
+                            git commit -am "Promoting ${binTag} for release"
+                            git tag ${binTag}
+                            git push --set-upstream origin ${binTag}
+                            git push --tags
+                        '''
+                        sh """#!/bin/bash -x
+                            cd ./goseg
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
+                        """
                     }
                 }
             }
@@ -179,25 +199,18 @@ pipeline {
             steps {
                 script {
                     /* copy to r2 */
-                    if (params.XSEG == 'Goseg') {
-                        if( "${params.CHANNEL}" != "nobuild" ) {  
-                            sh 'echo "debug: post-build actions"'
-                            sh """#!/bin/bash -x
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
-                            rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
-                            """
-                        }
-                    }
-                    if (params.XSEG == 'Gallseg') {
-                        script {
-                            if( "${params.CHANNEL}" != "nobuild" ) {  
-                                sh 'echo "debug: post-build actions"'
-                                sh '''#!/bin/bash -x
-                                source /opt/groundseg/version/glob/globhash.env
-                                rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
-                                '''
-                            }
-                        }
+                    if( "${params.CHANNEL}" != "nobuild" ) {  
+                        sh 'echo "debug: post-build actions"'
+                        sh """#!/bin/bash -x
+                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel} r2:groundseg/bin
+                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel} r2:groundseg/bin
+                        """
+                        sh '''#!/bin/bash -x
+                        source /opt/groundseg/version/glob/globhash.env
+                        rclone -vvv --config /var/jenkins_home/rclone.conf copy /opt/groundseg/version/glob/gallseg-${tag}-${hash}.glob r2:groundseg/glob
+                        '''
+                        /*
+                        */
                     }
                 }
             }
@@ -258,88 +271,86 @@ pipeline {
             }
             steps {
                 script {
-                    if (params.XSEG == 'Goseg') {
-                        def to_canary = "${params.TO_CANARY}".toLowerCase()
-                        if( "${params.CHANNEL}" == "latest" ) {
-                            sh '''#!/bin/bash -x
-                                cp ./release/standard_install.sh /opt/groundseg/get/install.sh
-                                cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
-                                webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
-                                webui_arm64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.arm64_sha256'`
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_url/payload \
-                                    -d "{\\"value\\":\\"${amdbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_url/payload \
-                                    -d "{\\"value\\":\\"${armbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_sha256/${amdsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_sha256/${armsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/major/${major}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/minor/${minor}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/patch/${patch}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
-                                    -d "{\\"value\\":\\"${amdbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
-                                    -d "{\\"value\\":\\"${armbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
-                            '''
-                        }
-                        if( "${params.CHANNEL}" == "edge" ) {
-                            sh '''#!/bin/bash -x
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
-                                    -d "{\\"value\\":\\"${amdbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_url/payload \
-                                    -d "{\\"value\\":\\"${armbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_sha256/${amdsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_sha256/${armsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/major/${major}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/minor/${minor}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
-                            '''
-                        }
-                        if( "${params.TO_CANARY}" == "true" ) {
-                            sh '''#!/bin/bash -x
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
-                                    -d "{\\"value\\":\\"${amdbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
-                                    -d "{\\"value\\":\\"${armbin}\\"}"
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
-                                curl -X PUT -H "X-Api-Key: ${versionauth}" \
-                                    https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
-                            '''
-                        }
+                    def to_canary = "${params.TO_CANARY}".toLowerCase()
+                    if( "${params.CHANNEL}" == "latest" ) {
+                        sh '''#!/bin/bash -x
+                            cp ./release/standard_install.sh /opt/groundseg/get/install.sh
+                            cp ./release/groundseg_install.sh /opt/groundseg/get/only.sh
+                            webui_amd64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.amd64_sha256'`
+                            webui_arm64_hash=`curl https://${VERSION_SERVER} | jq -r '.[].edge.webui.arm64_sha256'`
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/patch/${patch}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
+                        '''
+                    }
+                    if( "${params.CHANNEL}" == "edge" ) {
+                        sh '''#!/bin/bash -x
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/edge/groundseg/patch/${patch}
+                        '''
+                    }
+                    if( "${params.TO_CANARY}" == "true" ) {
+                        sh '''#!/bin/bash -x
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_url/payload \
+                                -d "{\\"value\\":\\"${amdbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" -H 'Content-Type: application/json' \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_url/payload \
+                                -d "{\\"value\\":\\"${armbin}\\"}"
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/amd64_sha256/${amdsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/arm64_sha256/${armsha}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/major/${major}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/minor/${minor}
+                            curl -X PUT -H "X-Api-Key: ${versionauth}" \
+                                https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/patch/${patch}
+                        '''
                     }
                 }
             }
@@ -364,7 +375,7 @@ pipeline {
                 script {
                     if(( "${params.CHANNEL}" == "latest" ) && ( "${params.PROMOTE}" == "promote" )) {
                         withCredentials([gitUsernamePassword(credentialsId: 'Github token', gitToolName: 'Default')]) {
-			                sh (
+                            sh (
                                 script: '''#!/bin/bash -x
                                     git remote update
                                     git fetch
@@ -374,7 +385,7 @@ pipeline {
                                     git push
                                 '''
                             )
-			            }
+                        }
                     }
                 }
             }
@@ -382,7 +393,7 @@ pipeline {
         stage('github release') {
             steps {
                 script {
-                    if( "${params.CHANNEL}" == "latest" ) {
+                    if(( "${params.CHANNEL}" == "latest" ) && ( "${params.VERSION_SERVER}" != "staging.version.groundseg.app")) {
 			            sh (
                             script: '''#!/bin/bash -x
                                 MESSAGE="Release ${binTag}"
@@ -408,10 +419,8 @@ pipeline {
         }
         success {
             script {
-                if( "${params.XSEG}" == "Gallseg" ) {
-                    glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
-                    currentBuild.description = "Glob URL: ${glob_url}"
-                }
+                glob_url = readFile('/opt/groundseg/version/glob/globurl.txt').trim()
+                currentBuild.description = "Glob URL: ${glob_url}"
             }
         }
     }

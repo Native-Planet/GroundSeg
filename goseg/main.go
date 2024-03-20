@@ -17,10 +17,12 @@ package main
 import (
 	"embed"
 	"fmt"
+	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
 	"groundseg/importer"
+	"groundseg/leak"
 	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
@@ -256,24 +258,20 @@ func main() {
 		}
 	}
 	// gallseg
-	/*
-		// temporarily disable gallseg
-		go leak.StartLeak()
-		go func() {
-			for {
-				broadcast.BroadcastToClients()
-				time.Sleep(2 * time.Second)
-			}
-		}()
-	*/
-	// drive management
-	//go routines.GetDriveStatus()
+	go leak.StartLeak() // vere 3.0
+	go func() {         // vere 3.0
+		for { // vere 3.0
+			broadcast.BroadcastToClients() // vere 3.0
+			time.Sleep(2 * time.Second)    // vere 3.0
+		} // vere 3.0
+	}() // vere 3.0
+	//go routines.GetDriveStatus() //unused
 	// startram reminder
 	go routines.StartramRenewalReminder()
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// chop limiter
-	//go routines.ChopAtLimit()
+	go routines.ChopAtLimit() // vere 3.0
 	// log manager routine
 	go routines.LogEvent()
 	// block until version info returns
