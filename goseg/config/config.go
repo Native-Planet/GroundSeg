@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -591,7 +592,13 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	mergedConfig.PenpaiRunning = customConfig.PenpaiRunning
 
 	// PenpaiActive
-	if customConfig.PenpaiActive != "" && customConfig.PenpaiActive != "Llama 2 7B" {
+	validModel := false
+	for _, model := range defaultConfig.PenpaiModels {
+		if strings.EqualFold(model.ModelName, customConfig.PenpaiActive) {
+			validModel = true
+		}
+	}
+	if customConfig.PenpaiActive != "" && validModel {
 		mergedConfig.PenpaiActive = customConfig.PenpaiActive
 	} else {
 		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
