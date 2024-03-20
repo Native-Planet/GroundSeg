@@ -153,17 +153,47 @@ func SysConfig(basePath string) structs.SysConfig {
 		Salt:           "",
 		PenpaiRunning:  false,
 		PenpaiCores:    1,
-		PenpaiActive:   "Llama 2 7B",
+		PenpaiActive:   "TinyLlama-1.1B",
 		PenpaiModels: []structs.Penpai{
 			{
-				ModelTitle: "Llama 2 7B",
-				ModelName:  "llama-2-7b-chat.bin",
-				ModelUrl:   "https://huggingface.co/TheBloke/Nous-Hermes-Llama-2-7B-GGML/resolve/main/nous-hermes-llama-2-7b.ggmlv3.q4_0.bin",
+				ModelTitle: "TinyLlama 1.1B",
+				ModelName:  "TinyLlama-1.1B",
+				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
 			},
 			{
-				ModelTitle: "Llama 2 13B",
-				ModelName:  "llama-2-13b-chat.bin",
-				ModelUrl:   "https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGML/resolve/main/nous-hermes-llama2-13b.ggmlv3.q4_0.bin",
+				ModelTitle: "Mistral 7B Instruct",
+				ModelName:  "Mistral 7B Instruct",
+				ModelUrl:   "https://huggingface.co/jartine/Mistral-7B-Instruct-v0.2-llamafile/resolve/main/mistral-7b-instruct-v0.2.Q5_K_M.llamafile?download=true",
+			},
+			{
+				ModelTitle: "Mixtral 8x7B Instruct",
+				ModelName:  "Mixtral-8x7B-Instruct",
+				ModelUrl:   "https://huggingface.co/jartine/Mixtral-8x7B-Instruct-v0.1-llamafile/resolve/main/mixtral-8x7b-instruct-v0.1.Q5_K_M.llamafile?download=true",
+			},
+			{
+				ModelTitle: "WizardCoder Python 13B",
+				ModelName:  "WizardCoder-Python-13B",
+				ModelUrl:   "https://huggingface.co/jartine/wizardcoder-13b-python/resolve/main/wizardcoder-python-13b.llamafile?download=true",
+			},
+			{
+				ModelTitle: "WizardCoder Python 34B",
+				ModelName:  "WizardCoder-Python-34B",
+				ModelUrl:   "https://huggingface.co/jartine/WizardCoder-Python-34B-V1.0-llamafile/resolve/main/wizardcoder-python-34b-v1.0.Q5_K_M.llamafile?download=true",
+			},
+			{
+				ModelTitle: "LLaVA 1.5",
+				ModelName:  "LLaVA-1.5",
+				ModelUrl:   "https://huggingface.co/jartine/llava-v1.5-7B-GGUF/resolve/main/llava-v1.5-7b-q4.llamafile?download=true",
+			},
+			{
+				ModelTitle: "TinyLlama 1.1B",
+				ModelName:  "TinyLlama-1.1B",
+				ModelUrl:   "https://huggingface.co/jartine/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q5_K_M.llamafile?download=true",
+			},
+			{
+				ModelTitle: "Rocket 3B",
+				ModelName:  "Rocket-3B",
+				ModelUrl:   "https://huggingface.co/jartine/rocket-3B-llamafile/resolve/main/rocket-3b.Q5_K_M.llamafile?download=true",
 			},
 		},
 	}
