@@ -18,8 +18,8 @@
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
-  import Chop from './Section/Chop.svelte'
-  //import Gallseg from './Section/Gallseg.svelte'
+  import Chop from './Section/Chop.svelte'  // vere 3.0
+  import Gallseg from './Section/Gallseg.svelte'  // vere 3.0
   import AdminLogin from './Section/AdminLogin.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
@@ -145,19 +145,20 @@
     {ownShip}
     />
   
-  <!-- temporarily disabled
-  <!-- Chop --
+  <!-- vere 3.0 -->
+  <!-- Chop -->
   <Chop {patp} />
 
-  <!-- GallSeg
+  <!-- vere 3.0 -->
+  <!-- GallSeg-->
   {#if !$URBIT_MODE}
     <Gallseg {gallseg} {tGallseg} on:click={()=>handleGallseg(patp)} />
   {/if}
 
+  <!-- vere 3.0 -->
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
-  -->
 
 
   <!-- Bottom Panel -->

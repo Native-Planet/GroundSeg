@@ -10,18 +10,18 @@ import (
 
 var (
 	logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	DefaultVersionText = `
+  DefaultVersionText = `
 {
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "1da35a6082b0a6ad302e56eab8f0d03020d31c6a3c886b4c2b8c76f5426a192f",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.15_latest",
-        "arm64_sha256": "924cac004b97a69191585f65a050d0321dd0ca661b54c3c83d62ab0b697a9b02",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.15_latest",
+        "amd64_sha256": "b0ed2befad1274940b212ab2a6074c95e07e7fae15ee2c9474375074b4609150",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.0_latest",
+        "arm64_sha256": "7162b67a1f2464072bc7873aec1e0919791e57c380e42abe622bd65d78dd1943",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.0_latest",
         "major": 2,
-        "minor": 0,
-        "patch": 15
+        "minor": 1,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -48,7 +48,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "af2e992c10202a3eb92e1cc149e0f7b1661ce7fabc01fde7b273b3f12f3870f5",
+        "amd64_sha256": "1ba046853c6bebc0951e85e150ebff0f38d61758a6ae3e25dd122b49ead8316c",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "edge"
@@ -68,13 +68,13 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "1b4211102187a967bc324e3fa13d3dfa9388e23f53f6c4f3489b936a5a7dd5ef",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.16-rc0_edge",
-        "arm64_sha256": "9701045589a80be7a154784136e04a51d32cbb8e3c5bd0c3c59d40b2cb0a10b1",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.16-rc0_edge",
+        "amd64_sha256": "4904aff0c98606138da31a276fad7c3668d77dd10d2898fe240f3aee2dc43283",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.1-rc0_edge",
+        "arm64_sha256": "f456b92801be19502a7416102b7ab971d79e61b30306ada490707de8faa19efa",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.1-rc0_edge",
         "major": 2,
-        "minor": 0,
-        "patch": 16
+        "minor": 1,
+        "patch": 1
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -101,10 +101,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "81fb791042b29eb94c8c10cd8a9f6efb7032c3d7404ead471f25d4c1a63ebbb1",
-        "arm64_sha256": "11ba34a3a0dc4e118280ed8a468d9f2289af82da1d9febb83e3b74de5bf3134f",
+        "amd64_sha256": "c968f7277bead15f8a29d1843fe98ee8515c00ed80650c05a58498d0d7b40656",
+        "arm64_sha256": "23b6218a48575aa981568c622c1937af7291665cf27d6f57c45e87eabab06cf9",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v2.12"
+        "tag": "v3.0"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",
@@ -121,13 +121,13 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "1da35a6082b0a6ad302e56eab8f0d03020d31c6a3c886b4c2b8c76f5426a192f",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.0.15_latest",
-        "arm64_sha256": "924cac004b97a69191585f65a050d0321dd0ca661b54c3c83d62ab0b697a9b02",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.0.15_latest",
+        "amd64_sha256": "b0ed2befad1274940b212ab2a6074c95e07e7fae15ee2c9474375074b4609150",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.0_latest",
+        "arm64_sha256": "7162b67a1f2464072bc7873aec1e0919791e57c380e42abe622bd65d78dd1943",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.0_latest",
         "major": 2,
-        "minor": 0,
-        "patch": 15
+        "minor": 1,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -154,10 +154,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "81fb791042b29eb94c8c10cd8a9f6efb7032c3d7404ead471f25d4c1a63ebbb1",
-        "arm64_sha256": "11ba34a3a0dc4e118280ed8a468d9f2289af82da1d9febb83e3b74de5bf3134f",
+        "amd64_sha256": "c968f7277bead15f8a29d1843fe98ee8515c00ed80650c05a58498d0d7b40656",
+        "arm64_sha256": "23b6218a48575aa981568c622c1937af7291665cf27d6f57c45e87eabab06cf9",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v2.12"
+        "tag": "v3.0"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",

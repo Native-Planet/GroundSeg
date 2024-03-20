@@ -50,17 +50,15 @@ func UrbitHandler(msg []byte) error {
 		return installPenpaiCompanion(patp, shipConf)
 	case "uninstall-penpai-companion":
 		return uninstallPenpaiCompanion(patp, shipConf)
-		/*
-			case "install-gallseg":
-				return installGallseg(patp, shipConf)
-			case "uninstall-gallseg":
-				return uninstallGallseg(patp, shipConf)
-			// ship operations
-			case "chop":
-				return ChopPier(patp, shipConf)
-			case "roll-chop":
-				return rollChopPier(patp, shipConf)
-		*/
+	case "install-gallseg": // vere 3.0
+		return installGallseg(patp, shipConf) // vere 3.0
+	case "uninstall-gallseg": // vere 3.0
+		return uninstallGallseg(patp, shipConf) // vere 3.0
+	// ship operations
+	case "chop": // vere 3.0
+		return ChopPier(patp, shipConf) // vere 3.0
+	case "roll-chop": // vere 3.0
+		return rollChopPier(patp, shipConf) // vere 3.0
 	case "pack":
 		return packPier(patp, shipConf)
 	case "pack-meld":
@@ -295,7 +293,8 @@ func installGallseg(patp string, shipConf structs.UrbitDocker) error {
 		return handleError(patp, "Handler failed to get groundseg desk info", err)
 	}
 	if status == "not-found" {
-		err := click.InstallDesk(patp, "~tadwer-pilbud-nallux-dozryl", "groundseg")
+		sourceShip := "~nattyv"
+		err := click.InstallDesk(patp, sourceShip, "groundseg")
 		if err != nil {
 			return handleError(patp, "Handler failed to get install groundseg desk", err)
 		}
@@ -448,6 +447,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
 			}
 		}
+		waitComplete(patp)
 	}
 	// stop ship
 	// start ship as pack
@@ -623,6 +623,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 				return fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err)
 			}
 		}
+		waitComplete(patp)
 	}
 	// start ship as chop
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "chopping"}
@@ -1091,6 +1092,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
 			}
 		}
+		waitComplete(patp)
 	}
 	// start ship as roll
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "rolling"}
