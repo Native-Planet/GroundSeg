@@ -61,8 +61,7 @@ func DiskUsageWarning() {
 				}
 			}
 		}
-		//time.Sleep(30*time.Minute) // check every 30 minutes
-		time.Sleep(15 * time.Second)
+		time.Sleep(30 * time.Minute) // check every 30 minutes
 	}
 }
 
