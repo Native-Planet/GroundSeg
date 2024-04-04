@@ -265,7 +265,8 @@ func main() {
 			time.Sleep(2 * time.Second)    // vere 3.0
 		} // vere 3.0
 	}() // vere 3.0
-	//go routines.GetDriveStatus() //unused
+	// disk usage warning
+	go routines.DiskUsageWarning()
 	// startram reminder
 	go routines.StartramRenewalReminder()
 	// pack scheduler

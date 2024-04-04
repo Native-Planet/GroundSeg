@@ -43,7 +43,7 @@ func sendStartramReminder(patp string, daysLeft int) error {
 		return fmt.Errorf("Click startram hark notification failed to create hoon: %v", err)
 	}
 	// defer hoon file deletion
-	//defer deleteHoon(patp, file)
+	defer deleteHoon(patp, file)
 	// execute hoon file
 	response, err := clickExec(patp, file, "")
 	if err != nil {
@@ -55,6 +55,45 @@ func sendStartramReminder(patp string, daysLeft int) error {
 	}
 	if !succeeded {
 		return fmt.Errorf("Click startram hark notification failed poke: %s", patp)
+	}
+	return nil
+}
+
+func sendDiskSpaceWarning(patp, diskName string, diskUsage float64) error {
+	file := "diskspace-hark"
+	// construct poke
+	text := fmt.Sprintf("'Your drive %s is %v%% full. Manage your disk to prevent issues!'", diskName, diskUsage)
+	con := fmt.Sprintf("~[%s]", text)
+	id := "(end 7 (shas %diskusage eny.bowl))"
+	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"
+	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'"
+
+	but := "~"
+	hoon := joinGap([]string{
+		"=/", "m", "(strand ,vase)",
+		";<", "=bowl:rand", "bind:m", "get-bowl",
+		";<", "~", "bind:m",
+		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
+		"(pure:m !>('success'))",
+	})
+
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click disk warning hark notification failed to create hoon: %v", err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "")
+	if err != nil {
+		return fmt.Errorf("Click disk warning hark notification failed to get exec: %v", err)
+	}
+	_, succeeded, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click disk warning hark notification failed to get exec: %v", err)
+	}
+	if !succeeded {
+		return fmt.Errorf("Click disk warning hark notification failed poke: %s", patp)
 	}
 	return nil
 }

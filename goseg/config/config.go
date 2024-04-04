@@ -513,6 +513,9 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	mergedConfig.StartramSetReminder.Three = customConfig.StartramSetReminder.Three || defaultConfig.StartramSetReminder.Three
 	mergedConfig.StartramSetReminder.Seven = customConfig.StartramSetReminder.Seven || defaultConfig.StartramSetReminder.Seven
 
+	// DiskWarning
+	mergedConfig.DiskWarning = customConfig.DiskWarning
+
 	// PwHash
 	if customConfig.PwHash != "" {
 		mergedConfig.PwHash = customConfig.PwHash

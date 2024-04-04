@@ -1,6 +1,9 @@
 package structs
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // system.json config struct
 type SysConfig struct {
@@ -33,20 +36,29 @@ type SysConfig struct {
 		Three bool `json:"three"`
 		Seven bool `json:"seven"`
 	} `json:"startramSetReminder"`
-	PwHash         string   `json:"pwHash"`
-	C2cInterval    int      `json:"c2cInterval"`
-	GsVersion      string   `json:"gsVersion"`
-	CfgDir         string   `json:"CFG_DIR"`
-	UpdateInterval int      `json:"updateInterval"`
-	BinHash        string   `json:"binHash"`
-	Pubkey         string   `json:"pubkey"`
-	Privkey        string   `json:"privkey"`
-	Salt           string   `json:"salt"`
-	PenpaiAllow    bool     `json:"penpaiAllow"`
-	PenpaiRunning  bool     `json:"penpaiRunning"`
-	PenpaiCores    int      `json:"penpaiCores"`
-	PenpaiModels   []Penpai `json:"penpaiModels"`
-	PenpaiActive   string   `json:"penpaiActive"`
+	DiskWarning    map[string]DiskWarning `json:"diskWarning"`
+	PwHash         string                 `json:"pwHash"`
+	C2cInterval    int                    `json:"c2cInterval"`
+	GsVersion      string                 `json:"gsVersion"`
+	CfgDir         string                 `json:"CFG_DIR"`
+	UpdateInterval int                    `json:"updateInterval"`
+	BinHash        string                 `json:"binHash"`
+	Pubkey         string                 `json:"pubkey"`
+	Privkey        string                 `json:"privkey"`
+	Salt           string                 `json:"salt"`
+	PenpaiAllow    bool                   `json:"penpaiAllow"`
+	PenpaiRunning  bool                   `json:"penpaiRunning"`
+	PenpaiCores    int                    `json:"penpaiCores"`
+	PenpaiModels   []Penpai               `json:"penpaiModels"`
+	PenpaiActive   string                 `json:"penpaiActive"`
+}
+type DiskWarning struct {
+	// true if warning has been sent
+	// resets to false when disk goes below 80% usage
+	// 95% will send a recurring warning
+	Eighty     bool      `json:"eighty"`
+	Ninety     bool      `json:"ninety"`
+	NinetyFive time.Time `json:"ninetyFive"`
 }
 
 type Penpai struct {

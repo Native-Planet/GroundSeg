@@ -36,6 +36,12 @@ func SendNotification(patp string, payload structs.HarkNotification) error {
 	switch payload.Type {
 	case "startram-reminder":
 		return sendStartramReminder(patp, payload.StartramDaysLeft)
+	case "disk-warning":
+		return sendDiskSpaceWarning(patp, payload.DiskName, payload.DiskUsage)
+		/*
+			case "cpu-temperature":
+				return sendCPUTempWarning(patp)
+		*/
 	default:
 		return fmt.Errorf("invalid hark notification type: %s", payload.Type)
 	}

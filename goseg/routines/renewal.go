@@ -63,7 +63,7 @@ func StartramRenewalReminder() {
 		// the send function
 		send := func() {
 			logger.Logger.Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
-			sendHarkNotification(daysUntil, conf.Piers)
+			sendStartramHarkNotification(daysUntil, conf.Piers)
 		}
 
 		rem := conf.StartramSetReminder
@@ -95,11 +95,10 @@ func setReminder(daysType string, reminded bool) {
 	}
 }
 
-func sendHarkNotification(daysLeft int, piers []string) {
+func sendStartramHarkNotification(daysLeft int, piers []string) {
 	noti := structs.HarkNotification{Type: "startram-reminder", StartramDaysLeft: daysLeft}
 	// Send notification
 	for _, patp := range piers {
-		logger.Logger.Warn(patp)
 		shipConf := config.UrbitConf(patp)
 		if shipConf.StartramReminder == true {
 			if err := click.SendNotification(patp, noti); err != nil {
