@@ -528,6 +528,8 @@ func errorCleanup(filename, patp, errmsg string) {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
 	}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: errmsg}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
 	return
 }
 
