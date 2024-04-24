@@ -15,13 +15,13 @@ var (
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "474053b59cfa13b60485f0bc4ceed160c764336b831ff0433ebc1b221fb56a83",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.1_latest",
-        "arm64_sha256": "5ee2619c164d13e87cee6cec541e2f3c5901356adfc51c687d22ed514d7af626",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.1_latest",
+        "amd64_sha256": "271477b8c36829325c4ac73a17133ebb5f7c5a93432fa29ded4fb6f7b5cb63ca",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.3_latest",
+        "arm64_sha256": "001b73413cdf30c06871e439d519cc82ca63e0dd62bb982032811a6d916b35c1",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.3_latest",
         "major": 2,
         "minor": 1,
-        "patch": 1
+        "patch": 3
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -48,7 +48,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "aefd886d3fadecea7db086f7a7dffc478881709a92ac1fa3de2eaa289994d0d4",
+        "amd64_sha256": "d2ab6187135174e5894e81c47bd85d2e76d6bb86ab6044f0771a94df57a95dc4",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "edge"
@@ -68,13 +68,13 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "f72b9bdd8b4a7f4ee3cc9f4785c20a2f11ee05c42e9ff000fea31acfc65c06b3",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.2-rc3_edge",
-        "arm64_sha256": "469a26b76fcf16f8edc76d6f4d58d52ac727497a40bedb7e2acf7421663f4454",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.2-rc3_edge",
+        "amd64_sha256": "1cc318a6309eceb6015750319faba2305ba1772cb2ee4d7d921f1735ac704957",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.4-rc2_edge",
+        "arm64_sha256": "dc2d28475695cb54ed60e916ab813c9da053af38a658d50aa15fa04261e081b5",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.4-rc2_edge",
         "major": 2,
         "minor": 1,
-        "patch": 2
+        "patch": 4
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -121,13 +121,13 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "474053b59cfa13b60485f0bc4ceed160c764336b831ff0433ebc1b221fb56a83",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.1_latest",
-        "arm64_sha256": "5ee2619c164d13e87cee6cec541e2f3c5901356adfc51c687d22ed514d7af626",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.1_latest",
+        "amd64_sha256": "271477b8c36829325c4ac73a17133ebb5f7c5a93432fa29ded4fb6f7b5cb63ca",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.3_latest",
+        "arm64_sha256": "001b73413cdf30c06871e439d519cc82ca63e0dd62bb982032811a6d916b35c1",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.3_latest",
         "major": 2,
         "minor": 1,
-        "patch": 1
+        "patch": 3
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
