@@ -52,7 +52,7 @@
   <div class="label">Bootfile</div>
   <KeyDropper
     on:changeKey={e => key = e.detail}
-    on:changePatp={e => name = e.detail}
+    on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
   />
 </div>
 
