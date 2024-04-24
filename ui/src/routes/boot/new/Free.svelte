@@ -86,18 +86,19 @@
   </div>
 </div>
 <div class="input-wrapper">
+  {#if registered && running}
   <div class="label">Configuration</div>
-  <div class="check-wrapper" on:click={()=>remote = !remote}>
-    {#if registered && running}
+    <div class="check-wrapper" on:click={()=>remote = !remote}>
       <div class="checkbox">
         {#if remote}
           <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
         {/if}
       </div>
       <div class="check-label">Set to remote</div>
-    {/if}
-  </div>
+    </div>
+  {/if}
 </div>
+
 {/if}
 <div class="input-wrapper">
   <div class="buttons">
