@@ -378,6 +378,9 @@ func constructSystemInfo() structs.System {
 						if err != nil {
 							continue
 						}
+						if strings.HasPrefix(dev.Name, "mmcblk") {
+							continue
+						}
 						drives[dev.Name] = structs.SystemDrive{
 							DriveID: n,
 						}
