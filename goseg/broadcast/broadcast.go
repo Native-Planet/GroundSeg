@@ -366,6 +366,9 @@ func constructSystemInfo() structs.System {
 		logger.Logger.Warn(fmt.Sprintf("Error getting block devices: %v", err))
 	} else {
 		for _, dev := range blockDevices.BlockDevices {
+			if strings.HasPrefix(dev.Name, "mmcblk") {
+				continue
+			}
 			// groundseg formatted drives do not have partitions
 			if len(dev.Children) < 1 {
 				// is the device mounted?
@@ -376,9 +379,6 @@ func constructSystemInfo() structs.System {
 					if len(matches) > 1 {
 						n, err := strconv.Atoi(matches[1])
 						if err != nil {
-							continue
-						}
-						if strings.HasPrefix(dev.Name, "mmcblk") {
 							continue
 						}
 						drives[dev.Name] = structs.SystemDrive{
