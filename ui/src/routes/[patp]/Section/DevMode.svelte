@@ -27,7 +27,7 @@
 <div class="section">
   <div class="section-left">
     <div class="section-title">Developer Mode</div>
-    <div class="section-description">This enables your ship to be able to debug from another computer</div>
+    <div class="section-description">This enables remote debugging of your ship from a different computer</div>
   </div>
   <div class="section-right">
     <UnplugWarning component={"dev"} {ownShip}>
