@@ -65,7 +65,7 @@
       </div>
 
   {#if penpaiAllowed}
-    <div class="wifi-toggle">
+    <!-- <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
       <div class="right">
         <button disabled={activeCores == minCores} class="btn" on:click={()=>setPenpaiCores(activeCores - 1)}>
@@ -76,7 +76,7 @@
           <Fa icon={faPlus} size="1x" />
         </button>
       </div>
-    </div>
+    </div> -->
 
     <div class="wifi-options">
         <div class="active">

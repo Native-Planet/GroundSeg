@@ -1,44 +1,93 @@
 package routines
 
-/*
-
 import (
 	"fmt"
+	"groundseg/click"
+	"groundseg/config"
 	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
+	"math"
 	"time"
 )
 
-func GetDriveStatus() {
+func DiskUsageWarning() {
 	for {
-		var drives []string
-		var parts []string
-
-		// lsblk
-		blockDevices, err := system.ListHardDisks()
-		if err != nil {
-			logger.Logger.Debug(fmt.Sprintf("Failed to retrieve block mounts: %v", err))
+		if diskUsage, err := system.GetDisk(); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Error getting disk usage: %v", err))
 			continue
-		}
-		for _, dev := range blockDevices.BlockDevices {
-			// empty drive
-			if len(dev.Children) < 1 && !isDevMounted(dev)
-				// is mounted, do nothing
-				// not mounted, put disk on
-
-
-			} else {
-				logger.Logger.Debug(fmt.Sprintf("%+v has children!", dev.Name))
-		// yes: check if partitions are mounted
-				for _, part := range dev.Children {
-					isMounted := isDevMounted(part)
+		} else {
+			conf := config.Conf()
+			for part, usage := range diskUsage {
+				percentage := math.Round(float64(usage[0]) / float64(usage[1]) * 100 * 100 / 100) // 2 decimal places
+				switch {
+				case percentage < 80:
+					// reset to default
+					if err := setWarningInfo(conf, part, false, false, time.Time{}); err != nil {
+						logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+					}
+				case percentage >= 95:
+					now := time.Now()
+					// if time longer than 1 day, send noti and reset timer
+					if info, exists := conf.DiskWarning[part]; !exists || now.Sub(info.NinetyFive) >= 24*time.Hour {
+						// send hark notif
+						sendDriveHarkNotification(part, percentage, conf.Piers)
+						if err := setWarningInfo(conf, part, true, true, now); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+						}
+					}
+				case percentage >= 90:
+					// if config is false, send noti and set to true
+					if info, exists := conf.DiskWarning[part]; !exists || !info.Ninety {
+						// send hark notif
+						sendDriveHarkNotification(part, percentage, conf.Piers)
+						if err := setWarningInfo(conf, part, true, true, time.Time{}); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+						}
+					}
+				case percentage >= 80:
+					// if config is false, send noti and set to true
+					if info, exists := conf.DiskWarning[part]; !exists || !info.Eighty {
+						// send hark notif
+						sendDriveHarkNotification(part, percentage, conf.Piers)
+						if err := setWarningInfo(conf, part, true, false, time.Time{}); err != nil {
+							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+						}
+					}
+				default:
+					if err := setWarningInfo(conf, part, false, false, time.Time{}); err != nil {
+						logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+					}
 				}
 			}
 		}
-		time.Sleep(15 * time.Second)
-		//time.Sleep(time.Minute)
+		time.Sleep(30 * time.Minute) // check every 30 minutes
 	}
 }
 
-*/
+func setWarningInfo(conf structs.SysConfig, part string, eighty, ninety bool, ninetyFive time.Time) error {
+	if conf.DiskWarning == nil {
+		conf.DiskWarning = make(map[string]structs.DiskWarning)
+	}
+	conf.DiskWarning[part] = structs.DiskWarning{
+		Eighty:     eighty,
+		Ninety:     ninety,
+		NinetyFive: ninetyFive,
+	}
+	if err := config.UpdateConf(map[string]interface{}{
+		"diskWarning": conf.DiskWarning,
+	}); err != nil {
+		return fmt.Errorf("Couldn't set disk warning in config 80%:%v 90%:%v 95%:%v: %v", err, eighty, ninety, ninetyFive)
+	}
+	return nil
+}
+
+func sendDriveHarkNotification(part string, percentage float64, piers []string) {
+	noti := structs.HarkNotification{Type: "disk-warning", DiskName: part, DiskUsage: percentage}
+	// Send notification
+	for _, patp := range piers {
+		if err := click.SendNotification(patp, noti); err != nil {
+			logger.Logger.Error(fmt.Sprintf("Failed to send drive warning to %s: %v", patp, err))
+		}
+	}
+}

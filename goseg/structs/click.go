@@ -17,4 +17,6 @@ type ClickDesks struct {
 type HarkNotification struct {
 	Type             string
 	StartramDaysLeft int
+	DiskName         string
+	DiskUsage        float64
 }

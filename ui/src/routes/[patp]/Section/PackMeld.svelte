@@ -38,7 +38,7 @@
   <div class="section-left">
     <div class="section-title">Pack Pier</div>
     <div class="section-description">
-      This function will refragement your ship's memory capacity, optimizing its performance. We recommend scheduling these once a week
+      This function will defragement your ship's memory capacity, optimizing its performance. We recommend scheduling these once a week
     </div>
   </div>
   <div class="section-right">

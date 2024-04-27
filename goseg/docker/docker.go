@@ -406,11 +406,6 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-ui":
-		containerConfig, hostConfig, err = llamaUIContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	default:
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
@@ -558,11 +553,6 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		if err != nil {
 			return containerState, err
 		}
-	case "llama-ui":
-		containerConfig, hostConfig, err = llamaUIContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	default:
 		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
 		return containerState, errmsg
@@ -611,14 +601,9 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	// hardcoded llama stuff for testing
 	res = make(map[string]string)
 	if containerType == "llama-api" {
-		res["tag"] = "latest"
-		res["hash"] = "72923134b83c755da917f5d790f8c3cb90dd3ce55bcdc0fe347c092bd93b2469"
+		res["tag"] = "dev"
+		res["hash"] = "ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
 		res["repo"] = "nativeplanet/llama-gpt"
-		return res, nil
-	} else if containerType == "llama-ui" {
-		res["tag"] = "latest"
-		res["hash"] = "bf4811fe07c11a3a78b760f58b01ee11a61e0e9d6ec8a9e8832d3e14af428200"
-		res["repo"] = "nativeplanet/llama-gpt-ui"
 		return res, nil
 	}
 	arch := config.Architecture
