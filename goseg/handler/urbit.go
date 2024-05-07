@@ -45,6 +45,9 @@ func UrbitHandler(msg []byte) error {
 		// set whether or not ship wants startram reminders
 	case "startram-reminder":
 		return startramReminder(patp, urbitPayload.Payload.Remind, shipConf)
+		// manual startram service deletion
+	case "delete-service":
+		return urbitDeleteStartramService(patp, urbitPayload.Payload.Service, shipConf)
 		// urbit desks
 	case "install-penpai-companion":
 		return installPenpaiCompanion(patp, shipConf)
@@ -363,6 +366,18 @@ func startramReminder(patp string, remind bool, shipConf structs.UrbitDocker) er
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
+	return nil
+}
+
+func urbitDeleteStartramService(patp string, service string, shipConf structs.UrbitDocker) error {
+	// check svc type, reconstruct subdomain
+	/*
+		 subdomain = fmt.Sprintf("s3.%s.%s",patp,startramDomain")
+		 if err := startram.SvcDelete(subdomain, service); err != nil {
+			 return fmt.Errorf("Failed to delete startram service: %v", err)
+		}
+	*/
+	logger.Logger.Warn(fmt.Sprintf("%+v %+v", patp, service))
 	return nil
 }
 

@@ -110,6 +110,17 @@ func bootstrapBroadcastState() error {
 	return nil
 }
 
+func GetStartramServices() error {
+	logger.Logger.Info("Retrieving StarTram services info")
+	if res, err := startram.Retrieve(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("%v", err))
+		return err
+	} else {
+		logger.Logger.Info(fmt.Sprintf("%+v", res.Subdomains))
+		return nil
+	}
+}
+
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
 	logger.Logger.Info("Retrieving StarTram region info")
@@ -327,6 +338,47 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Expiry = config.StartramConfig.Lease
 	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
 	startramInfo.Info.UrlID = config.StartramConfig.UrlID
+
+	startramServices := make(map[string]structs.StartramService)
+	for _, subdomain := range config.StartramConfig.Subdomains {
+		// examples of subdomain.URL
+		/*
+			console.s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
+			console.s3.worbep-halrec-nallux-dozryl.nativeplanet.live
+			s3.watmyl-ponrup-nallux-dozryl.nativeplanet.live
+			s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
+			fadlyn-rivsul-nallux-dozryl.nativeplanet.live
+			ames.lablet-nallux-dozryl.nativeplanet.live
+			ames.ladsec-rinwyt-nallux-dozryl.nativeplanet.live
+			bucket.s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
+			bucket.s3.worbep-halrec-nallux-dozryl.nativeplanet.live
+			console.s3.fadlyn-rivsul-nallux-dozryl.nativeplanet.live
+			console.s3.lablet-nallux-dozryl.nativeplanet.live
+		*/
+		//startramServices := make(map[string]structs.StartramService)
+		parts := strings.Split(subdomain.URL, ".")
+		// Check if there are at least three elements
+		if len(parts) < 3 {
+			logger.Logger.Warn(fmt.Sprintf("startram services information invalid url: %s", subdomain.URL))
+			continue
+		} else {
+			// Select the third last item
+			patp := parts[len(parts)-3]
+
+			// Properly initializing the nested map and struct
+			if _, exists := startramServices[patp]; !exists {
+				startramServices[patp] = make(map[string]struct {
+					Status string `json:"status"`
+				})
+			}
+			startramServices[patp][subdomain.SvcType] = struct {
+				Status string `json:"status"`
+			}{
+				Status: subdomain.Status,
+			}
+		}
+	}
+	startramInfo.Info.StartramServices = startramServices
 
 	// Get Regions
 	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions

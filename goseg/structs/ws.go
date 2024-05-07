@@ -317,6 +317,7 @@ type WsUrbitAction struct {
 	Day          string `json:"day"`
 	Date         int    `json:"date"`
 	Remind       bool   `json:"remind"`
+	Service      string `json:"service"`
 }
 
 type WsDevAction struct {

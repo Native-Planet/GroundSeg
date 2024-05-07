@@ -23,6 +23,8 @@ func StartramHandler(msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal startram payload: %v", err)
 	}
 	switch startramPayload.Payload.Action {
+	case "services":
+		go handleStartramServices()
 	case "regions":
 		go handleStartramRegions()
 	case "register":
@@ -47,6 +49,10 @@ func StartramHandler(msg []byte) error {
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
 	}
 	return nil
+}
+
+func handleStartramServices() {
+	go broadcast.GetStartramServices()
 }
 
 func handleStartramRegions() {
