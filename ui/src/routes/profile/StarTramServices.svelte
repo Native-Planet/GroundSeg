@@ -1,9 +1,13 @@
 <script>
+  import Fa from 'svelte-fa'
+  import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
+
   import { onMount } from 'svelte'
   import { structure } from '$lib/stores/data'
   import { startramGetServices, deleteStartramService } from '$lib/stores/websocket'
   $: services = $structure?.profile?.startram?.info?.startramServices || {}
   $: urbitKeys = Object.keys(services)
+  $: urbitJSONKeys = Object.keys($structure?.urbits)
   let serviceNames = ["minio", "minio-bucket", "minio-console", "urbit-ames", "urbit-web"]
   /*
   $: selectAllCheck = selectSwitcher(urbits)
@@ -19,32 +23,41 @@
   }
 */
 
+  const handleDeleteServices = patp => {
+    // for each service in an array of string called services do:
+    serviceNames.forEach(service => {
+      deleteStartramService(patp, service)
+    })
+  }
+
   onMount(()=>startramGetServices())
 </script>
 {#if urbitKeys.length < 1}
   <div class="no-ships-text">No startram services registered</div>
 {:else}
   <div class="ships">
-    <div class="option">
-      <div class="patp">Ships</div>
-      {#each serviceNames as svc}
-        <div class="check-label">
-          {svc}
-        </div>
-      {/each}
-    </div>
     {#each urbitKeys as patp}
       <div class="option">
         <div class="patp">{patp}</div>
-        {#each serviceNames as svc}
-          <div class="checkbox" on:click={()=>deleteStartramService(patp,svc)}>
-            {#if services[patp][svc].status == "ok"}
-              <img class="checkmark" src="/checkmark.svg" alt="checkmark"  />
-            {:else if services[patp][svc].status == "creating"}
-              creating...
-            {/if}
+        {#if !urbitJSONKeys.includes(patp)}
+          <div class="patp-skull">
+            <Fa icon={faCircleExclamation} size="1x" color="black"/>
+            <div class="ship-not-found">ship not found on device!</div>
           </div>
-        {/each}
+        {/if}
+        <div class="service-info">
+          {#each serviceNames as svc}
+            <div class="service-option">
+              <div class="service-name">{svc}</div>
+              <div
+                class="service-status"
+                on:click={()=>deleteStartramService(patp,svc)}>
+                {services[patp][svc].status}
+              </div>
+            </div>
+          {/each}
+        </div>
+        <button on:click={()=>handleDeleteServices(patp)} class="delete-service">Delete StarTram Services</button>
       </div>
     {/each}
   </div>
@@ -66,25 +79,14 @@
     flex-direction: column;
     gap: 32px;
   }
-  .spacer {
-    flex: 1;
-  }
   .option {
     display: flex;
+    flex-direction: column;
     gap: 16px; 
-    width: 600px;
+    max-width: 400px;
     flex: 1;
   }
-  .checkbox {
-    width: 24px;
-    height: 24px;
-    border: solid 2px var(--text-color);
-    border-radius: 8px;
-    background: var(--bg-modal);
-    cursor: pointer;
-  }
   .patp {
-    cursor: pointer;
     font-size: 24px;
     text-align: left;
     leading-trim: both;
@@ -93,9 +95,51 @@
     font-style: normal;
     letter-spacing: -1.44px;
   }
-  .checkmark {
-    height: 18px;
-    width: 18px;
-    padding: 3px;
+  .patp-skull {
+    display: flex;
+    gap: 8px;
+    background: orange;
+    padding: 8px;
+    align-items: center;
+    height: 16px;
+    width: 200px;
+  }
+  .ship-not-found {
+    font-size: 16px;
+    text-align: left;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-style: normal;
+    letter-spacing: -1.44px;
+  }
+  .service-info {
+    display: flex;
+    flex-direction: column;
+  }
+  .service-option {
+    display: flex;
+  }
+  .service-name {
+    flex: 1;
+  }
+  .service-status {
+    flex: 1;
+  }
+  .delete-service {
+    cursor: pointer;
+    background: black;
+    color: white;
+    padding: 4px;
+    width: 220px;
+    border-radius: 8px;
+    text-align: left;
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-style: normal;
+    letter-spacing: -1.44px;
+    font-size: 18px;
+    text-align: center;
   }
 </style>
