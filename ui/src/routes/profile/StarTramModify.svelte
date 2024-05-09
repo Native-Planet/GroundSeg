@@ -77,6 +77,7 @@
     gap: 32px;
   }
   .label {
+    cursor: pointer;
     font-size: 17px;
     margin-bottom: 21px;
     display: flex;

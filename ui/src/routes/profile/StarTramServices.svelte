@@ -36,6 +36,13 @@
   <div class="no-ships-text">No startram services registered</div>
 {:else}
   <div class="ships">
+    <!-- non-registered ships -->
+    {#each urbitJSONKeys as patp}
+      {#if !urbitKeys.includes(patp)}
+        {patp}
+      {/if}
+    {/each}
+    <!-- registered ships -->
     {#each urbitKeys as patp}
       <div class="option">
         <div class="patp">{patp}</div>
