@@ -7,8 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/disk"
 )
 
 var (
@@ -103,8 +106,7 @@ func init() {
 		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
-	basePath := getBasePath()
-	logPath = basePath + "/logs/"
+	logPath := makeLogPath()
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
@@ -200,11 +202,76 @@ func TailLogs(filename string, n int) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func getBasePath() string {
-	switch os.Getenv("GS_BASE_PATH") {
-	case "":
-		return "/opt/nativeplanet/groundseg"
-	default:
-		return os.Getenv("GS_BASE_PATH")
+func makeLogPath() string {
+	defer os.Exit(0) // dev
+	// if base path is mounted on emmc, switch to /media/data/logs
+	// get base path
+	basePath := os.Getenv("GS_BASE_PATH")
+	if basePath == "" {
+		basePath = "/opt/nativeplanet/groundseg"
 	}
+	if isMMC(basePath) {
+		return "/media/data/logs"
+	}
+	return basePath + "/logs"
+}
+
+// used below
+type PathDetails struct {
+	Dirs     []string
+	Absolute bool
+}
+
+func isMMC(path string) bool {
+
+	parsed := parsePath(path)
+	if !parsed.Absolute {
+		fmt.Println("base path not absolute path! Exiting...")
+		exit(1)
+	}
+
+	dirs := parsed.Dirs
+	for len(dirs) > 0 {
+		mmc, err := findMountPoint(dirs)
+		if err != nil {
+			fmt.Println("mountpoint search issue for logs. Exiting...")
+			exit(1)
+		}
+		dirs = arr[:len(dirs)-1]
+	}
+
+	if len(dirs) == 0 {
+		fmt.Println("/")
+	}
+	mmc, err := findMountpoint(parsed.Dirs)
+
+	return mmc
+}
+
+func findMountpoint(dirs []string) (bool error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return true, err
+	}
+
+	for _, p := range partitions {
+		if path == p.Mountpoint || len(path) > len(p.Mountpoint) && path[len(p.Mountpoint)] == '/' && path[:len(p.Mountpoint)] == p.Mountpoint {
+			return p.Mountpoint, nil
+		}
+	}
+	return "", fmt.Errorf("no mount point found for path: %s", path)
+}
+
+// Function to parse the path and return the structured details
+func parsePath(path string) PathDetails {
+	// Split the path by "/"
+	parts := strings.Split(path, "/")
+	// Remove empty elements resulting from leading "/"
+	if parts[0] == "" {
+		parts = parts[1:]
+	}
+	// Determine if the path is absolute
+	isAbs := strings.HasPrefix(path, "/")
+	// Return the struct with parsed data
+	return PathDetails{Dirs: parts, Absolute: isAbs}
 }

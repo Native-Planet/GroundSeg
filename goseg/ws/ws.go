@@ -309,16 +309,19 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "logs":
 				var logPayload structs.WsLogsPayload
-				if err := json.Unmarshal(msg, &logPayload); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-					continue
-				}
-				logEvent := structs.LogsEvent{
-					Action:      logPayload.Payload.Action,
-					ContainerID: logPayload.Payload.ContainerID,
-					MuCon:       MuCon,
-				}
-				config.LogsEventBus <- logEvent
+				logger.Logger.Warn(fmt.Sprintf("%+v", logPayload))
+				/*
+					if err := json.Unmarshal(msg, &logPayload); err != nil {
+						logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+						continue
+					}
+					logEvent := structs.LogsEvent{
+						Action:      logPayload.Payload.Action,
+						ContainerID: logPayload.Payload.ContainerID,
+						MuCon:       MuCon,
+					}
+					config.LogsEventBus <- logEvent
+				*/
 			case "setup":
 				if err = setup.Setup(msg, MuCon, token); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
