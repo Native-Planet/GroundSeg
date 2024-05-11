@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -203,75 +204,44 @@ func TailLogs(filename string, n int) ([]string, error) {
 }
 
 func makeLogPath() string {
-	defer os.Exit(0) // dev
-	// if base path is mounted on emmc, switch to /media/data/logs
-	// get base path
 	basePath := os.Getenv("GS_BASE_PATH")
 	if basePath == "" {
 		basePath = "/opt/nativeplanet/groundseg"
 	}
-	if isMMC(basePath) {
-		return "/media/data/logs"
+	// check if basePath is an absolute path, if it isn't exit
+	if !strings.HasPrefix(basePath, "/") {
+		fmt.Println("base path is not absolute! Exiting...")
+		os.Exit(1)
 	}
-	return basePath + "/logs"
-}
+	// check if the basePath (or its parents) is a mountpoint with gopsutil
+	bpCopy := basePath
 
-// used below
-type PathDetails struct {
-	Dirs     []string
-	Absolute bool
-}
-
-func isMMC(path string) bool {
-
-	parsed := parsePath(path)
-	if !parsed.Absolute {
-		fmt.Println("base path not absolute path! Exiting...")
-		exit(1)
-	}
-
-	dirs := parsed.Dirs
-	for len(dirs) > 0 {
-		mmc, err := findMountPoint(dirs)
-		if err != nil {
-			fmt.Println("mountpoint search issue for logs. Exiting...")
-			exit(1)
-		}
-		dirs = arr[:len(dirs)-1]
-	}
-
-	if len(dirs) == 0 {
-		fmt.Println("/")
-	}
-	mmc, err := findMountpoint(parsed.Dirs)
-
-	return mmc
-}
-
-func findMountpoint(dirs []string) (bool error) {
 	partitions, err := disk.Partitions(true)
 	if err != nil {
-		return true, err
+		fmt.Println("failed to get list of partitions! Exiting...")
+		os.Exit(1)
 	}
 
-	for _, p := range partitions {
-		if path == p.Mountpoint || len(path) > len(p.Mountpoint) && path[len(p.Mountpoint)] == '/' && path[:len(p.Mountpoint)] == p.Mountpoint {
-			return p.Mountpoint, nil
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+	//var mountpoint string
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == bpCopy {
+				if strings.Contains(p.Device, "mmc") {
+					return "/media/data/logs"
+				} else {
+					break OuterLoop
+				}
+			}
 		}
+		if bpCopy == "/" {
+			break
+		}
+		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
 	}
-	return "", fmt.Errorf("no mount point found for path: %s", path)
-}
-
-// Function to parse the path and return the structured details
-func parsePath(path string) PathDetails {
-	// Split the path by "/"
-	parts := strings.Split(path, "/")
-	// Remove empty elements resulting from leading "/"
-	if parts[0] == "" {
-		parts = parts[1:]
-	}
-	// Determine if the path is absolute
-	isAbs := strings.HasPrefix(path, "/")
-	// Return the struct with parsed data
-	return PathDetails{Dirs: parts, Absolute: isAbs}
+	return basePath + "/logs"
 }
