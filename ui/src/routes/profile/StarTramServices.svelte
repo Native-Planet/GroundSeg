@@ -1,6 +1,6 @@
 <script>
   import Fa from 'svelte-fa'
-  import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
+  import { faTrashCan } from '@fortawesome/free-solid-svg-icons';
 
   import { onMount } from 'svelte'
   import { structure } from '$lib/stores/data'
@@ -44,28 +44,12 @@
     {/each}
     <!-- registered ships -->
     {#each urbitKeys as patp}
+      {#if !urbitJSONKeys.includes(patp)}
       <div class="option">
         <div class="patp">{patp}</div>
-        {#if !urbitJSONKeys.includes(patp)}
-          <div class="patp-skull">
-            <Fa icon={faCircleExclamation} size="1x" color="black"/>
-            <div class="ship-not-found">ship not found on device!</div>
-          </div>
-        {/if}
-        <div class="service-info">
-          {#each serviceNames as svc}
-            <div class="service-option">
-              <div class="service-name">{svc}</div>
-              <div
-                class="service-status"
-                on:click={()=>deleteStartramService(patp,svc)}>
-                {services[patp][svc].status}
-              </div>
-            </div>
-          {/each}
-        </div>
-        <button on:click={()=>handleDeleteServices(patp)} class="delete-service">Delete StarTram Services</button>
+        <button on:click={()=>handleDeleteServices(patp)} class="delete-service"><Fa icon={faTrashCan} size="1x"/></button>
       </div>
+      {/if}
     {/each}
   </div>
 {/if}
@@ -88,12 +72,11 @@
   }
   .option {
     display: flex;
-    flex-direction: column;
+    max-width: 480px;
     gap: 16px; 
-    max-width: 400px;
-    flex: 1;
   }
   .patp {
+    flex: 1;
     font-size: 24px;
     text-align: left;
     leading-trim: both;
@@ -102,45 +85,12 @@
     font-style: normal;
     letter-spacing: -1.44px;
   }
-  .patp-skull {
-    display: flex;
-    gap: 8px;
-    background: orange;
-    padding: 8px;
-    align-items: center;
-    height: 16px;
-    width: 200px;
-  }
-  .ship-not-found {
-    font-size: 16px;
-    text-align: left;
-    leading-trim: both;
-    text-edge: cap;
-    font-family: Inter;
-    font-style: normal;
-    letter-spacing: -1.44px;
-  }
-  .service-info {
-    display: flex;
-    flex-direction: column;
-  }
-  .service-option {
-    display: flex;
-  }
-  .service-name {
-    flex: 1;
-  }
-  .service-status {
-    flex: 1;
-  }
   .delete-service {
     cursor: pointer;
-    background: black;
+    background: var(--btn-secondary);
     color: white;
-    padding: 4px;
-    width: 220px;
+    padding: 8px;
     border-radius: 8px;
-    text-align: left;
     leading-trim: both;
     text-edge: cap;
     font-family: Inter;

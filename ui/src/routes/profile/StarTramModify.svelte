@@ -58,8 +58,8 @@
 
   <div class="item">
     <div class="label"
-         on:click={()=>viewServices=!viewServices}>
-      Registered StarTram services by ship
+       on:click={()=>viewServices=!viewServices}>
+       Orphaned services
       <Fa icon={viewServices ? faCaretUp : faCaretDown} size="1x"/>
     </div>
     {#if viewServices}
