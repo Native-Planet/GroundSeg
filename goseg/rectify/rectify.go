@@ -63,6 +63,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.PenpaiCompanion = event.Event
 			case "gallseg":
 				urbitStruct.Transition.Gallseg = event.Event
+			case "deleteService":
+				urbitStruct.Transition.StartramServices = event.Event
 			default:
 				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue

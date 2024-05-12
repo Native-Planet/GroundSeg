@@ -186,7 +186,7 @@ func Check502Loop() {
 					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if _, found := status[pier]; found {
 						// found = 2x in a row
-
+						logger.Logger.Warn(fmt.Sprintf("502 second strike for %v", pier))
 						// record all remote ships
 						wgShips := map[string]bool{}
 						piers := conf.Piers

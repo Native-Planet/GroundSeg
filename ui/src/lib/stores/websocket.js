@@ -284,6 +284,14 @@ export const startramGetRegions = () => {
   send(payload)
 }
 
+export const startramGetServices = () => {
+  let payload = {
+    "type":"startram",
+    "action":"services"
+  }
+  send(payload)
+}
+
 export const startramRegister = (key,region) => {
   let payload = {
     "type":"startram",
@@ -758,6 +766,16 @@ export const installGallseg = patp => {
     "type":"urbit",
     "action":"install-gallseg",
     "patp":patp,
+  }
+  send(payload)
+}
+
+export const deleteStartramService = (patp, service) => {
+  let payload = {
+    "type":"urbit",
+    "action":"delete-service",
+    "patp": patp,
+    "service":service
   }
   send(payload)
 }
