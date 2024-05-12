@@ -339,7 +339,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
 	startramInfo.Info.UrlID = config.StartramConfig.UrlID
 
-	startramServices := make(map[string]structs.StartramService)
+	startramServices := []string{}
 	for _, subdomain := range config.StartramConfig.Subdomains {
 		// examples of subdomain.URL
 		/*
@@ -365,16 +365,16 @@ func constructProfileInfo() structs.Profile {
 			// Select the third last item
 			patp := parts[len(parts)-3]
 
-			// Properly initializing the nested map and struct
-			if _, exists := startramServices[patp]; !exists {
-				startramServices[patp] = make(map[string]struct {
-					Status string `json:"status"`
-				})
+			// Put ships in slice
+			shipExists := false
+			for _, ship := range startramServices {
+				if ship == patp {
+					shipExists = true
+					break
+				}
 			}
-			startramServices[patp][subdomain.SvcType] = struct {
-				Status string `json:"status"`
-			}{
-				Status: subdomain.Status,
+			if !shipExists {
+				startramServices = append(startramServices, patp)
 			}
 		}
 	}
