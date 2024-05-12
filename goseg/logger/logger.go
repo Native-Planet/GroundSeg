@@ -107,7 +107,7 @@ func init() {
 		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
-	logPath := makeLogPath()
+	logPath = makeLogPath()
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
@@ -231,8 +231,9 @@ OuterLoop:
 	for {
 		for _, p := range partitions {
 			if p.Mountpoint == bpCopy {
-				if strings.Contains(p.Device, "mmc") {
-					return "/media/data/logs"
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return "/media/data/logs/"
 				} else {
 					break OuterLoop
 				}
@@ -243,5 +244,5 @@ OuterLoop:
 		}
 		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
 	}
-	return basePath + "/logs"
+	return basePath + "/logs/"
 }
