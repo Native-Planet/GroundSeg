@@ -22,6 +22,10 @@ var (
 	Logger         *slog.Logger
 	dynamicHandler *DynamicLevelHandler
 	ErrBus         = make(chan string, 100)
+	filePointers   = make(map[string]struct {
+		file   *os.File
+		offset int64
+	})
 )
 
 const (
@@ -185,22 +189,41 @@ func (m *MuMultiWriter) Write(p []byte) (n int, err error) {
 }
 
 func TailLogs(filename string, n int) ([]string, error) {
-	file, err := os.Open(filename)
+	fp, exists := filePointers[filename]
+	if !exists || fp.file == nil {
+		var err error
+		fp.file, err = os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		fp.offset = 0
+		filePointers[filename] = fp
+	}
+	_, err := fp.file.Seek(fp.offset, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	var lines []string
-	buf := make([]byte, 0, 64*1024)
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(buf, bufio.MaxScanTokenSize)
+	scanner := bufio.NewScanner(fp.file)
+	bufSize := 1024
+	scanner.Buffer(make([]byte, bufSize), bufSize)
+	lineQueue := make([]string, 0, n)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if len(lines) > n {
-			lines = lines[1:]
+		if len(lineQueue) >= n {
+			lineQueue = lineQueue[1:]
 		}
+		lineQueue = append(lineQueue, scanner.Text())
 	}
-	return lines, scanner.Err()
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	newOffset, err := fp.file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+	fp.offset = newOffset
+	filePointers[filename] = fp
+	return lineQueue, nil
 }
 
 func makeLogPath() string {
