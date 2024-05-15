@@ -254,7 +254,7 @@ OuterLoop:
 	for {
 		for _, p := range partitions {
 			if p.Mountpoint == bpCopy {
-				devType := "nvme" //"mmc"
+				devType := "mmc"
 				if strings.Contains(p.Device, devType) {
 					return "/media/data/logs/"
 				} else {
