@@ -120,7 +120,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 	return dirPath, nil
 }
 
-func removeMultipartFiles(path string) error {
+func RemoveMultipartFiles(path string) error {
 	// Read the contents of the directory
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -138,7 +138,7 @@ func removeMultipartFiles(path string) error {
 			if err != nil {
 				return fmt.Errorf("failed to remove file %s: %v", filePath, err)
 			}
-			logger.Logger.Info(fmt.Sprintf("Removed file: %s", filePath))
+			logger.Logger.Debug(fmt.Sprintf("Removed file: %s", filePath))
 		}
 	}
 
@@ -149,7 +149,7 @@ func SetupTmpDir() error {
 	symlink := "/tmp"
 
 	// remove old uploads
-	if err := removeMultipartFiles(symlink); err != nil {
+	if err := RemoveMultipartFiles(symlink); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
 	}
 

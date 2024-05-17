@@ -292,6 +292,7 @@ func combineChunks(filename string, total int) error {
 }
 
 func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
+	defer system.RemoveMultipartFiles("/tmp") // remove multipart-* which are uploaded chunks
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
 	var customPath string
