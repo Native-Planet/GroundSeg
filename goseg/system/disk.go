@@ -126,8 +126,7 @@ func removeMultiparts(tmpDir string) error {
 }
 
 func SetupTmpDir() error {
-	//symlink := "/tmp"
-	symlink := "/tmpdev" // dev
+	symlink := "/tmp"
 
 	// remove old uploads
 	if err := removeMultiparts(symlink); err != nil {
@@ -142,13 +141,17 @@ func SetupTmpDir() error {
 
 	// is mounted on emmc
 	if mmc {
-		tmpDir, err := os.Stat(symlink)
+		isSym := false
+		tmpDir, err := os.Lstat(symlink)
 		if err != nil {
-			return fmt.Errorf("failed to check get /tmp info: %v", err)
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to get /tmp info: %v", err)
+			}
+		} else {
+			isSym = tmpDir.Mode()&os.ModeSymlink != 0
 		}
 
 		// symlink?
-		isSym := tmpDir.Mode()&os.ModeSymlink != 0
 		if !isSym {
 			altDir := "/media/data/tmp"
 			// make alt dir
