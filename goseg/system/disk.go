@@ -121,6 +121,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 }
 
 func RemoveMultipartFiles(path string) error {
+	logger.Logger.Debug(fmt.Sprintf("Clearing multipart files from %v", path))
 	// Read the contents of the directory
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
