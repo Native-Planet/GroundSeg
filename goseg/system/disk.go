@@ -4,11 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"groundseg/logger"
 	"groundseg/structs"
 	"os"
 	"os/exec"
+	"path"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/shirou/gopsutil/disk"
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
@@ -112,4 +116,85 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		}
 	}
 	return dirPath, nil
+}
+
+func removeMultiparts(tmpDir string) error {
+	// list and remove previous uploads
+	logger.Logger.Warn("remove multiparts not implemented")
+	return nil
+
+}
+
+func SetupTmpDir() error {
+	//symlink := "/tmp"
+	symlink := "/tmpdev" // dev
+
+	// remove old uploads
+	if err := removeMultiparts(symlink); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
+	}
+
+	// check if /tmp is on emmc
+	mmc, err := isMountedMMC(symlink)
+	if err != nil {
+		return fmt.Errorf("failed to check check /tmp mountpoint: %v", err)
+	}
+
+	// is mounted on emmc
+	if mmc {
+		tmpDir, err := os.Stat(symlink)
+		if err != nil {
+			return fmt.Errorf("failed to check get /tmp info: %v", err)
+		}
+
+		// symlink?
+		isSym := tmpDir.Mode()&os.ModeSymlink != 0
+		if !isSym {
+			altDir := "/media/data/tmp"
+			// make alt dir
+			if err := os.MkdirAll(altDir, 1777); err != nil {
+				return fmt.Errorf("failed to create alternate tmp directory: %v", err)
+			}
+
+			// delete /tmp
+			if err := os.RemoveAll(symlink); err != nil {
+				return fmt.Errorf("failed to remove %v: %v", symlink, err)
+			}
+
+			// create symlink
+			if err := os.Symlink(altDir, symlink); err != nil {
+				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink)
+			}
+		}
+	}
+	return nil
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
 }

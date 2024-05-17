@@ -219,6 +219,13 @@ func main() {
 	if err := system.ConfigureSwap(conf.SwapFile, conf.SwapVal); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
 	}
+
+	// setup /tmp
+	logger.Logger.Info("Setting up /tmp directory")
+	if err := system.SetupTmpDir(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to setup /tmp: %v", err))
+	}
+
 	// update mode
 	if conf.UpdateMode == "auto" {
 		remoteVersion = true
