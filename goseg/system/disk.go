@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"groundseg/logger"
 	"groundseg/structs"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -118,18 +120,36 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 	return dirPath, nil
 }
 
-func removeMultiparts(tmpDir string) error {
-	// list and remove previous uploads
-	logger.Logger.Warn("remove multiparts not implemented")
-	return nil
+func removeMultipartFiles(path string) error {
+	// Read the contents of the directory
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %v", err)
+	}
 
+	// Iterate through the contents
+	for _, file := range files {
+		// Check if the item is a file and its name starts with "multipart-"
+		if !file.IsDir() && filepath.HasPrefix(file.Name(), "multipart-") {
+			filePath := filepath.Join(path, file.Name())
+
+			// Remove the file
+			err := os.Remove(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to remove file %s: %v", filePath, err)
+			}
+			logger.Logger.Info(fmt.Sprintf("Removed file: %s", filePath))
+		}
+	}
+
+	return nil
 }
 
 func SetupTmpDir() error {
 	symlink := "/tmp"
 
 	// remove old uploads
-	if err := removeMultiparts(symlink); err != nil {
+	if err := removeMultipartFiles(symlink); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
 	}
 
