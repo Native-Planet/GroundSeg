@@ -4,11 +4,17 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"groundseg/logger"
 	"groundseg/structs"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/shirou/gopsutil/disk"
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
@@ -112,4 +118,107 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		}
 	}
 	return dirPath, nil
+}
+
+func RemoveMultipartFiles(path string) error {
+	logger.Logger.Debug(fmt.Sprintf("Clearing multipart files from %v", path))
+	// Read the contents of the directory
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %v", err)
+	}
+
+	// Iterate through the contents
+	for _, file := range files {
+		// Check if the item is a file and its name starts with "multipart-"
+		if !file.IsDir() && filepath.HasPrefix(file.Name(), "multipart-") {
+			filePath := filepath.Join(path, file.Name())
+
+			// Remove the file
+			err := os.Remove(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to remove file %s: %v", filePath, err)
+			}
+			logger.Logger.Debug(fmt.Sprintf("Removed file: %s", filePath))
+		}
+	}
+
+	return nil
+}
+
+func SetupTmpDir() error {
+	symlink := "/tmp"
+
+	// remove old uploads
+	if err := RemoveMultipartFiles(symlink); err != nil {
+		logger.Logger.Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
+	}
+
+	// check if /tmp is on emmc
+	mmc, err := isMountedMMC(symlink)
+	if err != nil {
+		return fmt.Errorf("failed to check check /tmp mountpoint: %v", err)
+	}
+
+	// is mounted on emmc
+	if mmc {
+		isSym := false
+		tmpDir, err := os.Lstat(symlink)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to get /tmp info: %v", err)
+			}
+		} else {
+			isSym = tmpDir.Mode()&os.ModeSymlink != 0
+		}
+
+		// symlink?
+		if !isSym {
+			altDir := "/media/data/tmp"
+			// make alt dir
+			if err := os.MkdirAll(altDir, 1777); err != nil {
+				return fmt.Errorf("failed to create alternate tmp directory: %v", err)
+			}
+
+			// delete /tmp
+			if err := os.RemoveAll(symlink); err != nil {
+				return fmt.Errorf("failed to remove %v: %v", symlink, err)
+			}
+
+			// create symlink
+			if err := os.Symlink(altDir, symlink); err != nil {
+				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink)
+			}
+		}
+	}
+	return nil
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
 }

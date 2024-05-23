@@ -1,10 +1,13 @@
 <script>
+  import Fa from 'svelte-fa'
+  import { faCaretUp, faCaretDown } from '@fortawesome/free-solid-svg-icons';
   // Modals
   import { openModal } from 'svelte-modals'
   import EndpointModal from './EndpointModal.svelte'
   import RegisterModal from './RegisterModal.svelte'
 
   import StarTramReminder from './StarTramReminder.svelte'
+  import StarTramServices from './StarTramServices.svelte'
 
   import { structure } from '$lib/stores/data'
 
@@ -15,6 +18,8 @@
   $: regionFormatted = capitalizeFirstLetter(region.replace(/-/g, ' '))
 
   const capitalizeFirstLetter = str => str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  let viewReminder = false
+  let viewServices = false
 </script>
 
 <div class="wrapper">
@@ -41,8 +46,25 @@
   {/if}
 
   <div class="item">
-    <div class="label">StarTram expiration reminder on Urbit</div>
-    <StarTramReminder />
+    <div class="label"
+         on:click={()=>viewReminder=!viewReminder}>
+      StarTram expiration reminder on Urbit
+      <Fa icon={viewReminder ? faCaretUp : faCaretDown} size="1x"/>
+    </div>
+    {#if viewReminder}
+      <StarTramReminder />
+    {/if}
+  </div>
+
+  <div class="item">
+    <div class="label"
+       on:click={()=>viewServices=!viewServices}>
+       Orphaned services
+      <Fa icon={viewServices ? faCaretUp : faCaretDown} size="1x"/>
+    </div>
+    {#if viewServices}
+      <StarTramServices />
+    {/if}
   </div>
 
 </div>
@@ -55,8 +77,12 @@
     gap: 32px;
   }
   .label {
+    cursor: pointer;
     font-size: 17px;
     margin-bottom: 21px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
   }
   .data {
     display: flex;

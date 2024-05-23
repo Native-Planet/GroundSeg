@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
@@ -23,57 +24,93 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/shirou/gopsutil/disk"
 )
 
 const (
 	bugEndpoint = "https://bugs.groundseg.app"
 )
 
+var (
+	bugReportPath string
+)
+
+func init() {
+	bugReportPath = makeBugReportPath()
+}
+
 // handle bug report requests
 func SupportHandler(msg []byte) error {
+	defer func() {
+		time.Sleep(1 * time.Second)
+		docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: ""}
+		time.Sleep(2 * time.Second)
+		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: ""}
+	}()
+	// transition to loading
 	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "loading"}
+	// error handling
 	handleError := func(err error) error {
 		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: fmt.Sprintf("%v", err)}
 		return err
 	}
+
+	// initialize payload
 	var supportPayload structs.WsSupportPayload
 	if err := json.Unmarshal(msg, &supportPayload); err != nil {
 		return handleError(fmt.Errorf("Couldn't unmarshal support payload: %v", err))
 	}
+	// unix timestamp
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+
+	// extract payload data
 	contact := supportPayload.Payload.Contact
 	description := supportPayload.Payload.Description
 	ships := supportPayload.Payload.Ships
 	cpuProfile := supportPayload.Payload.CPUProfile
 	penpai := supportPayload.Payload.Penpai
-	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
+
+	// set bug report dir
+	bugReportDir := filepath.Join(bugReportPath, timestamp)
+
+	// create the directory
 	if err := os.MkdirAll(bugReportDir, 0755); err != nil {
 		return handleError(fmt.Errorf("Error creating bug-report dir: %v", err))
 	}
-	if err := dumpBugReport(timestamp, contact, description, ships, penpai); err != nil {
+
+	// write bug report to disk
+	if err := dumpBugReport(bugReportDir, timestamp, contact, description, ships, penpai); err != nil {
 		return handleError(fmt.Errorf("Failed to dump logs: %v", err))
 	}
+
+	// collect cpu profile
 	if cpuProfile {
-		profilePath := filepath.Join(config.BasePath, "bug-reports", timestamp, "cpu.profile")
+		profilePath := filepath.Join(bugReportDir, "cpu.profile")
 		if err := captureCPUProfile(profilePath); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't collect CPU profile: %v", err))
+			return handleError(fmt.Errorf("Couldn't collect CPU profile: %v", err))
 		}
 	}
-	zipPath := filepath.Join(config.BasePath, "bug-reports", timestamp+".zip")
+
+	// set zipfile location on disk
+	zipPath := filepath.Join(bugReportPath, timestamp+".zip")
 	if err := zipDir(bugReportDir, zipPath); err != nil {
 		return handleError(fmt.Errorf("Error zipping bug report: %v", err))
 	}
+
+	// remove the bug report since we already have the zipped version
 	if err := os.RemoveAll(bugReportDir); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't remove report dir: %v", err))
 	}
+
+	// send bug report
 	if err := sendBugReport(zipPath, contact, description); err != nil {
 		return handleError(fmt.Errorf("Couldn't submit bug report: %v", err))
 	}
+
+	// completion transitions
 	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "success"}
 	time.Sleep(3 * time.Second)
 	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "done"}
-	time.Sleep(1 * time.Second)
-	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: ""}
 	return nil
 }
 
@@ -126,19 +163,22 @@ func dumpDockerLogs(containerID string, path string) error {
 	return nil
 }
 
-func dumpBugReport(timestamp, contact, description string, piers []string, llama bool) error {
-	bugReportDir := filepath.Join(config.BasePath, "bug-reports", timestamp)
-	descPath := filepath.Join(bugReportDir, "description.txt")
+func dumpBugReport(bugReportDir, timestamp, contact, description string, piers []string, llama bool) error {
+
 	// description.txt
+	descPath := filepath.Join(bugReportDir, "description.txt")
 	if err := ioutil.WriteFile(descPath, []byte(fmt.Sprintf("Contact:\n%s\nDetails:\n%s", contact, description)), 0644); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't write details.txt"))
 		return err
 	}
+
+	// llama bug dump
 	if llama {
 		if err := dumpDockerLogs("llama-gpt-api", bugReportDir+"/"+"llama.log"); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Couldn't dump llama logs: %v", err))
 		}
 	}
+
 	// selected pier logs
 	for _, pier := range piers {
 		if err := dumpDockerLogs(pier, bugReportDir+"/"+pier+".log"); err != nil {
@@ -148,22 +188,27 @@ func dumpBugReport(timestamp, contact, description string, piers []string, llama
 			logger.Logger.Warn(fmt.Sprintf("Couldn't dump minio logs: %v", err))
 		}
 	}
+
 	// service logs
 	if err := dumpDockerLogs("wireguard", bugReportDir+"/wireguard.log"); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
 	}
+
 	// system.json
 	srcPath := filepath.Join(config.BasePath, "settings", "system.json")
 	destPath := filepath.Join(bugReportDir, "system.json")
 	if err := copyFile(srcPath, destPath); err != nil {
 		logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
 	}
+
+	// remove private information
 	if err := sanitizeJSON(destPath, "sessions", "privkey", "salt", "pwHash"); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Couldn't sanitize system.json! Removing from report"))
 		if err := os.Remove(destPath); err != nil {
 			return fmt.Errorf("Error removing unsanitized system log: %v", err)
 		}
 	}
+
 	// pier configs
 	for _, pier := range piers {
 		srcPath = filepath.Join(config.BasePath, "settings", "pier", pier+".json")
@@ -178,6 +223,7 @@ func dumpBugReport(timestamp, contact, description string, piers []string, llama
 			}
 		}
 	}
+
 	// service config jsons
 	configFiles := []string{"mc.json", "netdata.json", "wireguard.json"}
 	for _, configFile := range configFiles {
@@ -187,19 +233,24 @@ func dumpBugReport(timestamp, contact, description string, piers []string, llama
 			logger.Logger.Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
 		}
 	}
+
 	// current and previous syslogs
 	sysLogs := []string{logger.SysLogfile(), logger.PrevSysLogfile()}
 	for _, sysLog := range sysLogs {
 		srcPath := sysLog
+		/*
+			file, err := os.Stat(srcPath)
+			if err != nil {
+				logger.Logger.Warn(fmt.Sprintf("failed to get size of logfile %s: %v", srcPath, err))
+			} else {
+				logger.Logger.Info(fmt.Sprintf("The file is %d bytes long", file.Size()))
+			}
+		*/
 		destPath := filepath.Join(bugReportDir, filepath.Base(sysLog))
 		if err := copyFile(srcPath, destPath); err != nil {
 			logger.Logger.Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
 		}
 	}
-	/*
-		if err := sanitizeJSON("sample.json", "key1", "key3"); err != nil {
-		}
-	*/
 	return nil
 }
 
@@ -339,4 +390,39 @@ func captureCPUProfile(filename string) error {
 	time.Sleep(30 * time.Second)
 	pprof.StopCPUProfile()
 	return nil
+}
+
+func makeBugReportPath() string {
+	// check if the basePath (or its parents) is a mountpoint with gopsutil
+	bpCopy := config.BasePath
+
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("failed to get list of partitions! Defaulting to BasePath"))
+		return filepath.Join(config.BasePath, "bug-reports")
+	}
+
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+	//var mountpoint string
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == bpCopy {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return "/media/data/bug-reports/"
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if bpCopy == "/" {
+			break
+		}
+		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
+	}
+	return filepath.Join(config.BasePath, "/bug-reports/")
 }

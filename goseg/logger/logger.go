@@ -7,8 +7,12 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/disk"
 )
 
 var (
@@ -18,6 +22,10 @@ var (
 	Logger         *slog.Logger
 	dynamicHandler *DynamicLevelHandler
 	ErrBus         = make(chan string, 100)
+	filePointers   = make(map[string]struct {
+		file   *os.File
+		offset int64
+	})
 )
 
 const (
@@ -103,8 +111,7 @@ func init() {
 		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
-	basePath := getBasePath()
-	logPath = basePath + "/logs/"
+	logPath = makeLogPath()
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
@@ -182,29 +189,83 @@ func (m *MuMultiWriter) Write(p []byte) (n int, err error) {
 }
 
 func TailLogs(filename string, n int) ([]string, error) {
-	file, err := os.Open(filename)
+	fp, exists := filePointers[filename]
+	if !exists || fp.file == nil {
+		var err error
+		fp.file, err = os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		fp.offset = 0
+		filePointers[filename] = fp
+	}
+	_, err := fp.file.Seek(fp.offset, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	var lines []string
-	buf := make([]byte, 0, 64*1024)
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(buf, bufio.MaxScanTokenSize)
+	scanner := bufio.NewScanner(fp.file)
+	bufSize := 1024
+	scanner.Buffer(make([]byte, bufSize), bufSize)
+	lineQueue := make([]string, 0, n)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if len(lines) > n {
-			lines = lines[1:]
+		if len(lineQueue) >= n {
+			lineQueue = lineQueue[1:]
 		}
+		lineQueue = append(lineQueue, scanner.Text())
 	}
-	return lines, scanner.Err()
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	newOffset, err := fp.file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+	fp.offset = newOffset
+	filePointers[filename] = fp
+	return lineQueue, nil
 }
 
-func getBasePath() string {
-	switch os.Getenv("GS_BASE_PATH") {
-	case "":
-		return "/opt/nativeplanet/groundseg"
-	default:
-		return os.Getenv("GS_BASE_PATH")
+func makeLogPath() string {
+	basePath := os.Getenv("GS_BASE_PATH")
+	if basePath == "" {
+		basePath = "/opt/nativeplanet/groundseg"
 	}
+	// check if basePath is an absolute path, if it isn't exit
+	if !strings.HasPrefix(basePath, "/") {
+		fmt.Println("base path is not absolute! Exiting...")
+		os.Exit(1)
+	}
+	// check if the basePath (or its parents) is a mountpoint with gopsutil
+	bpCopy := basePath
+
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		fmt.Println("failed to get list of partitions! Exiting...")
+		os.Exit(1)
+	}
+
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+	//var mountpoint string
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == bpCopy {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return "/media/data/logs/"
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if bpCopy == "/" {
+			break
+		}
+		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
+	}
+	return basePath + "/logs/"
 }
