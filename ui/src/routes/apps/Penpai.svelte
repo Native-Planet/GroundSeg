@@ -3,12 +3,10 @@
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { downloadPenpaiModel, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { URBIT_MODE } from '$lib/stores/data'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
-
-  // TODO: onMount check desks, bypassing flood control
 
   let showModels = false
 
@@ -65,7 +63,7 @@
       </div>
 
   {#if penpaiAllowed}
-    <!-- <div class="wifi-toggle">
+      <div class="wifi-toggle">
       <div class="install-text">Allocate CPU Cores</div>
       <div class="right">
         <button disabled={activeCores == minCores} class="btn" on:click={()=>setPenpaiCores(activeCores - 1)}>
@@ -76,11 +74,40 @@
           <Fa icon={faPlus} size="1x" />
         </button>
       </div>
-    </div> -->
+      </div>
 
+      <div class="active-title">Active Model</div>
+      <table>
+        <tr>
+          <th>Model Name</th>
+          <th>Installed</th>
+          <th>Active</th>
+        </tr>
+        {#each models as p}
+        <tr>
+          <td>{p.modelTitle}</td>
+          <td>
+            {#if p.downloaded}
+              <button class="delete-button">Delete</button>
+            {:else}
+            {/if}
+              <button class="download-button" on:click={()=>downloadPenpaiModel(p.modelTitle)}>Download</button>
+          </td>
+          <td>
+            {#if activeModel === p.modelTitle}
+              in-use
+            {:else}
+              <button class="download-button">Switch</button>
+            {/if}
+              </td>
+        </tr>
+        {/each}
+      </table>
+
+      <!--
     <div class="wifi-options">
         <div class="active">
-          <div class="active-title">Model</div>
+          <div class="active-title">Active Model</div>
           <div class="active-selector" on:click={()=>showModels = !showModels}>
             <div class="active-text">{selectedModel.length < 1 ? "Select a model" : selectedModel}</div>
             <div class="active-arrow">
@@ -102,11 +129,10 @@
         {/if}
     </div>
 
-    {#if selectedModel != activeModel}
-      <div class="submit-buttons">
-          <button class="connect" on:click={handleChangeModel}>Change Model</button>
-      </div>
-    {/if}
+    <div class="submit-buttons">
+      <button class="connect" class:disable={selectedModel == activeModel} on:click={handleChangeModel}>Change Model</button>
+    </div>
+      -->
 
     {#if urbitKeys.length > 0}
       <div class="companion-title">Install Companion App</div>
@@ -158,10 +184,6 @@
   }
   input[type="range"] {
     flex: 1;
-  }
-  .wifi-options {
-    display: flex;
-    flex-direction: column;
   }
   .companion-title {
     flex: 1;
@@ -309,18 +331,30 @@
     padding: 0 20px 0 20px;
     height: 61px;
   }
-  input:focus {
-    outline: none;
+  .delete-button {
+    background: red;
   }
-  input:disabled {
-    opacity: .6;
-    pointer-events: none;
+  .download-button {
+    background: var(--btn-secondary);
   }
-  .submit-buttons {
-    margin-top: 20px;
-    display: flex;
-    gap: 24px;
-    margin-bottom: 56px;
+  tr {
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    letter-spacing: -1.44px;
+    text-align: left;
+  }
+  th {
+    flex: 1;
+    min-width: 300px;
+    padding: 16px 0;
+  }
+  td {
+    flex: 1;
+    line-height: 65px;
   }
   button {
     border-radius: 16px;
@@ -347,10 +381,6 @@
   }
   .connect {
     background-color: var(--btn-primary);
-  }
-  .disabled {
-    opacity:.6;
-    pointer-events: none;
   }
   .right {
     display: flex;

@@ -67,10 +67,10 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
-	var found *structs.Penpai
+	var found structs.Penpai
 	for _, item := range conf.PenpaiModels {
 		if item.ModelName == conf.PenpaiActive {
-			found = &item
+			found = item
 			break
 		}
 	}

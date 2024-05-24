@@ -26,7 +26,7 @@ type PenpaiBroadcast struct {
 		Running     bool     `json:"running"`
 		ActiveCores int      `json:"activeCores"`
 		MaxCores    int      `json:"maxCores"`
-		Models      []string `json:"models"`
+		Models      []Penpai `json:"models"`
 		ActiveModel string   `json:"activeModel"`
 	} `json:"info"`
 }

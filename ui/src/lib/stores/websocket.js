@@ -735,6 +735,15 @@ export const setPenpaiCores = cores => {
   send(payload)
 }
 
+export const downloadPenpaiModel = model => {
+  let payload = {
+    "type":"penpai",
+    "action": "download-model",
+    "model": model
+  }
+  send(payload)
+}
+
 export const removePenpai = () => {
   let payload = {
     "type":"penpai",

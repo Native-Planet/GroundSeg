@@ -281,6 +281,8 @@ func main() {
 	go routines.PackScheduleLoop()
 	// chop limiter
 	go routines.ChopAtLimit() // vere 3.0
+	// penpai information updater
+	go routines.TrackPenpaiModels()
 	// log manager routine
 	go routines.LogEvent()
 	// block until version info returns

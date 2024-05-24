@@ -27,10 +27,6 @@ func PenpaiHandler(msg []byte) error {
 			if err != nil {
 				return fmt.Errorf(fmt.Sprintf("Failed to stop Llama API: %v", err))
 			}
-			err = docker.StopContainerByName("llama-gpt-ui")
-			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("Failed to stop Llama UI: %v", err))
-			}
 		} else {
 			// start container
 			info, err := docker.StartContainer("llama-gpt-api", "llama-api")
@@ -46,13 +42,17 @@ func PenpaiHandler(msg []byte) error {
 			return fmt.Errorf(fmt.Sprintf("%v", err))
 		}
 		return nil
+	case "download-model":
+		model := penpaiPayload.Payload.Model
+		logger.Logger.Warn(fmt.Sprintf("todo: download and check penpai model"))
+		return nil
 	case "set-model":
 		// update config
 		model := penpaiPayload.Payload.Model
 		if err = config.UpdateConf(map[string]interface{}{
 			"penpaiActive": model,
 		}); err != nil {
-			return fmt.Errorf(fmt.Sprintf("%v", err))
+			return err
 		}
 		if err := docker.DeleteContainer("llama-gpt-api"); err != nil {
 			return fmt.Errorf("Failed to delete container: %v", err)

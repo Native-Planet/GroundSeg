@@ -65,6 +65,8 @@ type Penpai struct {
 	ModelTitle string `json:"modelTitle"`
 	ModelName  string `json:"modelName"`
 	ModelUrl   string `json:"modelUrl"`
+	ModelHash  string `json:"modelHash"`
+	Downloaded bool   `json:"downloaded"`
 }
 
 // authenticated browser sessions

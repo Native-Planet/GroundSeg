@@ -310,12 +310,7 @@ func constructAppsInfo() structs.Apps {
 	conf := config.Conf()
 
 	// penpai
-	var modelTitles []string
-	// Iterate through penpais to extract modelTitle
-	for _, penpaiInfo := range conf.PenpaiModels {
-		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
-	}
-	apps.Penpai.Info.Models = modelTitles
+	apps.Penpai.Info.Models = conf.PenpaiModels
 	apps.Penpai.Info.Allowed = conf.PenpaiAllow
 	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
 	apps.Penpai.Info.Running = conf.PenpaiRunning
