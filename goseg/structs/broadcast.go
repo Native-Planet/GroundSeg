@@ -29,6 +29,12 @@ type PenpaiBroadcast struct {
 		Models      []Penpai `json:"models"`
 		ActiveModel string   `json:"activeModel"`
 	} `json:"info"`
+	Transition struct {
+		DownloadProgress map[string]struct {
+			Downloading bool `json:"downloading"`
+			Percentage  int  `json:"percentage"`
+		} `json:"downloadProgress"`
+	} `json:"transition"`
 }
 
 // new ship

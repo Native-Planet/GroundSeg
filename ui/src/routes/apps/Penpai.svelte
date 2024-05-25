@@ -16,6 +16,7 @@
   $: urbits = ($structure?.urbits) || {}
   $: urbitKeys = Object.keys(urbits)
   $: penpai = ($structure?.apps?.penpai?.info) || {}
+  $: tPenpai = ($structure?.apps?.penpai?.transition)
   $: models = (penpai?.models) || []
   $: activeModel = (penpai?.activeModel) || ""
   $: penpaiAllowed = (penpai?.allowed) || false

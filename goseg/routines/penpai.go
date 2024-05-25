@@ -13,7 +13,7 @@ func TrackPenpaiModels() {
 		if conf.PenpaiAllow {
 			dir := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data")
 			for _, m := range conf.PenpaiModels {
-				if m.Downloaded {
+				if m.Exists {
 					logger.Logger.Warn("todo: check penpai hash")
 					_ = dir
 					// find file in dir, if doesn't exist, download again

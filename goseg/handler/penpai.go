@@ -7,6 +7,8 @@ import (
 	"groundseg/docker"
 	"groundseg/logger"
 	"groundseg/structs"
+	"os"
+	"path/filepath"
 	"runtime"
 )
 
@@ -44,7 +46,17 @@ func PenpaiHandler(msg []byte) error {
 		return nil
 	case "download-model":
 		model := penpaiPayload.Payload.Model
-		logger.Logger.Warn(fmt.Sprintf("todo: download and check penpai model"))
+		for _, m := range conf.PenpaiModels {
+			if model == m.ModelTitle {
+				filename := fmt.Sprintf("%s.llamafile", model)
+				modelFile := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data", filename)
+				os.Remove(modelFile)
+				if err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				go downloadModel(m)
+			}
+		}
 		return nil
 	case "set-model":
 		// update config
@@ -94,4 +106,8 @@ func PenpaiHandler(msg []byte) error {
 		logger.Logger.Debug(fmt.Sprintf("Todo: remove penpai"))
 	}
 	return nil
+}
+
+func downloadModel(m structs.Penpai) {
+	logger.Logger.Warn(fmt.Sprintf("%+v", m))
 }

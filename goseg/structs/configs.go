@@ -66,7 +66,7 @@ type Penpai struct {
 	ModelName  string `json:"modelName"`
 	ModelUrl   string `json:"modelUrl"`
 	ModelHash  string `json:"modelHash"`
-	Downloaded bool   `json:"downloaded"`
+	Exists     bool   `json:"exists"`
 }
 
 // authenticated browser sessions
