@@ -6,6 +6,7 @@
 
   import Dropzone from './Dropzone.svelte';
   import NotFree from './NotFree.svelte';
+  import Transload from './Transload.svelte';
 
   let showPrompt = false
   let confirmed = false
@@ -21,6 +22,11 @@
     showPrompt = false
     confirmed = true
   }
+
+  const handleFileImport = event => {
+    console.log('Importing from path', event.detail.path);
+    
+  };
 
   $: upload = ($structure?.upload) || {}
 
@@ -43,6 +49,7 @@
       <div class="text">Make sure your pier is not running anywhere else or your <strong>pier will be corrupted</strong></div>
     </div>
     <Dropzone on:progress={e=>uploaded=e.detail} />
+    <Transload on:import={handleFileImport} />
   {:else}
     <NotFree {status} name={patp} {error} {uploaded} {extracted} />
   {/if}

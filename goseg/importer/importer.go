@@ -414,6 +414,129 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	go waitForShipReady(filename, patp, remote, fix)
 }
 
+// load a pier from a file on-disk already
+func TransloadPier(filename, patp string, remote, fix bool, compressedPath, dirPath string) {
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
+	// create pier config
+	var customPath string
+	if dirPath != "" {
+		customPath = dirPath
+	}
+	err := shipcreator.CreateUrbitConfig(patp, customPath)
+	if err != nil {
+		errmsg := fmt.Sprintf("Failed to create urbit config: %v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	// update system.json
+	err = shipcreator.AppendSysConfigPier(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("Failed to update system.json: %v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	// Prepare environment for pier
+	logger.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+	// delete container if exists
+	err = docker.DeleteContainer(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+	}
+	// delete volume if exists
+	err = docker.DeleteVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("%v (harmless)", err)
+		logger.Logger.Info(errmsg)
+	}
+	if customPath == "" { // no custom path provided
+		// create new docker volume
+		err = docker.CreateVolume(patp)
+		if err != nil {
+			errmsg := fmt.Sprintf("failed to create volume: %v", err)
+			logger.Logger.Error(errmsg)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	} else { // create custom directory for upload
+		if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
+			errmsg := fmt.Sprintf("create custom pier directory error: %v", err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	}
+	// extract file to volume directory
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
+	// set default path
+	volPath := filepath.Join(config.DockerDir, patp, "_data")
+	// modify if custom path
+	if customPath != "" {
+		volPath = filepath.Join(customPath, patp)
+	}
+	switch checkExtension(filename) {
+	case ".zip":
+		err := extractZip(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	case ".tar.gz", ".tgz":
+		err := extractTarGz(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	case ".tar":
+		err := extractTar(compressedPath, volPath)
+		if err != nil {
+			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
+			errorCleanup(filename, patp, errmsg)
+			return
+		}
+	default:
+		errmsg := fmt.Sprintf("Unsupported file type %v", filename)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	logger.Logger.Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
+	// run restructure
+	if err := restructureDirectory(patp); err != nil {
+		errorCleanup(filename, patp, fmt.Sprintf("Failed to restructure directory: %v", err))
+		return
+	}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
+	// start container
+	logger.Logger.Info(fmt.Sprintf("Starting extracted pier: %v", patp))
+	info, err := docker.StartContainer(patp, "vere")
+	if err != nil {
+		errmsg := fmt.Sprintf("%v", err)
+		logger.Logger.Error(errmsg)
+		errorCleanup(filename, patp, errmsg)
+		return
+	}
+	config.UpdateContainerState(patp, info)
+	os.Remove(filepath.Join(uploadDir, filename))
+
+	// debug, force error
+	//errmsg := "Self induced error, for debugging purposes"
+	//errorCleanup(filename, patp, errmsg)
+	//return
+
+	// if startram is registered
+	conf := config.Conf()
+	if conf.WgRegistered {
+		// Register Services
+		go registerServices(patp)
+	}
+	// check for +code
+	go waitForShipReady(filename, patp, remote, fix)
+}
+
 func waitForShipReady(filename, patp string, remote, fix bool) {
 	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
 	lusCodeTicker := time.NewTicker(1 * time.Second)

@@ -230,6 +230,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					logger.Logger.Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
+			case "pier_transload":
+				if err = handler.TransloadHandler(msg); err != nil {
+					logger.Logger.Error(fmt.Sprintf("%v", err))
+					ack = "nack"
+				}
 			case "password":
 				if err = handler.PwHandler(msg, false); err != nil {
 					logger.Logger.Error(fmt.Sprintf("%v", err))

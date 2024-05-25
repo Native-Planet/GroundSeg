@@ -517,3 +517,20 @@ type CtxWithCancel struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
+
+type WsTransloadPayload struct {
+	ID      string            `json:"id"`
+	Type    string            `json:"type"`
+	Payload WsTransloadAction `json:"payload"`
+	Token   WsTokenStruct     `json:"token"`
+}
+
+type WsTransloadAction struct {
+	Type          string `json:"type"`
+	Action        string `json:"action"`
+	Path          string `json:"path"`
+	Patp          string `json:"patp"`
+	SelectedDrive string `json:"selectedDrive"`
+	Fix           bool   `json:"fix"`
+	Remote        bool   `json:"remote"`
+}
