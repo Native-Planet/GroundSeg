@@ -7,8 +7,11 @@ import (
 	"groundseg/docker"
 	"groundseg/logger"
 	"groundseg/structs"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 )
 
@@ -48,12 +51,6 @@ func PenpaiHandler(msg []byte) error {
 		model := penpaiPayload.Payload.Model
 		for _, m := range conf.PenpaiModels {
 			if model == m.ModelTitle {
-				filename := fmt.Sprintf("%s.llamafile", model)
-				modelFile := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data", filename)
-				os.Remove(modelFile)
-				if err != nil && !os.IsNotExist(err) {
-					return err
-				}
 				go downloadModel(m)
 			}
 		}
@@ -108,6 +105,84 @@ func PenpaiHandler(msg []byte) error {
 	return nil
 }
 
-func downloadModel(m structs.Penpai) {
-	logger.Logger.Warn(fmt.Sprintf("%+v", m))
+func downloadModel(m structs.Penpai) error {
+	conf := config.Conf()
+	// retrieve file name
+	filename, err := extractLlamafileName(m.ModelUrl)
+	if err != nil {
+		return penpaiHandleError(err)
+	}
+
+	// clear old file if exists
+	modelFile := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data", filename)
+	os.Remove(modelFile)
+	if err != nil && !os.IsNotExist(err) {
+		return penpaiHandleError(err)
+	}
+
+	// Create the file
+	out, err := os.Create(modelFile)
+	if err != nil {
+		return penpaiHandleError(err)
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(m.ModelUrl)
+	if err != nil {
+		return penpaiHandleError(err)
+	}
+	defer resp.Body.Close()
+
+	// Check server response
+	if resp.StatusCode != http.StatusOK {
+		return penpaiHandleError(fmt.Errorf("bad status: %s", resp.Status))
+	}
+
+	// Get the content length (total size)
+	total := resp.ContentLength
+
+	// Create a progress reader
+	progressReader := &ProgressReader{
+		Reader: resp.Body,
+		Total:  total,
+	}
+
+	// Copy data from the response to the file, while tracking progress
+	_, err = io.Copy(out, progressReader)
+	if err != nil {
+		return penpaiHandleError(err)
+	}
+
+	return nil
+}
+
+// ProgressReader is a custom reader that tracks progress
+type ProgressReader struct {
+	Reader io.Reader
+	Total  int64
+	Done   int64
+}
+
+func (pr *ProgressReader) Read(p []byte) (int, error) {
+	n, err := pr.Reader.Read(p)
+	if n > 0 {
+		pr.Done += int64(n)
+		logger.Logger.Warn(fmt.Sprintf("done: %v, total: %v", pr.Done, pr.Total))
+	}
+	return n, err
+}
+
+func extractLlamafileName(url string) (string, error) {
+	re := regexp.MustCompile(`([^/]+\.llamafile)`)
+	match := re.FindStringSubmatch(url)
+	if len(match) > 1 {
+		return match[1], nil
+	}
+	return "", fmt.Errorf("invalid download link: %v", url)
+}
+
+func penpaiHandleError(err error) error {
+	logger.Logger.Error(fmt.Sprintf("Failed to download penpai model: %v", err))
+	return nil
 }
