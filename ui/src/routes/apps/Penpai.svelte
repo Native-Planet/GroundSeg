@@ -1,9 +1,17 @@
 <script>
-  import { afterUpdate } from 'svelte'
   import ToggleButton from '$lib/ToggleButton.svelte'
   import Fa from 'svelte-fa'
   import { faMinus, faPlus, faAngleUp, faAngleDown } from '@fortawesome/free-solid-svg-icons';
-  import  { downloadPenpaiModel, installPenpaiCompanion, uninstallPenpaiCompanion, setPenpaiModel, setPenpaiCores, togglePenpai, removePenpai } from '$lib/stores/websocket'
+  import  { 
+    deletePenpaiModel,
+    downloadPenpaiModel,
+    installPenpaiCompanion,
+    uninstallPenpaiCompanion,
+    setPenpaiModel,
+    setPenpaiCores,
+    togglePenpai,
+    removePenpai
+  } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import { URBIT_MODE } from '$lib/stores/data'
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -25,21 +33,7 @@
   $: maxCores = (penpai?.maxCores) || 1
   $: activeCores = (penpai?.activeCores) || 1
 
-  let selectedModel = ""
-
-  afterUpdate(()=>{
-    if (selectedModel.length < 1) {
-      selectedModel = activeModel
-    }
-  })
-
-  const selectModel = model => {
-    showModels = false
-    selectedModel = model
-  }
-
   const handleChangeModel = () => {
-    setPenpaiModel(selectedModel)
   }
 
   const handlePenpaiCompanion = p => {
@@ -92,48 +86,24 @@
               <button class="delete-button">Delete</button>
             {:else}
             {/if}
-              <button class="download-button" on:click={()=>downloadPenpaiModel(p.modelTitle)}>Download</button>
+              {#if p.exists}
+                <button class="download-button" on:click={()=>deletePenpaiModel(p.modelTitle)}>Remove</button>
+              {:else}
+                <button class="download-button" on:click={()=>downloadPenpaiModel(p.modelTitle)}>Download</button>
+              {/if}
           </td>
           <td>
-            {#if activeModel === p.modelTitle}
+            {#if !p.exists}
+              not found
+            {:else if activeModel === p.modelTitle}
               in-use
             {:else}
-              <button class="download-button">Switch</button>
+              <button class="download-button" on:click={()=>setPenpaiModel(p.modelTitle)}>Switch</button>
             {/if}
               </td>
         </tr>
         {/each}
       </table>
-
-      <!--
-    <div class="wifi-options">
-        <div class="active">
-          <div class="active-title">Active Model</div>
-          <div class="active-selector" on:click={()=>showModels = !showModels}>
-            <div class="active-text">{selectedModel.length < 1 ? "Select a model" : selectedModel}</div>
-            <div class="active-arrow">
-              {#if showModels}
-                <Fa icon={faAngleUp} size="1x" />
-              {:else}
-                <Fa icon={faAngleDown} size="1x" />
-              {/if}
-            </div>
-          </div>
-        </div>
-
-        {#if showModels}
-          <div class="networks">
-            {#each models as n}
-              <div class="network" on:click={()=>{selectModel(n)}}>{n}</div>
-            {/each}
-          </div>
-        {/if}
-    </div>
-
-    <div class="submit-buttons">
-      <button class="connect" class:disable={selectedModel == activeModel} on:click={handleChangeModel}>Change Model</button>
-    </div>
-      -->
 
     {#if urbitKeys.length > 0}
       <div class="companion-title">Install Companion App</div>

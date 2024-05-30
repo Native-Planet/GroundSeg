@@ -6,12 +6,12 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/logger"
+	"groundseg/penpai"
 	"groundseg/structs"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 )
 
@@ -44,7 +44,17 @@ func PenpaiHandler(msg []byte) error {
 		if err = config.UpdateConf(map[string]interface{}{
 			"penpaiRunning": running,
 		}); err != nil {
-			return fmt.Errorf(fmt.Sprintf("%v", err))
+			return fmt.Errorf("Failed to start penpai: %v", err)
+		}
+		return nil
+	case "delete-model":
+		model := penpaiPayload.Payload.Model
+		for _, m := range conf.PenpaiModels {
+			if model == m.ModelTitle {
+				if err := penpaiDeleteModel(m); err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("Failed to delete penpai model: %v", err)
+				}
+			}
 		}
 		return nil
 	case "download-model":
@@ -105,17 +115,52 @@ func PenpaiHandler(msg []byte) error {
 	return nil
 }
 
+func penpaiDeleteModel(m structs.Penpai) error {
+	logger.Logger.Info(fmt.Sprintf("Requested to delete penpai model %v", m.ModelName))
+	filename, err := penpai.ExtractLlamafileName(m.ModelUrl)
+	if err != nil {
+		return err
+	}
+	conf := config.Conf()
+	modelFile := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data", filename)
+	err = os.Remove(modelFile)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	var val *int
+	for i, model := range conf.PenpaiModels {
+		if model.ModelName == m.ModelName {
+			val = &i
+			break
+		}
+	}
+
+	if val == nil {
+		return fmt.Errorf("invalid index: %v", m.ModelName)
+	}
+
+	if err := penpai.SetExistence(m, false, *val); err != nil {
+		return fmt.Errorf("Penpai routine failed to update config: %v", err)
+	}
+	logger.Logger.Info(fmt.Sprintf("Penpai model deleted %v", m.ModelName))
+	return nil
+}
+
 func downloadModel(m structs.Penpai) error {
+	defer penpai.Unlock(m.ModelHash)
+	penpai.Lock(m.ModelHash)
+	logger.Logger.Info(fmt.Sprintf("Requested to download penpai model %v", m.ModelTitle))
 	conf := config.Conf()
 	// retrieve file name
-	filename, err := extractLlamafileName(m.ModelUrl)
+	filename, err := penpai.ExtractLlamafileName(m.ModelUrl)
 	if err != nil {
 		return penpaiHandleError(err)
 	}
 
 	// clear old file if exists
+	logger.Logger.Info("Preparing the environment")
 	modelFile := filepath.Join(conf.DockerData, "volumes", "llama-gpt-api", "_data", filename)
-	os.Remove(modelFile)
+	err = os.Remove(modelFile)
 	if err != nil && !os.IsNotExist(err) {
 		return penpaiHandleError(err)
 	}
@@ -128,6 +173,7 @@ func downloadModel(m structs.Penpai) error {
 	defer out.Close()
 
 	// Get the data
+	logger.Logger.Info("Fetching model from remote endpoint")
 	resp, err := http.Get(m.ModelUrl)
 	if err != nil {
 		return penpaiHandleError(err)
@@ -154,6 +200,34 @@ func downloadModel(m structs.Penpai) error {
 		return penpaiHandleError(err)
 	}
 
+	// get hash
+	logger.Logger.Info("Verifying llamafile hash")
+	hash, err := penpai.GetSHA256(modelFile)
+	if err != nil {
+		return penpaiHandleError(err)
+	}
+	if hash != m.ModelHash {
+		return penpaiHandleError(fmt.Errorf("Corrupted file download"))
+	}
+
+	var val *int
+	for i, model := range conf.PenpaiModels {
+		if model.ModelHash == hash {
+			val = &i
+			break
+		}
+	}
+
+	if val == nil {
+		return penpaiHandleError(fmt.Errorf("Invalid index"))
+	}
+
+	// update config
+	logger.Logger.Info("Updating config")
+	// update config
+	if err := penpai.SetExistence(m, true, *val); err != nil {
+		return penpaiHandleError(err)
+	}
 	return nil
 }
 
@@ -168,18 +242,9 @@ func (pr *ProgressReader) Read(p []byte) (int, error) {
 	n, err := pr.Reader.Read(p)
 	if n > 0 {
 		pr.Done += int64(n)
-		logger.Logger.Warn(fmt.Sprintf("done: %v, total: %v", pr.Done, pr.Total))
+		logger.Logger.Warn(fmt.Sprintf("%v%% done: %v, total: %v", float64(pr.Done)/float64(pr.Total)*100, pr.Done, pr.Total)) // dev
 	}
 	return n, err
-}
-
-func extractLlamafileName(url string) (string, error) {
-	re := regexp.MustCompile(`([^/]+\.llamafile)`)
-	match := re.FindStringSubmatch(url)
-	if len(match) > 1 {
-		return match[1], nil
-	}
-	return "", fmt.Errorf("invalid download link: %v", url)
 }
 
 func penpaiHandleError(err error) error {

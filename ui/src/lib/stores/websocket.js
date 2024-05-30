@@ -744,6 +744,15 @@ export const downloadPenpaiModel = model => {
   send(payload)
 }
 
+export const deletePenpaiModel = model => {
+  let payload = {
+    "type":"penpai",
+    "action": "delete-model",
+    "model": model
+  }
+  send(payload)
+}
+
 export const removePenpai = () => {
   let payload = {
     "type":"penpai",
