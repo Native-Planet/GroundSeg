@@ -5,6 +5,7 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/logger"
+	"groundseg/penpai"
 	"groundseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -39,7 +40,7 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
-	desiredImage := "nativeplanet/llama-gpt:dev@sha256:ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
+	desiredImage := "nativeplanet/llama-gpt:latest@sha256:d865f4e89d4853cabe2ed41bf73f35bb00effe901c9b671ff498cb36c46a1bfc"
 	// lessCores := conf.PenpaiCores
 	exists, err := volumeExists(apiContainerName)
 	if err != nil {
@@ -74,14 +75,16 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			break
 		}
 	}
+	fn, err := penpai.ExtractLlamafileName(found.ModelUrl)
+	if err != nil {
+		return containerConfig, hostConfig, fmt.Errorf("Failed to extract llamafile name from url")
+	}
 	containerConfig = container.Config{
 		Image:    desiredImage,
 		Hostname: apiContainerName,
 		Cmd:      []string{"/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"},
 		Env: []string{
-			fmt.Sprintf("MODEL=/models/%v", found.ModelName),
-			fmt.Sprintf("MODEL_NAME=%v", found.ModelName),
-			fmt.Sprintf("MODEL_DOWNLOAD_URL=%v", found.ModelUrl),
+			fmt.Sprintf("MODEL_FILE=%v", fn),
 			"N_GQA=1",
 			"USE_MLOCK=1",
 		},
