@@ -16,7 +16,8 @@
   const handleBack = () => {
     const bootExist = $page.route.id.includes("new")
     const bootNew = $page.route.id.includes("existing")
-    if (bootExist || bootNew) {
+    const bootTransload = $page.route.id.includes("transload")
+    if (bootExist || bootNew || bootTransload) {
       goto(pfx+"/boot")
     } else {
       goto(pfx+"/")

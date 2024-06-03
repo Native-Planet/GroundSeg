@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { structure } from '$lib/stores/data'
 
-  import Dropzone from './Dropzone.svelte';
+  import Transload from './Transload.svelte';
   import NotFree from './NotFree.svelte';
 
   let showPrompt = false
@@ -40,14 +40,14 @@
 
 <div id="card-wrapper" class="card-wrapper {wide ? "wide" : "slim"}">
   <div class="title-wrapper">
-    <div class="title">UPLOAD PIER</div>
+    <div class="title">ADVANCED PIER IMPORT</div>
   </div>
   {#if status.length < 1}
     <div class="warning">
       <div class="text">Warning</div>
       <div class="text">Make sure your pier is not running anywhere else or your <strong>pier will be corrupted</strong></div>
     </div>
-    <Dropzone on:progress={e=>uploaded=e.detail} />
+    <Transload on:progress={e=>uploaded=e.detail} />
   {:else}
     <NotFree {status} name={patp} {error} {uploaded} {extracted} />
   {/if}

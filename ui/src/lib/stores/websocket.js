@@ -826,12 +826,11 @@ export const devStartramReminderToggle = b => {
   send(payload)
 }
 
-export const transloadPier = (patp, path, remote, fix, selectedDrive) => {
+export const transloadPier = (filename, remote, fix, selectedDrive) => {
   let payload = {
     "type":"pier_transload",
     "action":"transload",
-    "patp": patp,
-    "path": path,
+    "filename": filename,
     "remote": remote,
     "fix": fix,
     "selectedDrive":selectedDrive,

@@ -1,6 +1,7 @@
 <script>
     import { structure } from '$lib/stores/data'
     import { transloadPier } from '$lib/stores/websocket'
+    import { createEventDispatcher } from 'svelte'
 
     const dispatch = createEventDispatcher();
     let filePath = '';
