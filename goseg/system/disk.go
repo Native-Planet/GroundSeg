@@ -157,7 +157,7 @@ func SetupTmpDir() error {
 	// check if /tmp is on emmc
 	mmc, err := isMountedMMC(symlink)
 	if err != nil {
-		return fmt.Errorf("failed to check check /tmp mountpoint: %v", err)
+		return fmt.Errorf("failed to check /tmp mountpoint: %v", err)
 	}
 
 	// is mounted on emmc

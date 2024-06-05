@@ -1,9 +1,7 @@
 <script>
-  import Dropzone from "dropzone"
   import { structure } from '$lib/stores/data'
-  import Sigil from './Sigil.svelte'
-  import { page } from '$app/stores'
   import { goto } from '$app/navigation'
+  import { checkPatp } from '$lib/stores/patp'
 
   import { openModal } from 'svelte-modals'
   import WarningPrompt from './WarningPrompt.svelte'
@@ -40,27 +38,6 @@
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
-  const handleDrive = name => {
-    selectedDrive = name
-    if (patp.length > 0) {
-      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
-    }
-  }
-  const handleRemote = () => {
-    remote = !remote
-    if (patp.length > 0) {
-      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
-    }
-  }
-
-  const handleFix = () => {
-    fix = !fix
-    if (patp.length > 0) {
-      openUploadEndpoint(endpoint,remote,fix,selectedDrive)
-    }
-  }
-
-
 </script>
 
 <div class="input-wrapper">
@@ -68,7 +45,9 @@
   <div class="available">
     {#if transloadPiers.length > 0}
     {#each transloadPiers as p}
+      {#if checkPatp(p.split(".")[0])}
       <div class="pier" on:click={()=>selectedPier=p} class:selected={p==selectedPier}>{p}</div>
+      {/if}
     {/each}
     {/if}
   </div>
@@ -83,13 +62,13 @@
 <div class="input-wrapper">
   <div class="label">Select Drive</div>
   <div class="mount-wrapper">
-    <div class="mount-info" on:click={()=>handleDrive("system-drive")} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+    <div class="mount-info" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
     {#each driveNames as name}
       <div class="mount">
         <div
           class="mount-info"
           class:active={selectedDrive==name}
-          on:click={()=>handleDrive(name)}
+          on:click={()=>selectedDrive=name}
           >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
         </div>
         {#if drives[name].driveID == 0}
@@ -104,7 +83,7 @@
 <div class="input-wrapper">
   <div class="label">Configuration</div>
   {#if registered && running}
-  <div class="check-wrapper" on:click={handleRemote}>
+    <div class="check-wrapper" on:click={()=>remote=!remote}>
     <div class="checkbox">
       {#if remote}
         <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
@@ -113,7 +92,7 @@
       <div class="check-label">Set to remote</div>
   </div>
   {/if}
-  <div class="check-wrapper" on:click={handleFix}>
+  <div class="check-wrapper" on:click={()=>fix=!fix}>
     <div class="checkbox">
       {#if fix}
         <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
@@ -126,7 +105,12 @@
 <div class="input-wrapper">
   <div class="buttons">
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
-    <button class="btn action-btn" disabled={selectedPier.length < 1} on:click={()=>openModal(WarningPrompt)}>Import</button>
+    <button
+      class="btn action-btn"
+      disabled={selectedPier.length < 1}
+      on:click={()=>openModal(WarningPrompt,{filename:selectedPier, remote, fix, selectedDrive})}>
+      Import
+    </button>
   </div>
 </div>
 

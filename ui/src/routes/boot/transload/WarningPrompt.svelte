@@ -1,13 +1,12 @@
 <script>
   import { closeModal } from 'svelte-modals'
   import Modal from '$lib/Modal.svelte'
+  import { transloadPier } from '$lib/stores/websocket'
 
-  import { warningDone } from './store'
-
-  export let isOpen
+  export let isOpen, filename, remote, fix, selectedDrive
 
   const kickstartUpload = () => {
-    warningDone.set(true)
+    transloadPier(filename,remote,fix,selectedDrive)
     closeModal()
   }
 </script>

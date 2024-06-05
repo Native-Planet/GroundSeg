@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -26,6 +27,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/gorilla/mux"
+	"github.com/shirou/gopsutil/disk"
 )
 
 type uploadSession struct {
@@ -751,4 +753,56 @@ func registerServices(patp string) {
 	if err := startram.RegisterNewShip(patp); err != nil {
 		logger.Logger.Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
 	}
+}
+
+func SetupTransloadDir() error {
+	// init default
+	loc := filepath.Join(config.BasePath, "transload")
+	// check if mmc
+	mmc, err := isMountedMMC(loc)
+	if err != nil {
+		return fmt.Errorf("failed to check transload mountpoint %v", err)
+	}
+	if mmc {
+		loc = "/media/data/transload"
+	}
+	if err := os.MkdirAll(filepath.Dir(loc), os.ModePerm); err != nil {
+		return err
+	}
+	err = config.UpdateConf(map[string]interface{}{
+		"transloadDir": loc,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
 }

@@ -528,8 +528,7 @@ type WsTransloadPayload struct {
 type WsTransloadAction struct {
 	Type          string `json:"type"`
 	Action        string `json:"action"`
-	Path          string `json:"path"`
-	Patp          string `json:"patp"`
+	FileName      string `json:"filename"`
 	SelectedDrive string `json:"selectedDrive"`
 	Fix           bool   `json:"fix"`
 	Remote        bool   `json:"remote"`

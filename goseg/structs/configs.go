@@ -8,6 +8,7 @@ import (
 // system.json config struct
 type SysConfig struct {
 	Setup        string   `json:"setup"`
+	TransloadDir string   `json:"transloadDir"`
 	EndpointUrl  string   `json:"endpointUrl"`
 	ApiVersion   string   `json:"apiVersion"`
 	Piers        []string `json:"piers"`

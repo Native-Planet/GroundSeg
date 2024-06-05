@@ -226,6 +226,12 @@ func main() {
 		logger.Logger.Error(fmt.Sprintf("Failed to setup /tmp: %v", err))
 	}
 
+	// setup transload directory
+	logger.Logger.Info("Setting up transload directory")
+	if err := importer.SetupTransloadDir(); err != nil {
+		logger.Logger.Error(fmt.Sprintf("Failed to setup transload directory %v", err))
+	}
+
 	// update mode
 	if conf.UpdateMode == "auto" {
 		remoteVersion = true

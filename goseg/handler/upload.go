@@ -6,9 +6,6 @@ import (
 	"groundseg/importer"
 	"groundseg/logger"
 	"groundseg/structs"
-	"os"
-	"path/filepath"
-	"regexp"
 )
 
 func UploadHandler(msg []byte) error {
@@ -41,17 +38,22 @@ func TransloadHandler(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("couldn't unmarshal transload payload: %v", err)
 	}
-	if err = checkPath(transloadPayload.Payload.Path); err != nil {
-		return fmt.Errorf("invalid pier path: %v", err)
-	}
-	filename := filepath.Base(transloadPayload.Payload.Path)
+	/*
+		if err = checkPath(transloadPayload.Payload.Path); err != nil {
+			return fmt.Errorf("invalid pier path: %v", err)
+		}
+	*/
+	//filename := filepath.Base(transloadPayload.Payload.Path)
 	if transloadPayload.Payload.SelectedDrive != "system-drive" {
 		customDrive = transloadPayload.Payload.SelectedDrive
 	}
-	go importer.TransloadPier(filename, transloadPayload.Payload.Patp, transloadPayload.Payload.Remote, transloadPayload.Payload.Fix, transloadPayload.Payload.Path, customDrive)
+	logger.Logger.Warn(fmt.Sprintf("%+v", transloadPayload))
+	_ = customDrive
+	//go importer.TransloadPier(filename, transloadPayload.Payload.Patp, transloadPayload.Payload.Remote, transloadPayload.Payload.Fix, transloadPayload.Payload.Path, customDrive)
 	return nil
 }
 
+/*
 func checkPath(filePath string) error {
 	validPathRegex := regexp.MustCompile(`^/(?:[^/]+/)*[^/]+(?:\.tar|\.tar\.gz|\.tgz|\.zip)$`)
 	if !validPathRegex.MatchString(filePath) {
@@ -64,3 +66,4 @@ func checkPath(filePath string) error {
 	}
 	return nil
 }
+*/
