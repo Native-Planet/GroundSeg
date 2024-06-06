@@ -2,6 +2,7 @@
   import { structure } from '$lib/stores/data'
   import { goto } from '$app/navigation'
   import { checkPatp } from '$lib/stores/patp'
+  import { page } from '$app/stores'
 
   import { openModal } from 'svelte-modals'
   import WarningPrompt from './WarningPrompt.svelte'
@@ -42,15 +43,22 @@
 </script>
 
 <div class="input-wrapper">
-  {JSON.stringify(transloadDir)}
+  <div class="label">Command</div>
+  {#if transloadDir.length > 0}
+    <pre class="command">scp {"<"}sampel-palnet.zip{">"} nativeplanet@{$page.url.hostname}:{transloadDir}</pre>
+  {:else}
+    <pre class="command">Unable to display command, transload misconfigured</pre>
+  {/if}
   <div class="label">Available Piers</div>
   <div class="available">
-    {#if transloadPiers.length > 0}
-    {#each transloadPiers as p}
-      {#if checkPatp(p.split(".")[0])}
-      <div class="pier" on:click={()=>selectedPier=p} class:selected={p==selectedPier}>{p}</div>
-      {/if}
-    {/each}
+    {#if transloadPiers.length < 1}
+      <div class="no-piers">No valid piers</div>
+    {:else}
+      {#each transloadPiers as p}
+        {#if checkPatp(p.split(".")[0])}
+        <div class="pier" on:click={()=>selectedPier=p} class:selected={p==selectedPier}>{p}</div>
+        {/if}
+      {/each}
     {/if}
   </div>
 </div>
@@ -109,7 +117,7 @@
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn action-btn"
-      disabled={selectedPier.length < 1}
+      disabled={selectedPier.length < 1 || transloadDir.length < 1}
       on:click={()=>openModal(WarningPrompt,{filename:selectedPier, remote, fix, selectedDrive})}>
       Import
     </button>
@@ -304,5 +312,20 @@
   .selected {
     background: var(--btn-secondary);
     color: white;
+  }
+  .command {
+    padding: 16px 32px;
+    background: var(--bg-modal);
+    border-radius: 16px;
+  }
+  .no-piers {
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 18px;
+    font-style: normal;
+    letter-spacing: -1.44px;
+    user-select: none;
+    cursor: pointer;
   }
 </style>

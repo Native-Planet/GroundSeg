@@ -416,20 +416,16 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	go waitForShipReady(filename, patp, remote, fix)
 }
 
-// load a pier from a file on-disk already
-func TransloadPier(filename, patp string, remote, fix bool, compressedPath, dirPath string) {
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
+func TransloadPier(filename string, remote, fix bool) {
+	patp := strings.Split(filename, ".")[0]
+	logger.Logger.Info(fmt.Sprintf("Transload pier requested for pier: %v", patp))
+	docker.TransloadShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
-	var customPath string
-	if dirPath != "" {
-		customPath = dirPath
-	}
-	err := shipcreator.CreateUrbitConfig(patp, customPath)
+	err := shipcreator.CreateUrbitConfig(patp, "")
 	if err != nil {
 		errmsg := fmt.Sprintf("Failed to create urbit config: %v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
+		transloadCleanup(filename, errmsg)
 		return
 	}
 	// update system.json
@@ -437,7 +433,7 @@ func TransloadPier(filename, patp string, remote, fix bool, compressedPath, dirP
 	if err != nil {
 		errmsg := fmt.Sprintf("Failed to update system.json: %v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
+		transloadCleanup(filename, errmsg)
 		return
 	}
 	// Prepare environment for pier
@@ -454,71 +450,63 @@ func TransloadPier(filename, patp string, remote, fix bool, compressedPath, dirP
 		errmsg := fmt.Sprintf("%v (harmless)", err)
 		logger.Logger.Info(errmsg)
 	}
-	if customPath == "" { // no custom path provided
-		// create new docker volume
-		err = docker.CreateVolume(patp)
-		if err != nil {
-			errmsg := fmt.Sprintf("failed to create volume: %v", err)
-			logger.Logger.Error(errmsg)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	} else { // create custom directory for upload
-		if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
-			errmsg := fmt.Sprintf("create custom pier directory error: %v", err)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
+	// create new docker volume
+	err = docker.CreateVolume(patp)
+	if err != nil {
+		errmsg := fmt.Sprintf("failed to create volume: %v", err)
+		logger.Logger.Error(errmsg)
+		transloadCleanup(filename, errmsg)
+		return
 	}
+
 	// extract file to volume directory
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
+	docker.TransloadShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
 	// set default path
 	volPath := filepath.Join(config.DockerDir, patp, "_data")
-	// modify if custom path
-	if customPath != "" {
-		volPath = filepath.Join(customPath, patp)
-	}
+
+	conf := config.Conf()
+	compressedPath := filepath.Join(conf.TransloadDir, filename)
 	switch checkExtension(filename) {
 	case ".zip":
 		err := extractZip(compressedPath, volPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
+			transloadCleanup(filename, errmsg)
 			return
 		}
 	case ".tar.gz", ".tgz":
 		err := extractTarGz(compressedPath, volPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
+			transloadCleanup(filename, errmsg)
 			return
 		}
 	case ".tar":
 		err := extractTar(compressedPath, volPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
+			transloadCleanup(filename, errmsg)
 			return
 		}
 	default:
 		errmsg := fmt.Sprintf("Unsupported file type %v", filename)
-		errorCleanup(filename, patp, errmsg)
+		transloadCleanup(filename, errmsg)
 		return
 	}
 	logger.Logger.Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
 	// run restructure
 	if err := restructureDirectory(patp); err != nil {
-		errorCleanup(filename, patp, fmt.Sprintf("Failed to restructure directory: %v", err))
+		transloadCleanup(filename, fmt.Sprintf("Failed to restructure directory: %v", err))
 		return
 	}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
+	docker.TransloadShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
 	// start container
 	logger.Logger.Info(fmt.Sprintf("Starting extracted pier: %v", patp))
 	info, err := docker.StartContainer(patp, "vere")
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
 		logger.Logger.Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
+		transloadCleanup(filename, errmsg)
 		return
 	}
 	config.UpdateContainerState(patp, info)
@@ -530,7 +518,6 @@ func TransloadPier(filename, patp string, remote, fix bool, compressedPath, dirP
 	//return
 
 	// if startram is registered
-	conf := config.Conf()
 	if conf.WgRegistered {
 		// Register Services
 		go registerServices(patp)
@@ -626,6 +613,10 @@ func importShipToggleRemote(patp string) {
 			return
 		}
 	}
+}
+
+func transloadCleanup(filename, errmsg string) {
+	logger.Logger.Error(errmsg)
 }
 
 func errorCleanup(filename, patp, errmsg string) {

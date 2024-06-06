@@ -12,6 +12,8 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -449,12 +451,36 @@ func constructSystemInfo() structs.System {
 	sysInfo.Info.TransloadDir = conf.TransloadDir
 
 	// transload lobby
-	sysInfo.Info.Transload = []string{"fakepier.zip", "otherfakepier.tar.gz", "pierrr.zip", "sampel-palnet.zip"}
+	validTransloadPiers, err := retrieveValidPiers(conf.TransloadDir)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("failed to retrieve valid piers for transload: %v", err))
+	}
+	sysInfo.Info.Transload = validTransloadPiers
 
 	// Transition
 	sysInfo.Transition = SystemTransitions
 
 	return sysInfo
+}
+
+func retrieveValidPiers(loc string) ([]string, error) {
+	var valid []string
+
+	files, err := ioutil.ReadDir(loc)
+	if err != nil {
+		return valid, err
+	}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(file.Name())
+		if checkPatp(file.Name()) && (ext == ".zip" || ext == ".tgz" || ext == ".tar" || strings.HasSuffix(file.Name(), ".tar.gz")) {
+			valid = append(valid, file.Name())
+		}
+	}
+
+	return valid, nil
 }
 
 // return a map of ships and their networks
@@ -534,4 +560,42 @@ func ReloadUrbits() error {
 	broadcastState.Urbits = urbits
 	mu.Unlock()
 	return nil
+}
+
+func checkPatp(patp string) bool {
+	// Handle undefined patp
+	if patp == "" {
+		return false
+	}
+
+	extRemoved := strings.Split(patp, ".")[0]
+
+	// Split the string by hyphen
+	wordlist := strings.Split(extRemoved, "-")
+
+	// Define the regular expression pattern
+	pattern := regexp.MustCompile("^[a-z]{6}$|^[a-z]{3}$")
+
+	// Define pre and suf (truncated for brevity)
+	pre := "dozmarbinwansamlitsighidfidlissogdirwacsabwissibrigsoldopmodfoglidhopdardorlorhodfolrintogsilmirholpaslacrovlivdalsatlibtabhanticpidtorbolfosdotlosdilforpilramtirwintadbicdifrocwidbisdasmidloprilnardapmolsanlocnovsitnidtipsicropwitnatpanminritpodmottamtolsavposnapnopsomfinfonbanmorworsipronnorbotwicsocwatdolmagpicdavbidbaltimtasmalligsivtagpadsaldivdactansidfabtarmonranniswolmispallasdismaprabtobrollatlonnodnavfignomnibpagsopralbilhaddocridmocpacravripfaltodtiltinhapmicfanpattaclabmogsimsonpinlomrictapfirhasbosbatpochactidhavsaplindibhosdabbitbarracparloddosbortochilmactomdigfilfasmithobharmighinradmashalraglagfadtopmophabnilnosmilfopfamdatnoldinhatnacrisfotribhocnimlarfitwalrapsarnalmoslandondanladdovrivbacpollaptalpitnambonrostonfodponsovnocsorlavmatmipfip"
+	suf := "zodnecbudwessevpersutletfulpensytdurwepserwylsunrypsyxdyrnuphebpeglupdepdysputlughecryttyvsydnexlunmeplutseppesdelsulpedtemledtulmetwenbynhexfebpyldulhetmevruttylwydtepbesdexsefwycburderneppurrysrebdennutsubpetrulsynregtydsupsemwynrecmegnetsecmulnymtevwebsummutnyxrextebfushepbenmuswyxsymselrucdecwexsyrwetdylmynmesdetbetbeltuxtugmyrpelsyptermebsetdutdegtexsurfeltudnuxruxrenwytnubmedlytdusnebrumtynseglyxpunresredfunrevrefmectedrusbexlebduxrynnumpyxrygryxfeptyrtustyclegnemfermertenlusnussyltecmexpubrymtucfyllepdebbermughuttunbylsudpemdevlurdefbusbeprunmelpexdytbyttyplevmylwedducfurfexnulluclennerlexrupnedlecrydlydfenwelnydhusrelrudneshesfetdesretdunlernyrsebhulrylludremlysfynwerrycsugnysnyllyndyndemluxfedsedbecmunlyrtesmudnytbyrsenwegfyrmurtelreptegpecnelnevfes"
+
+	for _, word := range wordlist {
+		// Check regular expression match
+		if !pattern.MatchString(word) {
+			return false
+		}
+
+		// Check prefixes and suffixes
+		if len(word) > 3 {
+			if !strings.Contains(pre, word[0:3]) || !strings.Contains(suf, word[3:6]) {
+				return false
+			}
+		} else {
+			if !strings.Contains(suf, word) {
+				return false
+			}
+		}
+	}
+	return true
 }

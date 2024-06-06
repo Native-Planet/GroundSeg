@@ -22,13 +22,14 @@ import (
 )
 
 var (
-	VolumeDir          = config.DockerDir
-	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
-	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
-	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
-	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
-	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
-	ContainerStatList  []string                                    // slice of containers to poll for resource use
+	VolumeDir             = config.DockerDir
+	UTransBus             = make(chan structs.UrbitTransition, 100)   // urbit transition bus
+	SysTransBus           = make(chan structs.SystemTransition, 100)  // system transition bus
+	NewShipTransBus       = make(chan structs.NewShipTransition, 100) // transition event bus
+	ImportShipTransBus    = make(chan structs.UploadTransition, 100)  // transition event bus
+	TransloadShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
+	ContainerStats        = make(map[string]structs.ContainerStats)   // used for broadcast
+	ContainerStatList     []string                                    // slice of containers to poll for resource use
 )
 
 func init() {
