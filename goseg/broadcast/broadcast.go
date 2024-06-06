@@ -446,6 +446,7 @@ func constructSystemInfo() structs.System {
 		}
 	}
 	sysInfo.Info.Drives = drives
+	sysInfo.Info.TransloadDir = conf.TransloadDir
 
 	// transload lobby
 	sysInfo.Info.Transload = []string{"fakepier.zip", "otherfakepier.tar.gz", "pierrr.zip", "sampel-palnet.zip"}

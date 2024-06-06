@@ -766,7 +766,10 @@ func SetupTransloadDir() error {
 	if mmc {
 		loc = "/media/data/transload"
 	}
-	if err := os.MkdirAll(filepath.Dir(loc), os.ModePerm); err != nil {
+	if err := os.MkdirAll(loc, os.ModePerm); err != nil {
+		return err
+	}
+	if err := os.Chmod(loc, 0777); err != nil {
 		return err
 	}
 	err = config.UpdateConf(map[string]interface{}{

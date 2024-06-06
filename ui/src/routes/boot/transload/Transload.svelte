@@ -37,10 +37,12 @@
   /*  Uploader API address */
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
+  $: transloadDir = ($structure?.system?.info?.transloadDir) || ""
 
 </script>
 
 <div class="input-wrapper">
+  {JSON.stringify(transloadDir)}
   <div class="label">Available Piers</div>
   <div class="available">
     {#if transloadPiers.length > 0}
