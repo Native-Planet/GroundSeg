@@ -25,8 +25,9 @@
 
   $: drives = $structure?.system?.info?.drives || {}
   $: driveNames = Object.keys(drives)
-
-  $: transloadPiers = $structure?.system?.info?.transload || []
+  $: transload = $structure?.transload || {}
+  $: piers = transload?.piers || []
+  $: location = transload?.location || ""
 
 
   let patp = ""
@@ -38,23 +39,22 @@
   /*  Uploader API address */
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
-  $: transloadDir = ($structure?.system?.info?.transloadDir) || ""
 
 </script>
 
 <div class="input-wrapper">
   <div class="label">Command</div>
-  {#if transloadDir.length > 0}
-    <pre class="command">scp {"<"}sampel-palnet.zip{">"} nativeplanet@{$page.url.hostname}:{transloadDir}</pre>
+  {#if location.length > 0}
+    <pre class="command">scp {"<"}sampel-palnet.zip{">"} nativeplanet@{$page.url.hostname}:{location}</pre>
   {:else}
     <pre class="command">Unable to display command, transload misconfigured</pre>
   {/if}
   <div class="label">Available Piers</div>
   <div class="available">
-    {#if transloadPiers.length < 1}
+    {#if piers.length < 1}
       <div class="no-piers">No valid piers</div>
     {:else}
-      {#each transloadPiers as p}
+      {#each piers as p}
         {#if checkPatp(p.split(".")[0])}
         <div class="pier" on:click={()=>selectedPier=p} class:selected={p==selectedPier}>{p}</div>
         {/if}
@@ -117,7 +117,7 @@
     <button class="btn back" on:click={()=>goto(pfx+'/boot')}>Back</button>
     <button
       class="btn action-btn"
-      disabled={selectedPier.length < 1 || transloadDir.length < 1}
+      disabled={selectedPier.length < 1 || location.length < 1}
       on:click={()=>openModal(WarningPrompt,{filename:selectedPier, remote, fix, selectedDrive})}>
       Import
     </button>

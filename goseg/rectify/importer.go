@@ -41,10 +41,10 @@ func ImportShipTransitionHandler() {
 func TransloadShipTransitionHandler() {
 	for {
 		event := <-docker.TransloadShipTransBus
-		logger.Logger.Warn(fmt.Sprintf("%+v", event))
+		logger.Logger.Warn(fmt.Sprintf("%+v", event.Type))
 		/*
 			current := broadcast.GetState()
-			uploadStruct := current.Upload
+			transloadStruct := current.Transload
 			switch event.Type {
 			// uploading
 			// creating
@@ -54,18 +54,18 @@ func TransloadShipTransitionHandler() {
 			// completed
 			// aborted
 			case "status":
-				uploadStruct.Status = event.Event
+				transloadStruct.Status = event.Event
 			case "patp":
-				uploadStruct.Patp = event.Event
+				transloadStruct.Patp = event.Event
 			case "error":
-				uploadStruct.Error = event.Event
+				transloadStruct.Error = event.Event
 			case "extracted":
-				uploadStruct.Extracted = int64(event.Value)
+				transloadStruct.Extracted = int64(event.Value)
 			default:
 				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue
 			}
-			current.Upload = uploadStruct
+			current.Transload = transloadStruct
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		*/

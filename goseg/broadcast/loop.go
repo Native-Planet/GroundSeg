@@ -31,6 +31,8 @@ func BroadcastLoop() {
 				// profile info
 				profileInfo := constructProfileInfo()
 
+				transloadInfo := constructTransloadInfo()
+
 				// Retrieve broadcastState
 				mu.RLock()
 				newState := broadcastState
@@ -40,12 +42,14 @@ func BroadcastLoop() {
 				systemInfo = PreserveSystemTransitions(newState, systemInfo)
 				pierInfo = PreserveUrbitsTransitions(newState, pierInfo)
 				profileInfo = PreserveProfileTransitions(newState, profileInfo)
+				transloadInfo = PreserveTransloadInfo(newState, transloadInfo)
 
 				// Update broadcast state
 				newState.System = systemInfo
 				newState.Urbits = pierInfo
 				newState.Apps = appsInfo
 				newState.Profile = profileInfo
+				newState.Transload = transloadInfo
 
 				UpdateBroadcast(newState)
 
@@ -76,4 +80,11 @@ func PreserveUrbitsTransitions(oldState structs.AuthBroadcast, newUrbits map[str
 		newUrbits[k] = urbitStruct
 	}
 	return newUrbits
+}
+
+func PreserveTransloadInfo(oldState structs.AuthBroadcast, newTransload structs.Transload) structs.Transload {
+	newTransload.Status = oldState.Transload.Status
+	newTransload.Error = oldState.Transload.Error
+	newTransload.Extracted = oldState.Transload.Extracted
+	return newTransload
 }

@@ -97,6 +97,10 @@ func bootstrapBroadcastState() error {
 	mu.Lock()
 	broadcastState.System = sysInfo
 	mu.Unlock()
+	transloadInfo := constructTransloadInfo()
+	mu.Lock()
+	broadcastState.Transload = transloadInfo
+	mu.Unlock()
 	// update with profile state
 	profileInfo := constructProfileInfo()
 	mu.Lock()
@@ -326,6 +330,20 @@ func constructAppsInfo() structs.Apps {
 	return apps
 }
 
+func constructTransloadInfo() structs.Transload {
+	var info structs.Transload
+	conf := config.Conf()
+	info.Location = conf.TransloadDir
+	info.Status = "free"
+	// transload lobby
+	valid, err := retrieveValidPiers(info.Location)
+	if err != nil {
+		logger.Logger.Error(fmt.Sprintf("failed to retrieve valid piers for transload: %v", err))
+	}
+	info.Piers = valid
+	return info
+}
+
 func constructProfileInfo() structs.Profile {
 	// Build startram struct
 	var startramInfo structs.Startram
@@ -448,14 +466,6 @@ func constructSystemInfo() structs.System {
 		}
 	}
 	sysInfo.Info.Drives = drives
-	sysInfo.Info.TransloadDir = conf.TransloadDir
-
-	// transload lobby
-	validTransloadPiers, err := retrieveValidPiers(conf.TransloadDir)
-	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("failed to retrieve valid piers for transload: %v", err))
-	}
-	sysInfo.Info.Transload = validTransloadPiers
 
 	// Transition
 	sysInfo.Transition = SystemTransitions

@@ -7,6 +7,7 @@ type AuthBroadcast struct {
 	Type      string           `json:"type"`
 	AuthLevel string           `json:"auth_level"`
 	Upload    Upload           `json:"upload"`
+	Transload Transload        `json:"transload"`
 	Logs      Logs             `json:"logs"`
 	NewShip   NewShip          `json:"newShip"`
 	System    System           `json:"system"`
@@ -43,12 +44,10 @@ type NewShip struct {
 // broadcast payload subobject
 type System struct {
 	Info struct {
-		Usage        SystemUsage            `json:"usage"`
-		Updates      SystemUpdates          `json:"updates"`
-		Wifi         SystemWifi             `json:"wifi"`
-		TransloadDir string                 `json:"transloadDir"`
-		Transload    []string               `json:"transload"`
-		Drives       map[string]SystemDrive `json:"drives"`
+		Usage   SystemUsage            `json:"usage"`
+		Updates SystemUpdates          `json:"updates"`
+		Wifi    SystemWifi             `json:"wifi"`
+		Drives  map[string]SystemDrive `json:"drives"`
 		//BlockDevices []BlockDev    `json:"blockDevices"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
@@ -214,6 +213,15 @@ type Logs struct {
 		Stream bool  `json:"stream"`
 		Logs   []any `json:"logs"`
 	} `json:"system"`
+}
+
+type Transload struct {
+	Status    string   `json:"status"`
+	Patp      string   `json:"patp"`
+	Piers     []string `json:"piers"`
+	Location  string   `json:"location"`
+	Error     string   `json:"error"`
+	Extracted int64    `json:"extracted"`
 }
 
 // broadcast payload subobject
