@@ -2,16 +2,17 @@ package leak
 
 import (
 	"fmt"
-	"groundseg/logger"
 	"net"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/zap"
 )
 
 func makeSymlink(patp, sockLocation, symlinkPath string) (string, error) {
 	err := os.MkdirAll(symlinkPath, 0755)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to create directory: %v : %v", symlinkPath, err))
+		zap.L().Error(fmt.Sprintf("Failed to create directory: %v : %v", symlinkPath, err))
 		return "", err
 	}
 	symlink := filepath.Join(symlinkPath, patp)

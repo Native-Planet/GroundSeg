@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"groundseg/broadcast"
 	"groundseg/docker"
-	"groundseg/logger"
+
+	"go.uber.org/zap"
 )
 
 func ImportShipTransitionHandler() {
@@ -29,7 +30,7 @@ func ImportShipTransitionHandler() {
 		case "extracted":
 			uploadStruct.Extracted = int64(event.Value)
 		default:
-			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 			continue
 		}
 		current.Upload = uploadStruct

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"groundseg/logger"
 	"math/big"
 	"net"
 
 	"github.com/stevelacy/go-urbit/noun"
+	"go.uber.org/zap"
 )
 
 func connectToIPC(socketPath string) (net.Conn, error) {
@@ -28,7 +28,7 @@ func toBytes(num *big.Int) []byte {
 	length := noun.ByteLen(num)
 	lenBytes, err := int64ToLittleEndianBytes(length)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v", err))
+		zap.L().Error(fmt.Sprintf("%v", err))
 	}
 	bytes := makeBytes(num)
 	padded = append(padded, version...)

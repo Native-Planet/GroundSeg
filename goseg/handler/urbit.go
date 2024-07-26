@@ -16,11 +16,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // handle urbit-type events
 func UrbitHandler(msg []byte) error {
-	logger.Logger.Info("Urbit")
+	zap.L().Info("Urbit")
 	var urbitPayload structs.WsUrbitPayload
 	err := json.Unmarshal(msg, &urbitPayload)
 	if err != nil {
@@ -169,7 +171,7 @@ func urbitCleanDelete(patp string) error {
 		isRunning := strings.Contains(status, "Up")
 		if isRunning {
 			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit: %v", patp, err))
 			}
 		}
 		for {
@@ -177,7 +179,7 @@ func urbitCleanDelete(patp string) error {
 			if err != nil {
 				break
 			}
-			logger.Logger.Warn(fmt.Sprintf("%s", status))
+			zap.L().Warn(fmt.Sprintf("%s", status))
 			if !strings.Contains(status, "Up") {
 				break
 			}
@@ -482,9 +484,9 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Failed to stop ship with |exit for pack & meld %s: %v", patp, err))
 			if err = docker.StopContainerByName(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
 			}
 		}
 		waitComplete(patp)
@@ -492,7 +494,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	// stop ship
 	// start ship as pack
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "packing"}
-	logger.Logger.Info(fmt.Sprintf("Attempting to urth pack %s", patp))
+	zap.L().Info(fmt.Sprintf("Attempting to urth pack %s", patp))
 	shipConf.BootStatus = "pack"
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
@@ -505,11 +507,11 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 		return packMeldError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
 	waitComplete(patp)
 
 	// start ship as meld
-	logger.Logger.Info(fmt.Sprintf("Attempting to urth meld %s", patp))
+	zap.L().Info(fmt.Sprintf("Attempting to urth meld %s", patp))
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "melding"}
 	shipConf.BootStatus = "meld"
 	update = make(map[string]structs.UrbitDocker)
@@ -523,7 +525,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 		return packMeldError(fmt.Errorf("Failed to urth meld %s: %v", patp, err))
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
 	waitComplete(patp)
 
 	// start ship if "boot"
@@ -633,7 +635,7 @@ func setMinIODomain(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 }
 
 func ChopPier(patp string, shipConf structs.UrbitDocker) error {
-	logger.Logger.Info(fmt.Sprintf("Chop called for %s", patp))
+	zap.L().Info(fmt.Sprintf("Chop called for %s", patp))
 	// error handling
 	chopError := func(err error) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "error"}
@@ -643,7 +645,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	defer func() {
 		time.Sleep(3 * time.Second)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: ""}
-		logger.Logger.Info(fmt.Sprintf("Chop for %s, ran defer", patp))
+		zap.L().Info(fmt.Sprintf("Chop for %s, ran defer", patp))
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
@@ -658,7 +660,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for chop %s: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Failed to stop ship with |exit for chop %s: %v", patp, err))
 			if err = docker.StopContainerByName(patp); err != nil {
 				return fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err)
 			}
@@ -667,7 +669,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 	// start ship as chop
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "chopping"}
-	logger.Logger.Info(fmt.Sprintf("Attempting to chop %s", patp))
+	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
 	shipConf.BootStatus = "chop"
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
@@ -680,7 +682,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 		return chopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
 	waitComplete(patp)
 
 	// start ship if "boot"
@@ -731,7 +733,7 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	contConf[patp] = patpConf
 	config.UpdateContainerState(patp, patpConf)
 	if err := click.BarExit(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v", err))
+		zap.L().Error(fmt.Sprintf("%v", err))
 		if err := docker.StopContainerByName(patp); err != nil {
 			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
 		}
@@ -742,26 +744,26 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	if conf.WgRegistered {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "removing-services"}
 		if err := startram.SvcDelete(patp, "urbit"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Couldn't remove urbit anchor for %v: %v", patp, err))
 		}
 		if err := startram.SvcDelete("s3."+patp, "s3"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Couldn't remove s3 anchor for %v: %v", patp, err))
 		}
 		if err := docker.DeleteContainer("minio_" + patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't delete minio docker container for %v: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Couldn't delete minio docker container for %v: %v", patp, err))
 		}
 	}
 	// get custom directory info before deleting config
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "deleting"}
 	if err := config.RemoveUrbitConfig(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
+		zap.L().Error(fmt.Sprintf("Couldn't remove config for %v: %v", patp, err))
 	}
 	conf = config.Conf()
 	piers := cutSlice(conf.Piers, patp)
 	if err := config.UpdateConf(map[string]interface{}{
 		"piers": piers,
 	}); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error updating config: %v", err))
+		zap.L().Error(fmt.Sprintf("Error updating config: %v", err))
 	}
 	customLoc, ok := shipConf.CustomPierLocation.(string) // Type assertion to string
 	if ok {
@@ -776,7 +778,7 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 		}
 	}
 	config.DeleteContainerState(patp)
-	logger.Logger.Info(fmt.Sprintf("%v container deleted", patp))
+	zap.L().Info(fmt.Sprintf("%v container deleted", patp))
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "success"}
 	time.Sleep(3 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "done"}
@@ -785,7 +787,7 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: ""}
 	// remove from broadcast
 	if err := broadcast.ReloadUrbits(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error updating broadcast: %v", err))
+		zap.L().Error(fmt.Sprintf("Error updating broadcast: %v", err))
 	}
 	return nil
 }
@@ -800,7 +802,7 @@ func exportShip(patp string, urbitPayload structs.WsUrbitPayload, shipConf struc
 	}
 	// stop container
 	if err := click.BarExit(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v", err))
+		zap.L().Error(fmt.Sprintf("%v", err))
 		if err := docker.StopContainerByName(patp); err != nil {
 			return err
 		}
@@ -839,7 +841,7 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 		}
 		_, err := docker.StartContainer(patp, "vere")
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	} else if shipConf.BootStatus == "boot" {
 		shipConf.BootStatus = "noboot"
@@ -849,9 +851,9 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 		}
 		err := click.BarExit(patp)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 			if err := docker.StopContainerByName(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("%v", err))
+				zap.L().Error(fmt.Sprintf("%v", err))
 			}
 		}
 	}
@@ -872,11 +874,11 @@ func toggleDevMode(patp string, shipConf structs.UrbitDocker) error {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
 	if err := urbitCleanDelete(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+		zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 	}
 	_, err := docker.StartContainer(patp, "vere")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("%v", err))
+		zap.L().Error(fmt.Sprintf("%v", err))
 	}
 	return nil
 }
@@ -884,7 +886,7 @@ func toggleDevMode(patp string, shipConf structs.UrbitDocker) error {
 func rebuildContainer(patp string, shipConf structs.UrbitDocker) error {
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rebuildContainer", Event: "loading"}
 	if err := urbitCleanDelete(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+		zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 	}
 	if shipConf.BootStatus != "noboot" {
 		_, err := docker.StartContainer(patp, "vere")
@@ -914,7 +916,7 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 	defer func() { docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "toggleNetwork", Event: ""} }()
 	currentNetwork := shipConf.Network
 	conf := config.Conf()
-	logger.Logger.Warn(fmt.Sprintf("%v", currentNetwork))
+	zap.L().Warn(fmt.Sprintf("%v", currentNetwork))
 	if currentNetwork == "wireguard" {
 		shipConf.Network = "bridge"
 		update := make(map[string]structs.UrbitDocker)
@@ -923,7 +925,7 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		if err := urbitCleanDelete(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+			zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 		}
 	} else if currentNetwork != "wireguard" && conf.WgRegistered == true {
 		shipConf.Network = "wireguard"
@@ -933,14 +935,14 @@ func toggleNetwork(patp string, shipConf structs.UrbitDocker) error {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
 		if err := urbitCleanDelete(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+			zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 		}
 	} else {
 		return fmt.Errorf("No remote registration")
 	}
 	if shipConf.BootStatus == "boot" {
 		if _, err := docker.StartContainer(patp, "vere"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 		}
 	}
 	return nil
@@ -950,11 +952,11 @@ func toggleBootStatus(patp string, shipConf structs.UrbitDocker) error {
 	if shipConf.BootStatus == "ignore" {
 		statusMap, err := docker.GetShipStatus([]string{patp})
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to get ship status for %s", patp))
+			zap.L().Error(fmt.Sprintf("Failed to get ship status for %s", patp))
 		}
 		status, exists := statusMap[patp]
 		if !exists {
-			logger.Logger.Error(fmt.Sprintf("Running status for %s doesn't exist", patp))
+			zap.L().Error(fmt.Sprintf("Running status for %s doesn't exist", patp))
 		}
 		if strings.Contains(status, "Up") {
 			shipConf.BootStatus = "boot"
@@ -1042,11 +1044,11 @@ func handleLoom(patp string, urbitPayload structs.WsUrbitPayload, shipConf struc
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
 	if err := urbitCleanDelete(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+		zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
 	}
 	if shipConf.BootStatus == "boot" {
 		if _, err := docker.StartContainer(patp, "vere"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 		}
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "success"}
@@ -1127,16 +1129,16 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to stop ship with |exit for roll & chop %s: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Failed to stop ship with |exit for roll & chop %s: %v", patp, err))
 			if err = docker.StopContainerByName(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
 			}
 		}
 		waitComplete(patp)
 	}
 	// start ship as roll
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "rolling"}
-	logger.Logger.Info(fmt.Sprintf("Attempting to roll %s", patp))
+	zap.L().Info(fmt.Sprintf("Attempting to roll %s", patp))
 	shipConf.BootStatus = "roll"
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
@@ -1149,11 +1151,11 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 		return rollChopError(fmt.Errorf("Failed to roll %s: %v", patp, err))
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Waiting for roll to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for roll to complete for %s", patp))
 	waitComplete(patp)
 
 	// start ship as chop
-	logger.Logger.Info(fmt.Sprintf("Attempting to chop %s", patp))
+	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "chopping"}
 	shipConf.BootStatus = "chop"
 	update = make(map[string]structs.UrbitDocker)
@@ -1167,7 +1169,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 		return rollChopError(fmt.Errorf("Failed to chop %s: %v", patp, err))
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
+	zap.L().Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
 	waitComplete(patp)
 
 	// start ship if "boot"

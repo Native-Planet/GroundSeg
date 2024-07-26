@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"go.uber.org/zap"
 )
 
 var (
@@ -36,27 +37,27 @@ func init() {
 	_, err := FindContainer("groundseg-webui")
 	if err == nil {
 		if err = StopContainerByName("groundseg-webui"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't stop old webui container: %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't stop old webui container: %v", err))
 		}
 	}
 	if err = killContainerUsingPort(80); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error creating Docker client: %v", err))
+		zap.L().Error(fmt.Sprintf("Error creating Docker client: %v", err))
 		return
 	}
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error getting Docker version: %v", err))
+		zap.L().Error(fmt.Sprintf("Error getting Docker version: %v", err))
 		if strings.Contains(err.Error(), "is too new") {
 			updateDocker()
 		}
 		return
 	}
 	//go getContainerStats()
-	logger.Logger.Info(fmt.Sprintf("Docker version: %s", version.Version))
+	zap.L().Info(fmt.Sprintf("Docker version: %s", version.Version))
 }
 
 func killContainerUsingPort(n uint16) error {
@@ -74,7 +75,7 @@ func killContainerUsingPort(n uint16) error {
 	// List running containers
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{Filters: filters})
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
+		zap.L().Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
 		return err
 	}
 
@@ -85,7 +86,7 @@ func killContainerUsingPort(n uint16) error {
 				logger.Logger.Debug(fmt.Sprintf("Stopping container %s to free port %v", cont.ID, n))
 				options := container.StopOptions{}
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
-					logger.Logger.Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
+					zap.L().Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
 				}
 				return nil
 			}
@@ -96,12 +97,12 @@ func killContainerUsingPort(n uint16) error {
 
 // attempt to update docker daemon (ubuntu/mint only)
 func updateDocker() {
-	logger.Logger.Info("Unsupported Docker version detected -- attempting to upgrade")
+	zap.L().Info("Unsupported Docker version detected -- attempting to upgrade")
 	packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
 	for _, pkg := range packages {
 		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
+			zap.L().Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
 			return
 		}
 	}
@@ -115,12 +116,12 @@ func updateDocker() {
 	for _, cmd := range commands {
 		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
+			zap.L().Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
 		}
 	}
 	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
 		return
 	}
 	codename := strings.TrimSpace(string(out))
@@ -131,7 +132,7 @@ func updateDocker() {
 	}
 	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
 	if archErr != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
 		return
 	}
 	architecture := strings.TrimSpace(string(archOut))
@@ -139,16 +140,16 @@ func updateDocker() {
 	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
 	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
 		return
 	}
 	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
 	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
 		return
 	}
-	logger.Logger.Info("Successfully updated Docker")
+	zap.L().Info("Successfully updated Docker")
 }
 
 // return the container status of a slice of ships
@@ -157,13 +158,13 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		return statuses, err
 	} else {
 		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 			return statuses, err
 		} else {
 			for _, pier := range patps {
@@ -233,10 +234,10 @@ func GetContainerNetwork(name string) (string, error) {
 func getContainerStats() (structs.ContainerStats, error) {
 	ticker := time.NewTicker(10 * time.Second)
 	for {
-		logger.Logger.Warn("hereeeeeeeeeeeeee")
+		zap.L().Warn("hereeeeeeeeeeeeee")
 		select {
 		case <-ticker.C:
-			logger.Logger.Warn(fmt.Sprintf("CONTAINER STAT LIST: %+v", ContainerStatList))
+			zap.L().Warn(fmt.Sprintf("CONTAINER STAT LIST: %+v", ContainerStatList))
 			for _, pier := range ContainerStatList {
 				var res structs.ContainerStats
 				cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -294,7 +295,7 @@ func CreateVolume(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	logger.Logger.Info(fmt.Sprintf("Created volume: %s", vol.Name))
+	zap.L().Info(fmt.Sprintf("Created volume: %s", vol.Name))
 	return nil
 }
 
@@ -312,7 +313,7 @@ func DeleteVolume(name string) error {
 		errmsg := fmt.Errorf("Failed to remove docker volume: %v : %v", name, err)
 		return errmsg
 	}
-	logger.Logger.Info(fmt.Sprintf("Deleted volume: %s", name))
+	zap.L().Info(fmt.Sprintf("Deleted volume: %s", name))
 	return nil
 }
 
@@ -331,7 +332,7 @@ func DeleteContainer(name string) error {
 		return errmsg
 	}
 	// Output created volume information
-	logger.Logger.Info(fmt.Sprintf("Deleted Container: %s", name))
+	zap.L().Info(fmt.Sprintf("Deleted Container: %s", name))
 	return nil
 }
 
@@ -356,7 +357,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 		errmsg := fmt.Errorf("Failed to write to volume: %v : %v", name, err)
 		return errmsg
 	}
-	logger.Logger.Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
+	zap.L().Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
 }
 
@@ -441,7 +442,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
-		logger.Logger.Info(msg)
+		zap.L().Info(msg)
 	case existingContainer.State == "exited":
 		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 		if err != nil {
@@ -456,14 +457,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
-		logger.Logger.Info(msg)
+		zap.L().Info(msg)
 	case existingContainer.State == "created":
 		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
 		if err != nil {
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started created container %s", containerName)
-		logger.Logger.Info(msg)
+		zap.L().Info(msg)
 	default:
 		// if container is running, check the image digest
 		currentImage := existingContainer.Image
@@ -476,7 +477,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			// if the hashes don't match, recreate the container with the new one
 			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
+				zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 			}
 			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
 			if err != nil {
@@ -487,7 +488,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 				return containerState, err
 			}
 			msg := fmt.Sprintf("Restarted %s with image %s", containerName, desiredImage)
-			logger.Logger.Info(msg)
+			zap.L().Info(msg)
 		}
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
@@ -662,7 +663,7 @@ func StopContainerByName(containerName string) error {
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
 					return fmt.Errorf("failed to stop container %s: %v", containerName, err)
 				}
-				logger.Logger.Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
+				zap.L().Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
 				return nil
 			}
 		}
@@ -726,7 +727,7 @@ func DockerPoller() {
 	for {
 		select {
 		case <-ticker.C:
-			logger.Logger.Info("polling docker")
+			zap.L().Info("polling docker")
 			// todo (maybe not necessary?)
 			// fetch the status of all containers and compare with app's state
 			// if there's a change, send an event to the EventBus

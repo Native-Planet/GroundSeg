@@ -3,12 +3,12 @@ package leak
 import (
 	"encoding/json"
 	"fmt"
-	"groundseg/logger"
 	"groundseg/structs"
 	"net"
 	"reflect"
 
 	"github.com/stevelacy/go-urbit/noun"
+	"go.uber.org/zap"
 )
 
 func listener(patp string, conn net.Conn, info LickStatus) {
@@ -19,7 +19,7 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 	lickStatuses[patp] = info
 	lickMu.Unlock()
 	defer func() {
-		logger.Logger.Info(fmt.Sprintf("Closing lick channel for %s", patp))
+		zap.L().Info(fmt.Sprintf("Closing lick channel for %s", patp))
 		lickMu.Lock()
 		// remove from status map
 		delete(lickStatuses, patp)
@@ -30,7 +30,7 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 		if conn != nil {
 			conn.Close()
 		}
-		logger.Logger.Info(fmt.Sprintf("Closed lick channel for %s", patp))
+		zap.L().Info(fmt.Sprintf("Closed lick channel for %s", patp))
 	}()
 	// Goroutine to read from connection
 	go func() {
@@ -73,7 +73,7 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	}
 	newBroadcastBytes, err := json.Marshal(newBroadcast)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
 		return oldBroadcast, nil
 	}
 	statuses := GetLickStatuses()
@@ -118,7 +118,7 @@ func sendBroadcast(conn net.Conn, broadcast string) (net.Conn, error) {
 	if conn != nil {
 		_, err := conn.Write(jBytes)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Send broadcast error: %v", err))
+			zap.L().Error(fmt.Sprintf("Send broadcast error: %v", err))
 			return nil, err
 		}
 	}

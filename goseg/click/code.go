@@ -5,6 +5,8 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func clearLusCode(patp string) {
@@ -63,7 +65,7 @@ func storeLusCodeError(patp string) {
 }
 
 func storeLusCode(patp, code string) {
-	logger.Logger.Info(fmt.Sprintf("Storing +code for %s", patp))
+	zap.L().Info(fmt.Sprintf("Storing +code for %s", patp))
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	lusCodes[patp] = structs.ClickLusCode{

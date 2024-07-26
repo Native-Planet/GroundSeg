@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hsanjuan/go-captive"
 	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
 )
 
 var (
@@ -45,7 +46,7 @@ var (
 func init() {
 	dev, err := getWifiDevice()
 	if err != nil || dev[0] == "" {
-		logger.Logger.Error(fmt.Sprintf("Couldn't find a wifi device! %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't find a wifi device! %v", err))
 		return
 	} else {
 		Device = dev[0]
@@ -82,7 +83,7 @@ func constructWifiInfo(dev string) {
 	if WifiInfo.Status {
 		c, err := wifi.New()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", dev, err))
+			zap.L().Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", dev, err))
 			WifiInfo.Status = false
 			WifiInfo.Active = ""
 			WifiInfo.Networks = []string{}
@@ -100,14 +101,14 @@ func constructWifiInfo(dev string) {
 func ifCheck() bool {
 	out, err := runCommand("nmcli", "radio", "wifi")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't check interface: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't check interface: %v", err))
 		return false
 	}
 	return strings.Contains(string(out), "enabled")
 }
 
 func C2CMode() error {
-	logger.Logger.Info(fmt.Sprintf("C2C Mode initializing"))
+	zap.L().Info(fmt.Sprintf("C2C Mode initializing"))
 	// make sure wifi is enabled
 	_, err := runCommand("nmcli", "radio", "wifi", "on")
 	if err != nil {
@@ -119,7 +120,7 @@ func C2CMode() error {
 	dev, _ := getWifiDevice()
 	// store ssids
 	C2CStoredSSIDs = ListWifiSSIDs(dev[0])
-	logger.Logger.Info(fmt.Sprintf("C2C retrieved available SSIDs: %v", C2CStoredSSIDs))
+	zap.L().Info(fmt.Sprintf("C2C retrieved available SSIDs: %v", C2CStoredSSIDs))
 	// stop systemd-resolved
 	_, err = runCommand("systemctl", "stop", "systemd-resolved")
 	if err != nil {
@@ -140,12 +141,12 @@ func C2CConnect(ssid, password string) {
 	dev, _ := getWifiDevice()
 	_, err := runCommand("nmcli", "radio", "wifi", "on")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to start wifi device %v: %v", dev[0], err))
+		zap.L().Error(fmt.Sprintf("Failed to start wifi device %v: %v", dev[0], err))
 	}
 	time.Sleep(5 * time.Second)
 	_, err = runCommand("sudo", "ip", "link", "set", dev[0], "up")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to set ip link for device %v: %v", dev[0], err))
+		zap.L().Error(fmt.Sprintf("Failed to set ip link for device %v: %v", dev[0], err))
 	}
 	// attempt to connect
 	err = ConnectToWifi(ssid, password)
@@ -187,7 +188,7 @@ func EnableResolved() error {
 
 func CaptivePortal(dev string) error {
 	if err := proxy.Run(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error creating captive portal: %v", err))
+		zap.L().Error(fmt.Sprintf("Error creating captive portal: %v", err))
 		os.Exit(1)
 	}
 	return nil
@@ -196,7 +197,7 @@ func CaptivePortal(dev string) error {
 func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
 	}
 	clients[conn] = true
@@ -204,23 +205,23 @@ func CaptiveAPI(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
-				logger.Logger.Info("WS closed")
+				zap.L().Info("WS closed")
 				conn.Close()
 			}
-			logger.Logger.Warn(fmt.Sprintf("Error reading websocket message: %v", err))
+			zap.L().Warn(fmt.Sprintf("Error reading websocket message: %v", err))
 			break
 		}
 		var payload structs.WsC2cPayload
 		if err := json.Unmarshal(msg, &payload); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
+			zap.L().Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 			continue
 		}
 		if payload.Payload.Action == "connect" {
 			if err := ConnectToWifi(payload.Payload.SSID, payload.Payload.Password); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to connect: %v", err))
+				zap.L().Error(fmt.Sprintf("Failed to connect: %v", err))
 			} else {
 				if _, err := runCommand("systemctl", "restart", "groundseg"); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
+					zap.L().Error(fmt.Sprintf("Couldn't restart GroundSeg after connection!"))
 				}
 			}
 		}
@@ -240,13 +241,13 @@ func announceNetworks(dev string) {
 			}
 			payloadJSON, err := json.Marshal(payload)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error marshaling payload: %v", err))
+				zap.L().Error(fmt.Sprintf("Error marshaling payload: %v", err))
 				continue
 			}
 			for client, _ := range clients {
 				if client != nil && clients[client] == true {
 					if err := client.WriteMessage(websocket.TextMessage, payloadJSON); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Error sending message: %v", err))
+						zap.L().Error(fmt.Sprintf("Error sending message: %v", err))
 						clients[client] = false
 						continue
 					}
@@ -272,7 +273,7 @@ func getWifiDevice() ([]string, error) {
 func ListWifiSSIDs(dev string) []string {
 	out, err := runCommand("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't gather wifi networks: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't gather wifi networks: %v", err))
 		return []string{}
 	}
 	lines := strings.Split(out, "\n")
@@ -289,7 +290,7 @@ func ListWifiSSIDs(dev string) []string {
 func getConnectedSSID(c *wifi.Client, dev string) string {
 	interfaces, err := c.Interfaces()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't get devices: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't get devices: %v", err))
 		return ""
 	}
 	for _, iface := range interfaces {

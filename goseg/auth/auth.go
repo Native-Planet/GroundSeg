@@ -52,6 +52,7 @@ import (
 
 	fernet "github.com/fernet/fernet-go"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 var (
@@ -176,10 +177,10 @@ func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) er
 		muConn = &structs.MuConn{Conn: conn, Active: true}
 		if authed {
 			ClientManager.AddAuthClient(tokenId, muConn)
-			logger.Logger.Info(fmt.Sprintf("%s added to auth", tokenId))
+			zap.L().Info(fmt.Sprintf("%s added to auth", tokenId))
 		} else {
 			ClientManager.AddUnauthClient(tokenId, muConn)
-			logger.Logger.Info(fmt.Sprintf("%s added to unauth", tokenId))
+			zap.L().Info(fmt.Sprintf("%s added to unauth", tokenId))
 		}
 		now := time.Now().Format("2006-01-02_15:04:05")
 		return AddSession(tokenId, hash, now, authed)
@@ -211,7 +212,7 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 	key := conf.KeyFile
 	res, err := KeyfileDecrypt(token["token"], key)
 	if err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Invalid token provided: %v", err))
+		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
 	} else {
 		// so you decrypt. now we see the useragent and ip.
@@ -233,13 +234,13 @@ func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) 
 					res["authorized"] = "true"
 					encryptedText, err := KeyfileEncrypt(res, key)
 					if err != nil {
-						logger.Logger.Error("Error encrypting token")
+						zap.L().Error("Error encrypting token")
 						return token["token"], false
 					}
 					return encryptedText, true
 				}
 			} else {
-				logger.Logger.Warn("TokenId doesn't match session!")
+				zap.L().Warn("TokenId doesn't match session!")
 				return token["token"], false
 			}
 		}
@@ -258,7 +259,7 @@ func AuthToken(token string) (string, error) {
 	res["authorized"] = "true"
 	encryptedText, err := KeyfileEncrypt(res, key)
 	if err != nil {
-		logger.Logger.Error("Error encrypting token")
+		zap.L().Error("Error encrypting token")
 		return "", err
 	}
 	return encryptedText, nil
@@ -293,7 +294,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string
 	key := conf.KeyFile
 	encryptedText, err := KeyfileEncrypt(contents, key)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("failed to encrypt token: %v", err))
+		zap.L().Error(fmt.Sprintf("failed to encrypt token: %v", err))
 		return nil, fmt.Errorf("failed to encrypt token: %v", err)
 	}
 	token := map[string]string{

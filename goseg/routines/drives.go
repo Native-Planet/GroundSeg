@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
 	"math"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func DiskUsageWarning() {
 	for {
 		if diskUsage, err := system.GetDisk(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error getting disk usage: %v", err))
+			zap.L().Error(fmt.Sprintf("Error getting disk usage: %v", err))
 			continue
 		} else {
 			conf := config.Conf()
@@ -24,7 +25,7 @@ func DiskUsageWarning() {
 				case percentage < 80:
 					// reset to default
 					if err := setWarningInfo(conf, part, false, false, time.Time{}); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+						zap.L().Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
 					}
 				case percentage >= 95:
 					now := time.Now()
@@ -33,7 +34,7 @@ func DiskUsageWarning() {
 						// send hark notif
 						sendDriveHarkNotification(part, percentage, conf.Piers)
 						if err := setWarningInfo(conf, part, true, true, now); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
 						}
 					}
 				case percentage >= 90:
@@ -42,7 +43,7 @@ func DiskUsageWarning() {
 						// send hark notif
 						sendDriveHarkNotification(part, percentage, conf.Piers)
 						if err := setWarningInfo(conf, part, true, true, time.Time{}); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
 						}
 					}
 				case percentage >= 80:
@@ -51,12 +52,12 @@ func DiskUsageWarning() {
 						// send hark notif
 						sendDriveHarkNotification(part, percentage, conf.Piers)
 						if err := setWarningInfo(conf, part, true, false, time.Time{}); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
 						}
 					}
 				default:
 					if err := setWarningInfo(conf, part, false, false, time.Time{}); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
+						zap.L().Error(fmt.Sprintf("Failed to update disk warning info: %v", err))
 					}
 				}
 			}
@@ -87,7 +88,7 @@ func sendDriveHarkNotification(part string, percentage float64, piers []string) 
 	// Send notification
 	for _, patp := range piers {
 		if err := click.SendNotification(patp, noti); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to send drive warning to %s: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Failed to send drive warning to %s: %v", patp, err))
 		}
 	}
 }

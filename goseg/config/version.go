@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -37,7 +38,7 @@ func CheckVersion() (structs.Channel, bool) {
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to connect to update server: %v", err)
-			logger.Logger.Warn(errmsg)
+			zap.L().Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -51,7 +52,7 @@ func CheckVersion() (structs.Channel, bool) {
 		resp.Body.Close()
 		if err != nil {
 			errmsg := fmt.Sprintf("Error reading version info: %v", err)
-			logger.Logger.Warn(errmsg)
+			zap.L().Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -64,7 +65,7 @@ func CheckVersion() (structs.Channel, bool) {
 		err = json.Unmarshal(body, &fetchedVersion)
 		if err != nil {
 			errmsg := fmt.Sprintf("Error unmarshalling JSON: %v", err)
-			logger.Logger.Warn(errmsg)
+			zap.L().Warn(errmsg)
 			if i < retries-1 {
 				time.Sleep(delay)
 				continue
@@ -79,7 +80,7 @@ func CheckVersion() (structs.Channel, bool) {
 		file, err := os.Create(confPath)
 		if err != nil {
 			errmsg := fmt.Sprintf("Failed to create file: %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 			VersionServerReady = false
 			return VersionInfo, false
 		}
@@ -88,7 +89,7 @@ func CheckVersion() (structs.Channel, bool) {
 		encoder.SetIndent("", "    ")
 		if err := encoder.Encode(&fetchedVersion); err != nil {
 			errmsg := fmt.Sprintf("Failed to write JSON: %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 		}
 		VersionServerReady = true
 		return VersionInfo, true
@@ -126,7 +127,7 @@ func LocalVersion() structs.Version {
 		if err != nil {
 			// panic if we can't create it
 			errmsg := fmt.Sprintf("Unable to write version info! %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 			panic(errmsg)
 		}
 	}

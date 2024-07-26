@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"groundseg/auth"
 	"groundseg/leakchannel"
-	"groundseg/logger"
 	"groundseg/structs"
 	"reflect"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"math/big"
 
 	"github.com/stevelacy/go-urbit/noun"
+	"go.uber.org/zap"
 )
 
 func handleAction(patp string, result []byte) {
@@ -23,11 +23,11 @@ func handleAction(patp string, result []byte) {
 	if reflect.TypeOf(res) == reflect.TypeOf(noun.Cell{}) {
 		bytes, err := decodeAtom(noun.Slag(res, 1).String())
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to decode payload: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to decode payload: %v", err))
 			return
 		}
 		if err := processAction(patp, bytes); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to process action: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to process action: %v", err))
 			return
 		}
 
@@ -60,7 +60,7 @@ func processAction(patp string, byteArray []byte) error {
 	if err := json.Unmarshal(byteArray, &payload); err != nil {
 		return fmt.Errorf("error unmarshalling payload: %v", err)
 	}
-	logger.Logger.Info(fmt.Sprintf("Received gallseg %s action from %s", payload.Payload.Type, patp))
+	zap.L().Info(fmt.Sprintf("Received gallseg %s action from %s", payload.Payload.Type, patp))
 	// handle special cases here, and send everything else to
 	// LeakChannel for handler package to process
 	status := GetLickStatuses()
@@ -84,7 +84,7 @@ func processAction(patp string, byteArray []byte) error {
 			case <-leakchannel.Logout:
 				urbitLogout(patp)
 			case <-time.After(2 * time.Minute):
-				logger.Logger.Error("Password change auto-logout timeout")
+				zap.L().Error("Password change auto-logout timeout")
 			}
 		}()
 		sendToLeakChannel(patp, isAuth, payload.Payload.Type, byteArray)
@@ -108,7 +108,7 @@ func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
 	var payload structs.WsLoginPayload
 	err := json.Unmarshal(loginPayload, &payload)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Urbit Login failed to unmarshal: %v", err))
+		zap.L().Error(fmt.Sprintf("Urbit Login failed to unmarshal: %v", err))
 		return
 	}
 	authed := auth.AuthenticateLogin(payload.Payload.Password)
@@ -116,7 +116,7 @@ func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
 	defer lickMu.Unlock()
 	status, exists := lickStatuses[patp]
 	if !exists {
-		logger.Logger.Error(fmt.Sprintf("Login failed, %s not in map", patp))
+		zap.L().Error(fmt.Sprintf("Login failed, %s not in map", patp))
 		return
 	}
 	response := AuthEvent{
@@ -127,12 +127,12 @@ func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
 		status.Auth = authed
 		lickStatuses[patp] = status
 	} else {
-		logger.Logger.Error(fmt.Sprintf("Password incorrect for admin login for  %s", patp))
+		zap.L().Error(fmt.Sprintf("Password incorrect for admin login for  %s", patp))
 		response.Error = "Incorrect Password"
 	}
 	responseBytes, err := json.Marshal(response)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to marshal login response for %s: %v", patp, err))
+		zap.L().Error(fmt.Sprintf("Failed to marshal login response for %s: %v", patp, err))
 		return
 	}
 	BytesChan[patp] <- string(responseBytes)

@@ -5,8 +5,9 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/handler"
-	"groundseg/logger"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func ChopAtLimit() {
@@ -19,9 +20,9 @@ func ChopAtLimit() {
 				continue
 			}
 			currentSize := int64(docker.GetContainerStats(patp).DiskUsage / GB)
-			logger.Logger.Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
+			zap.L().Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
 			if int64(urbConf.SizeLimit) <= currentSize {
-				logger.Logger.Info(fmt.Sprintf("Auto chop: Attempting to chop %s", patp))
+				zap.L().Info(fmt.Sprintf("Auto chop: Attempting to chop %s", patp))
 				go handler.ChopPier(patp, urbConf)
 			}
 		}

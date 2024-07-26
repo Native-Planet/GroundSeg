@@ -41,6 +41,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 var (
@@ -68,9 +69,9 @@ func C2cCheck() {
 	internetAvailable := connCheck()
 	if !internetAvailable && system.Device != "" && isNPBox {
 		if err := system.C2CMode(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error activating C2C mode: %v", err))
+			zap.L().Error(fmt.Sprintf("Error activating C2C mode: %v", err))
 		} else {
-			logger.Logger.Info("GroundSeg is in C2C Mode")
+			zap.L().Info("GroundSeg is in C2C Mode")
 			system.SetC2CMode(true)
 			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
 			if conf.C2cInterval > 0 {
@@ -84,13 +85,13 @@ func killSwitch() {
 	for {
 		conf := config.Conf()
 		time.Sleep(time.Duration(conf.C2cInterval) * time.Second)
-		logger.Logger.Info("Graceful reboot from C2C mode...")
+		zap.L().Info("Graceful reboot from C2C mode...")
 		routines.GracefulShipExit()
 		if config.DebugMode {
 			logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 			os.Exit(0)
 		} else {
-			logger.Logger.Info(fmt.Sprintf("Rebooting device.."))
+			zap.L().Info(fmt.Sprintf("Rebooting device.."))
 			cmd := exec.Command("reboot")
 			cmd.Run()
 		}
@@ -120,7 +121,7 @@ func connCheck() bool {
 func loadService(loadFunc func() error, errMsg string) {
 	go func() {
 		if err := loadFunc(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%s %v", errMsg, err))
+			zap.L().Error(fmt.Sprintf("%s %v", errMsg, err))
 		}
 	}()
 }
@@ -163,7 +164,7 @@ func startServer() { // *http.Server {
 	wsServer.ListenAndServe()
 	//go wsServer.ListenAndServe()
 	// http.ListenAndServe(":80", r)
-	//logger.Logger.Info("GroundSeg web UI serving")
+	//zap.L().Info("GroundSeg web UI serving")
 	//return server
 }
 
@@ -182,14 +183,14 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 func main() {
 	// make sure resolved was reenabled
 	if err := system.EnableResolved(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
+		zap.L().Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
 	}
 	// push error messages to fe
 	go rectify.ErrorMessageHandler()
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
-	logger.Logger.Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+	zap.L().Info(fmt.Sprintf("Internet available: %t", internetAvailable))
 	// ongoing connectivity check
 	go C2cCheck()
 	// async operation to retrieve version info if updates are on
@@ -199,7 +200,7 @@ func main() {
 	for _, arg := range os.Args[1:] {
 		// trigger dev mode with `./groundseg dev`
 		if arg == "dev" {
-			logger.Logger.Info("Starting pprof (:6060)")
+			zap.L().Info("Starting pprof (:6060)")
 			go http.ListenAndServe("0.0.0.0:6060", nil)
 		}
 		// set non-default port like `--http-port=8060`
@@ -207,23 +208,23 @@ func main() {
 			portStr := strings.TrimPrefix(arg, "--http-port=")
 			port, err := strconv.Atoi(portStr)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Invalid port number: %s -- defaulting to 80", portStr))
+				zap.L().Error(fmt.Sprintf("Invalid port number: %s -- defaulting to 80", portStr))
 			} else {
 				HttpPort = port
 			}
-			logger.Logger.Info(fmt.Sprintf("Running HTTP server on port %d", HttpPort))
+			zap.L().Info(fmt.Sprintf("Running HTTP server on port %d", HttpPort))
 		}
 	}
 	// setup swap
-	logger.Logger.Info(fmt.Sprintf("Setting up swap %v for %vG", conf.SwapFile, conf.SwapVal))
+	zap.L().Info(fmt.Sprintf("Setting up swap %v for %vG", conf.SwapFile, conf.SwapVal))
 	if err := system.ConfigureSwap(conf.SwapFile, conf.SwapVal); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to set swap: %v", err))
+		zap.L().Error(fmt.Sprintf("Unable to set swap: %v", err))
 	}
 
 	// setup /tmp
-	logger.Logger.Info("Setting up /tmp directory")
+	zap.L().Info("Setting up /tmp directory")
 	if err := system.SetupTmpDir(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to setup /tmp: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to setup /tmp: %v", err))
 	}
 
 	// update mode
@@ -262,7 +263,7 @@ func main() {
 	if conf.WgRegistered == true {
 		_, err := startram.Retrieve()
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
+			zap.L().Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
 	}
 	// gallseg
@@ -287,9 +288,9 @@ func main() {
 	if remoteVersion == true {
 		select {
 		case <-versionUpdateChannel:
-			logger.Logger.Info("Version info retrieved")
+			zap.L().Info("Version info retrieved")
 		case <-time.After(10 * time.Second):
-			logger.Logger.Warn("Could not retrieve version info after 10 seconds!")
+			zap.L().Warn("Could not retrieve version info after 10 seconds!")
 			versionStruct := config.LocalVersion()
 			releaseChannel := conf.UpdateBranch
 			targetChan := versionStruct.Groundseg[releaseChannel]
@@ -299,17 +300,17 @@ func main() {
 
 	// grab wg now cause its huge
 	if wgConf, err := docker.GetLatestContainerInfo("wireguard"); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
+		zap.L().Warn(fmt.Sprintf("Error getting WG container: %v", err))
 	} else {
-		logger.Logger.Info("Downloading Wireguard image")
+		zap.L().Info("Downloading Wireguard image")
 		if _, err := docker.PullImageIfNotExist("wireguard", wgConf); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error getting WG container: %v", err))
+			zap.L().Warn(fmt.Sprintf("Error getting WG container: %v", err))
 		}
 	}
 	if conf.WgRegistered == true {
 		// Load Wireguard
 		if err := docker.LoadWireguard(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
+			zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))
 		} else {
 			// Load MC
 			loadService(docker.LoadMC, "Unable to load MinIO Client!")

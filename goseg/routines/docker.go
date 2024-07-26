@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/client"
+	"go.uber.org/zap"
 )
 
 var (
@@ -32,7 +33,7 @@ func DockerListener() {
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
+		zap.L().Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return
 	}
 	messages, errs := cli.Events(ctx, types.EventsOptions{})
@@ -43,7 +44,7 @@ func DockerListener() {
 			eventBus <- structs.Event{Type: event.Action, Data: event}
 		case err := <-errs:
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Docker event error: %v", err))
+				zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
 			}
 		}
 	}
@@ -56,14 +57,14 @@ func DockerSubscriptionHandler() {
 		event := <-eventBus
 		dockerEvent, ok := event.Data.(events.Message)
 		if !ok {
-			logger.Logger.Error("Failed to assert Docker event data type")
+			zap.L().Error("Failed to assert Docker event data type")
 			continue
 		}
 		contName := dockerEvent.Actor.Attributes["name"]
 		switch dockerEvent.Action {
 
 		case "stop":
-			logger.Logger.Info(fmt.Sprintf("Docker: %s stopped", contName))
+			zap.L().Info(fmt.Sprintf("Docker: %s stopped", contName))
 
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "stopped"
@@ -76,7 +77,7 @@ func DockerSubscriptionHandler() {
 			}
 
 		case "start":
-			logger.Logger.Info(fmt.Sprintf("Docker: %s started", contName))
+			zap.L().Info(fmt.Sprintf("Docker: %s started", contName))
 
 			containerState, exists := config.GetContainerState()[contName]
 			if exists {
@@ -89,7 +90,7 @@ func DockerSubscriptionHandler() {
 						"wgOn": true,
 					})
 					if err != nil {
-						logger.Logger.Error(fmt.Sprintf("%v", err))
+						zap.L().Error(fmt.Sprintf("%v", err))
 					}
 					// update profile
 					current := broadcast.GetState()
@@ -100,7 +101,7 @@ func DockerSubscriptionHandler() {
 			}
 
 		case "die":
-			logger.Logger.Warn(fmt.Sprintf("Docker: %s died!", contName))
+			zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "died"
 				// we don't want infinite restart loop
@@ -131,7 +132,7 @@ func makeBroadcast(contName string, status string) {
 			wgOn = true
 		}
 		if err := config.UpdateConf(map[string]interface{}{"wgOn": wgOn}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		// update profile
 		current := broadcast.GetState()
@@ -151,19 +152,19 @@ func Check502Loop() {
 		conf := config.Conf()
 		pierStatus, err := docker.GetShipStatus(conf.Piers)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't get pier status: %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't get pier status: %v", err))
 			continue
 		}
 		for _, pier := range conf.Piers {
 			err := config.LoadUrbitConfig(pier)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+				zap.L().Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
 				continue
 			}
 			shipConf := config.UrbitConf(pier)
 			pierNetwork, err := docker.GetContainerNetwork(pier)
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
+				zap.L().Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
 				continue
 			}
 			turnedOn := false
@@ -172,27 +173,27 @@ func Check502Loop() {
 			}
 			if turnedOn && pierNetwork != "default" && conf.WgOn {
 				if _, err := click.GetLusCode(pier); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
+					zap.L().Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
 					continue
 				}
 				resp, err := http.Get("https://" + shipConf.WgURL)
 				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
+					zap.L().Error(fmt.Sprintf("Error remote polling %v: %v", pier, err))
 					continue
 				}
 				resp.Body.Close()
 				logger.Logger.Debug(fmt.Sprintf("%v 502 check: %v", pier, resp.StatusCode))
 				if resp.StatusCode == http.StatusBadGateway {
-					logger.Logger.Warn(fmt.Sprintf("Got 502 response for %v", pier))
+					zap.L().Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if _, found := status[pier]; found {
 						// found = 2x in a row
-						logger.Logger.Warn(fmt.Sprintf("502 second strike for %v", pier))
+						zap.L().Warn(fmt.Sprintf("502 second strike for %v", pier))
 						// record all remote ships
 						wgShips := map[string]bool{}
 						piers := conf.Piers
 						pierStatus, err := docker.GetShipStatus(piers)
 						if err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
 						}
 						for pier, status := range pierStatus {
 							dockerConfig := config.UrbitConf(pier)
@@ -203,13 +204,13 @@ func Check502Loop() {
 
 						// restart wireguard container
 						if err := docker.RestartContainer("wireguard"); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+							zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 						}
 						// operate on urbit ships
 						for patp, isRunning := range wgShips {
 							if isRunning {
 								if err := click.BarExit(patp); err != nil {
-									logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+									zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
 								} else {
 									for {
 										exited, err := shipExited(patp)
@@ -224,22 +225,22 @@ func Check502Loop() {
 							}
 							// delete container
 							if err := docker.DeleteContainer(patp); err != nil {
-								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+								zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 							}
 							minio := fmt.Sprintf("minio_%s", patp)
 							if err := docker.DeleteContainer(minio); err != nil {
-								logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+								zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 							}
 						}
 						// create startram containers
 						if err := docker.LoadUrbits(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to load urbits: %v", err))
 						}
 						if err := docker.LoadMC(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
 						}
 						if err := docker.LoadMinIOs(); err != nil {
-							logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
+							zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
 						}
 						// remove from map after restart
 						delete(status, pier)
@@ -293,12 +294,12 @@ func GracefulShipExit() error {
 	piers := conf.Piers
 	pierStatus, err := docker.GetShipStatus(piers)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
 	}
 	for patp, status := range pierStatus {
 		if status == "Up" || strings.HasPrefix(status, "Up ") {
 			if err := click.BarExit(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
 				continue
 			}
 			for {

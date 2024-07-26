@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/importer"
-	"groundseg/logger"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 func UploadHandler(msg []byte) error {
-	logger.Logger.Info("Upload")
+	zap.L().Info("Upload")
 	var uploadPayload structs.WsUploadPayload
 	err := json.Unmarshal(msg, &uploadPayload)
 	if err != nil {

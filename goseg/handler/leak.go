@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/leakchannel"
-	"groundseg/logger"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 func HandleLeakAction() {
@@ -27,7 +28,7 @@ func gallsegUnauthHandler(action leakchannel.ActionChannel) {
 	var urbitPayload structs.WsUrbitPayload
 	err := json.Unmarshal(action.Content, &urbitPayload)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't unmarshal urbit payload from %s's gallseg: %v", action.Patp, err))
+		zap.L().Error(fmt.Sprintf("Couldn't unmarshal urbit payload from %s's gallseg: %v", action.Patp, err))
 		return
 	}
 	if urbitPayload.Payload.Type != "urbit" {
@@ -37,7 +38,7 @@ func gallsegUnauthHandler(action leakchannel.ActionChannel) {
 		return
 	}
 	if err := UrbitHandler(action.Content); err != nil {
-		logger.Logger.Error(fmt.Sprintf("%+v", err))
+		zap.L().Error(fmt.Sprintf("%+v", err))
 		return
 	}
 }
@@ -46,33 +47,33 @@ func gallsegAuthedHandler(action leakchannel.ActionChannel) {
 	switch action.Type {
 	case "urbit":
 		if err := UrbitHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%+v", err))
+			zap.L().Error(fmt.Sprintf("%+v", err))
 		}
 	case "penpai":
 		if err := PenpaiHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "new_ship":
 		if err := NewShipHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "system":
 		if err := SystemHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "startram":
 		if err := StartramHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "support":
 		if err := SupportHandler(action.Content); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error creating bug report: %v", err))
+			zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
 		}
 	case "password":
 		if err := PwHandler(action.Content, true); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	default:
-		logger.Logger.Error(fmt.Sprintf("Invalid gallseg action: %v", action.Type))
+		zap.L().Error(fmt.Sprintf("Invalid gallseg action: %v", action.Type))
 	}
 }

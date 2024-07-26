@@ -14,6 +14,8 @@ import (
 	"groundseg/structs"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func UrbitTransitionHandler() {
@@ -66,7 +68,7 @@ func UrbitTransitionHandler() {
 			case "deleteService":
 				urbitStruct.Transition.StartramServices = event.Event
 			default:
-				logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+				zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue
 			}
 			current.Urbits[event.Patp] = urbitStruct
@@ -103,7 +105,7 @@ func NewShipTransitionHandler() {
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
 		default:
-			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 	}
 }
@@ -166,7 +168,7 @@ func RectifyUrbit() {
 					running := containerState.ActualStatus == "running"
 					current.Profile.Startram.Info.Running = running
 					if err := config.UpdateConf(map[string]interface{}{"wgOn": running}); err != nil {
-						logger.Logger.Error(fmt.Sprintf("%v", err))
+						zap.L().Error(fmt.Sprintf("%v", err))
 					}
 				}
 				current.Profile.Startram.Info.Registered = conf.WgRegistered
@@ -192,7 +194,7 @@ func RectifyUrbit() {
 					}
 				}
 				if !found {
-					logger.Logger.Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
+					zap.L().Info(fmt.Sprintf("Registering missing StarTram service for %v", patp))
 					startram.SvcCreate(patp, "urbit")
 					startram.SvcCreate("s3."+patp, "minio")
 				}
@@ -296,7 +298,7 @@ func SystemTransitionHandler() {
 		case "bugReportError":
 			current.System.Transition.BugReportError = event.Event
 		default:
-			logger.Logger.Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
 		broadcast.UpdateBroadcast(current)
 		broadcast.BroadcastToClients()

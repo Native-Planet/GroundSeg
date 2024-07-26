@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"groundseg/auth"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 
 func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 	var setupPayload structs.WsSetupPayload
-	logger.Logger.Info("Setup")
+	zap.L().Info("Setup")
 	err := json.Unmarshal(msg, &setupPayload)
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal setup payload: %v", err)

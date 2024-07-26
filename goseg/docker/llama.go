@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -12,18 +11,19 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
+	"go.uber.org/zap"
 )
 
 func LoadLlama() error {
 	conf := config.Conf()
 	if !conf.PenpaiAllow {
-		logger.Logger.Info("Llama GPT disabled")
+		zap.L().Info("Llama GPT disabled")
 		return nil
 	}
-	logger.Logger.Info("Loading Llama GPT")
+	zap.L().Info("Loading Llama GPT")
 	if !conf.PenpaiRunning {
 		if err := StopContainerByName("llama-gpt-api"); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
+			zap.L().Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
 		}
 	}
 	info, err := StartContainer("llama-gpt-api", "llama-api")

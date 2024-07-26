@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"groundseg/auth"
 	"groundseg/leak"
-	"groundseg/logger"
 	"groundseg/structs"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func BroadcastLoop() {
@@ -22,7 +23,7 @@ func BroadcastLoop() {
 				// pier info
 				pierInfo, err := ConstructPierInfo()
 				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Unable to build pier info: %v", err))
+					zap.L().Error(fmt.Sprintf("Unable to build pier info: %v", err))
 				}
 
 				// apps info

@@ -8,6 +8,8 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func StartramRenewalReminder() {
@@ -22,7 +24,7 @@ func StartramRenewalReminder() {
 		}
 		retrieve, err := startram.Retrieve()
 		if err != nil {
-			logger.Logger.Error("Failed to retrieve StarTram information: %v", err)
+			zap.L().Error(fmt.Sprintf("Failed to retrieve StarTram information: %v", err))
 			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 60 minutes"))
 			// check again in 60 minutes
 			time.Sleep(60 * time.Minute)
@@ -44,7 +46,7 @@ func StartramRenewalReminder() {
 		// Parse the date string into a time.Time object
 		expiryDate, err := time.Parse(layout, retrieve.Lease)
 		if err != nil {
-			logger.Logger.Error("Failed to parse expiry date %v: %v", retrieve.Lease, err)
+			zap.L().Error(fmt.Sprintf("Failed to parse expiry date %v: %v", retrieve.Lease, err))
 			// check again in 12 hours
 			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 			time.Sleep(12 * time.Hour)
@@ -62,13 +64,13 @@ func StartramRenewalReminder() {
 
 		// the send function
 		send := func() {
-			logger.Logger.Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
+			zap.L().Warn(fmt.Sprintf("Send renew notification to hark for test %v", daysUntil))
 			sendStartramHarkNotification(daysUntil, conf.Piers)
 		}
 
 		rem := conf.StartramSetReminder
 		if !rem.One && daysUntil <= 1 {
-			logger.Logger.Warn("Send renew notification to hark for less than 1 day")
+			zap.L().Warn("Send renew notification to hark for less than 1 day")
 			send()
 			setReminder("one", true)
 		} else if !rem.Three && daysUntil <= 3 {
@@ -91,7 +93,7 @@ func setReminder(daysType string, reminded bool) {
 			daysType: reminded,
 		},
 	}); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
 	}
 }
 
@@ -102,7 +104,7 @@ func sendStartramHarkNotification(daysLeft int, piers []string) {
 		shipConf := config.UrbitConf(patp)
 		if shipConf.StartramReminder == true {
 			if err := click.SendNotification(patp, noti); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
 			}
 		}
 	}

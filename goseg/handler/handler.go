@@ -7,13 +7,14 @@ import (
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/leakchannel"
-	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -32,7 +33,7 @@ func init() {
 }
 
 func NewShipHandler(msg []byte) error {
-	logger.Logger.Info("New ship")
+	zap.L().Info("New ship")
 	// Unmarshal JSON
 	var shipPayload structs.WsNewShipPayload
 	err := json.Unmarshal(msg, &shipPayload)
@@ -131,11 +132,11 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
 			return make(map[string]string), fmt.Errorf("Unable to process login: %v", err)
 		}
-		logger.Logger.Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
+		zap.L().Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return token, nil
 	} else {
 		failedLogins++
-		logger.Logger.Warn(fmt.Sprintf("Failed auth"))
+		zap.L().Warn(fmt.Sprintf("Failed auth"))
 		if failedLogins >= MaxFailedLogins && remainder == 0 {
 			go enforceLockout()
 		}
@@ -156,7 +157,7 @@ func enforceLockout() {
 	for remainder > 0 {
 		unauth, err := UnauthHandler()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
 		}
 		broadcast.UnauthBroadcast(unauth)
 		<-ticker.C
@@ -169,7 +170,7 @@ func enforceLockout() {
 
 	unauth, err := UnauthHandler()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
 	}
 	broadcast.UnauthBroadcast(unauth)
 }
@@ -239,7 +240,7 @@ func PwHandler(msg []byte, urbitMode bool) error {
 	}
 	switch pwPayload.Payload.Action {
 	case "modify":
-		logger.Logger.Info("Setting new password")
+		zap.L().Info("Setting new password")
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
 			update := map[string]interface{}{

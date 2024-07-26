@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"path/filepath"
 	"sort"
+
+	"go.uber.org/zap"
 )
 
 func CreateUrbitConfig(patp, customDrive string) error {
@@ -72,7 +73,7 @@ func getOpenUrbitPorts() (int, int) {
 	}
 	httpPort = findSmallestMissing(httpAll, httpPort)
 	amesPort = findSmallestMissing(amesAll, amesPort)
-	logger.Logger.Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
+	zap.L().Info(fmt.Sprintf("Open Urbit Ports:  http: %v , ames: %v", httpPort, amesPort))
 	return httpPort, amesPort
 }
 

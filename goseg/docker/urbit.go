@@ -14,19 +14,20 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
+	"go.uber.org/zap"
 )
 
 // load existing urbits from config json
 func LoadUrbits() error {
-	logger.Logger.Info("Loading Urbit ships")
+	zap.L().Info("Loading Urbit ships")
 	// Loop through pier list
 	conf := config.Conf()
 	for _, pier := range conf.Piers {
-		logger.Logger.Info(fmt.Sprintf("Loading pier %s", pier))
+		zap.L().Info(fmt.Sprintf("Loading pier %s", pier))
 		// load json into struct
 		err := config.LoadUrbitConfig(pier)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+			zap.L().Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
 			continue
 		}
 		shipConf := config.UrbitConf(pier)
@@ -34,14 +35,14 @@ func LoadUrbits() error {
 		if shipConf.BootStatus != "noboot" {
 			info, err := StartContainer(pier, "vere")
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				zap.L().Error(fmt.Sprintf("Error starting %s: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(pier, info)
 		} else {
 			info, err := CreateContainer(pier, "vere")
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				zap.L().Error(fmt.Sprintf("Error starting %s: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(pier, info)
@@ -87,7 +88,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	newConf.MinioRepo = minioInfo["repo"]
 	if shipConf != newConf {
 		if err := config.UpdateUrbitConfig(map[string]structs.UrbitDocker{containerName: newConf}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
 		}
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
@@ -130,7 +131,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
+			zap.L().Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
 	default:
 		// set everything else back to boot
@@ -140,7 +141,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		newConfig[containerName] = updateUrbitConf
 		err = config.UpdateUrbitConfig(newConfig)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
+			zap.L().Warn(fmt.Sprintf("Unable to reset %s boot script!", containerName))
 		}
 	}
 	// write the script

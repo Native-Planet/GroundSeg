@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"fmt"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+	"go.uber.org/zap"
 )
 
 var (
@@ -60,7 +60,7 @@ func GetDisk() (map[string][2]uint64, error) {
 				}
 				label, err = octalToAscii(label)
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Couldn't decode octal in disk label: %v", err))
+					zap.L().Warn(fmt.Sprintf("Couldn't decode octal in disk label: %v", err))
 					return device, ""
 				}
 				return device, label
@@ -132,12 +132,12 @@ func GetTemp() float64 {
 			for _, tempInput := range tempInputs {
 				temp, err := ioutil.ReadFile(tempInput)
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error reading temperature from %s: %v\n", tempInput, err))
+					zap.L().Warn(fmt.Sprintf("Error reading temperature from %s: %v\n", tempInput, err))
 					continue
 				}
 				tempValue, err := strconv.Atoi(strings.TrimSpace(string(temp)))
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error converting temperature: %s\n", temp))
+					zap.L().Warn(fmt.Sprintf("Error converting temperature: %s\n", temp))
 					continue
 				}
 				totalTemp += float64(tempValue)
@@ -165,10 +165,10 @@ func FixerScript(basePath string) error {
 	// check if it's one of our boxes
 	if IsNPBox(basePath) {
 		// Create fixer.sh
-		logger.Logger.Info("Thank you for supporting Native Planet!")
+		zap.L().Info("Thank you for supporting Native Planet!")
 		fixer := filepath.Join(basePath, "fixer.sh")
 		if _, err := os.Stat(fixer); os.IsNotExist(err) {
-			logger.Logger.Info("Fixer script not detected, creating")
+			zap.L().Info("Fixer script not detected, creating")
 			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
 			if err != nil {
 				return err
@@ -176,14 +176,14 @@ func FixerScript(basePath string) error {
 		}
 		//make it a cron
 		if !cronExists(fixer) {
-			logger.Logger.Info("Fixer cron not found, creating")
+			zap.L().Info("Fixer cron not found, creating")
 			cronJob := fmt.Sprintf("*/5 * * * * /bin/bash %s\n", fixer)
 			err := addCron(cronJob)
 			if err != nil {
 				return err
 			}
 		} else {
-			logger.Logger.Info("Fixer cron found. Doing nothing")
+			zap.L().Info("Fixer cron found. Doing nothing")
 		}
 	}
 	return nil

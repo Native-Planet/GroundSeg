@@ -8,7 +8,6 @@ import (
 	"groundseg/config"
 	"groundseg/defaults"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 var (
@@ -30,7 +30,7 @@ func WhitelistContainer(container string, token structs.WsTokenStruct) error {
 	exportMu.Lock()
 	defer exportMu.Unlock()
 	whitelist[container] = token
-	logger.Logger.Info(fmt.Sprintf("Whitelisted %v for export", container))
+	zap.L().Info(fmt.Sprintf("Whitelisted %v for export", container))
 	return nil
 }
 
@@ -38,7 +38,7 @@ func RemoveContainerFromWhitelist(container string) error {
 	exportMu.Lock()
 	defer exportMu.Unlock()
 	delete(whitelist, container)
-	logger.Logger.Info(fmt.Sprintf("Removed %v from export whitelist", container))
+	zap.L().Info(fmt.Sprintf("Removed %v from export whitelist", container))
 	return nil
 }
 
@@ -53,7 +53,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	exportError := func(err error) {
-		logger.Logger.Error(fmt.Sprintf("Unable to export: %v", err))
+		zap.L().Error(fmt.Sprintf("Unable to export: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	cleanup := func(patp, containerName, exportTrans, compressedTrans string) {
@@ -69,7 +69,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	exportMu.Unlock()
 	if !exists {
 		err := fmt.Errorf("Container %v is not in whitelist!", container)
-		logger.Logger.Error(fmt.Sprintf("Rejecting Export request: %v", err))
+		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -89,7 +89,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&tokenData)
 	if err != nil {
 		err := fmt.Errorf("Export failed to decode token: %v", err)
-		logger.Logger.Error(fmt.Sprintf("Rejecting Export request: %v", err))
+		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -98,7 +98,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	if whitelistToken != tokenData {
 		err := fmt.Errorf("Token for exporting %v is not valid", container)
 		err = fmt.Errorf("Export failed to decode token: %v", err)
-		logger.Logger.Error(fmt.Sprintf("Rejecting Export request: %v", err))
+		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}

@@ -10,6 +10,7 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
+
 	// "io/ioutil"
 	"os"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/fsnotify/fsnotify"
+	"go.uber.org/zap"
 )
 
 var (
@@ -57,7 +59,7 @@ func LogEvent() {
 		logger.Logger.Debug(fmt.Sprintf("Log action %v", event.Action))
 		switch event.Action {
 		case true:
-			logger.Logger.Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
+			zap.L().Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
 			ctx, cancel := context.WithCancel(context.Background())
 			if _, exists := logsMap[event.MuCon]; !exists {
 				logsMap[event.MuCon] = make(map[string]*structs.CtxWithCancel)
@@ -86,7 +88,7 @@ func LogEvent() {
 				}
 			}
 		default:
-			logger.Logger.Warn(fmt.Sprintf("Unrecognized log request for %v -- %v", event.ContainerID, event.Action))
+			zap.L().Warn(fmt.Sprintf("Unrecognized log request for %v -- %v", event.ContainerID, event.Action))
 			continue
 		}
 	}
@@ -145,7 +147,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 	if containerID != "system" {
 		dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			zap.L().Error(fmt.Sprintf("Error streaming logs: %v", err))
 			return
 		}
 		defer dockerClient.Close()
@@ -157,7 +159,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 		}
 		existingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error streaming previous logs: %v", err))
+			zap.L().Error(fmt.Sprintf("Error streaming previous logs: %v", err))
 			return
 		}
 		defer existingLogs.Close()
@@ -170,7 +172,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 			}
 			if err != nil {
 				if err != io.EOF {
-					logger.Logger.Error(fmt.Sprintf("Error reading log chunk: %v", err))
+					zap.L().Error(fmt.Sprintf("Error reading log chunk: %v", err))
 				}
 				break
 			}
@@ -188,7 +190,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 		}
 		streamingLogs, err := dockerClient.ContainerLogs(ctx, containerID, options)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error streaming logs: %v", err))
+			zap.L().Error(fmt.Sprintf("Error streaming logs: %v", err))
 			return
 		}
 		defer streamingLogs.Close()
@@ -197,7 +199,7 @@ func streamLogs(ctx context.Context, MuCon *structs.MuConn, containerID string) 
 	} else {
 		err := tailLogs(ctx, MuCon, logger.SysLogfile())
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error streaming system logs: %v", err))
+			zap.L().Error(fmt.Sprintf("Error streaming system logs: %v", err))
 		}
 	}
 }
@@ -215,7 +217,7 @@ func sendChunkedLogs(ctx context.Context, MuCon *structs.MuConn, containerID str
 		message.Type = "log"
 		logJSON, err := json.Marshal(message)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+			zap.L().Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
 			return
 		}
 		MuCon.Write(logJSON)
@@ -251,7 +253,7 @@ func tailLogs(ctx context.Context, MuCon *structs.MuConn, filename string) error
 					sendSysLogs(ctx, MuCon, scanner.Text())
 				}
 				if err := scanner.Err(); err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Syslog scan error: %v", err))
+					zap.L().Warn(fmt.Sprintf("Syslog scan error: %v", err))
 				}
 			}
 		case err := <-watcher.Errors:
@@ -271,13 +273,13 @@ func sendChunkedSysLogs(ctx context.Context, MuCon *structs.MuConn) {
 		message.Type = "log"
 		logLines, err := logger.TailLogs(logger.SysLogfile(), 500)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error tailing logs: %v", err))
+			zap.L().Warn(fmt.Sprintf("Error tailing logs: %v", err))
 			return
 		}
 		message.Log.Line = strings.Join(logLines, "\n")
 		logJSON, err := json.Marshal(message)
 		if err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
+			zap.L().Warn(fmt.Sprintf("Error sending chunked logs: %v", err))
 			return
 		}
 		MuCon.Write(logJSON)
@@ -304,7 +306,7 @@ func sendLogs(ctx context.Context, MuCon *structs.MuConn, containerID string, lo
 				message.Type = "log"
 				logJSON, err := json.Marshal(message)
 				if err != nil {
-					logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+					zap.L().Warn(fmt.Sprintf("Error streaming logs: %v", err))
 					break
 				}
 				MuCon.Write(logJSON)
@@ -330,7 +332,7 @@ func sendSysLogs(ctx context.Context, MuCon *structs.MuConn, line string) {
 			message.Type = "log"
 			logJSON, err := json.Marshal(message)
 			if err != nil {
-				logger.Logger.Warn(fmt.Sprintf("Error streaming logs: %v", err))
+				zap.L().Warn(fmt.Sprintf("Error streaming logs: %v", err))
 				return
 			}
 			MuCon.Write(logJSON)

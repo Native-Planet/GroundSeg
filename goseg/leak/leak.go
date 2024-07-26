@@ -3,12 +3,13 @@ package leak
 import (
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -43,7 +44,7 @@ func StartLeak() {
 		// result of broadcastUpdate becomes the new-oldBroadcast
 		oldBroadcast, err = updateBroadcast(oldBroadcast, newBroadcast)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to update leak broadcast: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to update leak broadcast: %v", err))
 		}
 	}
 }
@@ -89,7 +90,7 @@ func LookForPorts() bool {
 			// socket exists, shorten path with symlink
 			info.Symlink, err = makeSymlink(patp, sockLocation, symlinkPath)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("%v", err))
+				zap.L().Error(fmt.Sprintf("%v", err))
 				continue
 			}
 			// Auth is false by default
@@ -100,7 +101,7 @@ func LookForPorts() bool {
 			if conn == nil {
 				continue
 			}
-			logger.Logger.Info(fmt.Sprintf("Opening lick channel for %s", patp))
+			zap.L().Info(fmt.Sprintf("Opening lick channel for %s", patp))
 			go listener(patp, conn, info)
 		}
 		time.Sleep(1 * time.Second) // interval

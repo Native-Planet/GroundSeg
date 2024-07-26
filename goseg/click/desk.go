@@ -5,6 +5,8 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func reviveDesk(patp, desk string) error {
@@ -173,7 +175,7 @@ func storeDeskError(patp, desk string) {
 }
 
 func storeDesk(patp, desk, deskStatus string) {
-	logger.Logger.Info(fmt.Sprintf("Storing %%%v desk status for %s", desk, patp))
+	zap.L().Info(fmt.Sprintf("Storing %%%v desk status for %s", desk, patp))
 	desksMutex.Lock()
 	defer desksMutex.Unlock()
 	deskInfo, exists := shipDesks[patp]

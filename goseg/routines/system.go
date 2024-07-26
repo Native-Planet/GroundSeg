@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/grandcat/zeroconf"
+	"go.uber.org/zap"
 )
 
 var (
@@ -47,14 +48,14 @@ func AptUpdateLoop() {
 func mDNSServer() {
 	domains, err := mDNSDiscovery()
 	if err != nil {
-		logger.Logger.Warn("Couldn't discover mDNS servers on LAN -- defaulting to nativeplanet.local")
+		zap.L().Warn("Couldn't discover mDNS servers on LAN -- defaulting to nativeplanet.local")
 	} else {
 		// check if there's already a nativeplanet.local
 		counter := 2
 		domainBase := strings.Split(LocalDomain, ".")[0]
 		for contains(domains, domainBase) {
 			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
-			logger.Logger.Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
+			zap.L().Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
 			counter++
 			domainBase = strings.Split(LocalDomain, ".")[0]
 		}
@@ -80,7 +81,7 @@ func mDNSServer() {
 			nil,
 		)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		}
 		time.Sleep(120 * time.Second)
 		server.Shutdown()

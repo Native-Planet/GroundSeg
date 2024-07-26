@@ -3,7 +3,7 @@ package docker
 import (
 	"context"
 	"encoding/json"
-	"groundseg/logger"
+	"fmt"
 	"groundseg/structs"
 	"io/ioutil"
 	"os"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"go.uber.org/zap"
 )
 
 var (
@@ -54,28 +55,28 @@ func ForceUpdateContainerStats(name string) structs.ContainerStats {
 func getMemoryUsage(containerID string) uint64 {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		logger.Logger.Error("Failed to create Docker client: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
 		return 0
 	}
 	defer cli.Close()
 
 	resp, err := cli.ContainerStats(context.Background(), containerID, false)
 	if err != nil {
-		logger.Logger.Error("Failed to get container stats: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to get container stats: ", err))
 		return 0
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logger.Logger.Error("Failed to read container stats: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to read container stats: ", err))
 		return 0
 	}
 
 	var stats types.StatsJSON
 	err = json.Unmarshal(data, &stats)
 	if err != nil {
-		logger.Logger.Error("Failed to unmarshal container stats: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to unmarshal container stats: ", err))
 		return 0
 	}
 
@@ -86,14 +87,14 @@ func getMemoryUsage(containerID string) uint64 {
 func getDiskUsage(containerID string) int64 {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		logger.Logger.Error("Failed to create Docker client: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
 		return 0
 	}
 	defer cli.Close()
 
 	inspect, err := cli.ContainerInspect(context.Background(), containerID)
 	if err != nil {
-		logger.Logger.Error("Failed to inspect container: ", err)
+		zap.L().Error(fmt.Sprintf("Failed to inspect container: ", err))
 		return 0
 	}
 
@@ -102,7 +103,7 @@ func getDiskUsage(containerID string) int64 {
 		if mount.Type == "volume" || mount.Type == "bind" {
 			size, err := getDirSize(mount.Source)
 			if err != nil {
-				logger.Logger.Error("Failed to get size for directory: ", mount.Source, " Error: ", err)
+				zap.L().Error(fmt.Sprintf("Failed to get size for directory: ", mount.Source, " Error: ", err))
 				continue // Continue calculating the size of other volumes even if one fails
 			}
 			totalSize += size

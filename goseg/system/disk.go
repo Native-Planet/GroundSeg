@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shirou/gopsutil/disk"
+	"go.uber.org/zap"
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
@@ -151,7 +152,7 @@ func SetupTmpDir() error {
 
 	// remove old uploads
 	if err := RemoveMultipartFiles(symlink); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
+		zap.L().Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
 	}
 
 	// check if /tmp is on emmc

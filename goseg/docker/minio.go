@@ -14,12 +14,13 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
 )
 
 func LoadMC() error {
 	conf := config.Conf()
 	if conf.WgRegistered {
-		logger.Logger.Info("Loading MC container")
+		zap.L().Info("Loading MC container")
 		confPath := filepath.Join(config.BasePath, "settings", "mc.json")
 		_, err := os.Open(confPath)
 		if err != nil {
@@ -28,13 +29,13 @@ func LoadMC() error {
 			if err != nil {
 				// error if we can't create it
 				errmsg := fmt.Sprintf("Unable to create MC config! %v", err)
-				logger.Logger.Error(errmsg)
+				zap.L().Error(errmsg)
 			}
 		}
-		logger.Logger.Info("Running MC")
+		zap.L().Info("Running MC")
 		info, err := StartContainer("mc", "miniomc")
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error starting MC: %v", err))
+			zap.L().Error(fmt.Sprintf("Error starting MC: %v", err))
 			return err
 		}
 		config.UpdateContainerState("mc", info)
@@ -47,12 +48,12 @@ func LoadMC() error {
 func LoadMinIOs() error {
 	conf := config.Conf()
 	if conf.WgRegistered {
-		logger.Logger.Info("Loading MinIO containers")
+		zap.L().Info("Loading MinIO containers")
 		for _, pier := range conf.Piers {
 			label := "minio_" + pier
 			info, err := StartContainer(label, "minio")
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
+				zap.L().Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
 				continue
 			}
 			config.UpdateContainerState(label, info)

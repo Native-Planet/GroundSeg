@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -28,7 +30,7 @@ func init() {
 }
 
 func Start(dev string) error {
-	logger.Logger.Info(fmt.Sprintf("Starting router on %v", dev))
+	zap.L().Info(fmt.Sprintf("Starting router on %v", dev))
 	wlan = dev
 	// make sure dependencies are met
 	if err := checkDependencies(); err != nil {
@@ -44,7 +46,7 @@ func Start(dev string) error {
 		return err
 	}
 	if running {
-		logger.Logger.Info("Accesspoint already started")
+		zap.L().Info("Accesspoint already started")
 	}
 	// dump config to file
 	if err := writeHostapdConfig(); err != nil {
@@ -56,7 +58,7 @@ func Start(dev string) error {
 }
 
 func Stop(dev string) error {
-	logger.Logger.Info(fmt.Sprintf("Stopping router on %v", dev))
+	zap.L().Info(fmt.Sprintf("Stopping router on %v", dev))
 	wlan = dev
 	// make sure params are set (maybe not needed)
 	if err := checkParameters(); err != nil {
@@ -71,7 +73,7 @@ func Stop(dev string) error {
 	if running {
 		stopRouter()
 	} else {
-		logger.Logger.Info("Accesspoint already stopped")
+		zap.L().Info("Accesspoint already stopped")
 	}
 	return nil
 }

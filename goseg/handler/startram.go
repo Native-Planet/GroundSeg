@@ -12,6 +12,8 @@ import (
 	"groundseg/structs"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // startram action handler
@@ -60,7 +62,7 @@ func handleStartramRegions() {
 }
 
 func handleStartramRestart() {
-	logger.Logger.Info("Restarting StarTram")
+	zap.L().Info("Restarting StarTram")
 	startram.EventBus <- structs.Event{Type: "restart", Data: "startram"}
 	conf := config.Conf()
 	// only restart if startram is on
@@ -70,7 +72,7 @@ func handleStartramRestart() {
 		piers := conf.Piers
 		pierStatus, err := docker.GetShipStatus(piers)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
 		}
 		for pier, status := range pierStatus {
 			dockerConfig := config.UrbitConf(pier)
@@ -81,14 +83,14 @@ func handleStartramRestart() {
 		logger.Logger.Debug(fmt.Sprintf("Containers: %+v", wgShips))
 		// restart wireguard container
 		if err := docker.RestartContainer("wireguard"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
 		}
 		// operate on urbit ships
-		logger.Logger.Info("Recreating containers")
+		zap.L().Info("Recreating containers")
 		for patp, isRunning := range wgShips {
 			if isRunning {
 				if err := click.BarExit(patp); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
+					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
 				} else {
 					for {
 						exited, err := shipExited(patp)
@@ -103,28 +105,28 @@ func handleStartramRestart() {
 			}
 			// delete container
 			if err := docker.DeleteContainer(patp); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
 			}
 			minio := fmt.Sprintf("minio_%s", patp)
 			if err := docker.DeleteContainer(minio); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
 			}
 		}
 		// delete mc
 		if err := docker.DeleteContainer("mc"); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to delete minio client: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
 		}
 		// create startram containers
 		startram.EventBus <- structs.Event{Type: "restart", Data: "urbits"}
 		if err := docker.LoadUrbits(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to load urbits: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to load urbits: %v", err))
 		}
 		startram.EventBus <- structs.Event{Type: "restart", Data: "minios"}
 		if err := docker.LoadMC(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
 		}
 		if err := docker.LoadMinIOs(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
 		}
 		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
 		time.Sleep(3 * time.Second)
@@ -139,11 +141,11 @@ func handleStartramToggle() {
 		if err := config.UpdateConf(map[string]interface{}{
 			"wgOn": false,
 		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		err := docker.StopContainerByName("wireguard")
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		// toggle ships back to local
 		for _, patp := range conf.Piers {
@@ -158,11 +160,11 @@ func handleStartramToggle() {
 				}
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error marshalling JSON for %v:", patp, err))
+					zap.L().Error(fmt.Sprintf("Error marshalling JSON for %v:", patp, err))
 					continue
 				}
 				if err := UrbitHandler(jsonData); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Error sending action to UrbitHandler for %v:", patp, err))
+					zap.L().Error(fmt.Sprintf("Error sending action to UrbitHandler for %v:", patp, err))
 				}
 			}
 		}
@@ -170,31 +172,31 @@ func handleStartramToggle() {
 		if err := config.UpdateConf(map[string]interface{}{
 			"wgOn": true,
 		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 		_, err := docker.StartContainer("wireguard", "wireguard")
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
 	// delete mc
 	if err := docker.DeleteContainer("mc"); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to delete minio client: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
 	}
 	// load mc
 	if err := docker.LoadMC(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to load minio client: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
 	}
 	for _, patp := range conf.Piers {
 		// delete minio
 		minio := fmt.Sprintf("minio_%s", patp)
 		if err := docker.DeleteContainer(minio); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+			zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
 		}
 	}
 	// load minio
 	if err := docker.LoadMinIOs(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to load minios: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
 	}
 	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
 }
@@ -203,7 +205,7 @@ func handleStartramRegister(regCode, region string) {
 	// error handling
 	handleError := func(errmsg string) {
 		msg := fmt.Sprintf("Error: %s", errmsg)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		startram.EventBus <- structs.Event{Type: "register", Data: msg}
 		time.Sleep(3 * time.Second)
 		startram.EventBus <- structs.Event{Type: "register", Data: nil}
@@ -270,10 +272,10 @@ func handleStartramEndpoint(endpoint string) {
 		startram.EventBus <- structs.Event{Type: "endpoint", Data: "unregistering"}
 		for _, p := range conf.Piers {
 			if err := startram.SvcDelete(p, "urbit"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", p))
+				zap.L().Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", p))
 			}
 			if err := startram.SvcDelete("s3."+p, "s3"); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", p))
+				zap.L().Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", p))
 			}
 		}
 	}
@@ -311,7 +313,7 @@ func handleStartramEndpoint(endpoint string) {
 func handleStartramCancel(key string, reset bool) {
 	handleError := func(errmsg string) {
 		msg := fmt.Sprintf("Error: %s", errmsg)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		startram.EventBus <- structs.Event{Type: "cancelSub", Data: msg}
 		time.Sleep(3 * time.Second)
 		startram.EventBus <- structs.Event{Type: "cancelSub", Data: nil}
@@ -319,12 +321,12 @@ func handleStartramCancel(key string, reset bool) {
 	if reset {
 		for _, svc := range config.StartramConfig.Subdomains {
 			if err := startram.SvcDelete(svc.URL, svc.SvcType); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't delete service %v: %v", svc.URL, err))
+				zap.L().Error(fmt.Sprintf("Couldn't delete service %v: %v", svc.URL, err))
 			}
 		}
 	}
 	if err := startram.CancelSub(key); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't cancel subscription: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't cancel subscription: %v", err))
 		return
 	}
 	if err := config.CycleWgKey(); err != nil {
@@ -342,14 +344,14 @@ func handleStartramReminder(remind bool) {
 		shipConf.StartramReminder = remind
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
-			logger.Logger.Error("Couldn't update urbit config: %v", err)
+			zap.L().Error(fmt.Sprintf("Couldn't update urbit config: %v", err))
 		}
 	}
 }
 
 // temp
 func handleNotImplement(action string) {
-	logger.Logger.Error(fmt.Sprintf("temp error: %v not implemented", action))
+	zap.L().Error(fmt.Sprintf("temp error: %v not implemented", action))
 }
 
 func shipExited(patp string) (bool, error) {

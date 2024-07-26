@@ -11,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func PackScheduleLoop() {
 	// check once at start
 	if err := queuePack(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
+		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
 	}
 	ticker := time.NewTicker(1 * time.Minute)
 	//ticker := time.NewTicker(15 * time.Second)
@@ -24,11 +26,11 @@ func PackScheduleLoop() {
 		select {
 		case <-broadcast.SchedulePackBus:
 			if err := queuePack(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
+				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
 		case <-ticker.C:
 			if err := queuePack(); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
+				zap.L().Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
 			}
 		}
 	}
@@ -61,31 +63,31 @@ func queuePack() error {
 		case "month":
 			meldNext, err = setMonthSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDate, shipConf.MeldTime)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
 				continue
 			}
 		case "week":
 			meldNext, err = setWeekSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDay, shipConf.MeldTime)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
 				continue
 			}
 		case "day":
 			meldNext, err = setDaySchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldTime)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
 				continue
 			}
 		default:
-			logger.Logger.Warn(fmt.Sprintf("Pack schedule type for %s is not set. Defaulting to week", patp))
+			zap.L().Warn(fmt.Sprintf("Pack schedule type for %s is not set. Defaulting to week", patp))
 			meldNext, err = setWeekSchedule(meldNext, shipConf.MeldFrequency, shipConf.MeldDay, shipConf.MeldTime)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Pack scheduling for %s failed: %v", patp, err))
 				continue
 			}
 		}
 		if err := broadcast.UpdateScheduledPack(patp, meldNext); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
+			zap.L().Error(fmt.Sprintf("Failed to update pack schedule struct for %s: %v", patp, err))
 		}
 
 		now := time.Now()
@@ -171,10 +173,10 @@ func convertMeldTime(meldTime string) (int, int, error) {
 func setScheduledPackTimer(patp string, delay time.Duration) {
 	shipConf := config.UrbitConf(patp)
 	if delay > 0 {
-		logger.Logger.Info(fmt.Sprintf("Starting scheduled pack for %s in %v", patp, delay))
+		zap.L().Info(fmt.Sprintf("Starting scheduled pack for %s in %v", patp, delay))
 		time.Sleep(delay)
 	} else {
-		logger.Logger.Info(fmt.Sprintf("Starting scheduled pack for %s", patp))
+		zap.L().Info(fmt.Sprintf("Starting scheduled pack for %s", patp))
 	}
 	// error handling
 	packError := func(err error) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,10 +12,11 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"go.uber.org/zap"
 )
 
 func LoadNetdata() error {
-	logger.Logger.Info("Loading NetData container")
+	zap.L().Info("Loading NetData container")
 	confPath := filepath.Join(config.BasePath, "settings", "netdata.json")
 	_, err := os.Open(confPath)
 	if err != nil {
@@ -25,7 +25,7 @@ func LoadNetdata() error {
 		if err != nil {
 			// panic if we can't create it
 			errmsg := fmt.Sprintf("Unable to create NetData config! %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 			panic(errmsg)
 		}
 	}
@@ -33,10 +33,10 @@ func LoadNetdata() error {
 	if err != nil {
 		return err
 	}
-	logger.Logger.Info("Running NetData")
+	zap.L().Info("Running NetData")
 	info, err := StartContainer("netdata", "netdata")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error starting NetData: %v", err))
+		zap.L().Error(fmt.Sprintf("Error starting NetData: %v", err))
 		return err
 	}
 	config.UpdateContainerState("netdata", info)
@@ -104,12 +104,12 @@ func WriteNDConf() error {
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
-		logger.Logger.Info("Creating ND config")
+		zap.L().Info("Creating ND config")
 		return writeNDConfToFile(filePath, newConf)
 	}
 	if string(existingConf) != newConf {
 		// If they differ, overwrite
-		logger.Logger.Info("Writing ND config")
+		zap.L().Info("Writing ND config")
 		return writeNDConfToFile(filePath, newConf)
 	}
 	return nil
@@ -182,7 +182,7 @@ func copyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 	}
 	defer func() {
 		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
-			logger.Logger.Error("Failed to remove temporary container: ", removeErr)
+			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: ", removeErr))
 		}
 	}()
 	return nil

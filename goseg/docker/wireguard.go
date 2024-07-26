@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -16,11 +15,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"go.uber.org/zap"
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 func LoadWireguard() error {
-	logger.Logger.Info("Loading Startram Wireguard container")
+	zap.L().Info("Loading Startram Wireguard container")
 	confPath := filepath.Join(config.BasePath, "settings", "wireguard.json")
 	_, err := os.Open(confPath)
 	if err != nil {
@@ -36,10 +36,10 @@ func LoadWireguard() error {
 	if err != nil {
 		return err
 	}
-	logger.Logger.Info("Running Wireguard")
+	zap.L().Info("Running Wireguard")
 	info, err := StartContainer("wireguard", "wireguard")
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error starting wireguard: %v", err))
+		zap.L().Error(fmt.Sprintf("Error starting wireguard: %v", err))
 		return err
 	}
 	config.UpdateContainerState("wireguard", info)
@@ -108,12 +108,12 @@ func WriteWgConf() error {
 	existingConf, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
-		logger.Logger.Info("Creating WG config")
+		zap.L().Info("Creating WG config")
 		return writeWgConfToFile(filePath, newConf)
 	}
 	if string(existingConf) != newConf {
 		// If they differ, overwrite
-		logger.Logger.Info("Updating WG config")
+		zap.L().Info("Updating WG config")
 		return writeWgConfToFile(filePath, newConf)
 	}
 	return nil
@@ -186,7 +186,7 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 	}
 	defer func() {
 		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
-			logger.Logger.Error("Failed to remove temporary container: ", removeErr)
+			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: ", removeErr))
 		}
 	}()
 	return nil

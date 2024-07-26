@@ -2,8 +2,9 @@ package accesspoint
 
 import (
 	"fmt"
-	"groundseg/logger"
 	"io/ioutil"
+
+	"go.uber.org/zap"
 )
 
 func writeHostapdConfig() error {
@@ -16,7 +17,7 @@ func writeHostapdConfig() error {
 	if err != nil {
 		return err
 	}
-	logger.Logger.Info(fmt.Sprintf("Hostapd config saved to %s", hostapdConfigPath))
+	zap.L().Info(fmt.Sprintf("Hostapd config saved to %s", hostapdConfigPath))
 	return nil
 }
 

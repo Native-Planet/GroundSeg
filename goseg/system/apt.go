@@ -2,10 +2,11 @@ package system
 
 import (
 	"fmt"
-	"groundseg/logger"
 	"groundseg/structs"
 	"os/exec"
 	"regexp"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -45,7 +46,7 @@ func RunUpgrade() error {
 
 func UpdateCheck() {
 	if updates, err := hasUpdates(); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to check updates: %v", err))
+		zap.L().Error(fmt.Sprintf("Unable to check updates: %v", err))
 	} else {
 		SystemUpdates = updates
 	}

@@ -8,10 +8,12 @@ import (
 	"groundseg/logger"
 	"groundseg/structs"
 	"runtime"
+
+	"go.uber.org/zap"
 )
 
 func PenpaiHandler(msg []byte) error {
-	logger.Logger.Info("Penpai")
+	zap.L().Info("Penpai")
 	var penpaiPayload structs.WsPenpaiPayload
 	err := json.Unmarshal(msg, &penpaiPayload)
 	if err != nil {

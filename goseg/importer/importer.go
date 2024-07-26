@@ -26,6 +26,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 type uploadSession struct {
@@ -89,7 +90,7 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 					// check if mountpoint matches groundseg's expectations
 					matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
 					if err != nil {
-						logger.Logger.Error(fmt.Sprintf("Regex error for mountpoint: %v", m))
+						zap.L().Error(fmt.Sprintf("Regex error for mountpoint: %v", m))
 						continue
 					}
 					// yes
@@ -132,7 +133,7 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 	existingSession.NeedsFormatting = sel != "system-drive" && customDrive == ""
 
 	uploadSessions[endpoint] = existingSession
-	logger.Logger.Warn(fmt.Sprintf("current upload configuration: %+v", uploadPayload.Payload))
+	zap.L().Warn(fmt.Sprintf("current upload configuration: %+v", uploadPayload.Payload))
 	return nil
 }
 
@@ -174,7 +175,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	patp := vars["patp"]
 	handleSend := func(requestCode int, status, message string) {
 		if status == "failure" {
-			logger.Logger.Error(fmt.Sprintf("Upload error: %v", message))
+			zap.L().Error(fmt.Sprintf("Upload error: %v", message))
 			docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: message}
 			docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
 		}
@@ -254,7 +255,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		logger.Logger.Error(fmt.Sprintf("Invalid upload session request %v", session))
+		zap.L().Error(fmt.Sprintf("Invalid upload session request %v", session))
 		handleSend(http.StatusUnauthorized, "failure", "Invalid upload session")
 		return
 	}
@@ -302,7 +303,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	err := shipcreator.CreateUrbitConfig(patp, customPath)
 	if err != nil {
 		errmsg := fmt.Sprintf("Failed to create urbit config: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
@@ -310,30 +311,30 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	err = shipcreator.AppendSysConfigPier(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("Failed to update system.json: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
 	// Prepare environment for pier
-	logger.Logger.Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+	zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
 	// delete container if exists
 	err = docker.DeleteContainer(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	// delete volume if exists
 	err = docker.DeleteVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v (harmless)", err)
-		logger.Logger.Info(errmsg)
+		zap.L().Info(errmsg)
 	}
 	if customPath == "" { // no custom path provided
 		// create new docker volume
 		err = docker.CreateVolume(patp)
 		if err != nil {
 			errmsg := fmt.Sprintf("failed to create volume: %v", err)
-			logger.Logger.Error(errmsg)
+			zap.L().Error(errmsg)
 			errorCleanup(filename, patp, errmsg)
 			return
 		}
@@ -388,11 +389,11 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
 	// start container
-	logger.Logger.Info(fmt.Sprintf("Starting extracted pier: %v", patp))
+	zap.L().Info(fmt.Sprintf("Starting extracted pier: %v", patp))
 	info, err := docker.StartContainer(patp, "vere")
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
@@ -415,7 +416,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 }
 
 func waitForShipReady(filename, patp string, remote, fix bool) {
-	logger.Logger.Info(fmt.Sprintf("Booting ship: %v", patp))
+	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
 	lusCodeTicker := time.NewTicker(1 * time.Second)
 	for {
 		select {
@@ -433,7 +434,7 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 		if fix {
 			if err := click.FixAcme(patp); err != nil {
 				errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
-				logger.Logger.Error(errmsg)
+				zap.L().Error(errmsg)
 			}
 		}
 		conf := config.Conf()
@@ -451,28 +452,28 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 			logger.Logger.Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
 			statuses, err := docker.GetShipStatus([]string{patp})
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
+				zap.L().Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
 			}
 			status, exists := statuses[patp]
 			if !exists {
-				logger.Logger.Error(fmt.Sprintf("%s status doesn't exist: %v"))
+				zap.L().Error(fmt.Sprintf("%s status doesn't exist: %v"))
 			}
 			isRunning := strings.Contains(status, "Up")
 			if isRunning {
 				if err := click.BarExit(patp); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
+					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
 				}
 			}
 			if err := docker.DeleteContainer(patp); err != nil {
 				errmsg := fmt.Sprintf("Failed to delete local container for imported ship: %v", err)
-				logger.Logger.Error(errmsg)
+				zap.L().Error(errmsg)
 			}
 			docker.StartContainer("minio_"+patp, "minio")
 			logger.Logger.Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
 			info, err := docker.StartContainer(patp, "vere")
 			if err != nil {
 				errmsg := fmt.Sprintf("%v", err)
-				logger.Logger.Error(errmsg)
+				zap.L().Error(errmsg)
 				errorCleanup(filename, patp, errmsg)
 				return
 			}
@@ -505,29 +506,29 @@ func importShipToggleRemote(patp string) {
 
 func errorCleanup(filename, patp, errmsg string) {
 	// notify that we are cleaning up
-	logger.Logger.Info(fmt.Sprintf("Pier import process failed: %s: %s", patp, errmsg))
-	logger.Logger.Info(fmt.Sprintf("Running cleanup routine"))
+	zap.L().Info(fmt.Sprintf("Pier import process failed: %s: %s", patp, errmsg))
+	zap.L().Info(fmt.Sprintf("Running cleanup routine"))
 	//remove file
-	logger.Logger.Info(fmt.Sprintf("Removing %v", filename))
+	zap.L().Info(fmt.Sprintf("Removing %v", filename))
 	os.Remove(filepath.Join(uploadDir, filename))
 	// remove <patp>.json
-	logger.Logger.Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
+	zap.L().Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
 	if err := config.RemoveUrbitConfig(patp); err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	// remove patp from system.json
-	logger.Logger.Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
+	zap.L().Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
 	err := shipcreator.RemoveSysConfigPier(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	// remove docker volume
 	err = docker.DeleteVolume(patp)
 	if err != nil {
 		errmsg := fmt.Sprintf("%v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: errmsg}
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
@@ -535,7 +536,7 @@ func errorCleanup(filename, patp, errmsg string) {
 }
 
 func restructureDirectory(patp string) error {
-	logger.Logger.Info("Checking pier directory")
+	zap.L().Info("Checking pier directory")
 	// get docker volume path for patp
 	volDir := ""
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -550,7 +551,7 @@ func restructureDirectory(patp string) error {
 	shipConf := config.UrbitConf(patp)
 	customDir, ok := shipConf.CustomPierLocation.(string)
 	if ok {
-		logger.Logger.Info("Custom pier location found!")
+		zap.L().Info("Custom pier location found!")
 		volDir = customDir
 	} else {
 		for _, vol := range volumes.Volumes {
@@ -563,7 +564,7 @@ func restructureDirectory(patp string) error {
 	if volDir == "" {
 		return fmt.Errorf("No docker volume for %d!", patp)
 	}
-	logger.Logger.Info(fmt.Sprintf("%v pier path: %v", patp, volDir))
+	zap.L().Info(fmt.Sprintf("%v pier path: %v", patp, volDir))
 	// find .urb
 	var urbLoc []string
 	_ = filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
@@ -588,7 +589,7 @@ func restructureDirectory(patp string) error {
 	unusedDir := filepath.Join(volDir, "unused")
 	// move it into the right place
 	if filepath.Join(pierDir, ".urb") != filepath.Join(urbLoc[0], ".urb") {
-		logger.Logger.Info(".urb location incorrect! Restructuring directory structure")
+		zap.L().Info(".urb location incorrect! Restructuring directory structure")
 		logger.Logger.Debug(fmt.Sprintf(".urb found in %v", urbLoc[0]))
 		logger.Logger.Debug(fmt.Sprintf("Moving to %v", tempDir))
 		if volDir == urbLoc[0] { // .urb in root
@@ -617,7 +618,7 @@ func restructureDirectory(patp string) error {
 			}
 		}
 		os.Rename(tempDir, pierDir)
-		logger.Logger.Info(fmt.Sprintf("%v restructuring done", patp))
+		zap.L().Info(fmt.Sprintf("%v restructuring done", patp))
 	} else {
 		logger.Logger.Debug("No restructuring needed")
 	}
@@ -626,6 +627,6 @@ func restructureDirectory(patp string) error {
 
 func registerServices(patp string) {
 	if err := startram.RegisterNewShip(patp); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
+		zap.L().Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
 	}
 }

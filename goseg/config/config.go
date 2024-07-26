@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -52,20 +54,20 @@ var (
 
 // try initializing from system.json on disk
 func init() {
-	logger.Logger.Info("Starting GroundSeg")
-	logger.Logger.Info("Urbit is love <3")
+	zap.L().Info("Starting GroundSeg")
+	zap.L().Info("Urbit is love <3")
 	for _, arg := range os.Args[1:] {
 		// trigger this with `./groundseg dev`
 		if arg == "dev" {
-			logger.Logger.Info("Starting GroundSeg in debug mode")
+			zap.L().Info("Starting GroundSeg in debug mode")
 			DebugMode = true
 		}
 	}
 	BasePath = getBasePath()
 	if err := system.FixerScript(BasePath); err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
+		zap.L().Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
 	}
-	logger.Logger.Info(fmt.Sprintf("Loading configs from %s", BasePath))
+	zap.L().Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	keyPath := filepath.Join(BasePath, "settings", "session.key")
 	file, err := os.Open(confPath)
@@ -74,7 +76,7 @@ func init() {
 		err = createDefaultConf()
 		if err != nil {
 			// panic if we can't create it
-			logger.Logger.Error(fmt.Sprintf("Unable to create config! %v", err))
+			zap.L().Error(fmt.Sprintf("Unable to create config! %v", err))
 			fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
 			fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
 			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
@@ -85,7 +87,7 @@ func init() {
 		salt := RandString(32)
 		wgPriv, wgPub, err := WgKeyGen()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		} else {
 			if err = UpdateConf(map[string]interface{}{
 				"pubkey":  wgPub,
@@ -93,7 +95,7 @@ func init() {
 				"salt":    salt,
 				"keyfile": keyPath,
 			}); err != nil {
-				logger.Logger.Error(fmt.Sprintf("%v", err))
+				zap.L().Error(fmt.Sprintf("%v", err))
 			}
 		}
 	}
@@ -105,14 +107,14 @@ func init() {
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
 			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
 	}
 	// read the sysconfig to memory
 	decoder := json.NewDecoder(file)
 	if err = decoder.Decode(&globalConfig); err != nil {
-		logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
+		zap.L().Error(fmt.Sprintf("Error decoding JSON: %v", err))
 	}
 	// add mising fields
 	globalConfig = mergeConfigs(defaults.SysConfig(BasePath), globalConfig)
@@ -124,37 +126,37 @@ func init() {
 	hash, err := GetSHA256(filepath.Join(BasePath, "groundseg"))
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting binary sha256 hash: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	globalConfig.BinHash = hash
-	logger.Logger.Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
+	zap.L().Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
 
 	configMap := make(map[string]interface{})
 	configBytes, err := json.Marshal(globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshaling JSON: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	err = json.Unmarshal(configBytes, &configMap)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error unmarshaling JSON: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	err = persistConf(configMap)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error persisting JSON: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	file, err = os.Open(confPath)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error opening JSON: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	decoder = json.NewDecoder(file)
 	err = decoder.Decode(&globalConfig)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	}
 	// create a keyfile if you dont have one (gs1)
 	conf := Conf()
@@ -164,14 +166,14 @@ func init() {
 		if err != nil || keyfile.Size() == 0 {
 			keyContent := RandString(32)
 			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
+				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
 		file, _ = os.Open(confPath)
 		if err = UpdateConf(map[string]interface{}{
 			"keyfile": keyPath,
 		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("%v", err))
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
 	go ConfChannel()
@@ -214,7 +216,7 @@ func ConfChannel() {
 				if err := UpdateConf(map[string]interface{}{
 					"c2cInterval": 600,
 				}); err != nil {
-					logger.Logger.Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
+					zap.L().Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
 				}
 			}
 		}
@@ -263,13 +265,13 @@ func persistConf(configMap map[string]interface{}) error {
 	confPath := filepath.Join(BasePath, "settings", "system.json")
 	file, err := os.Open(confPath)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Couldn't open system.json: %v", err))
+		zap.L().Error(fmt.Sprintf("Couldn't open system.json: %v", err))
 	} else {
 		decoder := json.NewDecoder(file)
 		// confMutex.Lock()
 		// defer confMutex.Unlock()
 		if err = decoder.Decode(&globalConfig); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Error decoding JSON: %v", err))
+			zap.L().Error(fmt.Sprintf("Error decoding JSON: %v", err))
 		}
 	}
 	return nil
@@ -285,7 +287,7 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 	logMsg := "<hidden>"
 	res, _ := json.Marshal(containerState)
 	contMutex.Unlock()
-	logger.Logger.Info(fmt.Sprintf("%s state:%s", name, logMsg))
+	zap.L().Info(fmt.Sprintf("%s state:%s", name, logMsg))
 	logger.Logger.Debug(fmt.Sprintf("%s state:%s", name, string(res)))
 }
 
@@ -332,7 +334,7 @@ func NetCheck(netCheck string) bool {
 	conn, err := net.DialTimeout("tcp", netCheck, timeout)
 	if err != nil {
 		errmsg := fmt.Sprintf("Check internet access error: %v", err)
-		logger.Logger.Error(errmsg)
+		zap.L().Error(errmsg)
 	} else {
 		internet = true
 		_ = conn.Close()
@@ -345,7 +347,7 @@ func RandString(length int) string {
 	randBytes := make([]byte, length)
 	_, err := rand.Read(randBytes)
 	if err != nil {
-		logger.Logger.Warn("Random error :s")
+		zap.L().Warn("Random error :s")
 		return ""
 	}
 	return base64.URLEncoding.EncodeToString(randBytes)

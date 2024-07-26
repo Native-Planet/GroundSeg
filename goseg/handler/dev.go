@@ -11,6 +11,8 @@ import (
 	"groundseg/system"
 	"os"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var isDev = checkDevMode()
@@ -36,10 +38,10 @@ func DevHandler(msg []byte) error {
 	}
 	switch devPayload.Payload.Action {
 	case "reset-setup":
-		logger.Logger.Warn("Dev reset-setup not allowed!")
+		zap.L().Warn("Dev reset-setup not allowed!")
 	case "print-mounts":
 		if blockDevices, err := system.ListHardDisks(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to print block mounts: %v", err))
+			zap.L().Error(fmt.Sprintf("Failed to print block mounts: %v", err))
 		} else {
 			logger.Logger.Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
 		}
@@ -76,7 +78,7 @@ func DevHandler(msg []byte) error {
 				shipConf := config.UrbitConf(patp)
 				if shipConf.StartramReminder == true {
 					if err := click.SendNotification(patp, noti); err != nil {
-						logger.Logger.Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
+						zap.L().Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
 					}
 				}
 			}
@@ -92,7 +94,7 @@ func DevHandler(msg []byte) error {
 				"seven": reminded,
 			},
 		}); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
+			zap.L().Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
 		}
 	default:
 		return fmt.Errorf("Unknown Dev action: %v", devPayload.Payload.Action)
