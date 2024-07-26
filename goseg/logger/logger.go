@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/disk"
+	"go.uber.org/zap"
 )
 
 var (
@@ -100,6 +101,10 @@ func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 }
 
 func init() {
+	// zap
+	zap.ReplaceGlobals(zap.Must(zap.NewProduction()))
+	zap.L().Info("new logger")
+
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
 		"@&Y^  \n    ?&@@@@@@@@@&J             !G@@@@B?. .^ \n   Y@@@@@@@@@@@@@J         :?B@@@@G!  :" +
