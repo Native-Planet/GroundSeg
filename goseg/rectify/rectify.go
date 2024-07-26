@@ -207,23 +207,23 @@ func RectifyUrbit() {
 					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
 						// update alias
 						if remote.Alias == "null" && local.CustomUrbitWeb != "" {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Resetting %v alias", patp))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Resetting %v alias", patp))
 							local.CustomUrbitWeb = ""
 							modified = true
 						} else if remote.Alias != local.CustomUrbitWeb {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v alias to %v", patp, remote.Alias))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v alias to %v", patp, remote.Alias))
 							local.CustomUrbitWeb = remote.Alias
 							modified = true
 						}
 						// update www port
 						if remote.Port != local.WgHTTPPort {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v WG port to %v", patp, remote.Port))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v WG port to %v", patp, remote.Port))
 							local.WgHTTPPort = remote.Port
 							modified = true
 						}
 						// update remote url
 						if remote.URL != local.WgURL {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v URL to %v", patp, remote.URL))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v URL to %v", patp, remote.URL))
 							local.WgURL = remote.URL
 							modified = true
 						}
@@ -233,7 +233,7 @@ func RectifyUrbit() {
 					nestd := strings.Join(strings.Split(remote.URL, ".")[:2], ".")
 					if nestd == "ames."+patp && remote.SvcType == "urbit-ames" && remote.Status == "ok" {
 						if remote.Port != local.WgAmesPort {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v ames port to %v", patp, remote.Port))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v ames port to %v", patp, remote.Port))
 							local.WgAmesPort = remote.Port
 							modified = true
 						}
@@ -242,7 +242,7 @@ func RectifyUrbit() {
 					// for minio
 					if nestd == "s3."+patp && remote.SvcType == "minio" && remote.Status == "ok" {
 						if remote.Port != local.WgS3Port {
-							logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v minio port to %v", patp, remote.Port))
+							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v minio port to %v", patp, remote.Port))
 							local.WgS3Port = remote.Port
 							modified = true
 						}
@@ -251,7 +251,7 @@ func RectifyUrbit() {
 					// for minio console
 					consd := strings.Join(strings.Split(remote.URL, ".")[:3], ".")
 					if consd == "console.s3."+patp && remote.SvcType == "minio-console" && remote.Status == "ok" {
-						logger.Logger.Debug(fmt.Sprintf("Retrieve: Setting %v console port to %v", patp, remote.Port))
+						zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v console port to %v", patp, remote.Port))
 						if remote.Port != local.WgConsolePort {
 							local.WgConsolePort = remote.Port
 							modified = true

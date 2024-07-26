@@ -7,7 +7,6 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
 	"strings"
@@ -114,7 +113,7 @@ func DockerSubscriptionHandler() {
 			}
 
 		default:
-			logger.Logger.Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
+			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 		}
 	}
 }
@@ -182,7 +181,7 @@ func Check502Loop() {
 					continue
 				}
 				resp.Body.Close()
-				logger.Logger.Debug(fmt.Sprintf("%v 502 check: %v", pier, resp.StatusCode))
+				zap.L().Debug(fmt.Sprintf("%v 502 check: %v", pier, resp.StatusCode))
 				if resp.StatusCode == http.StatusBadGateway {
 					zap.L().Warn(fmt.Sprintf("Got 502 response for %v", pier))
 					if _, found := status[pier]; found {
@@ -307,7 +306,7 @@ func GracefulShipExit() error {
 				if err != nil {
 					break
 				}
-				logger.Logger.Debug(fmt.Sprintf("%s", status))
+				zap.L().Debug(fmt.Sprintf("%s", status))
 				if !strings.Contains(status, "Up") {
 					break
 				}

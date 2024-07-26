@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
 	"io"
@@ -288,7 +287,7 @@ func UpdateContainerState(name string, containerState structs.ContainerState) {
 	res, _ := json.Marshal(containerState)
 	contMutex.Unlock()
 	zap.L().Info(fmt.Sprintf("%s state:%s", name, logMsg))
-	logger.Logger.Debug(fmt.Sprintf("%s state:%s", name, string(res)))
+	zap.L().Debug(fmt.Sprintf("%s state:%s", name, string(res)))
 }
 
 // delete a container from the config map
@@ -296,7 +295,7 @@ func DeleteContainerState(name string) {
 	contMutex.Lock()
 	delete(GSContainers, name)
 	contMutex.Unlock()
-	logger.Logger.Debug(fmt.Sprintf("%s removed from container state map", name))
+	zap.L().Debug(fmt.Sprintf("%s removed from container state map", name))
 }
 
 // get the current container state

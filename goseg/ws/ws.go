@@ -7,7 +7,6 @@ import (
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/handler"
-	"groundseg/logger"
 	"groundseg/setup"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -34,7 +33,7 @@ var (
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
-	logger.Logger.Debug("New ws session")
+	zap.L().Debug("New ws session")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't upgrade websocket connection: %v", err))
 		return
@@ -43,7 +42,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
-			logger.Logger.Debug("WS closed")
+			zap.L().Debug("WS closed")
 			conn.Close()
 			// cancel all log streams for this ws
 			auth.ClientManager.Mu.RLock()
@@ -65,7 +64,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			// mute the session
 			auth.WsNilSession(conn)
 		}
-		logger.Logger.Debug(fmt.Sprintf("WS error: %v", err))
+		zap.L().Debug(fmt.Sprintf("WS error: %v", err))
 	}
 	// get the token from payload and check vs auth map
 	var payload structs.WsPayload
@@ -73,7 +72,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		zap.L().Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 	}
 	tokenId := payload.Token.ID
-	logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
+	zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
 	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 	token := map[string]string{
 		"id":    payload.Token.ID,
@@ -141,7 +140,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := MuCon.Read(auth.ClientManager)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
-				logger.Logger.Debug("WS closed")
+				zap.L().Debug("WS closed")
 				conn.Close()
 				// cancel all log streams for this ws
 				auth.ClientManager.Mu.RLock()
@@ -163,14 +162,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				// mute the session
 				auth.WsNilSession(conn)
 			}
-			logger.Logger.Debug(fmt.Sprintf("WS error: %v", err))
+			zap.L().Debug(fmt.Sprintf("WS error: %v", err))
 			break
 		}
 		if err := json.Unmarshal(msg, &payload); err != nil {
 			zap.L().Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
 		}
 		tokenId := payload.Token.ID
-		logger.Logger.Debug(fmt.Sprintf("New WS session for %v", tokenId))
+		zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
 		MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
 		token := map[string]string{
 			"id":    payload.Token.ID,
@@ -288,7 +287,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(resp)
 			case "verify":
-				logger.Logger.Debug("Handling verify for auth")
+				zap.L().Debug("Handling verify for auth")
 				authed := true
 				if conf.Setup != "complete" {
 					authed = false
@@ -298,7 +297,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 				if !authed && conf.Setup == "complete" {
-					logger.Logger.Debug("Not authed in auth flow")
+					zap.L().Debug("Not authed in auth flow")
 					resp, err := handler.UnauthHandler()
 					if err != nil {
 						zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
@@ -388,7 +387,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					"id":    payload.Token.ID,
 					"token": tokenContent,
 				}
-				logger.Logger.Debug(fmt.Sprintf("Verify %v check result: %v", payload.Token.ID, authed))
+				zap.L().Debug(fmt.Sprintf("Verify %v check result: %v", payload.Token.ID, authed))
 			default:
 				resp, err := handler.UnauthHandler()
 				if err != nil {

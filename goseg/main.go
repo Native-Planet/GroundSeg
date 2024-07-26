@@ -23,7 +23,6 @@ import (
 	"groundseg/exporter"
 	"groundseg/importer"
 	"groundseg/leak"
-	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
 	"groundseg/startram"
@@ -88,7 +87,7 @@ func killSwitch() {
 		zap.L().Info("Graceful reboot from C2C mode...")
 		routines.GracefulShipExit()
 		if config.DebugMode {
-			logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+			zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 			os.Exit(0)
 		} else {
 			zap.L().Info(fmt.Sprintf("Rebooting device.."))

@@ -7,7 +7,6 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"strings"
@@ -80,7 +79,7 @@ func handleStartramRestart() {
 				wgShips[pier] = (status == "Up" || strings.HasPrefix(status, "Up "))
 			}
 		}
-		logger.Logger.Debug(fmt.Sprintf("Containers: %+v", wgShips))
+		zap.L().Debug(fmt.Sprintf("Containers: %+v", wgShips))
 		// restart wireguard container
 		if err := docker.RestartContainer("wireguard"); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))

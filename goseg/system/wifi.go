@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/accesspoint"
-	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
 	"os"
@@ -136,7 +135,7 @@ func C2CMode() error {
 }
 
 func C2CConnect(ssid, password string) {
-	logger.Logger.Debug("C2C Attempting to connect to ssid")
+	zap.L().Debug("C2C Attempting to connect to ssid")
 	UnaliveC2C()
 	dev, _ := getWifiDevice()
 	_, err := runCommand("nmcli", "radio", "wifi", "on")
@@ -159,7 +158,7 @@ func C2CConnect(ssid, password string) {
 		cmd := exec.Command("reboot")
 		_, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Logger.Debug(fmt.Sprintf("Failed to reboot device: %v", err))
+			zap.L().Debug(fmt.Sprintf("Failed to reboot device: %v", err))
 		}
 	}
 }

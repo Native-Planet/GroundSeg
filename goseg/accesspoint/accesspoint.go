@@ -3,7 +3,6 @@ package accesspoint
 import (
 	"bytes"
 	"fmt"
-	"groundseg/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,7 +107,7 @@ func checkDependencies() error {
 
 // ExecuteShell executes a shell command and returns its output
 func executeShell(commandString string) (string, error) {
-	logger.Logger.Debug(fmt.Sprintf("%v", commandString))
+	zap.L().Debug(fmt.Sprintf("%v", commandString))
 	// Initialize the command
 	cmd := exec.Command("sh", "-c", commandString)
 
@@ -124,6 +123,6 @@ func executeShell(commandString string) (string, error) {
 	}
 
 	// Decode the result
-	logger.Logger.Debug(stdout.String())
+	zap.L().Debug(stdout.String())
 	return stdout.String(), nil
 }

@@ -2,7 +2,6 @@ package click
 
 import (
 	"fmt"
-	"groundseg/logger"
 	"groundseg/structs"
 	"time"
 
@@ -161,7 +160,7 @@ func fetchDeskFromMemory(patp, desk string) (string, error) {
 }
 
 func storeDeskError(patp, desk string) {
-	logger.Logger.Debug(fmt.Sprintf("Recording penpai desk info failure for %s", patp))
+	zap.L().Debug(fmt.Sprintf("Recording penpai desk info failure for %s", patp))
 	desksMutex.Lock()
 	defer desksMutex.Unlock()
 	deskInfo, exists := shipDesks[patp]

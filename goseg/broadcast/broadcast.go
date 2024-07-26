@@ -8,7 +8,6 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/leak"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
@@ -157,7 +156,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	}
 	hostName := system.LocalUrl
 	if hostName == "" {
-		logger.Logger.Debug(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
+		zap.L().Debug(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
 		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
@@ -209,7 +208,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if conf.WgRegistered && conf.WgOn {
 			minIOPwd, err = config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
 			if err != nil {
-				//logger.Logger.Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
+				//zap.L().Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
 			}
 		}
 		var lusCode string
@@ -224,7 +223,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			deskStatus, err := click.GetDesk(pier, "penpai", false)
 			if err != nil {
 				penpaiCompanionInstalled = false
-				logger.Logger.Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
+				zap.L().Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
 			}
 			penpaiCompanionInstalled = deskStatus == "running"
 		}
@@ -234,7 +233,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			deskStatus, err := click.GetDesk(pier, "groundseg", false)
 			if err != nil {
 				gallsegInstalled = false
-				logger.Logger.Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
+				zap.L().Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
 			}
 			gallsegInstalled = deskStatus == "running"
 		}

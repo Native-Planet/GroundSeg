@@ -42,7 +42,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"net"
@@ -63,7 +62,7 @@ func init() {
 	conf := config.Conf()
 	authed := conf.Sessions.Authorized
 	for key := range authed {
-		logger.Logger.Debug(fmt.Sprintf("Cached auth session: %v", key))
+		zap.L().Debug(fmt.Sprintf("Cached auth session: %v", key))
 		ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
 	}
 	go func() {
@@ -160,7 +159,7 @@ func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
 	clientManager.Mu.RLock()
 	defer clientManager.Mu.RUnlock()
 	_, exists := clientManager.AuthClients[token]
-	logger.Logger.Debug(fmt.Sprintf("%s present in authmap: %v", token, exists))
+	zap.L().Debug(fmt.Sprintf("%s present in authmap: %v", token, exists))
 	return exists
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/system"
 	"net"
 	"strings"
@@ -69,7 +68,7 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
-		logger.Logger.Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
+		zap.L().Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
 		server, err := zeroconf.RegisterProxy(
 			strings.Split(system.LocalUrl, ".")[0],
 			"_http._tcp",

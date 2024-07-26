@@ -2,7 +2,6 @@ package click
 
 import (
 	"fmt"
-	"groundseg/logger"
 	"groundseg/structs"
 	"time"
 
@@ -28,7 +27,7 @@ func getLusCode(patp string) (string, error) {
 		}
 		return code.LusCode, nil
 	}
-	// logger.Logger.Debug(fmt.Sprintf("Allowing +code request for %s", patp))
+	// zap.L().Debug(fmt.Sprintf("Allowing +code request for %s", patp))
 	// <file>.hoon
 	file := "code"
 	// actual hoon
@@ -56,7 +55,7 @@ func getLusCode(patp string) (string, error) {
 }
 
 func storeLusCodeError(patp string) {
-	logger.Logger.Debug(fmt.Sprintf("Recording +code failure for %s", patp))
+	zap.L().Debug(fmt.Sprintf("Recording +code failure for %s", patp))
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	lusCodes[patp] = structs.ClickLusCode{

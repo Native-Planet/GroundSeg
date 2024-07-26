@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
@@ -83,7 +82,7 @@ func killContainerUsingPort(n uint16) error {
 	for _, cont := range containers {
 		for _, port := range cont.Ports {
 			if port.PublicPort == n {
-				logger.Logger.Debug(fmt.Sprintf("Stopping container %s to free port %v", cont.ID, n))
+				zap.L().Debug(fmt.Sprintf("Stopping container %s to free port %v", cont.ID, n))
 				options := container.StopOptions{}
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
 					zap.L().Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
@@ -365,7 +364,7 @@ func WriteFileToVolume(name string, file string, content string) error {
 // contructs a container.Config, then runs through whether to boot/restart/etc
 // saves the current container state in memory after completion
 func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
-	logger.Logger.Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
+	zap.L().Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
 	// bundle of info about container
 	var containerState structs.ContainerState
 	// config params for container

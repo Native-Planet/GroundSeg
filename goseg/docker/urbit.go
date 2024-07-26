@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"path/filepath"
@@ -170,7 +169,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	var network string
 	var portMap nat.PortMap
 	if shipConf.Network == "wireguard" {
-		logger.Logger.Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
+		zap.L().Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
 		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
 		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
 		network = "container:wireguard"
@@ -238,6 +237,6 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 		Mounts:       mounts,
 		PortBindings: portMap,
 	}
-	logger.Logger.Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
+	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
 }

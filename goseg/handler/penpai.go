@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/structs"
 	"runtime"
 
@@ -93,7 +92,7 @@ func PenpaiHandler(msg []byte) error {
 	case "remove":
 		// check if container exists
 		// remove container, delete volume
-		logger.Logger.Debug(fmt.Sprintf("Todo: remove penpai"))
+		zap.L().Debug(fmt.Sprintf("Todo: remove penpai"))
 	}
 	return nil
 }

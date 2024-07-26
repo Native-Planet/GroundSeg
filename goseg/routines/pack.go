@@ -6,7 +6,6 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/structs"
 	"strconv"
 	"strings"
@@ -38,7 +37,7 @@ func PackScheduleLoop() {
 
 func queuePack() error {
 	var err error
-	logger.Logger.Debug("Updating pack schedule")
+	zap.L().Debug("Updating pack schedule")
 	conf := config.Conf()
 	for _, patp := range conf.Piers {
 		shipConf := config.UrbitConf(patp)
@@ -92,7 +91,7 @@ func queuePack() error {
 
 		now := time.Now()
 		// if less than 1 * time.Minute left, create routine with timer
-		logger.Logger.Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
+		zap.L().Debug(fmt.Sprintf("Next pack for %s on %v", patp, meldNext))
 		oneMinuteLater := now.Add(1 * time.Minute)
 		if oneMinuteLater.After(meldNext) || oneMinuteLater.Equal(meldNext) {
 			go setScheduledPackTimer(patp, meldNext.Sub(now))

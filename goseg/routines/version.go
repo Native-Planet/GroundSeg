@@ -7,7 +7,6 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/handler"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io"
 	"net/http"
@@ -180,7 +179,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// systemctl restart groundseg
 	if config.DebugMode {
-		logger.Logger.Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
+		zap.L().Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
 		os.Exit(0)
 	} else {
 		zap.L().Info("Restarting GroundSeg systemd service")

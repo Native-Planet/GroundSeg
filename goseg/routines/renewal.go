@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"time"
@@ -14,25 +13,25 @@ import (
 
 func StartramRenewalReminder() {
 	for {
-		logger.Logger.Debug(fmt.Sprintf("Checking StarTram renewal status.."))
+		zap.L().Debug(fmt.Sprintf("Checking StarTram renewal status.."))
 		conf := config.Conf()
 		// check again in 10 minutes
 		if !conf.WgRegistered {
-			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 10 minutes"))
+			zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 10 minutes"))
 			time.Sleep(10 * time.Minute)
 			continue
 		}
 		retrieve, err := startram.Retrieve()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to retrieve StarTram information: %v", err))
-			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 60 minutes"))
+			zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 60 minutes"))
 			// check again in 60 minutes
 			time.Sleep(60 * time.Minute)
 			continue
 		}
 		if retrieve.Ongoing == 1 {
 			// check again in 12 hours
-			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
+			zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 			setReminder("one", false)
 			setReminder("three", false)
 			setReminder("seven", false)
@@ -48,7 +47,7 @@ func StartramRenewalReminder() {
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to parse expiry date %v: %v", retrieve.Lease, err))
 			// check again in 12 hours
-			logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
+			zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 			time.Sleep(12 * time.Hour)
 			continue
 		}
@@ -81,7 +80,7 @@ func StartramRenewalReminder() {
 			setReminder("seven", true)
 		}
 		// check again in 12 hours
-		logger.Logger.Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
+		zap.L().Debug(fmt.Sprintf("Next StarTram renewal check in 12 hours"))
 		time.Sleep(12 * time.Hour)
 		continue
 	}

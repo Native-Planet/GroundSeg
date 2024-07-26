@@ -8,7 +8,6 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"net"
@@ -145,10 +144,10 @@ func waitComplete(patp string) {
 				continue
 			}
 			if strings.Contains(status, "Up") {
-				logger.Logger.Debug(fmt.Sprintf("%s continue waiting...", patp))
+				zap.L().Debug(fmt.Sprintf("%s continue waiting...", patp))
 				continue
 			}
-			logger.Logger.Debug(fmt.Sprintf("%s finished", patp))
+			zap.L().Debug(fmt.Sprintf("%s finished", patp))
 			return
 		}
 	}

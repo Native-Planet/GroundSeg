@@ -7,7 +7,6 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/shipcreator"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -188,9 +187,9 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		sesh, exists := uploadSessions[session]
 		// debug
 		if exists {
-			logger.Logger.Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
+			zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
 		} else {
-			logger.Logger.Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
+			zap.L().Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
 		}
 		// end debug
 
@@ -223,7 +222,7 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		filename := fileHeader.Filename
 		chunkIndex := r.FormValue("dzchunkindex")
 		totalChunks := r.FormValue("dztotalchunkcount")
-		logger.Logger.Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
+		zap.L().Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
 		index, err := strconv.Atoi(chunkIndex)
 		if err != nil {
 			handleSend(http.StatusBadRequest, "failure", "Invalid chunk index")
@@ -381,7 +380,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
-	logger.Logger.Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
+	zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
 	// run restructure
 	if err := restructureDirectory(patp); err != nil {
 		errorCleanup(filename, patp, fmt.Sprintf("Failed to restructure directory: %v", err))
@@ -449,7 +448,7 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 				errorCleanup(filename, patp, errmsg)
 				return
 			}
-			logger.Logger.Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
+			zap.L().Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
 			statuses, err := docker.GetShipStatus([]string{patp})
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
@@ -469,7 +468,7 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 				zap.L().Error(errmsg)
 			}
 			docker.StartContainer("minio_"+patp, "minio")
-			logger.Logger.Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
+			zap.L().Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
 			info, err := docker.StartContainer(patp, "vere")
 			if err != nil {
 				errmsg := fmt.Sprintf("%v", err)
@@ -583,15 +582,15 @@ func restructureDirectory(patp string) error {
 	if len(urbLoc) < 1 {
 		return fmt.Errorf("No ship found in pier directory")
 	}
-	logger.Logger.Debug(fmt.Sprintf(".urb subdirectory in %v", urbLoc[0]))
+	zap.L().Debug(fmt.Sprintf(".urb subdirectory in %v", urbLoc[0]))
 	pierDir := filepath.Join(volDir, patp)
 	tempDir := filepath.Join(volDir, "temp_dir")
 	unusedDir := filepath.Join(volDir, "unused")
 	// move it into the right place
 	if filepath.Join(pierDir, ".urb") != filepath.Join(urbLoc[0], ".urb") {
 		zap.L().Info(".urb location incorrect! Restructuring directory structure")
-		logger.Logger.Debug(fmt.Sprintf(".urb found in %v", urbLoc[0]))
-		logger.Logger.Debug(fmt.Sprintf("Moving to %v", tempDir))
+		zap.L().Debug(fmt.Sprintf(".urb found in %v", urbLoc[0]))
+		zap.L().Debug(fmt.Sprintf("Moving to %v", tempDir))
 		if volDir == urbLoc[0] { // .urb in root
 			_ = os.MkdirAll(tempDir, 0755)
 			items, _ := ioutil.ReadDir(urbLoc[0])
@@ -620,7 +619,7 @@ func restructureDirectory(patp string) error {
 		os.Rename(tempDir, pierDir)
 		zap.L().Info(fmt.Sprintf("%v restructuring done", patp))
 	} else {
-		logger.Logger.Debug("No restructuring needed")
+		zap.L().Debug("No restructuring needed")
 	}
 	return nil
 }

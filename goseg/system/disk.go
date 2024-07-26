@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"os"
@@ -122,7 +121,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 }
 
 func RemoveMultipartFiles(path string) error {
-	logger.Logger.Debug(fmt.Sprintf("Clearing multipart files from %v", path))
+	zap.L().Debug(fmt.Sprintf("Clearing multipart files from %v", path))
 	// Read the contents of the directory
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -140,7 +139,7 @@ func RemoveMultipartFiles(path string) error {
 			if err != nil {
 				return fmt.Errorf("failed to remove file %s: %v", filePath, err)
 			}
-			logger.Logger.Debug(fmt.Sprintf("Removed file: %s", filePath))
+			zap.L().Debug(fmt.Sprintf("Removed file: %s", filePath))
 		}
 	}
 

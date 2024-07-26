@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
-	"groundseg/logger"
 	"groundseg/structs"
 	"groundseg/system"
 	"os"
@@ -55,7 +54,7 @@ func SystemHandler(msg []byte) error {
 		switch systemPayload.Payload.Command {
 		case "restart":
 			if config.DebugMode {
-				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping GroundSeg restart. Exiting program."))
+				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping GroundSeg restart. Exiting program."))
 				os.Exit(0)
 			} else {
 				zap.L().Info(fmt.Sprintf("Restarting GroundSeg.."))
@@ -70,7 +69,7 @@ func SystemHandler(msg []byte) error {
 		case "shutdown":
 			zap.L().Info(fmt.Sprintf("Device shutdown requested"))
 			if config.DebugMode {
-				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
+				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 				os.Exit(0)
 			} else {
 				zap.L().Info(fmt.Sprintf("Turning off device.."))
@@ -80,7 +79,7 @@ func SystemHandler(msg []byte) error {
 		case "restart":
 			zap.L().Info(fmt.Sprintf("Device restart requested"))
 			if config.DebugMode {
-				logger.Logger.Debug(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
+				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
 				os.Exit(0)
 			} else {
 				zap.L().Info(fmt.Sprintf("Restarting device.."))

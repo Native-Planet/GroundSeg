@@ -103,7 +103,12 @@ func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 func init() {
 	// zap
 	zap.ReplaceGlobals(zap.Must(zap.NewProduction()))
-	zap.L().Info("new logger")
+	for _, arg := range os.Args[1:] {
+		// trigger dev mode with `./groundseg dev`
+		if arg == "dev" {
+			zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
+		}
+	}
 
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +

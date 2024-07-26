@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
@@ -43,7 +42,7 @@ func DevHandler(msg []byte) error {
 		if blockDevices, err := system.ListHardDisks(); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to print block mounts: %v", err))
 		} else {
-			logger.Logger.Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
+			zap.L().Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
 		}
 	case "startram-reminder":
 		conf := config.Conf()
@@ -83,7 +82,7 @@ func DevHandler(msg []byte) error {
 				}
 			}
 		} else {
-			logger.Logger.Debug("Dev not sending startram reminder. Already reminded!")
+			zap.L().Debug("Dev not sending startram reminder. Already reminded!")
 		}
 	case "startram-reminder-toggle":
 		reminded := devPayload.Payload.Reminded

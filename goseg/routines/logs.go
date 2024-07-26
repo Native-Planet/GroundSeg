@@ -56,7 +56,7 @@ func cleanupLogsMap() {
 func LogEvent() {
 	for {
 		event := <-config.LogsEventBus
-		logger.Logger.Debug(fmt.Sprintf("Log action %v", event.Action))
+		zap.L().Debug(fmt.Sprintf("Log action %v", event.Action))
 		switch event.Action {
 		case true:
 			zap.L().Info(fmt.Sprintf("Starting logs for %v", event.ContainerID))
@@ -72,7 +72,7 @@ func LogEvent() {
 		// cancel all log streams on ws break
 		case false:
 			if event.ContainerID == "all" {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
+				zap.L().Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if conMap, exists := logsMap[event.MuCon]; exists {
 					for container, cancel := range conMap {
 						cancel.Cancel()
@@ -81,7 +81,7 @@ func LogEvent() {
 					}
 				}
 			} else {
-				logger.Logger.Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
+				zap.L().Debug(fmt.Sprintf("Cancelling log stream for ws %v", event.ContainerID))
 				if cancel, exists := logsMap[event.MuCon][event.ContainerID]; exists {
 					cancel.Cancel()
 					delete(logsMap[event.MuCon], event.ContainerID)

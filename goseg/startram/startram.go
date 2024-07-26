@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"io/ioutil"
 	"math"
@@ -82,7 +81,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		// pin that ho to the global vars
 		config.StartramConfig = retrieve
 		zap.L().Info(fmt.Sprintf("StarTram info retrieved"))
-		logger.Logger.Debug(fmt.Sprintf("StarTram info: %s", string(body)))
+		zap.L().Debug(fmt.Sprintf("StarTram info: %s", string(body)))
 	} else {
 		regStatus = false
 		return retrieve, fmt.Errorf(fmt.Sprintf("No registration record"))

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"groundseg/config"
-	"groundseg/logger"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
@@ -278,7 +277,7 @@ func CreateMinIOServiceAccount(patp string) (structs.MinIOServiceAccount, error)
 	if err != nil {
 		return svcAccount, fmt.Errorf("Failed to remove old service account for %s: %v", patp, err)
 	}
-	logger.Logger.Debug(fmt.Sprintf("Remove old service account response: %s", response))
+	zap.L().Debug(fmt.Sprintf("Remove old service account response: %s", response))
 	// couldn't edit, add new instead
 	if strings.Contains(response, "successfully") {
 		cmd = []string{
