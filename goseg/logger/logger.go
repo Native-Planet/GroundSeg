@@ -102,13 +102,16 @@ func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 
 func init() {
 	// zap
-	zap.ReplaceGlobals(zap.Must(zap.NewProduction()))
+	cfg := zap.NewProductionConfig()
+	cfg.EncoderConfig = zap.NewDevelopmentEncoderConfig()
 	for _, arg := range os.Args[1:] {
 		// trigger dev mode with `./groundseg dev`
 		if arg == "dev" {
-			zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
+			cfg = zap.NewDevelopmentConfig()
+			cfg.Encoding = "json"
 		}
 	}
+	zap.ReplaceGlobals(zap.Must(cfg.Build()))
 
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
