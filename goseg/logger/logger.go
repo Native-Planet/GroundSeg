@@ -8,15 +8,22 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
+	// zap and lumberjack
+	logChannel = make(chan string, 100)
+
+	// legacy
 	logPath        string
 	logFile        *os.File
 	multiWriter    io.Writer
@@ -101,17 +108,43 @@ func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 }
 
 func init() {
-	// zap
-	cfg := zap.NewProductionConfig()
-	cfg.EncoderConfig = zap.NewDevelopmentEncoderConfig()
-	for _, arg := range os.Args[1:] {
-		// trigger dev mode with `./groundseg dev`
-		if arg == "dev" {
-			cfg = zap.NewDevelopmentConfig()
-			cfg.Encoding = "json"
-		}
+
+	// lumberjack logger
+	lumberjackLogger := &lumberjack.Logger{
+		Filename:   filepath.Join(makeLogPath(), "zaplog.log"),
+		MaxSize:    10, // megabytes
+		MaxBackups: 3,
+		MaxAge:     28,   // days
+		Compress:   true, // disabled by default
 	}
-	zap.ReplaceGlobals(zap.Must(cfg.Build()))
+
+	// encoder config
+	fileWriteSyncer := zapcore.AddSync(lumberjackLogger)
+	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+
+	// encoder
+	fmt.Println(fmt.Sprintf("%+v", &encoderConfig))
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+	/*
+		for _, arg := range os.Args[1:] {
+			// trigger dev mode with `./groundseg dev`
+			if arg == "dev" {
+				cfg = zap.NewDevelopmentConfig()
+				cfg.Encoding = "json"
+			}
+		}
+	*/
+
+	// zap core
+	core := zapcore.NewTee(
+		zapcore.NewCore(encoder, fileWriteSyncer, zap.InfoLevel),
+		zapcore.NewCore(encoder, consoleWriteSyncer, zap.InfoLevel),
+		//zapcore.NewCore(encoder, zapcore.AddSync(&ChannelWriter{Channel: logChannel}), zap.InfoLevel),
+	)
+
+	// zap
+	zap.ReplaceGlobals(zap.Must(zap.New(core, zap.AddCaller()), nil))
 
 	fmt.Println("                                       !G#:\n                                   " +
 		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
