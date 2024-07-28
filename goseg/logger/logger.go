@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,12 +15,11 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
-	// zap and lumberjack
-	logChannel = make(chan string, 100)
+	// zap
+	SysLogChannel = make(chan []byte)
 
 	// legacy
 	logPath        string
@@ -107,24 +105,50 @@ func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 	return NewErrorChannelHandler(e.underlyingHandler.WithGroup(name))
 }
 
-func init() {
+// FileWriter
+type FileWriter struct{}
 
-	// lumberjack logger
-	lumberjackLogger := &lumberjack.Logger{
-		Filename:   filepath.Join(makeLogPath(), "zaplog.log"),
-		MaxSize:    10, // megabytes
-		MaxBackups: 3,
-		MaxAge:     28,   // days
-		Compress:   true, // disabled by default
+func (fw FileWriter) Write(p []byte) (n int, err error) {
+	// Open the file in append mode, create it if it doesn't exist
+	f, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
 	}
+	defer f.Close()
+
+	// Write the byte slice to the file
+	n, err = f.Write(p)
+	return n, err
+}
+
+// Sync implements the zapcore.WriteSyncer interface for ConsoleWriter.
+func (fw FileWriter) Sync() error {
+	return nil
+}
+
+type ChanWriter struct{}
+
+func (cw ChanWriter) Write(p []byte) (n int, err error) {
+	SysLogChannel <- p
+	return len(p), nil
+}
+
+func (cw ChanWriter) Sync() error {
+	return nil
+}
+
+func init() {
+	// write logs to file
+	fw := FileWriter{}
+	fileWriteSyncer := zapcore.AddSync(fw)
+
+	// stdout
+	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
 
 	// encoder config
-	fileWriteSyncer := zapcore.AddSync(lumberjackLogger)
-	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 
 	// encoder
-	fmt.Println(fmt.Sprintf("%+v", &encoderConfig))
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	/*
 		for _, arg := range os.Args[1:] {
