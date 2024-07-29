@@ -24,6 +24,8 @@ import (
 )
 
 var (
+	// zap
+	logSessions      []*structs.MuConn
 	logsMap          = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
 	wsLogMessagePool = sync.Pool{
 		New: func() interface{} {
@@ -31,6 +33,16 @@ var (
 		},
 	}
 )
+
+// zap
+func LogStreamer() {
+	for {
+		log, _ := <-logger.SysLogChannel
+		for data, _ := range logSessions {
+			fmt.Println(fmt.Sprintf("log herererere %s, %+v", string(log), data))
+		}
+	}
+}
 
 func cleanupLogsMap() {
 	for MuCon, conMap := range logsMap {

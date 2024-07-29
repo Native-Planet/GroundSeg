@@ -1,6 +1,10 @@
 <script>
+  import { page } from '$app/stores'
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
+  import { URBIT_MODE } from '$lib/stores/data'
   import { logs, toggleLog } from '$lib/stores/websocket'
+  import { wsPort } from '$lib/stores/websocket'
+  import { connect } from '$lib/stores/logsocket'
   import Clipboard from 'clipboard'
 
   export let type
@@ -21,11 +25,20 @@
     }
   })
 
+  onMount(()=> {
+    const hostname = $page.url.hostname
+    if (!$URBIT_MODE) {
+      connect("ws://" + hostname + ":" + $wsPort + "/logs")
+    }
+  })
+    /*
   onMount(()=>{
+    connect(
     toggleLog(type,true)
     toLatest()
   })
-  onDestroy(()=>toggleLog(type,false))
+  */
+  //onDestroy(()=>toggleLog(type,false))
 	beforeUpdate(() => {
 		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 0);
 	})

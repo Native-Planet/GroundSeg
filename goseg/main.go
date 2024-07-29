@@ -152,7 +152,7 @@ func startServer() { // *http.Server {
 	}
 	w := mux.NewRouter()
 	w.HandleFunc("/ws", ws.WsHandler)
-	//w.HandleFunc("/logs", logger.Handler)
+	w.HandleFunc("/logs", ws.LogsHandler)
 	w.HandleFunc("/export/{container}", exporter.ExportHandler)
 	w.HandleFunc("/import/{uploadSession}/{patp}", importer.HTTPUploadHandler)
 	wsServer := &http.Server{
@@ -273,6 +273,8 @@ func main() {
 			time.Sleep(2 * time.Second)    // vere 3.0
 		} // vere 3.0
 	}() // vere 3.0
+	// log stream to frontend
+	go routines.LogStreamer() // infinite version check loop
 	// disk usage warning
 	go routines.DiskUsageWarning()
 	// startram reminder

@@ -19,7 +19,7 @@ import (
 
 var (
 	// zap
-	SysLogChannel = make(chan []byte)
+	SysLogChannel = make(chan []byte, 100)
 
 	// legacy
 	logPath        string
@@ -145,6 +145,10 @@ func init() {
 	// stdout
 	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
 
+	// channel
+	cw := ChanWriter{}
+	wsWriteSyncer := zapcore.AddSync(cw)
+
 	// encoder config
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 
@@ -164,7 +168,7 @@ func init() {
 	core := zapcore.NewTee(
 		zapcore.NewCore(encoder, fileWriteSyncer, zap.InfoLevel),
 		zapcore.NewCore(encoder, consoleWriteSyncer, zap.InfoLevel),
-		//zapcore.NewCore(encoder, zapcore.AddSync(&ChannelWriter{Channel: logChannel}), zap.InfoLevel),
+		zapcore.NewCore(encoder, wsWriteSyncer, zap.InfoLevel),
 	)
 
 	// zap
