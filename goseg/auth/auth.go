@@ -202,7 +202,7 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 }
 
 // check the validity of the token
-func CheckToken(token map[string]string, conn *websocket.Conn, r *http.Request) (string, bool) {
+func CheckToken(token map[string]string, r *http.Request) (string, bool) {
 	// great you have token. we see if valid.
 	if token["token"] == "" {
 		return "", false
@@ -399,4 +399,45 @@ func AuthenticateLogin(password string) bool {
 	} else {
 		return false
 	}
+}
+
+func LogTokenCheck(token structs.WsTokenStruct, r *http.Request) bool {
+	conf := config.Conf()
+	key := conf.KeyFile
+	res, err := KeyfileDecrypt(token.Token, key)
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
+		return false
+	} else {
+		// so you decrypt. now we see the useragent and ip.
+		var ip string
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			ip = strings.Split(forwarded, ",")[0]
+		} else {
+			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+		}
+		userAgent := r.Header.Get("User-Agent")
+		// you in auth map?
+		if TokenIdAuthed(ClientManager, token.ID) {
+			// check the decrypted token contents
+			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token.ID {
+				// already marked authorized? yes
+				if res["authorized"] == "true" {
+					return true
+				} else {
+					res["authorized"] = "true"
+					_, err := KeyfileEncrypt(res, key)
+					if err != nil {
+						zap.L().Error("Error encrypting token")
+						return false
+					}
+					return true
+				}
+			} else {
+				zap.L().Warn("TokenId doesn't match session!")
+				return false
+			}
+		}
+	}
+	return false
 }

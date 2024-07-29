@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,7 +20,9 @@ import (
 
 var (
 	// zap
-	SysLogChannel = make(chan []byte, 100)
+	SysLogChannel    = make(chan []byte, 100)
+	LogSessions      = make(map[string][]*websocket.Conn)
+	SessionsToRemove = make(map[string][]*websocket.Conn)
 
 	// legacy
 	logPath        string
@@ -342,4 +345,30 @@ OuterLoop:
 		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
 	}
 	return basePath + "/logs/"
+}
+
+func RemoveSessions(logType string) {
+	result := []*websocket.Conn{}
+	itemsToRemove := make(map[*websocket.Conn]struct{})
+
+	// Create a set of items to remove for quick lookup
+	rSessions, exists := SessionsToRemove[logType]
+	if exists {
+		for _, item := range rSessions {
+			itemsToRemove[item] = struct{}{}
+		}
+
+		// Iterate over slice1 and add to result if not in itemsToRemove
+		lSessions, exists := LogSessions[logType]
+		if exists {
+			for _, item := range lSessions {
+				if _, found := itemsToRemove[item]; !found {
+					result = append(result, item)
+				}
+			}
+			LogSessions[logType] = result
+		}
+	}
+	// always clear remove list after running function
+	SessionsToRemove[logType] = []*websocket.Conn{}
 }

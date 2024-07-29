@@ -4,7 +4,7 @@
   import { URBIT_MODE } from '$lib/stores/data'
   import { logs, toggleLog } from '$lib/stores/websocket'
   import { wsPort } from '$lib/stores/websocket'
-  import { connect } from '$lib/stores/logsocket'
+  import { connect, disconnect } from '$lib/stores/logsocket'
   import Clipboard from 'clipboard'
 
   export let type
@@ -28,7 +28,7 @@
   onMount(()=> {
     const hostname = $page.url.hostname
     if (!$URBIT_MODE) {
-      connect("ws://" + hostname + ":" + $wsPort + "/logs")
+      connect("ws://" + hostname + ":" + $wsPort + "/logs", type)
     }
   })
     /*
@@ -38,7 +38,7 @@
     toLatest()
   })
   */
-  //onDestroy(()=>toggleLog(type,false))
+  onDestroy(()=>disconnect())
 	beforeUpdate(() => {
 		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 0);
 	})

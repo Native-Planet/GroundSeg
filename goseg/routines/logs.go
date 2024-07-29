@@ -25,7 +25,6 @@ import (
 
 var (
 	// zap
-	logSessions      []*structs.MuConn
 	logsMap          = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
 	wsLogMessagePool = sync.Pool{
 		New: func() interface{} {
@@ -34,12 +33,40 @@ var (
 	}
 )
 
-// zap
-func LogStreamer() {
+func FakeLogs() {
 	for {
+		zap.L().Info("fake log")
+		time.Sleep(10 * time.Second)
+	}
+}
+
+// zap
+func SysLogStreamer() {
+	sys := "system"
+	for {
+		logger.RemoveSessions(sys)
 		log, _ := <-logger.SysLogChannel
-		for data, _ := range logSessions {
-			fmt.Println(fmt.Sprintf("log herererere %s, %+v", string(log), data))
+		sessions, exists := logger.LogSessions[sys]
+		if !exists {
+			continue
+		}
+		// cleanup log string
+		var buffer bytes.Buffer
+		err := json.Compact(&buffer, log)
+		if err != nil {
+			continue
+		}
+		escapedLog := buffer.Bytes()
+		logJSON := []byte(fmt.Sprintf(`{"type":"system","log":%s}`, escapedLog))
+		if err != nil {
+			continue
+		}
+		for _, conn := range sessions {
+			if err := conn.WriteMessage(1, logJSON); err != nil {
+				zap.L().Error(fmt.Sprintf("error writing message: %v", err))
+				conn.Close()
+				logger.SessionsToRemove[sys] = append(logger.SessionsToRemove[sys], conn)
+			}
 		}
 	}
 }

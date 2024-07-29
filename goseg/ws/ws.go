@@ -78,7 +78,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		"id":    payload.Token.ID,
 		"token": payload.Token.Token,
 	}
-	tokenContent, authed := auth.CheckToken(token, conn, r)
+	tokenContent, authed := auth.CheckToken(token, r)
 	token = map[string]string{
 		"id":    payload.Token.ID,
 		"token": tokenContent,
@@ -175,7 +175,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
 		}
-		tokenContent, authed := auth.CheckToken(token, conn, r)
+		tokenContent, authed := auth.CheckToken(token, r)
 		token = map[string]string{
 			"id":    payload.Token.ID,
 			"token": tokenContent,
@@ -382,7 +382,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				// 	ack = "nack"
 				// }
 				// token = newToken
-				tokenContent, authed := auth.CheckToken(token, conn, r)
+				tokenContent, authed := auth.CheckToken(token, r)
 				token = map[string]string{
 					"id":    payload.Token.ID,
 					"token": tokenContent,
