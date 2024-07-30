@@ -28,14 +28,20 @@ const handleOpen = logType => {
 }
 
 const handleMessage = msg => {
-  logs.update(current => {
-    if (!current[msg.type]) {
-      current[msg.type] = []
-    }
-    current[msg.type].push(msg.log)
-    return current
-  })
-  console.log(get(logs))
+  if (msg.history) {
+    logs.update(current => {
+      current[msg.type] = msg.log
+      return current
+    })
+  } else {
+    logs.update(current => {
+      if (!current[msg.type]) {
+        current[msg.type] = []
+      }
+      current[msg.type].push(msg.log)
+      return current
+    })
+  }
 }
 
 export const send = async logType => {

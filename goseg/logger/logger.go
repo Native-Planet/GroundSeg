@@ -118,21 +118,20 @@ func init() {
 
 	// encoder
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
-	/*
-		for _, arg := range os.Args[1:] {
-			// trigger dev mode with `./groundseg dev`
-			if arg == "dev" {
-				cfg = zap.NewDevelopmentConfig()
-				cfg.Encoding = "json"
-			}
+
+	// trigger dev mode with `./groundseg dev`
+	logLevel := zap.InfoLevel
+	for _, arg := range os.Args[1:] {
+		if arg == "dev" {
+			logLevel = zap.DebugLevel
 		}
-	*/
+	}
 
 	// zap core
 	core := zapcore.NewTee(
-		zapcore.NewCore(encoder, fileWriteSyncer, zap.InfoLevel),
-		zapcore.NewCore(encoder, consoleWriteSyncer, zap.InfoLevel),
-		zapcore.NewCore(encoder, wsWriteSyncer, zap.InfoLevel),
+		zapcore.NewCore(encoder, fileWriteSyncer, logLevel),
+		zapcore.NewCore(encoder, consoleWriteSyncer, logLevel),
+		zapcore.NewCore(encoder, wsWriteSyncer, logLevel),
 	)
 
 	// instantiate global logger

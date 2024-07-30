@@ -274,7 +274,7 @@ func main() {
 		} // vere 3.0
 	}() // vere 3.0
 	// fake log temp
-	go routines.FakeLogs()
+	//go routines.FakeLogs()
 	// log stream to frontend
 	go routines.SysLogStreamer()
 	// disk usage warning

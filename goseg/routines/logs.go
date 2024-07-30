@@ -57,7 +57,7 @@ func SysLogStreamer() {
 			continue
 		}
 		escapedLog := buffer.Bytes()
-		logJSON := []byte(fmt.Sprintf(`{"type":"system","log":%s}`, escapedLog))
+		logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, escapedLog))
 		if err != nil {
 			continue
 		}
