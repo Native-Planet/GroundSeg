@@ -44,23 +44,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 			zap.L().Debug("WS closed")
 			conn.Close()
-			// cancel all log streams for this ws
-			auth.ClientManager.Mu.RLock()
-			for _, clients := range auth.ClientManager.AuthClients {
-				for _, client := range clients {
-					if client != nil && client.Conn == conn {
-						logEvent := structs.LogsEvent{
-							Action:      false,
-							ContainerID: "all",
-							MuCon:       client,
-						}
-						config.LogsEventBus <- logEvent
-						break
-					}
-					break
-				}
-			}
-			auth.ClientManager.Mu.RUnlock()
 			// mute the session
 			auth.WsNilSession(conn)
 		}
@@ -142,23 +125,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				zap.L().Debug("WS closed")
 				conn.Close()
-				// cancel all log streams for this ws
-				auth.ClientManager.Mu.RLock()
-				for _, clients := range auth.ClientManager.AuthClients {
-					for _, client := range clients {
-						if client != nil && client.Conn == conn {
-							logEvent := structs.LogsEvent{
-								Action:      false,
-								ContainerID: "all",
-								MuCon:       client,
-							}
-							config.LogsEventBus <- logEvent
-							break
-						}
-						break
-					}
-				}
-				auth.ClientManager.Mu.RUnlock()
 				// mute the session
 				auth.WsNilSession(conn)
 			}
@@ -307,18 +273,6 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if err := broadcast.BroadcastToClients(); err != nil {
 					zap.L().Error(fmt.Sprintf("Unable to broadcast to clients: %v", err))
 				}
-			case "logs":
-				var logPayload structs.WsLogsPayload
-				if err := json.Unmarshal(msg, &logPayload); err != nil {
-					zap.L().Error(fmt.Sprintf("Error unmarshalling payload: %v", err))
-					continue
-				}
-				logEvent := structs.LogsEvent{
-					Action:      logPayload.Payload.Action,
-					ContainerID: logPayload.Payload.ContainerID,
-					MuCon:       MuCon,
-				}
-				config.LogsEventBus <- logEvent
 			case "setup":
 				if err = setup.Setup(msg, MuCon, token); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))

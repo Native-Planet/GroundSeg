@@ -2,14 +2,10 @@ package logger
 
 import (
 	"bufio"
-	"context"
 	"fmt"
-	"io"
-	"log/slog"
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -19,88 +15,45 @@ import (
 )
 
 var (
-	logPath        string
-	logFile        *os.File
-	multiWriter    io.Writer
-	Logger         *slog.Logger
-	dynamicHandler *DynamicLevelHandler
-	ErrBus         = make(chan string, 100)
-	filePointers   = make(map[string]struct {
-		file   *os.File
-		offset int64
-	})
+	logPath          string
+	SysLogChannel    = make(chan []byte, 100)
+	LogSessions      = make(map[string][]*websocket.Conn)
+	SessionsToRemove = make(map[string][]*websocket.Conn)
 )
 
-const (
-	LevelInfo  = slog.LevelInfo
-	LevelDebug = slog.LevelDebug
-)
+// File Writer
+type FileWriter struct{}
 
-type MuMultiWriter struct {
-	Writers []io.Writer
-	Mu      sync.Mutex
-}
-
-type DynamicLevelHandler struct {
-	currentLevel slog.Leveler
-	handler      slog.Handler
-}
-
-func NewDynamicLevelHandler(initialLevel slog.Leveler, h slog.Handler) *DynamicLevelHandler {
-	return &DynamicLevelHandler{currentLevel: initialLevel, handler: h}
-}
-
-func (d *DynamicLevelHandler) SetLevel(newLevel slog.Leveler) {
-	d.currentLevel = newLevel
-}
-
-func (d *DynamicLevelHandler) Enabled(_ context.Context, level slog.Level) bool {
-	return level >= d.currentLevel.Level()
-}
-
-func (d *DynamicLevelHandler) Handle(ctx context.Context, r slog.Record) error {
-	return d.handler.Handle(ctx, r)
-}
-
-func (d *DynamicLevelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return NewDynamicLevelHandler(d.currentLevel, d.handler.WithAttrs(attrs))
-}
-
-func (d *DynamicLevelHandler) WithGroup(name string) slog.Handler {
-	return NewDynamicLevelHandler(d.currentLevel, d.handler.WithGroup(name))
-}
-
-func (d *DynamicLevelHandler) Level() slog.Level {
-	return d.currentLevel.Level()
-}
-
-type ErrorChannelHandler struct {
-	underlyingHandler slog.Handler
-}
-
-func NewErrorChannelHandler(handler slog.Handler) *ErrorChannelHandler {
-	return &ErrorChannelHandler{underlyingHandler: handler}
-}
-
-func (e *ErrorChannelHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return e.underlyingHandler.Enabled(ctx, level)
-}
-
-func (e *ErrorChannelHandler) Handle(ctx context.Context, r slog.Record) error {
-	// If the level is Error, send the message to ErrBus channel
-	if r.Level == slog.LevelError {
-		ErrBus <- r.Message
+func (fw FileWriter) Write(p []byte) (n int, err error) {
+	// Open the file in append mode, create it if it doesn't exist
+	f, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
 	}
-	return e.underlyingHandler.Handle(ctx, r)
+	defer f.Close()
+
+	// Write the byte slice to the file
+	n, err = f.Write(p)
+	return n, err
 }
 
-func (e *ErrorChannelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return NewErrorChannelHandler(e.underlyingHandler.WithAttrs(attrs))
+// Sync implements the zapcore.WriteSyncer interface for ConsoleWriter.
+func (fw FileWriter) Sync() error {
+	return nil
 }
 
-func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
-	return NewErrorChannelHandler(e.underlyingHandler.WithGroup(name))
+// Channel Writer
+type ChanWriter struct{}
+
+func (cw ChanWriter) Write(p []byte) (n int, err error) {
+	SysLogChannel <- p
+	return len(p), nil
 }
+
+func (cw ChanWriter) Sync() error {
+	return nil
+}
+
 func init() {
 	// write logs to file
 	fw := FileWriter{}
@@ -149,7 +102,6 @@ func init() {
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
 
-	// legacy
 	logPath = makeLogPath()
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {
@@ -159,31 +111,6 @@ func init() {
 			"\n   (  >< )\n Love, Native Planet")
 		fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 		panic("")
-	}
-	logFile, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open log file: %v", err))
-	}
-	multiWriter = muMultiWriter(os.Stdout, logFile)
-	jsonHandler := slog.NewJSONHandler(multiWriter, nil)
-	var level slog.Level
-	for _, arg := range os.Args[1:] {
-		if arg == "dev" {
-			level = LevelDebug
-		} else {
-			level = LevelInfo
-		}
-	}
-	dynamicHandler = NewDynamicLevelHandler(level, jsonHandler)
-	customHandler := NewErrorChannelHandler(dynamicHandler)
-	Logger = slog.New(customHandler)
-}
-
-func ToggleDebugLogging(enable bool) {
-	if enable {
-		dynamicHandler.SetLevel(LevelDebug)
-	} else {
-		dynamicHandler.SetLevel(LevelInfo)
 	}
 }
 
@@ -203,66 +130,6 @@ func PrevSysLogfile() string {
 		month = month - 1
 	}
 	return fmt.Sprintf("%s%d-%02d.log", logPath, year, month)
-}
-
-func muMultiWriter(writers ...io.Writer) *MuMultiWriter {
-	return &MuMultiWriter{
-		Writers: writers,
-	}
-}
-
-func (m *MuMultiWriter) Write(p []byte) (n int, err error) {
-	m.Mu.Lock()
-	defer m.Mu.Unlock()
-	var firstError error
-	for _, w := range m.Writers {
-		n, err := w.Write(p)
-		if err != nil && firstError == nil {
-			firstError = err
-		}
-		if n != len(p) && firstError == nil {
-			firstError = io.ErrShortWrite
-		}
-	}
-	return len(p), firstError
-}
-
-func TailLogs(filename string, n int) ([]string, error) {
-	fp, exists := filePointers[filename]
-	if !exists || fp.file == nil {
-		var err error
-		fp.file, err = os.Open(filename)
-		if err != nil {
-			return nil, err
-		}
-		fp.offset = 0
-		filePointers[filename] = fp
-	}
-	_, err := fp.file.Seek(fp.offset, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-	scanner := bufio.NewScanner(fp.file)
-	bufSize := 1024
-	scanner.Buffer(make([]byte, bufSize), bufSize)
-	lineQueue := make([]string, 0, n)
-	for scanner.Scan() {
-		if len(lineQueue) >= n {
-			lineQueue = lineQueue[1:]
-		}
-		lineQueue = append(lineQueue, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	newOffset, err := fp.file.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil, err
-	}
-	fp.offset = newOffset
-	filePointers[filename] = fp
-	return lineQueue, nil
 }
 
 func makeLogPath() string {
@@ -333,4 +200,44 @@ func RemoveSessions(logType string) {
 	}
 	// always clear remove list after running function
 	SessionsToRemove[logType] = []*websocket.Conn{}
+}
+
+func RetrieveLogHistory(logType string) ([]byte, error) {
+	switch logType {
+	case "system":
+		return systemHistory()
+	default:
+		return []byte{}, fmt.Errorf("Unknown log type: %s", logType)
+	}
+}
+
+func systemHistory() ([]byte, error) {
+	filePath := SysLogfile()
+	// Open the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return []byte{}, fmt.Errorf("Error opening file: %v", err)
+	}
+	defer file.Close()
+
+	// Create a scanner to read the file line by line
+	scanner := bufio.NewScanner(file)
+	var lines []string
+
+	// Read each line and append it to the lines slice
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		return []byte{}, fmt.Errorf("Error reading file:", err)
+	}
+
+	// Join the lines slice into a single string resembling a JavaScript array
+	jsArray := fmt.Sprintf("[%s]", strings.Join(lines, ", "))
+	fmt.Println(jsArray)
+
+	// Print the JavaScript array string
+	return []byte(fmt.Sprintf(`{"type":"system","history":true,"log":%s}`, jsArray)), nil
 }

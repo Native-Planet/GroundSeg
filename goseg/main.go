@@ -184,8 +184,6 @@ func main() {
 	if err := system.EnableResolved(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
 	}
-	// push error messages to fe
-	go rectify.ErrorMessageHandler()
 	// global SysConfig var is managed through config package
 	conf := config.Conf()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
@@ -274,7 +272,6 @@ func main() {
 		} // vere 3.0
 	}() // vere 3.0
 	// fake log temp
-	//go routines.FakeLogs()
 	// log stream to frontend
 	go routines.SysLogStreamer()
 	// disk usage warning
@@ -285,8 +282,6 @@ func main() {
 	go routines.PackScheduleLoop()
 	// chop limiter
 	go routines.ChopAtLimit() // vere 3.0
-	// log manager routine
-	go routines.LogEvent()
 	// block until version info returns
 	if remoteVersion == true {
 		select {

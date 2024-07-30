@@ -6,11 +6,13 @@ import (
 	"groundseg/structs"
 	"log/slog"
 	"os"
+
+	"go.uber.org/zap"
 )
 
 var (
 	logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
-  DefaultVersionText = `
+	DefaultVersionText = `
 {
   "groundseg": {
     "canary": {
@@ -180,7 +182,6 @@ var (
 
 func init() {
 	if err := json.Unmarshal([]byte(DefaultVersionText), &VersionInfo); err != nil {
-		errmsg := fmt.Sprintf("Error unmarshalling default version info: %v", err)
-		logger.Error(errmsg)
+		zap.L().Error(fmt.Sprintf("Error unmarshalling default version info: %v", err))
 	}
 }
