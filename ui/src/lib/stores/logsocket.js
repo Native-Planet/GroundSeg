@@ -1,19 +1,26 @@
 import { loadSession } from './gs-crypto'
-let SESSION;
+import { get, writable } from 'svelte/store'
+
+export let logs = writable({})
+let SESSION = {};
 
 // Initialize connection
 export const connect = async (url, logType) => {
-  SESSION = new WebSocket(url);
-  SESSION.onopen = () => handleOpen(logType);
-  SESSION.onmessage = (message) => handleMessage(JSON.parse(message.data));
-  SESSION.onerror = (error) => console.log(error);
-  SESSION.onclose = () => reconnect(url);
+  SESSION[logType] = new WebSocket(url);
+  SESSION[logType].onopen = () => handleOpen(logType);
+  SESSION[logType].onmessage = (message) => handleMessage(JSON.parse(message.data));
+  SESSION[logType].onerror = (error) => console.log(error);
+  SESSION[logType].onclose = () => {};
 }
 
-export const disconnect = () => {
-  SESSION.close(1000)
-  SESSION = undefined
-  console.log("disconnected")
+export const disconnect = logType => {
+  SESSION[logType].close(1000)
+  SESSION[logType] = undefined
+  logs.update(current => {
+    delete current[logType]
+    return current
+  })
+  console.log(logType + " logs disconnected")
 }
 
 const handleOpen = logType => {
@@ -21,12 +28,14 @@ const handleOpen = logType => {
 }
 
 const handleMessage = msg => {
-  console.log("msg: " + JSON.stringify(msg))
-}
-
-const reconnect = url => {
-  console.log("disconnected")
-  //connect(url)
+  logs.update(current => {
+    if (!current[msg.type]) {
+      current[msg.type] = []
+    }
+    current[msg.type].push(msg.log)
+    return current
+  })
+  console.log(get(logs))
 }
 
 export const send = async logType => {
@@ -36,11 +45,11 @@ export const send = async logType => {
   if (token) {
     let data = {
       "type": logType,
-      "token": token
+      "token": token,
     }
     // Send the request
     console.log("requesting " + logType + " logs")
-    SESSION.send(JSON.stringify(data));
+    SESSION[logType].send(JSON.stringify(data));
   } else {
     console.log("invalid log session. Not send request: " + logType)
   }

@@ -19,12 +19,6 @@ import (
 )
 
 var (
-	// zap
-	SysLogChannel    = make(chan []byte, 100)
-	LogSessions      = make(map[string][]*websocket.Conn)
-	SessionsToRemove = make(map[string][]*websocket.Conn)
-
-	// legacy
 	logPath        string
 	logFile        *os.File
 	multiWriter    io.Writer
@@ -107,39 +101,6 @@ func (e *ErrorChannelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (e *ErrorChannelHandler) WithGroup(name string) slog.Handler {
 	return NewErrorChannelHandler(e.underlyingHandler.WithGroup(name))
 }
-
-// FileWriter
-type FileWriter struct{}
-
-func (fw FileWriter) Write(p []byte) (n int, err error) {
-	// Open the file in append mode, create it if it doesn't exist
-	f, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-
-	// Write the byte slice to the file
-	n, err = f.Write(p)
-	return n, err
-}
-
-// Sync implements the zapcore.WriteSyncer interface for ConsoleWriter.
-func (fw FileWriter) Sync() error {
-	return nil
-}
-
-type ChanWriter struct{}
-
-func (cw ChanWriter) Write(p []byte) (n int, err error) {
-	SysLogChannel <- p
-	return len(p), nil
-}
-
-func (cw ChanWriter) Sync() error {
-	return nil
-}
-
 func init() {
 	// write logs to file
 	fw := FileWriter{}
@@ -174,7 +135,7 @@ func init() {
 		zapcore.NewCore(encoder, wsWriteSyncer, zap.InfoLevel),
 	)
 
-	// zap
+	// instantiate global logger
 	zap.ReplaceGlobals(zap.Must(zap.New(core, zap.AddCaller()), nil))
 
 	fmt.Println("                                       !G#:\n                                   " +
@@ -188,6 +149,8 @@ func init() {
 		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
+
+	// legacy
 	logPath = makeLogPath()
 	err := os.MkdirAll(logPath, 0755)
 	if err != nil {

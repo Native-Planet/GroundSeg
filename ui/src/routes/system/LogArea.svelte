@@ -2,28 +2,14 @@
   import { page } from '$app/stores'
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
   import { URBIT_MODE } from '$lib/stores/data'
-  import { logs, toggleLog } from '$lib/stores/websocket'
   import { wsPort } from '$lib/stores/websocket'
-  import { connect, disconnect } from '$lib/stores/logsocket'
+  import { logs, connect, disconnect } from '$lib/stores/logsocket'
   import Clipboard from 'clipboard'
 
   export let type
-  let div
-	let autoscroll
-  let isLatest = true
   let copied = false
-  let y 
 
-  $: lines = ($logs[type]) || ""
-  $: splitLines = lines.split("\n") || []
-  $: prettyLines = splitLines.map(str=>{
-    try {
-      let parsedJSON = JSON.parse(str) 
-      return JSON.stringify(parsedJSON, null, 2)
-    } catch {
-      return str
-    }
-  })
+  $: lines = ($logs[type]) || []
 
   onMount(()=> {
     const hostname = $page.url.hostname
@@ -31,26 +17,9 @@
       connect("ws://" + hostname + ":" + $wsPort + "/logs", type)
     }
   })
-    /*
-  onMount(()=>{
-    connect(
-    toggleLog(type,true)
-    toLatest()
-  })
-  */
-  onDestroy(()=>disconnect())
-	beforeUpdate(() => {
-		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 0);
-	})
-	afterUpdate(() => {
-		if (autoscroll) div.scrollTo(0, div.scrollHeight);
-    if (isLatest) {
-      toLatest()
-    }
-	})
-
+  onDestroy(()=>disconnect(type))
   const toLatest = () => {
-    div.scrollTo(0, div.scrollHeight)
+    console.log("toLatest() placeholder")
   }
 
   let copy = new Clipboard('#logs');
@@ -64,15 +33,13 @@
   {#if copied}
     <div class="copy">copied!</div>
   {:else}
-    <img id="logs" data-clipboard-text={lines} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
+    <img id="logs" data-clipboard-text={lines.map(obj => JSON.stringify(obj, null, 2)).join('\n')} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
   {/if}
   <button on:click={toLatest} class="latest">Latest</button>
-  <div class="log-wrapper" bind:this={div}>
-    {#if (prettyLines.length > 0)}
-      {#each prettyLines as ln}
-        <pre class="log-line">{ln}</pre>
-      {/each}
-    {/if}
+  <div class="log-wrapper">
+    {#if (lines.length > 0)}{#each lines as ln}
+      <pre class="log-line">{JSON.stringify(ln,null,2)}</pre>
+    {/each}{/if}
   </div>
 </div>
 
