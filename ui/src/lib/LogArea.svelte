@@ -1,44 +1,27 @@
 <script>
+  import { page } from '$app/stores'
   import { onMount, onDestroy, beforeUpdate, afterUpdate } from 'svelte'
-  import { logs, toggleLog } from '$lib/stores/websocket'
+  import { URBIT_MODE } from '$lib/stores/data'
+  import { wsPort } from '$lib/stores/websocket'
+  import { logs, connect, disconnect } from '$lib/stores/logsocket'
   import Clipboard from 'clipboard'
 
-  export let container
-  let div
-	let autoscroll
-  let isLatest = true
+  export let type
   let copied = false
+  let latest = true
 
-  // minio and ship
+  $: lines = ($logs[type]) || []
 
-  $: lines = ($logs[container]) || ""
-  $: splitLines = lines.split("\n") || []
-  $: prettyLines = splitLines.map(str=>{
-    try {
-      let parsedJSON = JSON.parse(str) 
-      return JSON.stringify(parsedJSON, null, 2)
-    } catch {
-      return str
+  onMount(()=> {
+    const hostname = $page.url.hostname
+    if (!$URBIT_MODE) {
+      connect("ws://" + hostname + ":" + $wsPort + "/logs", type)
     }
   })
-
-  onMount(()=>{
-    toggleLog(container,true)
-    toLatest()
-  })
-  onDestroy(()=>toggleLog(container,false))
-	beforeUpdate(() => {
-		autoscroll = div && (div.offsetHeight + div.scrollTop) > (div.scrollHeight - 0);
-	})
-	afterUpdate(() => {
-		if (autoscroll) div.scrollTo(0, div.scrollHeight);
-    if (isLatest) {
-      toLatest()
-    }
-	})
-
+  onDestroy(()=>disconnect(type))
   const toLatest = () => {
-    div.scrollTo(0, div.scrollHeight)
+    window.location.href = "#latest"
+    latest = true
   }
 
   let copy = new Clipboard('#logs');
@@ -46,23 +29,35 @@
       copied = true;
       setTimeout(()=> copied = false, 1000)
     })
+
+  afterUpdate(()=>{
+    if (latest) {
+      toLatest()
+    }
+  })
+  const handleWheel = e => {
+    if (e.deltaY < 0) {
+      latest = false   
+    }
+  }
 </script>
 
 <div class="logarea">
   {#if copied}
     <div class="copy">copied!</div>
   {:else}
-    <img id="logs" data-clipboard-text={lines} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
+    <img id="logs" data-clipboard-text={lines.map(obj => JSON.stringify(obj, null, 2)).join('\n')} class="copy" src="/clipboard.svg" size="25px" alt="copy icon" />
   {/if}
-  {#if !autoscroll}
+  {#if !latest}
     <button on:click={toLatest} class="latest">Latest</button>
   {/if}
-  <div class="log-wrapper" bind:this={div}>
-    {#if (prettyLines.length > 0)}
-      {#each prettyLines as ln}
-        <pre class="log-line">{ln}</pre>
-      {/each}
-    {/if}
+  <div class="log-wrapper" on:wheel={handleWheel}>
+    {#if (lines.length > 0)}{#each lines as ln}
+      <pre class="log-line">
+        {type == "system" ? JSON.stringify(ln,null,2) : ln}
+      </pre>
+    {/each}{/if}
+    <div id="latest"></div>
   </div>
 </div>
 
@@ -81,17 +76,16 @@
     overflow-y: scroll;
     height: 100%;
   }
+  pre {
+    margin: 0;
+  }
   .log-line {
     display: flex;
-    gap: 20px;
     color: #000;
-    leading-trim: both;
-    text-edge: cap;
     font-family: var(--log-font, Source Code Pro);
     font-size: 16px;
     font-style: normal;
     font-weight: 400;
-    line-height: 20px; /* 125% */
     letter-spacing: -0.96px;
   }
   .latest {

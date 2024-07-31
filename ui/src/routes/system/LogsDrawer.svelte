@@ -4,7 +4,7 @@
   import { showLogs } from './store'
   import { structure } from '$lib/stores/data'
   import Drawer from '$lib/Drawer.svelte'
-  import LogArea from './LogArea.svelte'
+  import LogArea from '$lib/LogArea.svelte'
   export let title
   export let isOpen
   let type = "system"
@@ -20,7 +20,10 @@
     {/if}
   </div>
   {#if type == "startram"}
+    <!--
     <LogArea type="wireguard" />
+    -->
+    <LogArea type="haltyc-rosled-nallux-dozryl" />
   {:else}
     <LogArea type="system" />
   {/if}

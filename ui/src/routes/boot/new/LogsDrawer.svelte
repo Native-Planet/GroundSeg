@@ -3,7 +3,7 @@
   import { faXmark } from '@fortawesome/free-solid-svg-icons';
   import { structure } from '$lib/stores/data'
   import Drawer from '$lib/Drawer.svelte'
-  import LogArea from './LogArea.svelte'
+  import LogArea from '$lib/LogArea.svelte'
   export let patp
   export let isOpen
   let type = "urbit"
@@ -11,7 +11,7 @@
 
 {#if isOpen}
 <Drawer title={patp+" Logs"}>
-  <LogArea container={patp} />
+  <LogArea type={patp} />
 </Drawer>
 {/if}
 
