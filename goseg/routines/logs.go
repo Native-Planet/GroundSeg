@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"groundseg/logger"
 	"groundseg/structs"
+	"strings"
 	"time"
 
 	// "io/ioutil"
@@ -128,6 +129,7 @@ func streamToConn(container string, conn *websocket.Conn) {
 		if len(scanner.Text()) > 8 {
 			line = scanner.Text()[8:]
 		}
+		line = strings.ReplaceAll(line, "\\", "\\\\")
 		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, container, line))
 		if err := conn.WriteMessage(1, logJSON); err != nil {
 			zap.L().Error(fmt.Sprintf("error writing message for %v: %v", container, err))
