@@ -2,12 +2,16 @@ package logger
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
@@ -15,10 +19,11 @@ import (
 )
 
 var (
-	logPath          string
-	SysLogChannel    = make(chan []byte, 100)
-	LogSessions      = make(map[string][]*websocket.Conn)
-	SessionsToRemove = make(map[string][]*websocket.Conn)
+	logPath             string
+	SysLogChannel       = make(chan []byte, 100)
+	SysLogSessions      []*websocket.Conn
+	DockerLogSessions   = make(map[string]map[*websocket.Conn]bool)
+	SysSessionsToRemove []*websocket.Conn
 )
 
 // File Writer
@@ -176,42 +181,63 @@ OuterLoop:
 	return basePath + "/logs/"
 }
 
-func RemoveSessions(logType string) {
+func RemoveSysSessions() {
 	result := []*websocket.Conn{}
 	itemsToRemove := make(map[*websocket.Conn]struct{})
 
 	// Create a set of items to remove for quick lookup
-	rSessions, exists := SessionsToRemove[logType]
-	if exists {
-		for _, item := range rSessions {
-			itemsToRemove[item] = struct{}{}
-		}
+	for _, item := range SysSessionsToRemove {
+		itemsToRemove[item] = struct{}{}
+	}
 
-		// Iterate over slice1 and add to result if not in itemsToRemove
-		lSessions, exists := LogSessions[logType]
-		if exists {
-			for _, item := range lSessions {
-				if _, found := itemsToRemove[item]; !found {
-					result = append(result, item)
-				}
-			}
-			LogSessions[logType] = result
+	// Iterate over slice1 and add to result if not in itemsToRemove
+	for _, item := range SysLogSessions {
+		if _, found := itemsToRemove[item]; !found {
+			result = append(result, item)
 		}
 	}
+	SysLogSessions = result
 	// always clear remove list after running function
-	SessionsToRemove[logType] = []*websocket.Conn{}
+	SysSessionsToRemove = []*websocket.Conn{}
 }
 
-func RetrieveLogHistory(logType string) ([]byte, error) {
-	switch logType {
-	case "system":
-		return systemHistory()
-	default:
-		return []byte{}, fmt.Errorf("Unknown log type: %s", logType)
+func getDockerLogs(name string) ([]byte, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return []byte{}, err
 	}
+
+	options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true}
+	logs, err := cli.ContainerLogs(context.Background(), name, options)
+	if err != nil {
+		return []byte{}, err
+	}
+	defer logs.Close()
+
+	var logEntries []string
+	scanner := bufio.NewScanner(logs)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) > 8 {
+			line = line[8:]
+		}
+		jsonLine, err := json.Marshal(line)
+		if err != nil {
+			return []byte{}, err
+		}
+		logEntries = append(logEntries, string(jsonLine))
+	}
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		return []byte{}, fmt.Errorf("Error reading docker logs:", err)
+	}
+	jsArray := fmt.Sprintf("[%s]", strings.Join(logEntries, ", "))
+
+	// Print the JavaScript array string
+	return []byte(fmt.Sprintf(`{"type":"%s","history":true,"log":%s}`, name, jsArray)), nil
 }
 
-func systemHistory() ([]byte, error) {
+func RetrieveSysLogHistory() ([]byte, error) {
 	filePath := SysLogfile()
 	// Open the file
 	file, err := os.Open(filePath)

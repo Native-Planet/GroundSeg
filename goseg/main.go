@@ -274,6 +274,8 @@ func main() {
 	// fake log temp
 	// log stream to frontend
 	go routines.SysLogStreamer()
+	go routines.DockerLogStreamer()
+	go routines.DockerLogConnRemover()
 	// disk usage warning
 	go routines.DiskUsageWarning()
 	// startram reminder

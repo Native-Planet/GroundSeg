@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/docker"
 	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
 
@@ -54,18 +56,31 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 			conn.Close()
 			break
 		}
-		logHistory, err := logger.RetrieveLogHistory(payload.Type)
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("failed to retrieve log history: %v", err))
-			conn.Close()
-			break
+		if payload.Type == "system" {
+			logHistory, err := logger.RetrieveSysLogHistory()
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("failed to retrieve log history: %v", err))
+				conn.Close()
+				break
+			}
+			if err := conn.WriteMessage(1, logHistory); err != nil {
+				zap.L().Error(fmt.Sprintf("error writing message: %v", err))
+				conn.Close()
+				break
+			}
+			zap.L().Info("log request authenticated")
+			logger.SysLogSessions = append(logger.SysLogSessions, conn)
+		} else {
+			_, err := docker.FindContainer(payload.Type)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("log retrieval failed: %v", err))
+				conn.Close()
+				break
+			}
+			if _, exists := logger.DockerLogSessions[payload.Type]; !exists {
+				logger.DockerLogSessions[payload.Type] = make(map[*websocket.Conn]bool)
+			}
+			logger.DockerLogSessions[payload.Type][conn] = false
 		}
-		if err := conn.WriteMessage(1, logHistory); err != nil {
-			zap.L().Error(fmt.Sprintf("error writing message: %v", err))
-			conn.Close()
-			break
-		}
-		zap.L().Info("log request authenticated")
-		logger.LogSessions[payload.Type] = append(logger.LogSessions[payload.Type], conn)
 	}
 }
