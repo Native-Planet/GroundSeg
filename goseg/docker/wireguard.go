@@ -150,6 +150,7 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
 	containerInfo, err := GetLatestContainerInfo("wireguard")
 	if err != nil {
 		return err
