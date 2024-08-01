@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	logPath             string
+	LogPath             string
 	SysLogChannel       = make(chan []byte, 100)
 	SysLogSessions      []*websocket.Conn
 	DockerLogSessions   = make(map[string]map[*websocket.Conn]bool)
@@ -30,8 +30,9 @@ var (
 type FileWriter struct{}
 
 func (fw FileWriter) Write(p []byte) (n int, err error) {
+	fileName := SysLogfile()
 	// Open the file in append mode, create it if it doesn't exist
-	f, err := os.OpenFile(SysLogfile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return 0, err
 	}
@@ -107,8 +108,8 @@ func init() {
 		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
 		" ·▀▀▀▀ (~)")
 
-	logPath = makeLogPath()
-	err := os.MkdirAll(logPath, 0755)
+	LogPath = makeLogPath()
+	err := os.MkdirAll(LogPath, 0755)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
 		fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
@@ -121,7 +122,24 @@ func init() {
 
 func SysLogfile() string {
 	currentTime := time.Now()
-	return fmt.Sprintf("%s%d-%02d.log", logPath, currentTime.Year(), currentTime.Month())
+	curMonthYear := fmt.Sprintf("%d-%02d", currentTime.Year(), currentTime.Month())
+	count := 0
+	for {
+		// check if y-m-part-n.log exists
+		fn := fmt.Sprintf("%s%s-part-%v.log", LogPath, curMonthYear, count)
+		// file doesn't exist, use this
+		file, err := os.Stat(fn)
+		if err != nil {
+			return fn
+		}
+		// check if already 10MB
+		const maxSize int64 = 10 * 1024 * 1024
+		if file.Size() >= maxSize {
+			count = count + 1
+			continue
+		}
+		return fn
+	}
 }
 
 func PrevSysLogfile() string {
@@ -134,7 +152,7 @@ func PrevSysLogfile() string {
 	} else {
 		month = month - 1
 	}
-	return fmt.Sprintf("%s%d-%02d.log", logPath, year, month)
+	return fmt.Sprintf("%s%d-%02d.log", LogPath, year, month)
 }
 
 func makeLogPath() string {

@@ -276,6 +276,7 @@ func main() {
 	go routines.SysLogStreamer()
 	go routines.DockerLogStreamer()
 	go routines.DockerLogConnRemover()
+	go routines.OldLogsCleaner()
 	// disk usage warning
 	go routines.DiskUsageWarning()
 	// startram reminder

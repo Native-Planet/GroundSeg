@@ -19,6 +19,8 @@ import (
 	"path"
 	"path/filepath"
 	"runtime/pprof"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -236,17 +238,9 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	}
 
 	// current and previous syslogs
-	sysLogs := []string{logger.SysLogfile(), logger.PrevSysLogfile()}
+	sysLogs := lastTwoLogs()
 	for _, sysLog := range sysLogs {
 		srcPath := sysLog
-		/*
-			file, err := os.Stat(srcPath)
-			if err != nil {
-				zap.L().Warn(fmt.Sprintf("failed to get size of logfile %s: %v", srcPath, err))
-			} else {
-				zap.L().Info(fmt.Sprintf("The file is %d bytes long", file.Size()))
-			}
-		*/
 		destPath := filepath.Join(bugReportDir, filepath.Base(sysLog))
 		if err := copyFile(srcPath, destPath); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
@@ -426,4 +420,60 @@ OuterLoop:
 		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
 	}
 	return filepath.Join(config.BasePath, "/bug-reports/")
+}
+
+// LogFile represents a structured log file with a date and part number.
+type LogFile struct {
+	Name string
+	Date string
+	Part int
+}
+
+// lastTwoLogs returns the two most recent log files from the directory.
+func lastTwoLogs() []string {
+	// Read the directory
+	files, err := ioutil.ReadDir(logger.LogPath)
+	if err != nil {
+		fmt.Printf("Failed to read directory: %v\n", err)
+		return nil
+	}
+
+	// Create a slice to store LogFile structs
+	var logFiles []LogFile
+
+	// Filter and parse log files
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".log") {
+			parts := strings.Split(file.Name(), "-part-")
+			if len(parts) == 2 {
+				date := parts[0]
+				partNumber, err := strconv.Atoi(strings.TrimSuffix(parts[1], ".log"))
+				if err != nil {
+					fmt.Printf("Failed to parse part number from file: %s\n", file.Name())
+					continue
+				}
+				logFiles = append(logFiles, LogFile{
+					Name: file.Name(),
+					Date: date,
+					Part: partNumber,
+				})
+			}
+		}
+	}
+
+	// Sort log files first by Date, then by Part (both in descending order)
+	sort.Slice(logFiles, func(i, j int) bool {
+		if logFiles[i].Date == logFiles[j].Date {
+			return logFiles[i].Part > logFiles[j].Part
+		}
+		return logFiles[i].Date > logFiles[j].Date
+	})
+
+	// Get the two most recent log files
+	var recentLogs []string
+	for i := 0; i < len(logFiles) && i < 2; i++ {
+		recentLogs = append(recentLogs, filepath.Join(logger.LogPath, logFiles[i].Name))
+	}
+
+	return recentLogs
 }
