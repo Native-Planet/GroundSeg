@@ -606,7 +606,7 @@ func StopContainerByName(containerName string) error {
 	if err != nil {
 		return err
 	}
-	defer cli.Close(()
+	defer cli.Close()
 	// fetch all containers incl stopped
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
 	if err != nil {
