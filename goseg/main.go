@@ -279,6 +279,8 @@ func main() {
 	go routines.OldLogsCleaner()
 	// disk usage warning
 	go routines.DiskUsageWarning()
+	// S.M.A.R.T check
+	go routines.SmartDiskCheck()
 	// startram reminder
 	go routines.StartramRenewalReminder()
 	// pack scheduler

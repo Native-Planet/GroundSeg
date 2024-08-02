@@ -12,6 +12,39 @@ import (
 	"go.uber.org/zap"
 )
 
+func SmartDiskCheck() {
+	for {
+		disks, err := system.ListHardDisks()
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("smart disk check error: %v", err))
+			time.Sleep(1 * time.Hour)
+			continue
+		}
+		for _, disk := range disks.BlockDevices {
+			zap.L().Info(fmt.Sprintf("name: %v", disk.Name))
+		}
+
+		/*
+			dev, _ := smart.OpenNVMe("/dev/nvme0n1")
+			c, nss, _ := dev.Identify()
+			fmt.Println("Model number: ", c.ModelNumber())
+			fmt.Println("Serial number: ", c.SerialNumber())
+			fmt.Println("Size: ", c.Tnvmcap.Val[0])
+
+			// namespace #1
+			ns := nss[0]
+			fmt.Println("Namespace 1 utilization: ", ns.Nuse*ns.LbaSize())
+
+			sm, _ := dev.ReadSMART()
+			fmt.Println("Temperature: ", sm.Temperature, "K")
+			// PowerOnHours is reported as 128-bit value and represented by this library as an array of uint64
+			fmt.Println("Power-on hours: ", sm.PowerOnHours.Val[0])
+			fmt.Println("Power cycles: ", sm.PowerCycles.Val[0])
+		*/
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func DiskUsageWarning() {
 	for {
 		if diskUsage, err := system.GetDisk(); err != nil {
