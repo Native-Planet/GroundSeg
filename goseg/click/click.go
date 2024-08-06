@@ -38,6 +38,8 @@ func SendNotification(patp string, payload structs.HarkNotification) error {
 		return sendStartramReminder(patp, payload.StartramDaysLeft)
 	case "disk-warning":
 		return sendDiskSpaceWarning(patp, payload.DiskName, payload.DiskUsage)
+	case "smart-fail":
+		return sendSmartWarning(patp, payload.DiskName)
 		/*
 			case "cpu-temperature":
 				return sendCPUTempWarning(patp)

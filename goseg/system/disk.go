@@ -256,7 +256,7 @@ func SmartCheckAllDrives(devices structs.LSBLKDevice) map[string]bool {
 
 func checkSataDrive(name string) (bool, error) {
 	name = fmt.Sprintf("/dev/%v", name)
-	zap.L().Info(fmt.Sprintf("running SMART check for sata drive /dev/%v", name))
+	zap.L().Info(fmt.Sprintf("running SMART check for sata drive %v", name))
 	dev, err := smart.OpenSata(name)
 	if err != nil {
 		return false, err
@@ -265,7 +265,34 @@ func checkSataDrive(name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	_ = log
+	// #5 reallocated sector count < 50
+	if sectorCount, exists := log.Attrs[5]; exists {
+		if sectorCount.ValueRaw >= 50 {
+			return false, nil
+		}
+	}
+
+	// #9 power on hours < 30,000
+	if powerOnHours, exists := log.Attrs[9]; exists {
+		if powerOnHours.ValueRaw >= 30000 {
+			return false, nil
+		}
+	}
+
+	// #187 uncorrectable error count < 1
+	if errorCount, exists := log.Attrs[187]; exists {
+		if errorCount.ValueRaw >= 1 {
+			return false, nil
+		}
+	}
+
+	// #199 airflow temp celcius < 55
+	if temperature, exists := log.Attrs[190]; exists {
+		if temperature.ValueRaw >= 55 {
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 

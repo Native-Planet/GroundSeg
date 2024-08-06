@@ -17,11 +17,18 @@ func SmartDiskCheck() {
 		disks, err := system.ListHardDisks()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("smart disk check error: %v", err))
-			time.Sleep(1 * time.Hour)
-			continue
+		} else {
+			res := system.SmartCheckAllDrives(disks)
+			system.SmartResults = res
+			conf := config.Conf()
+			for k, v := range res {
+				if !v {
+					sendSmartFailHarkNotification(k, conf.Piers)
+				}
+			}
 		}
-		system.SmartResults = system.SmartCheckAllDrives(disks)
-		time.Sleep(15 * time.Second)
+		time.Sleep(6 * time.Hour)
+		//time.Sleep(15 * time.Second) //dev
 	}
 }
 
@@ -102,6 +109,16 @@ func sendDriveHarkNotification(part string, percentage float64, piers []string) 
 	for _, patp := range piers {
 		if err := click.SendNotification(patp, noti); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to send drive warning to %s: %v", patp, err))
+		}
+	}
+}
+
+func sendSmartFailHarkNotification(dev string, piers []string) {
+	noti := structs.HarkNotification{Type: "smart-fail", DiskName: dev}
+	// Send notification
+	for _, patp := range piers {
+		if err := click.SendNotification(patp, noti); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to send smart check warning to %s: %v", patp, err))
 		}
 	}
 }
