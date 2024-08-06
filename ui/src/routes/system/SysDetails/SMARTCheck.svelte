@@ -6,7 +6,7 @@
 
   <div class="volume-info">
     <div class="info-wrapper">
-      <div class="info-title">Hard Drive Health</div>
+      <div class="info-title">Drive Health</div>
       <div class="smart">
       {#each Object.entries(smart) as [name,pass]}
         <div class="smart-wrapper">
