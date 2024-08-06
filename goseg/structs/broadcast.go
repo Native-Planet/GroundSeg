@@ -47,7 +47,7 @@ type System struct {
 		Updates SystemUpdates          `json:"updates"`
 		Wifi    SystemWifi             `json:"wifi"`
 		Drives  map[string]SystemDrive `json:"drives"`
-		//BlockDevices []BlockDev    `json:"blockDevices"`
+		SMART   map[string]bool        `json:"smart"`
 	} `json:"info"`
 	Transition SystemTransitionBroadcast `json:"transition"`
 }
