@@ -44,6 +44,7 @@ var (
 	// channel for log stream requests
 	DockerDir     = defaults.DockerData("volumes") + "/"
 	confPath      = filepath.Join(BasePath, "settings", "system.json")
+	keyPath       = filepath.Join(BasePath, "settings", "session.key")
 	confMutex     sync.Mutex
 	contMutex     sync.Mutex
 	versMutex     sync.Mutex
@@ -52,22 +53,12 @@ var (
 
 // try initializing from system.json on disk
 func init() {
-	zap.L().Info("Starting GroundSeg")
-	zap.L().Info("Urbit is love <3")
-	for _, arg := range os.Args[1:] {
-		// trigger this with `./groundseg dev`
-		if arg == "dev" {
-			zap.L().Info("Starting GroundSeg in debug mode")
-			DebugMode = true
-		}
-	}
+	setDebugMode()
 	BasePath = getBasePath()
-	if err := system.FixerScript(BasePath); err != nil {
-		zap.L().Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
-	}
+	configureFixerScript()
 	zap.L().Info(fmt.Sprintf("Loading configs from %s", BasePath))
-	confPath := filepath.Join(BasePath, "settings", "system.json")
-	keyPath := filepath.Join(BasePath, "settings", "session.key")
+	confPath = filepath.Join(BasePath, "settings", "system.json")
+	keyPath = filepath.Join(BasePath, "settings", "session.key")
 	file, err := os.Open(confPath)
 	if err != nil {
 		// create a default if it doesn't exist
@@ -380,6 +371,16 @@ func GetSHA256(filePath string) (string, error) {
 func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConfig {
 	mergedConfig := structs.SysConfig{}
 
+	// GracefulExit
+	mergedConfig.GracefulExit = customConfig.GracefulExit || defaultConfig.GracefulExit
+
+	//LastKnownMDNS
+	if customConfig.LastKnownMDNS != "" {
+		mergedConfig.LastKnownMDNS = customConfig.LastKnownMDNS
+	} else {
+		mergedConfig.LastKnownMDNS = defaultConfig.LastKnownMDNS
+	}
+
 	// Setup
 
 	// if pwhash is empty:
@@ -607,4 +608,20 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
 	}
 	return mergedConfig
+}
+
+func setDebugMode() {
+	for _, arg := range os.Args[1:] {
+		// trigger this with `./groundseg dev`
+		if arg == "dev" {
+			zap.L().Info("Starting GroundSeg in debug mode")
+			DebugMode = true
+		}
+	}
+}
+
+func configureFixerScript() {
+	if err := system.FixerScript(BasePath); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to configure fixer script: %v", err))
+	}
 }
