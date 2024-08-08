@@ -181,6 +181,7 @@ pipeline {
 
                             cd ../goseg
                             go fmt ./...
+			    go mod tidy
                             git commit -am "Promoting ${binTag} for release"
                             git tag ${binTag}
                             git push --set-upstream origin ${binTag}
