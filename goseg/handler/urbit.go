@@ -178,7 +178,7 @@ func urbitCleanDelete(patp string) error {
 			if err != nil {
 				break
 			}
-			zap.L().Warn(fmt.Sprintf("%s", status))
+			zap.L().Debug(fmt.Sprintf("%s", status))
 			if !strings.Contains(status, "Up") {
 				break
 			}
