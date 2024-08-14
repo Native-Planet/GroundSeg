@@ -53,6 +53,11 @@ func SystemHandler(msg []byte) error {
 		zap.L().Info(fmt.Sprintf("Device shutdown requested"))
 		switch systemPayload.Payload.Command {
 		case "restart":
+			if err = config.UpdateConf(map[string]interface{}{
+				"gracefulExit": true,
+			}); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
+			}
 			if config.DebugMode {
 				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping GroundSeg restart. Exiting program."))
 				os.Exit(0)
@@ -68,6 +73,11 @@ func SystemHandler(msg []byte) error {
 		switch systemPayload.Payload.Command {
 		case "shutdown":
 			zap.L().Info(fmt.Sprintf("Device shutdown requested"))
+			if err = config.UpdateConf(map[string]interface{}{
+				"gracefulExit": true,
+			}); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
+			}
 			if config.DebugMode {
 				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping shutdown. Exiting program."))
 				os.Exit(0)
@@ -78,6 +88,11 @@ func SystemHandler(msg []byte) error {
 			}
 		case "restart":
 			zap.L().Info(fmt.Sprintf("Device restart requested"))
+			if err = config.UpdateConf(map[string]interface{}{
+				"gracefulExit": true,
+			}); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't set graceful exit to true: %v", err))
+			}
 			if config.DebugMode {
 				zap.L().Debug(fmt.Sprintf("DebugMode detected, skipping restart. Exiting program."))
 				os.Exit(0)

@@ -12,9 +12,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/anatol/smart.go"
 	"github.com/google/uuid"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
+)
+
+var (
+	SmartResults = make(map[string]bool)
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
@@ -221,4 +226,102 @@ OuterLoop:
 		dirPath = path.Dir(dirPath) // Reduce the path by one level
 	}
 	return false, nil
+}
+
+func SmartCheckAllDrives(devices structs.LSBLKDevice) map[string]bool {
+	results := make(map[string]bool)
+	for _, disk := range devices.BlockDevices {
+		if strings.Contains(disk.Name, "sd") {
+			// sata
+			pass, err := checkSataDrive(disk.Name)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to do SMART check sata drive %v: %v", disk.Name, err))
+				continue
+			} else {
+				results[disk.Name] = pass
+			}
+		} else if strings.Contains(disk.Name, "nvme") {
+			// nvme
+			pass, err := checkNvmeDrive(disk.Name)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to do SMART check nvme drive %v: %v", disk.Name, err))
+				continue
+			} else {
+				results[disk.Name] = pass
+			}
+		}
+	}
+	return results
+}
+
+func checkSataDrive(name string) (bool, error) {
+	name = fmt.Sprintf("/dev/%v", name)
+	zap.L().Info(fmt.Sprintf("running SMART check for sata drive %v", name))
+	dev, err := smart.OpenSata(name)
+	if err != nil {
+		return false, err
+	}
+	log, err := dev.ReadSMARTData()
+	if err != nil {
+		return false, err
+	}
+	// #5 reallocated sector count < 50
+	if sectorCount, exists := log.Attrs[5]; exists {
+		if sectorCount.ValueRaw >= 50 {
+			return false, nil
+		}
+	}
+
+	// #9 power on hours < 30,000
+	if powerOnHours, exists := log.Attrs[9]; exists {
+		if powerOnHours.ValueRaw >= 30000 {
+			return false, nil
+		}
+	}
+
+	// #187 uncorrectable error count < 1
+	if errorCount, exists := log.Attrs[187]; exists {
+		if errorCount.ValueRaw >= 1 {
+			return false, nil
+		}
+	}
+
+	// #199 airflow temp celcius < 55
+	if temperature, exists := log.Attrs[190]; exists {
+		if temperature.ValueRaw >= 55 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func checkNvmeDrive(name string) (bool, error) {
+	name = fmt.Sprintf("/dev/%v", name)
+	zap.L().Info(fmt.Sprintf("running SMART check for nvme drive %v", name))
+	dev, err := smart.OpenNVMe(name)
+	if err != nil {
+		return false, err
+	}
+	log, err := dev.ReadSMART()
+	if err != nil {
+		return false, err
+	}
+	// crit warning
+	if log.CritWarning != 0 {
+		return false, nil
+	}
+	// temp
+	if log.Temperature > 353 {
+		return false, nil
+	}
+	// avail spare higher than spare threshold
+	if log.AvailSpare <= log.SpareThresh {
+		return false, nil
+	}
+	// percentage used below 100%
+	if log.PercentUsed >= 100 {
+		return false, nil
+	}
+	return true, nil
 }

@@ -118,6 +118,8 @@ func init() {
 		fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 		panic("")
 	}
+	zap.L().Info("Starting GroundSeg")
+	zap.L().Info("Urbit is love <3")
 }
 
 func SysLogfile() string {

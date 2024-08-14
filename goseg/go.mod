@@ -3,6 +3,7 @@ module groundseg
 go 1.21
 
 require (
+	github.com/anatol/smart.go v0.0.0-20240606135530-b987830bbb40
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/fernet/fernet-go v0.0.0-20211208181803-9f70042a33ee

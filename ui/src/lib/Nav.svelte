@@ -4,6 +4,7 @@
   import { wide, version } from '$lib/stores/display'
   import { structure, URBIT_MODE } from '$lib/stores/data'
   import SatelliteDish from '$lib/SatelliteDish.svelte'
+  import DiskWarningIcon from '$lib/DiskWarningIcon.svelte'
 
   // Temp dev mode
   import DevToggle from '$lib/DevToggle.svelte'
@@ -38,11 +39,7 @@
           <div class="app-version">{$version}</div>
         </div>
         <SatelliteDish />
-        <!--
-        - STARTRAM {
-          !registered ? "UNREGISTERED" :
-          running ? "ONLINE" : "OFFLINE"
-          }
+        <DiskWarningIcon />
           <!--
         <DevToggle />
           -->

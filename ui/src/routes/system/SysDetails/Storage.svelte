@@ -1,9 +1,6 @@
 <script>
   import './theme.css'
 
-  import { openModal } from 'svelte-modals'
-  import DiskModal from '../DiskModal.svelte'
-
   export let disk = {};
 
   function formatBytes(bytes, decimals = 2) {
@@ -38,7 +35,6 @@
           <div class="bar-fg" style="width:{(100 * used / total).toFixed(2)}%"></div>
         </div>
       {/each}
-      <!--button on:click={()=>openModal(DiskModal)}>Manage Disks</button-->
     </div>
   </div>
 

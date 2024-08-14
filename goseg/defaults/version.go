@@ -17,13 +17,13 @@ var (
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "ca15b87fa30d3c7b1932f1e19aa380a39fe7720b9d23b14104de23b871cadfa2",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.4_latest",
-        "arm64_sha256": "a7799260139c411f24cfee0b88518cb2d58167bc7868837f318ec59605942dce",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.4_latest",
+        "amd64_sha256": "411f45433708c6755a354e702c8164a11e532ccb82d0d0af1f01b251e2789d1c",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.0_latest",
+        "arm64_sha256": "84c8200e55b7737db75143a92fbfbc721042e7134d69f5860503408ae4bd3168",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.0_latest",
         "major": 2,
-        "minor": 1,
-        "patch": 4
+        "minor": 2,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -50,7 +50,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "0185413195334c2ccd2060315d54829a1350fe55125efbc32db4516bd0acac98",
+        "amd64_sha256": "2fdc4be94c1206344b2e969c292d7cc28e3ff751e00b32680527468ecfb7b7d9",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "canary"
@@ -70,13 +70,13 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "35054e96e80ef2b73ddaa4a1e87529cb88c9150b71769eb3517e171d6a6b8587",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.7-rc3_edge",
-        "arm64_sha256": "96fd700059181ea57165b9d33b625c685d28dc980f683bbfc5f01edfb5cb5f51",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.7-rc3_edge",
+        "amd64_sha256": "6b3f9aedb6fdd409fb74b8ac6b0206d5662f076f0247f813e93742ef3ec82026",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1-rc0_edge",
+        "arm64_sha256": "8e5a1976a104ffadcfe100e7dbce98768c3f2e9c653233da98b324070e4f59fc",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1-rc0_edge",
         "major": 2,
-        "minor": 1,
-        "patch": 7
+        "minor": 2,
+        "patch": 1
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -123,13 +123,13 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "d62023993d9e5e91969eecc9bff1778bdf5e65098fdbee080e43c1d668aa614d",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.1.5_latest",
-        "arm64_sha256": "3b6d852f42beb7b16f11465204f9e8f604a07eb003551b6ba02b357109b50781",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.1.5_latest",
+        "amd64_sha256": "411f45433708c6755a354e702c8164a11e532ccb82d0d0af1f01b251e2789d1c",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.0_latest",
+        "arm64_sha256": "84c8200e55b7737db75143a92fbfbc721042e7134d69f5860503408ae4bd3168",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.0_latest",
         "major": 2,
-        "minor": 1,
-        "patch": 4
+        "minor": 2,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -156,10 +156,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "c968f7277bead15f8a29d1843fe98ee8515c00ed80650c05a58498d0d7b40656",
-        "arm64_sha256": "23b6218a48575aa981568c622c1937af7291665cf27d6f57c45e87eabab06cf9",
+        "amd64_sha256": "164137948e7e6af3d7b7da9e0008adf1331f2f1e9de3c3384f5921a9b57a0c7c",
+        "arm64_sha256": "727d43a00ace1612962abe2ea9c0462eb539a191bd3c7093b4567b8b9b163c92",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v3.0"
+        "tag": "v3.1"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",

@@ -3,6 +3,7 @@ package config
 // functions related to managing urbit config jsons & corresponding structs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"groundseg/defaults"
@@ -10,7 +11,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/client"
 )
 
 var (
@@ -82,6 +88,10 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	defer urbitMutex.Unlock()
 	// update UrbitsConfig with the values from inputConfig
 	for pier, config := range inputConfig {
+		ver, err := getImageTagByContainerName(pier)
+		if err == nil {
+			config.UrbitVersion = ver
+		}
 		UrbitsConfig[pier] = config
 		// also update the corresponding json files
 		path := filepath.Join(BasePath, "settings", "pier", pier+".json")
@@ -100,4 +110,42 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 		}
 	}
 	return nil
+}
+
+func getImageTagByContainerName(containerName string) (string, error) {
+	ctx := context.Background()
+
+	// Create a new Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+
+	// Set up a filter to search for the container by name using a filter
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("name", containerName)
+
+	// List containers using the filter
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{Filters: filterArgs, All: true})
+	if err != nil {
+		return "", fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// Check if any container matches the exact given name
+	for _, container := range containers {
+		for _, name := range container.Names {
+			// Docker names are prefixed with "/", so we need to trim it
+			if strings.TrimPrefix(name, "/") == containerName {
+				// Extract the image tag from the container's image name
+				imageParts := strings.Split(container.Image, ":")
+				if len(imageParts) > 1 {
+					return strings.Split(imageParts[1], "@")[0], nil
+				}
+				return "latest", nil // Default tag if no specific tag is found
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no exact match found for container with name %s", containerName)
 }

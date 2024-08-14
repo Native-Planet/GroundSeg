@@ -9,6 +9,7 @@
   import Storage from './SysDetails/Storage.svelte'
   import CPULoad from './SysDetails/CPULoad.svelte'
   import CPUTemp from './SysDetails/CPUTemp.svelte'
+  import SMARTCheck from './SysDetails/SMARTCheck.svelte'
 
   $: usage = ($structure?.system?.info?.usage) || {}
   $: swap = (usage?.swap) || 0
@@ -16,6 +17,7 @@
   $: disk = (usage?.disk) || {};
   $: cpu = (usage?.cpu) || 0
   $: cpuTemp = (usage?.cpu_temp) || 0
+  $: smart = ($structure?.system?.info?.smart) || {}
 
   let restarting = false
   let dead = false
@@ -70,6 +72,9 @@
   </div>
   <div class="item-wrapper">
     <Storage {disk} />
+  </div>
+  <div class="item-wrapper">
+    <SMARTCheck {smart} />
   </div>
 </div>
 

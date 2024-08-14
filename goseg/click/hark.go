@@ -97,3 +97,42 @@ func sendDiskSpaceWarning(patp, diskName string, diskUsage float64) error {
 	}
 	return nil
 }
+
+func sendSmartWarning(patp, diskName string) error {
+	file := "smart-fail-hark"
+	// construct poke
+	text := fmt.Sprintf("'Your drive %s failed a health check. Replace your hard drive to prevent data loss!'", diskName)
+	con := fmt.Sprintf("~[%s]", text)
+	id := "(end 7 (shas %smartfail eny.bowl))"
+	rope := "[[~ our.bowl %nativeplanet] [~ %diary our.bowl %documentation] %groups /]"
+	wer := "/groups/'~nattyv'/nativeplanet/channels/diary/'~nattyv'/documentation/note/'170141184506683847949839018055058849792'"
+
+	but := "~"
+	hoon := joinGap([]string{
+		"=/", "m", "(strand ,vase)",
+		";<", "=bowl:rand", "bind:m", "get-bowl",
+		";<", "~", "bind:m",
+		fmt.Sprintf("(poke [our.bowl %%hark] %%hark-action !>([%%add-yarn & & [%s %s now.bowl %s %s %s]]))", id, rope, con, wer, but),
+		"(pure:m !>('success'))",
+	})
+
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click disk failure hark notification failed to create hoon: %v", err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "")
+	if err != nil {
+		return fmt.Errorf("Click disk failure hark notification failed to get exec: %v", err)
+	}
+	_, succeeded, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click disk failure hark notification failed to get exec: %v", err)
+	}
+	if !succeeded {
+		return fmt.Errorf("Click disk failure hark notification failed poke: %s", patp)
+	}
+	return nil
+}

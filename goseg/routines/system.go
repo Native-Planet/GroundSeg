@@ -45,21 +45,26 @@ func AptUpdateLoop() {
 }
 
 func mDNSServer() {
-	domains, err := mDNSDiscovery()
-	if err != nil {
-		zap.L().Warn("Couldn't discover mDNS servers on LAN -- defaulting to nativeplanet.local")
+	conf := config.Conf()
+	if !conf.GracefulExit && (len(conf.LastKnownMDNS) > 0) {
+		system.LocalUrl = conf.LastKnownMDNS
 	} else {
-		// check if there's already a nativeplanet.local
-		counter := 2
-		domainBase := strings.Split(LocalDomain, ".")[0]
-		for contains(domains, domainBase) {
-			LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
-			zap.L().Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
-			counter++
-			domainBase = strings.Split(LocalDomain, ".")[0]
+		domains, err := mDNSDiscovery()
+		if err != nil {
+			zap.L().Warn("Couldn't discover mDNS servers on LAN -- defaulting to nativeplanet.local")
+		} else {
+			// check if there's already a nativeplanet.local
+			counter := 2
+			domainBase := strings.Split(LocalDomain, ".")[0]
+			for contains(domains, domainBase) {
+				LocalDomain = fmt.Sprintf("nativeplanet%d.local", counter)
+				zap.L().Info(fmt.Sprintf("Incrementing to %v...", LocalDomain))
+				counter++
+				domainBase = strings.Split(LocalDomain, ".")[0]
+			}
 		}
+		system.LocalUrl = LocalDomain
 	}
-	system.LocalUrl = LocalDomain
 	// advertise the http server on loop
 	// we use RegisterProxy so we can spoof the hostname
 	for {
@@ -68,7 +73,7 @@ func mDNSServer() {
 			fmt.Println("Error:", err)
 			return
 		}
-		zap.L().Debug(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
+		zap.L().Info(fmt.Sprintf("Announcing %v for %v", system.LocalUrl, ips))
 		server, err := zeroconf.RegisterProxy(
 			strings.Split(system.LocalUrl, ".")[0],
 			"_http._tcp",
@@ -81,6 +86,14 @@ func mDNSServer() {
 		)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
+		} else {
+			zap.L().Info(fmt.Sprintf("Caching %v", system.LocalUrl))
+			if err = config.UpdateConf(map[string]interface{}{
+				"gracefulExit":  false,
+				"lastKnownMDNS": system.LocalUrl,
+			}); err != nil {
+				zap.L().Error(fmt.Sprintf("Couldn't update mdns cache: %v", err))
+			}
 		}
 		time.Sleep(120 * time.Second)
 		server.Shutdown()

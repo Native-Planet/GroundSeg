@@ -412,7 +412,6 @@ func constructSystemInfo() structs.System {
 		sysInfo.Info.Usage.Disk = diskUsage
 		sysInfo.Info.Usage.SwapFile = conf.SwapVal
 	}
-
 	drives := make(map[string]structs.SystemDrive)
 	// Block Devices
 	if blockDevices, err := system.ListHardDisks(); err != nil {
@@ -444,6 +443,7 @@ func constructSystemInfo() structs.System {
 					}
 				}
 			}
+			sysInfo.Info.SMART = system.SmartResults
 		}
 	}
 	sysInfo.Info.Drives = drives
