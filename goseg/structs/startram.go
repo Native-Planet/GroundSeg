@@ -24,6 +24,7 @@ type Subdomain struct {
 	Status  string `json:"status"`
 	SvcType string `json:"svc_type"`
 	URL     string `json:"url"`
+	Backups []int  `json:"backups"`
 }
 
 // UnmarshalJSON custom unmarshal for Subdomain
