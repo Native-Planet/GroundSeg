@@ -410,10 +410,10 @@ func CancelSub(key string) error {
 }
 
 func maskPubkey(input string) string {
-	// Regular expression pattern to match text between "pubkey=" and "0K"
-	re := regexp.MustCompile(`(?s)(pubkey=)[a-zA-Z]+(0K)`)
+	// Regular expression pattern to match text between "pubkey=" and "0K", including letters and numbers
+	re := regexp.MustCompile(`(?s)(pubkey=)[a-zA-Z0-9]+(0K)`)
 
-	// Replace the matched text with the same prefix and suffix, and "x" for each letter in between
+	// Replace the matched text with the same prefix and suffix, and "x" for each letter or number in between
 	output := re.ReplaceAllStringFunc(input, func(s string) string {
 		// Extract the prefix "pubkey=" and suffix "0K"
 		prefix := "pubkey="
