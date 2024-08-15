@@ -115,6 +115,7 @@ type UrbitDocker struct {
 	StartramReminder   interface{} `json:"startram_reminder"`
 	ChopOnUpgrade      interface{} `json:"chop_on_upgrade"`
 	SizeLimit          int         `json:"size_limit"`
+	EnableRemoteBackup bool        `json:"enable_backup"`
 }
 
 // Define the interface

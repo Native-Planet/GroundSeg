@@ -47,6 +47,8 @@ func StartramHandler(msg []byte) error {
 		go handleStartramEndpoint(endpoint)
 	case "reminder":
 		go handleStartramReminder(startramPayload.Payload.Remind)
+	case "enable-backup":
+		go handleStartramEnableBackup(startramPayload.Payload.Patp, startramPayload.Payload.Reset)
 	case "restore-backup":
 		go handleStartramRestoreBackup(startramPayload.Payload.Patp, startramPayload.Payload.Backup, startramPayload.Payload.Key)
 	case "upload-backup":
@@ -349,6 +351,17 @@ func handleStartramReminder(remind bool) {
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't update urbit config: %v", err))
 		}
+	}
+}
+
+func handleStartramEnableBackup(patp string, enable bool) {
+	update := make(map[string]structs.UrbitDocker)
+	shipConf := config.UrbitConf(patp)
+	shipConf.EnableRemoteBackup = enable
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		startram.EventBus <- structs.Event{Type: "enableBackup", Data: "error"}
+		zap.L().Error(fmt.Sprintf("Couldn't set remote backups: %v", err))
 	}
 }
 
