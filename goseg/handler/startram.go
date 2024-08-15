@@ -9,6 +9,7 @@ import (
 	"groundseg/docker"
 	"groundseg/startram"
 	"groundseg/structs"
+	"os"
 	"strings"
 	"time"
 
@@ -45,7 +46,10 @@ func StartramHandler(msg []byte) error {
 		go handleStartramEndpoint(endpoint)
 	case "reminder":
 		go handleStartramReminder(startramPayload.Payload.Remind)
-
+	case "get-backup":
+		go handleStartramGetBackup(startramPayload.Payload.Patp, startramPayload.Payload.Backup, startramPayload.Payload.Key)
+	case "upload-backup":
+		go handleStartramUploadBackup(startramPayload.Payload.Patp)
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
 	}
@@ -346,6 +350,48 @@ func handleStartramReminder(remind bool) {
 			zap.L().Error(fmt.Sprintf("Couldn't update urbit config: %v", err))
 		}
 	}
+}
+
+func handleStartramGetBackup(patp string, backup int, key string) {
+	if key == "" {
+		keyBytes, err := os.ReadFile("backup.key")
+		if err != nil || len(keyBytes) == 0 {
+			zap.L().Error(fmt.Sprintf("No key provided and failed to read private key file: %w", err))
+			return
+		}
+	}
+	startram.EventBus <- structs.Event{Type: "backup", Data: "download"}
+	backupFile, err := startram.GetBackup(patp, fmt.Sprintf("%d", backup), key)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to get backup: %v", err))
+		startram.EventBus <- structs.Event{Type: "backup", Data: "error"}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "backup", Data: nil}
+		return
+	}
+	startram.EventBus <- structs.Event{Type: "backup", Data: nil}
+	handleNotImplement(fmt.Sprintf("use backup %v", backupFile))
+}
+
+func handleStartramUploadBackup(patp string) {
+	startram.EventBus <- structs.Event{Type: "backup", Data: "upload"}
+	filePath := "backup.key"
+	keyBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("failed to read private key file: %w", err))
+		return
+	}
+	pk := strings.TrimSpace(string(keyBytes))
+	err = startram.UploadBackup(patp, pk, filePath)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to upload backup: %v", err))
+		startram.EventBus <- structs.Event{Type: "backup", Data: fmt.Sprintf("%v", err)}
+		time.Sleep(3 * time.Second)
+		startram.EventBus <- structs.Event{Type: "backup", Data: nil}
+		return
+	}
+	startram.EventBus <- structs.Event{Type: "backup", Data: nil}
+	handleNotImplement("upload backup")
 }
 
 // temp

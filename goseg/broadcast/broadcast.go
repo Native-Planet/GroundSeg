@@ -189,11 +189,13 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			setRemote = true
 		}
 		remoteReady := false
+		backups := []int{}
 		for _, subdomain := range config.StartramConfig.Subdomains {
 			if subdomain.URL == dockerConfig.WgURL {
 				if subdomain.Status == "ok" {
 					remoteReady = true
 				}
+				backups = subdomain.Backups
 				break
 			}
 		}
@@ -296,6 +298,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
 		urbit.Info.SizeLimit = dockerConfig.SizeLimit
+		urbit.Info.Backups = backups
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()

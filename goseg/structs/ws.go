@@ -458,6 +458,8 @@ type WsStartramAction struct {
 	Endpoint string `json:"endpoint"`
 	Reset    bool   `json:"reset"`
 	Remind   bool   `json:"remind"`
+	Backup   int    `json:"backup"`
+	Patp     string `json:"patp"`
 }
 
 type WsLogMessage struct {

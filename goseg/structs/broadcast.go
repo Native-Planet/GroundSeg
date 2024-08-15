@@ -164,6 +164,7 @@ type Urbit struct {
 		StartramReminder   bool   `json:"startramReminder"`
 		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
 		SizeLimit          int    `json:"sizeLimit"`
+		Backups            []int  `json:"backups"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

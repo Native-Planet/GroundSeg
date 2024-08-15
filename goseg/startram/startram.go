@@ -443,13 +443,13 @@ func maskPubkey(input string) string {
 }
 
 // get a backup download URL for a specific ship and backup timestamp from retrieve blob
-func GetBackup(ship, pubkey, timestamp, privateKey string) (string, error) {
+func GetBackup(ship, timestamp, privateKey string) (string, error) {
+	conf := config.Conf()
 	reqData := structs.GetBackupRequest{
 		Ship:      ship,
-		Pubkey:    pubkey,
+		Pubkey:    conf.Pubkey,
 		Timestamp: timestamp,
 	}
-	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/backup/get"
 	jsonData, err := json.Marshal(reqData)
 	if err != nil {
@@ -471,7 +471,10 @@ func GetBackup(ship, pubkey, timestamp, privateKey string) (string, error) {
 	if err := json.Unmarshal(body, &getBackupResp); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response data: %w", err)
 	}
-	resp, err = http.Get(fmt.Sprintf("%s", &getBackupResp.Result))
+	if fmt.Sprintf("%v", &getBackupResp.Result) == "" {
+		return "", fmt.Errorf("returned empty backup URL")
+	}
+	resp, err = http.Get(fmt.Sprintf("%v", &getBackupResp.Result))
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}
