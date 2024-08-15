@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"go.uber.org/zap"
@@ -32,7 +33,7 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 	regionUrl := "https://" + conf.EndpointUrl + "/v1/regions"
 	resp, err := http.Get(regionUrl)
 	if err != nil {
-		errmsg := fmt.Sprintf("Unable to connect to API server: %v", err)
+		errmsg := maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err))
 		zap.L().Warn(errmsg)
 		return regions, err
 	}
@@ -62,7 +63,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	regionUrl := "https://" + conf.EndpointUrl + "/v1/retrieve?pubkey=" + conf.Pubkey
 	resp, err := http.Get(regionUrl)
 	if err != nil {
-		errmsg := fmt.Sprintf("Unable to connect to API server: %v", err)
+		errmsg := maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err))
 		zap.L().Warn(errmsg)
 		return retrieve, err
 	}
@@ -78,7 +79,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 	err = json.Unmarshal(body, &retrieve)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error unmarshalling retrieve json: %v", err)
-		fmt.Println(string(body))
+		//fmt.Println(string(body))
 		zap.L().Warn(errmsg)
 		return retrieve, err
 	}
@@ -125,7 +126,7 @@ func Register(regCode string, region string) error {
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(regJSON))
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -174,7 +175,7 @@ func SvcCreate(subdomain string, svcType string) error {
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(createJSON))
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -212,7 +213,7 @@ func SvcDelete(subdomain string, svcType string) error {
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(delJSON))
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -249,7 +250,7 @@ func AliasCreate(subdomain string, alias string) error {
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(aliasJSON))
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -292,7 +293,7 @@ func AliasDelete(subdomain string, alias string) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -398,7 +399,7 @@ func CancelSub(key string) error {
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(cancelJSON))
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
+		return fmt.Errorf(maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
 	}
 	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -414,14 +415,41 @@ func CancelSub(key string) error {
 	return nil
 }
 
+func maskPubkey(input string) string {
+	// Regular expression pattern to match text between "pubkey=" and "0K", including letters and numbers
+	re := regexp.MustCompile(`(?s)(pubkey=)[a-zA-Z0-9]+(0K)`)
+
+	// Replace the matched text with the same prefix and suffix, and "x" for each letter or number in between
+	output := re.ReplaceAllStringFunc(input, func(s string) string {
+		// Extract the prefix "pubkey=" and suffix "0K"
+		prefix := "pubkey="
+		suffix := "0K"
+
+		// Get the length of the part to be replaced with "x"
+		length := len(s) - len(prefix) - len(suffix)
+
+		// Create the replacement string with "x" for each character
+		replacement := prefix + string(make([]rune, length, length)) + suffix
+
+		// Replace all characters in between with "x"
+		for i := 0; i < length; i++ {
+			replacement = replacement[:len(prefix)+i] + "x" + replacement[len(prefix)+i+1:]
+		}
+
+		return replacement
+	})
+
+	return output
+}
+
 // get a backup download URL for a specific ship and backup timestamp from retrieve blob
-func GetBackup(ship, timestamp, privateKey string) (string, error) {
-	conf := config.Conf()
+func GetBackup(ship, pubkey, timestamp, privateKey string) (string, error) {
 	reqData := structs.GetBackupRequest{
 		Ship:      ship,
-		Pubkey:    conf.Pubkey,
+		Pubkey:    pubkey,
 		Timestamp: timestamp,
 	}
+	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/backup/get"
 	jsonData, err := json.Marshal(reqData)
 	if err != nil {
@@ -443,10 +471,7 @@ func GetBackup(ship, timestamp, privateKey string) (string, error) {
 	if err := json.Unmarshal(body, &getBackupResp); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response data: %w", err)
 	}
-	if fmt.Sprintf("%v", &getBackupResp.Result) == "" {
-		return "", fmt.Errorf("empty backup retrieval URL")
-	}
-	resp, err = http.Get(fmt.Sprintf("%v", &getBackupResp.Result))
+	resp, err = http.Get(fmt.Sprintf("%s", &getBackupResp.Result))
 	if err != nil {
 		return "", fmt.Errorf("failed to download file: %w", err)
 	}
