@@ -415,7 +415,7 @@ func CancelSub(key string) error {
 }
 
 // get a backup download URL for a specific ship and backup timestamp from retrieve blob
-func GetBackup(ship, pubkey, timestamp string) (*structs.GetBackupResponse, error) {
+func GetBackup(ship, pubkey, timestamp, privateKey string) (string, error) {
 	reqData := structs.GetBackupRequest{
 		Ship:      ship,
 		Pubkey:    pubkey,
@@ -425,26 +425,46 @@ func GetBackup(ship, pubkey, timestamp string) (*structs.GetBackupResponse, erro
 	url := "https://" + conf.EndpointUrl + "/v1/backup/get"
 	jsonData, err := json.Marshal(reqData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request data: %w", err)
+		return "", fmt.Errorf("failed to marshal request data: %w", err)
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to make POST request: %w", err)
+		return "", fmt.Errorf("failed to make POST request: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 	var getBackupResp structs.GetBackupResponse
 	if err := json.Unmarshal(body, &getBackupResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response data: %w", err)
+		return "", fmt.Errorf("failed to unmarshal response data: %w", err)
 	}
-	// the GetBckupResponse.Result is a presigned URL
-	return &getBackupResp, nil
+	resp, err = http.Get(fmt.Sprintf("%s", &getBackupResp.Result))
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download file: server returned %d", resp.StatusCode)
+	}
+	out, err := os.Create(timestamp)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+	outputFile, err := decryptBackup(timestamp, privateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt backup: %w", err)
+	}
+	return outputFile, nil
 }
 
 // upload an encrypted backup blob to startram
@@ -517,31 +537,35 @@ func encryptFile(filename string, keyString string) (string, error) {
 	}
 	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
 	if err = os.WriteFile(filename+".enc", ciphertext, 0644); err != nil {
-		return "", fmt.Errorf("failed to write encrypted file: %w", err)
+		return "", err
 	}
-	return fmt.Sprintf("%s.env", filename), nil
+	return fmt.Sprintf("%s.enc", filename), nil
 }
 
 // decrypt for encryptBackup
-func decryptBackup(filename string, keyString string) error {
+func decryptBackup(filename string, keyString string) (string, error) {
 	key := sha256.Sum256([]byte(keyString)) // Derive a 256-bit key from the provided string
 	ciphertext, err := os.ReadFile(filename)
 	if err != nil {
-		return err
+		return "", err
 	}
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
-		return err
+		return "", err
 	}
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return err
+		return "", err
 	}
 	nonceSize := aesGCM.NonceSize()
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return os.WriteFile(filename+".dec", plaintext, 0644)
+	output := fmt.Sprintf("%s.dec", filename)
+	if err = os.WriteFile(output, plaintext, 0644); err != nil {
+		return "", err
+	}
+	return output, nil
 }
