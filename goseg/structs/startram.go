@@ -133,3 +133,13 @@ type CancelStartramSub struct {
 	Message string `json:"message"`
 	Error   int    `json:"error"`
 }
+
+type GetBackupRequest struct {
+	Ship      string `json:"ship"`
+	Pubkey    string `json:"pubkey"`
+	Timestamp string `json:"timestamp"`
+}
+
+type GetBackupResponse struct {
+	Result string `json:"result"`
+}

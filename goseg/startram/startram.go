@@ -2,13 +2,19 @@ package startram
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
-	"io/ioutil"
+	"io"
 	"math"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"go.uber.org/zap"
@@ -30,7 +36,7 @@ func GetRegions() (map[string]structs.StartramRegion, error) {
 		zap.L().Warn(errmsg)
 		return regions, err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading regions info: %v", err)
@@ -61,7 +67,7 @@ func Retrieve() (structs.StartramRetrieve, error) {
 		return retrieve, err
 	}
 	// read response body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error reading retrieve info: %v", err)
@@ -121,7 +127,7 @@ func Register(regCode string, region string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -170,7 +176,7 @@ func SvcCreate(subdomain string, svcType string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -208,7 +214,7 @@ func SvcDelete(subdomain string, svcType string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -245,7 +251,7 @@ func AliasCreate(subdomain string, alias string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -288,7 +294,7 @@ func AliasDelete(subdomain string, alias string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -394,7 +400,7 @@ func CancelSub(key string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Unable to connect to API server: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Error reading response: %v", err))
@@ -406,4 +412,136 @@ func CancelSub(key string) error {
 		return fmt.Errorf(fmt.Sprintf("Couldn't cancel subscription: %v", &respObj.Message))
 	}
 	return nil
+}
+
+// get a backup download URL for a specific ship and backup timestamp from retrieve blob
+func GetBackup(ship, pubkey, timestamp string) (*structs.GetBackupResponse, error) {
+	reqData := structs.GetBackupRequest{
+		Ship:      ship,
+		Pubkey:    pubkey,
+		Timestamp: timestamp,
+	}
+	conf := config.Conf()
+	url := "https://" + conf.EndpointUrl + "/v1/backup/get"
+	jsonData, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request data: %w", err)
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to make POST request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	var getBackupResp structs.GetBackupResponse
+	if err := json.Unmarshal(body, &getBackupResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response data: %w", err)
+	}
+	// the GetBckupResponse.Result is a presigned URL
+	return &getBackupResp, nil
+}
+
+// upload an encrypted backup blob to startram
+func UploadBackup(ship, privateKey, filePath string) error {
+	conf := config.Conf()
+	url := "https://" + conf.EndpointUrl + "/v1/backup/upload"
+	encFile, err := encryptFile(filePath, privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	file, err := os.Open(encFile)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("ship", ship); err != nil {
+		return fmt.Errorf("failed to write ship field: %w", err)
+	}
+	if err := writer.WriteField("pubkey", conf.Pubkey); err != nil {
+		return fmt.Errorf("failed to write pubkey field: %w", err)
+	}
+	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	if err != nil {
+		return fmt.Errorf("failed to create form file: %w", err)
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return fmt.Errorf("failed to copy file data: %w", err)
+	}
+	writer.Close()
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make POST request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("request failed with status %d", resp.StatusCode)
+	}
+	if err = os.Remove(encFile); err != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't remove encrypted file post-upload: %v", err))
+	}
+	return nil
+}
+
+// encrypt an arbitrary file with a path and key
+func encryptFile(filename string, keyString string) (string, error) {
+	key := sha256.Sum256([]byte(keyString)) // Derive a 256-bit key from the provided string
+	plaintext, err := os.ReadFile(filename)
+	if err != nil {
+		return "", err
+	}
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return "", err
+	}
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err = io.ReadFull(os.Stdin, nonce); err != nil {
+		return "", err
+	}
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+	if err = os.WriteFile(filename+".enc", ciphertext, 0644); err != nil {
+		return "", fmt.Errorf("failed to write encrypted file: %w", err)
+	}
+	return fmt.Sprintf("%s.env", filename), nil
+}
+
+// decrypt for encryptBackup
+func decryptBackup(filename string, keyString string) error {
+	key := sha256.Sum256([]byte(keyString)) // Derive a 256-bit key from the provided string
+	ciphertext, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return err
+	}
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	nonceSize := aesGCM.NonceSize()
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filename+".dec", plaintext, 0644)
 }
