@@ -189,13 +189,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			setRemote = true
 		}
 		remoteReady := false
+		// attach backup timestamps from retrieve blob
 		backups := []int{}
-		for _, subdomain := range config.StartramConfig.Subdomains {
-			if subdomain.URL == dockerConfig.WgURL {
-				if subdomain.Status == "ok" {
-					remoteReady = true
-				}
-				backups = subdomain.Backups
+		for _, backup := range config.StartramConfig.Backups {
+			if value, exists := backup.Ship[pier]; exists {
+				backups = value
 				break
 			}
 		}

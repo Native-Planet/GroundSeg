@@ -11,13 +11,16 @@
   import Fa from 'svelte-fa'
   import { faPlugCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 
- import { structure } from '$lib/stores/data'
+  import { structure } from '$lib/stores/data'
   import { URBIT_MODE } from '$lib/stores/data'
 
+  export let patp
+
+  $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
+  $: ship = ($structure?.urbits?.[patp]) || {}
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
   $: enableBackups = ship?.info?.enableBackups == undefined || ship?.info?.enableBackups // true by default
 
-  export let patp
   export let remote
   export let remoteReady
   export let tToggleNetwork = ""

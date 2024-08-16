@@ -50,7 +50,7 @@ func StartramHandler(msg []byte) error {
 	case "enable-backup":
 		go handleStartramEnableBackup(startramPayload.Payload.Patp, startramPayload.Payload.Reset)
 	case "restore-backup":
-		go handleStartramRestoreBackup(startramPayload.Payload.Patp, startramPayload.Payload.Backup, startramPayload.Payload.Key)
+		go handleStartramRestoreBackup(startramPayload.Payload.Target, startramPayload.Payload.Patp, startramPayload.Payload.Backup, startramPayload.Payload.Key)
 	case "upload-backup":
 		go handleStartramUploadBackup(startramPayload.Payload.Patp)
 	default:
@@ -365,7 +365,8 @@ func handleStartramEnableBackup(patp string, enable bool) {
 	}
 }
 
-func handleStartramRestoreBackup(patp string, backup int, key string) {
+// download the source backup, decrypt with key, and restore to target
+func handleStartramRestoreBackup(target, source string, backup int, key string) {
 	keyFile := "backup.key"
 	startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "init"}
 	if key == "" {
@@ -395,7 +396,7 @@ func handleStartramRestoreBackup(patp string, backup int, key string) {
 		}
 	}
 	startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "download"}
-	backupFile, err := startram.GetBackup(patp, fmt.Sprintf("%d", backup), key)
+	backupFile, err := startram.GetBackup(source, fmt.Sprintf("%d", backup), key)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to get backup: %v", err))
 		startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "error"}
@@ -404,7 +405,7 @@ func handleStartramRestoreBackup(patp string, backup int, key string) {
 		return
 	}
 	startram.EventBus <- structs.Event{Type: "backup", Data: nil}
-	handleNotImplement(fmt.Sprintf("restore from backup %v", backupFile))
+	handleNotImplement(fmt.Sprintf("restore %s from %s backup %v", target, source, backupFile))
 }
 
 func handleStartramUploadBackup(patp string) {

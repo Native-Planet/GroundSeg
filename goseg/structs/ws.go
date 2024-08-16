@@ -460,6 +460,7 @@ type WsStartramAction struct {
 	Remind   bool   `json:"remind"`
 	Backup   int    `json:"backup"`
 	Patp     string `json:"patp"`
+	Target   string `json:"target"`
 }
 
 type WsLogMessage struct {

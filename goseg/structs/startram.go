@@ -6,6 +6,7 @@ import "encoding/json"
 type StartramRetrieve struct {
 	UrlID      string      `json:"urlid"`
 	Action     string      `json:"action"`
+	Backups    []Backup    `json:"backups"`
 	Conf       string      `json:"conf"`
 	Debug      any         `json:"debug"`
 	Error      int         `json:"error"`
@@ -24,7 +25,11 @@ type Subdomain struct {
 	Status  string `json:"status"`
 	SvcType string `json:"svc_type"`
 	URL     string `json:"url"`
-	Backups []int  `json:"backups"`
+}
+
+// Backup struct
+type Backup struct {
+	Ship map[string][]int `json:"ship"`
 }
 
 // UnmarshalJSON custom unmarshal for Subdomain

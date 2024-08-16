@@ -346,12 +346,35 @@ export const setAllStartramReminder = remind => {
   send(payload)
 }
 
+//
+// Pier backups and restoration
+//
+
 export const toggleBackups = (patp,reset) => {
   let payload = {
     "type":"startram",
     "action":"enable-backup",
     "patp":patp,
     "reset":reset
+  }
+  send(payload)
+}
+
+export const restoreBackup = (source,target) => {
+  let payload = {
+    "type":"startram",
+    "action":"enable-backup",
+    "target":target,
+    "source":source
+  }
+  send(payload)
+}
+
+export const uploadBackup = (patp) => {
+  let payload = {
+    "type":"startram",
+    "action":"enable-backup",
+    "patp":patp
   }
   send(payload)
 }
