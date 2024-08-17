@@ -6,7 +6,8 @@
     toggleNetwork,
     toggleUrbitPower,
     installGallseg,
-    uninstallGallseg
+    uninstallGallseg,
+    toggleBackups
   } from '$lib/stores/websocket'
 
   import { structure, URBIT_MODE } from '$lib/stores/data'
@@ -18,6 +19,7 @@
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
+  import BackupTlon from './Section/BackupTlon.svelte'
   import Chop from './Section/Chop.svelte'  // vere 3.0
   import Gallseg from './Section/Gallseg.svelte'  // vere 3.0
   import AdminLogin from './Section/AdminLogin.svelte'
@@ -54,12 +56,15 @@
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
   $: authLevel = ($structure?.auth_level) || "unauthorized"
+  $: toggleBackups = (ship?.info?.toggleBackups) || false
+  $: backups = (ship?.info?.backups) || []
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
+  $: tToggleBackups = (tShip?.toggleBackups) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
   $: tGallseg = tShip?.gallseg || ""
 
@@ -127,6 +132,14 @@
     {remote}
     {tToggleNetwork}
     {ownShip}
+    />
+
+    <!-- Backup Tlon -->
+    <BackupTlon
+      on:click={()=>toggleBackups(patp,!toggleBackups)}
+      {remoteReady}
+      {toggleBackups}
+      {tToggleBackups}
     />
 
   <!-- Dev Mode -->

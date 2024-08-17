@@ -3,7 +3,6 @@
   import FinalModal from './FinalModal.svelte';
   import ToggleButton from '$lib/ToggleButton.svelte'
   import UnplugWarning from './UnplugWarning.svelte';
-  import { toggleBackups } from '$lib/stores/websocket';
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
@@ -19,15 +18,11 @@
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
   $: ship = ($structure?.urbits?.[patp]) || {}
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
-  $: enableBackups = ship?.info?.enableBackups == undefined || ship?.info?.enableBackups // true by default
 
   export let remote
   export let remoteReady
   export let tToggleNetwork = ""
   export let ownShip
-  let loading = false
-  let awaitChange = false
-  let lastState = enableBackups
 
   const dispatch = createEventDispatcher()
 
@@ -38,29 +33,12 @@
       dispatch("click")
     }
   }
-
-  const handleToggleBackups = () => {
-    loading = true
-    awaitChange = true
-    lastState = enableBackups
-    toggleBackups(patp, !enableBackups)
-  }
 </script>
 
 <div class="section" class:disabled={!wgRunning || !remoteReady}>
   <div class="section-left">
     <div class="section-title">Remote Access</div>
     <div class="section-description">Access your ship via a StarTram connection</div>
-      {#if remote}
-        <div class="check-wrapper" class:disabled={loading}>
-          <div class="checkbox" on:click={handleToggleBackups}>
-            {#if enableBackups}
-              <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
-            {/if}
-          </div>
-          <div class="check-text" on:click={handleToggleBackups}>Daily remote encrypted chat backups</div>
-        </div>
-      {/if}
   </div>
   <div class="section-right">
     <UnplugWarning component={"remote"} {ownShip}>

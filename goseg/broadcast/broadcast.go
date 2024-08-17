@@ -189,14 +189,21 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			setRemote = true
 		}
 		remoteReady := false
-		// attach backup timestamps from retrieve blob
-		backups := []int{}
-		for _, backup := range config.StartramConfig.Backups {
-			if value, exists := backup.Ship[pier]; exists {
-				backups = value
-				break
+		for _, subdomain := range config.StartramConfig.Subdomains {
+			if subdomain.URL == dockerConfig.WgURL {
+				if subdomain.Status == "ok" {
+					remoteReady = true
+				}
 			}
 		}
+		// attach backup timestamps from retrieve blob
+		/*
+			backups := []int{}
+			for _, backup := range config.StartramConfig.Backups {
+				if value, exists := backup.Ship[pier]; exists {
+					backups = value
+					break
+		*/
 		urbitAlias := dockerConfig.CustomUrbitWeb
 		minIOAlias := dockerConfig.CustomS3Web
 		showUrbAlias := false
@@ -296,7 +303,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
 		urbit.Info.SizeLimit = dockerConfig.SizeLimit
-		urbit.Info.Backups = backups
+		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
 		UrbTransMu.RUnlock()
