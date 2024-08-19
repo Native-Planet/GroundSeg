@@ -347,39 +347,6 @@ export const setAllStartramReminder = remind => {
 }
 
 //
-// Pier backups and restoration
-//
-
-export const toggleBackups = (patp,reset) => {
-  let payload = {
-    "type":"startram",
-    "action":"enable-backup",
-    "patp":patp,
-    "reset":reset
-  }
-  send(payload)
-}
-
-export const restoreBackup = (source,target) => {
-  let payload = {
-    "type":"startram",
-    "action":"enable-backup",
-    "target":target,
-    "source":source
-  }
-  send(payload)
-}
-
-export const uploadBackup = (patp) => {
-  let payload = {
-    "type":"startram",
-    "action":"enable-backup",
-    "patp":patp
-  }
-  send(payload)
-}
-
-//
 //  Upload Pier
 //
 
@@ -459,6 +426,29 @@ export const resetNewShip = () => {
 //
 //  Urbits
 //
+
+//
+// Pier backups and restoration
+//
+
+export const toggleBackups = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-backup",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const restoreBackup = (patp, backupFile) => {
+  let payload = {
+    "type":"urbit",
+    "action":"restore-backup",
+    "patp":patp,
+    "file": "this must fail"
+  }
+  send(payload)
+}
 
 export const registerServiceAgain = patp => {
   let payload = {

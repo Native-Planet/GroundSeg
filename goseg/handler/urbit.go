@@ -92,6 +92,8 @@ func UrbitHandler(msg []byte) error {
 		return toggleChopOnVereUpdate(patp, shipConf)
 	case "new-max-pier-size":
 		return setNewMaxPierSize(patp, urbitPayload, shipConf)
+	case "toggle-backup":
+		return handleStartramToggleBackup(patp, shipConf)
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -1187,5 +1189,19 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 		}
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "success"}
+	return nil
+}
+
+func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "backupsEnabled", Event: "loading"}
+	defer func() {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "backupsEnabled", Event: ""}
+	}()
+	update := make(map[string]structs.UrbitDocker)
+	shipConf.EnableRemoteBackup = !shipConf.EnableRemoteBackup
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't set remote backups: %v", err)
+	}
 	return nil
 }

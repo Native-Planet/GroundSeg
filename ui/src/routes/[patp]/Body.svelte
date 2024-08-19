@@ -56,7 +56,7 @@
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
   $: authLevel = ($structure?.auth_level) || "unauthorized"
-  $: toggleBackups = (ship?.info?.toggleBackups) || false
+  $: backupsEnabled = (ship?.backupsEnabled) || false
   $: backups = (ship?.info?.backups) || []
 
   // transitions
@@ -64,7 +64,7 @@
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
-  $: tToggleBackups = (tShip?.toggleBackups) || ""
+  $: tBackupsEnabled = (tShip?.backupsEnabled) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
   $: tGallseg = tShip?.gallseg || ""
 
@@ -136,10 +136,10 @@
 
     <!-- Backup Tlon -->
     <BackupTlon
-      on:click={()=>toggleBackups(patp,!toggleBackups)}
+      on:click={()=>toggleBackups(patp)}
       {remoteReady}
-      {toggleBackups}
-      {tToggleBackups}
+      {backupsEnabled}
+      {tBackupsEnabled}
     />
 
   <!-- Dev Mode -->

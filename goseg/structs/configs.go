@@ -248,6 +248,12 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			}
 		case "size_limit":
 			u.SetSizeLimit(v)
+		case "enable_backup":
+			if v == nil {
+				u.EnableRemoteBackup = true
+			} else {
+				u.EnableRemoteBackup = v.(bool)
+			}
 		}
 	}
 	return nil

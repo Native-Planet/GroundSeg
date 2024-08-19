@@ -45,6 +45,7 @@ var (
 		DevMode:            false,
 		Click:              true,
 		StartramReminder:   true,
+		EnableRemoteBackup: true,
 	}
 	NetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",

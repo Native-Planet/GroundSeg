@@ -303,6 +303,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.StartramReminder = startramReminder
 		urbit.Info.ChopOnUpgrade = chopOnUpgrade
 		urbit.Info.SizeLimit = dockerConfig.SizeLimit
+		urbit.Info.BackupsEnabled = dockerConfig.EnableRemoteBackup
 		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]

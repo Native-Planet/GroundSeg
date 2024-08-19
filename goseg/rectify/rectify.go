@@ -65,6 +65,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.Gallseg = event.Event
 			case "deleteService":
 				urbitStruct.Transition.StartramServices = event.Event
+			case "backupsEnabled":
+				urbitStruct.Transition.BackupsEnabled = event.Event
 			default:
 				zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue

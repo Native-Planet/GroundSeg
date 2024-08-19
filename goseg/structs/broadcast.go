@@ -164,6 +164,7 @@ type Urbit struct {
 		StartramReminder   bool   `json:"startramReminder"`
 		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
 		SizeLimit          int    `json:"sizeLimit"`
+		BackupsEnabled     bool   `json:"backupsEnabled"`
 		Backups            []int  `json:"backups"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
@@ -193,6 +194,7 @@ type UrbitTransitionBroadcast struct {
 	ChopOnUpgrade             string `json:"chopOnUpgrade"`
 	RollChop                  string `json:"rollChop"`
 	StartramServices          string `json:"startramServices"`
+	BackupsEnabled            string `json:"backupsEnabled"`
 }
 
 // used to construct broadcast pier info subobject

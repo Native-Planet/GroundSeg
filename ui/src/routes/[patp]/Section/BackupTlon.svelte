@@ -15,8 +15,8 @@
 
   $: wgRunning = ($structure?.profile?.startram?.info?.running) || false
   export let remoteReady
-  export let toggleBackups
-  export let tToggleBackups
+  export let backupsEnabled
+  export let tBackupsEnabled
 
   const dispatch = createEventDispatcher()
 </script>
@@ -29,8 +29,8 @@
   <div class="section-right">
     <ToggleButton
       on:click={()=>dispatch("click")}
-      on={toggleBackups}
-      loading={tToggleBackups.length > 0}
+      on={backupsEnabled}
+      loading={tBackupsEnabled.length > 0}
       />
   </div>
 </div>
