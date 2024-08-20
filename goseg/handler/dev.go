@@ -44,11 +44,26 @@ func DevHandler(msg []byte) error {
 		} else {
 			zap.L().Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
 		}
-	case "backup-activity":
+	case "backup-tlon":
 		conf := config.Conf()
 		for _, patp := range conf.Piers {
 			if err := click.BackupActivity(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup activity for %v", err))
+			}
+			if err := click.BackupChannels(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup channels for %v", err))
+			}
+			if err := click.BackupChannelsServer(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup channels server for %v", err))
+			}
+			if err := click.BackupGroups(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup groups for %v", err))
+			}
+			if err := click.BackupProfile(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup profile for %v", err))
+			}
+			if err := click.BackupChat(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup chat for %v", err))
 			}
 		}
 	case "startram-reminder":

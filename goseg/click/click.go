@@ -59,4 +59,9 @@ func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 }
 
 // backup.go
-func BackupActivity(patp string) error { return backupActivity(patp) }
+func BackupActivity(patp string) error       { return backupActivity(patp) }
+func BackupChannels(patp string) error       { return backupChannels(patp) }
+func BackupChannelsServer(patp string) error { return backupChannelsServer(patp) }
+func BackupGroups(patp string) error         { return backupGroups(patp) }
+func BackupProfile(patp string) error        { return backupProfile(patp) }
+func BackupChat(patp string) error           { return backupChat(patp) }

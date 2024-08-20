@@ -849,10 +849,10 @@ export const devStartramReminderToggle = b => {
   send(payload)
 }
 
-export const devBackupTlonActivity = () => {
+export const devBackupTlon = () => {
   let payload = {
     "type": "dev",
-    "action": "backup-activity",
+    "action": "backup-tlon",
   }
   send(payload)
 }

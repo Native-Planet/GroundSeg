@@ -23,7 +23,7 @@
     devStartramReminder,
     devStartramReminderToggle,
     printMounts,
-    devBackupTlonActivity
+    devBackupTlon
   } from '$lib/stores/websocket'
 
 
@@ -65,7 +65,7 @@
 <div class="dev">
   <button on:click={printMounts}>Print Mounts</button>
   <button on:click={devStartramReminder}>Remind Startram</button>
-  <button on:click={devBackupTlonActivity}>Backup Tlon Activity</button>
+  <button on:click={devBackupTlon}>Backup Tlon</button>
   <button on:click={()=>devStartramReminderToggle(true)}>Reminded</button>
   <button on:click={()=>devStartramReminderToggle(false)}>Have not Reminded</button>
 </div>
