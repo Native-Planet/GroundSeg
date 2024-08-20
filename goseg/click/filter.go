@@ -2,8 +2,11 @@ package click
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
+
+	"github.com/stevelacy/go-urbit/noun"
 )
 
 func filterResponse(resType string, response string) (string, bool, error) {
@@ -53,9 +56,31 @@ func filterResponse(resType string, response string) (string, bool, error) {
 					return "not-found", false, nil
 				}
 				return "not found", false, nil
-				//}
 			}
 		}
+	case "jam":
+		for _, line := range responseSlice {
+			if strings.Contains(line, "%avow") {
+				var jam string
+				// Find the index of "noun "
+				index := strings.Index(line, "noun ")
+
+				if index != -1 {
+					// Slice the string from just after "noun " onward
+					jam = line[index+len("noun "):]
+				} else {
+					return "", false, fmt.Errorf("Unable to extract jam file from avow")
+				}
+				jam = strings.TrimPrefix(jam, "0x")
+				jamAtom := new(big.Int)
+				jamAtom.SetString(jam, 16)
+				n := noun.Cue(jamAtom)
+				_ = n
+				// dump to file
+				return "some-file.jam", true, nil
+			}
+		}
+		return "not found", false, fmt.Errorf("Jam file thread failure")
 	case "default":
 		return "", false, fmt.Errorf("Unknown poke response")
 	}
