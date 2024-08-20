@@ -287,6 +287,8 @@ func main() {
 	go routines.PackScheduleLoop()
 	// chop limiter
 	go routines.ChopAtLimit() // vere 3.0
+	// backups
+	go routines.TlonBackups()
 	// block until version info returns
 	if remoteVersion == true {
 		select {

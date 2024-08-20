@@ -44,6 +44,13 @@ func DevHandler(msg []byte) error {
 		} else {
 			zap.L().Debug(fmt.Sprintf("lsblk: %+v", blockDevices))
 		}
+	case "backup-activity":
+		conf := config.Conf()
+		for _, patp := range conf.Piers {
+			if err := click.BackupActivity(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to backup activity for %v", err))
+			}
+		}
 	case "startram-reminder":
 		conf := config.Conf()
 		if !conf.WgRegistered {

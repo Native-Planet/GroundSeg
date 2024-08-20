@@ -57,3 +57,6 @@ func UnlinkStorage(patp string) error { return unlinkStorage(patp) }
 func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
 	return linkStorage(patp, endpoint, svcAccount)
 }
+
+// backup.go
+func BackupActivity(patp string) error { return backupActivity(patp) }
