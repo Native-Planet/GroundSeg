@@ -20,10 +20,11 @@ func backupActivity(patp string) error {
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "a=egg-any:gall", "bind:m", "(scry egg-any:gall /gv/activity/$)",
-		"(pure:m !>((jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))))",
+		//"(pure:m !>((jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))))",
+		"(pure:m !>((jam [123 123 123 123])))",
 	})
 	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click startram hark notification failed to create hoon: %v", err)
+		return fmt.Errorf("Click %s failed to create hoon: %v", file, err)
 	}
 	// defer hoon file deletion
 	defer deleteHoon(patp, file)
@@ -32,12 +33,14 @@ func backupActivity(patp string) error {
 	if err != nil {
 		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
 	}
-	jamFile, succeeded, err := filterResponse("jam", response)
+	jamFile, jamNoun, err := filterJamResponse(patp, file, response)
 	if err != nil {
 		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
 	}
-	if !succeeded {
-		return fmt.Errorf("Click %s failed scry: %s", file, patp)
+	zap.L().Debug(fmt.Sprintf("jamNoun for %s: %+v", file, jamNoun))
+	if jamNoun == nil {
+		zap.L().Error("jamNoun is invalid!")
+		//return fmt.Errorf("Click %s failed scry: %s", file, patp)
 	}
 	zap.L().Debug(fmt.Sprintf("jam response %s placeholder. Jam file: %s", file, jamFile))
 	return nil

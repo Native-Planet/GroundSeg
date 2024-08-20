@@ -288,7 +288,8 @@ func main() {
 	// chop limiter
 	go routines.ChopAtLimit() // vere 3.0
 	// backups
-	go routines.TlonBackups()
+	go routines.TlonBackupLocal()
+	go routines.TlonBackupRemote()
 	// block until version info returns
 	if remoteVersion == true {
 		select {
