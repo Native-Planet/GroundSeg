@@ -45,6 +45,16 @@
     </div>
   {/if}
 
+  {#if registered}
+    <div class="item">
+      <div class="label">Remote Backup</div>
+      <div class="data">
+        <div class="data-text">Your next backup is at "time here"</div>
+        <button>Backup Now</button>
+      </div>
+    </div>
+  {/if}
+
   <div class="item">
     <div class="label"
          on:click={()=>viewReminder=!viewReminder}>

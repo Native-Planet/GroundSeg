@@ -94,6 +94,10 @@ func UrbitHandler(msg []byte) error {
 		return setNewMaxPierSize(patp, urbitPayload, shipConf)
 	case "toggle-backup":
 		return handleStartramToggleBackup(patp, shipConf)
+	case "local-backup":
+		return handleLocalBackup(patp, shipConf)
+	case "schedule-local-backup":
+		return handleScheduleLocalBackup(patp, urbitPayload, shipConf)
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -1203,5 +1207,14 @@ func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't set remote backups: %v", err)
 	}
+	return nil
+}
+
+func handleLocalBackup(patp string, shipConf structs.UrbitDocker) error {
+	zap.L().Info("Local backup requested (placeholder)")
+	return nil
+}
+func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	zap.L().Info("Local backup scheduled (placeholder)")
 	return nil
 }

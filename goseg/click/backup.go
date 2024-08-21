@@ -20,8 +20,8 @@ func backupActivity(patp string) error {
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "a=egg-any:gall", "bind:m", "(scry egg-any:gall /gv/activity/$)",
-		//"(pure:m !>((jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))))",
-		"(pure:m !>((jam [123 123 123 123])))",
+		"(pure:m !>((jam ?>(?=(%live +<.a) a(p.old-state -:!>(*))))))",
+		//"(pure:m !>((jam [123 123 123 123])))",
 	})
 	if err := createHoon(patp, file, hoon); err != nil {
 		return fmt.Errorf("Click %s failed to create hoon: %v", file, err)
