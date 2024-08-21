@@ -133,39 +133,40 @@ type StartramTransition struct {
 // broadcast payload subobject
 type Urbit struct {
 	Info struct {
-		LusCode            string `json:"lusCode"`
-		Network            string `json:"network"`
-		Running            bool   `json:"running"`
-		URL                string `json:"url"`
-		UrbitAlias         string `json:"urbitAlias"`
-		MinIOAlias         string `json:"minioAlias"`
-		ShowUrbAlias       bool   `json:"showUrbAlias"`
-		MemUsage           uint64 `json:"memUsage"`
-		DiskUsage          int64  `json:"diskUsage"`
-		LoomSize           int    `json:"loomSize"`
-		DevMode            bool   `json:"devMode"`
-		DetectBootStatus   bool   `json:"detectBootStatus"`
-		Remote             bool   `json:"remote"`
-		RemoteReady        bool   `json:"remoteReady"` // remote reg is ready
-		Vere               any    `json:"vere"`
-		MinIOUrl           string `json:"minioUrl"`
-		MinIOPwd           string `json:"minioPwd"`
-		LastPack           string `json:"lastPack"`
-		NextPack           string `json:"nextPack"`
-		PackScheduleActive bool   `json:"packScheduleActive"`
-		PackIntervalType   string `json:"packIntervalType"`
-		PackIntervalValue  int    `json:"packIntervalValue"`
-		PackTime           string `json:"packTime"`
-		PackDay            string `json:"packDay"`
-		PackDate           int    `json:"packDate"`
-		PenpaiCompanion    bool   `json:"penpaiCompanion"`
-		Gallseg            bool   `json:"gallseg"`
-		MinIOLinked        bool   `json:"minioLinked"`
-		StartramReminder   bool   `json:"startramReminder"`
-		ChopOnUpgrade      bool   `json:"chopOnUpgrade"`
-		SizeLimit          int    `json:"sizeLimit"`
-		BackupsEnabled     bool   `json:"backupsEnabled"`
-		Backups            []int  `json:"backups"`
+		LusCode                  string `json:"lusCode"`
+		Network                  string `json:"network"`
+		Running                  bool   `json:"running"`
+		URL                      string `json:"url"`
+		UrbitAlias               string `json:"urbitAlias"`
+		MinIOAlias               string `json:"minioAlias"`
+		ShowUrbAlias             bool   `json:"showUrbAlias"`
+		MemUsage                 uint64 `json:"memUsage"`
+		DiskUsage                int64  `json:"diskUsage"`
+		LoomSize                 int    `json:"loomSize"`
+		DevMode                  bool   `json:"devMode"`
+		DetectBootStatus         bool   `json:"detectBootStatus"`
+		Remote                   bool   `json:"remote"`
+		RemoteReady              bool   `json:"remoteReady"` // remote reg is ready
+		Vere                     any    `json:"vere"`
+		MinIOUrl                 string `json:"minioUrl"`
+		MinIOPwd                 string `json:"minioPwd"`
+		LastPack                 string `json:"lastPack"`
+		NextPack                 string `json:"nextPack"`
+		PackScheduleActive       bool   `json:"packScheduleActive"`
+		PackIntervalType         string `json:"packIntervalType"`
+		PackIntervalValue        int    `json:"packIntervalValue"`
+		PackTime                 string `json:"packTime"`
+		PackDay                  string `json:"packDay"`
+		PackDate                 int    `json:"packDate"`
+		PenpaiCompanion          bool   `json:"penpaiCompanion"`
+		Gallseg                  bool   `json:"gallseg"`
+		MinIOLinked              bool   `json:"minioLinked"`
+		StartramReminder         bool   `json:"startramReminder"`
+		ChopOnUpgrade            bool   `json:"chopOnUpgrade"`
+		SizeLimit                int    `json:"sizeLimit"`
+		LocalTlonBackupsEnabled  bool   `json:"localTlonBackupsEnabled"`
+		RemoteTlonBackupsEnabled bool   `json:"remoteTlonBackupsEnabled"`
+		BackupTime               string `json:"backupTime"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }
@@ -194,7 +195,8 @@ type UrbitTransitionBroadcast struct {
 	ChopOnUpgrade             string `json:"chopOnUpgrade"`
 	RollChop                  string `json:"rollChop"`
 	StartramServices          string `json:"startramServices"`
-	BackupsEnabled            string `json:"backupsEnabled"`
+	LocalTlonBackupsEnabled   string `json:"localTlonBackupsEnabled"`
+	RemoteTlonBackupsEnabled  string `json:"remoteTlonBackupsEnabled"`
 }
 
 // used to construct broadcast pier info subobject

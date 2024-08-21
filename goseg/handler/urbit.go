@@ -93,7 +93,11 @@ func UrbitHandler(msg []byte) error {
 	case "new-max-pier-size":
 		return setNewMaxPierSize(patp, urbitPayload, shipConf)
 	case "toggle-backup":
+		return handleLocalToggleBackup(patp, shipConf)
+	case "toggle-startram-backup":
 		return handleStartramToggleBackup(patp, shipConf)
+	case "startram-backup":
+		return handleStartramBackup(patp, urbitPayload, shipConf)
 	case "local-backup":
 		return handleLocalBackup(patp, shipConf)
 	case "schedule-local-backup":
@@ -1196,13 +1200,27 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	return nil
 }
 
-func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error {
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "backupsEnabled", Event: "loading"}
+func handleLocalToggleBackup(patp string, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupsEnabled", Event: "loading"}
 	defer func() {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "backupsEnabled", Event: ""}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupsEnabled", Event: ""}
 	}()
 	update := make(map[string]structs.UrbitDocker)
-	shipConf.EnableRemoteBackup = !shipConf.EnableRemoteBackup
+	shipConf.LocalTlonBackup = !shipConf.LocalTlonBackup
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't set local backups: %v", err)
+	}
+	return nil
+}
+
+func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "remoteTlonBackupsEnabled", Event: "loading"}
+	defer func() {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "remoteTlonBackupsEnabled", Event: ""}
+	}()
+	update := make(map[string]structs.UrbitDocker)
+	shipConf.RemoteTlonBackup = !shipConf.RemoteTlonBackup
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't set remote backups: %v", err)
@@ -1210,10 +1228,15 @@ func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error
 	return nil
 }
 
+func handleStartramBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	zap.L().Info("startram backup requested (placeholder)")
+	return nil
+}
 func handleLocalBackup(patp string, shipConf structs.UrbitDocker) error {
 	zap.L().Info("Local backup requested (placeholder)")
 	return nil
 }
+
 func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
 	zap.L().Info("Local backup scheduled (placeholder)")
 	return nil

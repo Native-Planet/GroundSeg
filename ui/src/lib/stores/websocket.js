@@ -440,12 +440,39 @@ export const toggleBackups = patp => {
   send(payload)
 }
 
-export const restoreBackup = (patp, backupFile) => {
+export const toggleStartramBackups = patp => {
   let payload = {
     "type":"urbit",
-    "action":"restore-backup",
+    "action":"toggle-startram-backup",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const scheduleLocalBackup = (patp, backupTime) => {
+  let payload = {
+    "type":"urbit",
+    "action":"schedule-local-backup",
     "patp":patp,
-    "file": "this must fail"
+    "backupTime":backupTime 
+  }
+  send(payload)
+}
+
+export const localBackup = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"local-backup",
+    "patp":patp
+  }
+  send(payload)
+}
+
+export const startramBackup = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"startram-backup",
+    "patp":patp
   }
   send(payload)
 }
@@ -459,6 +486,17 @@ export const registerServiceAgain = patp => {
   send(payload)
 }
 
+export const restoreBackup = (patp, backupFile) => {
+  let payload = {
+    "type":"urbit",
+    "action":"restore-backup",
+    "patp":patp,
+    "file": "this must fail"
+  }
+  send(payload)
+}
+
+/***/
 export const toggleBootStatus = patp => {
   let payload = {
     "type":"urbit",

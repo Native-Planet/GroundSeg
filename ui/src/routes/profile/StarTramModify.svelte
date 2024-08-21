@@ -20,6 +20,7 @@
   const capitalizeFirstLetter = str => str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
   let viewReminder = false
   let viewServices = false
+  let viewBackup = false
 </script>
 
 <div class="wrapper">
@@ -46,15 +47,6 @@
   {/if}
 
   {#if registered}
-    <div class="item">
-      <div class="label">Remote Backup</div>
-      <div class="data">
-        <div class="data-text">Your next backup is at "time here"</div>
-        <button>Backup Now</button>
-      </div>
-    </div>
-  {/if}
-
   <div class="item">
     <div class="label"
          on:click={()=>viewReminder=!viewReminder}>
@@ -76,6 +68,7 @@
       <StarTramServices />
     {/if}
   </div>
+  {/if}
 
 </div>
 

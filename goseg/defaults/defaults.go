@@ -45,7 +45,9 @@ var (
 		DevMode:            false,
 		Click:              true,
 		StartramReminder:   true,
-		EnableRemoteBackup: true,
+		RemoteTlonBackup:   true,
+		LocalTlonBackup:    true,
+		BackupTime:         "0000",
 	}
 	NetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",

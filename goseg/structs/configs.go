@@ -115,7 +115,9 @@ type UrbitDocker struct {
 	StartramReminder   interface{} `json:"startram_reminder"`
 	ChopOnUpgrade      interface{} `json:"chop_on_upgrade"`
 	SizeLimit          int         `json:"size_limit"`
-	EnableRemoteBackup bool        `json:"enable_backup"`
+	RemoteTlonBackup   bool        `json:"remote_tlon_backup"`
+	LocalTlonBackup    bool        `json:"local_tlon_backup"`
+	BackupTime         string      `json:"backup_time"`
 }
 
 // Define the interface
@@ -248,12 +250,20 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			}
 		case "size_limit":
 			u.SetSizeLimit(v)
-		case "enable_backup":
+		case "remote_tlon_backup":
 			if v == nil {
-				u.EnableRemoteBackup = true
+				u.RemoteTlonBackup = true
 			} else {
-				u.EnableRemoteBackup = v.(bool)
+				u.RemoteTlonBackup = v.(bool)
 			}
+		case "local_tlon_backup":
+			if v == nil {
+				u.LocalTlonBackup = true
+			} else {
+				u.LocalTlonBackup = v.(bool)
+			}
+		case "backup_next":
+			u.BackupTime, _ = v.(string)
 		}
 	}
 	return nil

@@ -7,7 +7,8 @@
     toggleUrbitPower,
     installGallseg,
     uninstallGallseg,
-    toggleBackups
+    toggleBackups,
+    toggleStartramBackups
   } from '$lib/stores/websocket'
 
   import { structure, URBIT_MODE } from '$lib/stores/data'
@@ -56,7 +57,8 @@
   $: minioLinked = (ship?.minioLinked) || false
   $: gallseg = (ship?.gallseg)
   $: authLevel = ($structure?.auth_level) || "unauthorized"
-  $: backupsEnabled = (ship?.backupsEnabled) || false
+  $: localTlonBackupsEnabled = (ship?.localTlonBackupsEnabled) || false
+  $: remoteTlonBackupsEnabled = (ship?.remoteTlonBackupsEnabled) || false
   $: backups = (ship?.info?.backups) || []
 
   // transitions
@@ -64,7 +66,8 @@
   $: tTogglePower = (tShip?.togglePower) || ""
   $: tToggleDevMode = (tShip?.toggleDevMode) || ""
   $: tToggleNetwork = (tShip?.toggleNetwork) || ""
-  $: tBackupsEnabled = (tShip?.backupsEnabled) || ""
+  $: tLocalTlonBackupsEnabled = (tShip?.localTlonBackupsEnabled) || ""
+  $: tRemoteTlonBackupsEnabled = (tShip?.remoteTlonBackupsEnabled) || ""
   $: tToggleMinIOLink = (tShip?.toggleMinIOLink) || ""
   $: tGallseg = tShip?.gallseg || ""
 
@@ -136,10 +139,14 @@
 
     <!-- Backup Tlon -->
     <BackupTlon
-      on:click={()=>toggleBackups(patp)}
+      on:local={()=>toggleBackups(patp)}
+      on:remote={()=>toggleStartramBackups(patp)}
+      {patp}
       {remoteReady}
-      {backupsEnabled}
-      {tBackupsEnabled}
+      {localTlonBackupsEnabled}
+      {tLocalTlonBackupsEnabled}
+      {remoteTlonBackupsEnabled}
+      {tRemoteTlonBackupsEnabled}
     />
 
   <!-- Dev Mode -->
