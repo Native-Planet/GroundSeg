@@ -29,7 +29,12 @@ type Subdomain struct {
 
 // Backup struct
 type Backup struct {
-	Ship map[string][]int `json:"ship"`
+	Ship map[string][]BackupObject `json:"ship"`
+}
+
+type BackupObject struct {
+	Timestamp int    `json:"timestamp"`
+	MD5       string `json:"md5"`
 }
 
 // UnmarshalJSON custom unmarshal for Subdomain
