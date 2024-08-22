@@ -11,15 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-func TlonBackupLocal() {
-	for {
-		// check local backup time
-		// create backup
-		zap.L().Debug("temporary backup print for local backups")
-		time.Sleep(15 * time.Second) // temp
-	}
-}
-
 type BackupTime struct {
 	IsSet bool
 	Time  time.Time
@@ -35,6 +26,33 @@ func TlonBackupRemote() {
 		time.Sleep(15 * time.Second) // temp
 	}
 }
+func TlonBackupLocal() {
+	for {
+		conf := config.Conf()
+		for _, patp := range conf.Piers {
+			// get local tz
+			location := time.Now().Location()
+			// default backup time is midnight
+			backupTime := time.Date(0, 1, 1, 0, 0, 0, 0, location)
+			// time format
+			timeFormat := "1504"
+			// retrieve config
+			shipConf := config.UrbitConf(patp)
+			// parse backup time
+			parsedTime, err := time.ParseInLocation(timeFormat, shipConf.BackupTime, location)
+			if err == nil {
+				backupTime = parsedTime
+			}
+			zap.L().Debug(fmt.Sprintf("%s: %v", patp, backupTime)) // temp
+			// check if backups exists, if exists get latest timestamp
+			// check if backup date is before today
+			// check if it is currently later or equal backup time
+			// create backup
+		}
+		time.Sleep(1 * time.Minute)
+	}
+}
+
 func generateTimeOfDay(input string) time.Time {
 	// modulos
 	mod24 := big.NewInt(24)
