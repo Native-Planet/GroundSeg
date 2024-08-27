@@ -3,6 +3,7 @@ package click
 import (
 	"fmt"
 	"groundseg/structs"
+	"strings"
 	"sync"
 )
 
@@ -59,9 +60,30 @@ func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 }
 
 // backup.go
-func BackupActivity(patp string) error       { return backupActivity(patp) }
-func BackupChannels(patp string) error       { return backupChannels(patp) }
-func BackupChannelsServer(patp string) error { return backupChannelsServer(patp) }
-func BackupGroups(patp string) error         { return backupGroups(patp) }
-func BackupProfile(patp string) error        { return backupProfile(patp) }
-func BackupChat(patp string) error           { return backupChat(patp) }
+func BackupTlon(patp string) error {
+	var errors []string
+
+	components := []struct {
+		name string
+		err  error
+	}{
+		{"activity", backupAgent(patp, "activity")},
+		{"channels", backupAgent(patp, "channels")},
+		{"channels-server", backupAgent(patp, "channels-server")},
+		{"groups", backupAgent(patp, "groups")},
+		{"profile", backupAgent(patp, "profile")},
+		{"chat", backupAgent(patp, "chat")},
+	}
+
+	for _, component := range components {
+		if component.err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", component.name, component.err))
+		}
+	}
+
+	if len(errors) == 0 {
+		return nil // No errors, return nil
+	}
+
+	return fmt.Errorf("backup errors: %s", strings.Join(errors, ", "))
+}
