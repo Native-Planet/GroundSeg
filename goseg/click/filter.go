@@ -2,15 +2,8 @@ package click
 
 import (
 	"fmt"
-	"math/big"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
-
-	"github.com/stevelacy/go-urbit/noun"
-	"go.uber.org/zap"
 )
 
 func filterResponse(resType string, response string) (string, bool, error) {
@@ -59,7 +52,6 @@ func filterResponse(resType string, response string) (string, bool, error) {
 				} else {
 					return "not-found", false, nil
 				}
-				return "not found", false, nil
 			}
 		}
 	case "default":
@@ -68,6 +60,7 @@ func filterResponse(resType string, response string) (string, bool, error) {
 	return "", false, fmt.Errorf("+code not in poke response")
 }
 
+/*
 func filterJamResponse(patp, jamType, response string) (string, noun.Noun, error) {
 	responseSlice := strings.Split(response, "\n")
 	for _, line := range responseSlice {
@@ -114,3 +107,5 @@ func filterJamResponse(patp, jamType, response string) (string, noun.Noun, error
 	}
 	return "", nil, fmt.Errorf("Jam file thread failure")
 }
+
+*/

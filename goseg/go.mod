@@ -29,6 +29,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/tcpproxy v0.0.0-20180808230851-dfa16c61dad2 // indirect
 	github.com/josharian/native v1.1.0 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mdlayher/genetlink v1.3.2 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
