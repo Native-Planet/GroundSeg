@@ -461,6 +461,7 @@ type WsStartramAction struct {
 	Backup   int    `json:"backup"`
 	Patp     string `json:"patp"`
 	Target   string `json:"target"`
+	Password string `json:"password"`
 }
 
 type WsLogMessage struct {

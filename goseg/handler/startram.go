@@ -53,6 +53,8 @@ func StartramHandler(msg []byte) error {
 			case "upload-backup":
 				go handleStartramUploadBackup(startramPayload.Payload.Patp)
 		*/
+	case "set-backup-password":
+		go handleStartramSetBackupPassword(startramPayload.Payload.Password)
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
 	}
@@ -442,5 +444,15 @@ func shipExited(patp string) (bool, error) {
 			continue
 		}
 		return true, nil
+	}
+}
+
+func handleStartramSetBackupPassword(password string) {
+	err := config.UpdateConf(map[string]interface{}{
+		"remoteBackupPassword": password,
+	})
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to set backup password: %v", err))
+		return
 	}
 }

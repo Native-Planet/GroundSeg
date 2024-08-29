@@ -37,8 +37,9 @@ var (
 	// struct of minio passwords
 	minIOPasswords = make(map[string]string)
 	// set with `./groundseg dev` (enables verbose logging)
-	DebugMode = false
-	Ready     = false
+	DebugMode  = false
+	Ready      = false
+	BackupTime time.Time
 	// representation of desired/actual container states
 	GSContainers = make(map[string]structs.ContainerState)
 	// channel for log stream requests
@@ -607,6 +608,7 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	} else {
 		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
 	}
+	mergedConfig.RemoteBackupPassword = customConfig.RemoteBackupPassword
 	return mergedConfig
 }
 

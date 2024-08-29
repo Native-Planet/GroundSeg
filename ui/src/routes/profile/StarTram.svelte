@@ -19,6 +19,8 @@
   $: expiry = (info?.expiry) || ""
   $: running = (info?.running) || false
   $: registered = (info?.registered) || false
+  $: remoteBackupReady = (info?.remoteBackupReady) || false
+  $: backupTime = (info?.backupTime) || ""
 
   // Transition
   $: transition = ($structure?.profile?.startram?.transition) || {}
@@ -28,7 +30,7 @@
 
 <div class="container">
   <div class="top">
-    <StarTramInfo {renew} {expiry} {registered} />
+    <StarTramInfo {renew} {expiry} {registered} {remoteBackupReady} {backupTime}/>
     <div class="spacer"></div>
     <div class="controls">
       <div class="top">

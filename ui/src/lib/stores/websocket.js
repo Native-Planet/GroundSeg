@@ -205,6 +205,14 @@ export const setupStarTram = async (key,region) => {
   send(payload)
 }
 
+export const startramBackupPassword = password => {
+  let payload = {
+    "type":"startram",
+    "action":"set-backup-password",
+    "password":password
+  }
+  send(payload)
+}
 //
 //  System
 //

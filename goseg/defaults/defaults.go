@@ -117,19 +117,20 @@ func DockerData(pathType string) string {
 // this one needs params from config so we use a func
 func SysConfig(basePath string) structs.SysConfig {
 	sysConfig := structs.SysConfig{
-		GracefulExit:  false,
-		LastKnownMDNS: "",
-		Setup:         "start",
-		EndpointUrl:   "api.startram.io",
-		ApiVersion:    "v1",
-		Piers:         []string{},
-		NetCheck:      "1.1.1.1:53",
-		UpdateMode:    "auto",
-		UpdateUrl:     "https://version.groundseg.app",
-		UpdateBranch:  "latest",
-		SwapVal:       16,
-		SwapFile:      filepath.Join(basePath, "swapfile"),
-		KeyFile:       filepath.Join(basePath, "settings", "session.key"),
+		RemoteBackupPassword: "",
+		GracefulExit:         false,
+		LastKnownMDNS:        "",
+		Setup:                "start",
+		EndpointUrl:          "api.startram.io",
+		ApiVersion:           "v1",
+		Piers:                []string{},
+		NetCheck:             "1.1.1.1:53",
+		UpdateMode:           "auto",
+		UpdateUrl:            "https://version.groundseg.app",
+		UpdateBranch:         "latest",
+		SwapVal:              16,
+		SwapFile:             filepath.Join(basePath, "swapfile"),
+		KeyFile:              filepath.Join(basePath, "settings", "session.key"),
 		Sessions: struct {
 			Authorized   map[string]structs.SessionInfo `json:"authorized"`
 			Unauthorized map[string]structs.SessionInfo `json:"unauthorized"`

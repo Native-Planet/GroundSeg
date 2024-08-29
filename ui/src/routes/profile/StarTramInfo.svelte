@@ -5,11 +5,13 @@
   import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
   import { openModal } from 'svelte-modals'
   import StarTramReminderModal from '$lib/StarTramReminderModal.svelte'
+  import StarTramBackupModal from '$lib/StarTramBackupModal.svelte'
 
   export let renew
   export let expiry
   export let registered
-
+  export let remoteBackupReady
+  export let backupTime
   $: daysLeft = daysUntilDate(expiry)
 
 </script>
@@ -25,6 +27,14 @@
       <div class="info">
         <div class="item bold">{!renew ? "Renewal Date" : "Expiration Date"}</div>
         <div class="item">{expiry}</div>
+      </div>
+      <div class="info">
+        <div class="item bold">Remote Backup</div>
+        {#if remoteBackupReady}
+          <div class="item">{backupTime}</div>
+        {:else}
+          <button class="backup-button" on:click={()=>openModal(StarTramBackupModal,{})}>Set Up</button>
+        {/if}
       </div>
     </div>
     {#if daysLeft <= $startramMaxReminderDays}
@@ -49,7 +59,7 @@
   .info-wrapper {
     display: flex;
     margin-bottom: 12px;
-    gap: calc(56px * 1.5);
+    gap: 32px;
   }
   .info {
     display: flex;
@@ -78,6 +88,14 @@
   }
   .bold {
     font-weight: 500;
+  }
+  .backup-button {
+    background-color: var(--btn-secondary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
   }
   .warning {
     border: solid orange 2px;

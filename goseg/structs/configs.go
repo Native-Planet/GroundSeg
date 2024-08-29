@@ -7,20 +7,21 @@ import (
 
 // system.json config struct
 type SysConfig struct {
-	GracefulExit  bool     `json:"gracefulExit"`
-	LastKnownMDNS string   `json:"lastKnownMDNS"`
-	Setup         string   `json:"setup"`
-	EndpointUrl   string   `json:"endpointUrl"`
-	ApiVersion    string   `json:"apiVersion"`
-	Piers         []string `json:"piers"`
-	NetCheck      string   `json:"netCheck"`
-	UpdateMode    string   `json:"updateMode"`
-	UpdateUrl     string   `json:"updateUrl"`
-	UpdateBranch  string   `json:"updateBranch"`
-	SwapVal       int      `json:"swapVal"`
-	SwapFile      string   `json:"swapFile"`
-	KeyFile       string   `json:"keyFile"`
-	Sessions      struct {
+	RemoteBackupPassword string   `json:"remoteBackupPassword"`
+	GracefulExit         bool     `json:"gracefulExit"`
+	LastKnownMDNS        string   `json:"lastKnownMDNS"`
+	Setup                string   `json:"setup"`
+	EndpointUrl          string   `json:"endpointUrl"`
+	ApiVersion           string   `json:"apiVersion"`
+	Piers                []string `json:"piers"`
+	NetCheck             string   `json:"netCheck"`
+	UpdateMode           string   `json:"updateMode"`
+	UpdateUrl            string   `json:"updateUrl"`
+	UpdateBranch         string   `json:"updateBranch"`
+	SwapVal              int      `json:"swapVal"`
+	SwapFile             string   `json:"swapFile"`
+	KeyFile              string   `json:"keyFile"`
+	Sessions             struct {
 		Authorized   map[string]SessionInfo `json:"authorized"`
 		Unauthorized map[string]SessionInfo `json:"unauthorized"`
 	} `json:"sessions"`
@@ -263,6 +264,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 				u.LocalTlonBackup = v.(bool)
 			}
 		case "backup_next":
+			u.BackupTime, _ = v.(string)
+		case "backup_time":
 			u.BackupTime, _ = v.(string)
 		}
 	}

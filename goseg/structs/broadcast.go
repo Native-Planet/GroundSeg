@@ -104,15 +104,17 @@ type Profile struct {
 // broadcast payload subobject
 type Startram struct {
 	Info struct {
-		Registered       bool                      `json:"registered"`
-		Running          bool                      `json:"running"`
-		Region           any                       `json:"region"`
-		Expiry           any                       `json:"expiry"`
-		UrlID            string                    `json:"urlID"`
-		Renew            bool                      `json:"renew"`
-		Endpoint         string                    `json:"endpoint"`
-		Regions          map[string]StartramRegion `json:"regions"`
-		StartramServices []string                  `json:"startramServices"`
+		RemoteBackupReady bool                      `json:"remoteBackupReady"`
+		Registered        bool                      `json:"registered"`
+		Running           bool                      `json:"running"`
+		Region            any                       `json:"region"`
+		Expiry            any                       `json:"expiry"`
+		UrlID             string                    `json:"urlID"`
+		Renew             bool                      `json:"renew"`
+		Endpoint          string                    `json:"endpoint"`
+		Regions           map[string]StartramRegion `json:"regions"`
+		StartramServices  []string                  `json:"startramServices"`
+		BackupTime        string                    `json:"backupTime"`
 	} `json:"info"`
 	Transition StartramTransition `json:"transition"`
 }
