@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
+	"groundseg/startram"
 	"io"
 	"math/big"
 	"os"
@@ -39,14 +40,51 @@ func TlonBackupRemote() {
 		if !backupTime.IsSet {
 			backupTime = BackupTime{IsSet: true, Time: generateTimeOfDay(config.StartramConfig.UrlID)}
 		}
-		now := time.Now()
-		if now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
-			zap.L().Info("run remote backup placeholder")
-			// check latest remote backup for each ship
-			// if latest remote backup is older than 24 hours, run remote backup
-			// else do nothing
-		}
+		//now := time.Now()
+		if true { //now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
+			conf := config.Conf()
+			if conf.RemoteBackupPassword != "" {
+				for _, patp := range conf.Piers {
+					_ = patp
+					shipBackupDir := filepath.Join(BackupDir, patp)
+					// List all files in shipBackupDir
+					files, err := filepath.Glob(filepath.Join(shipBackupDir, "*"))
+					if err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to list backup files for %s: %v", patp, err))
+						continue
+					}
 
+					var latestTimestamp int64
+					var latestFile string
+
+					// Find the file with the most recent timestamp
+					for _, file := range files {
+						baseName := filepath.Base(file)
+						timestamp, err := strconv.ParseInt(baseName, 10, 64)
+						if err != nil {
+							// Skip files that are not valid timestamps
+							continue
+						}
+						if timestamp > latestTimestamp {
+							latestTimestamp = timestamp
+							latestFile = file
+						}
+					}
+
+					var backupFile string
+					if latestFile != "" {
+						backupFile = latestFile
+					} else {
+						zap.L().Warn(fmt.Sprintf("No valid backup files found for %s", patp))
+						continue
+					}
+					err = startram.UploadBackup(patp, conf.RemoteBackupPassword, backupFile)
+					if err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to upload backup for %v: %v", patp, err))
+					}
+				}
+			}
+		}
 		time.Sleep(15 * time.Second) // temp
 	}
 }

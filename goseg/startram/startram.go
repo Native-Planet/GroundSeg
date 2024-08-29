@@ -500,6 +500,7 @@ func GetBackup(ship, timestamp, privateKey string) (string, error) {
 
 // upload an encrypted backup blob to startram
 func UploadBackup(ship, privateKey, filePath string) error {
+	zap.L().Info(fmt.Sprintf("Uploading backup for %s", ship))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/backup/upload"
 	encFile, err := encryptFile(filePath, privateKey)
