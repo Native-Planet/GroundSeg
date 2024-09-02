@@ -29,6 +29,7 @@
 
   const isUrbitMode = process.env.GS_URBIT_MODE;
   const showDevPanel = process.env.GS_DEV_PANEL;
+  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
 
   onMount(()=> {
     URBIT_MODE.set(isUrbitMode)
@@ -37,7 +38,11 @@
     if ($URBIT_MODE) {
       subscribe(window.ship)
     } else {
-      connect("ws://" + hostname + ":" + $wsPort + "/ws")
+      if (customHostname) {
+        connect("ws://" + customHostname + ":" + $wsPort + "/ws")
+      } else {
+        connect("ws://" + hostname + ":" + $wsPort + "/ws")
+      }
     }
   })
 
