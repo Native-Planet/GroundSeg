@@ -39,7 +39,7 @@
       subscribe(window.ship)
     } else {
       if (customHostname) {
-        connect("ws://" + customHostname + ":" + $wsPort + "/ws")
+        connect("ws://" + customHostname + ":" + $wsPort + "/ws") // if GS_CUSTOM_HOSTNAME is set
       } else {
         connect("ws://" + hostname + ":" + $wsPort + "/ws")
       }
