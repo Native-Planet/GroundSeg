@@ -9,13 +9,17 @@
   export let type
   let copied = false
   let latest = true
-
+  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
   $: lines = ($logs[type]) || []
 
   onMount(()=> {
     const hostname = $page.url.hostname
     if (!$URBIT_MODE) {
-      connect("ws://" + hostname + ":" + $wsPort + "/logs", type)
+      if (customHostname) {
+        connect("ws://" + customHostname + ":" + $wsPort + "/logs",type) // if GS_CUSTOM_HOSTNAME is set
+      } else {
+        connect("ws://" + hostname + ":" + $wsPort + "/logs",type)
+      }
     }
   })
   onDestroy(()=>disconnect(type))
