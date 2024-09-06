@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"crypto/rand"
 	"groundseg/config"
 	"groundseg/structs"
@@ -443,14 +445,13 @@ func maskPubkey(input string) string {
 }
 
 // get a backup download URL for a specific ship and backup timestamp from retrieve blob
-func GetBackup(ship, timestamp, privateKey string) (string, error) {
-	conf := config.Conf()
+func GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl string) (string, error) {
 	reqData := structs.GetBackupRequest{
 		Ship:      ship,
-		Pubkey:    conf.Pubkey,
+		Pubkey:    pubkey,
 		Timestamp: timestamp,
 	}
-	url := "https://" + conf.EndpointUrl + "/v1/backup/get"
+	url := "https://" + endpointUrl + "/v1/backup/get"
 	jsonData, err := json.Marshal(reqData)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request data: %w", err)
@@ -471,31 +472,7 @@ func GetBackup(ship, timestamp, privateKey string) (string, error) {
 	if err := json.Unmarshal(body, &getBackupResp); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response data: %w", err)
 	}
-	if fmt.Sprintf("%v", &getBackupResp.Result) == "" {
-		return "", fmt.Errorf("returned empty backup URL")
-	}
-	resp, err = http.Get(fmt.Sprintf("%v", &getBackupResp.Result))
-	if err != nil {
-		return "", fmt.Errorf("failed to download file: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download file: server returned %d", resp.StatusCode)
-	}
-	out, err := os.Create(timestamp)
-	if err != nil {
-		return "", fmt.Errorf("failed to create file: %w", err)
-	}
-	defer out.Close()
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
-	}
-	outputFile, err := decryptBackup(timestamp, privateKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to decrypt backup: %w", err)
-	}
-	return outputFile, nil
+	return getBackupResp.Result, nil
 }
 
 // upload an encrypted backup blob to startram
@@ -612,6 +589,7 @@ func decryptBackup(filename string, keyString string) (string, error) {
 
 func RestoreBackup(ship string) error {
 	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
+	conf := config.Conf()
 	res, err := Retrieve()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve StarTram information: %w", err)
@@ -630,10 +608,45 @@ func RestoreBackup(ship string) error {
 			}
 		}
 		if highestTimestamp > 0 {
-			zap.L().Info(fmt.Sprintf("Latest backup for %s: Timestamp: %d, MD5: %s", ship, highestTimestamp, highestMD5))
-			// download the backup
+			link, err := GetBackup(ship, strconv.Itoa(highestTimestamp), conf.RemoteBackupPassword, conf.Pubkey, conf.EndpointUrl)
+			if err != nil {
+				return fmt.Errorf("failed to get backup: %w", err)
+			}
+			if link == "" {
+				return fmt.Errorf("backup link is empty")
+			}
+			data, err := downloadAndVerify(link, highestMD5)
+			if err != nil {
+				return fmt.Errorf("failed to download and verify backup: %w", err)
+			}
+			// decrypt the file
+			// write to appropriate location
+			_ = data
 			return nil
 		}
 	}
 	return fmt.Errorf("no backup found for %s", ship)
+}
+
+func downloadAndVerify(link, md5hash string) ([]byte, error) {
+	// Download the file
+	resp, err := http.Get(link)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Verify the MD5
+	computedMD5 := fmt.Sprintf("%x", md5.Sum(data))
+	if computedMD5 != md5hash {
+		return nil, fmt.Errorf("MD5 mismatch: expected %s, got %s", md5hash, computedMD5)
+	}
+
+	// Return the file as bytes
+	return data, nil
 }

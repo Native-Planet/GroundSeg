@@ -356,6 +356,7 @@ func handleStartramReminder(remind bool) {
 	}
 }
 
+/*
 // download the source backup, decrypt with key, and restore to target
 func handleStartramRestoreBackup(target, source string, backup int, key string) {
 	keyFile := "backup.key"
@@ -398,6 +399,7 @@ func handleStartramRestoreBackup(target, source string, backup int, key string) 
 	startram.EventBus <- structs.Event{Type: "backup", Data: nil}
 	handleNotImplement(fmt.Sprintf("restore %s from %s backup %v", target, source, backupFile))
 }
+*/
 
 func handleStartramUploadBackup(patp string) {
 	startram.EventBus <- structs.Event{Type: "uploadBackup", Data: "upload"}
