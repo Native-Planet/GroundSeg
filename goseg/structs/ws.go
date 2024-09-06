@@ -323,6 +323,8 @@ type WsUrbitAction struct {
 type WsDevAction struct {
 	Type     string `json:"type"`
 	Action   string `json:"action"`
+	Patp     string `json:"patp"`
+	Remote   bool   `json:"remote"`
 	Reminded bool   `json:"reminded"`
 }
 

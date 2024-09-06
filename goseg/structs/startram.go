@@ -27,10 +27,7 @@ type Subdomain struct {
 	URL     string `json:"url"`
 }
 
-// Backup struct
-type Backup struct {
-	Ship map[string][]BackupObject `json:"ship"`
-}
+type Backup map[string][]BackupObject
 
 type BackupObject struct {
 	Timestamp int    `json:"timestamp"`

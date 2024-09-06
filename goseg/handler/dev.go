@@ -9,7 +9,9 @@ import (
 	"groundseg/structs"
 	"groundseg/system"
 	"os"
+	"path/filepath"
 	"time"
+	"strconv"
 
 	"go.uber.org/zap"
 )
@@ -49,6 +51,46 @@ func DevHandler(msg []byte) error {
 		for _, patp := range conf.Piers {
 			if err := click.BackupTlon(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup tlon for %v", err))
+			}
+		}
+	case "remote-backup-tlon":
+		conf := config.Conf()
+		for _, patp := range conf.Piers {
+			shipBak := filepath.Join(config.BasePath, "backup", patp)
+			files, err := os.ReadDir(shipBak)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to read backup directory for %s: %v", patp, err))
+				continue
+			}
+
+			var latestTimestamp int64
+			var latestFile string
+
+			for _, file := range files {
+				if !file.IsDir() {
+					timestamp, err := strconv.ParseInt(file.Name(), 10, 64)
+					if err == nil && timestamp > latestTimestamp {
+						latestTimestamp = timestamp
+						latestFile = file.Name()
+					}
+				}
+			}
+
+			if latestFile != "" {
+				latestBak := filepath.Join(shipBak, latestFile)
+				if err := startram.UploadBackup(patp, conf.RemoteBackupPassword, latestBak); err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to upload backup for %s: %v", patp, err))
+				}
+			}
+		}
+	case "restore-tlon":
+		patp := devPayload.Payload.Patp
+		remote := devPayload.Payload.Remote
+		if !remote {
+			zap.L().Debug(fmt.Sprintf("Skipping local restore for %s for now....", patp))
+		} else {
+			if err := startram.RestoreBackup(patp); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to restore backup for %s: %v", patp, err))
 			}
 		}
 	case "startram-reminder":

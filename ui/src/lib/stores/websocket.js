@@ -902,3 +902,21 @@ export const devBackupTlon = () => {
   }
   send(payload)
 }
+
+export const devRemoteBackupTlon = () => {
+  let payload = {
+    "type": "dev",
+    "action": "remote-backup-tlon",
+  }
+  send(payload)
+}
+
+export const devRestoreTlon = (patp, remote) => {
+  let payload = {
+    "type": "dev",
+    "action": "restore-tlon",
+    "patp": patp,
+    "remote": remote
+  }
+  send(payload)
+}

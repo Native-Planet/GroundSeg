@@ -14,18 +14,10 @@
   import ApiSpinner from './ApiSpinner.svelte'
   import KeepAlive from './KeepAlive.svelte'
   import FirstLoad from './FirstLoad.svelte'
+  import DevPanel from '$lib/DevPanel.svelte'
 
   // Style
   import "../theme.css"
-
-  // Dev panel
-  import { 
-    devStartramReminder,
-    devStartramReminderToggle,
-    printMounts,
-    devBackupTlon
-  } from '$lib/stores/websocket'
-
 
   const isUrbitMode = process.env.GS_URBIT_MODE;
   const showDevPanel = process.env.GS_DEV_PANEL;
@@ -67,33 +59,5 @@
   <KeepAlive />
 {/if}
 {#if showDevPanel}
-<div class="dev">
-  <button on:click={printMounts}>Print Mounts</button>
-  <button on:click={devStartramReminder}>Remind Startram</button>
-  <button on:click={devBackupTlon}>Backup Tlon</button>
-  <button on:click={()=>devStartramReminderToggle(true)}>Reminded</button>
-  <button on:click={()=>devStartramReminderToggle(false)}>Have not Reminded</button>
-</div>
+  <DevPanel />
 {/if}
-<style>
-  .dev {
-    width: 100vw;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-  }
-  .dev > button {
-    padding: 6px;
-    border: solid 1px black;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .dev > button:hover {
-    background: black;
-    color: white;
-  }
-</style>

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"crypto/rand"
 	"groundseg/config"
 	"groundseg/structs"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
@@ -503,15 +503,12 @@ func UploadBackup(ship, privateKey, filePath string) error {
 	zap.L().Info(fmt.Sprintf("Uploading backup for %s", ship))
 	conf := config.Conf()
 	url := "https://" + conf.EndpointUrl + "/v1/backup/upload"
+	// encrypt the file
 	encFile, err := encryptFile(filePath, privateKey)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("failed to encrypt file: %w", err)
 	}
-	file, err := os.Open(encFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
+	// create the request body
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	if err := writer.WriteField("ship", ship); err != nil {
@@ -520,14 +517,19 @@ func UploadBackup(ship, privateKey, filePath string) error {
 	if err := writer.WriteField("pubkey", conf.Pubkey); err != nil {
 		return fmt.Errorf("failed to write pubkey field: %w", err)
 	}
-	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	part, err := writer.CreateFormFile("file", "backup.enc")
 	if err != nil {
-		return fmt.Errorf("failed to create form file: %w", err)
+		return err
 	}
-	if _, err := io.Copy(part, file); err != nil {
-		return fmt.Errorf("failed to copy file data: %w", err)
+	_, err = io.Copy(part, bytes.NewReader(encFile))
+	if err != nil {
+		return err
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close writer: %w", err)
+	}
+	// make the request
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -542,36 +544,42 @@ func UploadBackup(ship, privateKey, filePath string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("request failed with status %d", resp.StatusCode)
 	}
-	if err = os.Remove(encFile); err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't remove encrypted file post-upload: %v", err))
-	}
 	return nil
 }
 
 // encrypt an arbitrary file with a path and key
-func encryptFile(filename string, keyString string) (string, error) {
-	key := sha256.Sum256([]byte(keyString)) // Derive a 256-bit key from the provided string
+func encryptFile(filename string, keyString string) ([]byte, error) {
+	// Read the file
 	plaintext, err := os.ReadFile(filename)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
+
+	// Derive a 256-bit key from the provided string
+	key := sha256.Sum256([]byte(keyString))
+
+	// Create a new AES cipher block
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
+
+	// Create a new GCM mode
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
+
+	// Create a nonce
 	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err = io.ReadFull(os.Stdin, nonce); err != nil {
-		return "", err
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, fmt.Errorf("failed to create nonce: %w", err)
 	}
+
+	// Encrypt the data
 	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
-	if err = os.WriteFile(filename+".enc", ciphertext, 0644); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s.enc", filename), nil
+
+	return ciphertext, nil
 }
 
 // decrypt for encryptBackup
@@ -600,4 +608,32 @@ func decryptBackup(filename string, keyString string) (string, error) {
 		return "", err
 	}
 	return output, nil
+}
+
+func RestoreBackup(ship string) error {
+	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
+	res, err := Retrieve()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve StarTram information: %w", err)
+	}
+	for _, backup := range res.Backups {
+		data, exists := backup[ship]
+		if !exists {
+			continue
+		}
+		var highestTimestamp int
+		var highestMD5 string
+		for _, item := range data {
+			if item.Timestamp > highestTimestamp {
+				highestTimestamp = item.Timestamp
+				highestMD5 = item.MD5
+			}
+		}
+		if highestTimestamp > 0 {
+			zap.L().Info(fmt.Sprintf("Latest backup for %s: Timestamp: %d, MD5: %s", ship, highestTimestamp, highestMD5))
+			// download the backup
+			return nil
+		}
+	}
+	return fmt.Errorf("no backup found for %s", ship)
 }

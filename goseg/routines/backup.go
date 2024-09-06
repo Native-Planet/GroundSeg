@@ -37,6 +37,8 @@ type BackupTime struct {
 func TlonBackupRemote() {
 	backupTime := BackupTime{IsSet: false}
 	for {
+		time.Sleep(15 * time.Second)  // temp
+		continue
 		if !backupTime.IsSet {
 			backupTime = BackupTime{IsSet: true, Time: generateTimeOfDay(config.StartramConfig.UrlID)}
 		}
@@ -90,6 +92,7 @@ func TlonBackupRemote() {
 }
 func TlonBackupLocal() {
 	for {
+		zap.L().Info("Checking local backups")
 		conf := config.Conf()
 		for _, patp := range conf.Piers {
 			// get local tz
