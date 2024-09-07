@@ -41,8 +41,8 @@ func TlonBackupRemote() {
 			backupTime = BackupTime{IsSet: true, Time: generateTimeOfDay(config.StartramConfig.UrlID)}
 			config.BackupTime = backupTime.Time
 		}
-		//now := time.Now()
-		if true { //now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
+		now := time.Now()
+		if now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
 			conf := config.Conf()
 			if conf.RemoteBackupPassword != "" {
 				for _, patp := range conf.Piers {
