@@ -337,6 +337,7 @@ func constructProfileInfo() structs.Profile {
 	startramInfo.Info.Running = conf.WgOn
 	startramInfo.Info.Endpoint = conf.EndpointUrl
 	startramInfo.Info.RemoteBackupReady = conf.RemoteBackupPassword != ""
+	zap.L().Info(fmt.Sprintf("Backup time: %v", config.BackupTime))
 	startramInfo.Info.BackupTime = config.BackupTime.Format("3:04PM MST")
 	// Information from startram
 	startramInfo.Info.Region = config.StartramConfig.Region

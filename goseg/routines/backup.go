@@ -37,10 +37,9 @@ type BackupTime struct {
 func TlonBackupRemote() {
 	backupTime := BackupTime{IsSet: false}
 	for {
-		time.Sleep(15 * time.Second)  // temp
-		continue
 		if !backupTime.IsSet {
 			backupTime = BackupTime{IsSet: true, Time: generateTimeOfDay(config.StartramConfig.UrlID)}
+			config.BackupTime = backupTime.Time
 		}
 		//now := time.Now()
 		if true { //now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
