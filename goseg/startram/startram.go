@@ -5,11 +5,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"crypto/rand"
 	"groundseg/config"
 	"groundseg/structs"
 	"io"
@@ -17,7 +16,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 
 	"go.uber.org/zap"
@@ -559,32 +560,38 @@ func encryptFile(filename string, keyString string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// decrypt for encryptBackup
-func decryptBackup(filename string, keyString string) (string, error) {
-	key := sha256.Sum256([]byte(keyString)) // Derive a 256-bit key from the provided string
-	ciphertext, err := os.ReadFile(filename)
-	if err != nil {
-		return "", err
-	}
+func decryptFile(file []byte, keyString string) ([]byte, error) {
+	// Derive a 256-bit key from the provided string
+	key := sha256.Sum256([]byte(keyString))
+
+	// Create a new AES cipher block
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
+
+	// Create a new GCM mode
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
+
+	// Get the nonce size
 	nonceSize := aesGCM.NonceSize()
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	if len(file) < nonceSize {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+
+	// Extract the nonce from the ciphertext
+	nonce, ciphertext := file[:nonceSize], file[nonceSize:]
+
+	// Decrypt the data
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to decrypt: %w", err)
 	}
-	output := fmt.Sprintf("%s.dec", filename)
-	if err = os.WriteFile(output, plaintext, 0644); err != nil {
-		return "", err
-	}
-	return output, nil
+
+	return plaintext, nil
 }
 
 func RestoreBackup(ship string) error {
@@ -620,8 +627,20 @@ func RestoreBackup(ship string) error {
 				return fmt.Errorf("failed to download and verify backup: %w", err)
 			}
 			// decrypt the file
+			decryptedData, err := decryptFile(data, conf.RemoteBackupPassword)
+			if err != nil {
+				return fmt.Errorf("failed to decrypt backup: %w", err)
+			}
 			// write to appropriate location
-			_ = data
+			loc := filepath.Join("/opt/nativeplanet/groundseg/restore", ship)
+			// create the directory if it doesn't exist
+			if _, err := os.Stat(loc); os.IsNotExist(err) {
+				os.MkdirAll(loc, 0755)
+			}
+			err = os.WriteFile(filepath.Join(loc, strconv.Itoa(highestTimestamp)), decryptedData, 0644)
+			if err != nil {
+				return fmt.Errorf("failed to write backup to file: %w", err)
+			}
 			return nil
 		}
 	}

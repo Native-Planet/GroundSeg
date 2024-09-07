@@ -98,6 +98,8 @@
     background: black;
     padding: 32px;
     padding-top: 16px;
+    border: solid 2px white;
+    opacity: 0.8;
   }
   .panel-buttons {
     display: flex;
