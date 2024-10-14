@@ -44,9 +44,10 @@ func TlonBackupRemote() {
 		now := time.Now()
 		if now.Equal(backupTime.Time) || (now.After(backupTime.Time) && now.Sub(backupTime.Time) <= time.Hour) {
 			conf := config.Conf()
-			if conf.RemoteBackupPassword != "" {
+			if conf.RemoteBackupPassword != "" && conf.WgRegistered {
+				zap.L().Info("Time to backup ships remotely")
 				for _, patp := range conf.Piers {
-					_ = patp
+					zap.L().Info(fmt.Sprintf("Backing up %s", patp))
 					shipBackupDir := filepath.Join(BackupDir, patp)
 					// List all files in shipBackupDir
 					files, err := filepath.Glob(filepath.Join(shipBackupDir, "*"))
@@ -86,7 +87,7 @@ func TlonBackupRemote() {
 				}
 			}
 		}
-		time.Sleep(15 * time.Second) // temp
+		time.Sleep(1 * time.Minute)
 	}
 }
 func TlonBackupLocal() {
