@@ -24,6 +24,7 @@
   import Chop from './Section/Chop.svelte'  // vere 3.0
   import Gallseg from './Section/Gallseg.svelte'  // vere 3.0
   import AdminLogin from './Section/AdminLogin.svelte'
+  import RestoreTlon from './Section/RestoreTlon.svelte'
 
   import BottomPanel from './BottomPanel.svelte'
 
@@ -59,7 +60,8 @@
   $: authLevel = ($structure?.auth_level) || "unauthorized"
   $: localTlonBackupsEnabled = (ship?.localTlonBackupsEnabled) || false
   $: remoteTlonBackupsEnabled = (ship?.remoteTlonBackupsEnabled) || false
-  $: backups = (ship?.info?.backups) || []
+  $: remoteTlonBackups = (ship?.remoteTlonBackups) || []
+  $: localTlonBackups = (ship?.localTlonBackups) || []
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
@@ -179,6 +181,12 @@
   {#if $URBIT_MODE && (authLevel != "authorized")}
     <AdminLogin />
   {/if}
+
+  <RestoreTlon
+    {patp}
+    {remoteTlonBackups}
+    {localTlonBackups}
+  />
 
 
   <!-- Bottom Panel -->

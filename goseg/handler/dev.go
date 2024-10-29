@@ -10,8 +10,8 @@ import (
 	"groundseg/system"
 	"os"
 	"path/filepath"
-	"time"
 	"strconv"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -89,7 +89,7 @@ func DevHandler(msg []byte) error {
 		if !remote {
 			zap.L().Debug(fmt.Sprintf("Skipping local restore for %s for now....", patp))
 		} else {
-			if err := startram.RestoreBackup(patp); err != nil {
+			if err := startram.RestoreBackup(patp, remote, 0, true); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to restore backup for %s: %v", patp, err))
 			}
 		}

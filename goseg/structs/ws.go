@@ -318,6 +318,8 @@ type WsUrbitAction struct {
 	Date         int    `json:"date"`
 	Remind       bool   `json:"remind"`
 	Service      string `json:"service"`
+	Remote       bool   `json:"remote"`
+	Timestamp    int    `json:"timestamp"`
 }
 
 type WsDevAction struct {

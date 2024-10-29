@@ -11,6 +11,8 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
 
@@ -32,6 +35,7 @@ var (
 	UrbTransMu        sync.RWMutex
 	SysTransMu        sync.RWMutex
 	mu                sync.RWMutex // synchronize access to broadcastState
+	BackupDir         = setBackupDir()
 )
 
 func init() {
@@ -141,6 +145,38 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
 	conf := config.Conf()
 	piers := conf.Piers
+
+	// retrieve backup information
+	remoteBackups := config.StartramConfig.Backups
+	remoteBackupMap := make(structs.Backup)
+	for _, backup := range remoteBackups {
+		for ship, backupInfo := range backup {
+			remoteBackupMap[ship] = backupInfo
+		}
+	}
+	localBackups := make(structs.Backup)
+	// get local backups
+	// BackupDir has been set in init
+	// inside BackupDir there is a folder for each ship
+	// each of those folders contains a number of numbered files with no file extension, they are all unix timestamps
+	// backupInfo is a struct with a timestamp and md5
+	// we want to get all the backups for a given ship and add them to localBackups
+	for _, ship := range piers {
+		shipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "*"))
+		if err != nil {
+			continue
+		}
+		for _, backup := range shipBackups {
+			// each backup is a path with the filename being the unix timestamp
+			// strip off the dir and filename to get the timestamp
+			timestamp, err := strconv.Atoi(filepath.Base(backup))
+			if err != nil {
+				continue
+			}
+			localBackups[ship] = append(localBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
+		}
+	}
+
 	docker.ContainerStatList = piers
 	updates := make(map[string]structs.Urbit)
 	// load fresh broadcast state
@@ -156,7 +192,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	}
 	hostName := system.LocalUrl
 	if hostName == "" {
-		zap.L().Debug(fmt.Sprintf("Defaulting to `nativeplanet.local`"))
+		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
 	}
 	// convert the running status into bools
@@ -298,6 +334,12 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.RemoteTlonBackupsEnabled = dockerConfig.RemoteTlonBackup
 		urbit.Info.LocalTlonBackupsEnabled = dockerConfig.LocalTlonBackup
 		urbit.Info.BackupTime = dockerConfig.BackupTime
+		if remoteBak, exists := remoteBackupMap[pier]; exists {
+			urbit.Info.RemoteTlonBackups = remoteBak
+		}
+		if localBak, exists := localBackups[pier]; exists {
+			urbit.Info.LocalTlonBackups = localBak
+		}
 		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
@@ -535,4 +577,43 @@ func ReloadUrbits() error {
 	broadcastState.Urbits = urbits
 	mu.Unlock()
 	return nil
+}
+
+func setBackupDir() string {
+	mmc, _ := isMountedMMC(config.BasePath)
+	if mmc {
+		return "/media/data/backup"
+	} else {
+		return filepath.Join(config.BasePath, "backup")
+	}
+
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
 }

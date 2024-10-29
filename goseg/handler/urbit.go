@@ -102,6 +102,8 @@ func UrbitHandler(msg []byte) error {
 		return handleLocalBackup(patp, shipConf)
 	case "schedule-local-backup":
 		return handleScheduleLocalBackup(patp, urbitPayload, shipConf)
+	case "restore-tlon-backup":
+		return handleRestoreTlonBackup(patp, urbitPayload, shipConf)
 	default:
 		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
@@ -1239,5 +1241,13 @@ func handleLocalBackup(patp string, shipConf structs.UrbitDocker) error {
 
 func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
 	zap.L().Info("Local backup scheduled (placeholder)")
+	return nil
+}
+
+func handleRestoreTlonBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	remote := urbitPayload.Payload.Remote
+	if err := startram.RestoreBackup(patp, remote, urbitPayload.Payload.Timestamp, false); err != nil {
+		return fmt.Errorf("failed to restore backup for %s: %v", patp, err)
+	}
 	return nil
 }

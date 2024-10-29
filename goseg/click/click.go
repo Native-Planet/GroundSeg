@@ -28,6 +28,8 @@ func ReviveDesk(patp, desk string) error                     { return reviveDesk
 func UninstallDesk(patp, desk string) error                  { return uninstallDesk(patp, desk) }
 func InstallDesk(patp, ship, desk string) error              { return installDesk(patp, ship, desk) }
 func GetDesk(patp, desk string, bypass bool) (string, error) { return getDesk(patp, desk, bypass) }
+func MountDesk(patp, desk string) error                      { return mountDesk(patp, desk) }
+func CommitDesk(patp, desk string) error                     { return commitDesk(patp, desk) }
 
 // exit.go
 func BarExit(patp string) error { return barExit(patp) }
@@ -57,6 +59,35 @@ func SendPack(patp string) error { return sendPack(patp) }
 func UnlinkStorage(patp string) error { return unlinkStorage(patp) }
 func LinkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
 	return linkStorage(patp, endpoint, svcAccount)
+}
+
+// restore.go
+func RestoreTlon(patp string) error {
+	var errors []string
+
+	components := []struct {
+		name string
+		err  error
+	}{
+		{"activity", restoreAgent(patp, "activity")},
+		{"channels", restoreAgent(patp, "channels")},
+		{"channels-server", restoreAgent(patp, "channels-server")},
+		{"groups", restoreAgent(patp, "groups")},
+		{"profile", restoreAgent(patp, "profile")},
+		{"chat", restoreAgent(patp, "chat")},
+	}
+
+	for _, component := range components {
+		if component.err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", component.name, component.err))
+		}
+	}
+
+	if len(errors) == 0 {
+		return nil // No errors, return nil
+	}
+
+	return fmt.Errorf("restore errors: %s", strings.Join(errors, ", "))
 }
 
 // backup.go

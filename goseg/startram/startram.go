@@ -1,6 +1,7 @@
 package startram
 
 import (
+	"archive/tar"
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
@@ -9,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"groundseg/click"
 	"groundseg/config"
 	"groundseg/structs"
 	"io"
@@ -16,11 +18,16 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
+	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
 
@@ -594,7 +601,178 @@ func decryptFile(file []byte, keyString string) ([]byte, error) {
 	return plaintext, nil
 }
 
-func RestoreBackup(ship string) error {
+// prod version
+func RestoreBackup(ship string, remote bool, timestamp int, dev bool) error {
+	if dev {
+		return restoreBackupDev(ship)
+	}
+	return restoreBackupProd(ship, remote, timestamp)
+}
+
+func restoreBackupProd(ship string, remote bool, timestamp int) error {
+	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
+	var data []byte
+	var err error
+	if remote {
+		zap.L().Info(fmt.Sprintf("Restoring remote backup for %s at %d", ship, timestamp))
+		// TODO: Implement remote backup retrieval
+		return fmt.Errorf("remote backup restore not implemented")
+	} else {
+		// local restore
+		data, err = retrieveLocalBackup(ship, timestamp)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve local backup: %w", err)
+		}
+	}
+	err = writeBackupToVolume(ship, data)
+	if err != nil {
+		return fmt.Errorf("failed to write backup to volume: %w", err)
+	}
+	// commit the base desk
+	err = click.CommitDesk(ship, "base")
+	if err != nil {
+		return fmt.Errorf("failed to commit desk: %w", err)
+	}
+	err = click.RestoreTlon(ship)
+	if err != nil {
+		return fmt.Errorf("failed to restore tlon: %w", err)
+	}
+	zap.L().Info(fmt.Sprintf("Successfully restored backup for %s", ship))
+	return nil
+}
+
+func writeBackupToVolume(ship string, data []byte) error {
+	// Get the Docker volume location for the ship
+	cmd := exec.Command("docker", "inspect", "-f", "{{ range .Mounts }}{{ if eq .Type \"volume\" }}{{ .Source }}{{ end }}{{ end }}", ship)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get Docker volume location: %w", err)
+	}
+
+	volumePath := strings.TrimSpace(string(output))
+	if volumePath == "" {
+		return fmt.Errorf("no Docker volume found for container %s", ship)
+	}
+	bakDir := filepath.Join(volumePath, ship, "base", "bak")
+	// create the directory if it doesn't exist
+	if _, err := os.Stat(bakDir); os.IsNotExist(err) {
+		err = os.MkdirAll(bakDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create backup directory: %w", err)
+		}
+	}
+
+	// Create a temporary directory to decompress the backup
+	tmpDir, err := os.MkdirTemp("", "backup-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Decompress the zstd data
+	decoder, err := zstd.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create zstd decoder: %w", err)
+	}
+	defer decoder.Close()
+
+	// Create a tar reader
+	tr := tar.NewReader(decoder)
+
+	// Extract the tar archive
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		target := filepath.Join(bakDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", target, err)
+			}
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %w", target, err)
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return fmt.Errorf("failed to write file %s: %w", target, err)
+			}
+			f.Close()
+		}
+	}
+	return nil
+}
+
+func retrieveLocalBackup(ship string, timestamp int) ([]byte, error) {
+	setBackupDir := func() string {
+		mmc, _ := isMountedMMC(config.BasePath)
+		if mmc {
+			return "/media/data/backup"
+		} else {
+			return filepath.Join(config.BasePath, "backup")
+		}
+	}
+	backupDir := setBackupDir()
+	backupFile := filepath.Join(backupDir, ship, strconv.Itoa(timestamp))
+	zap.L().Info(fmt.Sprintf("Restoring local backup for %s at %d to %s", ship, timestamp, backupFile))
+	file, err := os.Stat(backupFile)
+	if err != nil {
+		return []byte{}, fmt.Errorf("backup file does not exist: %s", backupFile)
+	}
+	if file.IsDir() {
+		return []byte{}, fmt.Errorf("backup is a directory: %s", backupFile)
+	}
+	// read the file
+	data, err := os.ReadFile(backupFile)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to read backup file: %w", err)
+	}
+	err = click.MountDesk(ship, "base")
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to mount base desk: %w", err)
+	}
+	return data, nil
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
+}
+
+// dev version
+func restoreBackupDev(ship string) error {
 	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
 	conf := config.Conf()
 	res, err := Retrieve()

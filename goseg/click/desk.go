@@ -121,6 +121,64 @@ func getDesk(patp, desk string, bypass bool) (string, error) {
 	return vats, nil
 }
 
+func mountDesk(patp, desk string) error {
+	// <file>.hoon
+	file := "mount-" + desk
+	// actual hoon
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  ;<  ~  bind:m  (poke-our %%hood %%kiln-mount !>([(en-beam [our %%%v [%%da now]] /) %%%v]))  (pure:m !>('success'))", desk, desk)
+	// "click -b /usr/local/bin/urbit -k /pier/$1 $'=/ m (strand ,vase) ~& \\\'committing files\\\' ;< ~ bind:m (poke-our %hood %kiln-commit !>([[%base] %.n])) (pure:m !>(\\\'success\\\'))'"
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click mount desk %%%v failed to create hoon: %v", desk, err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	if err != nil {
+		storeDeskError(patp, desk)
+		return fmt.Errorf("Click |mount desk %%%v failed to get exec: %v", desk, err)
+	}
+	// succeeded
+	_, success, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click |mount %%%v failed to get exec: %v", desk, err)
+	}
+	if !success {
+		return fmt.Errorf("Click |mount %%%v poke failed", desk)
+	}
+	return nil
+}
+
+func commitDesk(patp, desk string) error {
+	// <file>.hoon
+	file := "commit-" + desk
+	// actual hoon
+	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  ~  bind:m  (poke-our %%hood %%kiln-commit !>([[%%%v] %%.n]))  (pure:m !>('success'))", desk)
+	// create hoon file
+	if err := createHoon(patp, file, hoon); err != nil {
+		return fmt.Errorf("Click commit desk %%%v failed to create hoon: %v", desk, err)
+	}
+	// defer hoon file deletion
+	defer deleteHoon(patp, file)
+	// execute hoon file
+	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	if err != nil {
+		storeDeskError(patp, desk)
+		return fmt.Errorf("Click |commit desk %%%v failed to get exec: %v", desk, err)
+	}
+	fmt.Println(response)
+	// succeeded
+	_, success, err := filterResponse("success", response)
+	if err != nil {
+		return fmt.Errorf("Click |commit %%%v failed to get exec: %v", desk, err)
+	}
+	if !success {
+		return fmt.Errorf("Click |commit %%%v poke failed", desk)
+	}
+	return nil
+}
+
 func allowDeskRequest(patp, desk string) bool {
 	desksMutex.Lock()
 	defer desksMutex.Unlock()
