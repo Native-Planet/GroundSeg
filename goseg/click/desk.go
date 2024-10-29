@@ -167,7 +167,6 @@ func commitDesk(patp, desk string) error {
 		storeDeskError(patp, desk)
 		return fmt.Errorf("Click |commit desk %%%v failed to get exec: %v", desk, err)
 	}
-	fmt.Println(response)
 	// succeeded
 	_, success, err := filterResponse("success", response)
 	if err != nil {

@@ -653,8 +653,37 @@ func writeBackupToVolume(ship string, data []byte) error {
 	if volumePath == "" {
 		return fmt.Errorf("no Docker volume found for container %s", ship)
 	}
-	bakDir := filepath.Join(volumePath, ship, "base", "bak")
-	// create the directory if it doesn't exist
+	deskDir := filepath.Join(volumePath, ship, "base")
+	marDir := filepath.Join(deskDir, "mar")
+	bakDir := filepath.Join(deskDir, "bak")
+
+	// Create mar directory if it doesn't exist
+	if _, err := os.Stat(marDir); os.IsNotExist(err) {
+		err = os.MkdirAll(marDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create mar directory: %w", err)
+		}
+	}
+
+	// Always write egg-any.hoon file
+	eggAnyPath := filepath.Join(marDir, "egg-any.hoon")
+	eggAnyContent := `|_  =egg-any:gall
+++  grad  %noun
+++  grow
+  |%
+  ++  noun  egg-any
+  --
+++  grab
+  |%
+  ++  noun  egg-any:gall
+  --
+--`
+	err = os.WriteFile(eggAnyPath, []byte(eggAnyContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create egg-any.hoon: %w", err)
+	}
+
+	// Create backup directory if it doesn't exist
 	if _, err := os.Stat(bakDir); os.IsNotExist(err) {
 		err = os.MkdirAll(bakDir, 0755)
 		if err != nil {
