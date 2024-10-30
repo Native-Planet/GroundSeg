@@ -1,6 +1,10 @@
 package click
 
-import "fmt"
+import (
+	"fmt"
+
+	"go.uber.org/zap"
+)
 
 func restoreAgent(patp, agent string) error {
 	file := fmt.Sprintf("restore-%s", agent)
@@ -13,7 +17,8 @@ func restoreAgent(patp, agent string) error {
 		"=/", "cg=cage", "[%noun !>((cue egg))]",
 		"=/", "=card:agent:gall", "[%pass /pokeas %agent dk %poke %egg-any -:!>(*egg-any:gall) (cue egg)]",
 		";<", "~", "bind:m", "(send-raw-card card)",
-		";<", "~", "bind:m", "(take-poke-ack /pokeas)", "(pure:m !>('success'))",
+		";<", "~", "bind:m", "(take-poke-ack /pokeas)",
+		"(pure:m !>('success'))",
 	})
 	if err := createHoon(patp, file, hoon); err != nil {
 		return fmt.Errorf("Click %s failed to create hoon: %v", file, err)
@@ -33,5 +38,6 @@ func restoreAgent(patp, agent string) error {
 	if !succeeded {
 		return fmt.Errorf("Click %s failed poke: %s", file, patp)
 	}
+	zap.L().Info(fmt.Sprintf("Click %s restored agent %s on %s", file, agent, patp))
 	return nil
 }
