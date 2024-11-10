@@ -1246,7 +1246,7 @@ func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload,
 
 func handleRestoreTlonBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
 	remote := urbitPayload.Payload.Remote
-	if err := startram.RestoreBackup(patp, remote, urbitPayload.Payload.Timestamp, false); err != nil {
+	if err := startram.RestoreBackup(patp, remote, urbitPayload.Payload.Timestamp, urbitPayload.Payload.MD5, false); err != nil {
 		return fmt.Errorf("failed to restore backup for %s: %v", patp, err)
 	}
 	return nil

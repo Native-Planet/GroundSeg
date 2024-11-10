@@ -16,12 +16,12 @@
 
   const restoreLocalBackup = (backup) => {
     console.log("local", backup)
-    restoreTlonBackup(patp, false, backup.timestamp)
+    restoreTlonBackup(patp, false, backup.timestamp, backup.md5)
   }
 
   const restoreRemoteBackup = (backup) => {
     console.log("remote", backup)
-    restoreTlonBackup(patp, true, backup.timestamp)
+    restoreTlonBackup(patp, true, backup.timestamp, backup.md5)
   }
 </script>
 

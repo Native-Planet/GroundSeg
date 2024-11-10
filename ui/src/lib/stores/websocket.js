@@ -485,15 +485,15 @@ export const startramBackup = patp => {
   send(payload)
 }
 
-export const restoreTlonBackup = (patp, remote, timestamp) => {
+export const restoreTlonBackup = (patp, remote, timestamp, md5) => {
   let payload = {
     "type": "urbit",
     "action": "restore-tlon-backup",
     "patp": patp,
     "remote": remote,
-    "timestamp": timestamp
+    "timestamp": timestamp,
+    "md5": md5
   }
-  console.log(payload)
   send(payload)
 } 
 

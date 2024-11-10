@@ -602,21 +602,22 @@ func decryptFile(file []byte, keyString string) ([]byte, error) {
 }
 
 // prod version
-func RestoreBackup(ship string, remote bool, timestamp int, dev bool) error {
+func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool) error {
 	if dev {
 		return restoreBackupDev(ship)
 	}
-	return restoreBackupProd(ship, remote, timestamp)
+	return restoreBackupProd(ship, remote, timestamp, md5hash)
 }
 
-func restoreBackupProd(ship string, remote bool, timestamp int) error {
+func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string) error {
 	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
 	var data []byte
 	var err error
 	if remote {
-		zap.L().Info(fmt.Sprintf("Restoring remote backup for %s at %d", ship, timestamp))
-		// TODO: Implement remote backup retrieval
-		return fmt.Errorf("remote backup restore not implemented")
+		data, err = retrieveRemoteBackup(ship, timestamp, md5hash)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve remote backup: %w", err)
+		}
 	} else {
 		// local restore
 		data, err = retrieveLocalBackup(ship, timestamp)
@@ -639,6 +640,27 @@ func restoreBackupProd(ship string, remote bool, timestamp int) error {
 	}
 	zap.L().Info(fmt.Sprintf("Successfully restored backup for %s", ship))
 	return nil
+}
+
+func retrieveRemoteBackup(ship string, timestamp int, md5hash string) ([]byte, error) {
+	conf := config.Conf()
+	link, err := GetBackup(ship, strconv.Itoa(timestamp), conf.RemoteBackupPassword, conf.Pubkey, conf.EndpointUrl)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to get backup: %w", err)
+	}
+	if link == "" {
+		return []byte{}, fmt.Errorf("backup link is empty")
+	}
+	data, err := downloadAndVerify(link, md5hash)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to download and verify backup: %w", err)
+	}
+	// decrypt the file
+	decryptedData, err := decryptFile(data, conf.RemoteBackupPassword)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to decrypt backup: %w", err)
+	}
+	return decryptedData, nil
 }
 
 func writeBackupToVolume(ship string, data []byte) error {
