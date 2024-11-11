@@ -13,15 +13,23 @@
   import { URBIT_MODE } from '$lib/stores/data'
 
   let showBackups = false
+  
+  let isSure = undefined
 
   const restoreLocalBackup = (backup) => {
-    console.log("local", backup)
-    restoreTlonBackup(patp, false, backup.timestamp, backup.md5)
+    if (isSure === backup.timestamp) {
+      restoreTlonBackup(patp, false, backup.timestamp, backup.md5)
+    } else {
+      isSure = backup.timestamp
+    }
   }
 
   const restoreRemoteBackup = (backup) => {
-    console.log("remote", backup)
-    restoreTlonBackup(patp, true, backup.timestamp, backup.md5)
+    if (isSure === backup.timestamp) {
+      restoreTlonBackup(patp, true, backup.timestamp, backup.md5)
+    } else {
+      isSure = backup.timestamp
+    }
   }
 </script>
 
@@ -46,7 +54,25 @@
   <div class="backups-section">
     <div class="backups-title">Remote Backups</div>
     {#each remoteTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-      <button class="btn backup-item" on:click={() => restoreRemoteBackup(backup)}>
+    {#if isSure === backup.timestamp}
+      <div class="backup-selected-wrapper">
+        <div class="backup-selected">{new Date(backup.timestamp * 1000).toLocaleString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: true
+        })}</div>
+        <div class="backup-button-wrapper">
+          <button class="backup-cancel" on:click={() => isSure = undefined}>
+            Cancel
+          </button>
+          <button class="backup-restore" on:click={() => restoreRemoteBackup(backup)}>Restore</button>
+        </div>
+      </div>
+    {:else}
+      <button disabled={isSure !== undefined} class="btn backup-item" on:click={() => restoreRemoteBackup(backup)}>
         {new Date(backup.timestamp * 1000).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',
@@ -56,12 +82,31 @@
           hour12: true
         })}
       </button>
+    {/if}
     {/each}
   </div>
   <div class="backups-section">
     <div class="backups-title">Local Backups</div>
     {#each localTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-      <button class="btn backup-item" on:click={() => restoreLocalBackup(backup)}>
+    {#if isSure === backup.timestamp}
+      <div class="backup-selected-wrapper">
+        <div class="backup-selected">{new Date(backup.timestamp * 1000).toLocaleString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: true
+        })}</div>
+        <div class="backup-button-wrapper">
+          <button class="backup-cancel" on:click={() => isSure = undefined}>
+            Cancel
+          </button>
+          <button class="backup-restore" on:click={() => restoreLocalBackup(backup)}>Restore</button>
+        </div>
+      </div>
+    {:else}
+      <button disabled={isSure !== undefined} class="btn backup-item" on:click={() => restoreLocalBackup(backup)}>
         {new Date(backup.timestamp * 1000).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',
@@ -71,6 +116,7 @@
           hour12: true
         })}
       </button>
+    {/if}
     {/each}
   </div>
 </div>
@@ -132,5 +178,46 @@
     line-height: normal;
     letter-spacing: -1.44px;
     text-align: center;
+}
+.backup-selected-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid white;
+  padding: 64px;
+}
+.backup-selected {
+    font-family: var(--regular-font);
+    leading-trim: both;
+    text-edge: cap;
+    font-family: Inter;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 300;
+    line-height: normal;
+    letter-spacing: -1.44px;
+    text-align: center;
+    margin-bottom: 32px;
+}
+.backup-button-wrapper {
+  display: flex;
+  gap: 8px;
+}
+.backup-restore {
+  background: var(--btn-primary);
+  color: var(--text-card-color);
+  flex: 1;
+  cursor: pointer;
+  padding: 16px;
+  border-radius: 16px;
+}
+.backup-cancel {
+  color: var(--text-card-color);
+  background: #FF6B6B;
+  flex: 1;
+  cursor: pointer;
+  padding: 16px;
+  border-radius: 16px;
 }
 </style>

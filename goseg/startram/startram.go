@@ -618,6 +618,16 @@ func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string) 
 		if err != nil {
 			return fmt.Errorf("failed to retrieve remote backup: %w", err)
 		}
+		// Create restore directory if it doesn't exist
+		restoreDir := filepath.Join("/opt/nativeplanet/groundseg/restore", ship)
+		if err := os.MkdirAll(restoreDir, 0755); err != nil {
+			return fmt.Errorf("failed to create restore directory: %w", err)
+		}
+		// Write backup to file
+		err = os.WriteFile(filepath.Join(restoreDir, strconv.Itoa(timestamp)), data, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write backup to file: %w", err)
+		}
 	} else {
 		// local restore
 		data, err = retrieveLocalBackup(ship, timestamp)

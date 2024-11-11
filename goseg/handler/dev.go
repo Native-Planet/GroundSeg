@@ -3,20 +3,35 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"groundseg/backups"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
 
 var isDev = checkDevMode()
+
+var (
+	BackupDir = func() string {
+		mmc, _ := isMountedMMC(config.BasePath)
+		if mmc {
+			return "/media/data/backup"
+		} else {
+			return filepath.Join(config.BasePath, "backup")
+		}
+	}()
+)
 
 func checkDevMode() bool {
 	for _, arg := range os.Args[1:] {
@@ -49,7 +64,12 @@ func DevHandler(msg []byte) error {
 	case "backup-tlon":
 		conf := config.Conf()
 		for _, patp := range conf.Piers {
-			if err := click.BackupTlon(patp); err != nil {
+			shipBackupDir := filepath.Join(BackupDir, patp)
+			if err := os.MkdirAll(shipBackupDir, 0755); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+				continue
+			}
+			if err := backups.CreateBackup(patp, shipBackupDir); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup tlon for %v", err))
 			}
 		}
@@ -148,4 +168,33 @@ func DevHandler(msg []byte) error {
 		return fmt.Errorf("Unknown Dev action: %v", devPayload.Payload.Action)
 	}
 	return nil
+}
+
+func isMountedMMC(dirPath string) (bool, error) {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get list of partitions")
+	}
+	/*
+		the outer loop loops from child up the unix path
+		until a mountpoint is found
+	*/
+OuterLoop:
+	for {
+		for _, p := range partitions {
+			if p.Mountpoint == dirPath {
+				devType := "mmc"
+				if strings.Contains(p.Device, devType) {
+					return true, nil
+				} else {
+					break OuterLoop
+				}
+			}
+		}
+		if dirPath == "/" {
+			break
+		}
+		dirPath = path.Dir(dirPath) // Reduce the path by one level
+	}
+	return false, nil
 }
