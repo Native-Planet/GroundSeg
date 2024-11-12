@@ -1,9 +1,10 @@
 <script>
+  import { onMount } from 'svelte'
+
   // Modal
   import Modal from '$lib/Modal.svelte'
-  import { closeModal } from 'svelte-modals'
 
-  import { startramBackup, localBackup, scheduleLocalBackup } from '$lib/stores/websocket'
+  import { localBackup, scheduleLocalBackup } from '$lib/stores/websocket'
   import { structure } from '$lib/stores/data'
   import BackupClock from './BackupClock.svelte'
 
@@ -13,9 +14,16 @@
   $: backupTime = ($structure?.urbits?.[patp]?.info?.backupTime)
   let newBackupTime = "unset"
 
+  onMount(() => {
+    newBackupTime = backupTime
+  })
+
   const handleClockChange = e => {
     newBackupTime = e.detail
   }
+
+  $: tLocalTlonBackup = ($structure?.urbits?.[patp]?.transition?.localTlonBackup) || ""
+  $: tLocalTlonBackupSchedule = ($structure?.urbits?.[patp]?.transition?.localTlonBackupSchedule) || ""
 </script>
 
 <Modal width={720}>
@@ -26,18 +34,36 @@
         <div class="time-wrapper">
           <div class="micro-title">Time</div>
           <BackupClock on:select={handleClockChange} {patp} />
-          <button
-            disabled={backupTime == newBackupTime}
-            on:click={()=>scheduleLocalBackup(patp,newBackupTime)}
-            >Save Schedule</button>
-        </div>
-      </div>
-      <div class="micro">
-        <div class="now-wrapper">
-          <div class="micro-title">Backup Now</div>
           <div class="button-wrapper">
-            <button on:click={()=>localBackup(patp)}>Local</button>
-            <button on:click={()=>startramBackup(patp)}>Remote</button>
+            {#if tLocalTlonBackupSchedule == ""}
+              <button
+                disabled={backupTime == newBackupTime}
+                on:click={()=>scheduleLocalBackup(patp,newBackupTime)}
+              >
+                Save Schedule
+              </button>
+            {:else if tLocalTlonBackupSchedule == "success"}
+              <button disabled>Schedule Saved!</button>
+            {:else if tLocalTlonBackupSchedule == "loading"}
+              <button disabled>Saving Schedule...</button>
+            {:else}
+              <div style="flex: 1; flex-direction: column;">  
+                <button class="now-btn" disabled>Error Saving Schedule</button>
+                <div class="error-message">{tLocalTlonBackupSchedule}</div>
+              </div>
+            {/if}
+            {#if tLocalTlonBackup == ""}
+              <button class="now-btn" on:click={()=>localBackup(patp)}>Local Backup Now</button>
+            {:else if tLocalTlonBackup == "loading"}
+              <button class="now-btn" disabled>Backup in Progress...</button>
+            {:else if tLocalTlonBackup == "success"}
+              <button class="now-btn" disabled>Backup Completed!</button>
+            {:else}
+              <div style="flex: 1; flex-direction: column;">
+                <button class="now-btn" disabled>Backup Failed</button>
+                <div class="error-message">{tLocalTlonBackup}</div>
+              </div>
+            {/if}
           </div>
         </div>
       </div>
@@ -205,10 +231,6 @@
   }
   .button-wrapper > button {
     flex: 1;
-    background: black;
-  }
-  .spacer {
-    flex: 1;
   }
   button {
     display: inline-flex;
@@ -237,5 +259,13 @@
   }
   .stop {
     background: var(--btn-secondary);
+  }
+  .now-btn {
+    background: black;
+  }
+  .error-message {
+    font-family: var(--regular-font);
+    color: red;
+    text-align: center;
   }
 </style>

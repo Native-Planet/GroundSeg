@@ -201,6 +201,9 @@ type UrbitTransitionBroadcast struct {
 	StartramServices          string `json:"startramServices"`
 	LocalTlonBackupsEnabled   string `json:"localTlonBackupsEnabled"`
 	RemoteTlonBackupsEnabled  string `json:"remoteTlonBackupsEnabled"`
+	LocalTlonBackup           string `json:"localTlonBackup"`
+	LocalTlonBackupSchedule   string `json:"localTlonBackupSchedule"`
+	HandleRestoreTlonBackup   string `json:"handleRestoreTlonBackup"`
 }
 
 // used to construct broadcast pier info subobject

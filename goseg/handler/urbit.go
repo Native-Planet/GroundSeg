@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"groundseg/backups"
 	"groundseg/broadcast"
 	"groundseg/click"
 	"groundseg/config"
@@ -12,6 +13,7 @@ import (
 	"groundseg/structs"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -96,16 +98,14 @@ func UrbitHandler(msg []byte) error {
 		return handleLocalToggleBackup(patp, shipConf)
 	case "toggle-startram-backup":
 		return handleStartramToggleBackup(patp, shipConf)
-	case "startram-backup":
-		return handleStartramBackup(patp, urbitPayload, shipConf)
 	case "local-backup":
-		return handleLocalBackup(patp, shipConf)
+		return handleLocalBackup(patp)
 	case "schedule-local-backup":
 		return handleScheduleLocalBackup(patp, urbitPayload, shipConf)
 	case "restore-tlon-backup":
 		return handleRestoreTlonBackup(patp, urbitPayload, shipConf)
 	default:
-		return fmt.Errorf("Unrecognized urbit action: %v", urbitPayload.Payload.Action)
+		return fmt.Errorf("unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
 }
 
@@ -1230,24 +1230,63 @@ func handleStartramToggleBackup(patp string, shipConf structs.UrbitDocker) error
 	return nil
 }
 
-func handleStartramBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
-	zap.L().Info("startram backup requested (placeholder)")
-	return nil
-}
-func handleLocalBackup(patp string, shipConf structs.UrbitDocker) error {
-	zap.L().Info("Local backup requested (placeholder)")
+func handleLocalBackup(patp string) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: "loading"}
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: ""}
+	}()
+	shipBackupDir := filepath.Join(BackupDir, patp)
+	if err := os.MkdirAll(shipBackupDir, 0755); err != nil {
+		text := fmt.Sprintf("failed to create backup directory for %v: %v", patp, err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
+		return fmt.Errorf(text)
+	}
+	if err := backups.CreateBackup(patp, shipBackupDir); err != nil {
+		text := fmt.Sprintf("failed to backup tlon for %v: %v", patp, err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
+		return fmt.Errorf(text)
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: "success"}
 	return nil
 }
 
 func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
-	zap.L().Info("Local backup scheduled (placeholder)")
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: "loading"}
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: ""}
+	}()
+	backupTime := urbitPayload.Payload.BackupTime
+	update := make(map[string]structs.UrbitDocker)
+	if len(backupTime) != 4 {
+		text := "invalid time format"
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: text}
+		return fmt.Errorf(text)
+	}
+	shipConf.BackupTime = backupTime
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		text := fmt.Sprintf("couldn't update urbit config: %v", err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: text}
+		return fmt.Errorf(text)
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: "success"}
 	return nil
 }
 
 func handleRestoreTlonBackup(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: "loading"}
+	defer func() {
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: ""}
+	}()
 	remote := urbitPayload.Payload.Remote
 	if err := startram.RestoreBackup(patp, remote, urbitPayload.Payload.Timestamp, urbitPayload.Payload.MD5, false); err != nil {
-		return fmt.Errorf("failed to restore backup for %s: %v", patp, err)
+		text := fmt.Sprintf("failed to restore backup for %s: %v", patp, err)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: text}
+		return fmt.Errorf(text)
 	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: "success"}
 	return nil
 }

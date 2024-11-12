@@ -69,6 +69,12 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.LocalTlonBackupsEnabled = event.Event
 			case "remoteTlonBackupsEnabled":
 				urbitStruct.Transition.RemoteTlonBackupsEnabled = event.Event
+			case "localTlonBackup":
+				urbitStruct.Transition.LocalTlonBackup = event.Event
+			case "localTlonBackupSchedule":
+				urbitStruct.Transition.LocalTlonBackupSchedule = event.Event
+			case "handleRestoreTlonBackup":
+				urbitStruct.Transition.HandleRestoreTlonBackup = event.Event
 			default:
 				zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 				continue

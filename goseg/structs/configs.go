@@ -263,8 +263,6 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			} else {
 				u.LocalTlonBackup = v.(bool)
 			}
-		case "backup_next":
-			u.BackupTime, _ = v.(string)
 		case "backup_time":
 			u.BackupTime, _ = v.(string)
 		}

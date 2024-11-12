@@ -321,6 +321,7 @@ type WsUrbitAction struct {
 	Remote       bool   `json:"remote"`
 	Timestamp    int    `json:"timestamp"`
 	MD5          string `json:"md5"`
+	BackupTime   string `json:"backupTime"`
 }
 
 type WsDevAction struct {
