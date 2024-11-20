@@ -30,6 +30,11 @@
     }
   }
 
+  const toggleRemote = () => {
+    remote = !remote
+    isSure = undefined
+  }
+
 </script>
 
 <Modal>
@@ -38,9 +43,10 @@
     <div class="text">Saved Backups</div>
     <div class="nav-wrapper">
       <div class="nav-indicator" class:left={remote} class:right={!remote}></div>
-      <button class="nav-item" class:active={remote} on:click={()=>remote = true}>Remote</button>
-      <button class="nav-item" class:active={!remote} on:click={()=>remote = false}>Local</button>
+      <button class="nav-item" class:active={remote} on:click={toggleRemote}>Remote</button>
+      <button class="nav-item" class:active={!remote} on:click={toggleRemote}>Local</button>
     </div>
+    <div class="backups-wrapper">
     {#if remote}
       {#each remoteTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
         <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreRemoteBackup(backup)}/>
@@ -50,6 +56,7 @@
         <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreLocalBackup(backup)}/>
       {/each}
     {/if}
+    </div>
   </div>
   {/if}
 </Modal>
@@ -72,16 +79,14 @@
     align-items: center;
     gap: 16px;
   }
-  .sub {
-    line-height: 32px;
-    font-size: 20px;
-    font-weight: 500;
-    margin-top: 32px;
-    color: var(--text-color);
+  .backups-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
   button {
     display: inline-flex;
-    padding: 24px 48px;
+    padding: 16px 48px;
     justify-content: center;
     align-items: center;
     gap: 8px;
@@ -109,6 +114,7 @@
     background: var(--bg-base);
     border-radius: 16px;
     position: relative;
+    margin-bottom: 32px;
   }
   .nav-item {
     background: transparent;

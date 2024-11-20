@@ -98,7 +98,6 @@
 }
 .btn {
 color: #161D17;
-text-align: right;
 font-family: Inter;
 font-size: 24px;
 font-style: normal;
@@ -107,12 +106,14 @@ line-height: 24px; /* 100% */
 height: 64px;
 letter-spacing: -1.44px;
 padding: 16px;
+text-align: center;
 display: flex;
 align-items: center;
 gap: 8px;
 border-radius: 12px;
-background: var(--NP_White, #F8F8F6);
+background: var(--btn-secondary);
 cursor: pointer;
+color: white;
 }
 .btn:disabled {
 opacity: .6;
