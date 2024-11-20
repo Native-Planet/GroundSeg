@@ -60,8 +60,6 @@
   $: authLevel = ($structure?.auth_level) || "unauthorized"
   $: localTlonBackupsEnabled = (ship?.localTlonBackupsEnabled) || false
   $: remoteTlonBackupsEnabled = (ship?.remoteTlonBackupsEnabled) || false
-  $: remoteTlonBackups = (ship?.remoteTlonBackups) || []
-  $: localTlonBackups = (ship?.localTlonBackups) || []
 
   // transitions
   $: tShip = ($structure?.urbits?.[patp]?.transition) || {}
@@ -184,8 +182,6 @@
 
   <RestoreTlon
     {patp}
-    {remoteTlonBackups}
-    {localTlonBackups}
   />
 
 

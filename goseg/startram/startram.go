@@ -697,23 +697,23 @@ func writeBackupToVolume(ship string, data []byte) error {
 		}
 	}
 
-	// Always write egg-any.hoon file
-	eggAnyPath := filepath.Join(marDir, "egg-any.hoon")
-	eggAnyContent := `|_  =egg-any:gall
-++  grad  %noun
-++  grow
-  |%
-  ++  noun  egg-any
-  --
-++  grab
-  |%
-  ++  noun  egg-any:gall
-  --
---`
-	err = os.WriteFile(eggAnyPath, []byte(eggAnyContent), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create egg-any.hoon: %w", err)
-	}
+	// 	// Always write egg-any.hoon file
+	// 	eggAnyPath := filepath.Join(marDir, "egg-any.hoon")
+	// 	eggAnyContent := `|_  =egg-any:gall
+	// ++  grad  %noun
+	// ++  grow
+	//   |%
+	//   ++  noun  egg-any
+	//   --
+	// ++  grab
+	//   |%
+	//   ++  noun  egg-any:gall
+	//   --
+	// --`
+	// 	err = os.WriteFile(eggAnyPath, []byte(eggAnyContent), 0644)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to create egg-any.hoon: %w", err)
+	// 	}
 
 	// Create backup directory if it doesn't exist
 	if _, err := os.Stat(bakDir); os.IsNotExist(err) {

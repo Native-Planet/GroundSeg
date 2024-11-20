@@ -1,40 +1,19 @@
 <script>
   // import ToggleButton from '$lib/ToggleButton.svelte'
-  // import { openModal } from 'svelte-modals'
   // import FinalModal from './FinalModal.svelte';
   // import UnplugWarning from './UnplugWarning.svelte'
   // Style
   import "../theme.css"
+  import { openModal } from 'svelte-modals'
   import { restoreTlonBackup } from '$lib/stores/websocket'
-  import { structure } from '$lib/stores/data'
 
-  import BackupItem from './RestoreTlon/BackupItem.svelte'
+  import BackupsModal from './BackupsModal.svelte'
 
   export let patp
-  export let remoteTlonBackups
-  export let localTlonBackups
   import { URBIT_MODE } from '$lib/stores/data'
 
-  let showBackups = false
-  
-  let isSure = undefined
-
-  $: tHandleRestoreTlonBackup = ($structure?.urbits?.[patp]?.transition?.handleRestoreTlonBackup) || ""
-
-  const restoreLocalBackup = (backup) => {
-    if (isSure === backup.timestamp) {
-      restoreTlonBackup(patp, false, backup.timestamp, backup.md5)
-    } else {
-      isSure = backup.timestamp
-    }
-  }
-
-  const restoreRemoteBackup = (backup) => {
-    if (isSure === backup.timestamp) {
-      restoreTlonBackup(patp, true, backup.timestamp, backup.md5)
-    } else {
-      isSure = backup.timestamp
-    }
+  const openBackupsModal = () => {
+    openModal(BackupsModal, { isOpen: true, patp })
   }
 </script>
 
@@ -47,29 +26,12 @@
     <div class="wrapper">
       <button
         class="btn domain-btn"
-        class:active={showBackups}
-        on:click={()=>showBackups = !showBackups}>
-        {showBackups ? "Hide" : "Show"} Backups
+        on:click={openBackupsModal}>
+        Show Backups
       </button>
     </div>
   </div>
 </div>
-{#if showBackups}
-<div class="backups-wrapper">
-  <div class="backups-section">
-    <div class="backups-title">Remote Backups</div>
-    {#each remoteTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-      <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreRemoteBackup(backup)}/>
-    {/each}
-  </div>
-  <div class="backups-section">
-    <div class="backups-title">Local Backups</div>
-    {#each localTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-      <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreLocalBackup(backup)}/>
-    {/each}
-  </div>
-</div>
-{/if}
 {/if}
 
 <style>
