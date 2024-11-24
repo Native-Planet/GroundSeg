@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateBackup(patp, shipBackupDir string) error {
+func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly string) error {
 	err := click.BackupTlon(patp)
 	if err != nil {
 		return fmt.Errorf("routine failed to backup tlon: %w", err)
@@ -96,15 +96,29 @@ func CreateBackup(patp, shipBackupDir string) error {
 
 	// Generate filename with current Unix timestamp
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-	filename := filepath.Join(shipBackupDir, timestamp) // tar.zst
+	filenameDaily := filepath.Join(shipBackupDirDaily, timestamp)     // tar.zst
+	filenameWeekly := filepath.Join(shipBackupDirWeekly, timestamp)   // tar.zst
+	filenameMonthly := filepath.Join(shipBackupDirMonthly, timestamp) // tar.zst
 
 	// Write compressed data to file
-	if err := os.WriteFile(filename, compressedData, 0644); err != nil {
+	if err := os.WriteFile(filenameDaily, compressedData, 0644); err != nil {
 		return fmt.Errorf("failed to write compressed backup: %w", err)
+	}
+	// if timestamp falls on sunday, also write to weekly
+	if time.Now().Weekday() == time.Sunday {
+		if err := os.WriteFile(filenameWeekly, compressedData, 0644); err != nil {
+			return fmt.Errorf("failed to write compressed backup: %w", err)
+		}
+	}
+	// if timestamp falls on first day of month, also write to monthly
+	if time.Now().Day() == 1 {
+		if err := os.WriteFile(filenameMonthly, compressedData, 0644); err != nil {
+			return fmt.Errorf("failed to write compressed backup: %w", err)
+		}
 	}
 
 	// Remove old backups, keeping only the most recent 3
-	files, err := os.ReadDir(shipBackupDir)
+	files, err := os.ReadDir(shipBackupDirDaily)
 	if err != nil {
 		return fmt.Errorf("failed to read backup directory: %w", err)
 	}
@@ -116,7 +130,7 @@ func CreateBackup(patp, shipBackupDir string) error {
 
 	// Keep the first 3 files (most recent) and remove the rest
 	for i := 3; i < len(files); i++ {
-		oldBackup := filepath.Join(shipBackupDir, files[i].Name())
+		oldBackup := filepath.Join(shipBackupDirDaily, files[i].Name())
 		if err := os.Remove(oldBackup); err != nil {
 			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
 		}

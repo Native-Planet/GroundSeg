@@ -98,7 +98,18 @@ func TlonBackupLocal() {
 			// retrieve config
 			shipConf := config.UrbitConf(patp)
 			shipBackupDir := filepath.Join(BackupDir, patp)
-			if err := os.MkdirAll(shipBackupDir, 0755); err != nil {
+			shipBackupDirDaily := filepath.Join(shipBackupDir, "daily")
+			shipBackupDirWeekly := filepath.Join(shipBackupDir, "weekly")
+			shipBackupDirMonthly := filepath.Join(shipBackupDir, "monthly")
+			if err := os.MkdirAll(shipBackupDirDaily, 0755); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+				continue
+			}
+			if err := os.MkdirAll(shipBackupDirWeekly, 0755); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+				continue
+			}
+			if err := os.MkdirAll(shipBackupDirMonthly, 0755); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
 				continue
 			}
@@ -108,7 +119,7 @@ func TlonBackupLocal() {
 				backupTime = parsedTime
 			}
 			// List all files in shipBackupDir that are unix timestamps
-			files, err := filepath.Glob(filepath.Join(shipBackupDir, "[0-9]*"))
+			files, err := filepath.Glob(filepath.Join(shipBackupDirDaily, "[0-9]*"))
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to list backup files for %v: %v", patp, err))
 				continue
@@ -148,8 +159,8 @@ func TlonBackupLocal() {
 				(now.Hour() > backupTime.Hour() || // Current hour is later than backup hour
 					(now.Hour() == backupTime.Hour() && now.Minute() >= backupTime.Minute())) { // Current hour is equal and minute is equal or later
 
-				// Create backup (placeholder function)
-				err := backups.CreateBackup(patp, shipBackupDir)
+				// Create backup
+				err := backups.CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly)
 				if err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to create backup for %v: %v", patp, err))
 				} else {
