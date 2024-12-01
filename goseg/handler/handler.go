@@ -6,6 +6,7 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
+	"groundseg/docker"
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"groundseg/system"
@@ -41,6 +42,21 @@ func NewShipHandler(msg []byte) error {
 		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
 	}
 	switch shipPayload.Payload.Action {
+	case "get-keyfile":
+		if shipPayload.Data != nil && shipPayload.Data.(string) != "" {
+			patp := sigRemove(shipPayload.Payload.Patp)
+			isValid := checkPatp(patp)
+			if !isValid {
+				return fmt.Errorf("Invalid @p provided: %v", patp)
+			}
+			keyfile, err := generateKeyfile(patp, shipPayload.Data.(string))
+			if err != nil {
+				return err
+			}
+			docker.NewShipTransBus <- structs.NewShipTransition{Type: "get-keyfile", Event: keyfile}
+		} else {
+			return fmt.Errorf("no master ticket provided")
+		}
 	case "boot":
 		// handle filesystem
 		sel := shipPayload.Payload.SelectedDrive //string
@@ -95,16 +111,36 @@ func NewShipHandler(msg []byte) error {
 		}
 		deleteMsg, err := json.Marshal(deletePayload)
 		if err != nil {
-			return fmt.Errorf("Failed to marshall payload for newly create %v for deletion: %v: %+v", err, deletePayload)
+			return fmt.Errorf("failed to marshall payload for newly create %v for deletion: %v: %+v", patp, err, deletePayload)
 		}
 		if err := UrbitHandler(deleteMsg); err != nil {
-			return fmt.Errorf("Failed to delete newly created %v: %v", patp, err)
+			return fmt.Errorf("failed to delete newly created %v: %v", patp, err)
 		}
 		if err := resetNewShip(); err != nil {
 			return err
 		}
+	// retrieve point info from roller (to determine dominion)
+	case "point-info":
+		patp := shipPayload.Payload.Patp
+		if err != nil {
+			return fmt.Errorf("error retrieving point info: %v", err)
+		}
+		pointPayload := structs.WsUrbitPayload{
+			Payload: structs.WsUrbitAction{
+				Type:   "urbit",
+				Action: "point-info",
+				Patp:   patp,
+			},
+		}
+		pointInfo, err := json.Marshal(pointPayload)
+		if err != nil {
+			return fmt.Errorf("error retrieving point info: %v", err)
+		}
+		if err := UrbitHandler(pointInfo); err != nil {
+			return fmt.Errorf("failed to delete newly created %v: %v", patp, err)
+		}
 	default:
-		return fmt.Errorf("Unknown NewShip action: %v", shipPayload.Payload.Action)
+		return fmt.Errorf("unknown NewShip action: %v", shipPayload.Payload.Action)
 	}
 	return nil
 }

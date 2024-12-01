@@ -3,6 +3,7 @@ package config
 // code for managing groundseg and container configurations
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -26,6 +27,7 @@ import (
 )
 
 var (
+	Ctx = context.Background()
 	// global settings config (accessed via funcs)
 	globalConfig structs.SysConfig
 	// base path for installation (override default with env var)
@@ -237,32 +239,52 @@ func UpdateConf(values map[string]interface{}) error {
 	return nil
 }
 
+// now with less config wiping!
 func persistConf(configMap map[string]interface{}) error {
 	BasePath = getBasePath()
-	// marshal and persist it
+	confPath := filepath.Join(BasePath, "settings", "system.json")
+	// marshal and persist it to temp file
 	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
-		return fmt.Errorf("Error encoding JSON: %v", err)
+		return fmt.Errorf("error encoding JSON: %v", err)
 	}
 	// update the globalConfig var
 	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
-		return fmt.Errorf("Error updating global config: %v", err)
+		return fmt.Errorf("error updating global config: %v", err)
 	}
-	// write to disk
-	if err := ioutil.WriteFile(confPath, updatedJSON, 0644); err != nil {
-		return fmt.Errorf("Error writing to file: %v", err)
-	}
-	confPath := filepath.Join(BasePath, "settings", "system.json")
-	file, err := os.Open(confPath)
+	// create temp file
+	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't open system.json: %v", err))
-	} else {
-		decoder := json.NewDecoder(file)
-		// confMutex.Lock()
-		// defer confMutex.Unlock()
-		if err = decoder.Decode(&globalConfig); err != nil {
-			zap.L().Error(fmt.Sprintf("Error decoding JSON: %v", err))
-		}
+		return fmt.Errorf("error creating temp file: %v", err)
+	}
+	tmpName := tmpFile.Name()
+	// exit if error
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpName)
+	}()
+	// write to temp
+	if _, err := tmpFile.Write(updatedJSON); err != nil {
+		return fmt.Errorf("error writing to temp file: %v", err)
+	}
+	// sync the file
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("error syncing temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("error closing temp file: %v", err)
+	}
+	// make sure it's non-zero length
+	fi, err := os.Stat(tmpName)
+	if err != nil {
+		return fmt.Errorf("error checking temp file size: %v", err)
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("resulting file would be empty")
+	}
+	// persist
+	if err := os.Rename(tmpName, confPath); err != nil {
+		return fmt.Errorf("error moving temp file to final location: %v", err)
 	}
 	return nil
 }

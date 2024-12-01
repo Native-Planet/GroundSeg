@@ -36,6 +36,8 @@ type NewShip struct {
 	Transition struct {
 		BootStage string `json:"bootStage"`
 		Patp      string `json:"patp"`
+		PointInfo *Point `json:"pointInfo,omitempty"`
+		Keyfile   string `json:"keyfile,omitempty"`
 		Error     string `json:"error"`
 	} `json:"transition"`
 }
@@ -169,6 +171,7 @@ type Urbit struct {
 		LocalTlonBackupsEnabled  bool           `json:"localTlonBackupsEnabled"`
 		RemoteTlonBackupsEnabled bool           `json:"remoteTlonBackupsEnabled"`
 		BackupTime               string         `json:"backupTime"`
+		PointInfo                *Point         `json:"pointInfo,omitempty"`
 		RemoteTlonBackups        []BackupObject `json:"remoteTlonBackups"`
 		LocalTlonBackups         []BackupObject `json:"localTlonBackups"`
 	} `json:"info"`

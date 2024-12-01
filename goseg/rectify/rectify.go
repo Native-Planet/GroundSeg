@@ -5,10 +5,12 @@ package rectify
 // and anything else that needs to be done asyncronously
 
 import (
+	"context"
 	"fmt"
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/roller"
 	"groundseg/startram"
 	"groundseg/structs"
 	"strings"
@@ -112,6 +114,26 @@ func NewShipTransitionHandler() {
 			current.NewShip.Transition.Patp = event.Event
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
+		case "pointInfo":
+			// type: pointInfo, event: <patp>
+			current := broadcast.GetState()
+			ctx := context.Background()
+			pointInfo, err := roller.Client.GetPoint(ctx, event.Event)
+			if err != nil {
+				zap.L().Error(fmt.Sprintf("Error retrieving point info: %v", err))
+				continue
+			}
+			if pointInfo == nil {
+				zap.L().Error("nil point info")
+				continue
+			}
+			current.NewShip.Transition.PointInfo = pointInfo
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
+		case "cleanup":
+			current := broadcast.GetState()
+			current.NewShip = structs.NewShip{}
+			broadcast.UpdateBroadcast(current)
 		default:
 			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
