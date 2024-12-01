@@ -2,17 +2,21 @@ package handler
 
 import (
 	"fmt"
+	"groundseg/aura"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/roller"
 	"groundseg/shipcreator"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"groundseg/wallet"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -222,6 +226,11 @@ func waitForShipReady(shipPayload structs.WsNewShipPayload, customDrive string) 
 		if conf.PenpaiAllow {
 			docker.StartContainer("llama-gpt-api", "llama-api")
 		}
+		// clean up the new ship object in the broadcast once we're done
+		go func() {
+			time.Sleep(10 * time.Second)
+			docker.NewShipTransBus <- structs.NewShipTransition{Type: "cleanup", Event: ""}
+		}()
 		return
 	}
 }
@@ -286,4 +295,24 @@ func newShipRegisterService(patp string) {
 	if err := startram.RegisterNewShip(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
 	}
+}
+
+func generateKeyfile(patp, ticket string) (string, error) {
+	point, err := roller.Client.GetPoint(config.Ctx, patp)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving point info: %v", err)
+	}
+	life, err := strconv.Atoi(point.Network.Keys.Life)
+	if err != nil {
+		return "", fmt.Errorf("error casting azimuth life: %v", err)
+	}
+	wallet, err := wallet.Wallet(patp, ticket, life)
+	if err != nil {
+		return "", fmt.Errorf("error generating wallet: %v", err)
+	}
+	if wallet.Network.Keys.Crypt.Public != point.Network.Keys.Crypt {
+		return "", fmt.Errorf("could not generate matching keyfile")
+	}
+	uw := aura.Cord2Uw(wallet.Network.Keys.Crypt.Private)
+	return uw, nil
 }

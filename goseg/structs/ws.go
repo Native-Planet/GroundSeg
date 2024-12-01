@@ -338,6 +338,7 @@ type WsNewShipPayload struct {
 	Type    string          `json:"type"`
 	Payload WsNewShipAction `json:"payload"`
 	Token   WsTokenStruct   `json:"token"`
+	Data    interface{}     `json:"data"`
 }
 
 type WsNewShipAction struct {
@@ -345,6 +346,7 @@ type WsNewShipAction struct {
 	Action        string `json:"action"`
 	Patp          string `json:"patp"`
 	Key           string `json:"key"`
+	Ticket        string `json:"ticket"`
 	Remote        bool   `json:"remote"`
 	Command       string `json:"command"`
 	SelectedDrive string `json:"selectedDrive"`

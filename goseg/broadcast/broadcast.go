@@ -36,6 +36,7 @@ var (
 	SysTransMu        sync.RWMutex
 	mu                sync.RWMutex // synchronize access to broadcastState
 	BackupDir         = setBackupDir()
+	PointInfo         = make(map[string]structs.Point)
 )
 
 func init() {
@@ -370,6 +371,11 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if localMonthlyBak, exists := localMonthlyBackups[pier]; exists {
 			urbit.Info.LocalMonthlyTlonBackups = localMonthlyBak
 		}
+		// if it has azimuth info, throw it in
+		_, ok := config.AzimuthPoints[pier]
+		if ok {
+			urbit.Info.PointInfo = config.AzimuthPoints[pier]
+		}
 		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()
 		urbit.Transition = UrbitTransitions[pier]
@@ -646,4 +652,16 @@ OuterLoop:
 		dirPath = path.Dir(dirPath) // Reduce the path by one level
 	}
 	return false, nil
+}
+
+// cant have more than one hyphen in @p and be on azimuth (black guy pointing at his head and smirking)
+func aziPatps(ships []string) []string {
+	filtered := make([]string, 0, len(ships))
+	for _, str := range ships {
+		count := strings.Count(str, "-")
+		if count <= 1 {
+			filtered = append(filtered, str)
+		}
+	}
+	return filtered
 }
