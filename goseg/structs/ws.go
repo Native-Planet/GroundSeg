@@ -322,6 +322,7 @@ type WsUrbitAction struct {
 	Timestamp    int    `json:"timestamp"`
 	MD5          string `json:"md5"`
 	BackupTime   string `json:"backupTime"`
+	BakType      string `json:"bakType"`
 }
 
 type WsDevAction struct {

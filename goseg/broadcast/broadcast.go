@@ -154,7 +154,9 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			remoteBackupMap[ship] = backupInfo
 		}
 	}
-	localBackups := make(structs.Backup)
+	localDailyBackups := make(structs.Backup)
+	localWeeklyBackups := make(structs.Backup)
+	localMonthlyBackups := make(structs.Backup)
 	// get local backups
 	// BackupDir has been set in init
 	// inside BackupDir there is a folder for each ship
@@ -162,18 +164,40 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// backupInfo is a struct with a timestamp and md5
 	// we want to get all the backups for a given ship and add them to localBackups
 	for _, ship := range piers {
-		shipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "*"))
+		dailyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "daily", "*"))
 		if err != nil {
 			continue
 		}
-		for _, backup := range shipBackups {
+		weeklyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "weekly", "*"))
+		if err != nil {
+			continue
+		}
+		monthlyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "monthly", "*"))
+		if err != nil {
+			continue
+		}
+		for _, backup := range dailyShipBackups {
 			// each backup is a path with the filename being the unix timestamp
 			// strip off the dir and filename to get the timestamp
 			timestamp, err := strconv.Atoi(filepath.Base(backup))
 			if err != nil {
 				continue
 			}
-			localBackups[ship] = append(localBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
+			localDailyBackups[ship] = append(localDailyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
+		}
+		for _, backup := range weeklyShipBackups {
+			timestamp, err := strconv.Atoi(filepath.Base(backup))
+			if err != nil {
+				continue
+			}
+			localWeeklyBackups[ship] = append(localWeeklyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
+		}
+		for _, backup := range monthlyShipBackups {
+			timestamp, err := strconv.Atoi(filepath.Base(backup))
+			if err != nil {
+				continue
+			}
+			localMonthlyBackups[ship] = append(localMonthlyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
 		}
 	}
 
@@ -337,8 +361,14 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		if remoteBak, exists := remoteBackupMap[pier]; exists {
 			urbit.Info.RemoteTlonBackups = remoteBak
 		}
-		if localBak, exists := localBackups[pier]; exists {
-			urbit.Info.LocalTlonBackups = localBak
+		if localDailyBak, exists := localDailyBackups[pier]; exists {
+			urbit.Info.LocalDailyTlonBackups = localDailyBak
+		}
+		if localWeeklyBak, exists := localWeeklyBackups[pier]; exists {
+			urbit.Info.LocalWeeklyTlonBackups = localWeeklyBak
+		}
+		if localMonthlyBak, exists := localMonthlyBackups[pier]; exists {
+			urbit.Info.LocalMonthlyTlonBackups = localMonthlyBak
 		}
 		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()

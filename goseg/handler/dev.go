@@ -64,12 +64,22 @@ func DevHandler(msg []byte) error {
 	case "backup-tlon":
 		conf := config.Conf()
 		for _, patp := range conf.Piers {
-			shipBackupDir := filepath.Join(BackupDir, patp)
-			if err := os.MkdirAll(shipBackupDir, 0755); err != nil {
+			shipBackupDirDaily := filepath.Join(BackupDir, patp, "daily")
+			shipBackupDirWeekly := filepath.Join(BackupDir, patp, "weekly")
+			shipBackupDirMonthly := filepath.Join(BackupDir, patp, "monthly")
+			if err := os.MkdirAll(shipBackupDirDaily, 0755); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
 				continue
 			}
-			if err := backups.CreateBackup(patp, shipBackupDir); err != nil {
+			if err := os.MkdirAll(shipBackupDirWeekly, 0755); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+				continue
+			}
+			if err := os.MkdirAll(shipBackupDirMonthly, 0755); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to create backup directory for %v: %v", patp, err))
+				continue
+			}
+			if err := backups.CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to backup tlon for %v", err))
 			}
 		}
@@ -109,7 +119,7 @@ func DevHandler(msg []byte) error {
 		if !remote {
 			zap.L().Debug(fmt.Sprintf("Skipping local restore for %s for now....", patp))
 		} else {
-			if err := startram.RestoreBackup(patp, remote, 0, "", true); err != nil {
+			if err := startram.RestoreBackup(patp, remote, 0, "", true, "remote"); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to restore backup for %s: %v", patp, err))
 			}
 		}

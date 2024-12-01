@@ -136,5 +136,43 @@ func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMo
 		}
 	}
 
+	// Remove old backups, keeping only the most recent 3
+	files, err = os.ReadDir(shipBackupDirWeekly)
+	if err != nil {
+		return fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	// Sort files by name (timestamp) in descending order
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() > files[j].Name()
+	})
+
+	// Keep the first 3 files (most recent) and remove the rest
+	for i := 3; i < len(files); i++ {
+		oldBackup := filepath.Join(shipBackupDirWeekly, files[i].Name())
+		if err := os.Remove(oldBackup); err != nil {
+			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
+		}
+	}
+
+	// Remove old backups, keeping only the most recent 3
+	files, err = os.ReadDir(shipBackupDirMonthly)
+	if err != nil {
+		return fmt.Errorf("failed to read backup directory: %w", err)
+	}
+
+	// Sort files by name (timestamp) in descending order
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() > files[j].Name()
+	})
+
+	// Keep the first 3 files (most recent) and remove the rest
+	for i := 3; i < len(files); i++ {
+		oldBackup := filepath.Join(shipBackupDirMonthly, files[i].Name())
+		if err := os.Remove(oldBackup); err != nil {
+			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
+		}
+	}
+
 	return nil
 }

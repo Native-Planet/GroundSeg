@@ -4,11 +4,12 @@
 
   export let backup;
   export let isSure;
+  export let bakType;
   export let tHandleRestoreTlonBackup = ""
   const dispatch = createEventDispatcher();
 
 </script>
-    {#if isSure === backup.timestamp}
+    {#if isSure.timestamp === backup.timestamp && isSure.bakType === bakType}
       <div class="backup-selected-wrapper">
         <div class="backup-selected">{new Date(backup.timestamp * 1000).toLocaleString('en-US', {
           day: 'numeric',
@@ -34,7 +35,7 @@
         </div>
       </div>
     {:else}
-      <button disabled={isSure !== undefined} class="btn backup-item" on:click={() => dispatch('restore')}>
+      <button disabled={isSure.timestamp !== null} class="btn backup-item" on:click={() => dispatch('restore')}>
         {new Date(backup.timestamp * 1000).toLocaleString('en-US', {
           day: 'numeric',
           month: 'long',

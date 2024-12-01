@@ -1,5 +1,6 @@
 <script>
   import { structure } from '$lib/stores/data'
+  import { restoreTlonBackup } from '$lib/stores/websocket'
   import BackupItem from './RestoreTlon/BackupItem.svelte'
   import Modal from '$lib/Modal.svelte'
   export let isOpen
@@ -7,32 +8,38 @@
 
   let remote = true
 
-  let isSure = undefined
+  let isSure = {bakType: null, timestamp: null}
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}
   $: remoteTlonBackups = (ship?.remoteTlonBackups) || []
-  $: localTlonBackups = (ship?.localTlonBackups) || []
+  $: localDailyTlonBackups = (ship?.localDailyTlonBackups) || []
+  $: localWeeklyTlonBackups = (ship?.localWeeklyTlonBackups) || []
+  $: localMonthlyTlonBackups = (ship?.localMonthlyTlonBackups) || []
   $: tHandleRestoreTlonBackup = ($structure?.urbits?.[patp]?.transition?.handleRestoreTlonBackup) || ""
 
-  const restoreLocalBackup = (backup) => {
-    if (isSure === backup.timestamp) {
-      restoreTlonBackup(patp, false, backup.timestamp, backup.md5)
+  const resetIsSure = () => {
+    isSure = {bakType: null, timestamp: null}
+  }
+
+  const restoreLocalBackup = (backup, bakType) => {
+    if (isSure.timestamp === backup.timestamp && isSure.bakType === bakType) {
+      restoreTlonBackup(patp, false, backup.timestamp, backup.md5, bakType)
     } else {
-      isSure = backup.timestamp
+      isSure = {bakType: bakType, timestamp: backup.timestamp}
     }
   }
 
   const restoreRemoteBackup = (backup) => {
-    if (isSure === backup.timestamp) {
-      restoreTlonBackup(patp, true, backup.timestamp, backup.md5)
+    if (isSure.timestamp === backup.timestamp) {
+      restoreTlonBackup(patp, true, backup.timestamp, backup.md5, "remote")
     } else {
-      isSure = backup.timestamp
+      isSure = {bakType: "remote", timestamp: backup.timestamp}
     }
   }
 
   const toggleRemote = () => {
     remote = !remote
-    isSure = undefined
+    isSure = {bakType: null, timestamp: null}
   }
 
 </script>
@@ -49,11 +56,20 @@
     <div class="backups-wrapper">
     {#if remote}
       {#each remoteTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-        <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreRemoteBackup(backup)}/>
+        <BackupItem bakType="remote" {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={resetIsSure} on:restore={()=>restoreRemoteBackup(backup)}/>
       {/each}
     {:else}
-      {#each localTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
-        <BackupItem {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={()=>isSure = undefined} on:restore={()=>restoreLocalBackup(backup)}/>
+      <div>Daily</div>
+      {#each localDailyTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
+        <BackupItem bakType="daily" {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={resetIsSure} on:restore={()=>restoreLocalBackup(backup, "daily")}/>
+      {/each}
+      <div>Weekly</div>
+      {#each localWeeklyTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
+        <BackupItem bakType="weekly" {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={resetIsSure} on:restore={()=>restoreLocalBackup(backup, "weekly")}/>
+      {/each}
+      <div>Monthly</div>
+      {#each localMonthlyTlonBackups.slice().sort((a, b) => b.timestamp - a.timestamp) as backup}
+        <BackupItem bakType="monthly" {backup} {isSure} {tHandleRestoreTlonBackup} on:cancel={resetIsSure} on:restore={()=>restoreLocalBackup(backup, "monthly")}/>
       {/each}
     {/if}
     </div>

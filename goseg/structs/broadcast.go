@@ -170,7 +170,9 @@ type Urbit struct {
 		RemoteTlonBackupsEnabled bool           `json:"remoteTlonBackupsEnabled"`
 		BackupTime               string         `json:"backupTime"`
 		RemoteTlonBackups        []BackupObject `json:"remoteTlonBackups"`
-		LocalTlonBackups         []BackupObject `json:"localTlonBackups"`
+		LocalDailyTlonBackups    []BackupObject `json:"localDailyTlonBackups"`
+		LocalWeeklyTlonBackups   []BackupObject `json:"localWeeklyTlonBackups"`
+		LocalMonthlyTlonBackups  []BackupObject `json:"localMonthlyTlonBackups"`
 	} `json:"info"`
 	Transition UrbitTransitionBroadcast `json:"transition"`
 }

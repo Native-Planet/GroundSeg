@@ -602,14 +602,14 @@ func decryptFile(file []byte, keyString string) ([]byte, error) {
 }
 
 // prod version
-func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool) error {
+func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) error {
 	if dev {
 		return restoreBackupDev(ship)
 	}
-	return restoreBackupProd(ship, remote, timestamp, md5hash)
+	return restoreBackupProd(ship, remote, timestamp, md5hash, bakType)
 }
 
-func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string) error {
+func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string, bakType string) error {
 	zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
 	var data []byte
 	var err error
@@ -630,7 +630,7 @@ func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string) 
 		}
 	} else {
 		// local restore
-		data, err = retrieveLocalBackup(ship, timestamp)
+		data, err = retrieveLocalBackup(ship, timestamp, bakType)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve local backup: %w", err)
 		}
@@ -772,7 +772,7 @@ func writeBackupToVolume(ship string, data []byte) error {
 	return nil
 }
 
-func retrieveLocalBackup(ship string, timestamp int) ([]byte, error) {
+func retrieveLocalBackup(ship string, timestamp int, bakType string) ([]byte, error) {
 	setBackupDir := func() string {
 		mmc, _ := isMountedMMC(config.BasePath)
 		if mmc {
@@ -782,7 +782,7 @@ func retrieveLocalBackup(ship string, timestamp int) ([]byte, error) {
 		}
 	}
 	backupDir := setBackupDir()
-	backupFile := filepath.Join(backupDir, ship, strconv.Itoa(timestamp))
+	backupFile := filepath.Join(backupDir, ship, bakType, strconv.Itoa(timestamp))
 	zap.L().Info(fmt.Sprintf("Restoring local backup for %s at %d to %s", ship, timestamp, backupFile))
 	file, err := os.Stat(backupFile)
 	if err != nil {
