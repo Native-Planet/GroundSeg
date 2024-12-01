@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"regexp"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -800,15 +801,25 @@ func ValidateAddress(address string, strip bool) (string, error) {
 func ValidatePoint(point interface{}, strip bool) (*big.Int, error) {
 	switch v := point.(type) {
 	case string:
-		if co.IsValidPatp(v) {
-			return co.Patp2Point(v)
-		}
-		if strings.HasPrefix(v, "0x") {
-			n, ok := new(big.Int).SetString(strings.TrimPrefix(v, "0x"), 16)
-			if !ok {
-				return nil, &ValidationError{"point", "invalid hex number"}
+		if !regexp.MustCompile(`\d`).MatchString(v) {
+			if strings.HasPrefix(v, "~") {
+				if co.IsValidPatp(v) {
+					return co.Patp2Point(v)
+				}
 			}
-			return n, nil
+			if strings.HasPrefix(v, "0x") {
+				n, ok := new(big.Int).SetString(strings.TrimPrefix(v, "0x"), 16)
+				if !ok {
+					return nil, &ValidationError{"point", "invalid hex number"}
+				}
+				return n, nil
+			}
+			if !strings.HasPrefix(v, "~") {
+				if co.IsValidPatp(fmt.Sprintf("~%s", v)) {
+					return co.Patp2Point(fmt.Sprintf("~%s", v))
+				}
+			}
+			return nil, &ValidationError{"point", "invalid point string format"}
 		} else {
 			n, ok := new(big.Int).SetString(v, 10)
 			if !ok {

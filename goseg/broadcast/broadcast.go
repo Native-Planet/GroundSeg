@@ -8,7 +8,6 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/leak"
-	"groundseg/roller"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
@@ -142,20 +141,6 @@ func LoadStartramRegions() error {
 	return nil
 }
 
-// retrieve current point info from roller
-func LoadPointInfo(urbits []string) map[string]*structs.Point {
-	points := make(map[string]*structs.Point)
-	for _, ship := range urbits {
-		point, err := roller.Client.GetPoint(config.Ctx, ship)
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Unable to get point for %s: %v", ship, err))
-			continue
-		}
-		points[ship] = point
-	}
-	return points
-}
-
 // this is for building the broadcast objects describing piers
 func ConstructPierInfo() (map[string]structs.Urbit, error) {
 	// get a list of piers
@@ -211,9 +196,6 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
 	}
-	// get a sublist of piers on azimuth
-	aziPiers := aziPatps(config.Conf().Piers)
-	aziInfo := LoadPointInfo(aziPiers)
 	// convert the running status into bools
 	for pier, status := range pierStatus {
 		// pull urbit info from json
@@ -360,9 +342,9 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 			urbit.Info.LocalTlonBackups = localBak
 		}
 		// if it has azimuth info, throw it in
-		_, ok := aziInfo[pier]
+		_, ok := config.AzimuthPoints[pier]
 		if ok {
-			urbit.Info.PointInfo = aziInfo[pier]
+			urbit.Info.PointInfo = config.AzimuthPoints[pier]
 		}
 		//urbit.Info.Backups = backups
 		UrbTransMu.RLock()

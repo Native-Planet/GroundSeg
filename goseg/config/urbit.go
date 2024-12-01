@@ -22,6 +22,7 @@ import (
 var (
 	UrbitsConfig = make(map[string]structs.UrbitDocker)
 	urbitMutex   sync.RWMutex
+	AzimuthPoints map[string]*structs.Point
 )
 
 // retrieve struct corresponding with urbit json file
