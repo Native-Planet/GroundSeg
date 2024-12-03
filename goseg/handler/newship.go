@@ -310,9 +310,14 @@ func generateKeyfile(patp, ticket string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error generating wallet: %v", err)
 	}
-	if wallet.Network.Keys.Crypt.Public != point.Network.Keys.Crypt {
-		return "", fmt.Errorf("could not generate matching keyfile")
-	}
+        pointKey := strings.TrimPrefix(point.Network.Keys.Crypt, "0x")
+        if wallet.Network.Keys.Crypt.Public != pointKey {
+                return "", fmt.Errorf("could not generate matching keyfile; generated: 0x%s / actual: %s", wallet.Network.Keys.Crypt.Public, point.Network.Keys.Crypt)
+        }
+	keyfile, err := roller.Keyfile(wallet.Network.Keys.Crypt.Private, wallet.Network.Keys.Auth.Private, patp, life)
+        if err != nil {
+                return "", fmt.Errorf("could not generate keyfile: %v", err)
+        }
 	uw := aura.Cord2Uw(wallet.Network.Keys.Crypt.Private)
 	return uw, nil
 }
