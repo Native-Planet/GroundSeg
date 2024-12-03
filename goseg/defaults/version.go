@@ -17,13 +17,13 @@ var (
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "411f45433708c6755a354e702c8164a11e532ccb82d0d0af1f01b251e2789d1c",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.0_latest",
-        "arm64_sha256": "84c8200e55b7737db75143a92fbfbc721042e7134d69f5860503408ae4bd3168",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.0_latest",
+        "amd64_sha256": "72ec95cda72f9540c6a99cb23637ffbe0c14b527868bb1f89b511dd2752eface",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1_latest",
+        "arm64_sha256": "7c6c1c4955c66c5185b70a68b77958cecf432a977ee2a1f814eda4ffc00d1fbe",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1_latest",
         "major": 2,
         "minor": 2,
-        "patch": 0
+        "patch": 1
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
@@ -50,7 +50,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "2fdc4be94c1206344b2e969c292d7cc28e3ff751e00b32680527468ecfb7b7d9",
+        "amd64_sha256": "17502fcdc0eba13e6e4d1b34412fad3346530b3be412d2b40924f49cc81cee8a",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "canary"
@@ -70,13 +70,13 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "6b3f9aedb6fdd409fb74b8ac6b0206d5662f076f0247f813e93742ef3ec82026",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1-rc0_edge",
-        "arm64_sha256": "8e5a1976a104ffadcfe100e7dbce98768c3f2e9c653233da98b324070e4f59fc",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1-rc0_edge",
+        "amd64_sha256": "f71ab5adaa2a68c4ecc3e88c06590a0d1177f234993d5fefe88403c465ca0247",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.3.0-rc1_edge",
+        "arm64_sha256": "79d91f03e2a7a5431e28e6e6fd5881b5847e2d62835b1c62caa99ebfe621bee5",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.3.0-rc1_edge",
         "major": 2,
-        "minor": 2,
-        "patch": 1
+        "minor": 3,
+        "patch": 0
       },
       "manual": {
         "amd64_sha256": "318a4a8922197493eefb73bfbd568728b5278f4146d2ba712929a032fd495092",
@@ -103,10 +103,10 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "c968f7277bead15f8a29d1843fe98ee8515c00ed80650c05a58498d0d7b40656",
-        "arm64_sha256": "23b6218a48575aa981568c622c1937af7291665cf27d6f57c45e87eabab06cf9",
+        "amd64_sha256": "3da9d1419abbb0cd42f9c8f53a38a5b91baa00f7b4fc4dfb7fa65a3ade47d611",
+        "arm64_sha256": "7e2eb9c2a8472a6c396a82f5fc7d629546a8f5d469e7e40bf1d87a8a05ba59d8",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
-        "tag": "v3.0"
+        "tag": "v3.1"
       },
       "webui": {
         "amd64_sha256": "cc6ea93a53dcd50bef7be7077c41dc475943baee83343cece13884cb2a351308",
@@ -123,13 +123,13 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "411f45433708c6755a354e702c8164a11e532ccb82d0d0af1f01b251e2789d1c",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.0_latest",
-        "arm64_sha256": "84c8200e55b7737db75143a92fbfbc721042e7134d69f5860503408ae4bd3168",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.0_latest",
+        "amd64_sha256": "72ec95cda72f9540c6a99cb23637ffbe0c14b527868bb1f89b511dd2752eface",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1_latest",
+        "arm64_sha256": "7c6c1c4955c66c5185b70a68b77958cecf432a977ee2a1f814eda4ffc00d1fbe",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1_latest",
         "major": 2,
         "minor": 2,
-        "patch": 0
+        "patch": 1
       },
       "manual": {
         "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
