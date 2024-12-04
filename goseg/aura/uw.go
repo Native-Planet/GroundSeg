@@ -92,6 +92,10 @@ func Uw2Cord(s string) (string, error) {
 	return string(bytes), nil
 }
 
+func Big2Uw(n *big.Int) string {
+	return encodeBigInt(n)
+}
+
 // helpers
 
 func decodeToBigInt(uw string) (*big.Int, error) {
