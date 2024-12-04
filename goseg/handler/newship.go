@@ -297,7 +297,7 @@ func newShipRegisterService(patp string) {
 	}
 }
 
-func generateKeyfile(patp, ticket string) (string, error) {
+func GenerateKeyfile(patp, ticket string) (string, error) {
 	point, err := roller.Client.GetPoint(config.Ctx, patp)
 	if err != nil {
 		return "", fmt.Errorf("error retrieving point info: %v", err)
