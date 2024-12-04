@@ -306,13 +306,24 @@ func generateKeyfile(patp, ticket string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error casting azimuth life: %v", err)
 	}
+	life -= 1
 	wallet, err := wallet.Wallet(patp, ticket, life)
 	if err != nil {
 		return "", fmt.Errorf("error generating wallet: %v", err)
 	}
-	if wallet.Network.Keys.Crypt.Public != point.Network.Keys.Crypt {
-		return "", fmt.Errorf("could not generate matching keyfile")
+	b, err := json.MarshalIndent(wallet.Network, "", "  ")
+    	if err != nil {
+        	zap.L().Error(fmt.Sprintf("error:", err))
+		return "", err
+    	}
+	fmt.Println(string(b))
+	pointKey := strings.TrimPrefix(point.Network.Keys.Crypt, "0x")
+	if wallet.Network.Keys.Crypt.Public != pointKey {
+		return "", fmt.Errorf("could not generate matching keyfile; 0x%s / %s", wallet.Network.Keys.Crypt.Public, point.Network.Keys.Crypt)
 	}
-	uw := aura.Cord2Uw(wallet.Network.Keys.Crypt.Private)
-	return uw, nil
+	keyfile, err := roller.Keyfile(wallet.Network.Keys.Crypt.Private, wallet.Network.Keys.Auth.Private, patp, life)
+	if err != nil {
+		return "", fmt.Errorf("could not generate keyfile: %v", err)
+	}
+	return keyfile, nil
 }
