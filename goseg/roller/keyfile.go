@@ -8,38 +8,7 @@ import (
 	"github.com/stevelacy/go-urbit/noun"
 )
 
-// aaaaa
-func xor(a, b []byte) []byte {
-	length := len(a)
-	if len(b) > length {
-		length = len(b)
-	}
-	result := make([]byte, length)
-	for i := 0; i < length; i++ {
-		var aByte, bByte byte
-		if i < len(a) {
-			aByte = a[i]
-		}
-		if i < len(b) {
-			bByte = b[i]
-		}
-		result[i] = aByte ^ bByte
-	}
-	return result
-}
-
-// encode jammed noun to hex string
-func bytes2Hex(bytes []byte) string {
-	for i, j := 0, len(bytes)-1; i < j; i, j = i+1, j-1 {
-		bytes[i], bytes[j] = bytes[j], bytes[i]
-	}
-	hexStr := fmt.Sprintf("%x", bytes)
-	if len(bytes) == 0 {
-		return "0"
-	}
-	return hexStr
-}
-
+// the shape of the keyfile noun
 func keyNoun(point *big.Int, revision int, bnsec *big.Int) noun.Cell {
 	return noun.MakeNoun([]interface{}{
 		[]interface{}{1, 0},            // [1 0]
