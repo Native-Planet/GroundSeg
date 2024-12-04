@@ -49,7 +49,7 @@ func NewShipHandler(msg []byte) error {
 			if !isValid {
 				return fmt.Errorf("Invalid @p provided: %v", patp)
 			}
-			keyfile, err := generateKeyfile(patp, shipPayload.Data.(string))
+			keyfile, err := GenerateKeyfile(patp, shipPayload.Data.(string))
 			if err != nil {
 				return err
 			}
