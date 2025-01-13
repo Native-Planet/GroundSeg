@@ -2,7 +2,8 @@ package exporter
 
 import (
 	"archive/zip"
-	"bytes"
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
@@ -19,6 +20,12 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+)
+
+const (
+	maxArchiveSize = 10 * 1024 * 1024 * 1024 // 10GB max archive size
+	bufferSize     = 1024 * 1024             // 1MB buffer for writing
+	progressInterval = 100                   // Update progress every 100 files
 )
 
 var (
@@ -47,33 +54,38 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
-	// Handle pre-flight OPTIONS request
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	exportError := func(err error) {
+
+	ctx := r.Context()
+
+	exportError := func(w http.ResponseWriter, err error) {
 		zap.L().Error(fmt.Sprintf("Unable to export: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+
 	cleanup := func(patp, containerName, exportTrans, compressedTrans string) {
 		RemoveContainerFromWhitelist(containerName)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
 	}
+
 	// check if container is whitelisted
 	vars := mux.Vars(r)
 	container := vars["container"]
+	
 	exportMu.Lock()
 	whitelistToken, exists := whitelist[container]
 	exportMu.Unlock()
+	
 	if !exists {
-		err := fmt.Errorf("Container %v is not in whitelist!", container)
-		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		exportError(w, fmt.Errorf("container %v is not in whitelist", container))
 		return
 	}
-	// Get patp if minio container
+
+	// get patp if minio container
 	patp := strings.TrimPrefix(container, "minio_")
 	exportTrans := "exportShip"
 	compressedTrans := "shipCompressed"
@@ -83,99 +95,183 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		compressedTrans = "bucketCompressed"
 	}
 
-	// check if token match
+	// validate token
 	var tokenData structs.WsTokenStruct
+	if err := json.NewDecoder(r.Body).Decode(&tokenData); err != nil {
+		exportError(w, fmt.Errorf("failed to decode token: %w", err))
+		cleanup(patp, container, exportTrans, compressedTrans)
+		return
+	}
 
-	err := json.NewDecoder(r.Body).Decode(&tokenData)
-	if err != nil {
-		err := fmt.Errorf("Export failed to decode token: %v", err)
-		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	if whitelistToken != tokenData {
-		err := fmt.Errorf("Token for exporting %v is not valid", container)
-		err = fmt.Errorf("Export failed to decode token: %v", err)
-		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
+		exportError(w, fmt.Errorf("invalid token for container %v", container))
+		cleanup(patp, container, exportTrans, compressedTrans)
 		return
 	}
-	// session is now valid. Defer cleanup
-	defer cleanup(patp, container, exportTrans, compressedTrans)
-	// make sure container is stopped
-	statusTicker := time.NewTicker(500 * time.Millisecond)
+
+	// wait for container to stop if not MinIO
 	if !isMinIO {
-	loopLabel:
+		statusTicker := time.NewTicker(500 * time.Millisecond)
+		defer statusTicker.Stop()
+
+	waitLoop:
 		for {
 			select {
+			case <-ctx.Done():
+				exportError(w, fmt.Errorf("client disconnected while waiting for container to stop"))
+				cleanup(patp, container, exportTrans, compressedTrans)
+				return
 			case <-statusTicker.C:
 				pierStatus, err := docker.GetShipStatus([]string{container})
 				if err != nil {
-					exportError(err)
+					exportError(w, err)
+					cleanup(patp, container, exportTrans, compressedTrans)
 					return
 				}
+				
 				status, exists := pierStatus[container]
 				if !exists {
-					exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
+					exportError(w, fmt.Errorf("container %v does not exist", container))
+					cleanup(patp, container, exportTrans, compressedTrans)
+					return
 				}
+				
 				if strings.Contains(status, "Exited") {
-					break loopLabel
+					break waitLoop
 				}
 			}
 		}
 	}
-	// compress volume transition compressed %
-	volumeDirectory := defaults.DockerData("volumes")
-	var memoryFile bytes.Buffer
-	filePath := filepath.Join(volumeDirectory, container, "_data")
-	shipConf := config.UrbitConf(container)
 
-	customLoc, ok := shipConf.CustomPierLocation.(string) // Type assertion to string
-	if ok {
+	// get file path
+	volumeDirectory := defaults.DockerData("volumes")
+	filePath := filepath.Join(volumeDirectory, container, "_data")
+	
+	shipConf := config.UrbitConf(container)
+	if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
 		filePath = customLoc
 	}
 
-	// Create new zip archive in memory
-	zipWriter := zip.NewWriter(&memoryFile)
-	// Walk through the file path
-	var walkErr error
-	// Count total files
+	// check total size before starting
+	var totalSize int64
+	if err := filepath.Walk(filePath, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && !strings.HasSuffix(info.Name(), ".sock") {
+			totalSize += info.Size()
+		}
+		return nil
+	}); err != nil {
+		exportError(w, fmt.Errorf("failed to calculate total size: %w", err))
+		cleanup(patp, container, exportTrans, compressedTrans)
+		return
+	}
+
+	if totalSize > maxArchiveSize {
+		exportError(w, fmt.Errorf("total size %d exceeds maximum allowed size %d", totalSize, maxArchiveSize))
+		cleanup(patp, container, exportTrans, compressedTrans)
+		return
+	}
+
+	// count total files for progress reporting
 	totalFiles := 0
-	filepath.Walk(filePath, func(_ string, info os.FileInfo, _ error) error {
-		if info != nil && !info.IsDir() {
+	if err := filepath.Walk(filePath, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && !strings.HasSuffix(info.Name(), ".sock") {
 			totalFiles++
 		}
 		return nil
-	})
-	completedFiles := 0
-	filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			walkErr = err
-			return err
-		}
-		arcDir := strings.TrimPrefix(path, filePath+"/")
-		if filepath.Base(path) != "conn.sock" {
-			f, _ := zipWriter.Create(arcDir)
-			fileReader, _ := os.Open(path)
-			defer fileReader.Close()
-			io.Copy(f, fileReader)
-			completedFiles++
-		}
-		progress := int(float64(completedFiles) / float64(totalFiles) * 100)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress}
-		return nil
-	})
-	if walkErr != nil {
-		exportError(walkErr)
+	}); err != nil {
+		exportError(w, fmt.Errorf("failed to count files: %w", err))
+		cleanup(patp, container, exportTrans, compressedTrans)
 		return
 	}
-	// Close the zip archive
-	zipWriter.Close()
-	// send file
-	reader := bytes.NewReader(memoryFile.Bytes())
-	http.ServeContent(w, r, container+".zip", time.Now(), reader)
+
+	// set response headers
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.zip", container))
+
+	// create buffered writer
+	bufferedWriter := bufio.NewWriterSize(w, bufferSize)
+	zipWriter := zip.NewWriter(bufferedWriter)
+
+	// ensure everything is properly closed
+	defer func() {
+		if err := zipWriter.Close(); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to close zip writer: %v", err))
+		}
+		if err := bufferedWriter.Flush(); err != nil {
+			zap.L().Error(fmt.Sprintf("Failed to flush buffer: %v", err))
+		}
+		cleanup(patp, container, exportTrans, compressedTrans)
+	}()
+
+	completedFiles := 0
+	err := filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("walk error at %s: %w", path, err)
+		}
+
+		// check for context cancellation
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("client disconnected during export")
+		default:
+		}
+
+		if info.IsDir() || strings.HasSuffix(info.Name(), ".sock") {
+			return nil
+		}
+
+		// create relative path for zip entry
+		arcDir := strings.TrimPrefix(path, filePath+"/")
+		
+		// create new file in zip
+		f, err := zipWriter.Create(arcDir)
+		if err != nil {
+			return fmt.Errorf("failed to create zip entry for %s: %w", arcDir, err)
+		}
+
+		// open and copy file
+		fileReader, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", path, err)
+		}
+		defer fileReader.Close()
+
+		// copy file contents
+		if _, err := io.Copy(f, fileReader); err != nil {
+			return fmt.Errorf("failed to copy %s: %w", path, err)
+		}
+
+		completedFiles++
+		
+		// update progress periodically
+		if completedFiles%progressInterval == 0 {
+			progress := int(float64(completedFiles) / float64(totalFiles) * 100)
+			docker.UTransBus <- structs.UrbitTransition{
+				Patp:  patp,
+				Type:  compressedTrans,
+				Value: progress,
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		// log error but can't send error response as we've already started sending file data
+		zap.L().Error(fmt.Sprintf("Error during export: %v", err))
+		return
+	}
+
+	// send final progress update
+	docker.UTransBus <- structs.UrbitTransition{
+		Patp:  patp,
+		Type:  compressedTrans,
+		Value: 100,
+	}
 }
