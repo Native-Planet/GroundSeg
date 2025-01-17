@@ -9,6 +9,7 @@ import (
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"groundseg/system"
+	"perigee/wallet"
 	"regexp"
 	"strings"
 	"sync"
@@ -42,6 +43,13 @@ func NewShipHandler(msg []byte) error {
 	}
 	switch shipPayload.Payload.Action {
 	case "boot":
+		keyType := shipPayload.Payload.KeyType
+		if keyType == "master-ticket" {
+			fmt.Println("master ticket")
+			fmt.Println(wallet.Network.Keys.Crypt.Private)
+			fmt.Println(wallet.Network.Keys.Auth.Private)
+		}
+		return fmt.Errorf("temp fake error")
 		// handle filesystem
 		sel := shipPayload.Payload.SelectedDrive //string
 		// if not using system-drive, that means custom location

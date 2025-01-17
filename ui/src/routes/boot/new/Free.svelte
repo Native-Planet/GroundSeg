@@ -15,6 +15,7 @@
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
+  let keyType = "keyfile" // master-ticket
   let name = '';
   let remote = true;
   let advanceOpen = false
@@ -30,7 +31,7 @@
   $: driveNames = Object.keys(drives)
 
   const handleBoot = () => {
-      bootShip(noSig,key,remote,selectedDrive) // temp
+      bootShip(noSig,key,keyType,remote,selectedDrive)
     /*
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
@@ -38,6 +39,10 @@
       openModal(NewDriveWarning)
     }
     */
+  }
+
+  const switchKeyType = () => {
+    keyType = keyType == "master-ticket" ? "keyfile" : "master-ticket"
   }
 </script>
 
@@ -49,13 +54,18 @@
   <input type="text" bind:value={name} placeholder="Ship Name" />
 </div>
 <div class="input-wrapper">
-  <div class="label">Bootfile</div>
-  <KeyDropper
-    on:changeKey={e => key = e.detail}
-    on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
-  />
+  {#if keyType == "keyfile"}
+    <div class="label">Bootfile</div>
+    <KeyDropper
+      on:changeKey={e => key = e.detail}
+      on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
+    />
+  {:else}
+    <div class="label">Master Ticket</div>
+    <input type="password" bind:value={key} placeholder="sampel-master-ticket" />
+  {/if}
+  <button class="btn keytype" on:click={switchKeyType}>{keyType == "master-ticket" ? "Use Bootfile" : "Use Master Ticket"}</button>
 </div>
-
 
 <!-- Customize -->
 <div class="input-wrapper">
@@ -280,6 +290,14 @@
   }
   .mount-icon {
     color: orange;
+    cursor: pointer;
+  }
+  .keytype {
+    background: var(--btn-secondary);
+    color: white;
+    padding: 16px 32px;
+    width: 280px;
+    border-radius: 16px;
     cursor: pointer;
   }
   .active {
