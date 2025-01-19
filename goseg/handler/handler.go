@@ -9,12 +9,12 @@ import (
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"groundseg/system"
-	"perigee/wallet"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Native-Planet/perigee/libprg"
 	"go.uber.org/zap"
 )
 
@@ -45,11 +45,12 @@ func NewShipHandler(msg []byte) error {
 	case "boot":
 		keyType := shipPayload.Payload.KeyType
 		if keyType == "master-ticket" {
-			fmt.Println("master ticket")
-			fmt.Println(wallet.Network.Keys.Crypt.Private)
-			fmt.Println(wallet.Network.Keys.Auth.Private)
+			kf, err := libprg.GetKeyfile(shipPayload.Payload.Patp, shipPayload.Payload.Key, "")
+			if err != nil {
+				return fmt.Errorf("Couldn't get keyfile: %v", err)
+			}
+			shipPayload.Payload.Key = kf
 		}
-		return fmt.Errorf("temp fake error")
 		// handle filesystem
 		sel := shipPayload.Payload.SelectedDrive //string
 		// if not using system-drive, that means custom location
