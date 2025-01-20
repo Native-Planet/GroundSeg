@@ -6,6 +6,7 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
+	"groundseg/docker"
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"groundseg/system"
@@ -43,11 +44,21 @@ func NewShipHandler(msg []byte) error {
 	}
 	switch shipPayload.Payload.Action {
 	case "boot":
+		handleError := func(err error) {
+			docker.NewShipTransBus <- structs.NewShipTransition{Type: "freeError", Event: err.Error()}
+			time.Sleep(5 * time.Second)
+			docker.NewShipTransBus <- structs.NewShipTransition{Type: "freeError", Event: ""}
+		}
 		keyType := shipPayload.Payload.KeyType
 		if keyType == "master-ticket" {
-			kf, err := libprg.GetKeyfile(shipPayload.Payload.Patp, shipPayload.Payload.Key, "")
+			masterTicket := shipPayload.Payload.Key
+			if !strings.HasPrefix(masterTicket, "~") {
+				masterTicket = "~" + masterTicket
+			}
+			kf, err := libprg.Keyfile(shipPayload.Payload.Patp, masterTicket, "", 0)
 			if err != nil {
-				return fmt.Errorf("Couldn't get keyfile: %v", err)
+				handleError(fmt.Errorf("Couldn't get keyfile: %v", err.Error()))
+				return err
 			}
 			shipPayload.Payload.Key = kf
 		}
@@ -58,7 +69,9 @@ func NewShipHandler(msg []byte) error {
 			// get list of devices -- lsblk -f
 			blockDevices, err := system.ListHardDisks()
 			if err != nil {
-				return fmt.Errorf("Failed to retrieve block devices: %v", err)
+				errMsg := fmt.Errorf("Failed to retrieve block devices: %v", err)
+				handleError(errMsg)
+				return errMsg
 			}
 			// we're looking for the drive the user specified
 			for _, dev := range blockDevices.BlockDevices {
@@ -67,13 +80,17 @@ func NewShipHandler(msg []byte) error {
 					for _, m := range dev.Mountpoints {
 						matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
 						if err != nil {
-							return fmt.Errorf("Regex match error: %v", err)
+							errMsg := fmt.Errorf("Regex match error: %v", err)
+							handleError(errMsg)
+							return errMsg
 						}
 						// device provided in payload does not match groundseg's format
 						if !matched {
 							// we overwrite the fs
 							if _, err := system.CreateGroundSegFilesystem(sel); err != nil {
-								return err
+								errMsg := fmt.Errorf("Failed to create groundseg filesystem: %v", err)
+								handleError(errMsg)
+								return errMsg
 							}
 						}
 					}
@@ -84,7 +101,9 @@ func NewShipHandler(msg []byte) error {
 		patp := sigRemove(shipPayload.Payload.Patp)
 		isValid := checkPatp(patp)
 		if !isValid {
-			return fmt.Errorf("Invalid @p provided: %v", patp)
+			errMsg := fmt.Errorf("Invalid @p provided: %v", patp)
+			// handleError(errMsg)
+			return errMsg
 		}
 		go createUrbitShip(patp, shipPayload)
 	case "reset":

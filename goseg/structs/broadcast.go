@@ -37,6 +37,7 @@ type NewShip struct {
 		BootStage string `json:"bootStage"`
 		Patp      string `json:"patp"`
 		Error     string `json:"error"`
+		FreeError string `json:"freeError"`
 	} `json:"transition"`
 }
 
