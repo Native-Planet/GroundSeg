@@ -55,6 +55,10 @@ func NewShipHandler(msg []byte) error {
 			if !strings.HasPrefix(masterTicket, "~") {
 				masterTicket = "~" + masterTicket
 			}
+			if len(masterTicket) != len("~sampel-sampel-sampel-sampel") {
+				handleError(fmt.Errorf("Invalid master ticket length: %v", len(masterTicket)))
+				return fmt.Errorf("Invalid master ticket length: %v", len(masterTicket))
+			}
 			kf, err := libprg.Keyfile(shipPayload.Payload.Patp, masterTicket, "", 0)
 			if err != nil {
 				handleError(fmt.Errorf("Couldn't get keyfile: %v", err.Error()))

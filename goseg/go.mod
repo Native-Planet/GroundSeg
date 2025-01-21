@@ -3,7 +3,7 @@ module groundseg
 go 1.23.2
 
 require (
-	github.com/Native-Planet/perigee v0.1.0
+	github.com/Native-Planet/perigee v0.1.1
 	github.com/anatol/smart.go v0.0.0-20240606135530-b987830bbb40
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -40,6 +40,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/tcpproxy v0.0.0-20180808230851-dfa16c61dad2 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/mdlayher/genetlink v1.3.2 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
@@ -53,6 +54,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkova/argon2 v0.3.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/spf13/cobra v1.8.1 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/twmb/murmur3 v1.1.5 // indirect
