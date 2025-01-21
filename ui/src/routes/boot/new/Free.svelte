@@ -58,7 +58,7 @@
   </div>
   <div class="input-wrapper">
     {#if keyType == "keyfile"}
-      <div class="label">Bootfile</div>
+      <div class="label">Keyfile</div>
       <KeyDropper
         on:changeKey={e => key = e.detail}
         on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
@@ -67,7 +67,7 @@
       <div class="label">Master Ticket</div>
       <input type="password" bind:value={key} placeholder="~sampel-master-ticket" />
     {/if}
-    <button class="btn keytype" on:click={switchKeyType}>{keyType == "master-ticket" ? "Use Bootfile" : "Use Master Ticket"}</button>
+    <button class="btn keytype" on:click={switchKeyType}>{keyType == "master-ticket" ? "Use Keyfile" : "Use Master Ticket"}</button>
   </div>
 
   <!-- Customize -->
