@@ -103,7 +103,8 @@ jobs:
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
           sudo mkdir -p /tmp/groundseg/version/glob/
           sudo mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${hash}.glob"
-          sudo echo $hash > /tmp/groundseg/version/glob/hash.txt
+          sudo echo "$hash" > hash.txt
+          sudo mv hash.txt /tmp/groundseg/version/glob/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
