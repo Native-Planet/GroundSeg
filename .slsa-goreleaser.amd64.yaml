@@ -13,6 +13,18 @@ goarch: amd64
 binary: groundseg_amd64
 dir: ./goseg
 main: .
+before:
+  hooks:
+    - dir: ./ui
+      cmd: |
+        curl -fsSL https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.gz -o node.tar.gz
+        tar xf node.tar.gz
+        export PATH=$PWD/node-v22.0.0-linux-x64/bin:$PATH
+        npm ci
+        npm run build
+        mkdir -p ../goseg/web
+        mv build/* ../goseg/web/
+
 builds:
   - main: ./goseg
 
