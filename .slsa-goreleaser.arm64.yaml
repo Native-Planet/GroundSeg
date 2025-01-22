@@ -11,6 +11,8 @@ flags:
 goos: linux
 goarch: arm64
 binary: groundseg_arm64
+dir: ./goseg
+main: .
 builds:
   - main: ./goseg
 
