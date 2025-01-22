@@ -1,0 +1,185 @@
+name: GroundSeg Release Pipeline
+on:
+  workflow_dispatch:
+    inputs:
+      release_channel:
+        description: 'Release Channel'
+        required: true
+        type: choice
+        options:
+          - nobuild
+          - edge
+          - canary
+          - latest
+      to_canary:
+        description: 'Also push build to canary channel (if edge)'
+        required: false
+        type: boolean
+        default: false
+      action_type:
+        description: 'Build or promote RC'
+        required: true
+        type: choice
+        options:
+          - build
+          - promote
+      version_server:
+        description: 'Version Server'
+        required: true
+        type: choice
+        options:
+          - staging.version.groundseg.app
+          - version.groundseg.app
+
+permissions: read-all
+
+env:
+  VERSION_AUTH: ${{ secrets.VERSION_AUTH }}
+  RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  args:
+    runs-on: ubuntu-latest
+    outputs:
+      commit-date: ${{ steps.ldflags.outputs.commit-date }}
+      commit: ${{ steps.ldflags.outputs.commit }}
+      version: ${{ steps.ldflags.outputs.version }}
+      tree-state: ${{ steps.ldflags.outputs.tree-state }}
+      channel: ${{ steps.channel.outputs.value }}
+      bin-tag: ${{ steps.channel.outputs.bin-tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - id: ldflags
+        run: |
+          COMMIT_DATE=$(git log --date=iso8601-strict -1 --pretty=%ct)
+          COMMIT=$GITHUB_SHA
+          VERSION=$(git describe --tags --always --dirty | cut -c2-)
+          TREE_STATE=$(if git diff --quiet; then echo "clean"; else echo "dirty"; fi)
+          
+          echo "commit-date=$COMMIT_DATE" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tree-state=$TREE_STATE" >> "$GITHUB_OUTPUT"
+
+      - id: channel
+        run: |
+          CHANNEL="${{ github.event.inputs.release_channel }}"
+          if [ "$CHANNEL" = "latest" ]; then
+            BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1)
+          else
+            BIN_TAG=${{ github.ref_name }}
+          fi
+          echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
+
+  frontend-build:
+    needs: args
+    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'latest' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Frontend
+        run: |
+          # Build Goseg Frontend
+          cd ./ui
+          docker build -t web-builder -f builder.Dockerfile .
+          container_id=$(docker create web-builder)
+          docker cp $container_id:/webui/build ./web
+          rm -rf ../goseg/web
+          mv web ../goseg/
+          docker build -t web-builder -f gallseg.Dockerfile .
+          container_id=$(docker create web-builder)
+          git clone https://github.com/Native-Planet/globber
+          cd globber
+          docker cp $container_id:/webui/build ./web
+          ./glob.sh web
+          hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
+          mkdir -p /tmp/groundseg/version/glob/
+          mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.ref_name }}-${hash}.glob"
+          echo $hash > /tmp/groundseg/version/glob/hash.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-outputs
+          path: |
+            /tmp/groundseg/version/glob
+
+  backend-build:
+    needs: [args, frontend-build]
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
+    with:
+      go-version: 1.21
+      compile-builder: true
+      target: ./goseg
+      evaluated-envs: |
+        {
+          "VERSION": "${{ needs.args.outputs.version }}",
+          "COMMIT": "${{ needs.args.outputs.commit }}",
+          "COMMIT_DATE": "${{ needs.args.outputs.commit-date }}",
+          "TREE_STATE": "${{ needs.args.outputs.tree-state }}",
+          "GOOS": "linux",
+          "GOARCH": "${{ matrix.arch }}"
+        }
+
+  create-release:
+    needs: [args, backend-build]
+    if: ${{ github.event.inputs.release_channel == 'latest' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        run: |
+          gh release create ${{ needs.args.outputs.bin-tag }} \
+            --title "${{ needs.args.outputs.bin-tag }}" \
+            --notes "GroundSeg ${{ needs.args.outputs.bin-tag }}" \
+            --target ${{ needs.args.outputs.commit }}
+
+  deploy:
+    needs: [args, backend-build]
+    if: ${{ github.event.inputs.release_channel != 'nobuild' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Rclone
+        run: |
+          mkdir -p ~/.config/rclone/
+          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-outputs
+          path: artifacts
+
+      - name: Deploy Files
+        run: |
+          # Copy binaries to R2
+          for arch in amd64 arm64; do
+            rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
+              r2:groundseg/bin/
+          done
+          
+          # Copy glob file if it exists
+          if [ -d "artifacts/version/glob" ]; then
+            GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
+            rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
+          fi
+
+          # Update version server
+          VERSION_SERVER="${{ github.event.inputs.version_server }}"
+          for arch in amd64 arm64; do
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}\"}"
+          done
