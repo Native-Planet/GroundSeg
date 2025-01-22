@@ -130,7 +130,7 @@ jobs:
           path: .
 
   backend-build:
-    needs: [args, frontend-build]
+    needs: [args, frontend-build, setup-backend]
     permissions:
       id-token: write
       contents: write
