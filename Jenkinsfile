@@ -186,11 +186,9 @@ pipeline {
                             git tag ${binTag}
                             git push --set-upstream origin ${binTag}
                             git push --tags
-                        '''
-                        sh """#!/bin/bash -x
                             env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
                             env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
-                        """
+                        '''
                     }
                 }
             }
