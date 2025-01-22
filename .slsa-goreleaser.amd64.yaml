@@ -1,9 +1,5 @@
 version: 1
 
-env:
-  - GO111MODULE=on
-  - CGO_ENABLED=0
-
 before:
   hooks:
     - sh -c 'cd ui && 
@@ -23,6 +19,9 @@ builds:
     dir: ./goseg
     env:
       - CGO_ENABLED=0
+      - GOOS=linux
+      - GOARCH=amd64
+      - GO111MODULE=on
     goos:
       - linux
     goarch:
