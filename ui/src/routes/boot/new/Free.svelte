@@ -44,6 +44,7 @@
   }
 
   const switchKeyType = () => {
+    // swtiching between keyfile and master-ticket
     keyType = keyType == "master-ticket" ? "keyfile" : "master-ticket"
   }
 </script>
