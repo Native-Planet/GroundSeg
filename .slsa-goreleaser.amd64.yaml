@@ -18,21 +18,22 @@ before:
       mkdir -p goseg/web && 
       mv ui/build/* goseg/web/'
 
-flags:
-  - -trimpath
-  - -tags=netgo
-
-goos: linux
-goarch: amd64
-binary: groundseg_amd64
-dir: ./goseg
-main: .
-
 builds:
-  - main: ./goseg
-
-ldflags:
-  - "-X main.Version=${VERSION}"
-  - "-X main.Commit=${COMMIT}"
-  - "-X main.CommitDate=${COMMIT_DATE}"
-  - "-X main.TreeState=${TREE_STATE}"
+  - id: groundseg
+    dir: ./goseg
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    main: .
+    binary: groundseg_amd64
+    flags:
+      - -trimpath
+      - -tags=netgo
+    ldflags:
+      - -X main.Version={{ .Env.VERSION }}
+      - -X main.Commit={{ .Env.COMMIT }}
+      - -X main.CommitDate={{ .Env.COMMIT_DATE }}
+      - -X main.TreeState={{ .Env.TREE_STATE }}
