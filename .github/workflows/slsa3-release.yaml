@@ -92,6 +92,8 @@ jobs:
           docker cp $container_id:/webui/build ./web
           rm -rf ../goseg/web
           mv web ../goseg/
+          
+          # Build and store Gallseg glob
           docker build -t web-builder -f gallseg.Dockerfile .
           container_id=$(docker create web-builder)
           git clone https://github.com/Native-Planet/globber
@@ -122,8 +124,6 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
       go-version: 1.21
-      compile-builder: true
-      target: ./goseg
       evaluated-envs: |
         {
           "VERSION": "${{ needs.args.outputs.version }}",
@@ -133,6 +133,7 @@ jobs:
           "GOOS": "linux",
           "GOARCH": "${{ matrix.arch }}"
         }
+      config-file: .slsa-goreleaser.yaml
 
   create-release:
     needs: [args, backend-build]
@@ -143,7 +144,7 @@ jobs:
         run: |
           gh release create ${{ needs.args.outputs.bin-tag }} \
             --title "${{ needs.args.outputs.bin-tag }}" \
-            --notes "GroundSeg ${{ needs.args.outputs.bin-tag }}" \
+            --notes "Release ${{ needs.args.outputs.bin-tag }}" \
             --target ${{ needs.args.outputs.commit }}
 
   deploy:
