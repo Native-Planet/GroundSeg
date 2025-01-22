@@ -177,7 +177,7 @@ pipeline {
                             
                             rm -r /opt/groundseg/release-ships/latest/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
-                            #/opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
+                            /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
                             cd goseg
                             go fmt ./...
@@ -186,8 +186,8 @@ pipeline {
                             git tag ${binTag}
                             git push --set-upstream origin ${binTag}
                             git push --tags
-                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_${params.channel}
-                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_${params.channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
                         '''
                     }
                 }
