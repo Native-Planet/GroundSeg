@@ -180,7 +180,6 @@ pipeline {
                             /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
                             cd goseg
-			    pwd
                             go fmt ./...
 			    go mod tidy
                             git commit -am "Promoting ${binTag} for release"
@@ -189,7 +188,6 @@ pipeline {
                             git push --tags
                         '''
                         sh """#!/bin/bash -x
-                            cd ./goseg
                             env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
                             env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
                         """
