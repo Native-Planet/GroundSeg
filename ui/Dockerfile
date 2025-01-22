@@ -1,4 +1,4 @@
-FROM node:18.15.0-buster-slim
+FROM node:20-buster-slim
 
 COPY ./ /webui
 
