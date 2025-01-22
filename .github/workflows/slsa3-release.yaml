@@ -103,7 +103,7 @@ jobs:
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
           sudo mkdir -p /tmp/groundseg/version/glob/
           sudo mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${hash}.glob"
-          echo $hash > /tmp/groundseg/version/glob/hash.txt
+          sudo echo $hash > /tmp/groundseg/version/glob/hash.txt
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
@@ -170,7 +170,7 @@ jobs:
               r2:groundseg/bin/
           done
           if [ -d "artifacts/version/glob" ]; then
-            GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
+            GLOB_HASH=$(sudo cat artifacts/version/glob/hash.txt)
             rclone copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob/
           fi
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
