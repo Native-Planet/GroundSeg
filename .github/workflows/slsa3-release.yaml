@@ -70,7 +70,7 @@ jobs:
           if [ "$CHANNEL" = "latest" ]; then
             BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1)
           else
-            BIN_TAG=${{ github.ref_name }}
+            BIN_TAG=$(echo ${{ github.ref_name }} | sed 's|/|-|g')
           fi
           echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"

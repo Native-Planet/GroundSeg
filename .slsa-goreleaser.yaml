@@ -1,4 +1,5 @@
 version: 1
+
 env:
   - GO111MODULE=on
   - CGO_ENABLED=0
@@ -8,13 +9,13 @@ flags:
   - -tags=netgo
 
 goos: linux
-goarch: {{ .Arch }}
-binary: groundseg_{{ .Arch }}
-dir: ./goseg
-main: .
+goarch: "{{.Arch}}"
+binary: "groundseg_{{.Arch}}"
+builds:
+  - main: ./goseg
 
 ldflags:
-  - "-X main.Version=${VERSION}"
-  - "-X main.Commit=${COMMIT}"
-  - "-X main.CommitDate=${COMMIT_DATE}"
-  - "-X main.TreeState=${TREE_STATE}"
+  - "-X main.Version={{.Env.VERSION}}"
+  - "-X main.Commit={{.Env.COMMIT}}"
+  - "-X main.CommitDate={{.Env.COMMIT_DATE}}"
+  - "-X main.TreeState={{.Env.TREE_STATE}}"
