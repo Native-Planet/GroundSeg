@@ -10,7 +10,6 @@ on:
           - nobuild
           - edge
           - canary
-          - latest
       to_canary:
         description: 'Also push build to canary channel (if edge)'
         required: false
@@ -146,7 +145,7 @@ jobs:
           gh release create ${{ needs.args.outputs.bin-tag }} \
             --title "${{ needs.args.outputs.bin-tag }}" \
             --notes "Release ${{ needs.args.outputs.bin-tag }}" \
-            --target "${{ needs.args.outputs.commit }}"
+            --target ${{ needs.args.outputs.commit }}
 
   deploy:
     needs: [args, backend-build]
