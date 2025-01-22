@@ -134,7 +134,7 @@ jobs:
           "GOOS": "linux",
           "GOARCH": "${{ matrix.arch }}"
         }
-      config-file: "../.slsa-goreleaser.${{ matrix.arch }}.yaml"
+      config-file: "goseg/.slsa-goreleaser.${{ matrix.arch }}.yaml"
 
   create-release:
     needs: [args, backend-build]
