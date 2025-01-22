@@ -1,11 +1,12 @@
 version: 1
+goos: linux
+goarch: amd64
 binary: groundseg_amd64
 dir: ./goseg
 main: .
 env:
+  - GO111MODULE=on
   - CGO_ENABLED=0
-  - GOOS=linux
-  - GOARCH=amd64
 flags:
   - -trimpath
   - -tags=netgo
