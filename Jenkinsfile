@@ -177,7 +177,7 @@ pipeline {
                             
                             rm -r /opt/groundseg/release-ships/latest/groundseg
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
-                            /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
+                            #/opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
                             cd goseg
                             go fmt ./...
