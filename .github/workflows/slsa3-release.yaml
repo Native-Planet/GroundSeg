@@ -111,6 +111,12 @@ jobs:
           name: build-outputs
           path: |
             /tmp/groundseg/version/glob
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-files
+          path: |
             goseg/web/
 
   setup-backend:
@@ -130,7 +136,7 @@ jobs:
           path: .
 
   backend-build:
-    needs: [args, frontend-build, setup-backend]
+    needs: [setup-backend]
     permissions:
       id-token: write
       contents: write
