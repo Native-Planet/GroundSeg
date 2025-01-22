@@ -152,8 +152,8 @@ pipeline {
                             DOCKER_BUILDKIT=0 docker build -t web-builder -f builder.Dockerfile .
                             container_id=$(docker create web-builder)
                             docker cp $container_id:/webui/build ./web
-                            rm -rf ../goseg/web
-                            mv web ../goseg/
+                            rm -rf goseg/web
+                            mv web goseg/
 
                             DOCKER_BUILDKIT=0 docker build -t web-builder -f gallseg.Dockerfile .
                             container_id=$(docker create web-builder)
@@ -179,7 +179,7 @@ pipeline {
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
                             /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
-                            cd ../goseg
+                            cd goseg
 			    pwd
                             go fmt ./...
 			    go mod tidy
