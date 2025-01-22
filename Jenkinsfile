@@ -188,6 +188,7 @@ pipeline {
                             git push --tags
                         '''
                         sh '''#!/bin/bash -x
+			    cd goseg
                             env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_latest
                             env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_latest
                         '''
