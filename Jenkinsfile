@@ -130,7 +130,7 @@ pipeline {
                                 exit 1
                             fi
                             git checkout ${tag}
-                            git checkout -b ${binTag}
+                            git checkout -b ${binTag}-release
                             git config --global user.email "mgmt@nativeplanet.io"
                             git config --global user.name "Native Planet CICD"
                             git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
@@ -180,6 +180,7 @@ pipeline {
                             /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
                             cd ../goseg
+			    pwd
                             go fmt ./...
 			    go mod tidy
                             git commit -am "Promoting ${binTag} for release"
