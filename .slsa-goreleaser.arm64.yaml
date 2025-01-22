@@ -1,0 +1,21 @@
+version: 1
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+flags:
+  - -trimpath
+  - -tags=netgo
+
+goos: linux
+goarch: arm64
+binary: groundseg_arm64
+builds:
+  - main: ./goseg
+
+ldflags:
+  - "-X main.Version=${VERSION}"
+  - "-X main.Commit=${COMMIT}"
+  - "-X main.CommitDate=${COMMIT_DATE}"
+  - "-X main.TreeState=${TREE_STATE}"
