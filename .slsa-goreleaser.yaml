@@ -9,7 +9,7 @@ flags:
 
 goos: linux
 goarch: amd64
-binary: groundseg_{{ .Arch }}_${VERSION}
+binary: groundseg_{{ .Arch }}
 
 ldflags:
   - "-X main.Version=${VERSION}"
