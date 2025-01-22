@@ -101,8 +101,8 @@ jobs:
           docker cp $container_id:/webui/build ./web
           ./glob.sh web
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
-          mkdir -p /tmp/groundseg/version/glob/
-          mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.ref_name }}-${hash}.glob"
+          sudo mkdir -p /tmp/groundseg/version/glob/
+          sudo mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${hash}.glob"
           echo $hash > /tmp/groundseg/version/glob/hash.txt
 
       - name: Upload Artifacts
@@ -133,7 +133,7 @@ jobs:
           "GOOS": "linux",
           "GOARCH": "${{ matrix.arch }}"
         }
-      config-file: .slsa-goreleaser.yaml
+      config-file: .slsa-goreleaser/release.yml
 
   create-release:
     needs: [args, backend-build]
@@ -165,19 +165,14 @@ jobs:
 
       - name: Deploy Files
         run: |
-          # Copy binaries to R2
           for arch in amd64 arm64; do
             rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
               r2:groundseg/bin/
           done
-          
-          # Copy glob file if it exists
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
+            rclone copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob/
           fi
-
-          # Update version server
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
