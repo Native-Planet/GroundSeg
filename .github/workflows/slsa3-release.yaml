@@ -113,6 +113,22 @@ jobs:
             /tmp/groundseg/version/glob
             goseg/web/
 
+  setup-backend:
+    needs: [args, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download web directory
+        uses: actions/download-artifact@v3
+        with:
+          name: web-files
+          path: goseg/web
+      - name: Upload prepared directory
+        uses: actions/upload-artifact@v3
+        with:
+          name: prepared-source
+          path: .
+
   backend-build:
     needs: [args, frontend-build]
     permissions:
@@ -122,12 +138,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
-    steps:
-      - name: download web directory
-        uses: actions/download-artifact@v3
-        with:
-          name: web-files
-          path: goseg/web/
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
       go-version: 1.21
