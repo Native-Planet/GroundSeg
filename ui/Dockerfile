@@ -1,4 +1,4 @@
-FROM node:22-buster-slim
+FROM node:22-bullseye-slim
 
 COPY ./ /webui
 
