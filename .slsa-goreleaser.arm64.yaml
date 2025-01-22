@@ -4,16 +4,12 @@ env:
   - GO111MODULE=on
   - CGO_ENABLED=0
 
-flags:
-  - -trimpath
-  - -tags=netgo
-
 before:
   hooks:
-    - sh -c 'cd ui &&
-      curl -fsSL https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-arm64.tar.gz -o node.tar.gz &&
+    - sh -c 'cd ui && 
+      curl -fsSL https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-arm64.tar.gz -o node.tar.gz && 
       tar xf node.tar.gz && 
-      export PATH=$PWD/node-v22.0.0-linux-x64/bin:$PATH && 
+      export PATH=$PWD/node-v22.0.0-linux-arm64/bin:$PATH && 
       npm install -g npm && 
       npm install && 
       npm run build && 
@@ -22,16 +18,22 @@ before:
       mkdir -p goseg/web && 
       mv ui/build/* goseg/web/'
 
-goos: linux
-goarch: arm64
-binary: groundseg_arm64
-dir: ./goseg
-main: .
 builds:
-  - main: ./goseg
-
-ldflags:
-  - "-X main.Version=${VERSION}"
-  - "-X main.Commit=${COMMIT}"
-  - "-X main.CommitDate=${COMMIT_DATE}"
-  - "-X main.TreeState=${TREE_STATE}"
+  - id: groundseg
+    dir: ./goseg
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm64
+    main: .
+    binary: groundseg_arm64
+    flags:
+      - -trimpath
+      - -tags=netgo
+    ldflags:
+      - -X main.Version={{ .Env.VERSION }}
+      - -X main.Commit={{ .Env.COMMIT }}
+      - -X main.CommitDate={{ .Env.COMMIT_DATE }}
+      - -X main.TreeState={{ .Env.TREE_STATE }}
