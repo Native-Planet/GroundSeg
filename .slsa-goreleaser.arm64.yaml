@@ -1,5 +1,19 @@
 version: 1
-
+binary: groundseg_arm64
+dir: ./goseg
+main: .
+env:
+  - CGO_ENABLED=0
+  - GOOS=linux
+  - GOARCH=arm64
+flags:
+  - -trimpath
+  - -tags=netgo
+ldflags:
+  - "-X main.Version={{ .Env.VERSION }}"
+  - "-X main.Commit={{ .Env.COMMIT }}"
+  - "-X main.CommitDate={{ .Env.COMMIT_DATE }}"
+  - "-X main.TreeState={{ .Env.TREE_STATE }}"
 before:
   hooks:
     - sh -c 'cd ui && 
@@ -13,26 +27,3 @@ before:
       rm -rf goseg/web && 
       mkdir -p goseg/web && 
       mv ui/build/* goseg/web/'
-
-builds:
-  - id: groundseg
-    dir: ./goseg
-    env:
-      - CGO_ENABLED=0
-      - GOOS=linux
-      - GOARCH=arm64
-      - GO111MODULE=on
-    goos:
-      - linux
-    goarch:
-      - arm64
-    main: .
-    binary: groundseg_arm64
-    flags:
-      - -trimpath
-      - -tags=netgo
-    ldflags:
-      - -X main.Version={{ .Env.VERSION }}
-      - -X main.Commit={{ .Env.COMMIT }}
-      - -X main.CommitDate={{ .Env.COMMIT_DATE }}
-      - -X main.TreeState={{ .Env.TREE_STATE }}
