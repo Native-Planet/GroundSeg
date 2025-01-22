@@ -8,8 +8,10 @@ flags:
   - -tags=netgo
 
 goos: linux
-goarch: amd64
+goarch: {{ .Arch }}
 binary: groundseg_{{ .Arch }}
+dir: ./goseg
+main: .
 
 ldflags:
   - "-X main.Version=${VERSION}"
