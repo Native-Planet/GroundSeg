@@ -124,6 +124,7 @@ jobs:
     uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
     with:
       go-version: 1.21
+      source-dir: ./goseg
       evaluated-envs: |
         {
           "VERSION": "${{ needs.args.outputs.version }}",
@@ -133,7 +134,7 @@ jobs:
           "GOOS": "linux",
           "GOARCH": "${{ matrix.arch }}"
         }
-      config-file: ".slsa-goreleaser.${{ matrix.arch }}.yaml"
+      config-file: "../.slsa-goreleaser.${{ matrix.arch }}.yaml"
 
   create-release:
     needs: [args, backend-build]
