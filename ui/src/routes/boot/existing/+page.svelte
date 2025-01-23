@@ -25,7 +25,6 @@
   $: upload = ($structure?.upload) || {}
 
   // debug
-  $: upload = ($structure?.upload) || {}
   $: status = (upload?.status) || ""
   $: patp = (upload?.patp) || ""
   $: extracted = (upload?.extracted) || 0

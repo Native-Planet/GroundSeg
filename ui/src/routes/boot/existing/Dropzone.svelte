@@ -41,7 +41,8 @@
   let percent = 0
 
   /*  Uploader API address */
-  $: addr = "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
+  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
+  $: addr = (customHostname) ? "http://" + customHostname + ":" + $wsPort + "/import/" + endpoint : "http://" + $page.url.hostname + ":" + $wsPort + "/import/" + endpoint
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
@@ -73,9 +74,9 @@
       error: onError,
   })})
 
+
   const handleAddr = () => {
-    const fullAddr = addr + "/" + patp
-    return fullAddr
+    return addr + "/" + patp
   }
 
   const handleUpload = (file, done) => {

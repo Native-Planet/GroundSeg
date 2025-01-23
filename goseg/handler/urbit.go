@@ -64,7 +64,7 @@ func UrbitHandler(msg []byte) error {
 	case "chop": // vere 3.0
 		return ChopPier(patp, shipConf) // vere 3.0
 	case "roll-chop": // vere 3.0
-		return rollChopPier(patp, shipConf) // vere 3.0
+		return RollChopPier(patp, shipConf) // vere 3.0
 	case "pack":
 		return packPier(patp, shipConf)
 	case "pack-meld":
@@ -1117,7 +1117,7 @@ func setNewMaxPierSize(patp string, urbitPayload structs.WsUrbitPayload, shipCon
 	return nil
 }
 
-func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
+func RollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	rollChopError := func(err error) error {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "error"}
 		return err
