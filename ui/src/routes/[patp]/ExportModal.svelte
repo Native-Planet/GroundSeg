@@ -18,6 +18,8 @@
   export let patp
   export let isOpen
 
+  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
+
   $: transition = ($structure?.urbits?.[patp]?.transition) || {}
 
   $: tExportShip = (transition?.exportShip) || ""
@@ -52,7 +54,10 @@
       return;
     }
     // send request
-    const hostname = $page.url.hostname
+    let hostname = $page.url.hostname
+    if (customHostname) {
+      hostname = customHostname
+    }
     const response = await fetch("http://"+hostname+":"+ $wsPort +"/export/"+container, {
       method: 'POST',
       headers: {

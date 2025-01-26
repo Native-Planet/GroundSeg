@@ -3,7 +3,6 @@ package exporter
 import (
 	"archive/zip"
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
@@ -23,9 +22,9 @@ import (
 )
 
 const (
-	maxArchiveSize = 10 * 1024 * 1024 * 1024 // 10GB max archive size
-	bufferSize     = 1024 * 1024             // 1MB buffer for writing
-	progressInterval = 100                   // Update progress every 100 files
+	maxArchiveSize   = 10 * 1024 * 1024 * 1024 // 10GB max archive size
+	bufferSize       = 1024 * 1024             // 1MB buffer for writing
+	progressInterval = 100                     // Update progress every 100 files
 )
 
 var (
@@ -75,11 +74,11 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	// check if container is whitelisted
 	vars := mux.Vars(r)
 	container := vars["container"]
-	
+
 	exportMu.Lock()
 	whitelistToken, exists := whitelist[container]
 	exportMu.Unlock()
-	
+
 	if !exists {
 		exportError(w, fmt.Errorf("container %v is not in whitelist", container))
 		return
@@ -128,14 +127,14 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 					cleanup(patp, container, exportTrans, compressedTrans)
 					return
 				}
-				
+
 				status, exists := pierStatus[container]
 				if !exists {
 					exportError(w, fmt.Errorf("container %v does not exist", container))
 					cleanup(patp, container, exportTrans, compressedTrans)
 					return
 				}
-				
+
 				if strings.Contains(status, "Exited") {
 					break waitLoop
 				}
@@ -146,7 +145,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	// get file path
 	volumeDirectory := defaults.DockerData("volumes")
 	filePath := filepath.Join(volumeDirectory, container, "_data")
-	
+
 	shipConf := config.UrbitConf(container)
 	if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
 		filePath = customLoc
@@ -228,7 +227,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 		// create relative path for zip entry
 		arcDir := strings.TrimPrefix(path, filePath+"/")
-		
+
 		// create new file in zip
 		f, err := zipWriter.Create(arcDir)
 		if err != nil {
@@ -248,7 +247,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		completedFiles++
-		
+
 		// update progress periodically
 		if completedFiles%progressInterval == 0 {
 			progress := int(float64(completedFiles) / float64(totalFiles) * 100)
