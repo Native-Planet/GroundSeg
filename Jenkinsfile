@@ -130,7 +130,7 @@ pipeline {
                                 exit 1
                             fi
                             git checkout ${tag}
-                            git checkout -b ${binTag}
+                            git checkout -b ${binTag}-release
                             git config --global user.email "mgmt@nativeplanet.io"
                             git config --global user.name "Native Planet CICD"
                             git config --global credential.helper store && echo "https://${npGhToken}:x-oauth-basic@github.com" > ~/.git-credentials
@@ -179,7 +179,7 @@ pipeline {
                             cp -r gallseg /opt/groundseg/release-ships/latest/groundseg
                             /opt/groundseg/release-ships/click/click -k -i /opt/groundseg/release-ships/commit.hoon /opt/groundseg/release-ships/latest
 
-                            cd ../goseg
+                            cd goseg
                             go fmt ./...
 			    go mod tidy
                             git commit -am "Promoting ${binTag} for release"
@@ -187,11 +187,11 @@ pipeline {
                             git push --set-upstream origin ${binTag}
                             git push --tags
                         '''
-                        sh """#!/bin/bash -x
-                            cd ./goseg
-                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${env.binTag}_${env.channel}
-                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${env.binTag}_${env.channel}
-                        """
+                        sh '''#!/bin/bash -x
+			    cd goseg
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o /opt/groundseg/version/bin/groundseg_amd64_${binTag}_latest
+                            env GOOS=linux CGO_ENABLED=0 GOARCH=arm64 go build -o /opt/groundseg/version/bin/groundseg_arm64_${binTag}_latest
+                        '''
                     }
                 }
             }

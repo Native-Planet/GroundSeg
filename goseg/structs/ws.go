@@ -345,6 +345,7 @@ type WsNewShipAction struct {
 	Action        string `json:"action"`
 	Patp          string `json:"patp"`
 	Key           string `json:"key"`
+	KeyType       string `json:"keyType"`
 	Remote        bool   `json:"remote"`
 	Command       string `json:"command"`
 	SelectedDrive string `json:"selectedDrive"`

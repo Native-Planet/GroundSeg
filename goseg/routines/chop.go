@@ -23,7 +23,7 @@ func ChopAtLimit() {
 			zap.L().Info(fmt.Sprintf("Auto chop: Checking if %s requires a chop. Limit: %v GB, Current Size (rounded) %v GB", patp, urbConf.SizeLimit, currentSize))
 			if int64(urbConf.SizeLimit) <= currentSize {
 				zap.L().Info(fmt.Sprintf("Auto chop: Attempting to chop %s", patp))
-				go handler.ChopPier(patp, urbConf)
+				go handler.RollChopPier(patp, urbConf)
 			}
 		}
 

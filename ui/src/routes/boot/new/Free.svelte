@@ -15,6 +15,7 @@
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
 
   let key = '';
+  let keyType = "keyfile" // master-ticket
   let name = '';
   let remote = true;
   let advanceOpen = false
@@ -26,11 +27,13 @@
   $: registered = ($structure?.profile?.startram?.info?.registered) || false
   $: running = ($structure?.profile?.startram?.info?.running) || false
 
+  $: freeError = ($structure?.newShip?.transition?.freeError) || ""
+
   $: drives = $structure?.system?.info?.drives || {}
   $: driveNames = Object.keys(drives)
 
   const handleBoot = () => {
-      bootShip(noSig,key,remote,selectedDrive) // temp
+      bootShip(noSig,key.trim(),keyType,remote,selectedDrive)
     /*
     if (selectedDrive == "system-drive") {
       bootShip(noSig,key,remote,selectedDrive)
@@ -39,66 +42,76 @@
     }
     */
   }
+
+  const switchKeyType = () => {
+    // swtiching between keyfile and master-ticket
+    keyType = keyType == "master-ticket" ? "keyfile" : "master-ticket"
+  }
 </script>
 
 <div class="sigil-wrapper">
   <Sigil {name} reverse={true} />
 </div>
-<div class="input-wrapper">
-  <div class="label">Urbit ID</div>
-  <input type="text" bind:value={name} placeholder="Ship Name" />
-</div>
-<div class="input-wrapper">
-  <div class="label">Bootfile</div>
-  <KeyDropper
-    on:changeKey={e => key = e.detail}
-    on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
-  />
-</div>
-
-
-<!-- Customize -->
-<div class="input-wrapper">
-  <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
-    Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
+{#if freeError.length < 1}
+  <div class="input-wrapper">
+    <div class="label">Urbit ID</div>
+    <input type="text" bind:value={name} placeholder="Ship Name" />
   </div>
-</div>
-{#if advanceOpen}
-<div class="input-wrapper">
-  <div class="label">Select Drive</div>
-  <div class="mount-wrapper">
-    <div class="mount-info" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
-    {#each driveNames as name}
-      <div class="mount">
-      <div
-        class="mount-info"
-        class:active={selectedDrive==name}
-        on:click={()=>selectedDrive=name}
-        >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
-      </div>
-      {#if drives[name].driveID == 0}
-      <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
-        <Fa icon={faCircleExclamation} size="1.5x" />
-      </div>
-      {/if}
+  <div class="input-wrapper">
+    {#if keyType == "keyfile"}
+      <div class="label">Keyfile</div>
+      <KeyDropper
+        on:changeKey={e => key = e.detail}
+        on:changePatp={e => name = e.detail.length > 0 ? e.detail : name}
+      />
+    {:else}
+      <div class="label">Master Ticket</div>
+      <input type="password" bind:value={key} placeholder="~sampel-master-ticket" />
+    {/if}
+    <button class="btn keytype" on:click={switchKeyType}>{keyType == "master-ticket" ? "Use Keyfile" : "Use Master Ticket"}</button>
+  </div>
+
+  <!-- Customize -->
+  <div class="input-wrapper">
+    <div class="advance" on:click={()=>advanceOpen = !advanceOpen}>
+      Customize <Fa icon={advanceOpen ? faAngleUp : faAngleDown} size="1x" />
     </div>
-    {/each}
   </div>
-</div>
-<div class="input-wrapper">
-  {#if registered && running}
-  <div class="label">Configuration</div>
-    <div class="check-wrapper" on:click={()=>remote = !remote}>
-      <div class="checkbox">
-        {#if remote}
-          <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
+  {#if advanceOpen}
+  <div class="input-wrapper">
+    <div class="label">Select Drive</div>
+    <div class="mount-wrapper">
+      <div class="mount-info" on:click={()=>selectedDrive="system-drive"} class:active={selectedDrive=="system-drive"}>System Drive (default)</div>
+      {#each driveNames as name}
+        <div class="mount">
+        <div
+          class="mount-info"
+          class:active={selectedDrive==name}
+          on:click={()=>selectedDrive=name}
+          >{drives[name].driveID == 0 ? "New Drive" : "Drive " + drives[name].driveID} ({name})
+        </div>
+        {#if drives[name].driveID == 0}
+        <div class="mount-icon" on:click={()=>openModal(NewDriveWarning,{driveName:name})}>
+          <Fa icon={faCircleExclamation} size="1.5x" />
+        </div>
         {/if}
       </div>
-      <div class="check-label">Set to remote</div>
+      {/each}
     </div>
-  {/if}
-</div>
-
+  </div>
+  <div class="input-wrapper">
+    {#if registered && running}
+    <div class="label">Configuration</div>
+      <div class="check-wrapper" on:click={()=>remote = !remote}>
+        <div class="checkbox">
+          {#if remote}
+            <img class="checkmark" src={pfx+"/checkmark.svg"} alt="checkmark"/>
+          {/if}
+        </div>
+        <div class="check-label">Set to remote</div>
+      </div>
+    {/if}
+  </div>
 {/if}
 <div class="input-wrapper">
   <div class="buttons">
@@ -113,6 +126,10 @@
     </button>
   </div>
 </div>
+{:else}
+  <div class="free-error">{freeError}</div>
+{/if}
+
 
 <style>
   .sigil-wrapper {
@@ -282,9 +299,25 @@
     color: orange;
     cursor: pointer;
   }
+  .keytype {
+    background: var(--btn-secondary);
+    color: white;
+    padding: 16px 32px;
+    width: 280px;
+    border-radius: 16px;
+    cursor: pointer;
+  }
   .active {
     background: var(--btn-secondary);
     color: white;
     pointer-events: none;
+  }
+  .free-error {
+    font-family: var(--regular-font);
+    color: red;
+    font-size: 24px;
+    text-align: center;
+    height: 64px;
+    line-height: 64px;
   }
 </style>
