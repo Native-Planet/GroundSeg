@@ -9,6 +9,7 @@ It simplifies the process of getting onto the Urbit network and provides a range
 that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
 subscription, users can also access their Urbit ship remotely.
 
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
 
 ## Dependencies
 

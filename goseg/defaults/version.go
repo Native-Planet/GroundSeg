@@ -12,22 +12,22 @@ import (
 
 var (
 	logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
-  DefaultVersionText = `
+	DefaultVersionText = `
 {
   "groundseg": {
     "canary": {
       "groundseg": {
-        "amd64_sha256": "72ec95cda72f9540c6a99cb23637ffbe0c14b527868bb1f89b511dd2752eface",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1_latest",
-        "arm64_sha256": "7c6c1c4955c66c5185b70a68b77958cecf432a977ee2a1f814eda4ffc00d1fbe",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1_latest",
+        "amd64_sha256": "b42881004c37a7b4d5f33c13e6b53dd8eba10965f7aa868faf8699b986c7f5c0",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.3.0_latest",
+        "arm64_sha256": "429068aa067c5ccf9cac8f3221292e9c636baa57d9e99609b18b2b5889dfd533",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.3.0_latest",
         "major": 2,
-        "minor": 2,
-        "patch": 1
+        "minor": 3,
+        "patch": 0
       },
       "manual": {
-        "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
-        "arm64_sha256": "1110245032e88d627ce625ed25758b21a473aca38251354c1815ba4938f8d23e",
+        "amd64_sha256": "e59d3e83cffb7be6c56b58624caa095cb8ec4075ecff7962db510d891696ca86",
+        "arm64_sha256": "41190934ca17ee553afa75bd286b539db3f8af066b8189b4646872c56b6bea63",
         "repo": "registry.hub.docker.com/nativeplanet/groundseg-manual",
         "tag": "latest"
       },
@@ -50,7 +50,7 @@ var (
         "tag": "latest"
       },
       "vere": {
-        "amd64_sha256": "17502fcdc0eba13e6e4d1b34412fad3346530b3be412d2b40924f49cc81cee8a",
+        "amd64_sha256": "a288be1742505b7dd0eadefbe8c379a4696031418384aa522c50f224bfdc497c",
         "arm64_sha256": "None",
         "repo": "registry.hub.docker.com/nativeplanet/urbit",
         "tag": "canary"
@@ -70,12 +70,12 @@ var (
     },
     "edge": {
       "groundseg": {
-        "amd64_sha256": "f71ab5adaa2a68c4ecc3e88c06590a0d1177f234993d5fefe88403c465ca0247",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.3.0-rc1_edge",
-        "arm64_sha256": "79d91f03e2a7a5431e28e6e6fd5881b5847e2d62835b1c62caa99ebfe621bee5",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.3.0-rc1_edge",
+        "amd64_sha256": "1fe2c3a0cced99b911253ed8f96ba674e811f8ac6c515ae64a5b07dece2d345a",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.4.0-rc4_edge",
+        "arm64_sha256": "0c4ea0940cf4be1bb348bdce4dbfb546ac7b5170210eb641fc9b946eda9455c3",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.4.0-rc4_edge",
         "major": 2,
-        "minor": 3,
+        "minor": 4,
         "patch": 0
       },
       "manual": {
@@ -123,17 +123,17 @@ var (
     },
     "latest": {
       "groundseg": {
-        "amd64_sha256": "72ec95cda72f9540c6a99cb23637ffbe0c14b527868bb1f89b511dd2752eface",
-        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.2.1_latest",
-        "arm64_sha256": "7c6c1c4955c66c5185b70a68b77958cecf432a977ee2a1f814eda4ffc00d1fbe",
-        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.2.1_latest",
+        "amd64_sha256": "b42881004c37a7b4d5f33c13e6b53dd8eba10965f7aa868faf8699b986c7f5c0",
+        "amd64_url": "https://files.native.computer/bin/groundseg_amd64_v2.3.0_latest",
+        "arm64_sha256": "429068aa067c5ccf9cac8f3221292e9c636baa57d9e99609b18b2b5889dfd533",
+        "arm64_url": "https://files.native.computer/bin/groundseg_arm64_v2.3.0_latest",
         "major": 2,
-        "minor": 2,
-        "patch": 1
+        "minor": 3,
+        "patch": 0
       },
       "manual": {
-        "amd64_sha256": "465a82af809481ce8c4861951be5d714a6e578e4330e6d7d7367fe1b170755a9",
-        "arm64_sha256": "1110245032e88d627ce625ed25758b21a473aca38251354c1815ba4938f8d23e",
+        "amd64_sha256": "e59d3e83cffb7be6c56b58624caa095cb8ec4075ecff7962db510d891696ca86",
+        "arm64_sha256": "41190934ca17ee553afa75bd286b539db3f8af066b8189b4646872c56b6bea63",
         "repo": "registry.hub.docker.com/nativeplanet/groundseg-manual",
         "tag": "latest"
       },

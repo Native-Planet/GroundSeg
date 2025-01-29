@@ -1,4 +1,4 @@
-FROM node:22-bullseye-slim
+FROM node:23.6.0-bullseye-slim
 ENV GS_URBIT_MODE true
 RUN npm install -g npm@9
 COPY ./src /webui/src

@@ -112,6 +112,11 @@ func NewShipTransitionHandler() {
 			current.NewShip.Transition.Patp = event.Event
 			broadcast.UpdateBroadcast(current)
 			broadcast.BroadcastToClients()
+		case "freeError":
+			current := broadcast.GetState()
+			current.NewShip.Transition.FreeError = event.Event
+			broadcast.UpdateBroadcast(current)
+			broadcast.BroadcastToClients()
 		default:
 			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
 		}
