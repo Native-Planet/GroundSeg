@@ -1,4 +1,4 @@
-name: GroundSeg Release Pipeline
+name: GroundSeg SLSA3 release
 on:
   workflow_dispatch:
     inputs:
@@ -10,6 +10,7 @@ on:
           - nobuild
           - edge
           - canary
+          - latest
       to_canary:
         description: 'Also push build to canary channel (if edge)'
         required: false
@@ -70,7 +71,7 @@ jobs:
           if [ "$CHANNEL" = "latest" ]; then
             BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1)
           else
-            BIN_TAG=$(echo ${{ github.ref_name }} | sed 's|/|-|g')
+            BIN_TAG=${{ github.ref_name }}
           fi
           echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
@@ -84,16 +85,13 @@ jobs:
       
       - name: Build Frontend
         run: |
-          # Build Goseg Frontend
           cd ./ui
           docker build -t web-builder -f builder.Dockerfile .
           container_id=$(docker create web-builder)
           docker cp $container_id:/webui/build ./web
           rm -rf ../goseg/web
           mv web ../goseg/
-          pwd
           
-          # Build and store Gallseg glob
           docker build -t web-builder -f gallseg.Dockerfile .
           container_id=$(docker create web-builder)
           git clone https://github.com/Native-Planet/globber
@@ -101,89 +99,65 @@ jobs:
           docker cp $container_id:/webui/build ./web
           ./glob.sh web
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
-          sudo mkdir -p /tmp/groundseg/version/glob/
-          sudo mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${hash}.glob"
-          sudo echo "$hash" > hash.txt
-          sudo mv hash.txt /tmp/groundseg/version/glob/
+          mkdir -p /tmp/groundseg/version/glob/
+          mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.ref_name }}-${hash}.glob"
+          echo $hash > /tmp/groundseg/version/glob/hash.txt
 
-      - name: Upload artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: build-outputs
-          path: |
-            /tmp/groundseg/version/glob
+          path: /tmp/groundseg/version/glob
 
-      - name: Upload artifacts
+      - name: Upload Web Files
         uses: actions/upload-artifact@v3
         with:
           name: web-files
-          path: |
-            goseg/web/
-
-  setup-backend:
-    needs: [args, frontend-build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download web directory
-        uses: actions/download-artifact@v3
-        with:
-          name: web-files
-          path: goseg/web
-      - name: Upload prepared directory
-        uses: actions/upload-artifact@v3
-        with:
-          name: prepared-source
-          path: .
+          path: goseg/web/
 
   backend-build:
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
     outputs:
-      hashes: ${{ steps.hash.outputs.hashes }}
+      hashes: ${{ steps.collect-hashes.outputs.hashes }}
     steps:
       - uses: actions/checkout@v4
-      
+        
       - name: Download web directory
         uses: actions/download-artifact@v3
         with:
           name: web-files
           path: goseg/web
-          
+            
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-          
-      - name: Build Go binary
+            
+      - name: Build binaries and generate hashes
         env:
           VERSION: ${{ needs.args.outputs.version }}
           COMMIT: ${{ needs.args.outputs.commit }}
           COMMIT_DATE: ${{ needs.args.outputs.commit-date }}
           TREE_STATE: ${{ needs.args.outputs.tree-state }}
-          GOARCH: ${{ matrix.arch }}
         run: | 
-          cd goseg && go build -o ../groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
-            -trimpath \
-            -tags=netgo \
-            -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" \
-            .
-          
-      - name: Generate hash
-        id: hash
-        run: | 
-          sha256sum groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes.txt
-          echo "hashes=$(cat hashes.txt)" >> $GITHUB_OUTPUT
+          cd goseg
+          for arch in amd64 arm64; do
+            GO111MODULE=on CGO_ENABLED=0 GOARCH=$arch go build -o ../groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
+              -trimpath \
+              -tags=netgo \
+              -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
+          done
+          cd ..
+          sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes.b64
+          echo "hashes=$(cat hashes.b64)" >> $GITHUB_OUTPUT
 
-      - name: Upload binary
+      - name: Upload binaries
         uses: actions/upload-artifact@v3
         with:
-          name: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-          path: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-  
+          name: binaries
+          path: groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+
   provenance:
     needs: [backend-build]
     permissions:
@@ -194,20 +168,8 @@ jobs:
     with:
       base64-subjects: "${{ needs.backend-build.outputs.hashes }}"
 
-  create-release:
-    needs: [args, backend-build]
-    if: ${{ github.event.inputs.release_channel == 'latest' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create GitHub Release
-        run: |
-          gh release create ${{ needs.args.outputs.bin-tag }} \
-            --title "${{ needs.args.outputs.bin-tag }}" \
-            --notes "Release ${{ needs.args.outputs.bin-tag }}" \
-            --target ${{ needs.args.outputs.commit }}
-
   deploy:
-    needs: [args, backend-build]
+    needs: [args, backend-build, provenance]
     if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
     steps:
@@ -216,7 +178,12 @@ jobs:
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
 
-      - name: Download Artifacts
+      - name: Download binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+
+      - name: Download blobs
         uses: actions/download-artifact@v3
         with:
           name: build-outputs
@@ -224,13 +191,14 @@ jobs:
 
       - name: Deploy Files
         run: |
+          apt update && sudo apt install rclone -y
           for arch in amd64 arm64; do
             rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
               r2:groundseg/bin/
           done
           if [ -d "artifacts/version/glob" ]; then
-            GLOB_HASH=$(sudo cat artifacts/version/glob/hash.txt)
-            rclone copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob/
+            GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
+            rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
           fi
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
