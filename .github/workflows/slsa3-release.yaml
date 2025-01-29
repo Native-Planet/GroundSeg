@@ -202,12 +202,11 @@ jobs:
           DEBIAN_FRONTEND=noninteractive sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install rclone -y
           for arch in amd64 arm64; do
-            rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
-              r2:groundseg/bin/
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} r2:groundseg/bin
           done
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${GLOB_HASH}.glob r2:groundseg/glob
           fi
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
