@@ -118,8 +118,8 @@ jobs:
   backend-build:
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
-    outputs:
-      hashes: ${{ steps.collect-hashes.outputs.hashes }}
+    outputs: 
+      hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - uses: actions/checkout@v4
         
@@ -134,7 +134,7 @@ jobs:
         with:
           go-version: '1.21'
             
-      - name: Build binaries and generate hashes
+      - name: Build binaries
         env:
           VERSION: ${{ needs.args.outputs.version }}
           COMMIT: ${{ needs.args.outputs.commit }}
@@ -148,16 +148,17 @@ jobs:
               -tags=netgo \
               -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
           done
-          cd ..
-          sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes.b64
-          echo "hashes=$(cat hashes.b64)" >> $GITHUB_OUTPUT
+
+      - name: Generate hashes
+        id: hash
+        run: |
+          echo "hashes=$(sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0)" >> "$GITHUB_OUTPUT"
 
       - name: Upload binaries
         uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-
   provenance:
     needs: [backend-build]
     permissions:
