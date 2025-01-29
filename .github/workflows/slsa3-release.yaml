@@ -103,14 +103,15 @@ jobs:
           mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${hash}.glob"
           echo "$hash" > /tmp/groundseg/version/glob/hash.txt
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: build-outputs
-          path: /tmp/groundseg/version/glob
+          path: |
+            /tmp/groundseg/version/glob
 
-      - name: Upload Web Files
-        uses: actions/upload-artifact@v3
+      - name: Upload web files
+        uses: actions/upload-artifact@v4
         with:
           name: web-files
           path: goseg/web/
@@ -122,9 +123,13 @@ jobs:
       hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download web directory
         
       - name: Download web directory
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web-files
           path: goseg/web
