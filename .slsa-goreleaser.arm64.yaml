@@ -1,0 +1,31 @@
+version: 1
+goos: linux
+goarch: amd64
+binary: groundseg_arm64
+dir: ./goseg
+main: .
+env:
+  - CGO_ENABLED=0
+  - GOOS=linux
+  - GOARCH=arm64
+flags:
+  - -trimpath
+  - -tags=netgo
+ldflags:
+  - "-X main.Version=${VERSION}"
+  - "-X main.Commit=${COMMIT}"
+  - "-X main.CommitDate=${COMMIT_DATE}"
+  - "-X main.TreeState=${TREE_STATE}"
+before:
+  hooks:
+    - sh -c 'cd ui && 
+      curl -fsSL https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-arm64.tar.gz -o node.tar.gz && 
+      tar xf node.tar.gz && 
+      export PATH=$PWD/node-v22.0.0-linux-arm64/bin:$PATH && 
+      npm install -g npm && 
+      npm install && 
+      npm run build && 
+      cd .. && 
+      rm -rf goseg/web && 
+      mkdir -p goseg/web && 
+      mv ui/build/* goseg/web/'

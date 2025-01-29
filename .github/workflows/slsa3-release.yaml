@@ -69,9 +69,9 @@ jobs:
         run: |
           CHANNEL="${{ github.event.inputs.release_channel }}"
           if [ "$CHANNEL" = "latest" ]; then
-            BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1)
+            BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1 | sed 's@/@.@g')
           else
-            BIN_TAG=${{ github.ref_name }}
+            BIN_TAG=$(echo ${{ github.ref_name }} | sed 's@/@.@g')
           fi
           echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
@@ -99,18 +99,19 @@ jobs:
           docker cp $container_id:/webui/build ./web
           ./glob.sh web
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
-          mkdir -p /tmp/groundseg/version/glob/
-          mv ./*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.ref_name }}-${hash}.glob"
-          echo $hash > /tmp/groundseg/version/glob/hash.txt
+          mkdir -p /tmp/groundseg/version/glob
+          mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${hash}.glob"
+          echo "$hash" > /tmp/groundseg/version/glob/hash.txt
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: build-outputs
-          path: /tmp/groundseg/version/glob
+          path: |
+            /tmp/groundseg/version/glob
 
-      - name: Upload Web Files
-        uses: actions/upload-artifact@v3
+      - name: Upload web files
+        uses: actions/upload-artifact@v4
         with:
           name: web-files
           path: goseg/web/
@@ -118,13 +119,15 @@ jobs:
   backend-build:
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
-    outputs:
+    outputs: 
       hashes: ${{ steps.hash.outputs.hashes }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
         
       - name: Download web directory
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: web-files
           path: goseg/web
@@ -134,8 +137,7 @@ jobs:
         with:
           go-version: '1.21'
             
-      - name: Build binaries and generate hashes
-        id: hash
+      - name: Build binaries
         env:
           VERSION: ${{ needs.args.outputs.version }}
           COMMIT: ${{ needs.args.outputs.commit }}
@@ -144,20 +146,25 @@ jobs:
         run: | 
           cd goseg
           for arch in amd64 arm64; do
-            GO111MODULE=on CGO_ENABLED=0 GOARCH=$arch go build -o ../groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
+            GO111MODULE=on CGO_ENABLED=0 GOARCH=$arch go build -o ../groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} \
               -trimpath \
               -tags=netgo \
               -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
           done
-          cd ..
-          sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes.b64
-          echo "hashes=$(cat hashes.b64)" >> $GITHUB_OUTPUT"
+
+      - name: Generate hashes
+        id: hash
+        run: |
+          ls -la groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+          HASH_OUTPUT=$(sha256sum groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} | tee /dev/stderr | base64 -w0)
+          echo "Hash base64: $HASH_OUTPUT" >&2
+          echo "hashes=$HASH_OUTPUT" >> "$GITHUB_OUTPUT"
 
       - name: Upload binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
-          path: groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+          path: groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
 
   provenance:
     needs: [backend-build]
@@ -174,36 +181,95 @@ jobs:
     if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Configure Rclone
-        run: |
-          mkdir -p ~/.config/rclone/
-          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
 
       - name: Download binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: binaries
 
       - name: Download blobs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build-outputs
           path: artifacts
 
       - name: Deploy Files
         run: |
-          apt update && sudo apt install rclone -y
+          mkdir -p ~/.config/rclone/
+          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          DEBIAN_FRONTEND=noninteractive sudo apt update
+          DEBIAN_FRONTEND=noninteractive sudo apt install rclone jq -y
           for arch in amd64 arm64; do
-            rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
-              r2:groundseg/bin/
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
           done
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
           fi
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
-              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}\"}"
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
+          AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
+          ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
+          AMDSHA=$(sha256sum "$AMD64_BIN" | awk '{print $1}')
+          ARMSHA=$(sha256sum "$ARM64_BIN" | awk '{print $1}')
+          curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+            "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/amd64_sha256/$AMDSHA"
+          curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+            "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/arm64_sha256/$ARMSHA"
+          VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
+          MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
+          MINOR=$(echo "$VERSION" | cut -d'.' -f2)
+          PATCH=$(echo "$VERSION" | cut -d'.' -f3)
+          is_number() {
+            [[ "$1" =~ ^[0-9]+$ ]]
+          }
+          if is_number "$MAJOR" && is_number "$MINOR" && is_number "$PATCH"; then
+            echo "All version components are valid numbers. Sending to version server..."
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/major/$MAJOR"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/minor/$MINOR"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/patch/$PATCH"
+          else
+            echo "Skipping version server semver update."
+            echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
+          fi
+    
+      - name: Create Release
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.args.outputs.bin-tag }}-${{ needs.args.outputs.channel }}
+          release_name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
+          draft: false
+          prerelease: ${{ contains(needs.args.outputs.channel, 'canary') }}
+      
+      - name: Upload Release Assets
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+          asset_name: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+          asset_content_type: application/octet-stream
+      
+      - name: Upload Provenance to Release
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./provenance/*.jsonl
+          asset_name: provenance.jsonl
+          asset_content_type: application/json
