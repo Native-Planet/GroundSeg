@@ -16,13 +16,6 @@ on:
         required: false
         type: boolean
         default: false
-      action_type:
-        description: 'Build or promote RC'
-        required: true
-        type: choice
-        options:
-          - build
-          - promote
       version_server:
         description: 'Version Server'
         required: true
@@ -78,7 +71,7 @@ jobs:
 
   frontend-build:
     needs: args
-    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'latest' }}
+    if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
