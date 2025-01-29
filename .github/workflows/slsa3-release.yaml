@@ -198,7 +198,7 @@ jobs:
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           DEBIAN_FRONTEND=noninteractive sudo apt update
-          DEBIAN_FRONTEND=noninteractive sudo apt install rclone -y
+          DEBIAN_FRONTEND=noninteractive sudo apt install rclone jq -y
           for arch in amd64 arm64; do
             rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
           done
@@ -212,6 +212,14 @@ jobs:
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
+          AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}"
+          ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}"
+          AMDSHA=$(sha256sum "$AMD64_BIN" | awk '{print $1}')
+          ARMSHA=$(sha256sum "$ARM64_BIN" | awk '{print $1}')
+          curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+            "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/amd64_sha256/$AMDSHA"
+          curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+            "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/arm64_sha256/$ARMSHA"
           VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
           MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
           MINOR=$(echo "$VERSION" | cut -d'.' -f2)
