@@ -192,7 +192,8 @@ jobs:
 
       - name: Deploy Files
         run: |
-          apt update && sudo apt install rclone -y
+          DEBIAN_FRONTEND=noninteractive sudo apt update
+          DEBIAN_FRONTEND=noninteractive sudo apt install rclone -y
           for arch in amd64 arm64; do
             rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
               r2:groundseg/bin/
