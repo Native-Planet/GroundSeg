@@ -114,38 +114,57 @@ jobs:
 
   backend-build:
     needs: [args, frontend-build]
-    permissions:
-      id-token: write
-      contents: write
-      actions: read
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64, arm64]
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
-    with:
-      go-version: 1.21
-      evaluated-envs: |
-        {
-          "VERSION": "${{ needs.args.outputs.version }}",
-          "COMMIT": "${{ needs.args.outputs.commit }}",
-          "COMMIT_DATE": "${{ needs.args.outputs.commit-date }}",
-          "TREE_STATE": "${{ needs.args.outputs.tree-state }}",
-          "GOOS": "linux",
-          "GOARCH": "${{ matrix.arch }}"
-        }
-      config-file: .slsa-goreleaser.yaml
-
-  create-release:
-    needs: [args, backend-build]
-    if: ${{ github.event.inputs.release_channel == 'latest' }}
-    runs-on: ubuntu-latest
+    outputs:
+      hashes: ${{ steps.collect-hashes.outputs.hashes }}
     steps:
-      - name: Create GitHub Release
+      - uses: actions/checkout@v4
+        
+      - name: Download web directory
+        uses: actions/download-artifact@v3
+        with:
+          name: web-files
+          path: goseg/web
+            
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+            
+      - name: Build Go binary
+        env:
+          VERSION: ${{ needs.args.outputs.version }}
+          COMMIT: ${{ needs.args.outputs.commit }}
+          COMMIT_DATE: ${{ needs.args.outputs.commit-date }}
+          TREE_STATE: ${{ needs.args.outputs.tree-state }}
+          GOARCH: ${{ matrix.arch }}
+        run: | 
+          cd goseg && GO111MODULE=on CGO_ENABLED=0 GOARCH=${{ matrix.arch }} go build -o ../groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
+            -trimpath \
+            -tags=netgo \
+            -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
+  
+      - name: Generate hash
+        id: hash
+        run: | 
+          sha256sum groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes-${{ matrix.arch }}.txt
+          echo "hashes-${{ matrix.arch }}=$(cat hashes-${{ matrix.arch }}.txt)" >> $GITHUB_OUTPUT
+  
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+          path: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+  
+      - name: Collect hashes
+        id: collect-hashes
+        if: ${{ matrix.arch == 'amd64' }}
         run: |
-          gh release create ${{ needs.args.outputs.bin-tag }} \
-            --title "${{ needs.args.outputs.bin-tag }}" \
-            --notes "Release ${{ needs.args.outputs.bin-tag }}" \
-            --target ${{ needs.args.outputs.commit }}
+          combined_hashes=$(echo -e "${{ steps.hash.outputs.hashes-amd64 }}\n${{ steps.hash.outputs.hashes-arm64 }}" | base64 -w0)
+          echo "hashes=$combined_hashes" >> $GITHUB_OUTPUT
 
   deploy:
     needs: [args, backend-build]
@@ -165,19 +184,15 @@ jobs:
 
       - name: Deploy Files
         run: |
-          # Copy binaries to R2
+          apt update && sudo apt install rclone -y
           for arch in amd64 arm64; do
             rclone copy groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
               r2:groundseg/bin/
           done
-          
-          # Copy glob file if it exists
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
             rclone copy artifacts/version/glob/gallseg-${{ github.ref_name }}-${GLOB_HASH}.glob r2:groundseg/glob/
           fi
-
-          # Update version server
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
