@@ -1,4 +1,4 @@
-name: GroundSeg Release Pipeline
+name: GroundSeg SLSA3 release
 on:
   workflow_dispatch:
     inputs:
@@ -85,7 +85,6 @@ jobs:
       
       - name: Build Frontend
         run: |
-          # Build Goseg Frontend
           cd ./ui
           docker build -t web-builder -f builder.Dockerfile .
           container_id=$(docker create web-builder)
@@ -93,7 +92,6 @@ jobs:
           rm -rf ../goseg/web
           mv web ../goseg/
           
-          # Build and store Gallseg glob
           docker build -t web-builder -f gallseg.Dockerfile .
           container_id=$(docker create web-builder)
           git clone https://github.com/Native-Planet/globber
@@ -109,15 +107,17 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: build-outputs
-          path: |
-            /tmp/groundseg/version/glob
+          path: /tmp/groundseg/version/glob
+
+      - name: Upload Web Files
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-files
+          path: goseg/web/
 
   backend-build:
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
     outputs:
       hashes: ${{ steps.collect-hashes.outputs.hashes }}
     steps:
@@ -134,40 +134,42 @@ jobs:
         with:
           go-version: '1.21'
             
-      - name: Build Go binary
+      - name: Build binaries and generate hashes
         env:
           VERSION: ${{ needs.args.outputs.version }}
           COMMIT: ${{ needs.args.outputs.commit }}
           COMMIT_DATE: ${{ needs.args.outputs.commit-date }}
           TREE_STATE: ${{ needs.args.outputs.tree-state }}
-          GOARCH: ${{ matrix.arch }}
         run: | 
-          cd goseg && GO111MODULE=on CGO_ENABLED=0 GOARCH=${{ matrix.arch }} go build -o ../groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
-            -trimpath \
-            -tags=netgo \
-            -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
-  
-      - name: Generate hash
-        id: hash
-        run: | 
-          sha256sum groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes-${{ matrix.arch }}.txt
-          echo "hashes-${{ matrix.arch }}=$(cat hashes-${{ matrix.arch }}.txt)" >> $GITHUB_OUTPUT
-  
-      - name: Upload binary
+          cd goseg
+          for arch in amd64 arm64; do
+            GO111MODULE=on CGO_ENABLED=0 GOARCH=$arch go build -o ../groundseg_${arch}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} \
+              -trimpath \
+              -tags=netgo \
+              -ldflags="-X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.CommitDate=${COMMIT_DATE} -X main.TreeState=${TREE_STATE}" .
+          done
+          cd ..
+          sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0 > hashes.b64
+          echo "hashes=$(cat hashes.b64)" >> $GITHUB_OUTPUT
+
+      - name: Upload binaries
         uses: actions/upload-artifact@v3
         with:
-          name: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-          path: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-  
-      - name: Collect hashes
-        id: collect-hashes
-        if: ${{ matrix.arch == 'amd64' }}
-        run: |
-          combined_hashes=$(echo -e "${{ steps.hash.outputs.hashes-amd64 }}\n${{ steps.hash.outputs.hashes-arm64 }}" | base64 -w0)
-          echo "hashes=$combined_hashes" >> $GITHUB_OUTPUT
+          name: binaries
+          path: groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+
+  provenance:
+    needs: [backend-build]
+    permissions:
+      actions: read
+      id-token: write  
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    with:
+      base64-subjects: "${{ needs.backend-build.outputs.hashes }}"
 
   deploy:
-    needs: [args, backend-build]
+    needs: [args, backend-build, provenance]
     if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
     steps:
@@ -176,7 +178,12 @@ jobs:
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
 
-      - name: Download Artifacts
+      - name: Download binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+
+      - name: Download blobs
         uses: actions/download-artifact@v3
         with:
           name: build-outputs
