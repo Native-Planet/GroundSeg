@@ -212,8 +212,8 @@ jobs:
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
-          AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}"
-          ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}"
+          AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
+          ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           AMDSHA=$(sha256sum "$AMD64_BIN" | awk '{print $1}')
           ARMSHA=$(sha256sum "$ARM64_BIN" | awk '{print $1}')
           curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
