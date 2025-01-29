@@ -170,6 +170,7 @@ jobs:
       base64-subjects: "${{ needs.backend-build.outputs.hashes }}"
 
   deploy:
+    permissions: write-all
     needs: [args, backend-build, provenance]
     if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
