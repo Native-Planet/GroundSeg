@@ -71,7 +71,7 @@ jobs:
           if [ "$CHANNEL" = "latest" ]; then
             BIN_TAG=$(echo ${{ github.ref_name }} | cut -d'-' -f1 | sed 's@/@.@g')
           else
-            BIN_TAG=${{ github.ref_name }}
+            BIN_TAG=$(echo ${{ github.ref_name }} | sed 's@/.@g')
           fi
           echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
@@ -212,7 +212,26 @@ jobs:
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
-
+          VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
+          MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
+          MINOR=$(echo "$VERSION" | cut -d'.' -f2)
+          PATCH=$(echo "$VERSION" | cut -d'.' -f3)
+          is_number() {
+            [[ "$1" =~ ^[0-9]+$ ]]
+          }
+          if is_number "$MAJOR" && is_number "$MINOR" && is_number "$PATCH"; then
+            echo "All version components are valid numbers. Sending to version server..."
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/major/$MAJOR"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/minor/$MINOR"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/patch/$PATCH"
+          else
+            echo "Skipping version server semver update."
+            echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
+          fi
+    
       - name: Create Release
         if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
         id: create_release
