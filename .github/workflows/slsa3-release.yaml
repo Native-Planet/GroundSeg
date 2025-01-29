@@ -137,27 +137,30 @@ jobs:
           path: .
 
   backend-build:
-    needs: [setup-backend]
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - name: Build Go binary
+        run: |
+          go build -o groundseg_binary
+          
+      - name: Generate hash
+        id: hash
+        run: | 
+          sha256sum groundseg_binary | base64 -w0 > hashes.txt
+          echo "hashes=$(cat hashes.txt)" >> $GITHUB_OUTPUT
+  
+  provenance:
+    needs: [backend-build]
     permissions:
-      id-token: write
-      contents: write
       actions: read
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-    uses: slsa-framework/slsa-github-generator/.github/workflows/builder_go_slsa3.yml@v2.0.0
+      id-token: write  
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
     with:
-      go-version: 1.21
-      evaluated-envs: |
-        {
-          "VERSION": "${{ needs.args.outputs.version }}",
-          "COMMIT": "${{ needs.args.outputs.commit }}",
-          "COMMIT_DATE": "${{ needs.args.outputs.commit-date }}",
-          "TREE_STATE": "${{ needs.args.outputs.tree-state }}",
-          "GOOS": "linux",
-          "GOARCH": "${{ matrix.arch }}"
-        }
-      config-file: ".slsa-goreleaser.${{ matrix.arch }}.yaml"
+      base64-subjects: "${{ needs.backend-build.outputs.hashes }}"
 
   create-release:
     needs: [args, backend-build]
