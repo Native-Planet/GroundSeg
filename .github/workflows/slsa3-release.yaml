@@ -155,7 +155,10 @@ jobs:
       - name: Generate hashes
         id: hash
         run: |
-          echo "hashes=$(sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | base64 -w0)" >> "$GITHUB_OUTPUT"
+          ls -la groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
+          HASH_OUTPUT=$(sha256sum groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }} | tee /dev/stderr | base64 -w0)
+          echo "Hash base64: $HASH_OUTPUT" >&2
+          echo "hashes=$HASH_OUTPUT" >> "$GITHUB_OUTPUT"
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
