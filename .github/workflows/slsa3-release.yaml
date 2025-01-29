@@ -100,7 +100,7 @@ jobs:
           ./glob.sh web
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
           mkdir -p /tmp/groundseg/version/glob
-          mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.ref_name }}-${hash}.glob"
+          mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${hash}.glob"
           echo "$hash" > /tmp/groundseg/version/glob/hash.txt
 
       - name: Upload Artifacts
