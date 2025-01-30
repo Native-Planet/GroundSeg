@@ -171,6 +171,7 @@ jobs:
 
   deploy:
     needs: [args, backend-build, provenance]
+    permissions: write-all
     if: ${{ github.event.inputs.release_channel != 'nobuild' }}
     runs-on: ubuntu-latest
     steps:
