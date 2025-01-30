@@ -257,9 +257,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.args.outputs.bin-tag }}
-          name: Release ${{ needs.args.outputs.bin-tag }}
+          name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.bin-tag }})
           draft: false
-          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') }}
+          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
           files: |
             ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
             ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
