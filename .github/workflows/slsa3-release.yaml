@@ -229,6 +229,11 @@ jobs:
           curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
             "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/slsa_url/payload" \
             -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
+          if [[ "${{github.event.inputs.to_canary}}" -eq "true" ]]; then
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/slsa_url/payload" \
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
+          fi
           VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
           MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
           MINOR=$(echo "$VERSION" | cut -d'.' -f2)
