@@ -206,6 +206,7 @@ jobs:
             rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
           fi
           mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl r2:groundseg/bin
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
@@ -225,6 +226,9 @@ jobs:
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/amd64_sha256/$AMDSHA"
           curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/arm64_sha256/$ARMSHA"
+          curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+            "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/slsa_url/payload" \
+            -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
           VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
           MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
           MINOR=$(echo "$VERSION" | cut -d'.' -f2)
