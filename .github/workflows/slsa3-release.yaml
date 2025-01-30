@@ -249,48 +249,18 @@ jobs:
             echo "Skipping version server semver update."
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
-    
-      - name: Create Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
-        id: create_release
-        uses: actions/create-release@v1
+
+      - name: Create Release and Upload Assets
+        if: ${{ github.event.inputs.version_server == 'version.groundseg.app' }}
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ needs.args.outputs.bin-tag }}-${{ needs.args.outputs.channel }}
-          release_name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
+          tag_name: ${{ needs.args.outputs.bin-tag }}
+          name: Release ${{ needs.args.outputs.bin-tag }}
           draft: false
-          prerelease: ${{ contains(needs.args.outputs.channel, 'canary') }}
-      
-      - name: Upload Release Asset AMD64
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-          asset_name: groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset ARM64
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-          asset_name: groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-          asset_content_type: application/octet-stream
-
-      - name: Upload Provenance to Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
-          asset_name: groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
-          asset_content_type: application/json
+          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') }}
+          files: |
+            ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+            ./groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
