@@ -186,6 +186,11 @@ jobs:
           name: build-outputs
           path: artifacts
 
+      - name: Download blobs
+        uses: actions/download-artifact@v4
+        with:
+          name: multiple.intoto.jsonl
+
       - name: Deploy Files
         run: |
           mkdir -p ~/.config/rclone/
@@ -199,11 +204,17 @@ jobs:
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
             rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
           fi
+          mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
+              if [[ "${{github.event.inputs.to_canary}}" -eq "true" ]]; then
+                curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+                  "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/${arch}_url/payload" \
+                  -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_canary_${{ needs.args.outputs.bin-tag }}\"}"
+              fi
           done
           AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
