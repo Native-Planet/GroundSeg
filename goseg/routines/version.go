@@ -1,6 +1,7 @@
 package routines
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slsa-framework/slsa-verifier/cli/slsa-verifier/verify"
 	"go.uber.org/zap"
 )
 
@@ -130,7 +132,8 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// Chmod groundseg_new
 	zap.L().Info("Modifying groundseg_new permissions")
-	if err := os.Chmod(filepath.Join(config.BasePath, "groundseg_new"), 0755); err != nil {
+	binaryPath := filepath.Join(config.BasePath, "groundseg_new")
+	if err := os.Chmod(binaryPath, 0755); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
@@ -146,6 +149,20 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if newVersionHash != newBinHash {
 		zap.L().Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
 		return
+	}
+	if !conf.DisableSlsa {
+		zap.L().Info("Verifying SLSA provenance")
+		if err := verifySlsaProvenance(
+			versionInfo.Groundseg.SlsaURL,
+			binaryPath,
+			"git+https://github.com/Native-Planet/GroundSeg",
+		); err != nil {
+			zap.L().Error(fmt.Sprintf("SLSA verification failed: %v", err))
+			return
+		}
+		zap.L().Info("SLSA verification successful")
+	} else {
+		zap.L().Warn("SLSA verification disabled by configuration")
 	}
 	// delete groundseg binary if exists
 	zap.L().Info("Deleting old groundseg")
@@ -190,6 +207,51 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 			return
 		}
 	}
+}
+
+func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI string) error {
+	// Download provenance to temp file
+	provenanceFile, err := os.CreateTemp("", "provenance-*.intoto.jsonl")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for provenance: %v", err)
+	}
+	defer os.Remove(provenanceFile.Name())
+	defer provenanceFile.Close()
+
+	// Download provenance file
+	resp, err := http.Get(provenanceURL)
+	if err != nil {
+		return fmt.Errorf("failed to download provenance: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to download provenance, status: %v", resp.StatusCode)
+	}
+
+	// Write provenance to temp file
+	_, err = io.Copy(provenanceFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write provenance file: %v", err)
+	}
+
+	// Create verification command
+	verifyCmd := &verify.VerifyArtifactCommand{
+		ProvenancePath:  provenanceFile.Name(),
+		SourceURI:       sourceURI,
+		PrintProvenance: false,
+	}
+
+	// Execute verification
+	ctx := context.Background()
+	trustedBuilder, err := verifyCmd.Exec(ctx, []string{binaryPath})
+	if err != nil {
+		return fmt.Errorf("SLSA verification failed: %v", err)
+	}
+
+	// Log the trusted builder information
+	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
+	return nil
 }
 
 func contains(slice []string, item string) bool {

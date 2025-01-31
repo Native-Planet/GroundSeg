@@ -54,7 +54,9 @@ type SysConfig struct {
 	PenpaiCores    int                    `json:"penpaiCores"`
 	PenpaiModels   []Penpai               `json:"penpaiModels"`
 	PenpaiActive   string                 `json:"penpaiActive"`
+	DisableSlsa    bool                   `json:"disableSlsa"`
 }
+
 type DiskWarning struct {
 	// true if warning has been sent
 	// resets to false when disk goes below 80% usage
