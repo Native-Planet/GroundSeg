@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/slsa-framework/slsa-verifier/cli/slsa-verifier/verify"
+	"github.com/slsa-framework/slsa-verifier/v2/verifiers/utils"
 	"go.uber.org/zap"
 )
 
@@ -251,6 +252,28 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 
 	// Log the trusted builder information
 	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
+	return nil
+}
+
+func Sigstore() error {
+	trustedRoot, err := utils.GetSigstoreTrustedRoot()
+	if err != nil {
+		return fmt.Errorf("failed to get sigstore trusted root: %w", err)
+	}
+	zap.L().Info("Successfully fetched Sigstore trusted root")
+
+	// Optionally, read the locally cached rekor public key.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	rekorPubPath := filepath.Join(home, ".sigstore", "root", "targets", "rekor.pub")
+	rekorPub, err := os.ReadFile(rekorPubPath)
+	if err != nil {
+		return fmt.Errorf("failed to read rekor public key from %q: %w", rekorPubPath, err)
+	}
+	zap.L().Info(fmt.Sprintf("Loaded Rekor public key from %q", rekorPubPath))
+
 	return nil
 }
 
