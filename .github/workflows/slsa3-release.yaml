@@ -188,23 +188,50 @@ jobs:
 
       - name: Deploy Files
         run: |
+          ### 🐲 𝓗𝓔𝓡𝓔 𝓑𝓔 𝓓𝓡𝓐𝓖𝓞𝓝𝓢 🐲
+          ### prepare environment
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           DEBIAN_FRONTEND=noninteractive sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install rclone jq -y
+          #
+          # copy files into bucket
+          #
+          ### copy binaries into bucket
           for arch in amd64 arm64; do
             rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
           done
+          #
+          ### copy glob into bucket
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
             rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
           fi
+          #
+          ### copy provenance into bucket
+          cp ./provenance/*.jsonl groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl r2:groundseg/bin
+          #
+          # update version server
+          #
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
+          #
+          ### binaries and provenance
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
+          curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+            "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/slsa_url/payload" \
+            -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl\"}"
+          if [ "${{ github.event.inputs.to_canary }} == "true" ]; then
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/slsa_url/payload" \
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl\"}"
+          fi
+          #
+          # get hashes
           AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           AMDSHA=$(sha256sum "$AMD64_BIN" | awk '{print $1}')
@@ -213,6 +240,21 @@ jobs:
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/amd64_sha256/$AMDSHA"
           curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/arm64_sha256/$ARMSHA"
+          #
+          ### update canary if needed
+          if [ "${{ github.event.inputs.to_canary }}" = "true" ] && [ "${{ github.event.inputs.release_channel }}" = "edge" ]; then
+            for arch in amd64 arm64; do
+              curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+                "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/${arch}_url/payload" \
+                -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
+            done
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/amd64_sha256/$AMDSHA"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/arm64_sha256/$ARMSHA"
+          fi
+          #
+          ### update semver
           VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
           MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
           MINOR=$(echo "$VERSION" | cut -d'.' -f2)
@@ -228,6 +270,14 @@ jobs:
               "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/minor/$MINOR"
             curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
               "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/patch/$PATCH"
+              if [ "${{ github.event.inputs.to_canary }}" = "true" ] && [ "${{ github.event.inputs.release_channel }}" = "edge" ]; then
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/major/$MAJOR"
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/minor/$MINOR"
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/patch/$PATCH"
+              fi
           else
             echo "Skipping version server semver update."
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
@@ -264,5 +314,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./provenance/*.jsonl
-          asset_name: provenance.jsonl
+          asset_name: groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl
           asset_content_type: application/json
