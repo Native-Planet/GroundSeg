@@ -166,7 +166,7 @@ jobs:
     needs: [backend-build]
     permissions:
       actions: read
-      id-token: write  
+      id-token: write
       contents: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
     with:
@@ -214,12 +214,14 @@ jobs:
     if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
     runs-on: ubuntu-latest
     steps:
-
+      - name: Download SLSA provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: multiple.intoto.jsonl
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
           name: binaries
-
       - name: Download blobs
         uses: actions/download-artifact@v4
         with:
@@ -249,8 +251,8 @@ jobs:
           fi
           #
           ### copy provenance into bucket
-          cp ./provenance/*.jsonl groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl
-          rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl r2:groundseg/bin
+          mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl r2:groundseg/bin
           #
           # update version server
           #
@@ -264,11 +266,11 @@ jobs:
           done
           curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
             "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/slsa_url/payload" \
-            -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl\"}"
+            -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
           if [ "${{ github.event.inputs.to_canary }} == "true" ]; then
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
               "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/slsa_url/payload" \
-              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl\"}"
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
           fi
           #
           # get hashes
@@ -354,5 +356,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./provenance/*.jsonl
-          asset_name: groundseg_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}.jsonl
+          asset_name: groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
           asset_content_type: application/json
