@@ -183,12 +183,25 @@ jobs:
     steps:
       - name: Promote version data
         run: |
+          mkdir -p ~/.config/rclone/
+          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           DEBIAN_FRONTEND=noninteractive sudo apt update
-          DEBIAN_FRONTEND=noninteractive sudo apt install -y jq
+          DEBIAN_FRONTEND=noninteractive sudo apt install -y jq rclone
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
           VERSION_DATA=$(curl -s -H "https://${VERSION_SERVER}/")
           EDGE_VALUES=$(echo "$VERSION_DATA" | jq -r '.groundseg.edge.groundseg')
-          for key in amd64_url arm64_url slsa_url; do
+          for key in amd64_url arm64_url; do
+            VALUE=$(echo "$EDGE_VALUES" | jq -r ".$key")
+            OLDFILE=${VALUE##*/}
+            NEWFILE=$(echo "$OLDFILE" | sed 's/-rc[0-9]\+//g' | sed 's/edge/latest/g)
+            NEWURL=$(echo "$VALUE" | sed 's/-rc[0-9]\+//g' | sed 's/edge/latest/g')
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy r2:groundseg/bin/${OLDFILE} r2:groundseg/bin/${NEWFILE}
+            echo "Setting $key URL to $VALUE"
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/${key}/payload" \
+              -d "{\"value\":\"$NEWURL\"}"
+          done
+          for key in slsa_url; do
             VALUE=$(echo "$EDGE_VALUES" | jq -r ".$key")
             echo "Setting $key URL to $VALUE"
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
