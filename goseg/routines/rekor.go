@@ -111,7 +111,7 @@ func rekorKey() (string, error) {
 			return "", fmt.Errorf("creating cache directory: %w", err)
 		}
 
-		keyData, err := downloadMetadata(fmt.Sprintf("%s/targets/rekor.pub", tufUrl))
+		keyData, err := downloadMetadata("https://rekor.sigstore.dev/api/v1/log/publicKey")
 		if err != nil {
 			return "", fmt.Errorf("downloading key data: %w", err)
 		}
