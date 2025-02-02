@@ -1,1 +1,0 @@
-goseg/go.mod
