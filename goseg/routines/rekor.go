@@ -106,8 +106,13 @@ func rekorKey() (string, error) {
 		}
 		keyData := []byte(rekorKeyInfo.Custom.Sigstore.URI)
 		h := sha256.Sum256(keyData)
-		if hex.EncodeToString(h[:]) != rekorKeyInfo.Hashes["sha256"] {
-			return "", fmt.Errorf("key data hash mismatch")
+		hexHash := hex.EncodeToString(h[:])
+		zap.L().Debug("Hash comparison",
+			zap.String("calculated", hexHash),
+			zap.String("expected", rekorKeyInfo.Hashes["sha256"]))
+		if hexHash != rekorKeyInfo.Hashes["sha256"] {
+			return "", fmt.Errorf("key data hash mismatch: got %s, want %s",
+				hexHash, rekorKeyInfo.Hashes["sha256"])
 		}
 		if err := os.WriteFile(fullKeyPath, keyData, 0644); err != nil {
 			return "", fmt.Errorf("caching rekor key: %w", err)
