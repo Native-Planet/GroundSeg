@@ -251,6 +251,7 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 		return fmt.Errorf("SLSA verification failed: %v", err)
 	}
 	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
+	zap.L().Info("https://github.blog/security/supply-chain-security/slsa-3-compliance-with-github-actions/")
 	return nil
 }
 
