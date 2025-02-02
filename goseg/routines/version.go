@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/slsa-framework/slsa-verifier/cli/slsa-verifier/verify"
-	"github.com/slsa-framework/slsa-verifier/v2/verifiers/utils"
 	"go.uber.org/zap"
 )
 
@@ -182,6 +181,14 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 		zap.L().Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
 	}
+	// re-disable bypass after one update
+	if conf.DisableSlsa {
+		if err := config.UpdateConf(map[string]interface{}{
+			"disableSlsa": false,
+		}); err != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
+		}
+	}
 	versionStr := "v" + strconv.Itoa(versionInfo.Groundseg.Major) + "." +
 		strconv.Itoa(versionInfo.Groundseg.Minor) + "." +
 		strconv.Itoa(versionInfo.Groundseg.Patch)
@@ -211,15 +218,15 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 }
 
 func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI string) error {
-	// Download provenance to temp file
+	if _, err := rekorKey(); err != nil {
+		return fmt.Errorf("failed to ensure Rekor key is available: %w", err)
+	}
 	provenanceFile, err := os.CreateTemp("", "provenance-*.intoto.jsonl")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file for provenance: %v", err)
 	}
 	defer os.Remove(provenanceFile.Name())
 	defer provenanceFile.Close()
-
-	// Download provenance file
 	resp, err := http.Get(provenanceURL)
 	if err != nil {
 		return fmt.Errorf("failed to download provenance: %v", err)
@@ -229,51 +236,21 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("failed to download provenance, status: %v", resp.StatusCode)
 	}
-
-	// Write provenance to temp file
 	_, err = io.Copy(provenanceFile, resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to write provenance file: %v", err)
 	}
-
-	// Create verification command
 	verifyCmd := &verify.VerifyArtifactCommand{
 		ProvenancePath:  provenanceFile.Name(),
 		SourceURI:       sourceURI,
 		PrintProvenance: false,
 	}
-
-	// Execute verification
 	ctx := context.Background()
 	trustedBuilder, err := verifyCmd.Exec(ctx, []string{binaryPath})
 	if err != nil {
 		return fmt.Errorf("SLSA verification failed: %v", err)
 	}
-
-	// Log the trusted builder information
 	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
-	return nil
-}
-
-func Sigstore() error {
-	trustedRoot, err := utils.GetSigstoreTrustedRoot()
-	if err != nil {
-		return fmt.Errorf("failed to get sigstore trusted root: %w", err)
-	}
-	zap.L().Info("Successfully fetched Sigstore trusted root")
-
-	// Optionally, read the locally cached rekor public key.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
-	}
-	rekorPubPath := filepath.Join(home, ".sigstore", "root", "targets", "rekor.pub")
-	rekorPub, err := os.ReadFile(rekorPubPath)
-	if err != nil {
-		return fmt.Errorf("failed to read rekor public key from %q: %w", rekorPubPath, err)
-	}
-	zap.L().Info(fmt.Sprintf("Loaded Rekor public key from %q", rekorPubPath))
-
 	return nil
 }
 
