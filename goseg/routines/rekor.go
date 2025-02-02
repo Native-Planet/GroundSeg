@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -56,6 +58,13 @@ type targetInfo struct {
 			Usage  string `json:"usage"`
 		} `json:"sigstore"`
 	} `json:"custom"`
+}
+
+func init() {
+	_, err := rekorKey()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to get rekor pubkey: %v", err))
+	}
 }
 
 func rekorKey() (string, error) {
