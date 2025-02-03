@@ -344,27 +344,25 @@ jobs:
           fi
     
       - name: Create Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ needs.args.outputs.bin-tag }}-${{ needs.args.outputs.channel }}
+          tag_name: ${{ needs.args.outputs.bin-tag }}
           release_name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
           draft: false
           prerelease: ${{ contains(needs.args.outputs.channel, 'canary') }}
       
       - name: Upload Release Assets
         if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
-        uses: actions/upload-release-asset@v1
+        run: |
+          for file in groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}; do
+            gh release upload ${{ needs.args.outputs.bin-tag }} "$file"
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./groundseg_*_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-          asset_name: groundseg_${{ matrix.arch }}_${{ needs.args.outputs.bin-tag }}_${{ needs.args.outputs.channel }}
-          asset_content_type: application/octet-stream
       
       - name: Upload Provenance to Release
         if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
