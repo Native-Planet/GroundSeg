@@ -355,5 +355,5 @@ jobs:
           prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
           files: |
             ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }
+            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
             ./groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
