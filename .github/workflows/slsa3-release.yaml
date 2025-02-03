@@ -228,6 +228,7 @@ jobs:
 
   deploy:
     needs: [args, backend-build, provenance]
+    permissions: write-all
     if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
     runs-on: ubuntu-latest
     steps:
