@@ -343,7 +343,7 @@ jobs:
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
 
-      - name: Create Release and Upload Assets
+      - name: Create release
         if: ${{ github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel == 'latest' }}
         uses: softprops/action-gh-release@v2
         env:
@@ -355,15 +355,5 @@ jobs:
           prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
           files: |
             ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-      
-      - name: Upload Provenance to Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./provenance/*.jsonl
-          asset_name: groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
-          asset_content_type: application/json
+            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }
+            ./groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
