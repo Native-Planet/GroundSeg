@@ -15,6 +15,7 @@ type StartramRetrieve struct {
 	Pubkey     string      `json:"pubkey"`
 	Region     string      `json:"region"`
 	Status     string      `json:"status"`
+	Cname      string      `json:"cname"`
 	Subdomains []Subdomain `json:"subdomains"`
 }
 

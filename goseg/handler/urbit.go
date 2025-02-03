@@ -126,6 +126,15 @@ func cutSlice(slice []string, s string) []string {
 
 // AreSubdomainsAliases checks if two subdomains are aliases of each other.
 func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
+	// Skip check for alt domains
+	firstDot := strings.Index(domain1, ".")
+	if firstDot == -1 {
+		return false, fmt.Errorf("Invalid subdomain")
+	}
+	if domain1[firstDot+1:] == config.StartramConfig.Cname {
+		// if it matches startram alt cname, we good
+		return true, nil
+	}
 	// Lookup CNAME for the first domain
 	cname1, err := net.LookupCNAME(domain1)
 	if err != nil {
