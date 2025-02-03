@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"groundseg/defaults"
 	"groundseg/structs"
 	"os"
@@ -31,30 +32,39 @@ func CreateDefaultMcConf() error {
 // write a conf to disk from version server info
 func UpdateMcConf() error {
 	conf := Conf()
-	releaseChannel := conf.UpdateBranch
-	mcRepo := VersionInfo.Miniomc.Repo
-	amdHash := VersionInfo.Miniomc.Amd64Sha256
-	armHash := VersionInfo.Miniomc.Arm64Sha256
 	newConfig := structs.McConfig{
 		McName:      "minio_client",
-		McVersion:   releaseChannel,
-		Repo:        mcRepo,
-		Amd64Sha256: amdHash,
-		Arm64Sha256: armHash,
+		McVersion:   conf.UpdateBranch,
+		Repo:        VersionInfo.Miniomc.Repo,
+		Amd64Sha256: VersionInfo.Miniomc.Amd64Sha256,
+		Arm64Sha256: VersionInfo.Miniomc.Arm64Sha256,
 	}
 	path := filepath.Join(BasePath, "settings", "mc.json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("error creating directories: %v", err)
 	}
-	file, err := os.Create(path)
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), "mc.json.*")
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating temp file: %v", err)
 	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	encoder := json.NewEncoder(tmpFile)
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(&newConfig); err != nil {
-		return err
+		tmpFile.Close()
+		return fmt.Errorf("error encoding config: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("error closing temp file: %v", err)
+	}
+	if fi, err := os.Stat(tmpPath); err != nil {
+		return fmt.Errorf("error checking temp file: %v", err)
+	} else if fi.Size() == 0 {
+		return fmt.Errorf("refusing to persist empty configuration")
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("error moving temp file: %v", err)
 	}
 	return nil
 }

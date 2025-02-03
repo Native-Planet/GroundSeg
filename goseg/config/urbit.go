@@ -98,15 +98,29 @@ func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 		if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 			return err
 		}
-		file, err := os.Create(path)
+		tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
 		if err != nil {
-			return err
+			return fmt.Errorf("error creating temp file: %v", err)
 		}
-		defer file.Close()
-		encoder := json.NewEncoder(file)
+		// write and validate temp file before overwriting
+		tmpPath := tmpFile.Name()
+		defer os.Remove(tmpPath)
+		encoder := json.NewEncoder(tmpFile)
 		encoder.SetIndent("", "    ")
 		if err := encoder.Encode(&config); err != nil {
-			return err
+			tmpFile.Close()
+			return fmt.Errorf("error encoding config: %v", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			return fmt.Errorf("error closing temp file: %v", err)
+		}
+		if fi, err := os.Stat(tmpPath); err != nil {
+			return fmt.Errorf("error checking temp file: %v", err)
+		} else if fi.Size() == 0 {
+			return fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
+		}
+		if err := os.Rename(tmpPath, path); err != nil {
+			return fmt.Errorf("error moving temp file: %v", err)
 		}
 	}
 	return nil

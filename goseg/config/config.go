@@ -238,31 +238,38 @@ func UpdateConf(values map[string]interface{}) error {
 }
 
 func persistConf(configMap map[string]interface{}) error {
-	BasePath = getBasePath()
-	// marshal and persist it
+	BasePath := getBasePath()
+	confPath := filepath.Join(BasePath, "settings", "system.json")
+	tmpFile, err := os.CreateTemp(filepath.Dir(confPath), "system.json.*")
+	if err != nil {
+		return fmt.Errorf("error creating temp file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
 	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
 	if err != nil {
-		return fmt.Errorf("Error encoding JSON: %v", err)
+		return fmt.Errorf("error encoding JSON: %v", err)
 	}
-	// update the globalConfig var
-	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
-		return fmt.Errorf("Error updating global config: %v", err)
+	// write to temp file and validate before overwriting
+	if _, err := tmpFile.Write(updatedJSON); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("error writing temp file: %v", err)
 	}
-	// write to disk
-	if err := ioutil.WriteFile(confPath, updatedJSON, 0644); err != nil {
-		return fmt.Errorf("Error writing to file: %v", err)
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("error closing temp file: %v", err)
 	}
-	confPath := filepath.Join(BasePath, "settings", "system.json")
-	file, err := os.Open(confPath)
+	fi, err := os.Stat(tmpPath)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't open system.json: %v", err))
-	} else {
-		decoder := json.NewDecoder(file)
-		// confMutex.Lock()
-		// defer confMutex.Unlock()
-		if err = decoder.Decode(&globalConfig); err != nil {
-			zap.L().Error(fmt.Sprintf("Error decoding JSON: %v", err))
-		}
+		return fmt.Errorf("error checking temp file: %v", err)
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("refusing to persist empty configuration file")
+	}
+	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
+		return fmt.Errorf("error updating global config: %v", err)
+	}
+	if err := os.Rename(tmpPath, confPath); err != nil {
+		return fmt.Errorf("error moving temp file: %v", err)
 	}
 	return nil
 }

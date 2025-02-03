@@ -131,7 +131,7 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 	if firstDot == -1 {
 		return false, fmt.Errorf("Invalid subdomain")
 	}
-	if domain1[firstDot+1:] == config.StartramConfig.Cname {
+	if config.StartramConfig.Cname != "" && domain1[firstDot+1:] == config.StartramConfig.Cname {
 		// if it matches startram alt cname, we good
 		return true, nil
 	}
