@@ -3,11 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       release_channel:
-        description: 'Release Channel'
+        description: 'Release channel'
         required: true
         type: choice
         options:
           - nobuild
+          - promote
           - edge
           - canary
           - latest
@@ -17,7 +18,7 @@ on:
         type: boolean
         default: false
       version_server:
-        description: 'Version Server'
+        description: 'Staging or production version server'
         required: true
         type: choice
         options:
@@ -71,7 +72,7 @@ jobs:
 
   frontend-build:
     needs: args
-    if: ${{ github.event.inputs.release_channel != 'nobuild' }}
+    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +111,7 @@ jobs:
           path: goseg/web/
 
   backend-build:
+    if: ${{ github.event.inputs.release_channel != 'promote' }}
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
     outputs: 
@@ -129,6 +131,10 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.23.2'
+          cache: true
+          cache-dependency-path: |
+              **/go.sum
+              **/go.mod
             
       - name: Build binaries
         env:
@@ -160,26 +166,79 @@ jobs:
           path: groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
 
   provenance:
+    if: ${{ github.event.inputs.release_channel != 'promote' }}
     needs: [backend-build]
     permissions:
       actions: read
-      id-token: write  
+      id-token: write
       contents: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
     with:
       base64-subjects: "${{ needs.backend-build.outputs.hashes }}"
 
-  deploy:
-    needs: [args, backend-build, provenance]
-    if: ${{ github.event.inputs.release_channel != 'nobuild' }}
+  promote:
+    needs: [args]
+    if: ${{ github.event.inputs.release_channel == 'promote' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Promote version data
+        run: |
+          mkdir -p ~/.config/rclone/
+          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          DEBIAN_FRONTEND=noninteractive sudo apt update
+          DEBIAN_FRONTEND=noninteractive sudo apt install -y jq rclone
+          VERSION_SERVER="${{ github.event.inputs.version_server }}"
+          VERSION_DATA=$(curl -s -H "https://${VERSION_SERVER}/")
+          EDGE_VALUES=$(echo "$VERSION_DATA" | jq -r '.groundseg.edge.groundseg')
+          for key in amd64_url arm64_url; do
+            VALUE=$(echo "$EDGE_VALUES" | jq -r ".$key")
+            OLDFILE=${VALUE##*/}
+            NEWFILE=$(echo "$OLDFILE" | sed 's/-rc[0-9]\+//g' | sed 's/edge/latest/g)
+            NEWURL=$(echo "$VALUE" | sed 's/-rc[0-9]\+//g' | sed 's/edge/latest/g')
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy r2:groundseg/bin/${OLDFILE} r2:groundseg/bin/${NEWFILE}
+            echo "Setting $key URL to $VALUE"
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/${key}/payload" \
+              -d "{\"value\":\"$NEWURL\"}"
+          done
+          for key in slsa_url; do
+            VALUE=$(echo "$EDGE_VALUES" | jq -r ".$key")
+            echo "Setting $key URL to $VALUE"
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/${key}/payload" \
+              -d "{\"value\":\"$VALUE\"}"
+          done
+          for key in amd64_sha256 arm64_sha256 major minor patch; do
+            VALUE=$(echo "$EDGE_VALUES" | jq -r ".$key")
+            echo "Setting $key to $VALUE"
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/latest/groundseg/${key}/${VALUE}" \
+              -d "{\"value\":\"$VALUE\"}"
+          done
+      - name: Update GitHub Release
+        if: ${{ github.event.inputs.version_server == 'version.groundseg.app' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.args.outputs.bin-tag }}
+        run: |
+          gh api \
+            --method PATCH \
+            "/repos/${{ github.repository }}/releases/tags/${TAG}-edge" \
+            -f prerelease=false
 
+  deploy:
+    needs: [args, backend-build, provenance]
+    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SLSA provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: multiple.intoto.jsonl
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
           name: binaries
-
       - name: Download blobs
         uses: actions/download-artifact@v4
         with:
@@ -188,23 +247,50 @@ jobs:
 
       - name: Deploy Files
         run: |
+          ### 🐲 𝓗𝓔𝓡𝓔 𝓑𝓔 𝓓𝓡𝓐𝓖𝓞𝓝𝓢 🐲
+          ### prepare environment
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           DEBIAN_FRONTEND=noninteractive sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install rclone jq -y
+          #
+          # copy files into bucket
+          #
+          ### copy binaries into bucket
           for arch in amd64 arm64; do
             rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
           done
+          #
+          ### copy glob into bucket
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
             rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
           fi
+          #
+          ### copy provenance into bucket
+          mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl r2:groundseg/bin
+          #
+          # update version server
+          #
           VERSION_SERVER="${{ github.event.inputs.version_server }}"
+          #
+          ### binaries and provenance
           for arch in amd64 arm64; do
             curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
               "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/${arch}_url/payload" \
               -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
           done
+          curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+            "https://${VERSION_SERVER}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/slsa_url/payload" \
+            -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
+          if [ "${{ github.event.inputs.to_canary }}" == "true" ]; then
+            curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+              "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/slsa_url/payload" \
+              -d "{\"value\":\"https://files.native.computer/bin/groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl\"}"
+          fi
+          #
+          # get hashes
           AMD64_BIN="groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           ARM64_BIN="groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}"
           AMDSHA=$(sha256sum "$AMD64_BIN" | awk '{print $1}')
@@ -213,6 +299,21 @@ jobs:
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/amd64_sha256/$AMDSHA"
           curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
             "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/arm64_sha256/$ARMSHA"
+          #
+          ### update canary if needed
+          if [ "${{ github.event.inputs.to_canary }}" = "true" ] && [ "${{ github.event.inputs.release_channel }}" = "edge" ]; then
+            for arch in amd64 arm64; do
+              curl -X PUT -H "X-Api-Key: ${VERSION_AUTH}" -H 'Content-Type: application/json' \
+                "https://${VERSION_SERVER}/modify/groundseg/canary/groundseg/${arch}_url/payload" \
+                -d "{\"value\":\"https://files.native.computer/bin/groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}\"}"
+            done
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/amd64_sha256/$AMDSHA"
+            curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+              "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/arm64_sha256/$ARMSHA"
+          fi
+          #
+          ### update semver
           VERSION=$(echo "${{ needs.args.outputs.bin-tag }}" | sed 's/-rc[0-9]*//')
           MAJOR=$(echo "$VERSION" | cut -d'.' -f1 | sed 's/v//')
           MINOR=$(echo "$VERSION" | cut -d'.' -f2)
@@ -228,13 +329,21 @@ jobs:
               "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/minor/$MINOR"
             curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
               "https://${{ github.event.inputs.version_server }}/modify/groundseg/${{ needs.args.outputs.channel }}/groundseg/patch/$PATCH"
+              if [ "${{ github.event.inputs.to_canary }}" = "true" ] && [ "${{ github.event.inputs.release_channel }}" = "edge" ]; then
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/major/$MAJOR"
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/minor/$MINOR"
+                curl -X PUT -H "X-Api-Key: ${{ env.VERSION_AUTH }}" \
+                  "https://${{ github.event.inputs.version_server }}/modify/groundseg/canary/groundseg/patch/$PATCH"
+              fi
           else
             echo "Skipping version server semver update."
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
     
       - name: Create Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -246,7 +355,7 @@ jobs:
           prerelease: ${{ contains(needs.args.outputs.channel, 'canary') }}
       
       - name: Upload Release Assets
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -257,12 +366,12 @@ jobs:
           asset_content_type: application/octet-stream
       
       - name: Upload Provenance to Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
+        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./provenance/*.jsonl
-          asset_name: provenance.jsonl
+          asset_name: groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
           asset_content_type: application/json

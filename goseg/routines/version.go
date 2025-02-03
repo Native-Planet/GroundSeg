@@ -1,6 +1,7 @@
 package routines
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier/verify"
 	"go.uber.org/zap"
 )
 
@@ -130,7 +132,8 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// Chmod groundseg_new
 	zap.L().Info("Modifying groundseg_new permissions")
-	if err := os.Chmod(filepath.Join(config.BasePath, "groundseg_new"), 0755); err != nil {
+	binaryPath := filepath.Join(config.BasePath, "groundseg_new")
+	if err := os.Chmod(binaryPath, 0755); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
@@ -146,6 +149,20 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if newVersionHash != newBinHash {
 		zap.L().Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
 		return
+	}
+	if !conf.DisableSlsa {
+		zap.L().Info("Verifying SLSA provenance")
+		if err := verifySlsaProvenance(
+			versionInfo.Groundseg.SlsaURL,
+			binaryPath,
+			"git+https://github.com/Native-Planet/GroundSeg",
+		); err != nil {
+			zap.L().Error(fmt.Sprintf("SLSA verification failed: %v", err))
+			return
+		}
+		zap.L().Info("SLSA verification successful")
+	} else {
+		zap.L().Warn("SLSA verification disabled by configuration")
 	}
 	// delete groundseg binary if exists
 	zap.L().Info("Deleting old groundseg")
@@ -163,6 +180,14 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if err := os.Rename(oldPath, newPath); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
+	}
+	// re-disable bypass after one update
+	if conf.DisableSlsa {
+		if err := config.UpdateConf(map[string]interface{}{
+			"disableSlsa": false,
+		}); err != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
+		}
 	}
 	versionStr := "v" + strconv.Itoa(versionInfo.Groundseg.Major) + "." +
 		strconv.Itoa(versionInfo.Groundseg.Minor) + "." +
@@ -190,6 +215,44 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 			return
 		}
 	}
+}
+
+func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI string) error {
+	if _, err := rekorKey(); err != nil {
+		return fmt.Errorf("failed to ensure Rekor key is available: %w", err)
+	}
+	provenanceFile, err := os.CreateTemp("", "provenance-*.intoto.jsonl")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for provenance: %v", err)
+	}
+	defer os.Remove(provenanceFile.Name())
+	defer provenanceFile.Close()
+	resp, err := http.Get(provenanceURL)
+	if err != nil {
+		return fmt.Errorf("failed to download provenance: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to download provenance, status: %v", resp.StatusCode)
+	}
+	_, err = io.Copy(provenanceFile, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write provenance file: %v", err)
+	}
+	verifyCmd := &verify.VerifyArtifactCommand{
+		ProvenancePath:  provenanceFile.Name(),
+		SourceURI:       sourceURI,
+		PrintProvenance: false,
+	}
+	ctx := context.Background()
+	trustedBuilder, err := verifyCmd.Exec(ctx, []string{binaryPath})
+	if err != nil {
+		return fmt.Errorf("SLSA verification failed: %v", err)
+	}
+	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
+	zap.L().Info("Info: https://github.blog/security/supply-chain-security/slsa-3-compliance-with-github-actions/")
+	return nil
 }
 
 func contains(slice []string, item string) bool {
