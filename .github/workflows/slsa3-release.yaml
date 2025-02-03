@@ -342,27 +342,20 @@ jobs:
             echo "Skipping version server semver update."
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
-    
-      - name: Create Release
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' }}
-        id: create_release
-        uses: actions/create-release@v1
+
+      - name: Create Release and Upload Assets
+        if: ${{ github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel == 'latest' }}
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.args.outputs.bin-tag }}
-          release_name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
+          name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
           draft: false
-          prerelease: ${{ contains(needs.args.outputs.channel, 'canary') }}
-      
-      - name: Upload Release Assets
-        if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
-        run: |
-          for file in groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}; do
-            gh release upload ${{ needs.args.outputs.bin-tag }} "$file"
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
+          files: |
+            ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
       
       - name: Upload Provenance to Release
         if: ${{ github.event.inputs.release_channel == 'latest' && github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel != 'promote' }}
