@@ -14,7 +14,7 @@
   export let ownShip
   export let running
   export let detectBootStatus
-  export let detectRestartPref
+  export let detectAutoRestart
   export let tTogglePower
 
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -46,11 +46,11 @@
     </div>
     <div class="check-wrapper">
       <div class="checkbox" on:click={()=>toggleAutoReboot(patp)}>
-      {#if detectRestartPref}
+      {#if detectAutoRestart}
         <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
       {/if}
       </div>
-      <div class="check-text" on:click={()=>toggleAutoReboot(patp)}>Reboot after ship crash</div>
+      <div class="check-text" on:click={()=>toggleAutoReboot(patp)}>Reboot ship after crash</div>
     </div>
   </div>
   <div class="section-right">

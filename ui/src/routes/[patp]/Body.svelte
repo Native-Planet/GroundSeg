@@ -44,7 +44,7 @@
   $: ship = ($structure?.urbits?.[patp]?.info)
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
-  $: detectAutoRestart = !(ship?.disableShipRestarts) || false
+  $: detectAutoRestart = !ship?.disableShipRestarts
   $: remote = (ship?.remote) || false
   $: remoteReady = (ship?.remoteReady) || false
   $: running = (ship?.running) || false

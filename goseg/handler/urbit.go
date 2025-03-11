@@ -997,12 +997,12 @@ func toggleBootStatus(patp string, shipConf structs.UrbitDocker) error {
 }
 
 func toggleAutoReboot(patp string, shipConf structs.UrbitDocker) error {
-	update := make(map[string]structs.UrbitDocker)
 	if !shipConf.DisableShipRestarts {
 		shipConf.DisableShipRestarts = true
 	} else {
 		shipConf.DisableShipRestarts = false
 	}
+	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
