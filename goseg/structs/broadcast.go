@@ -167,6 +167,7 @@ type Urbit struct {
 		StartramReminder         bool           `json:"startramReminder"`
 		ChopOnUpgrade            bool           `json:"chopOnUpgrade"`
 		SizeLimit                int            `json:"sizeLimit"`
+		DisableShipRestarts      bool           `json:"disableShipRestarts"`
 		LocalTlonBackupsEnabled  bool           `json:"localTlonBackupsEnabled"`
 		RemoteTlonBackupsEnabled bool           `json:"remoteTlonBackupsEnabled"`
 		BackupTime               string         `json:"backupTime"`
