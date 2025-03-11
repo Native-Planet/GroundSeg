@@ -105,11 +105,16 @@ func DockerSubscriptionHandler() {
 				if containerState.Type == "vere" {
 					config.LoadUrbitConfig(contName)
 					conf := config.UrbitConf(contName)
-					if conf.DisableShipRestarts != nil && conf.DisableShipRestarts.(bool) == true {
-						// if we don't want infinite restart loop
+					if disableRestart, ok := conf.DisableShipRestarts.(bool); ok {
+						if conf.DisableShipRestarts != nil && disableRestart {
+							// if we don't want infinite restart loop
+							containerState.DesiredStatus = "died"
+						}
+						click.ClearLusCode(contName)
+					} else { // if the DisableShipRestarts val isn't set, dont restart
 						containerState.DesiredStatus = "died"
+						click.ClearLusCode(contName)
 					}
-					click.ClearLusCode(contName)
 				}
 				containerState.ActualStatus = "died"
 				config.UpdateContainerState(contName, containerState)
