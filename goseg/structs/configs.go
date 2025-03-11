@@ -226,7 +226,7 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.BootStatus, _ = v.(string)
 		case "disable_ship_restarts":
 			if v == nil {
-				u.DisableShipRestarts = true
+				u.DisableShipRestarts = false
 			} else {
 				u.DisableShipRestarts = v.(bool)
 			}
