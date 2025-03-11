@@ -528,6 +528,15 @@ export const toggleBootStatus = patp => {
   send(payload)
 }
 
+export const toggleAutoReboot = patp => {
+  let payload = {
+    "type":"urbit",
+    "action":"toggle-auto-reboot",
+    "patp":patp
+  }
+  send(payload)
+}
+
 export const toggleDevMode = patp => {
   let payload = {
     "type":"urbit",

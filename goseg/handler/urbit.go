@@ -82,6 +82,8 @@ func UrbitHandler(msg []byte) error {
 		return handleLoom(patp, urbitPayload, shipConf)
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
+	case "toggle-auto-reboot":
+		return toggleAutoReboot(patp, shipConf)
 	case "toggle-network":
 		return toggleNetwork(patp, shipConf)
 	case "toggle-devmode":
@@ -852,6 +854,15 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 	defer func() {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "togglePower", Event: ""}
 	}()
+	statuses, err := docker.GetShipStatus([]string{patp})
+	if err != nil {
+		return fmt.Errorf("Failed to get ship status for %p: %v", patp, err)
+	}
+	status, exists := statuses[patp]
+	if !exists {
+		return fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp)
+	}
+	isRunning := strings.Contains(status, "Up")
 	update := make(map[string]structs.UrbitDocker)
 	if shipConf.BootStatus == "noboot" {
 		shipConf.BootStatus = "boot"
@@ -863,7 +874,7 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
-	} else if shipConf.BootStatus == "boot" {
+	} else if shipConf.BootStatus == "boot" && isRunning {
 		shipConf.BootStatus = "noboot"
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
@@ -875,6 +886,11 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 			if err := docker.StopContainerByName(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("%v", err))
 			}
+		}
+	} else if shipConf.BootStatus == "boot" && !isRunning {
+		_, err := docker.StartContainer(patp, "vere")
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
 	return nil
@@ -991,6 +1007,24 @@ func toggleBootStatus(patp string, shipConf structs.UrbitDocker) error {
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
+	return nil
+}
+
+func toggleAutoReboot(patp string, shipConf structs.UrbitDocker) error {
+	if err := config.LoadUrbitConfig(patp); err != nil {
+		return fmt.Errorf("Failed to load fresh urbit config: %v", err)
+	}
+	if boolValue, ok := shipConf.DisableShipRestarts.(bool); ok {
+		shipConf.DisableShipRestarts = !boolValue
+	} else {
+		shipConf.DisableShipRestarts = true
+	}
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	broadcast.BroadcastToClients()
 	return nil
 }
 

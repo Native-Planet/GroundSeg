@@ -103,12 +103,32 @@ func DockerSubscriptionHandler() {
 			zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "died"
-				// we don't want infinite restart loop
-				containerState.DesiredStatus = "died"
-				if containerState.Type == "vere" {
-					click.ClearLusCode(contName)
-				}
 				config.UpdateContainerState(contName, containerState)
+				if containerState.Type == "vere" {
+					config.LoadUrbitConfig(contName)
+					conf := config.UrbitConf(contName)
+					if disableRestart, ok := conf.DisableShipRestarts.(bool); ok && disableRestart {
+						zap.L().Info(fmt.Sprintf("Leaving %s container alone after death", contName))
+						containerState.DesiredStatus = "died"
+						click.ClearLusCode(contName)
+					} else {
+						click.ClearLusCode(contName)
+					}
+					if containerState.DesiredStatus != "died" && containerState.DesiredStatus != "stopped" {
+						zap.L().Info(fmt.Sprintf("Attempting to restart ship %s after death", contName))
+						go func(name, containerType string) {
+							time.Sleep(2 * time.Second)
+							_, err := docker.StartContainer(name, containerType)
+							if err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to restart %s after death: %v", name, err))
+							} else {
+								zap.L().Info(fmt.Sprintf("Successfully restarted %s after death", name))
+							}
+						}(contName, containerState.Type)
+					} else {
+						zap.L().Info(fmt.Sprintf("Ship desired status: %s", containerState.DesiredStatus))
+					}
+				}
 				makeBroadcast(contName, dockerEvent.Action)
 			}
 
