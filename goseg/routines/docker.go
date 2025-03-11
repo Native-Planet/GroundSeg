@@ -109,14 +109,14 @@ func DockerSubscriptionHandler() {
 					if disableRestart, ok := conf.DisableShipRestarts.(bool); ok {
 						if disableRestart {
 							// if we don't want infinite restart loop
-							zap.L().Debug(fmt.Sprintf("Ship %s has auto-restart disabled, setting DesiredStatus to died", contName))
+							zap.L().Info(fmt.Sprintf("Ship %s has auto-restart disabled, setting DesiredStatus to died", contName))
 							containerState.DesiredStatus = "died"
 						} else {
-							zap.L().Debug(fmt.Sprintf("Ship %s has auto-restart enabled, keeping DesiredStatus as %s", contName, containerState.DesiredStatus))
+							zap.L().Info(fmt.Sprintf("Ship %s has auto-restart enabled, keeping DesiredStatus as %s", contName, containerState.DesiredStatus))
 						}
 						click.ClearLusCode(contName)
 					} else {
-						zap.L().Debug(fmt.Sprintf("Ship %s has invalid DisableShipRestarts value, defaulting to auto-restart enabled", contName))
+						zap.L().Info(fmt.Sprintf("Ship %s has invalid DisableShipRestarts value, defaulting to auto-restart enabled", contName))
 						click.ClearLusCode(contName)
 					}
 

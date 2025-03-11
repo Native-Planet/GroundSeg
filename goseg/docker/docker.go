@@ -328,6 +328,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	var hostConfig container.HostConfig
 	// init error
 	var err error
+	containerState.Type = containerType
 	// switch on containerType to process containerConfig
 	switch containerType {
 	case "vere":
@@ -596,6 +597,7 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	res["tag"] = tag
 	res["hash"] = hashValue
 	res["repo"] = repo
+	res["type"] = containerType
 	return res, nil
 }
 
