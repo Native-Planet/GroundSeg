@@ -46,11 +46,11 @@
     </div>
     <div class="check-wrapper">
       <div class="checkbox" on:click={()=>toggleAutoReboot(patp)}>
-      {#if disableShipRestarts}
+      {#if !disableShipRestarts}
         <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
       {/if}
       </div>
-      <div class="check-text" on:click={()=>toggleAutoReboot(patp)}>Disable ship restart after crashes</div>
+      <div class="check-text" on:click={()=>toggleAutoReboot(patp)}>Restart ship after crashes</div>
     </div>
   </div>
   <div class="section-right">

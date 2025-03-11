@@ -1003,6 +1003,7 @@ func toggleAutoReboot(patp string, shipConf structs.UrbitDocker) error {
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
+	broadcast.BroadcastToClients()
 	return nil
 }
 
