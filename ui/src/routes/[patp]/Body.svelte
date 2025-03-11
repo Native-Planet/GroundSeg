@@ -2,7 +2,6 @@
   import { afterUpdate } from 'svelte'
   import { 
     toggleDevMode,
-    toggleAutoBoot,
     toggleNetwork,
     toggleUrbitPower,
     installGallseg,
@@ -44,7 +43,7 @@
   $: ship = ($structure?.urbits?.[patp]?.info)
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
-  $: detectAutoRestart = !ship?.disableShipRestarts
+  $: disableShipRestarts = (ship?.disableShipRestarts) || false
   $: remote = (ship?.remote) || false
   $: remoteReady = (ship?.remoteReady) || false
   $: running = (ship?.running) || false
@@ -91,7 +90,7 @@
     {patp}
     {running}
     {detectBootStatus}
-    {detectAutoRestart}
+    {disableShipRestarts}
     {tTogglePower}
     {ownShip}
     on:click={()=>toggleUrbitPower(patp)} 
