@@ -270,6 +270,10 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 				//zap.L().Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
 			}
 		}
+		var disableShipRestarts bool
+		if boolValue, ok := dockerConfig.DisableShipRestarts.(bool); ok {
+			disableShipRestarts = !boolValue
+		}
 		var lusCode string
 		if strings.Contains(pierStatus[pier], "Up") {
 			lusCode, _ = click.GetLusCode(pier)
@@ -357,7 +361,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.SizeLimit = dockerConfig.SizeLimit
 		urbit.Info.RemoteTlonBackupsEnabled = dockerConfig.RemoteTlonBackup
 		urbit.Info.LocalTlonBackupsEnabled = dockerConfig.LocalTlonBackup
-		urbit.Info.DisableShipRestarts = dockerConfig.DisableShipRestarts
+		urbit.Info.DisableShipRestarts = disableShipRestarts
 		urbit.Info.BackupTime = dockerConfig.BackupTime
 		if remoteBak, exists := remoteBackupMap[pier]; exists {
 			urbit.Info.RemoteTlonBackups = remoteBak

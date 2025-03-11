@@ -121,7 +121,7 @@ type UrbitDocker struct {
 	RemoteTlonBackup    bool        `json:"remote_tlon_backup"`
 	LocalTlonBackup     bool        `json:"local_tlon_backup"`
 	BackupTime          string      `json:"backup_time"`
-	DisableShipRestarts bool        `json:"disableShipRestarts"`
+	DisableShipRestarts interface{} `json:"disable_ship_restarts"`
 }
 
 // Define the interface
@@ -224,6 +224,12 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			u.MeldNext, _ = v.(string)
 		case "boot_status":
 			u.BootStatus, _ = v.(string)
+		case "disable_ship_restarts":
+			if v == nil {
+				u.DisableShipRestarts = true
+			} else {
+				u.DisableShipRestarts = v.(bool)
+			}
 		case "custom_urbit_web":
 			u.CustomUrbitWeb, _ = v.(string)
 		case "custom_s3_web":

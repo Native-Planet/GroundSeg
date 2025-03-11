@@ -105,7 +105,7 @@ func DockerSubscriptionHandler() {
 				if containerState.Type == "vere" {
 					config.LoadUrbitConfig(contName)
 					conf := config.UrbitConf(contName)
-					if conf.DisableShipRestarts {
+					if conf.DisableShipRestarts != nil && conf.DisableShipRestarts.(bool) == true {
 						// if we don't want infinite restart loop
 						containerState.DesiredStatus = "died"
 					}

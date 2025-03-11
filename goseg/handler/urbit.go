@@ -83,7 +83,7 @@ func UrbitHandler(msg []byte) error {
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
 	case "toggle-auto-reboot":
-		return toggleAutoReboot(patp)
+		return toggleAutoReboot(patp, shipConf)
 	case "toggle-network":
 		return toggleNetwork(patp, shipConf)
 	case "toggle-devmode":
@@ -996,14 +996,17 @@ func toggleBootStatus(patp string, shipConf structs.UrbitDocker) error {
 	return nil
 }
 
-func toggleAutoReboot(patp string) error {
+func toggleAutoReboot(patp string, shipConf structs.UrbitDocker) error {
 	if err := config.LoadUrbitConfig(patp); err != nil {
 		return fmt.Errorf("Failed to load fresh urbit config: %v", err)
 	}
-	freshConfig := config.UrbitConf(patp)
-	freshConfig.DisableShipRestarts = !freshConfig.DisableShipRestarts
+	if boolValue, ok := shipConf.DisableShipRestarts.(bool); ok {
+		shipConf.DisableShipRestarts = !boolValue
+	} else {
+		shipConf.DisableShipRestarts = true
+	}
 	update := make(map[string]structs.UrbitDocker)
-	update[patp] = freshConfig
+	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
