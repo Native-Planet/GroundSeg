@@ -6,7 +6,7 @@
   // Style
   import "../theme.css"
   import { createEventDispatcher } from 'svelte'
-  import { toggleBootStatus } from '$lib/stores/websocket'
+  import { toggleBootStatus, toggleAutoReboot } from '$lib/stores/websocket'
 
   import { URBIT_MODE } from '$lib/stores/data'
 
@@ -14,6 +14,7 @@
   export let ownShip
   export let running
   export let detectBootStatus
+  export let detectRestartPref
   export let tTogglePower
 
   $: pfx = $URBIT_MODE ? "/apps/groundseg" : ""
@@ -42,6 +43,14 @@
       <!--
       <div class="what">?</div>
       -->
+    </div>
+    <div class="check-wrapper">
+      <div class="checkbox" on:click={()=>toggleAutoReboot(patp)}>
+      {#if detectRestartPref}
+        <img class="checkmark" src={pfx+"/checkmark-white.svg"} alt="checkmark"/>
+      {/if}
+      </div>
+      <div class="check-text" on:click={()=>toggleAutoReboot(patp)}>Reboot after ship crash</div>
     </div>
   </div>
   <div class="section-right">

@@ -44,6 +44,7 @@
   $: ship = ($structure?.urbits?.[patp]?.info)
   $: devMode = (ship?.devMode) || false
   $: detectBootStatus = (ship?.detectBootStatus) || false
+  $: detectAutoRestart = !(ship?.disableShipRestarts) || false
   $: remote = (ship?.remote) || false
   $: remoteReady = (ship?.remoteReady) || false
   $: running = (ship?.running) || false
@@ -90,6 +91,7 @@
     {patp}
     {running}
     {detectBootStatus}
+    {detectAutoRestart}
     {tTogglePower}
     {ownShip}
     on:click={()=>toggleUrbitPower(patp)} 

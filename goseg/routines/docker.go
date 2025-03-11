@@ -102,12 +102,16 @@ func DockerSubscriptionHandler() {
 		case "die":
 			zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 			if containerState, exists := config.GetContainerState()[contName]; exists {
-				containerState.ActualStatus = "died"
-				// we don't want infinite restart loop
-				containerState.DesiredStatus = "died"
 				if containerState.Type == "vere" {
+					config.LoadUrbitConfig(contName)
+					conf := config.UrbitConf(contName)
+					if conf.DisableShipRestarts {
+						// if we don't want infinite restart loop
+						containerState.DesiredStatus = "died"
+					}
 					click.ClearLusCode(contName)
 				}
+				containerState.ActualStatus = "died"
 				config.UpdateContainerState(contName, containerState)
 				makeBroadcast(contName, dockerEvent.Action)
 			}
