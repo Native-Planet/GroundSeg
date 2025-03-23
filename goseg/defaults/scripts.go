@@ -12,8 +12,8 @@ var (
 	set -eu
 	echo $@
 	# set defaults
-	#amesPort="34343"
-	#httpPort="80"
+	amesPort="34343"
+	httpPort="80"
 	loom="31"
 	devMode="False"
 	
@@ -216,8 +216,8 @@ var (
 	
 	set -eu
 	# set defaults
-	#amesPort="34343"
-	#httpPort="80"
+	amesPort="34343"
+	httpPort="80"
 	loom="31"
 	devMode="False"
 	
@@ -309,8 +309,8 @@ var (
 	
 	set -eu
 	# set defaults
-	#amesPort="34343"
-	#httpPort="80"
+	amesPort="34343"
+	httpPort="80"
 	loom="31"
 	devMode="False"
 	
@@ -402,8 +402,8 @@ var (
 	
 	set -eu
 	# set defaults
-	#amesPort="34343"
-	#httpPort="80"
+	amesPort="34343"
+	httpPort="80"
 	loom="31"
 	devMode="False"
 	
@@ -483,8 +483,8 @@ var (
 	
 	set -eu
 	# set defaults
-	#amesPort="34343"
-	#httpPort="80"
+	amesPort="34343"
+	httpPort="80"
 	loom="31"
 	devMode="False"
 	
