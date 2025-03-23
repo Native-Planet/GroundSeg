@@ -474,7 +474,8 @@ var (
 			echo "File .vere.lock containing PID 1 has been deleted."
 		fi
 	fi
-	
+
+ 	urbit roll --loom $loom $dirname
 	urbit chop --loom $loom $dirname`
 
 	MeldScript = `#!/bin/bash
