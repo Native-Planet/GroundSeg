@@ -398,6 +398,7 @@ var (
 	urbit pack --loom $loom $dirname`
 
 	ChopScript = `#!/bin/bash
+	set -x
 	echo "URTH CHOP"
 	
 	set -eu
