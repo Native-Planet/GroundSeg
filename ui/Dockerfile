@@ -1,6 +1,8 @@
 FROM node:22-bullseye-slim
 
 COPY ./ /webui
+ARG GS_VERSION
+ENV GS_VERSION=$GS_VERSION
 
 WORKDIR /webui
 RUN npm install -g npm

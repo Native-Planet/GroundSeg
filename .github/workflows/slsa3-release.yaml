@@ -80,7 +80,7 @@ jobs:
       - name: Build Frontend
         run: |
           cd ./ui
-          docker build -t web-builder -f builder.Dockerfile .
+          docker build --build-arg GS_VERSION="${{ needs.args.outputs.version }}" -t web-builder -f builder.Dockerfile .
           container_id=$(docker create web-builder)
           docker cp $container_id:/webui/build ./web
           rm -rf ../goseg/web
