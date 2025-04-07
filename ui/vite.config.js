@@ -10,7 +10,7 @@ const config = {
     'process.env.GS_URBIT_MODE': JSON.stringify(gsUrbitMode),
     'process.env.GS_DEV_PANEL': JSON.stringify(devPanel),
     'process.env.GS_CUSTOM_HOSTNAME': JSON.stringify(customHostname),
-    'process.env.GS_VERSION': JSON.stringify(gsVersion),
+    'import.meta.env.GS_VERSION': JSON.stringify(gsVersion),
   }
 };
 if (gsUrbitMode) {
