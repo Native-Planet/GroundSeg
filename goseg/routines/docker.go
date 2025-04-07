@@ -204,7 +204,7 @@ func Check502Loop() {
 				zap.L().Debug(fmt.Sprintf("%v 502 check: %v", pier, resp.StatusCode))
 				if resp.StatusCode == http.StatusBadGateway {
 					zap.L().Warn(fmt.Sprintf("Got 502 response for %v", pier))
-					if _, found := status[pier]; found {
+					if _, found := status[pier]; found && !conf.Disable502 {
 						// found = 2x in a row
 						zap.L().Warn(fmt.Sprintf("502 second strike for %v", pier))
 						// record all remote ships
