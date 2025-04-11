@@ -74,13 +74,18 @@ jobs:
     needs: args
     if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ldflags.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Build Frontend
+        env:
+          VERSION: ${{ needs.args.outputs.version }}
         run: |
+          set -x
           cd ./ui
-          docker build --build-arg GS_VERSION="${version}" -t web-builder -f builder.Dockerfile .
+          docker build --build-arg GS_VERSION="${VERSION}" -t web-builder -f builder.Dockerfile .
           container_id=$(docker create web-builder)
           docker cp $container_id:/webui/build ./web
           rm -rf ../goseg/web
