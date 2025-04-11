@@ -11,6 +11,8 @@ var (
 	PrepScript = `#!/bin/bash
 	set -eu
 	echo $@
+	log_file="prep.log"
+	exec > >(tee -a "$log_file") 2>&1
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
@@ -213,7 +215,8 @@ var (
 
 	RollScript = `#!/bin/bash
 	echo "URTH ROLL"
-	
+	log_file="roll.log"
+	exec > >(tee -a "$log_file") 2>&1
 	set -eu
 	# set defaults
 	#amesPort="34343"
@@ -306,6 +309,8 @@ var (
 
 	PackScript = `#!/bin/bash
 	echo "URTH PACK"
+	log_file="pack.log"
+	exec > >(tee -a "$log_file") 2>&1
 	
 	set -eu
 	# set defaults
@@ -399,6 +404,8 @@ var (
 
 	ChopScript = `#!/bin/bash
 	echo "URTH CHOP"
+	log_file="chop.log"
+	exec > >(tee -a "$log_file") 2>&1
 	
 	set -eu
 	# set defaults
@@ -479,6 +486,8 @@ var (
 
 	MeldScript = `#!/bin/bash
 	echo "URTH MELD"
+	log_file="meld.log"
+	exec > >(tee -a "$log_file") 2>&1
 	
 	set -eu
 	# set defaults
