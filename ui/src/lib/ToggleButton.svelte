@@ -3,22 +3,34 @@
   const dispatch = createEventDispatcher()
   export let on = false
   export let loading = false
-
-  /* debug
-  let on = false
-  const loop = () => {on = !on;setTimeout(loop,3000)}
-  loop()
-  */
+  let lastUserAction = null;
+  let lastActionTime = 0;
+  $: effectiveState = shouldIgnoreBackendState() ? lastUserAction : on;
+  
+  function shouldIgnoreBackendState() {
+    return lastUserAction !== null && Date.now() - lastActionTime < 2000;
+  }
+  
+  function handleClick() {
+    if (!loading) {
+      lastUserAction = !on;
+      lastActionTime = Date.now();
+      dispatch('click');
+    }
+  }
+  $: if (on === lastUserAction && !loading) {
+    lastUserAction = null;
+  }
 </script>
 
 <div
-  class:on={on} 
+  class:on={effectiveState} 
   class:loading={loading}
   class="wrapper">
   <div class="text on-text">On</div>
   <div class="text off-text">Off</div>
-  <div on:click={()=>dispatch('click')} class="outer">
-    <div class="inner" style="margin-left:{on ? 71 : 8}px"></div>
+  <div on:click={handleClick} class="outer">
+    <div class="inner" style="margin-left:{effectiveState ? 71 : 8}px"></div>
   </div>
 </div>
 
@@ -29,11 +41,11 @@
     height: 65px;
     flex-shrink: 0;
     user-select: none;
-
     border-radius: 16px;
     background: var(--text-color, #313933);
     cursor: pointer;
     display: inline-flex;
+    transition: background-color 0.3s ease;
   }
   .outer {
     position: absolute;
@@ -46,7 +58,7 @@
     height: 49px;
     border-radius: 10px;
     background: #161D17;
-    transition: margin-left 0.2s ease;
+    transition: margin-left 0.3s ease, background-color 0.3s ease;
     margin-top: 8px;
   }
   .on {
@@ -58,10 +70,20 @@
   .on-text {
     position: absolute;
     left: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
   .off-text {
     position: absolute;
     right: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .on .on-text {
+    opacity: 1;
+  }
+  .wrapper:not(.on) .off-text {
+    opacity: 1;
   }
   .text {
     top: 16px;
@@ -81,5 +103,6 @@
   .loading {
     opacity: .6;
     pointer-events: none;
+    transition: opacity 0.3s ease;
   }
 </style>
