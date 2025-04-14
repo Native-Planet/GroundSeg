@@ -55,6 +55,7 @@ type SysConfig struct {
 	PenpaiModels   []Penpai               `json:"penpaiModels"`
 	PenpaiActive   string                 `json:"penpaiActive"`
 	DisableSlsa    bool                   `json:"disableSlsa"`
+	Disable502     bool                   `json:"disable502"`
 }
 
 type DiskWarning struct {

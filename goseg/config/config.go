@@ -615,6 +615,13 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 	} else {
 		mergedConfig.PenpaiActive = defaultConfig.PenpaiActive
 	}
+
+	// 502 checker
+	if customConfig.Disable502 {
+		mergedConfig.Disable502 = customConfig.Disable502
+	} else {
+		mergedConfig.Disable502 = defaultConfig.Disable502
+	}
 	mergedConfig.RemoteBackupPassword = customConfig.RemoteBackupPassword
 	return mergedConfig
 }

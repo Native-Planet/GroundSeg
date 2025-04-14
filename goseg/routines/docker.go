@@ -91,7 +91,6 @@ func DockerSubscriptionHandler() {
 					if err != nil {
 						zap.L().Error(fmt.Sprintf("%v", err))
 					}
-					// update profile
 					current := broadcast.GetState()
 					current.Profile.Startram.Info.Running = true
 					broadcast.UpdateBroadcast(current)
@@ -105,12 +104,17 @@ func DockerSubscriptionHandler() {
 				containerState.ActualStatus = "died"
 				config.UpdateContainerState(contName, containerState)
 				if containerState.Type == "vere" {
-					config.LoadUrbitConfig(contName)
+					if err := config.LoadUrbitConfig(contName); err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to load config for %s: %v", contName, err))
+					}
 					conf := config.UrbitConf(contName)
 					if disableRestart, ok := conf.DisableShipRestarts.(bool); ok && disableRestart {
-						zap.L().Info(fmt.Sprintf("Leaving %s container alone after death", contName))
-						containerState.DesiredStatus = "died"
+						zap.L().Info(fmt.Sprintf("Leaving %s container alone after death due to DisableShipRestarts=true", contName))
+						containerState.DesiredStatus = "stopped"
+						config.UpdateContainerState(contName, containerState)
 						click.ClearLusCode(contName)
+						makeBroadcast(contName, dockerEvent.Action)
+						return
 					} else {
 						click.ClearLusCode(contName)
 					}
@@ -131,7 +135,6 @@ func DockerSubscriptionHandler() {
 				}
 				makeBroadcast(contName, dockerEvent.Action)
 			}
-
 		default:
 			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 		}
@@ -204,7 +207,7 @@ func Check502Loop() {
 				zap.L().Debug(fmt.Sprintf("%v 502 check: %v", pier, resp.StatusCode))
 				if resp.StatusCode == http.StatusBadGateway {
 					zap.L().Warn(fmt.Sprintf("Got 502 response for %v", pier))
-					if _, found := status[pier]; found {
+					if _, found := status[pier]; found && !conf.Disable502 {
 						// found = 2x in a row
 						zap.L().Warn(fmt.Sprintf("502 second strike for %v", pier))
 						// record all remote ships

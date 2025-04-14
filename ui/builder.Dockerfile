@@ -1,4 +1,6 @@
 FROM node:23.6.0-bullseye-slim
+ARG GS_VERSION
+ENV GS_VERSION=$GS_VERSION
 RUN npm install -g npm@9
 COPY ./src /webui/src
 COPY ./static /webui/static
