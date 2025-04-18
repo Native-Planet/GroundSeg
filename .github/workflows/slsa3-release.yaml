@@ -67,7 +67,7 @@ jobs:
           else
             BIN_TAG=$(echo ${{ github.ref_name }} | sed 's@/@.@g')
           fi
-          echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
 
   frontend-build:
@@ -76,10 +76,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.ldflags.outputs.version }}
+      glob: ${{ steps.fe.outputs.glob }}
     steps:
       - uses: actions/checkout@v4
       
       - name: Build Frontend
+        id: fe
         env:
           VERSION: ${{ needs.args.outputs.version }}
         run: |
@@ -99,8 +101,9 @@ jobs:
           ./glob.sh web
           hash=$(ls -1 -c . | head -1 | sed "s/glob-\\([a-z0-9\\.]*\\).glob/\\1/")
           mkdir -p /tmp/groundseg/version/glob
-          mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${hash}.glob"
+          mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${VERSION}-${hash}.glob"
           echo "$hash" > /tmp/groundseg/version/glob/hash.txt
+          echo "glob=GLOB=$hash" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -261,13 +264,13 @@ jobs:
           #
           ### copy binaries into bucket
           for arch in amd64 arm64; do
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${GLOB_HASH}.glob r2:groundseg/glob
           done
           #
           ### copy glob into bucket
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${GLOB_HASH}.glob r2:groundseg/glob
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ env.VERSION }}-${{ env.GLOB }}.glob r2:groundseg/glob
           fi
           #
           ### copy provenance into bucket
