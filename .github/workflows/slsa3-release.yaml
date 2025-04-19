@@ -264,13 +264,13 @@ jobs:
           #
           ### copy binaries into bucket
           for arch in amd64 arm64; do
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${{ env.GLOB }}.glob r2:groundseg/glob
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${arch}_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }} r2:groundseg/bin
           done
           #
           ### copy glob into bucket
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${GLOB_HASH}.glob r2:groundseg/glob
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${GLOB_HASH}.glob r2:groundseg/glob        
           fi
           #
           ### copy provenance into bucket
