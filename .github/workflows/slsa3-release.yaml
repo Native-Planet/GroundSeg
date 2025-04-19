@@ -12,6 +12,7 @@ on:
           - edge
           - canary
           - latest
+          - glob-only
       to_canary:
         description: 'Also push build to canary channel (if edge)'
         required: false
@@ -118,7 +119,7 @@ jobs:
           path: goseg/web/
 
   backend-build:
-    if: ${{ github.event.inputs.release_channel != 'promote' }}
+    if: ${{ github.event.inputs.release_channel != 'promote' && github.event.inputs.release_channel != 'glob-only' }}
     needs: [args, frontend-build]
     runs-on: ubuntu-latest
     outputs: 
@@ -170,7 +171,7 @@ jobs:
           path: groundseg_*_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
 
   provenance:
-    if: ${{ github.event.inputs.release_channel != 'promote' }}
+    if: ${{ github.event.inputs.release_channel != 'promote' && github.event.inputs.release_channel != 'glob-only'}}
     needs: [backend-build]
     permissions:
       actions: read
@@ -233,7 +234,7 @@ jobs:
   deploy:
     needs: [args, backend-build, provenance]
     permissions: write-all
-    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
+    if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' && github.event.inputs.release_channel != 'glob-only' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download SLSA provenance
@@ -267,11 +268,9 @@ jobs:
           #
           ### copy glob into bucket
           ls
-          GLOB_HASH=$(cat hash.txt)
+          GLOB_HASH=$(cat hash.txt | head -n 1)
           echo "Uploading "Desk glob gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob if present"
-          if [ -f "gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob" ]; then
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob r2:groundseg/glob
-          fi
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
           #
           ### copy provenance into bucket
           mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
@@ -348,17 +347,19 @@ jobs:
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
 
-      - name: Create release
-        if: ${{ github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel == 'latest' }}
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.args.outputs.bin-tag }}
-          name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
-          draft: false
-          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
-          files: |
-            ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
-            ./groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
+      glob-upload:
+        if: ${{ github.event.inputs.release_channel == 'glob-only' }}
+        needs: [frontend-build]
+        runs-on: ubuntu-latest
+        steps:
+          - name: Download blobs
+            uses: actions/download-artifact@v4
+            with:
+              name: glob-output
+          - name: Upload glob to R2
+            run: |
+              mkdir -p ~/.config/rclone/
+              echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+              DEBIAN_FRONTEND=noninteractive sudo apt update
+              DEBIAN_FRONTEND=noninteractive sudo apt install rclone
+              rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
