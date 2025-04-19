@@ -267,7 +267,7 @@ jobs:
           #
           ### copy glob into bucket
           ls
-          if [ -d "glob" ]; then
+          if test -f "gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob"; then
             GLOB_HASH=$(cat hash.txt)
             rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob r2:groundseg/glob
           fi
