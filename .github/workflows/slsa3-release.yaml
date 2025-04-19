@@ -281,10 +281,10 @@ jobs:
           curl -X POST -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
-            -d '{
-              "branch": "${{ github.event.inputs.release_channel }}", 
-              "url": "https://files.native.computer/glob/${globfile}"
-            }' \
+            -d "{
+              \"branch\": \"${{ github.event.inputs.release_channel }}\", 
+              \"url\": \"https://files.native.computer/glob/${globfile}\"
+            }" \
             https://glob.native.computer/update-glob
           #
           ### copy provenance into bucket
@@ -385,8 +385,8 @@ jobs:
           curl -X POST -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
-            -d '{
-              "branch": "latest", 
-              "url": "https://files.native.computer/glob/${globfile}"
-            }' \
+            -d "{
+              \"branch\": \"latest\", 
+              \"url\": \"https://files.native.computer/glob/${globfile}\"
+            }" \
             https://glob.native.computer/update-glob
