@@ -67,7 +67,7 @@ jobs:
           else
             BIN_TAG=$(echo ${{ github.ref_name }} | sed 's@/@.@g')
           fi
-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "value=$CHANNEL" >> "$GITHUB_OUTPUT"
           echo "bin-tag=$BIN_TAG" >> "$GITHUB_OUTPUT"
 
   frontend-build:
@@ -268,8 +268,8 @@ jobs:
           ### copy glob into bucket
           ls
           if [ -d "glob" ]; then
-            GLOB_HASH=$(cat glob/hash.txt)
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy glob/gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob r2:groundseg/glob        
+            GLOB_HASH=$(cat hash.txt)
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob r2:groundseg/glob
           fi
           #
           ### copy provenance into bucket
