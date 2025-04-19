@@ -75,7 +75,6 @@ jobs:
     if: ${{ github.event.inputs.release_channel != 'nobuild' && github.event.inputs.release_channel != 'promote' }}
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.ldflags.outputs.version }}
       glob: ${{ steps.fe.outputs.glob }}
     steps:
       - uses: actions/checkout@v4
@@ -103,12 +102,12 @@ jobs:
           mkdir -p /tmp/groundseg/version/glob
           mv glob-*.glob "/tmp/groundseg/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${VERSION}-${hash}.glob"
           echo "$hash" > /tmp/groundseg/version/glob/hash.txt
-          echo "glob=GLOB=$hash" >> "$GITHUB_OUTPUT"
+          echo "glob=$hash" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-outputs
+          name: glob-output
           path: |
             /tmp/groundseg/version/glob
 
@@ -248,8 +247,7 @@ jobs:
       - name: Download blobs
         uses: actions/download-artifact@v4
         with:
-          name: build-outputs
-          path: artifacts
+          name: glob-output
 
       - name: Deploy Files
         run: |
@@ -268,9 +266,10 @@ jobs:
           done
           #
           ### copy glob into bucket
-          if [ -d "artifacts/version/glob" ]; then
-            GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${GLOB_HASH}.glob r2:groundseg/glob        
+          ls
+          if [ -d "glob" ]; then
+            GLOB_HASH=$(cat glob/hash.txt)
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy glob/gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob r2:groundseg/glob        
           fi
           #
           ### copy provenance into bucket
