@@ -270,9 +270,19 @@ jobs:
           ls
           GLOB_HASH=$(cat hash.txt | head -n 1)
           echo "Uploading desk glob gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob if present"
-          rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
+          globfile=$(ls *.glob)
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Auth-Token: ${{ secrets.GLOB_AUTH }}" \
+            -d '{
+              "branch": "${{ github.event.inputs.release_channel }}", 
+              "url": "https://files.native.computer/glob/${globfile}"
+            }' \
+            https://glob.native.computer/update-glob
           #
           ### copy provenance into bucket
+          #
           mv multiple.intoto.jsonl groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
           rclone -vvv --config ~/.config/rclone/rclone.conf copy groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl r2:groundseg/bin
           #
@@ -362,4 +372,13 @@ jobs:
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           DEBIAN_FRONTEND=noninteractive sudo apt update
           DEBIAN_FRONTEND=noninteractive sudo apt install rclone
-          rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
+          globfile=$(ls *.glob)
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Auth-Token: ${{ secrets.GLOB_AUTH }}" \
+            -d '{
+              "branch": "latest", 
+              "url": "https://files.native.computer/glob/${globfile}"
+            }' \
+            https://glob.native.computer/update-glob
