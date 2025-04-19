@@ -32,6 +32,7 @@ env:
   VERSION_AUTH: ${{ secrets.VERSION_AUTH }}
   RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GLOB_AUTH: ${{ secrets.GLOB_AUTH}}
 
 jobs:
   args:
@@ -274,7 +275,7 @@ jobs:
           rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
           curl -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Auth-Token: ${{ secrets.GLOB_AUTH }}" \
+            -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
             -d '{
               "branch": "${{ github.event.inputs.release_channel }}", 
               "url": "https://files.native.computer/glob/${globfile}"
@@ -376,7 +377,7 @@ jobs:
           rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
           curl -X POST \
             -H "Content-Type: application/json" \
-            -H "X-Auth-Token: ${{ secrets.GLOB_AUTH }}" \
+            -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
             -d '{
               "branch": "latest", 
               "url": "https://files.native.computer/glob/${globfile}"
