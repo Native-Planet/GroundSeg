@@ -347,19 +347,19 @@ jobs:
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
 
-      glob-upload:
-        if: ${{ github.event.inputs.release_channel == 'glob-only' }}
-        needs: [frontend-build]
-        runs-on: ubuntu-latest
-        steps:
-          - name: Download blobs
-            uses: actions/download-artifact@v4
-            with:
-              name: glob-output
-          - name: Upload glob to R2
-            run: |
-              mkdir -p ~/.config/rclone/
-              echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-              DEBIAN_FRONTEND=noninteractive sudo apt update
-              DEBIAN_FRONTEND=noninteractive sudo apt install rclone
-              rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
+  glob-upload:
+    if: ${{ github.event.inputs.release_channel == 'glob-only' }}
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download blobs
+        uses: actions/download-artifact@v4
+        with:
+          name: glob-output
+      - name: Upload glob to R2
+        run: |
+          mkdir -p ~/.config/rclone/
+          echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          DEBIAN_FRONTEND=noninteractive sudo apt update
+          DEBIAN_FRONTEND=noninteractive sudo apt install rclone
+          rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
