@@ -269,7 +269,7 @@ jobs:
           ### copy glob into bucket
           ls
           GLOB_HASH=$(cat hash.txt | head -n 1)
-          echo "Uploading "Desk glob gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob if present"
+          echo "Uploading desk glob gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob if present"
           rclone -vvv --config ~/.config/rclone/rclone.conf copy gallseg-*.glob r2:groundseg/glob
           #
           ### copy provenance into bucket
