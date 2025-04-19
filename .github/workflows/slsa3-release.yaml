@@ -270,7 +270,7 @@ jobs:
           ### copy glob into bucket
           if [ -d "artifacts/version/glob" ]; then
             GLOB_HASH=$(cat artifacts/version/glob/hash.txt)
-            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${{ env.GLOB }}.glob r2:groundseg/glob
+            rclone -vvv --config ~/.config/rclone/rclone.conf copy artifacts/version/glob/gallseg-${{ github.event.inputs.release_channel }}-${{ needs.args.outputs.version }}-${GLOB_HASH}.glob r2:groundseg/glob
           fi
           #
           ### copy provenance into bucket
