@@ -257,8 +257,13 @@ jobs:
           ### prepare environment
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-          DEBIAN_FRONTEND=noninteractive sudo apt update
-          DEBIAN_FRONTEND=noninteractive sudo apt install rclone jq -y
+          curl -o rclone.zip https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          curl -L -o jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+          busybox unzip rclone.zip
+          mv rclone-v*/rclone .
+          chmod +x rclone
+          chmod +x jq
+          mv jq rclone /usr/local/bin/
           #
           # copy files into bucket
           #
@@ -273,7 +278,7 @@ jobs:
           echo "Uploading desk glob gallseg-${{ needs.args.outputs.channel }}-${{ needs.args.outputs.bin-tag }}-${GLOB_HASH}.glob if present"
           globfile=$(ls *.glob)
           rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
-          curl -X POST \
+          curl -X POST -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
             -d '{
@@ -371,11 +376,13 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone/
           echo "${{ env.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-          DEBIAN_FRONTEND=noninteractive sudo apt update
-          DEBIAN_FRONTEND=noninteractive sudo apt install rclone
+          curl -o rclone.zip https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          busybox unzip rclone.zip
+          mv rclone-v*/rclone /usr/local/bin/
+          chmod +x /usr/local/bin/rclone
           globfile=$(ls *.glob)
           rclone -vvv --config ~/.config/rclone/rclone.conf copy ${globfile} r2:groundseg/glob
-          curl -X POST \
+          curl -X POST -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -H "X-Auth-Token: ${{ env.GLOB_AUTH }}" \
             -d '{
