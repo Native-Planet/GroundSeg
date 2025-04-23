@@ -363,6 +363,21 @@ jobs:
             echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
           fi
 
+      - name: Create release
+        if: ${{ github.event.inputs.version_server == 'version.groundseg.app' && github.event.inputs.release_channel == 'latest' }}
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.args.outputs.bin-tag }}
+          name: Release ${{ needs.args.outputs.bin-tag }} (${{ needs.args.outputs.channel }})
+          draft: false
+          prerelease: ${{ contains(needs.args.outputs.channel, 'edge') || contains(needs.args.outputs.channel, 'canary') }}
+          files: |
+            ./groundseg_amd64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+            ./groundseg_arm64_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}
+            ./groundseg_${{ needs.args.outputs.channel }}_${{ needs.args.outputs.bin-tag }}.jsonl
+
   glob-upload:
     if: ${{ github.event.inputs.release_channel == 'glob-only' }}
     needs: [frontend-build]
