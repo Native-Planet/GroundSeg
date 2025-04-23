@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -227,14 +228,25 @@ mcRunning:
 	if _, err := ExecDockerCommand(containerName, createCommand); err != nil {
 		return err
 	}
-	publicCommand := []string{
+
+	// write the script
+	scriptContent := fmt.Sprintf(
+		`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::%s/*"]}]}`,
+		"bucket",
+	)
+	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "policy.json")
+	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	if err != nil {
+		return err
+	}
+	policyCommand := []string{
 		"mc",
 		"anonymous",
-		"set",
-		"download",
+		"set-json",
+		"/data/policy.json",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
-	if _, err := ExecDockerCommand(containerName, publicCommand); err != nil {
+	if _, err := ExecDockerCommand(containerName, policyCommand); err != nil {
 		return err
 	}
 	return nil
