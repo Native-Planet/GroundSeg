@@ -39,8 +39,8 @@ type uploadSession struct {
 
 var (
 	uploadSessions = make(map[string]uploadSession) // todo: add checkbox data to struct
-	uploadDir      = filepath.Join(config.BasePath, "uploads")
-	tempDir        = filepath.Join(config.BasePath, "temp")
+	uploadDir      = config.GetStoragePath("uploads")
+	tempDir        = config.GetStoragePath("temp")
 	uploadMu       sync.Mutex
 )
 

@@ -23,7 +23,14 @@ import (
 var (
 	whitelist = make(map[string]structs.WsTokenStruct)
 	exportMu  sync.Mutex
+	exportDir string
 )
+
+func init() {
+	exportDir = config.GetStoragePath("export")
+	os.MkdirAll(exportDir, 0755)
+	zap.L().Info(fmt.Sprintf("Using export directory: %s", exportDir))
+}
 
 func WhitelistContainer(container string, token structs.WsTokenStruct) error {
 	exportMu.Lock()
@@ -64,7 +71,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	exportMu.Unlock()
 
 	if !exists {
-		err := fmt.Errorf("Container %v is not in whitelist!", container)
+		err := fmt.Errorf("container %v is not in whitelist!", container)
 		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -88,15 +95,15 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	var tokenData structs.WsTokenStruct
 	err := json.NewDecoder(r.Body).Decode(&tokenData)
 	if err != nil {
-		err := fmt.Errorf("Export failed to decode token: %v", err)
-		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
+		err := fmt.Errorf("export failed to decode token: %v", err)
+		zap.L().Error(fmt.Sprintf("rejecting Export request: %v", err))
 		cleanup()
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if whitelistToken != tokenData {
-		err := fmt.Errorf("Token for exporting %v is not valid", container)
+		err := fmt.Errorf("token for exporting %v is not valid", container)
 		zap.L().Error(fmt.Sprintf("Rejecting Export request: %v", err))
 		cleanup()
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -120,7 +127,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				status, exists := pierStatus[container]
 				if !exists {
-					exportError(fmt.Errorf("Unable to export nonexistent container: %v", container))
+					exportError(fmt.Errorf("unable to export nonexistent container: %v", container))
 					cleanup()
 					return
 				}
@@ -128,7 +135,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 					break loopLabel
 				}
 			case <-timeout:
-				exportError(fmt.Errorf("Timeout waiting for container to stop"))
+				exportError(fmt.Errorf("timeout waiting for container to stop"))
 				cleanup()
 				return
 			}
@@ -144,9 +151,9 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a temporary file for the zip
-	tempFile, err := os.CreateTemp("", container+"-*.zip")
+	tempFile, err := os.CreateTemp(exportDir, container+"-*.zip")
 	if err != nil {
-		exportError(fmt.Errorf("Failed to create temp file: %v", err))
+		exportError(fmt.Errorf("failed to create temp file: %v", err))
 		cleanup()
 		return
 	}
@@ -165,7 +172,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		exportError(fmt.Errorf("Failed to count files: %v", err))
+		exportError(fmt.Errorf("failed to count files: %v", err))
 		cleanup()
 		return
 	}
