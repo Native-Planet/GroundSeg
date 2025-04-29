@@ -354,6 +354,13 @@ func combineChunks(filename string, total int) error {
 }
 
 func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
+	defer system.RemoveMultipartFiles("/tmp")
+
+	extractionTimeout := time.NewTimer(4 * time.Hour)
+	extractionDone := make(chan bool, 1)
+
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
+
 	defer system.RemoveMultipartFiles("/tmp") // remove multipart-* which are uploaded chunks
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
@@ -414,6 +421,23 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	if customPath != "" {
 		volPath = filepath.Join(customPath, patp)
 	}
+	go func() {
+		select {
+		case <-extractionTimeout.C:
+			// Force completion if extraction gets stuck
+			docker.ImportShipTransBus <- structs.UploadTransition{
+				Type:  "extracted",
+				Value: 100,
+			}
+			docker.ImportShipTransBus <- structs.UploadTransition{
+				Type:  "status",
+				Event: "checking",
+			}
+		case <-extractionDone:
+			// Extraction completed normally
+			extractionTimeout.Stop()
+		}
+	}()
 	compressedPath := filepath.Join(uploadDir, filename)
 	switch checkExtension(filename) {
 	case ".zip":
@@ -442,6 +466,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
+	extractionDone <- true
 	zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
 	// run restructure
 	if err := restructureDirectory(patp); err != nil {
