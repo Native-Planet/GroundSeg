@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
 
@@ -46,6 +47,7 @@ var (
 	DockerDir     = defaults.DockerData("volumes") + "/"
 	confPath      = filepath.Join(BasePath, "settings", "system.json")
 	keyPath       = filepath.Join(BasePath, "settings", "session.key")
+	isEMMCMachine bool
 	confMutex     sync.Mutex
 	contMutex     sync.Mutex
 	versMutex     sync.Mutex
@@ -57,6 +59,7 @@ func init() {
 	setDebugMode()
 	BasePath = getBasePath()
 	configureFixerScript()
+	isEMMCMachine = checkIsEMMCMachine()
 	zap.L().Info(fmt.Sprintf("Loading configs from %s", BasePath))
 	confPath = filepath.Join(BasePath, "settings", "system.json")
 	keyPath = filepath.Join(BasePath, "settings", "session.key")
@@ -174,6 +177,65 @@ func Conf() structs.SysConfig {
 	confMutex.Lock()
 	defer confMutex.Unlock()
 	return globalConfig
+}
+
+func checkIsEMMCMachine() bool {
+	partitions, err := disk.Partitions(true)
+	if err != nil {
+		fmt.Println("Failed to get partitions, defaulting to non-eMMC assumption")
+		return false
+	}
+
+	// Check if root partition is on eMMC
+	for _, p := range partitions {
+		if p.Mountpoint == "/" {
+			return strings.Contains(p.Device, "mmc")
+		}
+	}
+
+	// If we can't find the root partition, check if /media/data exists as a fallback
+	if _, err := os.Stat("/media/data"); err == nil {
+		return true
+	}
+
+	return false
+}
+
+func GetStoragePath(operation string) string {
+	basePath := os.Getenv("GS_BASE_PATH")
+	if basePath == "" {
+		basePath = "/opt/nativeplanet/groundseg"
+	}
+	if !strings.HasPrefix(basePath, "/") {
+		fmt.Println("Base path is not absolute! Using default")
+		basePath = "/opt/nativeplanet/groundseg"
+	}
+	var operationPaths = map[string]string{
+		"uploads": "uploads",
+		"temp":    "temp",
+		"exports": "exports",
+		"logs":    "logs",
+	}
+	opPath, exists := operationPaths[operation]
+	if !exists {
+		fmt.Printf("Invalid operation '%s' for GetStoragePath\n", operation)
+		return filepath.Join(basePath, "temp") // Default to temp
+	}
+	var storagePath string
+	if isEMMCMachine {
+		storagePath = filepath.Join("/media/data", opPath)
+		if _, err := os.Stat("/media/data"); os.IsNotExist(err) {
+			fmt.Printf("/media/data not found, falling back to %s\n", basePath)
+			storagePath = filepath.Join(basePath, opPath)
+		}
+	} else {
+		storagePath = filepath.Join(basePath, opPath)
+	}
+	if err := os.MkdirAll(storagePath, 0755); err != nil {
+		fmt.Printf("Failed to create directory %s: %v\n", storagePath, err)
+	}
+
+	return storagePath
 }
 
 // tell if we're amd64 or arm64

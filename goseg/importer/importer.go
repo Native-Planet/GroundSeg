@@ -39,8 +39,8 @@ type uploadSession struct {
 
 var (
 	uploadSessions = make(map[string]uploadSession) // todo: add checkbox data to struct
-	uploadDir      = filepath.Join(config.BasePath, "uploads")
-	tempDir        = filepath.Join(config.BasePath, "temp")
+	uploadDir      = config.GetStoragePath("uploads")
+	tempDir        = config.GetStoragePath("temp")
 	uploadMu       sync.Mutex
 )
 
@@ -167,11 +167,16 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set timeouts on the request context
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	r = r.WithContext(ctx)
+
 	vars := mux.Vars(r)
 	session := vars["uploadSession"]
-	validSession := VerifySession(session)
-
 	patp := vars["patp"]
+
+	// Helper function for error responses
 	handleSend := func(requestCode int, status, message string) {
 		if status == "failure" {
 			zap.L().Error(fmt.Sprintf("Upload error: %v", message))
@@ -182,84 +187,123 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf(`{"status": "%s", "message": "%s"}`, status, message)))
 	}
 
-	if validSession {
-		// get session info
-		sesh, exists := uploadSessions[session]
-		// debug
-		if exists {
-			zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
-		} else {
-			zap.L().Debug(fmt.Sprintf("Upload session information for %v doesn't exist!", session))
-		}
-		// end debug
+	// Verify session
+	uploadMu.Lock()
+	sesh, validSession := uploadSessions[session]
+	uploadMu.Unlock()
 
-		// we first make sure we know which drive the user wants the pier written on
-		//we skip this step if system-drive was selected
-		if sesh.SelectedDrive != "system-drive" {
-			// check if drive needs formatting
-			if sesh.NeedsFormatting {
-				if mountpoint, err := system.CreateGroundSegFilesystem(sesh.SelectedDrive); err != nil {
-					handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("failed to format and use custom drive"))
-					return
-				} else {
-					sesh.NeedsFormatting = false
-					sesh.CustomDrive = mountpoint
-					uploadSessions[session] = sesh
-				}
-			}
-		}
-
-		// we then handle upload
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: patp}
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
-		file, fileHeader, err := r.FormFile("file")
-		if err != nil {
-			handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Unable to read uploaded file: %v", err))
-			return
-		}
-		defer file.Close()
-
-		filename := fileHeader.Filename
-		chunkIndex := r.FormValue("dzchunkindex")
-		totalChunks := r.FormValue("dztotalchunkcount")
-		zap.L().Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
-		index, err := strconv.Atoi(chunkIndex)
-		if err != nil {
-			handleSend(http.StatusBadRequest, "failure", "Invalid chunk index")
-			return
-		}
-		total, err := strconv.Atoi(totalChunks)
-		if err != nil {
-			handleSend(http.StatusBadRequest, "failure", "Invalid total chunk count")
-			return
-		}
-		tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
-		tempFile, err := os.Create(tempFilePath)
-		if err != nil {
-			handleSend(http.StatusBadRequest, "failure", "Failed to create temp file")
-			return
-		}
-		defer tempFile.Close()
-		io.Copy(tempFile, file)
-		if allChunksReceived(filename, total) {
-			if err := combineChunks(filename, total); err != nil {
-				handleSend(http.StatusBadRequest, "failure", "Failed to combine chunks")
-				return
-			}
-			handleSend(http.StatusOK, "success", "Upload successful")
-			uploadMu.Lock()
-			uploadMu.Unlock()
-			ClearUploadSession(session)
-			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
-			return
-		}
-	} else {
+	if !validSession {
 		zap.L().Error(fmt.Sprintf("Invalid upload session request %v", session))
 		handleSend(http.StatusUnauthorized, "failure", "Invalid upload session")
 		return
 	}
+
+	// Debug session info
+	zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
+
+	// Drive handling
+	if sesh.SelectedDrive != "system-drive" {
+		if sesh.NeedsFormatting {
+			mountpoint, err := system.CreateGroundSegFilesystem(sesh.SelectedDrive)
+			if err != nil {
+				handleSend(http.StatusBadRequest, "failure", "Failed to format and use custom drive")
+				return
+			}
+
+			uploadMu.Lock()
+			sesh.NeedsFormatting = false
+			sesh.CustomDrive = mountpoint
+			uploadSessions[session] = sesh
+			uploadMu.Unlock()
+		}
+	}
+
+	// Update status
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: patp}
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
+
+	// Handle file upload with streaming to disk
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Unable to read uploaded file: %v", err))
+		return
+	}
+	defer file.Close()
+
+	filename := fileHeader.Filename
+	chunkIndex := r.FormValue("dzchunkindex")
+	totalChunks := r.FormValue("dztotalchunkcount")
+
+	zap.L().Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
+
+	index, err := strconv.Atoi(chunkIndex)
+	if err != nil {
+		handleSend(http.StatusBadRequest, "failure", "Invalid chunk index")
+		return
+	}
+
+	total, err := strconv.Atoi(totalChunks)
+	if err != nil {
+		handleSend(http.StatusBadRequest, "failure", "Invalid total chunk count")
+		return
+	}
+
+	// Create temp file for this chunk with streaming
+	tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
+	tempFile, err := os.Create(tempFilePath)
+	if err != nil {
+		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to create temp file: %v", err))
+		return
+	}
+	defer tempFile.Close()
+
+	// Use a buffer for streaming data efficiently
+	buffer := make([]byte, 32*1024) // 32KB buffer
+	_, err = io.CopyBuffer(tempFile, file, buffer)
+	if err != nil {
+		os.Remove(tempFilePath) // Clean up on error
+		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to save chunk: %v", err))
+		return
+	}
+
+	// Check if all chunks have been received
+	if allChunksReceived(filename, total) {
+		// Create a dedicated context for the combine operation
+		combineCtx, combineCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer combineCancel()
+
+		// Use a channel to handle the result of the combine operation
+		resultCh := make(chan error, 1)
+
+		go func() {
+			resultCh <- combineChunks(filename, total)
+		}()
+
+		// Wait for combine to complete or timeout
+		select {
+		case err := <-resultCh:
+			if err != nil {
+				handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to combine chunks: %v", err))
+				return
+			}
+
+			handleSend(http.StatusOK, "success", "Upload successful")
+
+			// Clear session
+			ClearUploadSession(session)
+
+			// Configure the pier in the background
+			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
+			return
+
+		case <-combineCtx.Done():
+			handleSend(http.StatusRequestTimeout, "failure", "Timed out while combining chunks")
+			return
+		}
+	}
+
+	// If we get here, just acknowledge the chunk reception
 	handleSend(http.StatusOK, "success", "Chunk received successfully")
-	return
 }
 
 func allChunksReceived(filename string, total int) bool {
@@ -272,26 +316,51 @@ func allChunksReceived(filename string, total int) bool {
 }
 
 func combineChunks(filename string, total int) error {
-
-	destFile, err := os.Create(filepath.Join(uploadDir, filename))
+	destFilePath := filepath.Join(uploadDir, filename)
+	destFile, err := os.Create(destFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create destination file: %v", err)
 	}
 	defer destFile.Close()
+
+	// Use a buffer to improve performance
+	buffer := make([]byte, 32*1024) // 32KB buffer
+
 	for i := 0; i < total; i++ {
 		partFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, i))
+
+		// Open each chunk file
 		partFile, err := os.Open(partFilePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open chunk file %d: %v", i, err)
 		}
-		io.Copy(destFile, partFile)
-		partFile.Close()
-		os.Remove(partFilePath)
+
+		// Stream the chunk file to the destination using the buffer
+		_, err = io.CopyBuffer(destFile, partFile, buffer)
+		partFile.Close() // Close immediately after copying
+
+		if err != nil {
+			return fmt.Errorf("failed to copy chunk %d: %v", i, err)
+		}
+
+		// Remove the chunk file after successful copy
+		if err := os.Remove(partFilePath); err != nil {
+			zap.L().Warn(fmt.Sprintf("Failed to remove chunk file %s: %v", partFilePath, err))
+			// Continue despite error removing the file
+		}
 	}
+
 	return nil
 }
 
 func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
+	defer system.RemoveMultipartFiles("/tmp")
+
+	extractionTimeout := time.NewTimer(4 * time.Hour)
+	extractionDone := make(chan bool, 1)
+
+	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
+
 	defer system.RemoveMultipartFiles("/tmp") // remove multipart-* which are uploaded chunks
 	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
 	// create pier config
@@ -352,6 +421,23 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 	if customPath != "" {
 		volPath = filepath.Join(customPath, patp)
 	}
+	go func() {
+		select {
+		case <-extractionTimeout.C:
+			// Force completion if extraction gets stuck
+			docker.ImportShipTransBus <- structs.UploadTransition{
+				Type:  "extracted",
+				Value: 100,
+			}
+			docker.ImportShipTransBus <- structs.UploadTransition{
+				Type:  "status",
+				Event: "checking",
+			}
+		case <-extractionDone:
+			// Extraction completed normally
+			extractionTimeout.Stop()
+		}
+	}()
 	compressedPath := filepath.Join(uploadDir, filename)
 	switch checkExtension(filename) {
 	case ".zip":
@@ -380,6 +466,7 @@ func configureUploadedPier(filename, patp string, remote, fix bool, dirPath stri
 		errorCleanup(filename, patp, errmsg)
 		return
 	}
+	extractionDone <- true
 	zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
 	// run restructure
 	if err := restructureDirectory(patp); err != nil {

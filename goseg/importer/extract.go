@@ -4,15 +4,16 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"groundseg/docker"
 	"groundseg/structs"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// checkExtension identifies the type of compressed file by its extension
 func checkExtension(filename string) string {
 	if strings.HasSuffix(filename, ".tar.gz") {
 		return ".tar.gz"
@@ -20,180 +21,317 @@ func checkExtension(filename string) string {
 	return strings.ToLower(filepath.Ext(filename))
 }
 
-// extractZip extracts .zip files and sends % extracted to channel
 func extractZip(src, dest string) error {
-	// Open the zip archive
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	defer cancel()
+
 	r, err := zip.OpenReader(src)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	// Initialize total and extracted sizes
-	var totalSize int64 = 0
-	var extractedSize int64 = 0
-
-	// Calculate the total size of all files in the zip
-	for _, f := range r.File {
-		totalSize += int64(f.UncompressedSize)
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return err
 	}
 
-	// Loop through the files in the zip archive
-	for _, f := range r.File {
-		// Open the file inside the zip
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
+	var totalSize int64 = 0
+	var extractedSize int64 = 0
+	var fileCount int = 0
+	var processedCount int = 0
 
-		// Define the path and create directories as needed
-		target := filepath.Join(dest, f.Name)
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, f.Mode()); err != nil {
-				return err
+	for _, f := range r.File {
+		if !f.FileInfo().IsDir() {
+			totalSize += int64(f.UncompressedSize64)
+			fileCount++
+		}
+	}
+
+	buffer := make([]byte, 1024*1024)
+
+	for _, f := range r.File {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if strings.Contains(f.Name, "__MACOSX") ||
+				filepath.Base(f.Name) == ".DS_Store" ||
+				filepath.Base(f.Name) == "conn.sock" {
+				continue
 			}
-		} else {
-			// Create the parent directory if it doesn't exist
+
+			target := filepath.Join(dest, f.Name)
+
+			if f.FileInfo().IsDir() {
+				if err := os.MkdirAll(target, f.Mode()); err != nil {
+					return err
+				}
+				continue
+			}
+
 			parent := filepath.Dir(target)
 			if err := os.MkdirAll(parent, 0755); err != nil {
 				return err
 			}
 
-			// Extract the file
-			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, f.Mode())
+			rc, err := f.Open()
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, rc); err != nil {
+
+			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, f.Mode())
+			if err != nil {
+				rc.Close()
 				return err
 			}
-			file.Close()
-		}
-		rc.Close()
 
-		// Update extracted size and send to the channel
-		extractedSize += int64(f.UncompressedSize)
-		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
+			written, err := io.CopyBuffer(file, rc, buffer)
+
+			rc.Close()
+			file.Close()
+
+			if err != nil {
+				return err
+			}
+
+			extractedSize += written
+			processedCount++
+
+			percentExtracted := int((float64(processedCount) / float64(fileCount) * 50) +
+				(float64(extractedSize) / float64(totalSize) * 50))
+			if percentExtracted > 99 {
+				percentExtracted = 99
+			}
+
+			docker.ImportShipTransBus <- structs.UploadTransition{
+				Type:  "extracted",
+				Value: percentExtracted,
+			}
+		}
+	}
+
+	// Send explicit 100% when complete
+	docker.ImportShipTransBus <- structs.UploadTransition{
+		Type:  "extracted",
+		Value: 100,
 	}
 	return nil
 }
 
-// extractTarGz extracts .tar.gz  or .tgz files and sends % extracted to channel
 func extractTarGz(src, dest string) error {
-	// Open the tar.gz file
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	defer cancel()
+
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return err
+	}
+
 	file, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Create a gzip reader
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return err
 	}
 	defer gzr.Close()
 
-	// Create a tar reader
 	tr := tar.NewReader(gzr)
+	buffer := make([]byte, 1024*1024) // Increase to 1MB
 
-	// Initialize total and extracted sizes
-	var totalSize int64 = 0
-	var extractedSize int64 = 0
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
 
-	// Loop through the tar archive
+	totalSize := fileInfo.Size()
+	var processedBytes int64 = 0
+	lastUpdate := time.Now()
+
 	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		// Update total size
-		totalSize += header.Size
-
-		// Define the path and create directories as needed
-		target := filepath.Join(dest, header.Name)
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
-				return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			header, err := tr.Next()
+			if err == io.EOF {
+				// Send explicit 100% when complete
+				docker.ImportShipTransBus <- structs.UploadTransition{
+					Type:  "extracted",
+					Value: 100,
+				}
+				return nil
 			}
-		case tar.TypeReg:
-			// Extract the file
-			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, tr); err != nil {
-				return err
-			}
-			file.Close()
-		}
 
-		// Update extracted size and send to the channel
-		extractedSize += header.Size
-		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
+			if strings.Contains(header.Name, "__MACOSX") ||
+				filepath.Base(header.Name) == ".DS_Store" ||
+				filepath.Base(header.Name) == "conn.sock" {
+				continue
+			}
+
+			target := filepath.Join(dest, header.Name)
+
+			switch header.Typeflag {
+			case tar.TypeDir:
+				if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+					return err
+				}
+			case tar.TypeReg:
+				parent := filepath.Dir(target)
+				if err := os.MkdirAll(parent, 0755); err != nil {
+					return err
+				}
+
+				destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+				if err != nil {
+					return err
+				}
+
+				written, err := io.CopyBuffer(destFile, tr, buffer)
+				destFile.Close()
+
+				if err != nil {
+					return err
+				}
+
+				processedBytes += written
+
+				if time.Since(lastUpdate) > time.Second {
+					percentExtracted := int(float64(processedBytes) / float64(totalSize*2) * 100)
+					if percentExtracted > 99 {
+						percentExtracted = 99
+					}
+
+					docker.ImportShipTransBus <- structs.UploadTransition{
+						Type:  "extracted",
+						Value: percentExtracted,
+					}
+					lastUpdate = time.Now()
+				}
+			}
+		}
 	}
-	return nil
 }
 
-// extractTarGz extracts .tar files and sends % extracted to channel
 func extractTar(src, dest string) error {
-	// Open the tar.gz file
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+	defer cancel()
+
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return err
+	}
+
 	file, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Create a tar reader
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	totalSize := fileInfo.Size()
 	tr := tar.NewReader(file)
 
-	// Initialize total and extracted sizes
-	var totalSize int64 = 0
-	var extractedSize int64 = 0
+	buffer := make([]byte, 1024*1024) // Increase to 1MB
 
-	// Loop through the tar archive
+	var processedBytes int64 = 0
+	lastUpdate := time.Now()
+	var fileCount int = 0
+
+	// First count files
+	tmpFile, _ := os.Open(src)
+	defer tmpFile.Close()
+	tmpTr := tar.NewReader(tmpFile)
 	for {
-		header, err := tr.Next()
+		_, err := tmpTr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			break
 		}
+		fileCount++
+	}
 
-		// Update total size
-		totalSize += header.Size
+	var processedCount int = 0
 
-		// Define the path and create directories as needed
-		target := filepath.Join(dest, header.Name)
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
-				return err
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			header, err := tr.Next()
+			if err == io.EOF {
+				// Send explicit 100% when complete
+				docker.ImportShipTransBus <- structs.UploadTransition{
+					Type:  "extracted",
+					Value: 100,
+				}
+				return nil
 			}
-		case tar.TypeReg:
-			// Extract the file
-			file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, tr); err != nil {
-				return err
-			}
-			file.Close()
-		}
 
-		// Update extracted size and send to the channel
-		extractedSize += header.Size
-		percentExtracted := int(float64(extractedSize) / float64(totalSize) * 100)
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: percentExtracted}
+			processedCount++
+
+			if strings.Contains(header.Name, "__MACOSX") ||
+				filepath.Base(header.Name) == ".DS_Store" ||
+				filepath.Base(header.Name) == "conn.sock" {
+				continue
+			}
+
+			target := filepath.Join(dest, header.Name)
+
+			switch header.Typeflag {
+			case tar.TypeDir:
+				if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+					return err
+				}
+			case tar.TypeReg:
+				parent := filepath.Dir(target)
+				if err := os.MkdirAll(parent, 0755); err != nil {
+					return err
+				}
+
+				destFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+				if err != nil {
+					return err
+				}
+
+				written, err := io.CopyBuffer(destFile, tr, buffer)
+				destFile.Close()
+
+				if err != nil {
+					return err
+				}
+
+				processedBytes += written
+
+				// Only update progress at most once per second
+				if time.Since(lastUpdate) > time.Second {
+					// Use both file count and processed bytes for progress
+					percentExtracted := int((float64(processedCount) / float64(fileCount) * 50) +
+						(float64(processedBytes) / float64(totalSize) * 50))
+					if percentExtracted > 99 {
+						percentExtracted = 99
+					}
+
+					docker.ImportShipTransBus <- structs.UploadTransition{
+						Type:  "extracted",
+						Value: percentExtracted,
+					}
+					lastUpdate = time.Now()
+				}
+			}
+		}
 	}
-	return nil
 }
