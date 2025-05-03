@@ -25,17 +25,25 @@ import (
 )
 
 var (
-	broadcastInterval = 1 * time.Second // how often we refresh system info
-	broadcastState    structs.AuthBroadcast
-	scheduledPacks    = make(map[string]time.Time)
-	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
-	SchedulePackBus   = make(chan string)
-	SystemTransitions structs.SystemTransitionBroadcast
-	PackMu            sync.RWMutex
-	UrbTransMu        sync.RWMutex
-	SysTransMu        sync.RWMutex
-	mu                sync.RWMutex // synchronize access to broadcastState
-	BackupDir         = setBackupDir()
+	broadcastInterval    = 1 * time.Second // how often we refresh system info
+	broadcastState       structs.AuthBroadcast
+	scheduledPacks       = make(map[string]time.Time)
+	UrbitTransitions     = make(map[string]structs.UrbitTransitionBroadcast)
+	SchedulePackBus      = make(chan string)
+	SystemTransitions    structs.SystemTransitionBroadcast
+	PackMu               sync.RWMutex
+	UrbTransMu           sync.RWMutex
+	SysTransMu           sync.RWMutex
+	mu                   sync.RWMutex // synchronize access to broadcastState
+	BackupDir            = setBackupDir()
+	lusCodeCheckInterval = 10 * time.Minute
+	lusCodeCache         = make(map[string]string)
+	lusCodeLastCheck     = make(map[string]time.Time)
+	deskStatusCache      = make(map[string]map[string]string)    // [pier][desk] -> status
+	deskStatusLastCheck  = make(map[string]map[string]time.Time) // [pier][desk] -> lastCheck
+	deskCheckInterval    = 10 * time.Minute                      // use cache unless every 10 min
+	lusMu                sync.RWMutex
+	deskMu               sync.RWMutex
 )
 
 func init() {
@@ -276,14 +284,14 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		}
 		var lusCode string
 		if strings.Contains(pierStatus[pier], "Up") {
-			lusCode, _ = click.GetLusCode(pier)
+			lusCode, _ = getCachedLusCode(pier)
 		}
 
 		minioLinked := config.GetMinIOLinkedStatus(pier)
 
 		var penpaiCompanionInstalled bool
 		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "penpai", false)
+			deskStatus, err := getCachedDeskStatus(pier, "penpai", false)
 			if err != nil {
 				penpaiCompanionInstalled = false
 				zap.L().Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
@@ -293,7 +301,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 
 		var gallsegInstalled bool
 		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "groundseg", false)
+			deskStatus, err := getCachedDeskStatus(pier, "groundseg", false)
 			if err != nil {
 				gallsegInstalled = false
 				zap.L().Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
@@ -403,6 +411,56 @@ func constructAppsInfo() structs.Apps {
 	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
 	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
 	return apps
+}
+
+func getCachedLusCode(pier string) (string, error) {
+	lusMu.RLock()
+	lastCheck, exists := lusCodeLastCheck[pier]
+	cachedCode := lusCodeCache[pier]
+	lusMu.RUnlock()
+
+	now := time.Now()
+	if !exists || now.Sub(lastCheck) > lusCodeCheckInterval {
+		lusCode, err := click.GetLusCode(pier)
+		if err != nil {
+			return cachedCode, err
+		}
+
+		lusMu.Lock()
+		lusCodeCache[pier] = lusCode
+		lusCodeLastCheck[pier] = now
+		lusMu.Unlock()
+		return lusCode, nil
+	}
+	return cachedCode, nil
+}
+
+func getCachedDeskStatus(pier string, desk string, refresh bool) (string, error) {
+	deskMu.RLock()
+	if _, exists := deskStatusCache[pier]; !exists {
+		deskMu.RUnlock()
+		deskMu.Lock()
+		deskStatusCache[pier] = make(map[string]string)
+		deskStatusLastCheck[pier] = make(map[string]time.Time)
+		deskMu.Unlock()
+		deskMu.RLock()
+	}
+	lastCheck, timeExists := deskStatusLastCheck[pier][desk]
+	cachedStatus, statusExists := deskStatusCache[pier][desk]
+	deskMu.RUnlock()
+	now := time.Now()
+	if !timeExists || !statusExists || now.Sub(lastCheck) > deskCheckInterval || refresh {
+		status, err := click.GetDesk(pier, desk, false)
+		if err != nil {
+			return cachedStatus, err
+		}
+		deskMu.Lock()
+		deskStatusCache[pier][desk] = status
+		deskStatusLastCheck[pier][desk] = now
+		deskMu.Unlock()
+		return status, nil
+	}
+	return cachedStatus, nil
 }
 
 func constructProfileInfo() structs.Profile {
