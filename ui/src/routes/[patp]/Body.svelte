@@ -16,6 +16,7 @@
   import Urbit from './Section/Urbit.svelte'
   import MinIO from './Section/MinIO.svelte'
   import Loom from './Section/Loom.svelte'
+  import SnapTime from './Section/SnapTime.svelte'
   import PackMeld from './Section/PackMeld.svelte'
   import DevMode from './Section/DevMode.svelte'
   import RemoteAccess from './Section/RemoteAccess.svelte'
@@ -48,6 +49,7 @@
   $: remoteReady = (ship?.remoteReady) || false
   $: running = (ship?.running) || false
   $: loomSize = (ship?.loomSize)
+  $: snapTime = (ship?.snapTime)
   $: lusCode = (ship?.lusCode) || ""
   $: url = (ship?.url) || "#"
   $: showUrbAlias = (ship?.showUrbAlias) || false
@@ -165,7 +167,13 @@
     {loomSize} 
     {ownShip}
     />
-  
+
+  <!-- SnapTime -->
+  <SnapTime
+    {patp}
+    {snapTime} 
+    {ownShip}
+    />
   <!-- vere 3.0 -->
   <!-- Chop -->
   <Chop {patp} />

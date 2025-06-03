@@ -52,6 +52,7 @@ func LoadUrbits() error {
 
 // urbit container config builder
 func urbitContainerConf(containerName string) (container.Config, container.HostConfig, error) {
+	conf := config.Conf()
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	var scriptContent string
@@ -163,6 +164,15 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	} else {
 		devMode = "False"
 	}
+	snapTime := "60"
+	// global snap time default
+	if conf.SnapTime != 0 && conf.SnapTime != 60 {
+		snapTime = fmt.Sprintf("%v", conf.SnapTime)
+	}
+	// per-ship snap time default
+	if shipConf.SnapTime != 0 && shipConf.SnapTime != 60 {
+		snapTime = fmt.Sprintf("%v", shipConf.SnapTime)
+	}
 	// construct the network configuration based on conf val
 	var httpPort string
 	var amesPort string
@@ -183,6 +193,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--devmode=" + devMode,
 				"--http-port=" + httpPort,
 				"--port=" + amesPort,
+				"--snap-time=" + snapTime,
 			},
 		}
 	} else {
@@ -213,6 +224,7 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 				"--loom=" + loomValue,
 				"--dirname=" + shipName,
 				"--devmode=" + devMode,
+				"--snap-time=" + snapTime,
 			},
 		}
 	}

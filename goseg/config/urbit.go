@@ -66,6 +66,9 @@ func LoadUrbitConfig(pier string) error {
 	if targetStruct.StartramReminder == nil {
 		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
 	}
+	if targetStruct.SnapTime == 0 {
+		targetStruct.SnapTime = 60
+	}
 	// Store in var
 	UrbitsConfig[pier] = targetStruct
 	return nil

@@ -49,6 +49,7 @@ var (
 		LocalTlonBackup:     true,
 		BackupTime:          "0000",
 		DisableShipRestarts: false,
+		SnapTime:            60,
 	}
 	NetdataConfig = structs.NetdataConfig{
 		NetdataName:    "netdata",
@@ -160,6 +161,7 @@ func SysConfig(basePath string) structs.SysConfig {
 		Salt:           "",
 		PenpaiRunning:  false,
 		PenpaiCores:    1,
+		SnapTime:       60,
 		PenpaiActive:   "TinyLlama-1.1B",
 		PenpaiModels: []structs.Penpai{
 			{

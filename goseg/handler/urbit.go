@@ -80,6 +80,8 @@ func UrbitHandler(msg []byte) error {
 		return schedulePack(patp, urbitPayload, shipConf)
 	case "loom":
 		return handleLoom(patp, urbitPayload, shipConf)
+	case "snaptime":
+		return handleSnapTime(patp, urbitPayload, shipConf)
 	case "toggle-boot-status":
 		return toggleBootStatus(patp, shipConf)
 	case "toggle-auto-reboot":
@@ -1110,6 +1112,35 @@ func handleLoom(patp string, urbitPayload structs.WsUrbitPayload, shipConf struc
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: "done"}
 	time.Sleep(1 * time.Second)
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "loom", Event: ""}
+	return nil
+}
+
+func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "loading"}
+	shipConf.SnapTime = urbitPayload.Payload.Value
+	update := make(map[string]structs.UrbitDocker)
+	update[patp] = shipConf
+	if err := config.UpdateUrbitConfig(update); err != nil {
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "error"}
+		time.Sleep(3 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "done"}
+		time.Sleep(1 * time.Second)
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: ""}
+		return fmt.Errorf("Couldn't update urbit config: %v", err)
+	}
+	if err := urbitCleanDelete(patp); err != nil {
+		zap.L().Error(fmt.Sprintf("Container deletion for rebuild-container failed: %v", err))
+	}
+	if shipConf.BootStatus == "boot" {
+		if _, err := docker.StartContainer(patp, "vere"); err != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
+		}
+	}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "success"}
+	time.Sleep(3 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "done"}
+	time.Sleep(1 * time.Second)
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: ""}
 	return nil
 }
 
