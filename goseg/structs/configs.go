@@ -56,6 +56,7 @@ type SysConfig struct {
 	PenpaiActive   string                 `json:"penpaiActive"`
 	DisableSlsa    bool                   `json:"disableSlsa"`
 	Disable502     bool                   `json:"disable502"`
+	SnapTime       int                    `json:"snapTime"`
 }
 
 type DiskWarning struct {
@@ -123,6 +124,7 @@ type UrbitDocker struct {
 	LocalTlonBackup     bool   `json:"local_tlon_backup"`
 	BackupTime          string `json:"backup_time"`
 	DisableShipRestarts any    `json:"disable_ship_restarts"`
+	SnapTime            int    `json:"snap_time"`
 }
 
 // Define the interface
@@ -275,6 +277,8 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 			}
 		case "backup_time":
 			u.BackupTime, _ = v.(string)
+		case "snap_time":
+			u.SnapTime = toInt(v)
 		}
 	}
 	return nil
