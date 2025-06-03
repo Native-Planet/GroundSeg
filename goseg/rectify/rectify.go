@@ -35,6 +35,8 @@ func UrbitTransitionHandler() {
 				urbitStruct.Transition.PackMeld = event.Event
 			case "loom":
 				urbitStruct.Transition.Loom = event.Event
+			case "snapTime":
+				urbitStruct.Transition.SnapTime = event.Event
 			case "urbitDomain":
 				urbitStruct.Transition.UrbitDomain = event.Event
 			case "minioDomain":
@@ -311,7 +313,7 @@ func SystemTransitionHandler() {
 		case "bugReportError":
 			current.System.Transition.BugReportError = event.Event
 		default:
-			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+			zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", event.Type))
 		}
 		broadcast.UpdateBroadcast(current)
 		broadcast.BroadcastToClients()
