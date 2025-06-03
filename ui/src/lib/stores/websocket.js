@@ -659,6 +659,16 @@ export const setUrbitLoom = (patp, value) => {
   send(payload)
 }
 
+export const setUrbitSnapTime = (patp, value) => {
+  let payload = {
+    "type":"urbit",
+    "action":"snaptime",
+    "patp":patp,
+    "value": value
+  }
+  send(payload)
+}
+
 export const setPackSchedule = (patp, frequency, intervalType, time, day, date) => {
   let payload = {
     "type":"urbit",
