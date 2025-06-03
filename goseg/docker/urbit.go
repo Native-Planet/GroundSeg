@@ -166,11 +166,11 @@ func urbitContainerConf(containerName string) (container.Config, container.HostC
 	}
 	snapTime := "60"
 	// global snap time default
-	if conf.SnapTime != 0 {
+	if conf.SnapTime != 0 && conf.SnapTime != 60 {
 		snapTime = fmt.Sprintf("%v", conf.SnapTime)
 	}
 	// per-ship snap time default
-	if shipConf.SnapTime != 0 {
+	if shipConf.SnapTime != 0 && conf.SnapTime != 60 {
 		snapTime = fmt.Sprintf("%v", shipConf.SnapTime)
 	}
 	// construct the network configuration based on conf val

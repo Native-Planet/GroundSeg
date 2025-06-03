@@ -685,6 +685,9 @@ func mergeConfigs(defaultConfig, customConfig structs.SysConfig) structs.SysConf
 		mergedConfig.Disable502 = defaultConfig.Disable502
 	}
 	mergedConfig.RemoteBackupPassword = customConfig.RemoteBackupPassword
+	if customConfig.SnapTime == 0 {
+		mergedConfig.SnapTime = 60
+	}
 	return mergedConfig
 }
 
