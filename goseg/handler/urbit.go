@@ -1116,16 +1116,16 @@ func handleLoom(patp string, urbitPayload structs.WsUrbitPayload, shipConf struc
 }
 
 func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload, shipConf structs.UrbitDocker) error {
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: "loading"}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "loading"}
 	shipConf.SnapTime = urbitPayload.Payload.Value
 	update := make(map[string]structs.UrbitDocker)
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: "error"}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "error"}
 		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: "done"}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "done"}
 		time.Sleep(1 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: ""}
+		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: ""}
 		return fmt.Errorf("Couldn't update urbit config: %v", err)
 	}
 	if err := urbitCleanDelete(patp); err != nil {
@@ -1136,11 +1136,11 @@ func handleSnapTime(patp string, urbitPayload structs.WsUrbitPayload, shipConf s
 			zap.L().Error(fmt.Sprintf("Couldn't start %v: %v", patp, err))
 		}
 	}
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: "success"}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "success"}
 	time.Sleep(3 * time.Second)
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: "done"}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: "done"}
 	time.Sleep(1 * time.Second)
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snaptime", Event: ""}
+	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "snapTime", Event: ""}
 	return nil
 }
 

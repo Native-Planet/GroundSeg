@@ -363,6 +363,7 @@ func ConstructPierInfo() (map[string]structs.Urbit, error) {
 		urbit.Info.LocalTlonBackupsEnabled = dockerConfig.LocalTlonBackup
 		urbit.Info.DisableShipRestarts = disableShipRestarts
 		urbit.Info.BackupTime = dockerConfig.BackupTime
+		urbit.Info.SnapTime = dockerConfig.SnapTime
 		if remoteBak, exists := remoteBackupMap[pier]; exists {
 			urbit.Info.RemoteTlonBackups = remoteBak
 		}
