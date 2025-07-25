@@ -35,17 +35,35 @@ func DockerListener() {
 		zap.L().Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return
 	}
-	messages, errs := cli.Events(ctx, types.EventsOptions{})
+
 	for {
-		select {
-		case event := <-messages:
-			// Convert the Docker event to our custom event and send it to the EventBus
-			eventBus <- structs.Event{Type: event.Action, Data: event}
-		case err := <-errs:
-			if err != nil {
-				zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
+		messages, errs := cli.Events(ctx, types.EventsOptions{})
+
+		func() {
+			for {
+				select {
+				case event, ok := <-messages:
+					if !ok {
+						zap.L().Warn("Docker messages channel closed, reconnecting...")
+						return
+					}
+					// Convert the Docker event to our custom event and send it to the EventBus
+					eventBus <- structs.Event{Type: event.Action, Data: event}
+				case err, ok := <-errs:
+					if !ok {
+						zap.L().Warn("Docker errors channel closed, reconnecting...")
+						return
+					}
+					if err != nil {
+						zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
+						return
+					}
+				}
 			}
-		}
+		}()
+
+		time.Sleep(5 * time.Second)
+		zap.L().Info("Reconnecting to Docker events...")
 	}
 }
 
