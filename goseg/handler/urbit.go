@@ -155,7 +155,7 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 	return cname1 == cname2, nil
 }
 
-func waitComplete(patp string) {
+func WaitComplete(patp string) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	for {
 		select {
@@ -513,7 +513,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 				zap.L().Error(fmt.Sprintf("Failed to stop ship for pack & meld %s: %v", patp, err))
 			}
 		}
-		waitComplete(patp)
+		WaitComplete(patp)
 	}
 	// stop ship
 	// start ship as pack
@@ -689,7 +689,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 				return fmt.Errorf("Failed to stop ship for chop %s: %v", patp, err)
 			}
 		}
-		waitComplete(patp)
+		WaitComplete(patp)
 	}
 	// start ship as chop
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "chop", Event: "chopping"}
@@ -1219,7 +1219,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 				zap.L().Error(fmt.Sprintf("Failed to stop ship for roll & chop %s: %v", patp, err))
 			}
 		}
-		waitComplete(patp)
+		WaitComplete(patp)
 	}
 	// start ship as roll
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "rollChop", Event: "rolling"}

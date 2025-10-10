@@ -8,7 +8,7 @@
 
   export let patp
   export let min = 28
-  export let max = 33
+  export let max = 34
   export let loomSize
 
   let slide
