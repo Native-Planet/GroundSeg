@@ -317,7 +317,7 @@ var (
 	log_file="pack.log"
 	exec > >(tee -a "$log_file") 2>&1
 	
-	set -eu
+	set -eux
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
