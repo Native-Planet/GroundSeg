@@ -532,7 +532,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for urth pack to complete for %s", patp))
-	waitComplete(patp)
+	WaitComplete(patp)
 
 	// start ship as meld
 	zap.L().Info(fmt.Sprintf("Attempting to urth meld %s", patp))
@@ -550,7 +550,7 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for urth meld to complete for %s", patp))
-	waitComplete(patp)
+	WaitComplete(patp)
 
 	// start ship if "boot"
 	if isRunning {
@@ -707,7 +707,7 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
-	waitComplete(patp)
+	WaitComplete(patp)
 
 	// start ship if "boot"
 	if isRunning {
@@ -1237,7 +1237,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for roll to complete for %s", patp))
-	waitComplete(patp)
+	WaitComplete(patp)
 
 	// start ship as chop
 	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
@@ -1255,7 +1255,7 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}
 
 	zap.L().Info(fmt.Sprintf("Waiting for chop to complete for %s", patp))
-	waitComplete(patp)
+	WaitComplete(patp)
 
 	// start ship if "boot"
 	if isRunning {
