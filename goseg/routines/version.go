@@ -52,8 +52,8 @@ func callUpdater(releaseChannel string) {
 	latestChannelVersion := latestVersion
 	// check docker updates
 	if latestChannelVersion != currentChannelVersion {
-		config.VersionInfo = latestVersion
 		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+		config.VersionInfo = latestVersion
 	}
 	// Check for gs binary updates based on hash
 	binPath := filepath.Join(config.BasePath, "groundseg")
@@ -304,8 +304,8 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 								}
 							}
 
-							// Run urbit prep with new image (always, regardless of running status)
-							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with new vere image", pier))
+							// Run urbit prep with old image (always, regardless of running status)
+							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
 							urbConf.BootStatus = "prep"
 							update := make(map[string]structs.UrbitDocker)
 							update[pier] = urbConf
@@ -384,8 +384,8 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 								}
 							}
 
-							// Run urbit prep with new image (always, regardless of running status)
-							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with new vere image", pier))
+							// Run urbit prep with old image (always, regardless of running status)
+							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
 							urbConf.BootStatus = "prep"
 							update := make(map[string]structs.UrbitDocker)
 							update[pier] = urbConf
