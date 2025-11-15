@@ -105,13 +105,13 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 func CycleWgKey() error {
 	priv, pub, err := WgKeyGen()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Couldn't reset WG keys: %v", err))
+		return fmt.Errorf("Couldn't reset WG keys: %w", err)
 	}
 	if err := UpdateConf(map[string]interface{}{
 		"pubkey":  pub,
 		"privkey": priv,
 	}); err != nil {
-		return fmt.Errorf(fmt.Sprintf("Couldn't update new WG keys: %v", err))
+		return fmt.Errorf("Couldn't update new WG keys: %w", err)
 	}
 	return nil
 }

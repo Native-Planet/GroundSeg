@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 )
 
@@ -52,15 +52,13 @@ func LoadUrbitConfig(pier string) error {
 	confPath := filepath.Join(BasePath, "settings", "pier", pier+".json")
 	file, err := ioutil.ReadFile(confPath)
 	if err != nil {
-		errmsg := fmt.Sprintf("Unable to load %s config: %v", pier, err)
-		return fmt.Errorf(errmsg)
+		return fmt.Errorf("Unable to load %s config: %w", pier, err)
 		// todo: write a new conf
 	}
 	// Unmarshal JSON
 	var targetStruct structs.UrbitDocker
 	if err := json.Unmarshal(file, &targetStruct); err != nil {
-		errmsg := fmt.Sprintf("Error decoding %s JSON: %v", pier, err)
-		return fmt.Errorf(errmsg)
+		return fmt.Errorf("Error decoding %s JSON: %w", pier, err)
 	}
 	// set startram reminder
 	if targetStruct.StartramReminder == nil {
@@ -144,7 +142,7 @@ func getImageTagByContainerName(containerName string) (string, error) {
 	filterArgs.Add("name", containerName)
 
 	// List containers using the filter
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{Filters: filterArgs, All: true})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{Filters: filterArgs, All: true})
 	if err != nil {
 		return "", fmt.Errorf("failed to list containers: %w", err)
 	}

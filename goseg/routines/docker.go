@@ -13,8 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/events"
+	eventtypes "github.com/docker/docker/api/types/events"
 	"go.uber.org/zap"
 )
 
@@ -35,12 +34,12 @@ func DockerListener() {
 		zap.L().Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return
 	}
-	messages, errs := cli.Events(ctx, types.EventsOptions{})
+	messages, errs := cli.Events(ctx, eventtypes.ListOptions{})
 	for {
 		select {
 		case event := <-messages:
 			// Convert the Docker event to our custom event and send it to the EventBus
-			eventBus <- structs.Event{Type: event.Action, Data: event}
+			eventBus <- structs.Event{Type: string(event.Action), Data: event}
 		case err := <-errs:
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
@@ -54,7 +53,7 @@ func DockerListener() {
 func DockerSubscriptionHandler() {
 	for {
 		event := <-eventBus
-		dockerEvent, ok := event.Data.(events.Message)
+		dockerEvent, ok := event.Data.(eventtypes.Message)
 		if !ok {
 			zap.L().Error("Failed to assert Docker event data type")
 			continue
@@ -72,7 +71,7 @@ func DockerSubscriptionHandler() {
 				if containerState.DesiredStatus != "stopped" {
 					docker.StartContainer(contName, containerState.Type)
 				}
-				makeBroadcast(contName, dockerEvent.Action)
+				makeBroadcast(contName, string(dockerEvent.Action))
 			}
 
 		case "start":
@@ -95,7 +94,7 @@ func DockerSubscriptionHandler() {
 					current.Profile.Startram.Info.Running = true
 					broadcast.UpdateBroadcast(current)
 				}
-				makeBroadcast(contName, dockerEvent.Action)
+				makeBroadcast(contName, string(dockerEvent.Action))
 			}
 
 		case "die":
@@ -113,7 +112,7 @@ func DockerSubscriptionHandler() {
 						containerState.DesiredStatus = "stopped"
 						config.UpdateContainerState(contName, containerState)
 						click.ClearLusCode(contName)
-						makeBroadcast(contName, dockerEvent.Action)
+						makeBroadcast(contName, string(dockerEvent.Action))
 						return
 					} else {
 						click.ClearLusCode(contName)
@@ -133,7 +132,7 @@ func DockerSubscriptionHandler() {
 						zap.L().Info(fmt.Sprintf("Ship desired status: %s", containerState.DesiredStatus))
 					}
 				}
-				makeBroadcast(contName, dockerEvent.Action)
+				makeBroadcast(contName, string(dockerEvent.Action))
 			}
 		default:
 			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"go.uber.org/zap"
@@ -165,7 +164,7 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err != nil {
 		return err
 	}
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return err
 	}
 	file, err := os.Open(filepath.Join(filePath))
@@ -174,7 +173,7 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 	}
 	defer file.Close()
 	// Copy the file to the volume via the temporary container
-	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, types.CopyToContainerOptions{})
+	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, container.CopyToContainerOptions{})
 	if err != nil {
 		return err
 	}
@@ -182,12 +181,12 @@ func copyWGFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err := StopContainerByName("wg_writer"); err != nil {
 		return err
 	}
-	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); err != nil {
+	if err := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
 		return err
 	}
 	defer func() {
-		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
-			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: ", removeErr))
+		if removeErr := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); removeErr != nil {
+			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: %v", removeErr))
 		}
 	}()
 	return nil

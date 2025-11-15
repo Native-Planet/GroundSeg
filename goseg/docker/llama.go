@@ -28,7 +28,7 @@ func LoadLlama() error {
 	}
 	info, err := StartContainer("llama-gpt-api", "llama-api")
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
+		return fmt.Errorf("Error starting Llama API: %v", err)
 	}
 	config.UpdateContainerState("llama-api", info)
 	return nil
