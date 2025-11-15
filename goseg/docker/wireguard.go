@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"groundseg/config"
+	"groundseg/dockerclient"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -146,7 +146,7 @@ func writeWgConfToFile(filePath string, content string) error {
 // write wg conf to volume
 func copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}

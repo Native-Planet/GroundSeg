@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"groundseg/dockerclient"
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
@@ -23,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
@@ -143,7 +143,7 @@ func streamToConn(container string, conn *websocket.Conn) {
 	}()
 	defer conn.Close()
 	// Create a Docker client
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("failed to create Docker client: %w", err))
 		return

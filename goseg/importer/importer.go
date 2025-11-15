@@ -7,6 +7,7 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/dockerclient"
 	"groundseg/shipcreator"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -23,7 +24,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -625,7 +625,7 @@ func restructureDirectory(patp string) error {
 	zap.L().Info("Checking pier directory")
 	// get docker volume path for patp
 	volDir := ""
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}

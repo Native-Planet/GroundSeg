@@ -7,6 +7,7 @@ import (
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/dockerclient"
 	"groundseg/structs"
 	"net/http"
 	"strings"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
-	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 )
 
@@ -30,7 +30,7 @@ func init() {
 // subscribe to docker events and feed them into eventbus
 func DockerListener() {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error initializing Docker client: %v", err))
 		return

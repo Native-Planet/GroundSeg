@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
+	"groundseg/dockerclient"
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
@@ -42,7 +43,7 @@ func init() {
 	if err = killContainerUsingPort(80); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error creating Docker client: %v", err))
 		return
@@ -63,7 +64,7 @@ func init() {
 func killContainerUsingPort(n uint16) error {
 	// Initialize Docker client
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func updateDocker() {
 // return the container status of a slice of ships
 func GetShipStatus(patps []string) (map[string]string, error) {
 	statuses := make(map[string]string)
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
 		zap.L().Error(errmsg)
@@ -195,7 +196,7 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 
 func GetContainerRunningStatus(containerName string) (string, error) {
 	var status string
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 	}
 	defer cli.Close()
@@ -217,7 +218,7 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 
 // return the name of a container's network
 func GetContainerNetwork(name string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", err
 	}
@@ -234,7 +235,7 @@ func GetContainerNetwork(name string) (string, error) {
 
 // creates a volume by name
 func CreateVolume(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -254,7 +255,7 @@ func CreateVolume(name string) error {
 
 // deletes a volume by its name
 func DeleteVolume(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -272,7 +273,7 @@ func DeleteVolume(name string) error {
 
 // deletes a container by its name
 func DeleteContainer(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -291,7 +292,7 @@ func DeleteContainer(name string) error {
 
 // Write a file to a specific location in a volume
 func WriteFileToVolume(name string, file string, content string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -381,7 +382,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	existingContainer, _ := FindContainer(containerName)
 
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return containerState, err
 	}
@@ -525,7 +526,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, err
 	}
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return containerState, err
 	}
@@ -604,7 +605,7 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 // stop a container with the name
 func StopContainerByName(containerName string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}
@@ -633,7 +634,7 @@ func StopContainerByName(containerName string) error {
 // pull the image if it doesn't exist locally
 func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return false, err
 	}
@@ -660,7 +661,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 
 // looks for a container with the given name and returns it, or nil if not found
 func FindContainer(containerName string) (*types.Container, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +699,7 @@ func DockerPoller() {
 
 // execute command
 func ExecDockerCommand(containerName string, cmd []string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", err
 	}
@@ -758,7 +759,7 @@ func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 // restart a running container
 func RestartContainer(name string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return fmt.Errorf("Couldn't create client: %v", err)
 	}
@@ -787,7 +788,7 @@ func contains(slice []string, str string) bool {
 }
 
 func volumeExists(volumeName string) (bool, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return false, fmt.Errorf("Failed to create client: %v", err)
 	}
@@ -805,7 +806,7 @@ func volumeExists(volumeName string) (bool, error) {
 }
 
 func addOrGetNetwork(networkName string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", fmt.Errorf("Failed to create client: %v", err)
 	}

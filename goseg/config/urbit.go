@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/defaults"
+	"groundseg/dockerclient"
 	"groundseg/structs"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 )
 
 var (
@@ -133,7 +133,7 @@ func getImageTagByContainerName(containerName string) (string, error) {
 	ctx := context.Background()
 
 	// Create a new Docker client
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", fmt.Errorf("failed to create docker client: %w", err)
 	}

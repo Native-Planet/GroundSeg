@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"groundseg/config"
+	"groundseg/dockerclient"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"go.uber.org/zap"
 )
@@ -142,7 +142,7 @@ func writeNDConfToFile(filePath string, content string) error {
 // write ND conf to volume
 func copyNDFileToVolume(filePath string, targetPath string, volumeName string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}

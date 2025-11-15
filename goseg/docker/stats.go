@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"groundseg/dockerclient"
 	"groundseg/structs"
 	"io/ioutil"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +53,7 @@ func ForceUpdateContainerStats(name string) structs.ContainerStats {
 
 // getMemoryUsage retrieves the memory usage of a container.
 func getMemoryUsage(containerID string) uint64 {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
 		return 0
@@ -85,7 +85,7 @@ func getMemoryUsage(containerID string) uint64 {
 
 // getDiskUsage calculates the disk usage by totaling the space used by volumes of the container.
 func getDiskUsage(containerID string) int64 {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
 		return 0

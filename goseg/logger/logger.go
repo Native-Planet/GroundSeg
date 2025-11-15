@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"groundseg/dockerclient"
 	"os"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
@@ -222,7 +222,7 @@ func RemoveSysSessions() {
 }
 
 func getDockerLogs(name string) ([]byte, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return []byte{}, err
 	}
