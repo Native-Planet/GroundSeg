@@ -52,8 +52,8 @@ func callUpdater(releaseChannel string) {
 	latestChannelVersion := latestVersion
 	// check docker updates
 	if latestChannelVersion != currentChannelVersion {
-		config.VersionInfo = latestVersion
 		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+		config.VersionInfo = latestVersion
 	}
 	// Check for gs binary updates based on hash
 	binPath := filepath.Join(config.BasePath, "groundseg")
@@ -293,17 +293,67 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 					} else if sw == "vere" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							urbConf := config.UrbitConf(pier)
+
+							// Stop ship if running
 							if isRunning {
-								_, err := docker.StartContainer(pier, "vere")
-								if err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", err))
+								zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
+								if err := docker.StopContainerByName(pier); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
+									continue
 								}
+							}
+
+							// Run urbit prep with old image (always, regardless of running status)
+							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
+							urbConf.BootStatus = "prep"
+							update := make(map[string]structs.UrbitDocker)
+							update[pier] = urbConf
+							if err := config.UpdateUrbitConfig(update); err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
 								continue
 							}
-							// after starting (or not starting) the container,
-							// check if it wants a chop
-							urbConf := config.UrbitConf(pier)
-							if urbConf.ChopOnUpgrade == true {
+
+							// Start container to run prep
+							_, err := docker.StartContainer(pier, "vere")
+							if err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
+								continue
+							}
+
+							// Wait for prep to complete
+							zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
+							handler.WaitComplete(pier)
+
+							// Set boot status appropriately after prep
+							if isRunning {
+								// Ship was running before, boot it with new image
+								zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
+								urbConf.BootStatus = "boot"
+								update = make(map[string]structs.UrbitDocker)
+								update[pier] = urbConf
+								if err := config.UpdateUrbitConfig(update); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
+									continue
+								}
+								_, err = docker.StartContainer(pier, "vere")
+								if err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
+									continue
+								}
+							} else {
+								// Ship was not running, keep it stopped but update config
+								zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
+								urbConf.BootStatus = "noboot"
+								update = make(map[string]structs.UrbitDocker)
+								update[pier] = urbConf
+								if err := config.UpdateUrbitConfig(update); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
+								}
+							}
+
+							// Check if it wants a chop after upgrade (only if running)
+							if isRunning && urbConf.ChopOnUpgrade == true {
 								go handler.ChopPier(pier, urbConf)
 							}
 						}
@@ -323,17 +373,67 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 					} else if sw == "vere" {
 						for pier, status := range statuses {
 							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+							urbConf := config.UrbitConf(pier)
+
+							// Stop ship if running
 							if isRunning {
-								_, err := docker.StartContainer(pier, "vere")
-								if err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", err))
+								zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
+								if err := docker.StopContainerByName(pier); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
+									continue
 								}
+							}
+
+							// Run urbit prep with old image (always, regardless of running status)
+							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
+							urbConf.BootStatus = "prep"
+							update := make(map[string]structs.UrbitDocker)
+							update[pier] = urbConf
+							if err := config.UpdateUrbitConfig(update); err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
 								continue
 							}
-							// after starting (or not starting) the container,
-							// check if it wants a chop
-							urbConf := config.UrbitConf(pier)
-							if urbConf.ChopOnUpgrade == true {
+
+							// Start container to run prep
+							_, err := docker.StartContainer(pier, "vere")
+							if err != nil {
+								zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
+								continue
+							}
+
+							// Wait for prep to complete
+							zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
+							handler.WaitComplete(pier)
+
+							// Set boot status appropriately after prep
+							if isRunning {
+								// Ship was running before, boot it with new image
+								zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
+								urbConf.BootStatus = "boot"
+								update = make(map[string]structs.UrbitDocker)
+								update[pier] = urbConf
+								if err := config.UpdateUrbitConfig(update); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
+									continue
+								}
+								_, err = docker.StartContainer(pier, "vere")
+								if err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
+									continue
+								}
+							} else {
+								// Ship was not running, keep it stopped but update config
+								zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
+								urbConf.BootStatus = "noboot"
+								update = make(map[string]structs.UrbitDocker)
+								update[pier] = urbConf
+								if err := config.UpdateUrbitConfig(update); err != nil {
+									zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
+								}
+							}
+
+							// Check if it wants a chop after upgrade (only if running)
+							if isRunning && urbConf.ChopOnUpgrade == true {
 								go handler.ChopPier(pier, urbConf)
 							}
 						}

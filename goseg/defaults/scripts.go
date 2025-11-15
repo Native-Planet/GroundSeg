@@ -200,7 +200,23 @@ var (
 			echo "File .vere.lock containing PID 1 has been deleted."
 		fi
 	fi
-	
+
+	trap_urbit() {
+		local args="$@"
+		local logfile=$(mktemp)
+		
+		urbit $args 2>&1 | tee "$logfile"
+		local exit_code=${PIPESTATUS[0]}
+		
+		if [[ $exit_code -ne 0 ]] && grep -q " stale snapshot: " "$logfile"; then
+				echo "Detected stale snapshot, replaying with previous binary"
+				rm -f "$logfile"
+				exec prev-urbit -Lx $args
+		fi
+		
+		rm -f "$logfile"
+		exit $exit_code
+	}
 	
 	if [ $devMode == "True" ]; then
 		echo "Developer mode: $devMode"
@@ -215,7 +231,8 @@ var (
 		exit 0
 	else
 		echo "urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime $dirname"
-		urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime  $dirname
+		
+		trap_urbit $ttyflag -p $amesPort --http-port $httpPort --loom $loom --snap-time $snapTime  $dirname
 	fi`
 
 	RollScript = `#!/bin/bash
@@ -317,7 +334,7 @@ var (
 	log_file="pack.log"
 	exec > >(tee -a "$log_file") 2>&1
 	
-	set -eu
+	set -eux
 	# set defaults
 	#amesPort="34343"
 	#httpPort="80"
