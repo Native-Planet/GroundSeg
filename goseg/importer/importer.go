@@ -542,7 +542,7 @@ func waitForShipReady(filename, patp string, remote, fix bool) {
 			}
 			status, exists := statuses[patp]
 			if !exists {
-				zap.L().Error(fmt.Sprintf("%s status doesn't exist: %v"))
+				zap.L().Error(fmt.Sprintf("%s status doesn't exist", patp))
 			}
 			isRunning := strings.Contains(status, "Up")
 			if isRunning {
@@ -648,7 +648,7 @@ func restructureDirectory(patp string) error {
 		}
 	}
 	if volDir == "" {
-		return fmt.Errorf("No docker volume for %d!", patp)
+		return fmt.Errorf("No docker volume for %s!", patp)
 	}
 	zap.L().Info(fmt.Sprintf("%v pier path: %v", patp, volDir))
 	// find .urb

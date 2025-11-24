@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
@@ -125,7 +125,7 @@ func dumpDockerLogs(containerID string, path string) error {
 	}
 	defer dockerClient.Close()
 	// get previous 1k logs
-	options := types.ContainerLogsOptions{
+	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: true,

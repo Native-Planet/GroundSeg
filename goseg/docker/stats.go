@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"go.uber.org/zap"
 )
 
@@ -55,28 +55,28 @@ func ForceUpdateContainerStats(name string) structs.ContainerStats {
 func getMemoryUsage(containerID string) uint64 {
 	cli, err := dockerclient.New()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to create Docker client: %v", err))
 		return 0
 	}
 	defer cli.Close()
 
 	resp, err := cli.ContainerStats(context.Background(), containerID, false)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to get container stats: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to get container stats: %v", err))
 		return 0
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to read container stats: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to read container stats: %v", err))
 		return 0
 	}
 
-	var stats types.StatsJSON
+	var stats container.StatsResponse
 	err = json.Unmarshal(data, &stats)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to unmarshal container stats: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to unmarshal container stats: %v", err))
 		return 0
 	}
 
@@ -87,14 +87,14 @@ func getMemoryUsage(containerID string) uint64 {
 func getDiskUsage(containerID string) int64 {
 	cli, err := dockerclient.New()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to create Docker client: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to create Docker client: %v", err))
 		return 0
 	}
 	defer cli.Close()
 
 	inspect, err := cli.ContainerInspect(context.Background(), containerID)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to inspect container: ", err))
+		zap.L().Error(fmt.Sprintf("Failed to inspect container: %v", err))
 		return 0
 	}
 
@@ -103,7 +103,7 @@ func getDiskUsage(containerID string) int64 {
 		if mount.Type == "volume" || mount.Type == "bind" {
 			size, err := getDirSize(mount.Source)
 			if err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to get size for directory: ", mount.Source, " Error: ", err))
+				zap.L().Error(fmt.Sprintf("Failed to get size for directory %s: %v", mount.Source, err))
 				continue // Continue calculating the size of other volumes even if one fails
 			}
 			totalSize += size

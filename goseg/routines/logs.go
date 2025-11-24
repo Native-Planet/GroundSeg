@@ -23,7 +23,7 @@ import (
 
 	"sync"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
@@ -137,15 +137,15 @@ func DockerLogConnRemover() {
 	}
 }
 
-func streamToConn(container string, conn *websocket.Conn) {
+func streamToConn(containerName string, conn *websocket.Conn) {
 	defer func() {
-		dockerLogCancelChannel <- DockerCancel{Container: container, Conn: conn}
+		dockerLogCancelChannel <- DockerCancel{Container: containerName, Conn: conn}
 	}()
 	defer conn.Close()
 	// Create a Docker client
 	cli, err := dockerclient.New()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("failed to create Docker client: %w", err))
+		zap.L().Error(fmt.Sprintf("failed to create Docker client: %v", err))
 		return
 	}
 	defer cli.Close()
@@ -154,7 +154,7 @@ func streamToConn(container string, conn *websocket.Conn) {
 	ctx := context.Background()
 
 	// Specify options to stream logs
-	options := types.ContainerLogsOptions{
+	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true, // Stream the logs
@@ -162,9 +162,9 @@ func streamToConn(container string, conn *websocket.Conn) {
 	}
 
 	// Get the container logs as a stream
-	out, err := cli.ContainerLogs(ctx, container, options)
+	out, err := cli.ContainerLogs(ctx, containerName, options)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("failed to get logs for container %s: %w", container, err))
+		zap.L().Error(fmt.Sprintf("failed to get logs for container %s: %v", containerName, err))
 		return
 	}
 	defer out.Close()
@@ -177,14 +177,14 @@ func streamToConn(container string, conn *websocket.Conn) {
 			line = scanner.Text()[8:]
 		}
 		line = strings.ReplaceAll(line, "\\", "\\\\")
-		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, container, line))
+		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, containerName, line))
 		if err := conn.WriteMessage(1, logJSON); err != nil {
-			zap.L().Error(fmt.Sprintf("error writing message for %v: %v", container, err))
+			zap.L().Error(fmt.Sprintf("error writing message for %v: %v", containerName, err))
 			return
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		zap.L().Error(fmt.Sprintf("error reading logs: %w", err))
+		zap.L().Error(fmt.Sprintf("error reading logs: %v", err))
 		return
 	}
 }

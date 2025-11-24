@@ -14,10 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	imagetypes "github.com/docker/docker/api/types/image"
+	networktypes "github.com/docker/docker/api/types/network"
+	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 )
@@ -75,7 +76,7 @@ func killContainerUsingPort(n uint16) error {
 	filters.Add("status", "running")
 
 	// List running containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{Filters: filters})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{Filters: filters})
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
 		return err
@@ -164,7 +165,7 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 		return statuses, err
 	} else {
 		defer cli.Close()
-		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+		containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
 			zap.L().Error(errmsg)
@@ -201,7 +202,7 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 	}
 	defer cli.Close()
 	// List containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
 		return status, err
 	}
@@ -243,7 +244,7 @@ func CreateVolume(name string) error {
 	defer cli.Close()
 
 	// Create volume
-	vol, err := cli.VolumeCreate(context.Background(), volume.CreateOptions{Name: name})
+	vol, err := cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{Name: name})
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker volume: %v : %v", name, err)
 		return errmsg
@@ -280,7 +281,7 @@ func DeleteContainer(name string) error {
 	}
 	defer cli.Close()
 	// Force-remove the container
-	err = cli.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{Force: true})
+	err = cli.ContainerRemove(context.Background(), name, container.RemoveOptions{Force: true})
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to delete docker container: %v : %v", name, err)
 		return errmsg
@@ -394,14 +395,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		zap.L().Info(msg)
 	case existingContainer.State == "exited":
-		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 		if err != nil {
 			return containerState, err
 		}
@@ -409,14 +410,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
 		zap.L().Info(msg)
 	case existingContainer.State == "created":
-		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err := cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
@@ -432,7 +433,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		if currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
-			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+			err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 			}
@@ -440,7 +441,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+			err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 			if err != nil {
 				return containerState, err
 			}
@@ -611,7 +612,7 @@ func StopContainerByName(containerName string) error {
 	}
 	defer cli.Close()
 	// fetch all containers incl stopped
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return err
 	}
@@ -639,7 +640,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 		return false, err
 	}
 	defer cli.Close()
-	images, err := cli.ImageList(ctx, types.ImageListOptions{})
+	images, err := cli.ImageList(ctx, imagetypes.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -650,7 +651,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 			}
 		}
 	}
-	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), imagetypes.PullOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -660,14 +661,14 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 }
 
 // looks for a container with the given name and returns it, or nil if not found
-func FindContainer(containerName string) (*types.Container, error) {
+func FindContainer(containerName string) (*container.Summary, error) {
 	cli, err := dockerclient.New()
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 	// Fetch list of running containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -705,7 +706,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	}
 	defer cli.Close()
 	// Create an Exec configuration
-	execConfig := types.ExecConfig{
+	execConfig := container.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          cmd,
@@ -725,7 +726,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	}
 
 	// Start the exec command
-	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{})
+	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -742,7 +743,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 
 // Function to get container ID by name
 func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -793,7 +794,7 @@ func volumeExists(volumeName string) (bool, error) {
 		return false, fmt.Errorf("Failed to create client: %v", err)
 	}
 	defer cli.Close()
-	volumeList, err := cli.VolumeList(context.Background(), volume.ListOptions{})
+	volumeList, err := cli.VolumeList(context.Background(), volumetypes.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -811,7 +812,7 @@ func addOrGetNetwork(networkName string) (string, error) {
 		return "", fmt.Errorf("Failed to create client: %v", err)
 	}
 	defer cli.Close()
-	networks, err := cli.NetworkList(context.Background(), types.NetworkListOptions{})
+	networks, err := cli.NetworkList(context.Background(), networktypes.ListOptions{})
 	if err != nil {
 		return "", fmt.Errorf("Failed to list networks: %v", err)
 	}
@@ -820,7 +821,7 @@ func addOrGetNetwork(networkName string) (string, error) {
 			return network.ID, nil
 		}
 	}
-	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
+	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, networktypes.CreateOptions{
 		Driver: "bridge",
 		Scope:  "local",
 	})

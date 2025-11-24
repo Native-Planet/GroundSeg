@@ -127,7 +127,7 @@ func NewShipHandler(msg []byte) error {
 		}
 		deleteMsg, err := json.Marshal(deletePayload)
 		if err != nil {
-			return fmt.Errorf("Failed to marshall payload for newly create %v for deletion: %v: %+v", err, deletePayload)
+			return fmt.Errorf("Failed to marshall payload for newly created %s for deletion: %v payload=%+v", patp, err, deletePayload)
 		}
 		if err := UrbitHandler(deleteMsg); err != nil {
 			return fmt.Errorf("Failed to delete newly created %v: %v", patp, err)

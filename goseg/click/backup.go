@@ -38,7 +38,7 @@ func backupAgent(patp, agent string) error {
 		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
 	}
 	if !succeeded {
-		return fmt.Errorf("Click %s failed poke: %s", patp)
+		return fmt.Errorf("Click %s failed poke for %s", file, patp)
 	}
 	return nil
 }
