@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"groundseg/dockerclient"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
@@ -111,11 +111,11 @@ func init() {
 	LogPath = makeLogPath()
 	err := os.MkdirAll(LogPath, 0755)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
-		fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
-		fmt.Println("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
-			"\n   (  >< )\n Love, Native Planet")
-		fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+		fmt.Printf("Failed to create log directory: %v\n", err)
+		fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
+		fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
+			"\n   (  >< )\n Love, Native Planet\n")
+		fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 		panic("")
 	}
 	zap.L().Info("Starting GroundSeg")
@@ -222,12 +222,12 @@ func RemoveSysSessions() {
 }
 
 func getDockerLogs(name string) ([]byte, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return []byte{}, err
 	}
 
-	options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true}
+	options := container.LogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true}
 	logs, err := cli.ContainerLogs(context.Background(), name, options)
 	if err != nil {
 		return []byte{}, err
@@ -249,7 +249,7 @@ func getDockerLogs(name string) ([]byte, error) {
 	}
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading docker logs:", err)
+		return []byte{}, fmt.Errorf("Error reading docker logs: %w", err)
 	}
 	jsArray := fmt.Sprintf("[%s]", strings.Join(logEntries, ", "))
 
@@ -277,7 +277,7 @@ func RetrieveSysLogHistory() ([]byte, error) {
 
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading file:", err)
+		return []byte{}, fmt.Errorf("Error reading file: %w", err)
 	}
 
 	// Join the lines slice into a single string resembling a JavaScript array

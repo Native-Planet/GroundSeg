@@ -70,10 +70,10 @@ func init() {
 		if err != nil {
 			// panic if we can't create it
 			zap.L().Error(fmt.Sprintf("Unable to create config! %v", err))
-			fmt.Println(fmt.Sprintf("Failed to create log directory: %v", err))
-			fmt.Println("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.")
-			fmt.Println("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet")
-			fmt.Println(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+			fmt.Printf("Failed to create log directory: %v\n", err)
+			fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
+			fmt.Print("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet\n")
+			fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 			panic("")
 		}
 		file, _ = os.Open(confPath)

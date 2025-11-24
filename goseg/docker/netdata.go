@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"groundseg/config"
+	"groundseg/dockerclient"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"go.uber.org/zap"
 )
@@ -142,7 +141,7 @@ func writeNDConfToFile(filePath string, content string) error {
 // write ND conf to volume
 func copyNDFileToVolume(filePath string, targetPath string, volumeName string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func copyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err != nil {
 		return err
 	}
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return err
 	}
 	file, err := os.Open(filepath.Join(filePath))
@@ -170,7 +169,7 @@ func copyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 	}
 	defer file.Close()
 	// Copy the file to the volume via the temporary container
-	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, types.CopyToContainerOptions{})
+	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, container.CopyToContainerOptions{})
 	if err != nil {
 		return err
 	}
@@ -178,12 +177,12 @@ func copyNDFileToVolume(filePath string, targetPath string, volumeName string) e
 	if err := StopContainerByName("nd_writer"); err != nil {
 		return err
 	}
-	if err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); err != nil {
+	if err := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
 		return err
 	}
 	defer func() {
-		if removeErr := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
-			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: ", removeErr))
+		if removeErr := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); removeErr != nil {
+			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: %v", removeErr))
 		}
 	}()
 	return nil

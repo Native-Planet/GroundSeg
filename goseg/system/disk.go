@@ -192,7 +192,7 @@ func SetupTmpDir() error {
 
 			// create symlink
 			if err := os.Symlink(altDir, symlink); err != nil {
-				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink)
+				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink, err)
 			}
 		}
 	}

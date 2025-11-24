@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/config"
+	"groundseg/dockerclient"
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/volume"
+	imagetypes "github.com/docker/docker/api/types/image"
+	networktypes "github.com/docker/docker/api/types/network"
+	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 )
@@ -42,7 +43,7 @@ func init() {
 	if err = killContainerUsingPort(80); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error creating Docker client: %v", err))
 		return
@@ -51,9 +52,6 @@ func init() {
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error getting Docker version: %v", err))
-		if strings.Contains(err.Error(), "is too new") {
-			updateDocker()
-		}
 		return
 	}
 	//go getContainerStats()
@@ -63,7 +61,7 @@ func init() {
 func killContainerUsingPort(n uint16) error {
 	// Initialize Docker client
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}
@@ -74,7 +72,7 @@ func killContainerUsingPort(n uint16) error {
 	filters.Add("status", "running")
 
 	// List running containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{Filters: filters})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{Filters: filters})
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
 		return err
@@ -96,74 +94,17 @@ func killContainerUsingPort(n uint16) error {
 	return nil
 }
 
-// attempt to update docker daemon (ubuntu/mint only)
-func updateDocker() {
-	zap.L().Info("Unsupported Docker version detected -- attempting to upgrade")
-	packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
-	for _, pkg := range packages {
-		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
-			return
-		}
-	}
-	commands := []string{
-		"apt-get update",
-		"apt-get install -y ca-certificates curl gnupg",
-		"install -m 0755 -d /etc/apt/keyrings",
-		`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg`, // Added --yes
-		"chmod a+r /etc/apt/keyrings/docker.gpg",
-	}
-	for _, cmd := range commands {
-		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
-		}
-	}
-	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
-		return
-	}
-	codename := strings.TrimSpace(string(out))
-	if contains([]string{"ulyana", "ulyssa", "uma", "una"}, codename) {
-		codename = "focal"
-	} else if contains([]string{"vanessa", "vera", "victoria"}, codename) {
-		codename = "jammy"
-	}
-	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
-	if archErr != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
-		return
-	}
-	architecture := strings.TrimSpace(string(archOut))
-	sourcesList := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable", architecture, codename)
-	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
-	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
-		return
-	}
-	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
-	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
-		return
-	}
-	zap.L().Info("Successfully updated Docker")
-}
-
 // return the container status of a slice of ships
 func GetShipStatus(patps []string) (map[string]string, error) {
 	statuses := make(map[string]string)
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
 		zap.L().Error(errmsg)
 		return statuses, err
 	} else {
 		defer cli.Close()
-		containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+		containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 		if err != nil {
 			errmsg := fmt.Sprintf("Error getting containers: %v", err)
 			zap.L().Error(errmsg)
@@ -195,12 +136,12 @@ func GetShipStatus(patps []string) (map[string]string, error) {
 
 func GetContainerRunningStatus(containerName string) (string, error) {
 	var status string
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 	}
 	defer cli.Close()
 	// List containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
 		return status, err
 	}
@@ -217,7 +158,7 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 
 // return the name of a container's network
 func GetContainerNetwork(name string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", err
 	}
@@ -234,7 +175,7 @@ func GetContainerNetwork(name string) (string, error) {
 
 // creates a volume by name
 func CreateVolume(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -242,7 +183,7 @@ func CreateVolume(name string) error {
 	defer cli.Close()
 
 	// Create volume
-	vol, err := cli.VolumeCreate(context.Background(), volume.CreateOptions{Name: name})
+	vol, err := cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{Name: name})
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker volume: %v : %v", name, err)
 		return errmsg
@@ -254,7 +195,7 @@ func CreateVolume(name string) error {
 
 // deletes a volume by its name
 func DeleteVolume(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -272,14 +213,14 @@ func DeleteVolume(name string) error {
 
 // deletes a container by its name
 func DeleteContainer(name string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
 	}
 	defer cli.Close()
 	// Force-remove the container
-	err = cli.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{Force: true})
+	err = cli.ContainerRemove(context.Background(), name, container.RemoveOptions{Force: true})
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to delete docker container: %v : %v", name, err)
 		return errmsg
@@ -291,7 +232,7 @@ func DeleteContainer(name string) error {
 
 // Write a file to a specific location in a volume
 func WriteFileToVolume(name string, file string, content string) error {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
 		return errmsg
@@ -381,7 +322,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 	existingContainer, _ := FindContainer(containerName)
 
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return containerState, err
 	}
@@ -393,14 +334,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
 		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
 		zap.L().Info(msg)
 	case existingContainer.State == "exited":
-		err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 		if err != nil {
 			return containerState, err
 		}
@@ -408,14 +349,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		if err != nil {
 			return containerState, err
 		}
-		err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
 		msg := fmt.Sprintf("Started stopped container %s", containerName)
 		zap.L().Info(msg)
 	case existingContainer.State == "created":
-		err := cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+		err := cli.ContainerStart(ctx, containerName, container.StartOptions{})
 		if err != nil {
 			return containerState, err
 		}
@@ -431,7 +372,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		if currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
-			err := cli.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+			err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
 			}
@@ -439,7 +380,7 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			if err != nil {
 				return containerState, err
 			}
-			err = cli.ContainerStart(ctx, containerName, types.ContainerStartOptions{})
+			err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
 			if err != nil {
 				return containerState, err
 			}
@@ -525,7 +466,7 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, err
 	}
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return containerState, err
 	}
@@ -604,13 +545,13 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 // stop a container with the name
 func StopContainerByName(containerName string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return err
 	}
 	defer cli.Close()
 	// fetch all containers incl stopped
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return err
 	}
@@ -633,12 +574,12 @@ func StopContainerByName(containerName string) error {
 // pull the image if it doesn't exist locally
 func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return false, err
 	}
 	defer cli.Close()
-	images, err := cli.ImageList(ctx, types.ImageListOptions{})
+	images, err := cli.ImageList(ctx, imagetypes.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -649,7 +590,7 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 			}
 		}
 	}
-	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), types.ImagePullOptions{})
+	resp, err := cli.ImagePull(ctx, fmt.Sprintf("%s@sha256:%s", imageInfo["repo"], imageInfo["hash"]), imagetypes.PullOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -659,14 +600,14 @@ func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool
 }
 
 // looks for a container with the given name and returns it, or nil if not found
-func FindContainer(containerName string) (*types.Container, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+func FindContainer(containerName string) (*container.Summary, error) {
+	cli, err := dockerclient.New()
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 	// Fetch list of running containers
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -698,13 +639,13 @@ func DockerPoller() {
 
 // execute command
 func ExecDockerCommand(containerName string, cmd []string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", err
 	}
 	defer cli.Close()
 	// Create an Exec configuration
-	execConfig := types.ExecConfig{
+	execConfig := container.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		Cmd:          cmd,
@@ -724,7 +665,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 	}
 
 	// Start the exec command
-	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{})
+	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -741,7 +682,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, error) {
 
 // Function to get container ID by name
 func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -758,7 +699,7 @@ func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 // restart a running container
 func RestartContainer(name string) error {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := dockerclient.New()
 	if err != nil {
 		return fmt.Errorf("Couldn't create client: %v", err)
 	}
@@ -787,12 +728,12 @@ func contains(slice []string, str string) bool {
 }
 
 func volumeExists(volumeName string) (bool, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return false, fmt.Errorf("Failed to create client: %v", err)
 	}
 	defer cli.Close()
-	volumeList, err := cli.VolumeList(context.Background(), volume.ListOptions{})
+	volumeList, err := cli.VolumeList(context.Background(), volumetypes.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -805,12 +746,12 @@ func volumeExists(volumeName string) (bool, error) {
 }
 
 func addOrGetNetwork(networkName string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := dockerclient.New()
 	if err != nil {
 		return "", fmt.Errorf("Failed to create client: %v", err)
 	}
 	defer cli.Close()
-	networks, err := cli.NetworkList(context.Background(), types.NetworkListOptions{})
+	networks, err := cli.NetworkList(context.Background(), networktypes.ListOptions{})
 	if err != nil {
 		return "", fmt.Errorf("Failed to list networks: %v", err)
 	}
@@ -819,7 +760,7 @@ func addOrGetNetwork(networkName string) (string, error) {
 			return network.ID, nil
 		}
 	}
-	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, types.NetworkCreate{
+	networkResponse, err := cli.NetworkCreate(context.Background(), networkName, networktypes.CreateOptions{
 		Driver: "bridge",
 		Scope:  "local",
 	})

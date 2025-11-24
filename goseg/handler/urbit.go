@@ -446,11 +446,11 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		return packError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		return packError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		return packError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		return packError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	// running
 	if strings.Contains(status, "Up") {
@@ -498,11 +498,11 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		return packMeldError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		return packMeldError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		return packMeldError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		return packMeldError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
 	if isRunning {
@@ -673,11 +673,11 @@ func ChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		return chopError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		return chopError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		return chopError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		return chopError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
 	// stop ship
@@ -759,11 +759,11 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 	if err := click.BarExit(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("%v", err))
 		if err := docker.StopContainerByName(patp); err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't stop docker container for %v: %v", patp, err))
+			return fmt.Errorf("Couldn't stop docker container for %v: %v", patp, err)
 		}
 	}
 	if err := docker.DeleteContainer(patp); err != nil {
-		return fmt.Errorf(fmt.Sprintf("Couldn't delete docker container for %v: %v", patp, err))
+		return fmt.Errorf("Couldn't delete docker container for %v: %v", patp, err)
 	}
 	if conf.WgRegistered {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "deleteShip", Event: "removing-services"}
@@ -798,7 +798,7 @@ func deleteShip(patp string, shipConf structs.UrbitDocker) error {
 		}
 	} else {
 		if err := docker.DeleteVolume(patp); err != nil {
-			return fmt.Errorf(fmt.Sprintf("Couldn't remove docker volume for %v: %v", patp, err))
+			return fmt.Errorf("Couldn't remove docker volume for %v: %v", patp, err)
 		}
 	}
 	config.DeleteContainerState(patp)
@@ -858,11 +858,11 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		return fmt.Errorf("Failed to get ship status for %p: %v", patp, err)
+		return fmt.Errorf("Failed to get ship status for %s: %v", patp, err)
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		return fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp)
+		return fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp)
 	}
 	isRunning := strings.Contains(status, "Up")
 	update := make(map[string]structs.UrbitDocker)
@@ -1203,11 +1203,11 @@ func rollChopPier(patp string, shipConf structs.UrbitDocker) error {
 	}()
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		return rollChopError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		return rollChopError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		return rollChopError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		return rollChopError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
 	// stop ship
@@ -1314,7 +1314,7 @@ func handleLocalBackup(patp string) error {
 	if err := os.MkdirAll(shipBackupDir, 0755); err != nil {
 		text := fmt.Sprintf("failed to create backup directory for %v: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	shipBackupDirDaily := filepath.Join(shipBackupDir, "daily")
 	shipBackupDirWeekly := filepath.Join(shipBackupDir, "weekly")
@@ -1322,22 +1322,22 @@ func handleLocalBackup(patp string) error {
 	if err := os.MkdirAll(shipBackupDirDaily, 0755); err != nil {
 		text := fmt.Sprintf("failed to create backup directory for %v: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	if err := os.MkdirAll(shipBackupDirWeekly, 0755); err != nil {
 		text := fmt.Sprintf("failed to create backup directory for %v: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	if err := os.MkdirAll(shipBackupDirMonthly, 0755); err != nil {
 		text := fmt.Sprintf("failed to create backup directory for %v: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	if err := backups.CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly); err != nil {
 		text := fmt.Sprintf("failed to backup tlon for %v: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackup", Event: "success"}
 	return nil
@@ -1354,14 +1354,14 @@ func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload,
 	if len(backupTime) != 4 {
 		text := "invalid time format"
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	shipConf.BackupTime = backupTime
 	update[patp] = shipConf
 	if err := config.UpdateUrbitConfig(update); err != nil {
 		text := fmt.Sprintf("couldn't update urbit config: %v", err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: "success"}
 	return nil
@@ -1377,7 +1377,7 @@ func handleRestoreTlonBackup(patp string, urbitPayload structs.WsUrbitPayload, s
 	if err := startram.RestoreBackup(patp, remote, urbitPayload.Payload.Timestamp, urbitPayload.Payload.MD5, false, urbitPayload.Payload.BakType); err != nil {
 		text := fmt.Sprintf("failed to restore backup for %s: %v", patp, err)
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: text}
-		return fmt.Errorf(text)
+		return fmt.Errorf("%s", text)
 	}
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "handleRestoreTlonBackup", Event: "success"}
 	return nil

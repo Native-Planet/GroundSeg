@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/dockerclient"
 	"groundseg/logger"
 	"groundseg/structs"
 	"io"
@@ -24,8 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"github.com/docker/docker/api/types/container"
 	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
@@ -119,13 +119,13 @@ func SupportHandler(msg []byte) error {
 
 // dump docker logs to path
 func dumpDockerLogs(containerID string, path string) error {
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	dockerClient, err := dockerclient.New()
 	if err != nil {
 		return fmt.Errorf("Error creating Docker client: %v", err)
 	}
 	defer dockerClient.Close()
 	// get previous 1k logs
-	options := types.ContainerLogsOptions{
+	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: true,

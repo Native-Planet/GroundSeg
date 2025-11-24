@@ -168,11 +168,11 @@ func handleStartramToggle() {
 				}
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
-					zap.L().Error(fmt.Sprintf("Error marshalling JSON for %v:", patp, err))
+					zap.L().Error(fmt.Sprintf("Error marshalling JSON for %v: %v", patp, err))
 					continue
 				}
 				if err := UrbitHandler(jsonData); err != nil {
-					zap.L().Error(fmt.Sprintf("Error sending action to UrbitHandler for %v:", patp, err))
+					zap.L().Error(fmt.Sprintf("Error sending action to UrbitHandler for %v: %v", patp, err))
 				}
 			}
 		}
@@ -364,7 +364,7 @@ func handleStartramRestoreBackup(target, source string, backup int, key string) 
 	if key == "" {
 		keyBytes, err := os.ReadFile(keyFile)
 		if err != nil || len(keyBytes) == 0 {
-			zap.L().Error(fmt.Sprintf("No key provided and failed to read private key file: %w", err))
+			zap.L().Error(fmt.Sprintf("No key provided and failed to read private key file: %v", err))
 			return
 		}
 	}
@@ -406,7 +406,7 @@ func handleStartramUploadBackup(patp string) {
 	filePath := "backup.key"
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("failed to read private key file: %w", err))
+		zap.L().Error(fmt.Sprintf("failed to read private key file: %v", err))
 		return
 	}
 	decodedKeyBytes, err := base64.StdEncoding.DecodeString(string(keyBytes))

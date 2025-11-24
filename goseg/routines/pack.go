@@ -190,12 +190,12 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
-		packError(fmt.Errorf("Failed to get ship status for %p: %v", patp, err))
+		packError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
 		return
 	}
 	status, exists := statuses[patp]
 	if !exists {
-		packError(fmt.Errorf("Failed to get ship status for %p: status doesn't exist!", patp))
+		packError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 		return
 	}
 	// running

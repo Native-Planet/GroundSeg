@@ -37,7 +37,7 @@ var (
 		if [[ ${#patp} -eq 3 ]]; then
 			[[ $suf == *"$patp"* ]] && echo "$patp" && return
 		else
-			for p in "${patp_arr[@]}"; do
+			for p in "${patp_arr[@]}"; dofa
 				[[ ${#p} -eq 6 && $pre == *"${p:0:3}"* && $suf == *"${p:3:3}"* ]] || return
 			done
 			echo "$patp"
@@ -208,7 +208,7 @@ var (
 		urbit $args 2>&1 | tee "$logfile"
 		local exit_code=${PIPESTATUS[0]}
 		
-		if [[ $exit_code -ne 0 ]] && grep -q " stale snapshot: " "$logfile"; then
+		if [[ $exit_code -ne 0 ]] && grep -q "stale snapshot" "$logfile"; then
 				echo "Detected stale snapshot, replaying with previous binary"
 				rm -f "$logfile"
 				exec prev-urbit -Lx $args

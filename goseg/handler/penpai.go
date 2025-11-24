@@ -26,17 +26,17 @@ func PenpaiHandler(msg []byte) error {
 			// stop container
 			err := docker.StopContainerByName("llama-gpt-api")
 			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("Failed to stop Llama API: %v", err))
+				return fmt.Errorf("Failed to stop Llama API: %v", err)
 			}
 			err = docker.StopContainerByName("llama-gpt-ui")
 			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("Failed to stop Llama UI: %v", err))
+				return fmt.Errorf("Failed to stop Llama UI: %v", err)
 			}
 		} else {
 			// start container
 			info, err := docker.StartContainer("llama-gpt-api", "llama-api")
 			if err != nil {
-				return fmt.Errorf(fmt.Sprintf("Error starting Llama API: %v", err))
+				return fmt.Errorf("Error starting Llama API: %v", err)
 			}
 			config.UpdateContainerState("llama-api", info)
 			running = true
@@ -44,7 +44,7 @@ func PenpaiHandler(msg []byte) error {
 		if err = config.UpdateConf(map[string]interface{}{
 			"penpaiRunning": running,
 		}); err != nil {
-			return fmt.Errorf(fmt.Sprintf("%v", err))
+			return fmt.Errorf("%v", err)
 		}
 		return nil
 	case "set-model":
@@ -53,7 +53,7 @@ func PenpaiHandler(msg []byte) error {
 		if err = config.UpdateConf(map[string]interface{}{
 			"penpaiActive": model,
 		}); err != nil {
-			return fmt.Errorf(fmt.Sprintf("%v", err))
+			return fmt.Errorf("%v", err)
 		}
 		if err := docker.DeleteContainer("llama-gpt-api"); err != nil {
 			return fmt.Errorf("Failed to delete container: %v", err)
@@ -71,13 +71,13 @@ func PenpaiHandler(msg []byte) error {
 			return fmt.Errorf("Penpai unable to set 0 cores!")
 		}
 		if cores >= runtime.NumCPU() {
-			return fmt.Errorf(fmt.Sprintf("Penpai unable to set %v cores!", cores))
+			return fmt.Errorf("Penpai unable to set %v cores!", cores)
 		}
 		// update config
 		if err = config.UpdateConf(map[string]interface{}{
 			"penpaiCores": cores,
 		}); err != nil {
-			return fmt.Errorf(fmt.Sprintf("%v", err))
+			return fmt.Errorf("%v", err)
 		}
 		if err := docker.DeleteContainer("llama-gpt-api"); err != nil {
 			return fmt.Errorf("Failed to delete container: %v", err)
