@@ -9,6 +9,7 @@ import (
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,6 +53,9 @@ func init() {
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error getting Docker version: %v", err))
+		if strings.Contains(err.Error(), "is too new") {
+			updateDocker()
+		}
 		return
 	}
 	//go getContainerStats()
@@ -92,6 +96,63 @@ func killContainerUsingPort(n uint16) error {
 		}
 	}
 	return nil
+}
+
+// attempt to update docker daemon (ubuntu/mint only)
+func updateDocker() {
+	zap.L().Info("Unsupported Docker version detected -- attempting to upgrade")
+	packages := []string{"docker.io", "docker-doc", "docker-compose", "podman-docker", "containerd", "runc"}
+	for _, pkg := range packages {
+		out, err := exec.Command("apt-get", "remove", "-y", pkg).CombinedOutput()
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Couldn't update Docker: error removing package %s: %v\n%s", pkg, err, out))
+			return
+		}
+	}
+	commands := []string{
+		"apt-get update",
+		"apt-get install -y ca-certificates curl gnupg",
+		"install -m 0755 -d /etc/apt/keyrings",
+		`curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg`, // Added --yes
+		"chmod a+r /etc/apt/keyrings/docker.gpg",
+	}
+	for _, cmd := range commands {
+		out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Error executing command '%s': %v\n%s", cmd, err, out))
+		}
+	}
+	out, err := exec.Command("sh", "-c", ". /etc/os-release && echo $VERSION_CODENAME").Output()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching version codename: %v\n%s", err, out))
+		return
+	}
+	codename := strings.TrimSpace(string(out))
+	if contains([]string{"ulyana", "ulyssa", "uma", "una"}, codename) {
+		codename = "focal"
+	} else if contains([]string{"vanessa", "vera", "victoria"}, codename) {
+		codename = "jammy"
+	}
+	archOut, archErr := exec.Command("sh", "-c", "dpkg --print-architecture").Output()
+	if archErr != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error fetching system architecture: %v\n%s", archErr, archOut))
+		return
+	}
+	architecture := strings.TrimSpace(string(archOut))
+	sourcesList := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable", architecture, codename)
+	cmd := fmt.Sprintf("echo '%s' | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null", sourcesList)
+	out, err = exec.Command("sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error updating Docker sources list: %v\n%s", err, out))
+		return
+	}
+	dockerPackages := []string{"install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"}
+	out, err = exec.Command("apt-get", dockerPackages...).CombinedOutput()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't update Docker: Error installing Docker packages: %v\n%s", err, out))
+		return
+	}
+	zap.L().Info("Successfully updated Docker")
 }
 
 // return the container status of a slice of ships
