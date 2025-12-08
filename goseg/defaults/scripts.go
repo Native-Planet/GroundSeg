@@ -326,7 +326,8 @@ var (
 			echo "File .vere.lock containing PID 1 has been deleted."
 		fi
 	fi
-	
+
+	urbit -Lx --loom $loom $dirname
 	urbit roll --loom $loom $dirname`
 
 	PackScript = `#!/bin/bash
@@ -421,7 +422,8 @@ var (
 			echo "File .vere.lock containing PID 1 has been deleted."
 		fi
 	fi
-	
+
+	urbit -Lx --loom $loom $dirname
 	urbit pack --loom $loom $dirname`
 
 	ChopScript = `#!/bin/bash
@@ -504,6 +506,7 @@ var (
 		fi
 	fi
 	
+	urbit -Lx --loom $loom $dirname
 	urbit chop --loom $loom $dirname`
 
 	MeldScript = `#!/bin/bash
@@ -585,7 +588,8 @@ var (
 			echo "File .vere.lock containing PID 1 has been deleted."
 		fi
 	fi
-	
+
+	urbit -Lx --loom $loom $dirname
 	urbit meld --loom $loom $dirname`
 
 	Fixer = fmt.Sprintf(`if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 
