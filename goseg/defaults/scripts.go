@@ -211,7 +211,7 @@ var (
 		if [[ $exit_code -ne 0 ]] && grep -q "stale snapshot" "$logfile"; then
 				echo "Detected stale snapshot, replaying with previous binary"
 				rm -f "$logfile"
-				exec prev-urbit -Lx${ttyflag} $args
+				exec prev-urbit -Lxt $args
 		fi
 		
 		rm -f "$logfile"
@@ -327,7 +327,7 @@ var (
 		fi
 	fi
 
-	urbit -Lx${ttyflag} --loom $loom $dirname
+	urbit -Lxt --loom $loom $dirname
 	urbit roll --loom $loom $dirname`
 
 	PackScript = `#!/bin/bash
@@ -423,7 +423,7 @@ var (
 		fi
 	fi
 
-	urbit -Lx${ttyflag} --loom $loom $dirname
+	urbit -Lxt --loom $loom $dirname
 	urbit pack --loom $loom $dirname`
 
 	ChopScript = `#!/bin/bash
@@ -506,7 +506,7 @@ var (
 		fi
 	fi
 	
-	urbit -Lx${ttyflag} --loom $loom $dirname
+	urbit -Lxt --loom $loom $dirname
 	urbit chop --loom $loom $dirname`
 
 	MeldScript = `#!/bin/bash
@@ -589,7 +589,7 @@ var (
 		fi
 	fi
 
-	urbit -Lx${ttyflag} --loom $loom $dirname
+	urbit -Lxt --loom $loom $dirname
 	urbit meld --loom $loom $dirname`
 
 	Fixer = fmt.Sprintf(`if [[ $(systemctl is-failed groundseg)  == "failed" ]]; then 

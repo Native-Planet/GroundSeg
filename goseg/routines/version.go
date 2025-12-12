@@ -245,7 +245,9 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 		SourceURI:       sourceURI,
 		PrintProvenance: false,
 	}
-	ctx := context.Background()
+	// Use a 2 minute timeout to prevent hanging indefinitely
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 	trustedBuilder, err := verifyCmd.Exec(ctx, []string{binaryPath})
 	if err != nil {
 		return fmt.Errorf("SLSA verification failed: %v", err)
