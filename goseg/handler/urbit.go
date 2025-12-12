@@ -872,15 +872,22 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
 		}
-		_, err := docker.StartContainer(patp, "vere")
+		info, err := docker.StartContainer(patp, "vere")
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
+		} else {
+			config.UpdateContainerState(patp, info)
 		}
 	} else if shipConf.BootStatus == "boot" && isRunning {
 		shipConf.BootStatus = "noboot"
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {
 			return fmt.Errorf("Couldn't update urbit config: %v", err)
+		}
+		// Set DesiredStatus to stopped so the docker event handler doesn't restart it
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState(patp, containerState)
 		}
 		err := click.BarExit(patp)
 		if err != nil {
