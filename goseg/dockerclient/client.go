@@ -2,6 +2,8 @@ package dockerclient
 
 import (
 	"context"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,9 +16,10 @@ import (
 const pingTimeout = 5 * time.Second
 
 var (
-	versionMu       sync.RWMutex
-	cachedVersion   string
-	versionDetected bool
+	versionMu           sync.RWMutex
+	cachedVersion       string
+	versionDetected     bool
+	ignoredAPIEnvWarned sync.Once
 )
 
 // New returns a Docker client that pings the daemon once to discover the API
@@ -28,7 +31,7 @@ func New(extraOpts ...client.Opt) (*client.Client, error) {
 		return nil, err
 	}
 
-	opts := []client.Opt{client.FromEnv}
+	opts := []client.Opt{fromEnvWithoutAPIVersion}
 	if apiVersion == "" {
 		opts = append(opts, client.WithAPIVersionNegotiation())
 	} else {
@@ -62,7 +65,7 @@ func getAPIVersion() (string, error) {
 }
 
 func detectAPIVersion() (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(fromEnvWithoutAPIVersion, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", err
 	}
@@ -97,4 +100,27 @@ func detectAPIVersion() (string, error) {
 	}
 
 	return ping.APIVersion, nil
+}
+
+// fromEnvWithoutAPIVersion mirrors client.FromEnv but intentionally does not
+// read DOCKER_API_VERSION because it disables negotiation and can pin us to an
+// incompatible client version.
+func fromEnvWithoutAPIVersion(c *client.Client) error {
+	if configuredVersion := strings.TrimSpace(os.Getenv(client.EnvOverrideAPIVersion)); configuredVersion != "" {
+		ignoredAPIEnvWarned.Do(func() {
+			zap.L().Warn("Ignoring DOCKER_API_VERSION to allow Docker API negotiation",
+				zap.String("docker_api_version", configuredVersion))
+		})
+	}
+
+	opts := []client.Opt{
+		client.WithTLSClientConfigFromEnv(),
+		client.WithHostFromEnv(),
+	}
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
