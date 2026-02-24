@@ -157,6 +157,8 @@ func AreSubdomainsAliases(domain1, domain2 string) (bool, error) {
 
 func WaitComplete(patp string) {
 	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(10 * time.Minute)
 	for {
 		select {
 		case <-ticker.C:
@@ -173,6 +175,9 @@ func WaitComplete(patp string) {
 				continue
 			}
 			zap.L().Debug(fmt.Sprintf("%s finished", patp))
+			return
+		case <-timeout:
+			zap.L().Warn(fmt.Sprintf("%s timed out waiting for completion", patp))
 			return
 		}
 	}
@@ -460,6 +465,11 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 		}
 		// not running
 	} else {
+		// set DesiredStatus to prevent auto-restart when pack container exits
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState(patp, containerState)
+		}
 		// switch boot status to pack
 		shipConf.BootStatus = "pack"
 		update := make(map[string]structs.UrbitDocker)
@@ -472,6 +482,8 @@ func packPier(patp string, shipConf structs.UrbitDocker) error {
 		if err != nil {
 			return packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 		}
+		// wait for pack to complete before marking success
+		WaitComplete(patp)
 	}
 	// set last meld
 	now := time.Now().Unix()
@@ -505,6 +517,11 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 		return packMeldError(fmt.Errorf("Failed to get ship status for %s: status doesn't exist!", patp))
 	}
 	isRunning := strings.Contains(status, "Up")
+	// set DesiredStatus to prevent auto-restart from die/stop event handlers during maintenance
+	if containerState, exists := config.GetContainerState()[patp]; exists {
+		containerState.DesiredStatus = "stopped"
+		config.UpdateContainerState(patp, containerState)
+	}
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "stopping"}
 		if err := click.BarExit(patp); err != nil {
@@ -555,6 +572,11 @@ func packMeldPier(patp string, shipConf structs.UrbitDocker) error {
 	// start ship if "boot"
 	if isRunning {
 		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "packMeld", Event: "starting"}
+		// restore DesiredStatus so normal auto-restart behavior resumes
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "running"
+			config.UpdateContainerState(patp, containerState)
+		}
 		shipConf.BootStatus = "boot"
 		update := make(map[string]structs.UrbitDocker)
 		update[patp] = shipConf
@@ -877,6 +899,11 @@ func togglePower(patp string, shipConf structs.UrbitDocker) error {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	} else if shipConf.BootStatus == "boot" && isRunning {
+		// set DesiredStatus before stopping to prevent auto-restart from die/stop event handlers
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState(patp, containerState)
+		}
 		shipConf.BootStatus = "noboot"
 		update[patp] = shipConf
 		if err := config.UpdateUrbitConfig(update); err != nil {

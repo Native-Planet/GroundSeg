@@ -156,6 +156,34 @@ func setWeekSchedule(meldLast time.Time, freq int, dayStr, meldTime string) (tim
 	return meldNext, nil
 }
 
+func waitComplete(patp string) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(10 * time.Minute)
+	for {
+		select {
+		case <-ticker.C:
+			statuses, err := docker.GetShipStatus([]string{patp})
+			if err != nil {
+				continue
+			}
+			status, exists := statuses[patp]
+			if !exists {
+				continue
+			}
+			if strings.Contains(status, "Up") {
+				zap.L().Debug(fmt.Sprintf("%s continue waiting...", patp))
+				continue
+			}
+			zap.L().Debug(fmt.Sprintf("%s finished", patp))
+			return
+		case <-timeout:
+			zap.L().Warn(fmt.Sprintf("%s timed out waiting for scheduled pack completion", patp))
+			return
+		}
+	}
+}
+
 func convertMeldTime(meldTime string) (int, int, error) {
 	hour, err := strconv.Atoi(meldTime[0:2])
 	if err != nil {
@@ -207,6 +235,11 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 		}
 		// not running
 	} else {
+		// set DesiredStatus to prevent auto-restart when pack container exits
+		if containerState, exists := config.GetContainerState()[patp]; exists {
+			containerState.DesiredStatus = "stopped"
+			config.UpdateContainerState(patp, containerState)
+		}
 		// switch boot status to pack
 		shipConf.BootStatus = "pack"
 		update := make(map[string]structs.UrbitDocker)
@@ -221,6 +254,8 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 			packError(fmt.Errorf("Failed to urth pack %s: %v", patp, err))
 			return
 		}
+		// wait for pack to complete before marking success
+		waitComplete(patp)
 	}
 	// set last meld
 	now := time.Now().Unix()
