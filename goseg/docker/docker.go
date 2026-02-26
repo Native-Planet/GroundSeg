@@ -372,6 +372,15 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		}
 		if currentDigest != imageInfo["hash"] {
 			// if the hashes don't match, recreate the container with the new one
+			// for vere containers, gracefully stop with a 60s timeout before removing
+			if containerType == "vere" {
+				gracefulTimeout := 60
+				stopOpts := container.StopOptions{Timeout: &gracefulTimeout}
+				zap.L().Info(fmt.Sprintf("Gracefully stopping %s (60s timeout) before update", containerName))
+				if err := cli.ContainerStop(ctx, containerName, stopOpts); err != nil {
+					zap.L().Warn(fmt.Sprintf("Graceful stop failed for %s: %v, forcing removal", containerName, err))
+				}
+			}
 			err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
