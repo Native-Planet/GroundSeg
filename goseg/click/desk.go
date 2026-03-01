@@ -8,85 +8,33 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	executeClickCommandForDesk = executeClickCommand
+	createHoonForDesk          = createHoon
+	deleteHoonForDesk          = deleteHoon
+	clickExecForDesk           = clickExec
+	filterResponseForDesk      = filterResponse
+)
+
 func reviveDesk(patp, desk string) error {
-	// <file>.hoon
 	file := "revive-desk"
-	// actual hoon
 	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-revive !>(%%%v))  (pure:m !>('success'))", desk)
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click |revive %%%v failed to create hoon: %v", desk, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
-	if err != nil {
-		return fmt.Errorf("Click |revive %%%v failed to get exec: %v", desk, err)
-	}
-	// retrieve code
-	_, success, err := filterResponse("success", response)
-	if err != nil {
-		return fmt.Errorf("Click |revive %%%v failed to get exec: %v", desk, err)
-	}
-	if !success {
-		return fmt.Errorf("Click |revive %%%v poke failed", desk)
-	}
-	return nil
+	_, err := executeClickCommandForDesk(patp, file, hoon, "", "success", fmt.Sprintf("Click |revive %%%v", desk))
+	return err
 }
 
 func uninstallDesk(patp, desk string) error {
-	// <file>.hoon
 	file := "uninstall-desk"
-	// actual hoon
 	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-uninstall !>(%%%v))  (pure:m !>('success'))", desk)
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click |uninstall %%%v failed to create hoon: %v", desk, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
-	if err != nil {
-		return fmt.Errorf("Click |uninstall %%%v failed to get exec: %v", desk, err)
-	}
-	// retrieve code
-	_, success, err := filterResponse("success", response)
-	if err != nil {
-		return fmt.Errorf("Click |uninstall %%%v failed to get exec: %v", desk, err)
-	}
-	if !success {
-		return fmt.Errorf("Click |uninstall %%%v poke failed", desk)
-	}
-	return nil
+	_, err := executeClickCommandForDesk(patp, file, hoon, "", "success", fmt.Sprintf("Click |uninstall %%%v", desk))
+	return err
 }
 
 func installDesk(patp, ship, desk string) error {
-	// <file>.hoon
 	file := "install-desk"
-	// actual hoon
 	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %%hood] %%kiln-install !>([%%%v %v %%%v]))  (pure:m !>('success'))", desk, ship, desk)
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click |install %v %%%v failed to create hoon: %v", ship, desk, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
-	if err != nil {
-		return fmt.Errorf("Click |install %v %%%v failed to get exec: %v", ship, desk, err)
-	}
-	// retrieve code
-	_, success, err := filterResponse("success", response)
-	if err != nil {
-		return fmt.Errorf("Click |install %v %%%v failed to get exec: %v", ship, desk, err)
-	}
-	if !success {
-		return fmt.Errorf("Click |install %v %%%v poke failed", ship, desk)
-	}
-	return nil
+	_, err := executeClickCommandForDesk(patp, file, hoon, "", "success", fmt.Sprintf("Click |install %v %%%v", ship, desk))
+	return err
 }
 func getDesk(patp, desk string, bypass bool) (string, error) {
 	if !bypass {
@@ -100,19 +48,19 @@ func getDesk(patp, desk string, bypass bool) (string, error) {
 	// actual hoon
 	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  (pure:m !>((crip ~(ram re [%rose [~ ~ ~] (report-vats our now [%" + desk + " %kids ~] %$ |)]))))"
 	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
+	if err := createHoonForDesk(patp, file, hoon); err != nil {
 		return "", fmt.Errorf("Click get desk %%%v failed to create hoon: %v", desk, err)
 	}
 	// defer hoon file deletion
-	defer deleteHoon(patp, file)
+	defer deleteHoonForDesk(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	response, err := clickExecForDesk(patp, file, "/sur/hood/hoon")
 	if err != nil {
 		storeDeskError(patp, desk)
 		return "", fmt.Errorf("Click get desk %%%v failed to get exec: %v", desk, err)
 	}
 	// retrieve +vats
-	vats, _, err := filterResponse("desk", response)
+	vats, _, err := filterResponseForDesk("desk", response)
 	if err != nil {
 		storeDeskError(patp, desk)
 		return "", fmt.Errorf("Click penpai desk info failed to get exec: %v", err)
@@ -122,25 +70,16 @@ func getDesk(patp, desk string, bypass bool) (string, error) {
 }
 
 func mountDesk(patp, desk string) error {
-	// <file>.hoon
 	file := "mount-" + desk
-	// actual hoon
 	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  now=@da  bind:m  get-time  ;<  ~  bind:m  (poke-our %%hood %%kiln-mount !>([(en-beam [our %%%v [%%da now]] /) %%%v]))  (pure:m !>('success'))", desk, desk)
 	// "click -b /usr/local/bin/urbit -k /pier/$1 $'=/ m (strand ,vase) ~& \\\'committing files\\\' ;< ~ bind:m (poke-our %hood %kiln-commit !>([[%base] %.n])) (pure:m !>(\\\'success\\\'))'"
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click mount desk %%%v failed to create hoon: %v", desk, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	response, err := executeClickCommandForDesk(patp, file, hoon, "/sur/hood/hoon", "", fmt.Sprintf("Click |mount %%%v", desk))
 	if err != nil {
 		storeDeskError(patp, desk)
-		return fmt.Errorf("Click |mount desk %%%v failed to get exec: %v", desk, err)
+		return err
 	}
 	// succeeded
-	_, success, err := filterResponse("success", response)
+	_, success, err := filterResponseForDesk("success", response)
 	if err != nil {
 		return fmt.Errorf("Click |mount %%%v failed to get exec: %v", desk, err)
 	}
@@ -151,24 +90,15 @@ func mountDesk(patp, desk string) error {
 }
 
 func commitDesk(patp, desk string) error {
-	// <file>.hoon
 	file := "commit-" + desk
-	// actual hoon
 	hoon := fmt.Sprintf("=/  m  (strand ,vase)  ;<  ~  bind:m  (poke-our %%hood %%kiln-commit !>([[%%%v] %%.n]))  (pure:m !>('success'))", desk)
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click commit desk %%%v failed to create hoon: %v", desk, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "/sur/hood/hoon")
+	response, err := executeClickCommandForDesk(patp, file, hoon, "/sur/hood/hoon", "", fmt.Sprintf("Click |commit %%%v", desk))
 	if err != nil {
 		storeDeskError(patp, desk)
-		return fmt.Errorf("Click |commit desk %%%v failed to get exec: %v", desk, err)
+		return err
 	}
 	// succeeded
-	_, success, err := filterResponse("success", response)
+	_, success, err := filterResponseForDesk("success", response)
 	if err != nil {
 		return fmt.Errorf("Click |commit %%%v failed to get exec: %v", desk, err)
 	}

@@ -1,0 +1,155 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 38.0,
+    "dependency_health": 42.0,
+    "mid_level_elegance": 47.0,
+    "low_level_elegance": 44.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple assigned chunk files are pass-through wrappers with no behavior (e.g., `goseg/web/_app/immutable/chunks/0.f72efb1a.js`, `10.35bd59a0.js`, `11.9463674b.js`, `12.0b2f13c7.js` only import/export components).",
+        "`goseg/web/_app/immutable/entry/app.e0ffcb44.js` contains a large generated loader/registry (`we` array and route dictionary) that couples routing, preload, hydration, and chunk manifests in one minified artifact.",
+        "The same orchestration logic appears duplicated across generated entry artifacts (for example auth/poll/navigation control in both `_layout.svelte.8a290471.js` and `Nav.ad85b0b2.js`), indicating abstraction boundaries are at build output level rather than source responsibility level."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 35.0,
+        "indirection_cost": 22.0,
+        "interface_honesty": 57.0
+      }
+    },
+    "dependency_health": {
+      "evidence": [
+        "`goseg/web/_app/immutable/chunks/clipboard.750479b4.js` embeds full clipboard.js implementation in committed bundle output.",
+        "`goseg/web/_app/immutable/entry/boot-existing-page.svelte.509e2e47.js` embeds a very large Dropzone implementation directly in generated artifact.",
+        "`goseg/web/_app/immutable/chunks/urbit.f551ce98.js` includes a bundled fetch-event-source/SSE client plus custom channel client logic, adding a large dependency payload directly into immutable output files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "Auth/routing handoff is implemented as a perpetual timer loop (`setTimeout(f,500)`) in `goseg/web/_app/immutable/chunks/Nav.ad85b0b2.js` that drives redirect behavior based on multiple stores.",
+        "Equivalent loop/handoff logic appears again in `goseg/web/_app/immutable/entry/_layout.svelte.8a290471.js`, showing duplicated seam orchestration.",
+        "Cross-module behavior depends on implicit global store state transitions rather than a single boundary adapter, increasing drift risk between entry/layout/navigation modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`ui/src/lib/stores/data.js` uses `Math.abs(targetDate - currentDate)` in `daysUntilDate`, which erases sign and makes past dates indistinguishable from future dates.",
+        "Generated consumers in assigned bundle files (e.g., `goseg/web/_app/immutable/chunks/Nav.ad85b0b2.js` imports `d as Se` from data chunk and uses date-derived behavior for warnings/flows) can therefore receive misleading day values.",
+        "The defect hides temporal edge-case intent at function level, forcing callers to infer direction from unrelated conditions."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "generated_wrapper_indirection_chain",
+      "summary": "Route/chunk wrapper artifacts add deep indirection without policy or translation value.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/0.f72efb1a.js",
+        "goseg/web/_app/immutable/chunks/10.35bd59a0.js",
+        "goseg/web/_app/immutable/chunks/11.9463674b.js",
+        "goseg/web/_app/immutable/chunks/12.0b2f13c7.js",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js"
+      ],
+      "evidence": [
+        "Wrapper chunks only re-export components (`import ...; export {t as component...}`) and add no behavior.",
+        "The app entry keeps a large hashed loader manifest and route dictionary, requiring multiple indirection steps before real component logic is reached.",
+        "This pattern increases call/dependency depth while abstraction layers provide no stable contract or domain behavior."
+      ],
+      "suggestion": "Treat generated `_app/immutable` as build output only and move quality boundaries to source modules; remove or exclude wrapper artifacts from scored review/fix loops and keep a single source-level route/component abstraction map.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_artifacts_as_primary_surface"
+    },
+    {
+      "dimension": "dependency_health",
+      "identifier": "vendored_heavy_runtime_libs_in_output",
+      "summary": "Large third-party runtime libraries are embedded in committed immutable chunks, increasing update and audit burden.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/clipboard.750479b4.js",
+        "goseg/web/_app/immutable/entry/boot-existing-page.svelte.509e2e47.js",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js"
+      ],
+      "evidence": [
+        "`clipboard.750479b4.js` contains full clipboard.js implementation payload.",
+        "`boot-existing-page.svelte.509e2e47.js` contains embedded Dropzone implementation and templates.",
+        "`urbit.f551ce98.js` includes bundled SSE/fetch-event-source style logic and a large custom API client class."
+      ],
+      "suggestion": "Keep third-party dependencies in source/package management and avoid committing immutable built bundles as primary artifacts; rebuild in CI/release to reduce stale vendored dependency risk and simplify upgrade/audit flow.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_artifacts_as_primary_surface"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "duplicated_auth_polling_orchestrator",
+      "summary": "Auth/navigation seam is duplicated as timer-driven orchestration in multiple modules instead of one explicit boundary.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/Nav.ad85b0b2.js",
+        "goseg/web/_app/immutable/entry/_layout.svelte.8a290471.js",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js"
+      ],
+      "evidence": [
+        "Both `Nav...js` and `_layout.svelte...js` contain a recursive `setTimeout(..., 500)` auth loop and redirect helpers (`authorized/unauthorized/setup/captive` branches).",
+        "The orchestration reads/writes across multiple stores and navigation helper imports, but the seam is not centralized.",
+        "Duplicated seam logic in entry and chunk layers increases divergence risk when auth flow changes."
+      ],
+      "suggestion": "Consolidate auth-state-to-navigation orchestration into a single reactive source module (source-level store/effect), then have layout/nav consume that seam instead of duplicating polling logic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_state_orchestration"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "unsigned_day_delta_utility",
+      "summary": "`daysUntilDate` hides temporal direction by taking absolute difference, creating misleading downstream behavior.",
+      "related_files": [
+        "ui/src/lib/stores/data.js",
+        "goseg/web/_app/immutable/chunks/Nav.ad85b0b2.js",
+        "goseg/web/_app/immutable/entry/_patp_-page.svelte.eaf59d47.js"
+      ],
+      "evidence": [
+        "`ui/src/lib/stores/data.js` computes `diffTime = Math.abs(targetDate - currentDate)` then day floor, which returns positive days for both past and future.",
+        "Assigned generated consumers import the data module utility namespace and use date-driven UI/routing decisions, so signed-vs-unsigned semantics matter at call sites.",
+        "Function name implies directional countdown but implementation produces non-directional distance."
+      ],
+      "suggestion": "Return signed day deltas (`targetDate - currentDate`) and expose a separate helper for absolute distance when needed; update consumers to handle overdue/expired states explicitly.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "distributed_state_orchestration"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Generated build artifacts are being treated as review surface and dependency surface, obscuring source-level architecture.",
+      "Cross-cutting state/navigation behavior is spread across multiple entry/chunk modules without a single orchestrator contract."
+    ],
+    "likely_symptoms": [
+      "generated_wrapper_indirection_chain",
+      "duplicated_auth_polling_orchestrator",
+      "unsigned_day_delta_utility"
+    ],
+    "possible_false_positives": [
+      "Some wrapper indirection is framework-emitted by SvelteKit and not directly hand-authored; severity reflects committed-artifact surface and maintainability impact rather than framework correctness."
+    ]
+  }
+}

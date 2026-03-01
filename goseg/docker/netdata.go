@@ -1,12 +1,7 @@
 package docker
 
 import (
-	"context"
 	"fmt"
-	"groundseg/config"
-	"groundseg/dockerclient"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,40 +9,51 @@ import (
 	"go.uber.org/zap"
 )
 
+type netdataRuntime = dockerRuntime
+
+func newNetdataRuntime() netdataRuntime {
+	return newDockerRuntime()
+}
+
 func LoadNetdata() error {
+	return loadNetdata(newNetdataRuntime())
+}
+
+func loadNetdata(rt netdataRuntime) error {
 	zap.L().Info("Loading NetData container")
-	confPath := filepath.Join(config.BasePath, "settings", "netdata.json")
-	_, err := os.Open(confPath)
+	confPath := filepath.Join(rt.basePath(), "settings", "netdata.json")
+	_, err := rt.osOpen(confPath)
 	if err != nil {
 		// create a default if it doesn't exist
-		err = config.CreateDefaultNetdataConf()
+		err = rt.createDefaultNetdataConf()
 		if err != nil {
-			// panic if we can't create it
-			errmsg := fmt.Sprintf("Unable to create NetData config! %v", err)
-			zap.L().Error(errmsg)
-			panic(errmsg)
+			return fmt.Errorf("unable to create netdata config: %v", err)
 		}
 	}
-	err = WriteNDConf()
+	err = rt.writeNDConf(rt)
 	if err != nil {
 		return err
 	}
 	zap.L().Info("Running NetData")
-	info, err := StartContainer("netdata", "netdata")
+	info, err := rt.startContainer("netdata", "netdata")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error starting NetData: %v", err))
 		return err
 	}
-	config.UpdateContainerState("netdata", info)
+	rt.updateContainerState("netdata", info)
 	return nil
 }
 
 // netdata container config builder
 func netdataContainerConf() (container.Config, container.HostConfig, error) {
+	return netdataContainerConfWithRuntime(newNetdataRuntime())
+}
+
+func netdataContainerConfWithRuntime(rt netdataRuntime) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	// construct the container metadata from version server info
-	containerInfo, err := GetLatestContainerInfo("netdata")
+	containerInfo, err := rt.getLatestContainerInfo("netdata")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
@@ -98,38 +104,46 @@ func netdataContainerConf() (container.Config, container.HostConfig, error) {
 
 // write edited conf
 func WriteNDConf() error {
+	return writeNDConfWithRuntime(newNetdataRuntime())
+}
+
+func writeNDConfWithRuntime(rt netdataRuntime) error {
 	newConf := "[plugins]\n     apps = no\n"
-	filePath := filepath.Join(config.DockerDir, "netdataconfig", "_data", "netdata.conf")
-	existingConf, err := ioutil.ReadFile(filePath)
+	filePath := filepath.Join(rt.dockerDir(), "netdataconfig", "_data", "netdata.conf")
+	existingConf, err := rt.readFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
 		zap.L().Info("Creating ND config")
-		return writeNDConfToFile(filePath, newConf)
+		return writeNDConfToFileWithRuntime(rt, filePath, newConf)
 	}
 	if string(existingConf) != newConf {
 		// If they differ, overwrite
 		zap.L().Info("Writing ND config")
-		return writeNDConfToFile(filePath, newConf)
+		return writeNDConfToFileWithRuntime(rt, filePath, newConf)
 	}
 	return nil
 }
 
 // either write directly or create volumes
 func writeNDConfToFile(filePath string, content string) error {
+	return writeNDConfToFileWithRuntime(newNetdataRuntime(), filePath, content)
+}
+
+func writeNDConfToFileWithRuntime(rt netdataRuntime, filePath string, content string) error {
 	// try writing
-	err := ioutil.WriteFile(filePath, []byte(content), 0644)
+	err := rt.writeFile(filePath, []byte(content), 0644)
 	if err == nil {
 		return nil
 	}
 	// ensure the directory structure exists
 	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = rt.mkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	// try writing again
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
+	err = rt.writeFile(filePath, []byte(content), 0644)
 	if err != nil {
-		err = copyNDFileToVolume(filePath, "/etc/netdata/", "netdata")
+		err = rt.copyNDFileToVolume(rt, filePath, "/etc/netdata/", "netdata")
 		// otherwise create the volume
 		if err != nil {
 			return fmt.Errorf("Failed to copy ND config file to volume: %v", err)
@@ -140,50 +154,17 @@ func writeNDConfToFile(filePath string, content string) error {
 
 // write ND conf to volume
 func copyNDFileToVolume(filePath string, targetPath string, volumeName string) error {
-	ctx := context.Background()
-	cli, err := dockerclient.New()
-	if err != nil {
-		return err
-	}
-	defer cli.Close()
-	containerInfo, err := GetLatestContainerInfo("netdata")
-	if err != nil {
-		return err
-	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
-	// temp container to mount
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: desiredImage,
-	}, &container.HostConfig{
-		Binds: []string{volumeName + ":" + targetPath},
-	}, nil, nil, "nd_writer")
-	if err != nil {
-		return err
-	}
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return err
-	}
-	file, err := os.Open(filepath.Join(filePath))
-	if err != nil {
-		return fmt.Errorf("failed to open netdata.config file: %v", err)
-	}
-	defer file.Close()
-	// Copy the file to the volume via the temporary container
-	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, container.CopyToContainerOptions{})
-	if err != nil {
-		return err
-	}
-	// remove temporary container
-	if err := StopContainerByName("nd_writer"); err != nil {
-		return err
-	}
-	if err := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
-		return err
-	}
-	defer func() {
-		if removeErr := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); removeErr != nil {
-			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: %v", removeErr))
-		}
-	}()
-	return nil
+	return copyNDFileToVolumeWithRuntime(newNetdataRuntime(), filePath, targetPath, volumeName)
+}
+
+func copyNDFileToVolumeWithRuntime(rt netdataRuntime, filePath string, targetPath string, volumeName string) error {
+	return rt.copyFileToVolumeWithTempContainer(
+		filePath,
+		targetPath,
+		volumeName,
+		"nd_writer",
+		func() (string, error) {
+			return rt.latestContainerImage("netdata")
+		},
+	)
 }

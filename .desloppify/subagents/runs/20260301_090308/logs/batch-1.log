@@ -1,0 +1,555 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_090308/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go defines package globals (`EventBus`, `Regions`) and mutates them from request functions (`GetRegions`, `Retrieve`), creating hidden cross-module stateful behavior.",
+        "goseg/startram/startram.go `Retrieve` mutates `config.StartramConfig` and persists config via `config.UpdateConf`, so a transport-facing module writes directly into another module’s global/runtime state.",
+        "goseg/config/version.go `CheckVersion` combines remote HTTP fetch, global state mutation (`VersionInfo`, `VersionServerReady`), and local file persistence (`settings/version_info.json`) in one boundary-crossing function."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_cross_boundary_coupling",
+      "summary": "Cross-module coordination relies on mutable package globals, creating hidden coupling and broad change blast radius.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go:33-36 defines mutable globals (`EventBus`, `Regions`), and `GetRegions` overwrites `Regions` at line 64.",
+        "goseg/startram/startram.go:98 writes into external package global `config.StartramConfig` during `Retrieve`.",
+        "goseg/config/version.go:17-20 defines mutable globals (`VersionServerReady`, `VersionInfo`) and `CheckVersion` mutates/returns them as implicit shared state (lines 46-47, 77, 94-95)."
+      ],
+      "suggestion": "Introduce explicit state owners with interfaces (e.g., `StartramStore`, `VersionStore`) and inject them into call sites; replace package-global mutable variables with encapsulated structs guarded by synchronization where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_domain_persistence_mixed_in_single_modules",
+      "summary": "Network transport logic is tightly mixed with config persistence and event emission, collapsing module boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go `Retrieve` performs HTTP, decodes payload, mutates config state (`config.UpdateConf` at lines 107-109), and emits module event (`EventBus <- ...` at line 117) in one flow.",
+        "goseg/config/version.go `CheckVersion` performs HTTP polling and also writes a persisted JSON snapshot to disk (`os.Create` line 80, encoder writes lines 88-90).",
+        "goseg/handler/upload.go delegates directly to importer session mutation (`importer.SetUploadSession`, `importer.Reset`) from websocket action dispatch, without an intermediate application service boundary."
+      ],
+      "suggestion": "Split responsibilities into explicit layers: API client layer for HTTP calls, domain service layer for registration/version workflows, and persistence/event adapters; handlers should call service interfaces, not storage/session primitives directly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "bidirectional_config_startram_dependency_drift",
+      "summary": "Startram and config modules are mutually entangled through reads and writes, weakening dependency direction.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go depends on config for runtime reads (`config.Conf()` throughout) and writes (`config.UpdateConf`, `config.StartramConfig` mutation).",
+        "goseg/config/version.go maintains its own remote-fetch orchestration and global status state rather than depending on a dedicated outbound service abstraction, reinforcing horizontal coupling between runtime config and external API concerns."
+      ],
+      "suggestion": "Define a narrow configuration interface consumed by startram (read/update methods only) and move external API orchestration into dedicated service packages so config remains a state provider instead of a peer orchestrator.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_orchestration"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Package-level mutable singletons are used as integration points instead of explicit service interfaces.",
+      "Workflow orchestration (HTTP + persistence + eventing) is implemented inside boundary modules rather than composed via layered abstractions."
+    ],
+    "likely_symptoms": [
+      "global_state_cross_boundary_coupling",
+      "transport_domain_persistence_mixed_in_single_modules",
+      "bidirectional_config_startram_dependency_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019ca8a3-2027-7473-b690-508700581581
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+
+thinking
+**Preparing frequent commentary updates**
+codex
+Reviewing the blind packet and the three assigned files now, then I’ll produce a strict JSON assessment for only `cross_module_architecture` with evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/startram/startram.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/upload.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/config/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/importer"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+func UploadHandler(msg []byte) error {
+	zap.L().Info("Upload")
+	var uploadPayload structs.WsUploadPayload
+	err := json.Unmarshal(msg, &uploadPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+	}
+	switch uploadPayload.Payload.Action {
+	case "open-endpoint":
+ succeeded in 52ms:
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	VersionServerReady = false
+	VersionInfo        structs.Channel
+)
+ succeeded in 52ms:
+package startram
+
+import (
+	"archive/tar"
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"math"
+	"mime/multipart"
+	"net/http"
+ succeeded in 51ms:
+Total output lines: 1893
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "api_surface_coherence",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+        "Cross-module coordination through shared mutable state or import-time side effects",
+        "Compatibility shim paths that persist without active external need and blur boundaries",
+
+thinking
+**Planning global and import scan**
+codex
+I’ve parsed the packet constraints and initial file contents; next I’m extracting precise line-level evidence from the three files so the findings and score stay fully consistent and machine-importable.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/handler/upload.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '1,420p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/version.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package config
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/defaults"
+     7		"groundseg/structs"
+     8		"io/ioutil"
+     9		"net/http"
+    10		"os"
+    11		"path/filepath"
+    12		"time"
+    13	
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	var (
+    18		VersionServerReady = false
+    19		VersionInfo        structs.Channel
+    20	)
+ succeeded in 51ms:
+     1	package handler
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/importer"
+     7		"groundseg/structs"
+     8	
+     9		"go.uber.org/zap"
+    10	)
+    11	
+    12	func UploadHandler(msg []byte) error {
+    13		zap.L().Info("Upload")
+    14		var uploadPayload structs.WsUploadPayload
+    15		err := json.Unmarshal(msg, &uploadPayload)
+    16		if err != nil {
+    17			return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+    18		}
+    19		switch uploadPayload.Payload.Action {
+    20		case "open-endpoint":
+ succeeded in 51ms:
+     1	package startram
+     2	
+     3	import (
+     4		"archive/tar"
+     5		"bytes"
+     6		"crypto/aes"
+     7		"crypto/cipher"
+     8		"crypto/md5"
+     9		"crypto/rand"
+    10		"crypto/sha256"
+    11		"encoding/json"
+    12		"fmt"
+    13		"groundseg/click"
+    14		"groundseg/config"
+    15		"groundseg/structs"
+    16		"groundseg/system"
+    17		"io"
+    18		"math"
+    19		"mime/multipart"
+    20		"net/http"
+
+thinking
+**Fetching additional lines for context**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '420,860p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+   420		}
+   421		if respObj.Error == 1 {
+   422			return fmt.Errorf("Couldn't cancel subscription: %v", &respObj.Message)
+   423		}
+   424		return nil
+   425	}
+   426	
+   427	func maskPubkey(input string) string {
+   428		// Regular expression pattern to match text between "pubkey=" and "0K", including letters and numbers
+   429		re := regexp.MustCompile(`(?s)(pubkey=)[a-zA-Z0-9]+(0K)`)
+   430	
+   431		// Replace the matched text with the same prefix and suffix, and "x" for each letter or number in between
+   432		output := re.ReplaceAllStringFunc(input, func(s string) string {
+   433			// Extract the prefix "pubkey=" and suffix "0K"
+   434			prefix := "pubkey="
+   435			suffix := "0K"
+   436	
+   437			// Get the length of the part to be replaced with "x"
+   438			length := len(s) - len(prefix) - len(suffix)
+   439	
+
+thinking
+**Synthesizing detailed findings JSON**
+codex
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go defines package globals (`EventBus`, `Regions`) and mutates them from request functions (`GetRegions`, `Retrieve`), creating hidden cross-module stateful behavior.",
+        "goseg/startram/startram.go `Retrieve` mutates `config.StartramConfig` and persists config via `config.UpdateConf`, so a transport-facing module writes directly into another module’s global/runtime state.",
+        "goseg/config/version.go `CheckVersion` combines remote HTTP fetch, global state mutation (`VersionInfo`, `VersionServerReady`), and local file persistence (`settings/version_info.json`) in one boundary-crossing function."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_cross_boundary_coupling",
+      "summary": "Cross-module coordination relies on mutable package globals, creating hidden coupling and broad change blast radius.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go:33-36 defines mutable globals (`EventBus`, `Regions`), and `GetRegions` overwrites `Regions` at line 64.",
+        "goseg/startram/startram.go:98 writes into external package global `config.StartramConfig` during `Retrieve`.",
+        "goseg/config/version.go:17-20 defines mutable globals (`VersionServerReady`, `VersionInfo`) and `CheckVersion` mutates/returns them as implicit shared state (lines 46-47, 77, 94-95)."
+      ],
+      "suggestion": "Introduce explicit state owners with interfaces (e.g., `StartramStore`, `VersionStore`) and inject them into call sites; replace package-global mutable variables with encapsulated structs guarded by synchronization where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_domain_persistence_mixed_in_single_modules",
+      "summary": "Network transport logic is tightly mixed with config persistence and event emission, collapsing module boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go `Retrieve` performs HTTP, decodes payload, mutates config state (`config.UpdateConf` at lines 107-109), and emits module event (`EventBus <- ...` at line 117) in one flow.",
+        "goseg/config/version.go `CheckVersion` performs HTTP polling and also writes a persisted JSON snapshot to disk (`os.Create` line 80, encoder writes lines 88-90).",
+        "goseg/handler/upload.go delegates directly to importer session mutation (`importer.SetUploadSession`, `importer.Reset`) from websocket action dispatch, without an intermediate application service boundary."
+      ],
+      "suggestion": "Split responsibilities into explicit layers: API client layer for HTTP calls, domain service layer for registration/version workflows, and persistence/event adapters; handlers should call service interfaces, not storage/session primitives directly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "bidirectional_config_startram_dependency_drift",
+      "summary": "Startram and config modules are mutually entangled through reads and writes, weakening dependency direction.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go depends on config for runtime reads (`config.Conf()` throughout) and writes (`config.UpdateConf`, `config.StartramConfig` mutation).",
+        "goseg/config/version.go maintains its own remote-fetch orchestration and global status state rather than depending on a dedicated outbound service abstraction, reinforcing horizontal coupling between runtime config and external API concerns."
+      ],
+      "suggestion": "Define a narrow configuration interface consumed by startram (read/update methods only) and move external API orchestration into dedicated service packages so config remains a state provider instead of a peer orchestrator.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_orchestration"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Package-level mutable singletons are used as integration points instead of explicit service interfaces.",
+      "Workflow orchestration (HTTP + persistence + eventing) is implemented inside boundary modules rather than composed via layered abstractions."
+    ],
+    "likely_symptoms": [
+      "global_state_cross_boundary_coupling",
+      "transport_domain_persistence_mixed_in_single_modules",
+      "bidirectional_config_startram_dependency_drift"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+33,415
+

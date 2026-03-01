@@ -18,6 +18,12 @@ type LogPayload struct {
 	Token structs.WsTokenStruct `json:"token"`
 }
 
+var (
+	logTokenCheckForLogs         = auth.LogTokenCheck
+	retrieveSysLogHistoryForLogs = logger.RetrieveSysLogHistory
+	findContainerForLogs         = docker.FindContainer
+)
+
 func LogsHandler(w http.ResponseWriter, r *http.Request) {
 	// Upgrade the HTTP connection to a WebSocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -51,13 +57,13 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// verify session is authenticated
-		if authed := auth.LogTokenCheck(payload.Token, r); !authed {
+		if authed := logTokenCheckForLogs(payload.Token, r); !authed {
 			zap.L().Info("log request not unauthenticated")
 			conn.Close()
 			break
 		}
 		if payload.Type == "system" {
-			logHistory, err := logger.RetrieveSysLogHistory()
+			logHistory, err := retrieveSysLogHistoryForLogs()
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("failed to retrieve log history: %v", err))
 				conn.Close()
@@ -71,7 +77,7 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 			zap.L().Info("log request authenticated")
 			logger.SysLogSessions = append(logger.SysLogSessions, conn)
 		} else {
-			_, err := docker.FindContainer(payload.Type)
+			_, err := findContainerForLogs(payload.Type)
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("log retrieval failed: %v", err))
 				conn.Close()

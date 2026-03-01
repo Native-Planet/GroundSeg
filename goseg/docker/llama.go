@@ -14,57 +14,68 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	confForLlama                 = config.Conf
+	stopContainerByNameForLlama  = StopContainerByName
+	startContainerForLlama       = StartContainer
+	updateContainerStateForLlama = config.UpdateContainerState
+	volumeExistsForLlama         = volumeExists
+	createVolumeForLlama         = CreateVolume
+	addOrGetNetworkForLlama      = addOrGetNetwork
+	writeFileForLlama            = ioutil.WriteFile
+)
+
 func LoadLlama() error {
-	conf := config.Conf()
+	conf := confForLlama()
 	if !conf.PenpaiAllow {
 		zap.L().Info("Llama GPT disabled")
 		return nil
 	}
 	zap.L().Info("Loading Llama GPT")
 	if !conf.PenpaiRunning {
-		if err := StopContainerByName("llama-gpt-api"); err != nil {
+		if err := stopContainerByNameForLlama("llama-gpt-api"); err != nil {
 			zap.L().Warn(fmt.Sprintf("Failed to kill Llama API: %v", err))
 		}
 	}
-	info, err := StartContainer("llama-gpt-api", "llama-api")
+	info, err := startContainerForLlama("llama-gpt-api", "llama-api")
 	if err != nil {
 		return fmt.Errorf("Error starting Llama API: %v", err)
 	}
-	config.UpdateContainerState("llama-api", info)
+	updateContainerStateForLlama("llama-api", info)
 	return nil
 }
 
 func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
-	conf := config.Conf()
+	conf := confForLlama()
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	apiContainerName := "llama-gpt-api"
 	desiredImage := "nativeplanet/llama-gpt:dev@sha256:ac2dcfac72bc3d8ee51ee255edecc10072ef9c0f958120971c00be5f4944a6fa"
 	// lessCores := conf.PenpaiCores
-	exists, err := volumeExists(apiContainerName)
+	exists, err := volumeExistsForLlama(apiContainerName)
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
 	}
 	if !exists {
-		if err = CreateVolume(apiContainerName); err != nil {
+		if err = createVolumeForLlama(apiContainerName); err != nil {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
-	exists, err = volumeExists(apiContainerName + "_api")
+	exists, err = volumeExistsForLlama(apiContainerName + "_api")
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Error checking volume: %v", err)
 	}
 	if !exists {
-		if err = CreateVolume(apiContainerName + "_api"); err != nil {
+		if err = createVolumeForLlama(apiContainerName + "_api"); err != nil {
 			return containerConfig, hostConfig, fmt.Errorf("Error creating volume: %v", err)
 		}
 	}
-	llamaNet, err := addOrGetNetwork("llama")
+	llamaNet, err := addOrGetNetworkForLlama("llama")
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Unable to create or get network: %v", err)
 	}
 	scriptPath := filepath.Join(config.DockerDir, apiContainerName+"_api", "_data", "run.sh")
-	if err := ioutil.WriteFile(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
+	if err := writeFileForLlama(scriptPath, []byte(defaults.RunLlama), 0755); err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	var found *structs.Penpai
@@ -73,6 +84,9 @@ func llamaApiContainerConf() (container.Config, container.HostConfig, error) {
 			found = &item
 			break
 		}
+	}
+	if found == nil {
+		return containerConfig, hostConfig, fmt.Errorf("active penpai model %q not found", conf.PenpaiActive)
 	}
 	containerConfig = container.Config{
 		Image:    desiredImage,

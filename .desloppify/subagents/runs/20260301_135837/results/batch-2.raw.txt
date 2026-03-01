@@ -1,0 +1,120 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Config boundary is inconsistently applied: snapshot APIs exist in `goseg/config/config.go` (`StartramSettingsSnapshot`, `ShipSettingsSnapshot`, etc.) but consumers in `goseg/broadcast/broadcast.go` and `goseg/handler/startram.go` still pull full mutable state through `config.Conf()`, `config.GetStartramConfig()`, `config.LoadUrbitConfig()`, and `config.UrbitConf()`.",
+        "Several runtime indirection structs are large function-bag abstractions with one production implementation (`newVersionRuntime` in `goseg/routines/version.go`, `newDockerRoutineRuntime` in `goseg/routines/docker.go`, `newUrbitRuntime` in `goseg/docker/urbit.go`, `newWireguardRuntime` in `goseg/docker/wireguard.go`), increasing call depth and setup cost.",
+        "Domain config types are not interface-honest: `structs.UrbitDocker` in `goseg/structs/configs.go` uses multiple `any` fields (`CustomPierLocation`, `StartramReminder`, `ChopOnUpgrade`, `DisableShipRestarts`) and callers repeatedly reassert concrete types in operational code (`goseg/routines/docker.go`, `goseg/handler/urbit_operations.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 78.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_boundary_leakage",
+      "summary": "The codebase defines narrow config snapshots but frequently bypasses them with direct global config reads, weakening abstraction boundaries.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/startram.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`goseg/config/config.go` introduces typed snapshot abstractions (`StartramSettingsSnapshot`, `ShipSettingsSnapshot`, `SwapSettingsSnapshot`).",
+        "`goseg/broadcast/broadcast.go` mixes snapshots with direct globals (`config.GetStartramConfig()`, `config.LoadUrbitConfig()`, `config.UrbitConf()`, `config.Conf()`), so consumers can bypass the narrowed contracts.",
+        "`goseg/handler/startram.go` similarly uses snapshots for some values but directly reads `config.UrbitConf()` and `config.GetStartramConfig()` in orchestration paths, so no single stable abstraction is enforced."
+      ],
+      "suggestion": "Define a single read-model interface for runtime handlers/broadcast (for example, `ConfigView` with explicit typed getters) and migrate callers to that API; deprecate direct `Conf/GetStartramConfig/UrbitConf` reads outside `config` internals.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_read_model_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "function_bag_runtime_overindirection",
+      "summary": "Large runtime structs are used as function bags for tests, adding indirection cost without a cohesive domain abstraction.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/urbit.go",
+        "goseg/docker/wireguard.go",
+        "goseg/routines/version_test.go"
+      ],
+      "evidence": [
+        "`versionRuntime` in `goseg/routines/version.go` aggregates many unrelated function fields; `testVersionRuntime` in `goseg/routines/version_test.go` must stub almost all of them even for focused tests.",
+        "`dockerRoutineRuntime`, `urbitRuntime`, and `wireguardRuntime` repeat the same pattern across modules with one production constructor each, creating wrapper chains around package-level functions rather than explicit service boundaries.",
+        "Most fields are direct pass-throughs to package functions (`config.*`, `docker.*`, `handler.*`, `click.*`) and do not enforce policy/translation at the abstraction seam."
+      ],
+      "suggestion": "Replace broad function-bag runtimes with smaller role-specific interfaces (e.g., version metadata source, container lifecycle service, urbit config store) and inject only the dependencies each workflow actually uses.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_di_pattern"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "weakly_typed_urbit_config_contract",
+      "summary": "Using `any` in `UrbitDocker` leaks serialization concerns into business logic and forces repeated runtime type assertions.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/routines/docker.go",
+        "goseg/handler/urbit_operations.go"
+      ],
+      "evidence": [
+        "`goseg/structs/configs.go` defines operational fields as `any` (`CustomPierLocation`, `StartramReminder`, `ChopOnUpgrade`, `DisableShipRestarts`) and compensates with custom coercion in `UnmarshalJSON`.",
+        "`goseg/routines/docker.go` must guard with `if disableRestart, ok := conf.DisableShipRestarts.(bool); ok ...`, showing callers cannot trust the type contract.",
+        "`goseg/handler/urbit_operations.go` repeats assertions such as `customLoc, ok := shipConf.CustomPierLocation.(string)`, pushing schema uncertainty into handlers."
+      ],
+      "suggestion": "Introduce a strongly typed config model for runtime use (bool/string/pointer fields), keep legacy coercion isolated at load boundaries, and remove downstream type assertions from handlers/routines.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_read_model_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_service_interface",
+      "summary": "`shipcreator` uses a pass-through interface/implementation pair that adds indirection but no policy or adaptation.",
+      "related_files": [
+        "goseg/shipcreator/shipcreator.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`ConfigService` methods in `goseg/shipcreator/shipcreator.go` map 1:1 to existing `config` package functions, and `configService` is only a forwarding adapter.",
+        "The abstraction does not translate models, validate invariants, or hide backend volatility; it mostly duplicates existing API shape and increases call surface.",
+        "A package-level `defaultService` further couples this layer to global state instead of introducing a meaningful boundary."
+      ],
+      "suggestion": "Either collapse the pass-through interface and call `config` directly, or promote it into a real domain boundary by moving invariant checks, transaction semantics, and persistence orchestration behind the service.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "function_bag_di_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Abstractions were introduced incrementally for testability and migration, but boundary ownership stayed in global package state.",
+      "Serialization compatibility concerns are mixed into runtime domain models instead of being isolated at IO edges."
+    ],
+    "likely_symptoms": [
+      "config_boundary_leakage",
+      "weakly_typed_urbit_config_contract",
+      "function_bag_runtime_overindirection"
+    ],
+    "possible_false_positives": []
+  }
+}

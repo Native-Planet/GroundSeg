@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker"
@@ -23,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -36,25 +38,33 @@ const (
 
 var (
 	bugReportPath string
+	bugReportOnce sync.Once
 )
 
-func init() {
-	bugReportPath = makeBugReportPath()
+func InitializeSupport() {
+	ensureBugReportPath()
+}
+
+func ensureBugReportPath() {
+	bugReportOnce.Do(func() {
+		bugReportPath = makeBugReportPath()
+	})
 }
 
 // handle bug report requests
 func SupportHandler(msg []byte) error {
+	ensureBugReportPath()
 	defer func() {
 		time.Sleep(1 * time.Second)
-		docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: ""}
+		docker.PublishSystemTransition(structs.SystemTransition{Type: "bugReport", Event: ""})
 		time.Sleep(2 * time.Second)
-		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: ""}
+		docker.PublishSystemTransition(structs.SystemTransition{Type: "bugReportError", Event: ""})
 	}()
 	// transition to loading
-	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "loading"}
+	docker.PublishSystemTransition(structs.SystemTransition{Type: "bugReport", Event: "loading"})
 	// error handling
 	handleError := func(err error) error {
-		docker.SysTransBus <- structs.SystemTransition{Type: "bugReportError", Event: fmt.Sprintf("%v", err)}
+		docker.PublishSystemTransition(structs.SystemTransition{Type: "bugReportError", Event: fmt.Sprintf("%v", err)})
 		return err
 	}
 
@@ -82,8 +92,15 @@ func SupportHandler(msg []byte) error {
 	}
 
 	// write bug report to disk
+	var partialDumpErr error
 	if err := dumpBugReport(bugReportDir, timestamp, contact, description, ships, penpai); err != nil {
-		return handleError(fmt.Errorf("Failed to dump logs: %v", err))
+		var partialErr *partialBugReportError
+		if errors.As(err, &partialErr) {
+			partialDumpErr = partialErr
+			zap.L().Warn(fmt.Sprintf("Proceeding with partial bug report bundle: %v", partialErr))
+		} else {
+			return handleError(fmt.Errorf("Failed to dump logs: %w", err))
+		}
 	}
 
 	// collect cpu profile
@@ -107,14 +124,33 @@ func SupportHandler(msg []byte) error {
 
 	// send bug report
 	if err := sendBugReport(zipPath, contact, description); err != nil {
-		return handleError(fmt.Errorf("Couldn't submit bug report: %v", err))
+		return handleError(fmt.Errorf("Couldn't submit bug report: %w", err))
+	}
+
+	if partialDumpErr != nil {
+		return handleError(fmt.Errorf("Bug report submitted with missing artifacts: %w", partialDumpErr))
 	}
 
 	// completion transitions
-	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "success"}
-	time.Sleep(3 * time.Second)
-	docker.SysTransBus <- structs.SystemTransition{Type: "bugReport", Event: "done"}
+	publishTransitionWithPolicy(
+		docker.PublishSystemTransition,
+		structs.SystemTransition{Type: "bugReport", Event: "success"},
+		structs.SystemTransition{Type: "bugReport", Event: "done"},
+		3*time.Second,
+	)
 	return nil
+}
+
+type partialBugReportError struct {
+	err error
+}
+
+func (e *partialBugReportError) Error() string {
+	return fmt.Sprintf("bug report bundle is partial: %v", e.err)
+}
+
+func (e *partialBugReportError) Unwrap() error {
+	return e.err
 }
 
 // dump docker logs to path
@@ -167,6 +203,13 @@ func dumpDockerLogs(containerID string, path string) error {
 }
 
 func dumpBugReport(bugReportDir, timestamp, contact, description string, piers []string, llama bool) error {
+	recordNonFatal := func(nonFatalErrs *[]error, message string, err error) {
+		wrappedErr := fmt.Errorf("%s: %w", message, err)
+		*nonFatalErrs = append(*nonFatalErrs, wrappedErr)
+		zap.L().Warn(wrappedErr.Error())
+	}
+
+	var nonFatalErrs []error
 
 	// description.txt
 	descPath := filepath.Join(bugReportDir, "description.txt")
@@ -178,37 +221,38 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 	// llama bug dump
 	if llama {
 		if err := dumpDockerLogs("llama-gpt-api", bugReportDir+"/"+"llama.log"); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't dump llama logs: %v", err))
+			recordNonFatal(&nonFatalErrs, "couldn't dump llama logs", err)
 		}
 	}
 
 	// selected pier logs
 	for _, pier := range piers {
 		if err := dumpDockerLogs(pier, bugReportDir+"/"+pier+".log"); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't dump pier logs for %s", pier), err)
 		}
 		if err := dumpDockerLogs("minio_"+pier, bugReportDir+"/minio_"+pier+".log"); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't dump minio logs: %v", err))
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't dump minio logs for %s", pier), err)
 		}
 	}
 
 	// service logs
 	if err := dumpDockerLogs("wireguard", bugReportDir+"/wireguard.log"); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't dump pier logs: %v", err))
+		recordNonFatal(&nonFatalErrs, "couldn't dump wireguard logs", err)
 	}
 
 	// system.json
 	srcPath := filepath.Join(config.BasePath, "settings", "system.json")
 	destPath := filepath.Join(bugReportDir, "system.json")
 	if err := copyFile(srcPath, destPath); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
+		recordNonFatal(&nonFatalErrs, "couldn't copy system config", err)
 	}
 
 	// remove private information
-	if err := sanitizeJSON(destPath, "sessions", "privkey", "salt", "pwHash"); err != nil {
+	if err := sanitizeJSON(destPath, "sessions", "privkey", "salt", "pwHash"); err != nil && !os.IsNotExist(err) {
+		recordNonFatal(&nonFatalErrs, "couldn't sanitize system.json", err)
 		zap.L().Error(fmt.Sprintf("Couldn't sanitize system.json! Removing from report"))
 		if err := os.Remove(destPath); err != nil {
-			return fmt.Errorf("Error removing unsanitized system log: %v", err)
+			return fmt.Errorf("Error removing unsanitized system log: %w", err)
 		}
 	}
 
@@ -217,12 +261,13 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 		srcPath = filepath.Join(config.BasePath, "settings", "pier", pier+".json")
 		destPath = filepath.Join(bugReportDir, pier+".json")
 		if err := copyFile(srcPath, destPath); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't copy service config for %s", pier), err)
 		}
-		if err := sanitizeJSON(destPath, "minio_password"); err != nil {
+		if err := sanitizeJSON(destPath, "minio_password"); err != nil && !os.IsNotExist(err) {
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't sanitize %s.json", pier), err)
 			zap.L().Error(fmt.Sprintf("Couldn't sanitize %v.json! Removing from report", pier))
 			if err := os.Remove(destPath); err != nil {
-				return fmt.Errorf("Error removing unsanitized pier log: %v", err)
+				return fmt.Errorf("Error removing unsanitized pier log: %w", err)
 			}
 		}
 	}
@@ -233,7 +278,7 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 		srcPath = filepath.Join(config.BasePath, "settings", configFile)
 		destPath = filepath.Join(bugReportDir, configFile)
 		if err := copyFile(srcPath, destPath); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't copy service configs: %v", err))
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't copy service config %s", configFile), err)
 		}
 	}
 
@@ -243,8 +288,11 @@ func dumpBugReport(bugReportDir, timestamp, contact, description string, piers [
 		srcPath := sysLog
 		destPath := filepath.Join(bugReportDir, filepath.Base(sysLog))
 		if err := copyFile(srcPath, destPath); err != nil {
-			zap.L().Warn(fmt.Sprintf("Couldn't copy system logs: %v", err))
+			recordNonFatal(&nonFatalErrs, fmt.Sprintf("couldn't copy system log %s", filepath.Base(sysLog)), err)
 		}
+	}
+	if joined := errors.Join(nonFatalErrs...); joined != nil {
+		return &partialBugReportError{err: joined}
 	}
 	return nil
 }
@@ -275,7 +323,7 @@ func zipDir(directory, dest string) error {
 	defer destFile.Close()
 	zipWriter := zip.NewWriter(destFile)
 	defer zipWriter.Close()
-	filepath.Walk(directory, func(filePath string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(directory, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -297,7 +345,9 @@ func zipDir(directory, dest string) error {
 		defer fsFile.Close()
 		_, err = io.Copy(zipFile, fsFile)
 		return err
-	})
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 

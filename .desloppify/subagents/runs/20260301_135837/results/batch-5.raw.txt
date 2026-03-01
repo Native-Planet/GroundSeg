@@ -1,0 +1,132 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 5,
+  "assessments": {
+    "design_coherence": 64.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Ship lifecycle orchestration is duplicated across `handler/createUrbitShip` + `handler/waitForShipReady` and `importer/configureUploadedPier` + `importer/waitForShipReady`, including repeated remote-toggle polling and transition publishing logic.",
+        "Transition/error signaling is implemented ad hoc in many handlers (`handler/startram.go`, `handler/urbit_operations.go`, `handler/support.go`) with repeated `Publish*Transition` + sleep + clear patterns instead of a shared workflow abstraction.",
+        "`handler/support.go` mixes websocket command handling, filesystem/log collection, Docker log extraction, archive generation, redaction, and HTTP upload in one file, indicating mixed responsibilities and low cohesion.",
+        "`config/config.go` `init()` performs startup orchestration, keyfile creation, config migration/merge, binary hashing, persistence, and goroutine launch, creating a broad multi-concern bootstrap path.",
+        "`system/wifi.go` combines process control (`nmcli`, `systemctl`, `reboot`), captive portal/websocket serving, and mutable runtime state (`clients`, `WifiInfo`, `Device`, `ConfChannel`) in one module."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_ship_lifecycle_orchestration",
+      "summary": "New-ship and import flows duplicate the same multi-step orchestration logic instead of sharing a single lifecycle workflow.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`createUrbitShip` and `configureUploadedPier` both perform config creation, system config mutation, container/volume prep, startup, optional remote/network switching, and readiness polling.",
+        "`waitForShipReady` in both files uses near-identical ticker loops around `click.GetLusCode`, then conditionally toggles to wireguard mode and restarts containers.",
+        "Both modules also carry parallel cleanup routines (`errorCleanup`) with overlapping side effects."
+      ],
+      "suggestion": "Extract a shared ship-provisioning pipeline package with reusable steps (prepare-storage, bootstrap-config, start, wait-ready, optional-remote-switch, cleanup), and make new-ship/import pass strategy-specific options.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ship_lifecycle_workflow_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_state_machine_scattered",
+      "summary": "UI transition state handling is scattered and duplicated across handlers, producing inconsistent orchestration structure.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/urbit_operations.go",
+        "goseg/handler/support.go"
+      ],
+      "evidence": [
+        "Multiple handlers manually implement similar patterns: publish loading state, run operation, publish success/error, sleep, then clear event.",
+        "Examples include `handleStartramRegister`, `handleStartramEndpoint`, `setUrbitDomain`, `setMinIODomain`, `rebuildContainer`, and `SupportHandler`.",
+        "Error handling is repeatedly encoded as local closures that also mutate transition channels."
+      ],
+      "suggestion": "Introduce a shared transition runner/helper that standardizes begin/success/error/clear behavior with configurable labels and timeout behavior, then migrate handler actions to it.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "ship_lifecycle_workflow_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "support_handler_mixed_responsibilities",
+      "summary": "Support-report handling combines too many concerns in one module, reducing structural clarity and change isolation.",
+      "related_files": [
+        "goseg/handler/support.go",
+        "goseg/logger/logger.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "`SupportHandler` coordinates payload parsing, transition state, on-disk report assembly, optional profiling, zip generation, cleanup, and HTTP submission.",
+        "`dumpBugReport` directly couples report format decisions with Docker/system config/log data extraction and sanitization logic.",
+        "The file also owns transport concerns (`sendBugReport`) and filesystem/archive concerns (`zipDir`, `copyFile`, `sanitizeJSON`)."
+      ],
+      "suggestion": "Split support flow into focused components (collector, sanitizer, archiver, uploader, transition notifier) behind a small orchestration layer in the handler package.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_bootstrap_god_init",
+      "summary": "Global config initialization centralizes unrelated startup work in `init()`, creating a high-coupling bootstrap path.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/urbit.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config.init()` handles default file creation, key generation, merge/migration, hash calculation, persistence round-trip, and starts `ConfChannel` goroutine.",
+        "This startup path mutates global singleton state (`globalConfig`, `BasePath`, key files) while also performing disk I/O and long-lived goroutine setup.",
+        "Adjacent config files use narrower responsibilities, but startup remains centralized in one broad initializer."
+      ],
+      "suggestion": "Replace implicit `init()` orchestration with explicit startup phases (`load`, `migrate`, `ensure-secrets`, `publish-state`, `start-watchers`) invoked from a top-level bootstrap function.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_module_boundary_blur",
+      "summary": "WiFi subsystem blends transport API, device control, and runtime state management in one package-level module.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/system.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`wifi.go` contains websocket API endpoint handling (`CaptiveAPI`), captive portal startup, shell-command orchestration, and mutable singleton state.",
+        "Global variables (`clients`, `WifiInfo`, `Device`, `ConfChannel`, `c2cEnabled`) couple unrelated concerns and make behavior stateful across calls.",
+        "Operational flows such as `C2CConnect` include AP teardown, wifi setup, reboot trigger, and config signaling in a single function."
+      ],
+      "suggestion": "Separate WiFi domain service (state + device operations) from API adapters (websocket/captive endpoints), and encapsulate mutable runtime state in a struct instance rather than package globals.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Workflow orchestration logic is implemented per entrypoint rather than as reusable lifecycle primitives.",
+      "Transition/event publishing lacks a shared state-machine abstraction, encouraging copy-pasted control flow.",
+      "Package-level singletons and `init()` side effects concentrate concerns and hide module boundaries."
+    ],
+    "likely_symptoms": [
+      "duplicated_ship_lifecycle_orchestration",
+      "transition_state_machine_scattered"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -12,4 +12,5 @@ COPY vite.config.js /webui
 WORKDIR /webui
 RUN npm install -g npm
 RUN npm install
+RUN npm run test
 RUN npm run build

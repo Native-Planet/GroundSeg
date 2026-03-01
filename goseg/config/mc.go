@@ -9,6 +9,11 @@ import (
 	"path/filepath"
 )
 
+var (
+	confForMc              = Conf
+	getVersionChannelForMc = GetVersionChannel
+)
+
 // write a hardcoded default conf to disk
 func CreateDefaultMcConf() error {
 	defaultConfig := defaults.McConfig
@@ -31,13 +36,14 @@ func CreateDefaultMcConf() error {
 
 // write a conf to disk from version server info
 func UpdateMcConf() error {
-	conf := Conf()
+	conf := confForMc()
+	versionInfo := getVersionChannelForMc()
 	newConfig := structs.McConfig{
 		McName:      "minio_client",
 		McVersion:   conf.UpdateBranch,
-		Repo:        VersionInfo.Miniomc.Repo,
-		Amd64Sha256: VersionInfo.Miniomc.Amd64Sha256,
-		Arm64Sha256: VersionInfo.Miniomc.Arm64Sha256,
+		Repo:        versionInfo.Miniomc.Repo,
+		Amd64Sha256: versionInfo.Miniomc.Amd64Sha256,
+		Arm64Sha256: versionInfo.Miniomc.Arm64Sha256,
 	}
 	path := filepath.Join(BasePath, "settings", "mc.json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {

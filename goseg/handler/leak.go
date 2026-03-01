@@ -9,6 +9,16 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	urbitHandlerForLeak    = UrbitHandler
+	penpaiHandlerForLeak   = PenpaiHandler
+	newShipHandlerForLeak  = NewShipHandler
+	systemHandlerForLeak   = SystemHandler
+	startramHandlerForLeak = StartramHandler
+	supportHandlerForLeak  = SupportHandler
+	pwHandlerForLeak       = PwHandler
+)
+
 func HandleLeakAction() {
 	// no:
 	// pier upload
@@ -37,7 +47,7 @@ func gallsegUnauthHandler(action leakchannel.ActionChannel) {
 	if urbitPayload.Payload.Patp != action.Patp {
 		return
 	}
-	if err := UrbitHandler(action.Content); err != nil {
+	if err := urbitHandlerForLeak(action.Content); err != nil {
 		zap.L().Error(fmt.Sprintf("%+v", err))
 		return
 	}
@@ -46,31 +56,31 @@ func gallsegUnauthHandler(action leakchannel.ActionChannel) {
 func gallsegAuthedHandler(action leakchannel.ActionChannel) {
 	switch action.Type {
 	case "urbit":
-		if err := UrbitHandler(action.Content); err != nil {
+		if err := urbitHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%+v", err))
 		}
 	case "penpai":
-		if err := PenpaiHandler(action.Content); err != nil {
+		if err := penpaiHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "new_ship":
-		if err := NewShipHandler(action.Content); err != nil {
+		if err := newShipHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "system":
-		if err := SystemHandler(action.Content); err != nil {
+		if err := systemHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "startram":
-		if err := StartramHandler(action.Content); err != nil {
+		if err := startramHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	case "support":
-		if err := SupportHandler(action.Content); err != nil {
+		if err := supportHandlerForLeak(action.Content); err != nil {
 			zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
 		}
 	case "password":
-		if err := PwHandler(action.Content, true); err != nil {
+		if err := pwHandlerForLeak(action.Content, true); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	default:

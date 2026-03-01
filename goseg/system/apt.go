@@ -11,16 +11,20 @@ import (
 
 var (
 	SystemUpdates structs.SystemUpdates
+
+	execCommandForAPT        = exec.Command
+	hasUpdatesForAPT         = hasUpdates
+	updateCheckForRunUpgrade = UpdateCheck
 )
 
 func hasUpdates() (structs.SystemUpdates, error) {
 	var updates structs.SystemUpdates
-	cmd := exec.Command("apt", "update")
+	cmd := execCommandForAPT("apt", "update")
 	err := cmd.Run()
 	if err != nil {
 		return updates, err
 	}
-	cmd = exec.Command("apt", "upgrade", "-s")
+	cmd = execCommandForAPT("apt", "upgrade", "-s")
 	out, err := cmd.Output()
 	if err != nil {
 		return updates, err
@@ -38,14 +42,14 @@ func hasUpdates() (structs.SystemUpdates, error) {
 }
 
 func RunUpgrade() error {
-	cmd := exec.Command("apt", "upgrade", "-y")
+	cmd := execCommandForAPT("apt", "upgrade", "-y")
 	err := cmd.Run()
-	UpdateCheck()
+	updateCheckForRunUpgrade()
 	return err
 }
 
 func UpdateCheck() {
-	if updates, err := hasUpdates(); err != nil {
+	if updates, err := hasUpdatesForAPT(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to check updates: %v", err))
 	} else {
 		SystemUpdates = updates

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"groundseg/config"
+	"groundseg/structs"
 	"groundseg/system"
 	"net"
 	"strings"
@@ -15,17 +16,34 @@ import (
 
 var (
 	LocalDomain = "nativeplanet.local"
+
+	updateCheckForAptLoop          = system.UpdateCheck
+	configForSystemRoutine         = config.Conf
+	netInterfacesForSystemRoutine  = net.Interfaces
+	interfaceAddrsForSystemRoutine = func(i net.Interface) ([]net.Addr, error) {
+		return i.Addrs()
+	}
 )
 
-func init() {
+func StartMDNSServer() {
 	go mDNSServer()
 }
 
 func AptUpdateLoop() {
-	system.UpdateCheck()
-	conf := config.Conf()
-	val := time.Duration(conf.LinuxUpdates.Value)
+	updateCheckForAptLoop()
+	conf := configForSystemRoutine()
+	checkInterval := aptUpdateCheckInterval(conf)
+	ticker := time.NewTicker(checkInterval)
+	for {
+		select {
+		case <-ticker.C:
+			updateCheckForAptLoop()
+		}
+	}
+}
 
+func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
+	val := time.Duration(conf.LinuxUpdates.Value)
 	var interval time.Duration
 	if interv := conf.LinuxUpdates.Interval; interv == "week" {
 		interval = 7 * (time.Hour * 24)
@@ -34,14 +52,7 @@ func AptUpdateLoop() {
 	} else {
 		interval = 30 * (time.Hour * 24)
 	}
-	checkInterval := val * interval
-	ticker := time.NewTicker(checkInterval)
-	for {
-		select {
-		case <-ticker.C:
-			system.UpdateCheck()
-		}
-	}
+	return val * interval
 }
 
 func mDNSServer() {
@@ -88,10 +99,10 @@ func mDNSServer() {
 			zap.L().Error(fmt.Sprintf("Failed to announce mDNS server: %v", err))
 		} else {
 			zap.L().Info(fmt.Sprintf("Caching %v", system.LocalUrl))
-			if err = config.UpdateConf(map[string]interface{}{
-				"gracefulExit":  false,
-				"lastKnownMDNS": system.LocalUrl,
-			}); err != nil {
+			if err = config.UpdateConfTyped(
+				config.WithGracefulExit(false),
+				config.WithLastKnownMDNS(system.LocalUrl),
+			); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't update mdns cache: %v", err))
 			}
 		}
@@ -128,12 +139,12 @@ func mDNSDiscovery() ([]string, error) {
 
 func getAllIPs() ([]string, error) {
 	var ips []string
-	interfaces, err := net.Interfaces()
+	interfaces, err := netInterfacesForSystemRoutine()
 	if err != nil {
 		return nil, err
 	}
 	for _, i := range interfaces {
-		addrs, err := i.Addrs()
+		addrs, err := interfaceAddrsForSystemRoutine(i)
 		if err != nil {
 			return nil, err
 		}

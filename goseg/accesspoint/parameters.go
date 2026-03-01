@@ -1,11 +1,11 @@
 package accesspoint
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"strings"
 )
+
+var netInterfacesFn = net.Interfaces
 
 // validateIP validates the IP address format.
 func validateIP(ip string) bool {
@@ -13,9 +13,18 @@ func validateIP(ip string) bool {
 	return parsedIP != nil
 }
 
+func hasInterface(interfaceNames []string, target string) bool {
+	for _, name := range interfaceNames {
+		if name == target {
+			return true
+		}
+	}
+	return false
+}
+
 func checkParameters() error {
 	// get interfaces
-	interfaces, err := net.Interfaces()
+	interfaces, err := netInterfacesFn()
 	if err != nil {
 		return err
 	}
@@ -26,30 +35,28 @@ func checkParameters() error {
 	}
 
 	// Check wlan interface
-	if inet != "" {
-		if !strings.Contains(strings.Join(interfaceNames, ","), wlan) {
-			return errors.New(fmt.Sprintf("Wlan %s interface was not found", wlan))
-		}
+	if wlan != "" && !hasInterface(interfaceNames, wlan) {
+		return fmt.Errorf("Wlan %s interface was not found", wlan)
 	}
 
 	// Check inet interface
-	if inet != "" && !strings.Contains(strings.Join(interfaceNames, ","), inet) {
-		return errors.New(fmt.Sprintf("Inet %s interface was not found", inet))
+	if inet != "" && !hasInterface(interfaceNames, inet) {
+		return fmt.Errorf("Inet %s interface was not found", inet)
 	}
 
 	// Validate IP
 	if !validateIP(ip) {
-		return errors.New(fmt.Sprintf("Wrong ip %s", ip))
+		return fmt.Errorf("Wrong ip %s", ip)
 	}
 
 	// Check SSID
 	if ssid == "" {
-		return errors.New("SSID must not be empty")
+		return fmt.Errorf("SSID must not be empty")
 	}
 
 	// Check password
 	if password == "" {
-		return errors.New("Password must not be empty")
+		return fmt.Errorf("Password must not be empty")
 	}
 	return nil
 }

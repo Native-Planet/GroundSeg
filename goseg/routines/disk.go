@@ -12,6 +12,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	updateDiskWarningInConf = func(warnings map[string]structs.DiskWarning) error {
+		return config.UpdateConfTyped(config.WithDiskWarning(warnings))
+	}
+	sendNotificationForDiskWarning = click.SendNotification
+)
+
 func SmartDiskCheck() {
 	for {
 		disks, err := system.ListHardDisks()
@@ -95,9 +102,7 @@ func setWarningInfo(conf structs.SysConfig, part string, eighty, ninety bool, ni
 		Ninety:     ninety,
 		NinetyFive: ninetyFive,
 	}
-	if err := config.UpdateConf(map[string]interface{}{
-		"diskWarning": conf.DiskWarning,
-	}); err != nil {
+	if err := updateDiskWarningInConf(conf.DiskWarning); err != nil {
 		return fmt.Errorf("Couldn't set disk warning in config 80%%:%v 90%%:%v 95%%:%v: %v", eighty, ninety, ninetyFive, err)
 	}
 	return nil
@@ -107,7 +112,7 @@ func sendDriveHarkNotification(part string, percentage float64, piers []string) 
 	noti := structs.HarkNotification{Type: "disk-warning", DiskName: part, DiskUsage: percentage}
 	// Send notification
 	for _, patp := range piers {
-		if err := click.SendNotification(patp, noti); err != nil {
+		if err := sendNotificationForDiskWarning(patp, noti); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to send drive warning to %s: %v", patp, err))
 		}
 	}
@@ -117,7 +122,7 @@ func sendSmartFailHarkNotification(dev string, piers []string) {
 	noti := structs.HarkNotification{Type: "smart-fail", DiskName: dev}
 	// Send notification
 	for _, patp := range piers {
-		if err := click.SendNotification(patp, noti); err != nil {
+		if err := sendNotificationForDiskWarning(patp, noti); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to send smart check warning to %s: %v", patp, err))
 		}
 	}

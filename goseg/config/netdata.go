@@ -8,6 +8,11 @@ import (
 	"path/filepath"
 )
 
+var (
+	confForNetdata              = Conf
+	getVersionChannelForNetdata = GetVersionChannel
+)
+
 // write a hardcoded default conf to disk
 func CreateDefaultNetdataConf() error {
 	defaultConfig := defaults.NetdataConfig
@@ -30,11 +35,12 @@ func CreateDefaultNetdataConf() error {
 
 // write a conf to disk from version server info
 func UpdateNetdataConf() error {
-	conf := Conf()
+	conf := confForNetdata()
 	releaseChannel := conf.UpdateBranch
-	netdataRepo := VersionInfo.Netdata.Repo
-	amdHash := VersionInfo.Netdata.Amd64Sha256
-	armHash := VersionInfo.Netdata.Arm64Sha256
+	versionInfo := getVersionChannelForNetdata()
+	netdataRepo := versionInfo.Netdata.Repo
+	amdHash := versionInfo.Netdata.Amd64Sha256
+	armHash := versionInfo.Netdata.Arm64Sha256
 	newConfig := structs.NetdataConfig{
 		NetdataName:    "netdata",
 		Repo:           netdataRepo,

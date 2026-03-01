@@ -1,0 +1,134 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 4,
+  "assessments": {
+    "cross_module_architecture": 78.0,
+    "test_strategy": 74.0,
+    "package_organization": 81.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines backend runtime-boundary contracts for upload and masked errors, but those contracts are documented only in prose and not encoded as explicit typed contracts in goseg/handler/upload.go or goseg/startram/errors.go.",
+        "goseg/handler/upload.go directly maps websocket payload fields to importer.OpenUploadEndpointCmd and uses a handler-owned adapter that forwards 1:1 into importer package calls, creating transport-to-importer coupling.",
+        "goseg/startram/errors.go builds outward error text from fmt.Sprintf(\"... %v\", err) and applies maskPubkey only, so masking policy depends on one sanitizer and can drift from README's broader \"redacted outward message\" contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md specifies deterministic unit-test expectations for upload and masked-error flows plus a path-aware upload gate.",
+        "goseg/handler/upload.go uses mutable package-global defaultUploadService via SetUploadService with no scoped reset helper in the production API, a pattern that commonly causes order-dependent test behavior when tests override globals.",
+        "goseg/startram/errors.go contains contract-sensitive behavior (masking + unwrapping) concentrated in a small helper, but runtime safety depends on tests enforcing redaction breadth beyond pubkey-only masking."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure shows high file-count directories (goseg/handler/: 26 files, goseg/startram/: 15 files), indicating dense ownership areas where contract discoverability matters.",
+        "README.md mixes installation/uninstallation, architecture boundaries, quality gates, and CI policy in a single root document rather than placing governance/contracts in dedicated docs subfolders.",
+        "README.md already references docs/architecture/frontend-runtime.md, indicating a docs namespace exists but governance/test-contract material remains at root."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_transport_importer_tight_coupling",
+      "summary": "Upload handler is tightly coupled to importer command shape, making transport and importer boundaries change together.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "UploadHandler unmarshals websocket payload and directly constructs importer.OpenUploadEndpointCmd field-by-field before invoking defaultUploadService.OpenUploadEndpoint.",
+        "importerUploadService is a pass-through adapter that forwards directly to importer package functions, so handler layer owns importer contract details instead of a boundary service.",
+        "README runtime-boundary guidance expects stable handler/service boundaries, but command translation is embedded at the handler edge."
+      ],
+      "suggestion": "Introduce an upload application service boundary (`goseg/uploadsvc` or equivalent) that owns command validation/translation; make handler depend on a service DTO independent of importer.OpenUploadEndpointCmd; wire importer adapter only at composition root so importer API changes do not force websocket-handler rewrites.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contracts_defined_in_docs_not_in_code"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "global_service_override_fragility",
+      "summary": "Global mutable upload service dependency creates test-order fragility for contract-critical upload routing.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "defaultUploadService is a package-global variable and SetUploadService mutates it process-wide.",
+        "No production-side scoping helper exists to restore prior service after overrides, increasing risk of leaking test doubles across tests.",
+        "README requires deterministic upload-path testing and explicit branch-matrix coverage; global mutable dependencies undermine deterministic isolation if not strictly reset."
+      ],
+      "suggestion": "Replace global mutation with instance-based dependency injection (e.g., `type UploadHandlerDeps struct { Service UploadService }`) and construct handler with explicit deps in tests; if short-term retention is needed, add `SwapUploadServiceForTest(t *testing.T, svc UploadService)` with automatic `t.Cleanup` restore and enforce its use in upload tests.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contracts_defined_in_docs_not_in_code"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "masked_error_policy_drift",
+      "summary": "Masked external error contract is weakly enforced because outward message formatting still embeds raw error text before narrow masking.",
+      "related_files": [
+        "goseg/startram/errors.go",
+        "README.md"
+      ],
+      "evidence": [
+        "wrapAPIConnectionError formats outward message with `%v` from underlying error and then applies only maskPubkey.",
+        "If upstream errors include sensitive non-pubkey tokens/URLs, current masking policy can leak details despite preserved cause-chain intent.",
+        "README contract requires redacted outward message with preserved internal cause chain, but runtime implementation encodes only a partial redaction policy."
+      ],
+      "suggestion": "Move to a structured error policy: expose a constant outward message (no raw `%v`), keep full cause in `cause` only, and add explicit classifier-based redaction where needed; codify contract tests to assert forbidden substrings from representative upstream errors while keeping `errors.Is/Unwrap` behavior.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contracts_defined_in_docs_not_in_code"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "governance_contracts_in_root_readme",
+      "summary": "Governance and quality-contract material is co-located with install/uninstall content in root README, reducing contract discoverability and ownership clarity.",
+      "related_files": [
+        "README.md",
+        "goseg/handler/upload.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "README contains operational install/uninstall sections plus architecture boundaries, test policy, and CI contract gate details in one file.",
+        "The same README defines concrete code-level obligations for upload.go and errors.go, but those contracts are not housed near backend docs hierarchy.",
+        "holistic_context.structure shows large backend directories (handler 26 files, startram 15 files), increasing need for precise, local contract documentation."
+      ],
+      "suggestion": "Staged reorg plan: Stage 1 create `docs/governance/` and `docs/testing/`; Stage 2 move backend contract sections into `docs/governance/backend-contracts.md` and upload/startram expectations into `docs/testing/backend-quality-gates.md`; Stage 3 leave concise pointers in README and remove duplicated policy text; Stage 4 update internal links and references with `rg -n \"Backend Quality Gate|Upload Contract Gate|masked external errors|upload.go\" README.md docs`; Stage 5 validate with `go test ./goseg/handler ./goseg/startram` and run existing CI script `.github/scripts/check-upload-contract.sh` to confirm docs and gates still align.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contracts_defined_in_docs_not_in_code"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Architecture and test contracts are primarily governed by README prose instead of enforceable typed boundaries and localized contract modules.",
+      "Global mutable dependency patterns remain in contract-sensitive request paths, making deterministic verification harder."
+    ],
+    "likely_symptoms": [
+      "upload_transport_importer_tight_coupling",
+      "global_service_override_fragility",
+      "masked_error_policy_drift"
+    ],
+    "possible_false_positives": [
+      "package-organization fan-in/fan-out thresholds could not be fully applied because holistic_context.structure only exposed directory_profiles (no root_files or coupling_matrix in packet)."
+    ]
+  }
+}

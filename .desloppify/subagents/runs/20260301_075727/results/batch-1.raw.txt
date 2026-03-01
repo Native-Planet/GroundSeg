@@ -1,0 +1,96 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 58.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js centralizes transport, state stores, reconnect behavior, and dozens of domain command exports in one module (`let m=new Set,p;`, `setTimeout(()=>M(t),1e3)`, many `e({type:...})` wrappers).",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js uses a process-wide singleton client (`const f=new v(\"\")`) and mutates global callbacks/subscriptions (`f.onOpen`, `f.onRetry`, `f.onError`, `f.subscribe(...)`) from exported functions.",
+        "Multiple entry pages directly import websocket transport chunk (`apps-page`, `boot-existing-page`, `captive-page`, `system-page`) rather than consuming a narrower domain boundary.",
+        "ui/src/lib/stores/logsocket.js introduces a second independent websocket lifecycle (`let SESSION = {};`, `new WebSocket(url)`, per-type handlers), duplicating connection-state concerns outside the main websocket hub."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_hub_god_module",
+      "summary": "A single websocket hub module owns transport, state, retries, and broad domain command dispatch, creating a high-blast-radius dependency center.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/entry/system-page.svelte.d284871e.js",
+        "goseg/web/_app/immutable/entry/apps-page.svelte.85e3c543.js"
+      ],
+      "evidence": [
+        "websocket.84e20bf3.js maintains module-global connection state (`let m=new Set,p`) and reconnect policy (`p.onclose=()=>R(t)`, `setTimeout(()=>M(t),1e3)`).",
+        "The same module exports a very large command surface (`e({type:\"system\"...})`, `e({type:\"urbit\"...})`, `e({type:\"support\"...})`, etc.), combining unrelated domains behind one runtime hub.",
+        "Entry pages import this same chunk directly, coupling UI route modules to transport internals."
+      ],
+      "suggestion": "Split websocket concerns into a transport client plus domain-specific action modules (system, urbit, support, setup), and expose a thin application service boundary for pages so route modules depend on domain services instead of the transport hub.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_transport_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "singleton_event_client_side_effects",
+      "summary": "Global singleton event clients introduce hidden cross-module coupling and lifecycle side effects.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "urbit.f551ce98.js instantiates a singleton at module scope (`const f=new v(\"\")`) and stores mutable handlers/subscriptions on it (`f.onOpen`, `f.onRetry`, `f.onError`, `f.subscribe`).",
+        "Class `v` constructor registers browser lifecycle behavior (`window.addEventListener(\"beforeunload\", this.delete)`), tying network client behavior to global page lifecycle.",
+        "websocket.84e20bf3.js imports and conditionally routes through this singleton path (`import {b as w} from \"./urbit...\"`, `if(S(f)) w(t)`), making call behavior depend on global runtime flags and shared singleton state."
+      ],
+      "suggestion": "Replace module-level singleton clients with injected client instances owned by an explicit connection manager; make subscription setup/teardown explicit per consumer and avoid constructor-time global event binding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_lifecycle"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "duplicated_websocket_stacks",
+      "summary": "Two separate websocket stacks duplicate connection lifecycle logic and fragment architectural boundaries.",
+      "related_files": [
+        "ui/src/lib/stores/logsocket.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js"
+      ],
+      "evidence": [
+        "ui/src/lib/stores/logsocket.js owns its own session map and lifecycle (`let SESSION = {};`, `connect`, `disconnect`, `requestLogs`, `new WebSocket(url)`), independent from the main websocket client.",
+        "websocket.84e20bf3.js independently handles connection setup, reconnect, request routing, and state updates for broader app traffic.",
+        "Both modules implement overlapping transport responsibilities with different state models, increasing drift and making boundary ownership unclear."
+      ],
+      "suggestion": "Unify websocket lifecycle under one transport subsystem with typed channels/streams (including logs) so modules share retry/auth/session policy and expose only domain-level APIs to stores/pages.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_transport_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced boundary between UI routes and transport layer.",
+      "Module-level singleton state used as integration mechanism across features.",
+      "Feature growth added parallel websocket implementations instead of extending a shared transport abstraction."
+    ],
+    "likely_symptoms": [
+      "transport_hub_god_module",
+      "singleton_event_client_side_effects",
+      "duplicated_websocket_stacks"
+    ],
+    "possible_false_positives": [
+      "Some coupling in generated immutable entry/chunk files may originate from build output rather than authored source layout, but the runtime architecture issues remain observable in behavior and exported boundaries."
+    ]
+  }
+}

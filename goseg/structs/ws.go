@@ -59,24 +59,9 @@ func (ws *MuConn) Read(cm *ClientManager) (int, []byte, error) {
 
 // find *muconn in map or create new one if not present
 func (cm *ClientManager) GetMuConn(conn *websocket.Conn, tokenId string) *MuConn {
-	cm.Mu.RLock()
-	for _, muConns := range cm.AuthClients {
-		for _, muConn := range muConns {
-			if muConn.Conn == conn {
-				cm.Mu.RUnlock()
-				return muConn
-			}
-		}
+	if existing := cm.FindMuConn(conn); existing != nil {
+		return existing
 	}
-	for _, muConns := range cm.UnauthClients {
-		for _, muConn := range muConns {
-			if muConn.Conn == conn {
-				cm.Mu.RUnlock()
-				return muConn
-			}
-		}
-	}
-	cm.Mu.RUnlock()
 	newMuConn := &MuConn{
 		Conn:       conn,
 		Active:     true,
@@ -86,6 +71,80 @@ func (cm *ClientManager) GetMuConn(conn *websocket.Conn, tokenId string) *MuConn
 	// cm.UnauthClients[tokenId] = append(cm.UnauthClients[tokenId], newMuConn)
 	cm.Mu.Unlock()
 	return newMuConn
+}
+
+func (cm *ClientManager) findMuConnLocked(conn *websocket.Conn) *MuConn {
+	for _, muConns := range cm.AuthClients {
+		for _, muConn := range muConns {
+			if muConn != nil && muConn.Conn == conn {
+				return muConn
+			}
+		}
+	}
+	for _, muConns := range cm.UnauthClients {
+		for _, muConn := range muConns {
+			if muConn != nil && muConn.Conn == conn {
+				return muConn
+			}
+		}
+	}
+	return nil
+}
+
+func (cm *ClientManager) FindMuConn(conn *websocket.Conn) *MuConn {
+	if conn == nil {
+		return nil
+	}
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	return cm.findMuConnLocked(conn)
+}
+
+func (cm *ClientManager) HasAuthConnection(token string, conn *websocket.Conn) bool {
+	if conn == nil {
+		return false
+	}
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, existing := range cm.AuthClients[token] {
+		if existing != nil && existing.Conn == conn {
+			return true
+		}
+	}
+	return false
+}
+
+func (cm *ClientManager) HasAnyAuthConnection(conn *websocket.Conn) bool {
+	if conn == nil {
+		return false
+	}
+	cm.Mu.RLock()
+	defer cm.Mu.RUnlock()
+	for _, clients := range cm.AuthClients {
+		for _, existing := range clients {
+			if existing != nil && existing.Conn == conn {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (cm *ClientManager) HasConnection(conn *websocket.Conn) bool {
+	return cm.FindMuConn(conn) != nil
+}
+
+func (cm *ClientManager) DeactivateConnection(conn *websocket.Conn) bool {
+	if conn == nil {
+		return false
+	}
+	cm.Mu.Lock()
+	defer cm.Mu.Unlock()
+	if existing := cm.findMuConnLocked(conn); existing != nil {
+		existing.Active = false
+		return true
+	}
+	return false
 }
 
 // func (ws *MuConn) Write(data []byte) {
@@ -309,7 +368,7 @@ type WsUrbitAction struct {
 	Type         string `json:"type"`
 	Action       string `json:"action"`
 	Patp         string `json:"patp"`
-	Value        int    `json:value"`
+	Value        int    `json:"value"`
 	Domain       string `json:"domain"`
 	Frequency    int    `json:"frequency"`
 	IntervalType string `json:"intervalType"`

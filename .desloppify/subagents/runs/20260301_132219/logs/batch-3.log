@@ -1,0 +1,1025 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_132219/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/config/mc.go
+- goseg/handler/newship.go
+- goseg/handler/support.go
+- goseg/leak/handler.go
+- goseg/rectify/rectify_test.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/auth/auth.go
+- goseg/broadcast/broadcast.go
+- goseg/config/config.go
+- goseg/config/urbit.go
+- goseg/config/version.go
+- goseg/docker/docker.go
+- goseg/handler/handler.go
+- goseg/handler/startram.go
+- goseg/handler/urbit.go
+- goseg/handler/urbit_operations.go
+- goseg/handler/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger.go
+- goseg/structs/ws.go
+- goseg/system/disk.go
+- goseg/system/system.go
+- goseg/system/wifi.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 68.5
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/handler/newship.go` and `goseg/importer/importer.go` duplicate near-identical ship-ready polling, remote toggle waiting, Startram registration, and cleanup orchestration with only transition types/messages differing.",
+        "`goseg/handler/urbit_operations.go` repeats the same stop/reconfigure/start/wait/recover lifecycle in `ChopPier`, `rollChopPier`, and `packMeldPier`, including repeated transition publish and restart restoration logic.",
+        "`goseg/broadcast/broadcast.go:150-394` (`ConstructPierInfo`) combines filesystem backup discovery, docker state reads, network/service checks, click desk probes, and DTO assembly in one function.",
+        "`goseg/config/config.go:60-173` performs process bootstrap, key generation, config migration, hashing, persistence, and goroutine startup in `init()`, creating broad startup coupling.",
+        "`goseg/system/wifi.go:117-282` mixes system command orchestration, AP lifecycle, websocket API handling, and client broadcast loops in one module."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "ship_lifecycle_orchestration_duplication",
+      "summary": "New-ship and import flows duplicate the same asynchronous lifecycle orchestration, causing parallel logic drift risk.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`waitForShipReady` in `newship.go` (lines 173-226) and `importer.go` (lines 577-643) both poll `click.GetLusCode`, conditionally switch to wireguard, delete/restart containers, and finalize transitions.",
+        "`newShipToggleRemote` (lines 228-246) and `importShipToggleRemote` (lines 645-663) are effectively the same loop with different transition publishers.",
+        "`newShipRegisterService` (lines 284-288) and `registerServices` (lines 786-790) duplicate the same Startram registration call."
+      ],
+      "suggestion": "Extract a shared `ShipProvisioningOrchestrator` (phase runner + transition adapter) used by both new-ship and import flows, with pluggable transition emitters and optional phases (e.g., extraction/fix-acme).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_maintenance_workflow_copy_paste",
+      "summary": "Urbit maintenance operations reimplement the same multi-step container lifecycle instead of using a common operation primitive.",
+      "related_files": [
+        "goseg/handler/urbit_operations.go",
+        "goseg/handler/urbit.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "`ChopPier` (471-540), `rollChopPier` (980-1063), and `packMeldPier` (295-380+) all perform status check, conditional stop with `|exit`, `WaitComplete`, boot-status mutation, restart, and transition publish cycles.",
+        "These functions duplicate error-wrapper closures and delayed transition cleanup (`time.Sleep` + publish empty event), which increases divergence surface for behavior fixes.",
+        "`WaitComplete` exists as shared polling in `urbit.go` (147-190), but higher-level maintenance choreography remains copy-pasted."
+      ],
+      "suggestion": "Introduce a reusable maintenance state-machine helper that accepts ordered phases (`stop`, `run bootStatus`, `wait`, `restore`) and transition metadata, then have chop/roll/pack-meld compose phase lists.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_builder_god_function",
+      "summary": "Broadcast state construction is concentrated in one large function that mixes unrelated responsibilities.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/config/urbit.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` (150-394) performs local backup filesystem scanning, remote backup flattening, docker status/stats retrieval, click desk probing, Startram subdomain readiness checks, and UI struct assembly in one routine.",
+        "The function reads from config, docker, click, filesystem, and cached broadcast state in one pass, making behavior changes cross-cutting and hard to test in isolation.",
+        "The same function contains domain normalization logic (pack day/date defaults, alias visibility, backup projections), not just data collection."
+      ],
+      "suggestion": "Split into composable providers: `backupSnapshot`, `runtimeSnapshot`, `startramSnapshot`, and `urbitViewAssembler`; keep `ConstructPierInfo` as thin coordination only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_read_model_layer"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "action_handlers_embed_ui_transition_protocol",
+      "summary": "Domain handlers directly embed websocket/UI transition protocol details, coupling business orchestration to transport semantics.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/support.go",
+        "goseg/handler/newship.go"
+      ],
+      "evidence": [
+        "Multiple handlers inline repeated event lifecycle patterns (`Publish... loading/error/success`, `time.Sleep`, clear) instead of a shared transition transaction helper.",
+        "`startram.go` repeats local `handleError` closures in separate actions (`handleStartramRegister`, `handleStartramEndpoint`, `handleStartramCancel`) with slightly different event types and reset behavior.",
+        "`support.go` and `newship.go` also encode transition timing and cleanup sequencing directly in business flow, making orchestration logic depend on UI event choreography."
+      ],
+      "suggestion": "Create a shared transition-emitter utility (start/progress/fail/succeed/clear with policy-driven delays) and keep handlers focused on domain steps + typed outcomes.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_domain_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_bootstrap_and_runtime_concerns_conflated",
+      "summary": "Configuration package combines initialization, migration, key management, runtime state, and utility concerns in one central module.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go",
+        "goseg/config/urbit.go",
+        "goseg/config/mc.go"
+      ],
+      "evidence": [
+        "`config.go` is 1205 lines and `init()` (60-173) performs filesystem creation, key setup, merge/migration, hash computation, persistence, and starts a goroutine (`ConfChannel`).",
+        "The package also stores mutable runtime registries (`GSContainers`, `startramConfig`, minio password map) alongside disk persistence and random/hash helpers.",
+        "Sibling files (`urbit.go`, `version.go`, `mc.go`) use better-scoped persistence helpers, but `config.go` remains a catch-all orchestration center."
+      ],
+      "suggestion": "Split `config` into explicit subpackages/components: `bootstrap`, `store` (disk persistence), `runtime_state`, and `credentials`; make initialization explicit from `main` instead of heavy `init()` side effects.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_centralization"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_module_mixes_transport_and_system_orchestration",
+      "summary": "WiFi module mixes OS command orchestration, AP lifecycle, websocket request handling, and periodic broadcast loops in one package surface.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`C2CMode`, `C2CConnect`, and `UnaliveC2C` orchestrate system services and shell commands, while `CaptiveAPI` handles websocket protocol parsing and `announceNetworks` manages long-lived client broadcasts in the same file.",
+        "`C2CConnect` includes system reboot side effects (`execCommandForWiFi(\"reboot\")`), while `CaptiveAPI` may also restart groundseg, indicating competing lifecycle paths in transport-facing code.",
+        "Shared mutable `clients` map is managed in the same module that executes networking shell commands, increasing responsibility spread."
+      ],
+      "suggestion": "Separate WiFi domain service (connect/AP state transitions) from captive websocket transport handlers and from network-announcement publisher; expose a narrow service API consumed by handlers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_domain_conflation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing shared orchestration primitives for repeated ship/container lifecycle flows",
+      "Transport event protocols embedded directly into domain handlers",
+      "Global state centralization in large coordinator modules (`config`, `broadcast`)"
+    ],
+    "likely_symptoms": [
+      "ship_lifecycle_orchestration_duplication",
+      "urbit_maintenance_workflow_copy_paste",
+      "action_handlers_embed_ui_transition_protocol"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019ca990-6c6c-7f91-b1a2-de1a36cf88e4
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Design coherence — Mechanical Concern Signals
+Batch dimensions: design_coherence
+Batch rationale: mechanical detectors identified structural patterns needing judgment; concern types: duplication_design, mixed_responsibilities, systemic_pattern
+
+Files assigned:
+- goseg/config/mc.go
+- goseg/handler/newship.go
+- goseg/handler/support.go
+- goseg/leak/handler.go
+- goseg/rectify/rectify_test.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/auth/auth.go
+- goseg/broadcast/broadcast.go
+- goseg/config/config.go
+- goseg/config/urbit.go
+- goseg/config/version.go
+- goseg/docker/docker.go
+- goseg/handler/handler.go
+- goseg/handler/startram.go
+- goseg/handler/urbit.go
+- goseg/handler/urbit_operations.go
+- goseg/handler/urbit_test.go
+- goseg/importer/extract_test.go
+- goseg/importer/importer.go
+- goseg/importer/importer_test.go
+- goseg/leak/broadcast_test.go
+- goseg/leak/handler_test.go
+- goseg/logger/logger.go
+- goseg/structs/ws.go
+- goseg/system/disk.go
+- goseg/system/system.go
+- goseg/system/wifi.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’m going to review the blind packet constraints first, then inspect only the assigned files for `design_coherence` signals and produce the required JSON with evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files /Users/chuah/NP/GroundSeg/goseg | wc -l' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 2607
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "design_coherence",
+    "abstraction_fitness",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "design_coherence": {
+      "description": "Are structural design decisions sound \u2014 functions focused, abstractions earned, patterns consistent?",
+      "look_for": [
+        "Functions doing too many things \u2014 multiple distinct responsibilities in one body",
+        "Parameter lists that should be config/context objects \u2014 many related params passed together",
+        "Files accumulating issues across many dimensions \u2014 likely mixing unrelated concerns",
+        "Deep nesting that could be flattened with early returns or extraction",
+        "Repeated structural patterns that should be data-driven"
+ succeeded in 52ms:
+     381
+
+thinking
+**Planning targeted function scan**
+codex
+I’ve extracted the packet and now I’m scanning the assigned files for concrete structural patterns (large mixed handlers, duplicated control flow, and cross-module convention drift) so findings are evidence-based.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"t\\.Run\\(|for _,|case \\\"\" goseg/rectify/rectify_test.go goseg/accesspoint/accesspoint_test.go goseg/handler/urbit_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/broadcast_test.go goseg/leak/handler_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "func " goseg/handler/newship.go goseg/handler/support.go goseg/leak/handler.go goseg/auth/auth.go goseg/broadcast/broadcast.go goseg/handler/handler.go goseg/handler/startram.go goseg/handler/urbit.go goseg/handler/urbit_operations.go goseg/importer/importer.go goseg/system/system.go goseg/system/wifi.go goseg/system/disk.go goseg/config/config.go goseg/config/urbit.go goseg/config/version.go goseg/config/mc.go goseg/docker/docker.go goseg/logger/logger.go | sort' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"func |switch |case |if err|json\\.|broadcast|Conf\\(|Get[A-Za-z]+\\(\" goseg/handler/newship.go goseg/handler/support.go goseg/leak/handler.go goseg/auth/auth.go goseg/broadcast/broadcast.go goseg/handler/handler.go goseg/handler/startram.go goseg/handler/urbit.go goseg/handler/urbit_operations.go goseg/importer/importer.go goseg/system/system.go goseg/system/wifi.go goseg/system/disk.go goseg/config/config.go goseg/config/urbit.go goseg/config/version.go goseg/config/mc.go goseg/docker/docker.go goseg/logger/logger.go goseg/structs/ws.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/importer/extract_test.go:31:	for _, evt := range events {
+goseg/importer/extract_test.go:93:	for _, entry := range entries {
+goseg/importer/extract_test.go:138:	for _, entry := range entries {
+goseg/importer/extract_test.go:177:	for _, tt := range tests {
+goseg/importer/extract_test.go:204:	for _, skipped := range []string{
+goseg/importer/extract_test.go:251:	for _, skipped := range []string{
+goseg/importer/extract_test.go:298:	for _, skipped := range []string{
+goseg/importer/importer_test.go:70:	for _, tokenID := range tokenIDs {
+goseg/accesspoint/accesspoint_test.go:76:	for _, tc := range testCases {
+goseg/accesspoint/accesspoint_test.go:78:		t.Run(tc.name, func(t *testing.T) {
+goseg/accesspoint/accesspoint_test.go:222:	for _, cmd := range commands {
+goseg/accesspoint/accesspoint_test.go:278:	for _, want := range expected {
+goseg/accesspoint/accesspoint_test.go:308:	for _, want := range expected {
+ succeeded in 53ms:
+goseg/auth/auth.go:102:func WsNilSession(conn *websocket.Conn) error {
+goseg/auth/auth.go:113:func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
+goseg/auth/auth.go:124:func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
+goseg/auth/auth.go:147:func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
+goseg/auth/auth.go:160:func requestIdentityFromRequest(r *http.Request) (string, string) {
+goseg/auth/auth.go:174:func ValidateAndAuthorizeRequestToken(tokenID, tokenValue string, r *http.Request) (string, error) {
+goseg/auth/auth.go:202:func CheckToken(token map[string]string, r *http.Request) (string, bool) {
+goseg/auth/auth.go:212:func AuthToken(token string) (string, error) {
+goseg/auth/auth.go:229:func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string]string, error) {
+goseg/auth/auth.go:270:func AddSession(tokenID string, hash string, created string, authorized bool) error {
+goseg/auth/auth.go:290:func KeyfileEncrypt(contents map[string]string, keyStr string) (string, error) {
+goseg/auth/auth.go:310:func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
+goseg/auth/auth.go:332:func Hasher(password string) string {
+goseg/auth/auth.go:341:func AuthenticateLogin(password string) bool {
+goseg/auth/auth.go:351:func LogTokenCheck(token structs.WsTokenStruct, r *http.Request) bool {
+goseg/auth/auth.go:63:func Initialize() {
+goseg/auth/auth.go:80:func NewClientManager() *structs.ClientManager {
+goseg/auth/auth.go:87:func GetClientManager() *structs.ClientManager {
+goseg/auth/auth.go:92:func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
+goseg/auth/auth.go:97:func WsAuthCheck(conn *websocket.Conn) bool {
+ succeeded in 52ms:
+Total output lines: 1208
+
+goseg/config/version.go:49:func newInMemoryVersionStore() *inMemoryVersionStore {
+goseg/config/version.go:53:func (store *inMemoryVersionStore) Snapshot() VersionState {
+goseg/config/version.go:62:func (store *inMemoryVersionStore) SetState(channel structs.Channel, ready bool) {
+goseg/config/version.go:69:func (store *inMemoryVersionStore) SetChannel(channel structs.Channel) {
+goseg/config/version.go:75:func (store *inMemoryVersionStore) SetServerReady(ready bool) {
+goseg/config/version.go:81:func SetVersionStore(store VersionStore) {
+goseg/config/version.go:87:func SetVersionHTTPClient(client versionHTTPDoer) {
+goseg/config/version.go:93:func SetVersionFetchRetryPolicy(retries int, delay time.Duration) {
+goseg/config/version.go:102:func GetVersionState() VersionState {
+goseg/config/version.go:106:func GetVersionChannel() structs.Channel {
+goseg/config/version.go:110:func SetVersionChannel(channel structs.Channel) {
+goseg/config/version.go:114:func IsVersionServerReady() bool {
+goseg/config/version.go:118:func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
+goseg/config/version.go:128:		if err != nil {
+goseg/config/version.go:135:		if err != nil {
+goseg/config/version.go:145:		if err := httpx.ReadJSON(resp, url, &fetchedVersion); err != nil {
+goseg/config/version.go:160:func persistVersionInfo(version structs.Version) error {
+goseg/config/version.go:163:	if err != nil {
+
+thinking
+**Analyzing key file complexities**
+codex
+I found likely structural hotspots; next I’m pulling precise line-level excerpts from those functions to ensure each finding is defensible and tied to root causes rather than superficial size alone.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/startram.go | sed -n '220,520p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/startram.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && wc -l goseg/handler/startram.go goseg/handler/urbit_operations.go goseg/broadcast/broadcast.go goseg/config/config.go goseg/handler/newship.go goseg/importer/importer.go goseg/system/wifi.go goseg/leak/handler.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     473 goseg/handler/startram.go
+    1063 goseg/handler/urbit_operations.go
+     674 goseg/broadcast/broadcast.go
+    1205 goseg/config/config.go
+     288 goseg/handler/newship.go
+     790 goseg/importer/importer.go
+     396 goseg/system/wifi.go
+     148 goseg/leak/handler.go
+    5037 total
+ succeeded in 51ms:
+   220		}
+   221		// load mc
+   222		if err := docker.LoadMC(); err != nil {
+   223			appendOrchestrationError(&stepErrors, "load minio client container", err)
+   224		}
+   225		for _, patp := range conf.Piers {
+   226			// delete minio
+   227			minio := fmt.Sprintf("minio_%s", patp)
+   228			if err := docker.DeleteContainer(minio); err != nil {
+   229				appendOrchestrationError(&stepErrors, fmt.Sprintf("delete %s container", minio), err)
+   230			}
+   231		}
+   232		// load minio
+   233		if err := docker.LoadMinIOs(); err != nil {
+   234			appendOrchestrationError(&stepErrors, "load minio containers", err)
+   235		}
+   236		if joinedErr := errors.Join(stepErrors...); joinedErr != nil {
+   237			startram.PublishEvent(structs.Event{Type: "toggle", Data: fmt.Sprintf("Error: %v", joinedErr)})
+   238			time.Sleep(3 * time.Second)
+   239			startram.PublishEvent(structs.Event{Type: "toggle", Data: nil})
+ succeeded in 51ms:
+     1	package handler
+     2	
+     3	import (
+     4		"encoding/base64"
+     5		"encoding/json"
+     6		"errors"
+     7		"fmt"
+     8		"groundseg/broadcast"
+     9		"groundseg/click"
+    10		"groundseg/config"
+    11		"groundseg/docker"
+    12		"groundseg/startram"
+    13		"groundseg/structs"
+    14		"os"
+    15		"strings"
+    16		"time"
+    17	
+    18		"go.uber.org/zap"
+    19	)
+    20	
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/urbit.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/urbit_operations.go | sed -n '220,380p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/urbit_operations.go | sed -n '460,560p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package handler
+     2	
+     3	import (
+     4		"context"
+     5		"encoding/json"
+     6		"fmt"
+     7		"groundseg/click"
+     8		"groundseg/config"
+     9		"groundseg/docker"
+    10		"groundseg/structs"
+    11		"net"
+    12		"strings"
+    13		"time"
+    14	
+    15		"go.uber.org/zap"
+    16	)
+    17	
+    18	var (
+    19		lookupCNAME          = net.LookupCNAME
+    20		urbitGetShipStatus   = docker.GetShipStatus
+ succeeded in 52ms:
+   460		shipConf.CustomS3Web = alias
+   461		if err := persistShipConf(patp, shipConf); err != nil {
+   462			docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "error"})
+   463			return fmt.Errorf("Couldn't update urbit config: %w", err)
+   464		}
+   465		docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "success"})
+   466		time.Sleep(3 * time.Second)
+   467		docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "minioDomain", Event: "done"})
+   468		return nil
+   469	}
+   470	
+   471	func ChopPier(patp string, shipConf structs.UrbitDocker) error {
+   472		zap.L().Info(fmt.Sprintf("Chop called for %s", patp))
+   473		// error handling
+   474		chopError := func(err error) error {
+   475			docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "chop", Event: "error"})
+   476			return err
+   477		}
+   478		// clear transition after end
+   479		defer func() {
+ succeeded in 52ms:
+   220				subdomain = fmt.Sprintf("%s.%s.%s", "bucket.s3", patp, baseURL)
+   221			default:
+   222				return fmt.Errorf("Invalid service type: unable to manually delete service")
+   223			}
+   224			if err := startram.SvcDelete(subdomain, service); err != nil {
+   225				return fmt.Errorf("Failed to delete startram service: %w", err)
+   226			} else {
+   227				_, err := startram.SyncRetrieve()
+   228				if err != nil {
+   229					return fmt.Errorf("Failed to retrieve after manual service deletion: %w", err)
+   230				}
+   231			}
+   232			return nil
+   233		}
+   234	}
+   235	
+   236	func packPier(patp string, shipConf structs.UrbitDocker) error {
+   237		// error handling
+   238		packError := func(err error) error {
+   239			docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"})
+
+thinking
+**Identifying duplicate patterns in code**
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/urbit_operations.go | sed -n '940,1065p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+   940		frequency := urbitPayload.Payload.Frequency
+   941		// frequency not 0
+   942		if frequency < 1 {
+   943			return fmt.Errorf("pack frequency cannot be 0!")
+   944		}
+   945		intervalType := urbitPayload.Payload.IntervalType
+   946		switch intervalType {
+   947		case "month", "week", "day":
+   948			shipConf.MeldTime = urbitPayload.Payload.Time
+   949			shipConf.MeldSchedule = true
+   950			shipConf.MeldScheduleType = intervalType
+   951			shipConf.MeldFrequency = frequency
+   952			shipConf.MeldDay = urbitPayload.Payload.Day
+   953			shipConf.MeldDate = urbitPayload.Payload.Date
+   954			if err := persistShipConf(patp, shipConf); err != nil {
+   955				return fmt.Errorf("Failed to update pack schedule: %w", err)
+   956			}
+   957		default:
+   958			return fmt.Errorf("Schedule pack unknown interval type: %v", intervalType)
+   959		}
+
+thinking
+**Identifying duplicate workflow lines**
+codex
+I’m now validating duplicated lifecycle flows between `newship` and `importer`, plus cross-cutting orchestration in `broadcast`/`wifi`, since those are likely the main design-coherence regressions.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/importer/importer.go | sed -n '520,760p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/newship.go | sed -n '1,320p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/importer/importer.go | sed -n '760,820p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package handler
+     2	
+     3	import (
+     4		"fmt"
+     5		"groundseg/click"
+     6		"groundseg/config"
+     7		"groundseg/docker"
+     8		"groundseg/shipcreator"
+     9		"groundseg/startram"
+    10		"groundseg/structs"
+    11		"groundseg/system"
+    12		"io/ioutil"
+    13		"os"
+    14		"path/filepath"
+    15		"regexp"
+    16		"strings"
+    17		"time"
+    18	
+    19		"go.uber.org/zap"
+    20	)
+ succeeded in 53ms:
+   760				}
+   761			} else {
+   762				os.Rename(urbLoc[0], tempDir)
+   763			}
+   764			unused := []string{}
+   765			dirs, _ := ioutil.ReadDir(volDir)
+   766			for _, dir := range dirs {
+   767				dirName := dir.Name()
+   768				if dirName != "temp_dir" && dirName != "unused" {
+   769					unused = append(unused, dirName)
+   770				}
+   771			}
+   772			if len(unused) > 0 {
+   773				_ = os.MkdirAll(unusedDir, 0755)
+   774				for _, u := range unused {
+   775					os.Rename(filepath.Join(volDir, u), filepath.Join(unusedDir, u))
+   776				}
+   777			}
+   778			os.Rename(tempDir, pierDir)
+   779			zap.L().Info(fmt.Sprintf("%v restructuring done", patp))
+ succeeded in 53ms:
+   520					}()
+   521					defer close(extractionDone)
+   522	
+   523					compressedPath := filepath.Join(uploadDir, filename)
+   524					switch checkExtension(filename) {
+   525					case ".zip":
+   526						if err := extractZip(compressedPath, volPath); err != nil {
+   527							return fmt.Errorf("failed to extract %v: %w", filename, err)
+   528						}
+   529					case ".tar.gz", ".tgz":
+   530						if err := extractTarGz(compressedPath, volPath); err != nil {
+   531							return fmt.Errorf("failed to extract %v: %w", filename, err)
+   532						}
+   533					case ".tar":
+   534						if err := extractTar(compressedPath, volPath); err != nil {
+   535							return fmt.Errorf("failed to extract %v: %w", filename, err)
+   536						}
+   537					default:
+   538						return fmt.Errorf("unsupported file type %v", filename)
+   539					}
+
+thinking
+**Analyzing broadcast and wifi responsibilities**
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/broadcast/broadcast.go | sed -n '150,420p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/broadcast/broadcast.go | sed -n '481,675p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/system/wifi.go | sed -n '117,290p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+   150	func ConstructPierInfo() (map[string]structs.Urbit, error) {
+   151		// get a list of piers
+   152		conf := config.Conf()
+   153		piers := conf.Piers
+   154	
+   155		// retrieve backup information
+   156		remoteBackups := config.GetStartramConfig().Backups
+   157		remoteBackupMap := make(structs.Backup)
+   158		for _, backup := range remoteBackups {
+   159			for ship, backupInfo := range backup {
+   160				remoteBackupMap[ship] = backupInfo
+   161			}
+   162		}
+   163		localDailyBackups := make(structs.Backup)
+   164		localWeeklyBackups := make(structs.Backup)
+   165		localMonthlyBackups := make(structs.Backup)
+   166		// get local backups
+   167		// BackupDir has been set in init
+   168		// inside BackupDir there is a folder for each ship
+   169		// each of those folders contains a number of numbered files with no file extension, they are all unix timestamps
+ succeeded in 52ms:
+   481	func constructSystemInfo() structs.System {
+   482		// init
+   483		var ramObj []uint64
+   484		var sysInfo structs.System
+   485		conf := config.Conf()
+   486	
+   487		// Linux update
+   488		sysInfo.Info.Updates = system.SystemUpdates
+   489	
+   490		// Wifi
+   491		sysInfo.Info.Wifi = system.WifiInfo
+   492		// Sys details
+   493		if usedRam, totalRam, err := system.GetMemory(); err != nil {
+   494			zap.L().Warn(fmt.Sprintf("Error getting memory usage: %v", err))
+   495		} else {
+   496			sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
+   497		}
+   498		if cpuUsage, err := system.GetCPU(); err != nil {
+   499			zap.L().Warn(fmt.Sprintf("Error getting CPU usage: %v", err))
+   500		} else {
+ succeeded in 53ms:
+   117	func C2CMode() error {
+   118		zap.L().Info(fmt.Sprintf("C2C Mode initializing"))
+   119		// make sure wifi is enabled
+   120		_, err := runCommand("nmcli", "radio", "wifi", "on")
+   121		if err != nil {
+   122			return fmt.Errorf("Couldn't check interface: %w", err)
+   123		}
+   124		// this is necessary because it takes a while for the SSIDs to populate
+   125		time.Sleep(10 * time.Second)
+   126		// get wifi device
+   127		device, err := primaryWifiDevice()
+   128		if err != nil {
+   129			return fmt.Errorf("failed to discover wifi device for C2C mode: %w", err)
+   130		}
+   131		// store ssids
+   132		C2CStoredSSIDs = ListWifiSSIDs(device)
+   133		zap.L().Info(fmt.Sprintf("C2C retrieved available SSIDs: %v", C2CStoredSSIDs))
+   134		// stop systemd-resolved
+   135		_, err = runCommand("systemctl", "stop", "systemd-resolved")
+   136		if err != nil {
+
+thinking
+**Identifying duplicate action switches**
+codex
+I have enough for core patterns; I’m checking the remaining assigned handler files for any additional systemic routing or responsibility-mixing defects so the batch output is complete.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/handler.go | sed -n '1,360p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/leak/handler.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/config/config.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package handler
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/auth"
+     8		"groundseg/broadcast"
+     9		"groundseg/config"
+    10		"groundseg/docker"
+    11		"groundseg/leakchannel"
+    12		"groundseg/structs"
+    13		"groundseg/system"
+    14		"regexp"
+    15		"strings"
+    16		"sync"
+    17		"time"
+    18	
+    19		"github.com/Native-Planet/perigee/libprg"
+    20		"go.uber.org/zap"
+ succeeded in 53ms:
+     1	package leak
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/auth"
+     7		"groundseg/leakchannel"
+     8		"groundseg/structs"
+     9		"reflect"
+    10		"time"
+    11	
+    12		"math/big"
+    13	
+    14		"github.com/stevelacy/go-urbit/noun"
+    15		"go.uber.org/zap"
+    16	)
+    17	
+    18	func handleAction(patp string, result []byte) {
+    19		stripped := result[5:]
+    20		reversed := reverseLittleEndian(stripped)
+ succeeded in 53ms:
+     1	package config
+     2	
+     3	// code for managing groundseg and container configurations
+     4	
+     5	import (
+     6		"crypto/sha256"
+     7		"encoding/base64"
+     8		"encoding/hex"
+     9		"encoding/json"
+    10		"fmt"
+    11		"groundseg/defaults"
+    12		"groundseg/structs"
+    13		"groundseg/system"
+    14		"io"
+    15		"io/ioutil"
+    16		"math/rand"
+    17		"net"
+    18		"os"
+    19		"path/filepath"
+    20		"runtime"
+codex
+I identified one more candidate around support/report generation, and I’ll quickly confirm whether it’s a real structural defect or just expected complexity before finalizing scores.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && nl -ba goseg/handler/support.go | sed -n '1,430p'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+     1	package handler
+     2	
+     3	import (
+     4		"archive/zip"
+     5		"bufio"
+     6		"bytes"
+     7		"context"
+     8		"encoding/json"
+     9		"fmt"
+    10		"groundseg/config"
+    11		"groundseg/docker"
+    12		"groundseg/dockerclient"
+    13		"groundseg/logger"
+    14		"groundseg/structs"
+    15		"io"
+    16		"io/ioutil"
+    17		"mime/multipart"
+    18		"net/http"
+    19		"os"
+    20		"path"
+
+thinking
+**Composing detailed design coherence assessment**
+codex
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 68.5
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/handler/newship.go` and `goseg/importer/importer.go` duplicate near-identical ship-ready polling, remote toggle waiting, Startram registration, and cleanup orchestration with only transition types/messages differing.",
+        "`goseg/handler/urbit_operations.go` repeats the same stop/reconfigure/start/wait/recover lifecycle in `ChopPier`, `rollChopPier`, and `packMeldPier`, including repeated transition publish and restart restoration logic.",
+        "`goseg/broadcast/broadcast.go:150-394` (`ConstructPierInfo`) combines filesystem backup discovery, docker state reads, network/service checks, click desk probes, and DTO assembly in one function.",
+        "`goseg/config/config.go:60-173` performs process bootstrap, key generation, config migration, hashing, persistence, and goroutine startup in `init()`, creating broad startup coupling.",
+        "`goseg/system/wifi.go:117-282` mixes system command orchestration, AP lifecycle, websocket API handling, and client broadcast loops in one module."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "ship_lifecycle_orchestration_duplication",
+      "summary": "New-ship and import flows duplicate the same asynchronous lifecycle orchestration, causing parallel logic drift risk.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`waitForShipReady` in `newship.go` (lines 173-226) and `importer.go` (lines 577-643) both poll `click.GetLusCode`, conditionally switch to wireguard, delete/restart containers, and finalize transitions.",
+        "`newShipToggleRemote` (lines 228-246) and `importShipToggleRemote` (lines 645-663) are effectively the same loop with different transition publishers.",
+        "`newShipRegisterService` (lines 284-288) and `registerServices` (lines 786-790) duplicate the same Startram registration call."
+      ],
+      "suggestion": "Extract a shared `ShipProvisioningOrchestrator` (phase runner + transition adapter) used by both new-ship and import flows, with pluggable transition emitters and optional phases (e.g., extraction/fix-acme).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_maintenance_workflow_copy_paste",
+      "summary": "Urbit maintenance operations reimplement the same multi-step container lifecycle instead of using a common operation primitive.",
+      "related_files": [
+        "goseg/handler/urbit_operations.go",
+        "goseg/handler/urbit.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "`ChopPier` (471-540), `rollChopPier` (980-1063), and `packMeldPier` (295-380+) all perform status check, conditional stop with `|exit`, `WaitComplete`, boot-status mutation, restart, and transition publish cycles.",
+        "These functions duplicate error-wrapper closures and delayed transition cleanup (`time.Sleep` + publish empty event), which increases divergence surface for behavior fixes.",
+        "`WaitComplete` exists as shared polling in `urbit.go` (147-190), but higher-level maintenance choreography remains copy-pasted."
+      ],
+      "suggestion": "Introduce a reusable maintenance state-machine helper that accepts ordered phases (`stop`, `run bootStatus`, `wait`, `restore`) and transition metadata, then have chop/roll/pack-meld compose phase lists.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_builder_god_function",
+      "summary": "Broadcast state construction is concentrated in one large function that mixes unrelated responsibilities.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/config/urbit.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` (150-394) performs local backup filesystem scanning, remote backup flattening, docker status/stats retrieval, click desk probing, Startram subdomain readiness checks, and UI struct assembly in one routine.",
+        "The function reads from config, docker, click, filesystem, and cached broadcast state in one pass, making behavior changes cross-cutting and hard to test in isolation.",
+        "The same function contains domain normalization logic (pack day/date defaults, alias visibility, backup projections), not just data collection."
+      ],
+      "suggestion": "Split into composable providers: `backupSnapshot`, `runtimeSnapshot`, `startramSnapshot`, and `urbitViewAssembler`; keep `ConstructPierInfo` as thin coordination only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_read_model_layer"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "action_handlers_embed_ui_transition_protocol",
+      "summary": "Domain handlers directly embed websocket/UI transition protocol details, coupling business orchestration to transport semantics.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/support.go",
+        "goseg/handler/newship.go"
+      ],
+      "evidence": [
+        "Multiple handlers inline repeated event lifecycle patterns (`Publish... loading/error/success`, `time.Sleep`, clear) instead of a shared transition transaction helper.",
+        "`startram.go` repeats local `handleError` closures in separate actions (`handleStartramRegister`, `handleStartramEndpoint`, `handleStartramCancel`) with slightly different event types and reset behavior.",
+        "`support.go` and `newship.go` also encode transition timing and cleanup sequencing directly in business flow, making orchestration logic depend on UI event choreography."
+      ],
+      "suggestion": "Create a shared transition-emitter utility (start/progress/fail/succeed/clear with policy-driven delays) and keep handlers focused on domain steps + typed outcomes.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_domain_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_bootstrap_and_runtime_concerns_conflated",
+      "summary": "Configuration package combines initialization, migration, key management, runtime state, and utility concerns in one central module.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go",
+        "goseg/config/urbit.go",
+        "goseg/config/mc.go"
+      ],
+      "evidence": [
+        "`config.go` is 1205 lines and `init()` (60-173) performs filesystem creation, key setup, merge/migration, hash computation, persistence, and starts a goroutine (`ConfChannel`).",
+        "The package also stores mutable runtime registries (`GSContainers`, `startramConfig`, minio password map) alongside disk persistence and random/hash helpers.",
+        "Sibling files (`urbit.go`, `version.go`, `mc.go`) use better-scoped persistence helpers, but `config.go` remains a catch-all orchestration center."
+      ],
+      "suggestion": "Split `config` into explicit subpackages/components: `bootstrap`, `store` (disk persistence), `runtime_state`, and `credentials`; make initialization explicit from `main` instead of heavy `init()` side effects.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_centralization"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_module_mixes_transport_and_system_orchestration",
+      "summary": "WiFi module mixes OS command orchestration, AP lifecycle, websocket request handling, and periodic broadcast loops in one package surface.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`C2CMode`, `C2CConnect`, and `UnaliveC2C` orchestrate system services and shell commands, while `CaptiveAPI` handles websocket protocol parsing and `announceNetworks` manages long-lived client broadcasts in the same file.",
+        "`C2CConnect` includes system reboot side effects (`execCommandForWiFi(\"reboot\")`), while `CaptiveAPI` may also restart groundseg, indicating competing lifecycle paths in transport-facing code.",
+        "Shared mutable `clients` map is managed in the same module that executes networking shell commands, increasing responsibility spread."
+      ],
+      "suggestion": "Separate WiFi domain service (connect/AP state transitions) from captive websocket transport handlers and from network-announcement publisher; expose a narrow service API consumed by handlers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_domain_conflation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing shared orchestration primitives for repeated ship/container lifecycle flows",
+      "Transport event protocols embedded directly into domain handlers",
+      "Global state centralization in large coordinator modules (`config`, `broadcast`)"
+    ],
+    "likely_symptoms": [
+      "ship_lifecycle_orchestration_duplication",
+      "urbit_maintenance_workflow_copy_paste",
+      "action_handlers_embed_ui_transition_protocol"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+87,597
+

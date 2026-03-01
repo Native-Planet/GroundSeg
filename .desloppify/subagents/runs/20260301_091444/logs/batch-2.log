@@ -1,0 +1,758 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_091444/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 68.0,
+    "test_strategy": 62.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go combines remote API client concerns (FetchRegions/Retrieve/Register/SvcCreate/SvcDelete/AliasCreate/AliasDelete), local config mutation (config.UpdateConf, config.StartramConfig), event publication (EventBus), and backup restore orchestration with filesystem and docker shell calls (writeBackupToVolume, restoreBackupProd).",
+        "goseg/config/version.go exposes and mutates package-level state (VersionServerReady, VersionInfo) and returns stale global values on failures from CheckVersion/SyncVersionInfo, making callers depend on shared mutable state instead of explicit contracts.",
+        "README.md defines a frontend-only quality gate (npm test/build under ui) while backend modules in goseg/config and goseg/startram implement critical runtime behavior without corresponding documented backend architecture/testing contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md Frontend Quality Gate only requires ui checks (`npm run test`, `npm run build`) and does not define backend quality gates for critical Go runtime paths.",
+        "goseg/config/version.go performs network retries and file persistence with hardwired globals (`globalConfig.UpdateUrl`, VersionInfo/VersionServerReady, time.Sleep), creating critical behavior with no seam for deterministic unit testing.",
+        "goseg/startram/startram.go uses direct `http.Get`/`http.Post`, direct filesystem writes, and `exec.Command(\"docker\", ...)` in core paths (registration and backup restore), but these paths are not structured around injectable interfaces, limiting reliable cross-module integration tests."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_boundary_erosion_hub",
+      "summary": "Startram module acts as a multi-responsibility hub that collapses API, state, eventing, and restore orchestration boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "startram.go mixes remote control-plane calls (FetchRegions/Retrieve/Register/SvcCreate/Alias*), state mutation (`config.UpdateConf`, `config.StartramConfig`), and runtime side effects (`EventBus <- ...`, docker inspect, tar extraction, restore writes).",
+        "This design creates broad change blast radius: modifying transport or restore behavior requires touching the same package that also owns registration contracts."
+      ],
+      "suggestion": "Split startram into explicit boundaries: a transport client package, a state synchronization/service layer, and a backup restore worker. Keep side effects behind narrow interfaces and move config/event writes out of low-level transport calls.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_erosion_between_transport_state_and_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_state_contract_drift",
+      "summary": "Package-level mutable state creates implicit cross-module contracts and stale-read behavior on failure paths.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "version.go stores release state in globals (`VersionInfo`, `VersionServerReady`) and returns previous cached values when fetch/parse/channel resolution fails.",
+        "startram.go similarly relies on package-level `Regions` map and `EventBus` channel while mutating `config.StartramConfig`, coupling callers to hidden global lifecycle and ordering."
+      ],
+      "suggestion": "Replace mutable package globals with explicit state holders injected into callers, and return typed results that separate fresh data from cached fallback to make failure/caching behavior explicit.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_erosion_between_transport_state_and_orchestration"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "backend_quality_gate_missing",
+      "summary": "Repository-level quality gate documents frontend checks only, leaving backend risk paths without a required gate.",
+      "related_files": [
+        "README.md",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "README.md Frontend Quality Gate mandates only UI checks (`cd ui && npm ci`, `npm run test`, `npm run build`).",
+        "Critical backend runtime paths (registration, backup upload/restore, docker volume writes) are implemented in startram.go but are not included in documented release gating."
+      ],
+      "suggestion": "Add a backend quality gate section in README that requires Go test execution for backend packages and at least one integration test suite covering startram/config critical flows before release.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_paths_not_testable_by_design",
+      "summary": "Core versioning and upload/registration paths are hardwired to concrete dependencies, preventing reliable deterministic tests on high-risk logic.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "version.go uses direct HTTP client calls, retry sleeps, filesystem writes, and mutable globals with no injectable seams.",
+        "upload.go directly invokes importer package actions in a switch, without abstractions for dependency substitution in tests.",
+        "startram.go directly performs HTTP, OS, and docker command side effects in core operations (Register/Svc*/RestoreBackup/writeBackupToVolume)."
+      ],
+      "suggestion": "Introduce dependency interfaces (HTTP client, clock/sleeper, persistence, importer service, docker executor) and table-driven tests for action routing/retry/error contracts; add integration tests for registration and restore flows using fakes.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_testability_seams_for_side_effect_heavy_code"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transport, orchestration, and state management responsibilities are co-located in the same modules.",
+      "Critical runtime code was not paired with a backend governance/testing contract at repository level.",
+      "Direct side effects are preferred over dependency seams, limiting verifiable behavior."
+    ],
+    "likely_symptoms": [
+      "startram_boundary_erosion_hub",
+      "shared_state_contract_drift",
+      "critical_paths_not_testable_by_design"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019ca8ad-c117-70d0-8437-216617c3411f
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I will inspect the blind packet and only the four assigned files, then produce a strict JSON assessment for `cross_module_architecture` and `test_strategy` with evidence-backed findings. I’m starting by reading the packet `system_prompt` constraints to ensure exact compliance.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	VersionServerReady = false
+	VersionInfo        structs.Channel
+)
+ succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 52ms:
+Total output lines: 1894
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "test_strategy",
+    "api_surface_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+        "Cross-module coordination through shared mutable state or import-time side effects",
+        "Compatibility shim paths that persist without active external need and blur boundaries",
+
+thinking
+**Planning additional file reads**
+codex
+I’ve loaded the packet and first two files; next I’m reading `upload.go` and `startram.go` to verify architecture-contract drift and testability gaps using only this batch scope.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,340p' goseg/startram/startram.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/upload.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/importer"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+func UploadHandler(msg []byte) error {
+	zap.L().Info("Upload")
+	var uploadPayload structs.WsUploadPayload
+	err := json.Unmarshal(msg, &uploadPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+	}
+	switch uploadPayload.Payload.Action {
+	case "open-endpoint":
+ succeeded in 51ms:
+package startram
+
+import (
+	"archive/tar"
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"math"
+	"mime/multipart"
+	"net/http"
+
+thinking
+**Continuing test file exploration**
+codex
+I need the remainder of `startram.go` to confirm whether these patterns repeat across the full module and avoid partial conclusions. I’m pulling the rest now.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '341,760p' goseg/startram/startram.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+		return fmt.Errorf("Error deleting alias %s: %v", alias, respObj.Debug)
+	}
+	return nil
+}
+
+// call registration endpoint for 5 minutes or until all services are "ok"
+func backoffRetrieve() error {
+	startTime := time.Now()
+	duration := 5 * time.Second
+	for {
+		res, err := SyncRetrieve()
+		if err != nil {
+			return err
+		}
+		// return if all services are registered
+		for _, remote := range res.Subdomains {
+			if remote.Status != "ok" {
+				zap.L().Warn(fmt.Sprintf("backoff: %v %v", remote.URL, remote.Status))
+				break
+			}
+
+thinking
+**Planning test and README inspection**
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '761,1120p' goseg/startram/startram.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+
+	// Extract the tar archive
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		target := filepath.Join(bakDir, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", target, err)
+			}
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+
+thinking
+**Checking test presence with patterns**
+codex
+I’ve finished reading the assigned code and am now collecting precise line-number evidence (including whether these paths have direct tests) so the findings and scores stay tightly consistent.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/version.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/handler/upload.go | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package config
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/defaults"
+     7		"groundseg/structs"
+     8		"io/ioutil"
+     9		"net/http"
+    10		"os"
+    11		"path/filepath"
+    12		"time"
+    13	
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	var (
+    18		VersionServerReady = false
+    19		VersionInfo        structs.Channel
+    20	)
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package handler
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/importer"
+     7		"groundseg/structs"
+     8	
+     9		"go.uber.org/zap"
+    10	)
+    11	
+    12	func UploadHandler(msg []byte) error {
+    13		zap.L().Info("Upload")
+    14		var uploadPayload structs.WsUploadPayload
+    15		err := json.Unmarshal(msg, &uploadPayload)
+    16		if err != nil {
+    17			return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+    18		}
+    19		switch uploadPayload.Payload.Action {
+    20		case "open-endpoint":
+ succeeded in 50ms:
+     1	package startram
+     2	
+     3	import (
+     4		"archive/tar"
+     5		"bytes"
+     6		"crypto/aes"
+     7		"crypto/cipher"
+     8		"crypto/md5"
+     9		"crypto/rand"
+    10		"crypto/sha256"
+    11		"encoding/json"
+    12		"fmt"
+    13		"groundseg/click"
+    14		"groundseg/config"
+    15		"groundseg/structs"
+    16		"groundseg/system"
+    17		"io"
+    18		"math"
+    19		"mime/multipart"
+    20		"net/http"
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba README.md | sed -n '1,220p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	# Native Planet GroundSeg
+     2	
+     3	![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+     4	
+     5	#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+     6	
+     7	GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+     8	It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+     9	that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+    10	subscription, users can also access their Urbit ship remotely.
+    11	
+    12	Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+    13	
+    14	## Dependencies
+    15	
+    16	- `docker`
+    17	- `systemd`
+    18	
+    19	### Semi-dependencies
+    20	
+
+thinking
+**Planning deeper code exploration**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '620,980p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '260,620p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "rg --files | rg '(_test\\.go"'$|'"\\.test\\.)'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg -n "Test(MaskPubkey|GetBackup|UploadHandler|CheckVersion|SyncVersionInfo|FetchRegions|Retrieve|Register|SvcCreate|SvcDelete|AliasCreate|AliasDelete|RestoreBackup|downloadAndVerify)" goseg' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+   620		return plaintext, nil
+   621	}
+   622	
+   623	// prod version
+   624	func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) error {
+   625		if dev {
+   626			return restoreBackupDev(ship)
+   627		}
+   628		return restoreBackupProd(ship, remote, timestamp, md5hash, bakType)
+   629	}
+   630	
+   631	func restoreBackupProd(ship string, remote bool, timestamp int, md5hash string, bakType string) error {
+   632		zap.L().Info(fmt.Sprintf("Restoring backup for %s", ship))
+   633		var data []byte
+   634		var err error
+   635		if remote {
+   636			data, err = retrieveRemoteBackup(ship, timestamp, md5hash)
+   637			if err != nil {
+   638				return fmt.Errorf("failed to retrieve remote backup: %w", err)
+   639			}
+ succeeded in 52ms:
+   260		} else {
+   261			return fmt.Errorf("Error deleting %s: %v", subdomain, respObj.Debug)
+   262		}
+   263		return nil
+   264	}
+   265	
+   266	// create a custom domain
+   267	func AliasCreate(subdomain string, alias string) error {
+   268		zap.L().Info(fmt.Sprintf("Registering alias %s for %s", alias, subdomain))
+   269		conf := config.Conf()
+   270		url := "https://" + conf.EndpointUrl + "/v1/create/alias"
+   271		var aliasObj structs.StartramAlias
+   272		var respObj structs.StartramAliasResp
+   273		aliasObj.Pubkey = conf.Pubkey
+   274		aliasObj.Subdomain = subdomain
+   275		aliasObj.Alias = alias
+   276		aliasJSON, err := json.Marshal(aliasObj)
+   277		if err != nil {
+   278			return fmt.Errorf("Couldn't marshal registration: %v", err)
+   279		}
+ succeeded in 52ms:
+goseg/defaults/defaults_test.go
+goseg/system/system_test.go
+goseg/startram/startram_test.go
+goseg/ws/ws_test.go
+goseg/broadcast/broadcast_test.go
+goseg/routines/backup_test.go
+goseg/handler/handler_test.go
+goseg/docker/docker_test.go
+goseg/accesspoint/accesspoint_test.go
+goseg/config/config_test.go
+goseg/auth/auth_test.go
+goseg/structs/ws_test.go
+ui/src/routes/alive.test.js
+ui/src/lib/stores/websocket.test.js
+ui/src/lib/stores/websocket-commands.test.js
+ui/src/lib/stores/patp.test.js
+ui/src/lib/stores/gs-crypto.test.js
+ui/src/lib/stores/urbit.test.js
+ui/src/lib/stores/logsocket.test.js
+ui/src/lib/utils/date/days-until-date.test.js
+ succeeded in 51ms:
+goseg/startram/startram_test.go:10:func TestMaskPubkey(t *testing.T) {
+
+thinking
+**Scoping findings to listed files only**
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 68.0,
+    "test_strategy": 62.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go combines remote API client concerns (FetchRegions/Retrieve/Register/SvcCreate/SvcDelete/AliasCreate/AliasDelete), local config mutation (config.UpdateConf, config.StartramConfig), event publication (EventBus), and backup restore orchestration with filesystem and docker shell calls (writeBackupToVolume, restoreBackupProd).",
+        "goseg/config/version.go exposes and mutates package-level state (VersionServerReady, VersionInfo) and returns stale global values on failures from CheckVersion/SyncVersionInfo, making callers depend on shared mutable state instead of explicit contracts.",
+        "README.md defines a frontend-only quality gate (npm test/build under ui) while backend modules in goseg/config and goseg/startram implement critical runtime behavior without corresponding documented backend architecture/testing contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md Frontend Quality Gate only requires ui checks (`npm run test`, `npm run build`) and does not define backend quality gates for critical Go runtime paths.",
+        "goseg/config/version.go performs network retries and file persistence with hardwired globals (`globalConfig.UpdateUrl`, VersionInfo/VersionServerReady, time.Sleep), creating critical behavior with no seam for deterministic unit testing.",
+        "goseg/startram/startram.go uses direct `http.Get`/`http.Post`, direct filesystem writes, and `exec.Command(\"docker\", ...)` in core paths (registration and backup restore), but these paths are not structured around injectable interfaces, limiting reliable cross-module integration tests."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_boundary_erosion_hub",
+      "summary": "Startram module acts as a multi-responsibility hub that collapses API, state, eventing, and restore orchestration boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "startram.go mixes remote control-plane calls (FetchRegions/Retrieve/Register/SvcCreate/Alias*), state mutation (`config.UpdateConf`, `config.StartramConfig`), and runtime side effects (`EventBus <- ...`, docker inspect, tar extraction, restore writes).",
+        "This design creates broad change blast radius: modifying transport or restore behavior requires touching the same package that also owns registration contracts."
+      ],
+      "suggestion": "Split startram into explicit boundaries: a transport client package, a state synchronization/service layer, and a backup restore worker. Keep side effects behind narrow interfaces and move config/event writes out of low-level transport calls.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_erosion_between_transport_state_and_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_state_contract_drift",
+      "summary": "Package-level mutable state creates implicit cross-module contracts and stale-read behavior on failure paths.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "version.go stores release state in globals (`VersionInfo`, `VersionServerReady`) and returns previous cached values when fetch/parse/channel resolution fails.",
+        "startram.go similarly relies on package-level `Regions` map and `EventBus` channel while mutating `config.StartramConfig`, coupling callers to hidden global lifecycle and ordering."
+      ],
+      "suggestion": "Replace mutable package globals with explicit state holders injected into callers, and return typed results that separate fresh data from cached fallback to make failure/caching behavior explicit.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_erosion_between_transport_state_and_orchestration"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "backend_quality_gate_missing",
+      "summary": "Repository-level quality gate documents frontend checks only, leaving backend risk paths without a required gate.",
+      "related_files": [
+        "README.md",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "README.md Frontend Quality Gate mandates only UI checks (`cd ui && npm ci`, `npm run test`, `npm run build`).",
+        "Critical backend runtime paths (registration, backup upload/restore, docker volume writes) are implemented in startram.go but are not included in documented release gating."
+      ],
+      "suggestion": "Add a backend quality gate section in README that requires Go test execution for backend packages and at least one integration test suite covering startram/config critical flows before release.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_paths_not_testable_by_design",
+      "summary": "Core versioning and upload/registration paths are hardwired to concrete dependencies, preventing reliable deterministic tests on high-risk logic.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "version.go uses direct HTTP client calls, retry sleeps, filesystem writes, and mutable globals with no injectable seams.",
+        "upload.go directly invokes importer package actions in a switch, without abstractions for dependency substitution in tests.",
+        "startram.go directly performs HTTP, OS, and docker command side effects in core operations (Register/Svc*/RestoreBackup/writeBackupToVolume)."
+      ],
+      "suggestion": "Introduce dependency interfaces (HTTP client, clock/sleeper, persistence, importer service, docker executor) and table-driven tests for action routing/retry/error contracts; add integration tests for registration and restore flows using fakes.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_testability_seams_for_side_effect_heavy_code"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transport, orchestration, and state management responsibilities are co-located in the same modules.",
+      "Critical runtime code was not paired with a backend governance/testing contract at repository level.",
+      "Direct side effects are preferred over dependency seams, limiting verifiable behavior."
+    ],
+    "likely_symptoms": [
+      "startram_boundary_erosion_hub",
+      "shared_state_contract_drift",
+      "critical_paths_not_testable_by_design"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+50,499
+

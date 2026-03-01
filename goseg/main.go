@@ -17,12 +17,15 @@ package main
 import (
 	"embed"
 	"fmt"
+	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
+	"groundseg/handler"
 	"groundseg/importer"
 	"groundseg/leak"
+	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
 	"groundseg/startram"
@@ -59,22 +62,30 @@ var (
 	DevMode       = false
 	shutdownChan  = make(chan struct{})
 	HttpPort      = 80
+	netCheckFn    = config.NetCheck
+	connCheckFn   = connCheck
+	connTimeout   = 30 * time.Second
+	connInterval  = 5 * time.Second
+	isNPBoxFn     = system.IsNPBox
+	c2cModeFn     = system.C2CMode
+	setC2CModeFn  = system.SetC2CMode
+	killSwitchFn  = killSwitch
 )
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func C2cCheck() {
-	conf := config.Conf()
-	isNPBox := system.IsNPBox(config.BasePath)
-	internetAvailable := connCheck()
+	connectivity := config.ConnectivitySettingsSnapshot()
+	isNPBox := isNPBoxFn(config.BasePath)
+	internetAvailable := connCheckFn()
 	if !internetAvailable && system.Device != "" && isNPBox {
-		if err := system.C2CMode(); err != nil {
+		if err := c2cModeFn(); err != nil {
 			zap.L().Error(fmt.Sprintf("Error activating C2C mode: %v", err))
 		} else {
 			zap.L().Info("GroundSeg is in C2C Mode")
-			system.SetC2CMode(true)
+			setC2CModeFn(true)
 			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
-			if conf.C2cInterval > 0 {
-				go killSwitch()
+			if connectivity.C2cInterval > 0 {
+				go killSwitchFn()
 			}
 		}
 	}
@@ -82,8 +93,8 @@ func C2cCheck() {
 
 func killSwitch() {
 	for {
-		conf := config.Conf()
-		time.Sleep(time.Duration(conf.C2cInterval) * time.Second)
+		connectivity := config.ConnectivitySettingsSnapshot()
+		time.Sleep(time.Duration(connectivity.C2cInterval) * time.Second)
 		zap.L().Info("Graceful reboot from C2C mode...")
 		routines.GracefulShipExit()
 		if config.DebugMode {
@@ -92,23 +103,25 @@ func killSwitch() {
 		} else {
 			zap.L().Info(fmt.Sprintf("Rebooting device.."))
 			cmd := exec.Command("reboot")
-			cmd.Run()
+			if err := cmd.Run(); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to reboot device in C2C kill switch: %v", err))
+			}
 		}
 	}
 }
 
 func connCheck() bool {
-	internetAvailable := config.NetCheck("1.1.1.1:53")
+	internetAvailable := netCheckFn("1.1.1.1:53")
 	if internetAvailable {
 		return true
 	}
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(5 * time.Second)
+	timeout := time.After(connTimeout)
+	ticker := time.NewTicker(connInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			if config.NetCheck("1.1.1.1:53") {
+			if netCheckFn("1.1.1.1:53") {
 				return true
 			}
 		case <-timeout:
@@ -159,8 +172,14 @@ func startServer() { // *http.Server {
 		Addr:    ":3000",
 		Handler: w,
 	}
-	go server.ListenAndServe()
-	wsServer.ListenAndServe()
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			zap.L().Error(fmt.Sprintf("HTTP server failed: %v", err))
+		}
+	}()
+	if err := wsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		zap.L().Error(fmt.Sprintf("Websocket server failed: %v", err))
+	}
 	//go wsServer.ListenAndServe()
 	// http.ListenAndServe(":80", r)
 	//zap.L().Info("GroundSeg web UI serving")
@@ -180,14 +199,37 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 func main() {
+	logger.Initialize()
+	auth.Initialize()
+	handler.Initialize()
+	handler.InitializeSupport()
+	if err := exporter.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize exporter subsystem: %v", err))
+	}
+	if err := importer.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize importer subsystem: %v", err))
+	}
+	if err := system.InitializeWiFi(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to initialize wifi subsystem: %v", err))
+	}
+	routines.StartMDNSServer()
+	routines.StartDockerHealthLoops()
+	go routines.PrimeRekorKey()
+
 	// make sure resolved was reenabled
 	if err := system.EnableResolved(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
 	}
-	// global SysConfig var is managed through config package
-	conf := config.Conf()
+	updateSettings := config.UpdateSettingsSnapshot()
+	startramSettings := config.StartramSettingsSnapshot()
 	internetAvailable := config.NetCheck("1.1.1.1:53")
 	zap.L().Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+	if err := broadcast.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize broadcast subsystem: %v", err))
+	}
+	if err := docker.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize docker subsystem: %v", err))
+	}
 	// ongoing connectivity check
 	go C2cCheck()
 	// async operation to retrieve version info if updates are on
@@ -213,8 +255,9 @@ func main() {
 		}
 	}
 	// setup swap
-	zap.L().Info(fmt.Sprintf("Setting up swap %v for %vG", conf.SwapFile, conf.SwapVal))
-	if err := system.ConfigureSwap(conf.SwapFile, conf.SwapVal); err != nil {
+	swapSettings := config.SwapSettingsSnapshot()
+	zap.L().Info(fmt.Sprintf("Setting up swap %v for %vG", swapSettings.SwapFile, swapSettings.SwapVal))
+	if err := system.ConfigureSwap(swapSettings.SwapFile, swapSettings.SwapVal); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to set swap: %v", err))
 	}
 
@@ -225,19 +268,19 @@ func main() {
 	}
 
 	// update mode
-	if conf.UpdateMode == "auto" {
+	if updateSettings.UpdateMode == "auto" {
 		remoteVersion = true
 		// get version info from remote server
 		go func() {
-			_, versionUpdate := config.CheckVersion()
+			_, versionUpdate := config.SyncVersionInfo()
 			versionUpdateChannel <- versionUpdate
 		}()
 		// otherwise use cached if possible, or save hardcoded defaults and use that
 	} else {
 		versionStruct := config.LocalVersion()
-		releaseChannel := conf.UpdateBranch
+		releaseChannel := updateSettings.UpdateBranch
 		targetChan := versionStruct.Groundseg[releaseChannel]
-		config.VersionInfo = targetChan
+		config.SetVersionChannel(targetChan)
 	}
 	// routines/version.go
 	go routines.CheckVersionLoop() // infinite version check loop
@@ -257,8 +300,8 @@ func main() {
 	// digest retrieve data
 	go rectify.RectifyUrbit()
 	// get the startram config from server
-	if conf.WgRegistered == true {
-		_, err := startram.Retrieve()
+	if startramSettings.WgRegistered == true {
+		_, err := startram.SyncRetrieve()
 		if err != nil {
 			zap.L().Warn(fmt.Sprintf("Could not retrieve StarTram/Anchor config: %v", err))
 		}
@@ -298,9 +341,9 @@ func main() {
 		case <-time.After(10 * time.Second):
 			zap.L().Warn("Could not retrieve version info after 10 seconds!")
 			versionStruct := config.LocalVersion()
-			releaseChannel := conf.UpdateBranch
+			releaseChannel := updateSettings.UpdateBranch
 			targetChan := versionStruct.Groundseg[releaseChannel]
-			config.VersionInfo = targetChan
+			config.SetVersionChannel(targetChan)
 		}
 	}
 
@@ -313,7 +356,7 @@ func main() {
 			zap.L().Warn(fmt.Sprintf("Error getting WG container: %v", err))
 		}
 	}
-	if conf.WgRegistered == true {
+	if startramSettings.WgRegistered == true {
 		// Load Wireguard
 		if err := docker.LoadWireguard(); err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to load Wireguard: %v", err))

@@ -24,12 +24,25 @@ var (
 	whitelist = make(map[string]structs.WsTokenStruct)
 	exportMu  sync.Mutex
 	exportDir string
+
+	mkdirAllForExporter               = os.MkdirAll
+	getStoragePathForExporter         = config.GetStoragePath
+	createTempForExporter             = os.CreateTemp
+	removeForExporter                 = os.Remove
+	walkForExporter                   = filepath.Walk
+	dockerDataForExporter             = defaults.DockerData
+	urbitConfForExporter              = config.UrbitConf
+	publishUrbitTransitionForExporter = docker.PublishUrbitTransition
+	getShipStatusForExporter          = docker.GetShipStatus
 )
 
-func init() {
-	exportDir = config.GetStoragePath("export")
-	os.MkdirAll(exportDir, 0755)
+func Initialize() error {
+	exportDir = getStoragePathForExporter("export")
+	if err := mkdirAllForExporter(exportDir, 0755); err != nil {
+		return err
+	}
 	zap.L().Info(fmt.Sprintf("Using export directory: %s", exportDir))
+	return nil
 }
 
 func WhitelistContainer(container string, token structs.WsTokenStruct) error {
@@ -88,8 +101,8 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	cleanup := func() {
 		RemoveContainerFromWhitelist(container)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""}
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0}
+		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: exportTrans, Event: ""})
+		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: 0})
 	}
 
 	var tokenData structs.WsTokenStruct
@@ -119,7 +132,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case <-statusTicker.C:
-				pierStatus, err := docker.GetShipStatus([]string{container})
+				pierStatus, err := getShipStatusForExporter([]string{container})
 				if err != nil {
 					exportError(err)
 					cleanup()
@@ -142,22 +155,22 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	volumeDirectory := defaults.DockerData("volumes")
+	volumeDirectory := dockerDataForExporter("volumes")
 	filePath := filepath.Join(volumeDirectory, container, "_data")
-	shipConf := config.UrbitConf(container)
+	shipConf := urbitConfForExporter(container)
 
 	if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
 		filePath = customLoc
 	}
 
 	// Create a temporary file for the zip
-	tempFile, err := os.CreateTemp(exportDir, container+"-*.zip")
+	tempFile, err := createTempForExporter(exportDir, container+"-*.zip")
 	if err != nil {
 		exportError(fmt.Errorf("failed to create temp file: %v", err))
 		cleanup()
 		return
 	}
-	defer os.Remove(tempFile.Name())
+	defer removeForExporter(tempFile.Name())
 	defer tempFile.Close()
 
 	// Create zip writer that writes to the temp file
@@ -165,7 +178,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Count total files for progress reporting
 	totalFiles := 0
-	err = filepath.Walk(filePath, func(_ string, info os.FileInfo, _ error) error {
+	err = walkForExporter(filePath, func(_ string, info os.FileInfo, _ error) error {
 		if info != nil && !info.IsDir() {
 			totalFiles++
 		}
@@ -179,7 +192,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Process files with progress reporting
 	completedFiles := 0
-	err = filepath.Walk(filePath, func(path string, info os.FileInfo, err error) error {
+	err = walkForExporter(filePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}
@@ -208,7 +221,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 
 		completedFiles++
 		progress := int(float64(completedFiles) / float64(totalFiles) * 100)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress}
+		publishUrbitTransitionForExporter(structs.UrbitTransition{Patp: patp, Type: compressedTrans, Value: progress})
 		return nil
 	})
 	if err != nil {

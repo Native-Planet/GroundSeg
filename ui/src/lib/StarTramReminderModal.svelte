@@ -1,5 +1,5 @@
 <script>
-  import { structure, daysUntilDate } from '$lib/stores/data'
+  import { structure } from '$lib/stores/data'
 
   import Modal from '$lib/Modal.svelte'
   import { closeModal } from 'svelte-modals'

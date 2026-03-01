@@ -1,0 +1,262 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "naming_quality": 74.0,
+    "logic_clarity": 71.0,
+    "type_safety": 66.0,
+    "contract_coherence": 61.0,
+    "error_consistency": 58.0,
+    "initialization_coupling": 64.0,
+    "convention_outlier": 88.0,
+    "api_surface_coherence": 69.0,
+    "authorization_consistency": 62.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "`ui/src/lib/stores/websocket.js` exports many API functions with terse parameter names (`old`, `pwd`, `val`, `b`, `fix`, `bakType`) that hide domain intent.",
+        "The same command family mixes prefixes and vocab (`devStartramReminder`, `toggleExperimentalPenpai`, `registerServiceAgain`) without a stable naming grammar for action/category."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "logic_clarity": {
+      "evidence": [
+        "`ui/src/lib/stores/websocket.js` marks many functions `async` even when they only construct payload objects and call `send`, which obscures actual async boundaries.",
+        "`reconnect` always schedules another connection attempt after 1s without stop conditions; failure flow is hard to reason about under prolonged outages."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "type_safety": {
+      "evidence": [
+        "`logs` store values are mutated with incompatible shapes: string concatenation for container logs in `websocket.js`, arrays in `logsocket.js`, and object map roots in both.",
+        "Message objects are used with unchecked dynamic fields (`data.log.container_id`, `data.response`, `msg.history`) after parse, with no schema narrowing at boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "`restoreBackup(patp, backupFile)` in `ui/src/lib/stores/websocket.js` ignores `backupFile` and sends a hardcoded `\"this must fail\"` file field.",
+        "The generated bundle copy (`goseg/web/_app/immutable/chunks/websocket.84e20bf3.js`) preserves this behavior, confirming runtime contract drift."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Both websocket modules parse inbound JSON directly in event handlers (`JSON.parse(message.data)`) without defensive parse handling at network boundary.",
+        "Socket errors are only logged (`console.log(error)`) with no standardized recovery/reporting contract; handlers mix silent no-op close behavior and auto-retry behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "`ui/src/lib/stores/websocket.js` relies on module singleton state (`SESSION`, `PENDING`) where call order matters (`send` can run before `connect`).",
+        "`ui/src/lib/stores/logsocket.js` keeps mutable module-scope `SESSION` map keyed by log type, coupling lifecycle correctness to global shared state."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "The repository includes both authored store modules in `ui/src/lib/stores` and hashed generated runtime copies under `goseg/web/_app/immutable/*`, creating duplicated convention domains.",
+        "The generated files use minified identifier/style patterns unlike source modules, which is expected for build artifacts but still increases review and debugging inconsistency."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Generated and source artifacts are co-located in the same repository workflow, so naming/style conventions appear split between authored and compiled code."
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "`ui/src/lib/stores/websocket.js` exposes a very wide flat API surface with inconsistent parameter counts and payload styles (e.g., `setPackSchedule` takes 6 positional args, many peers take 0-2).",
+        "Closely related transport modules differ in interaction contract (`websocket.send` transmits without requiring token; `logsocket.send` suppresses send when token missing)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "`ui/src/lib/stores/websocket.js` conditionally adds token but still sends privileged actions when token is absent.",
+        "`ui/src/lib/stores/logsocket.js` explicitly blocks requests without token (`invalid log session` path), so auth expectations differ across sibling socket APIs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "restore_backup_param_ignored",
+      "summary": "Backup restore API violates its own function contract by ignoring `backupFile` and forcing a failing payload value.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "`restoreBackup(patp, backupFile)` defines `backupFile` but payload uses `\"file\": \"this must fail\"`.",
+        "Compiled websocket chunk contains matching action path for restore-backup behavior, so defect is runtime-effective."
+      ],
+      "suggestion": "Use the `backupFile` argument in payload construction (with validation) and add a small contract test for restore payload shape.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "socket_parse_and_error_strategy_drift",
+      "summary": "Socket layers use inconsistent and lossy failure handling at network boundaries.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "Both modules parse inbound messages with `JSON.parse(message.data)` directly in `onmessage` without parse guard.",
+        "`onerror` paths only log errors; one module auto-reconnects while the other sets empty `onclose`, creating divergent failure semantics."
+      ],
+      "suggestion": "Centralize socket boundary handling with shared parse/error adapter: guarded parse, structured error objects, and explicit reconnect policy per channel type.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "module_singleton_connection_state",
+      "summary": "Import-scoped socket singletons create boot-order dependencies and lifecycle coupling across callers.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js"
+      ],
+      "evidence": [
+        "`SESSION` and `PENDING` are mutable module globals in `websocket.js`; exported methods rely on their implicit initialization.",
+        "`logsocket.js` stores all per-log sockets in module-global `SESSION` object and mutates it across calls."
+      ],
+      "suggestion": "Refactor to explicit connection instances (factory/class) passed to callers, so initialization and teardown are explicit and testable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_singleton_state"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "token_enforcement_inconsistent_between_channels",
+      "summary": "Sibling websocket APIs enforce authentication differently, creating inconsistent trust boundaries.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "`websocket.send` sends request payload even when no token is loaded (token only added conditionally).",
+        "`logsocket.send` explicitly refuses to send when token is absent."
+      ],
+      "suggestion": "Define one transport auth policy: either require token for all privileged action messages or whitelist unauthenticated action types with explicit guard code.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "flat_action_api_with_unbounded_positional_params",
+      "summary": "The websocket command layer exposes a large inconsistent API surface with fragile positional signatures.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "Single module exports a large set of action wrappers with inconsistent argument counts and shapes (e.g., `setPackSchedule` has six positional args, many others are zero-arg toggles).",
+        "Most wrappers duplicate payload creation logic instead of sharing typed command schemas."
+      ],
+      "suggestion": "Move to a schema-driven command API (`sendCommand({type, action, ...})` + validated builders) and group exported actions by domain to reduce positional ambiguity.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "type_safety",
+      "identifier": "heterogeneous_logs_store_shape",
+      "summary": "Log store values are shape-unstable across socket modules, increasing runtime type ambiguity for consumers.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js"
+      ],
+      "evidence": [
+        "`websocket.js` appends log lines into newline-concatenated strings by `container_id`.",
+        "`logsocket.js` stores history/live logs as arrays under `current[msg.type]`."
+      ],
+      "suggestion": "Define a single log data model (e.g., `{source, lines: string[]}`) and normalize both update paths before writing to the store.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_singleton_state"
+    },
+    {
+      "dimension": "logic_clarity",
+      "identifier": "async_boundary_blur_in_command_wrappers",
+      "summary": "Overuse of `async` on synchronous command wrappers obscures true asynchronous control flow.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js"
+      ],
+      "evidence": [
+        "Many exported wrapper methods in `websocket.js` are marked `async` without `await`, while behavior is effectively synchronous payload construction.",
+        "`connect`/`send` signatures in both modules mix async and sync semantics without clear contract (some return unresolved side effects only)."
+      ],
+      "suggestion": "Remove unnecessary `async` markers and document/return explicit promises only for operations that have completion semantics callers can await.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "naming_quality",
+      "identifier": "inconsistent_parameter_vocabulary",
+      "summary": "Command API naming uses inconsistent abbreviations and mixed vocab that weakens intent communication.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "Parameters such as `pwd`, `old`, `val`, `b`, `fix`, and `bakType` are mixed with fully spelled peers in the same module.",
+        "`uploader.js` and `websocket.js` use different naming style for related file/upload concepts, reducing cross-module readability."
+      ],
+      "suggestion": "Adopt a naming convention table for transport payload builders (full words, stable domain terms) and apply it across store modules.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Socket transport responsibilities are concentrated in module-global stores without a typed command/schema boundary.",
+      "Generated bundle files mirror source defects, amplifying contract drift visibility across source and artifact layers."
+    ],
+    "likely_symptoms": [
+      "restore_backup_param_ignored",
+      "socket_parse_and_error_strategy_drift",
+      "flat_action_api_with_unbounded_positional_params",
+      "heterogeneous_logs_store_shape"
+    ],
+    "possible_false_positives": [
+      "Client-side authorization checks may be intentionally minimal if server enforces all permissions."
+    ]
+  }
+}

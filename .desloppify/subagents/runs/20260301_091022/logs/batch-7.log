@@ -1,0 +1,1401 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_091022/results/batch-7.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 7
+Batch name: Cross-cutting Sweep
+Batch dimensions: naming_quality, logic_clarity, type_safety, contract_coherence, error_consistency, initialization_coupling, convention_outlier, authorization_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+- goseg/click/hark.go
+- goseg/broadcast/broadcast.go
+- goseg/rectify/rectify.go
+- goseg/defaults/defaults.go
+- goseg/main.go
+- goseg/system/wifi.go
+- goseg/config/wireguard.go
+- goseg/docker/wireguard.go
+- goseg/leak/broadcast.go
+- goseg/routines/docker.go
+- goseg/structs/configs.go
+- goseg/defaults/version.go
+- goseg/routines/rekor.go
+- goseg/broadcast/loop.go
+- goseg/accesspoint/accesspoint.go
+- goseg/docker/urbit.go
+- goseg/docker/llama.go
+- goseg/docker/netdata.go
+- goseg/config/config.go
+- goseg/structs/ws.go
+- goseg/handler/urbit.go
+- goseg/docker/docker.go
+- goseg/routines/version.go
+- goseg/importer/importer.go
+- goseg/docker/minio.go
+- goseg/handler/startram.go
+- goseg/handler/support.go
+- goseg/importer/extract.go
+- goseg/dockerclient/client.go
+- goseg/auth/auth.go
+- goseg/config/urbit.go
+- goseg/handler/newship.go
+- goseg/shipcreator/shipcreator.go
+- goseg/accesspoint/config.go
+- goseg/click/acme.go
+- goseg/click/backup.go
+- goseg/click/click.go
+- goseg/handler/dev.go
+- goseg/handler/handler.go
+- goseg/handler/handler_test.go
+- goseg/routines/backup.go
+- goseg/routines/backup_test.go
+- goseg/routines/chop.go
+- README.md
+- goseg/logger/logger.go
+- goseg/system/system.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "naming_quality": 88.0,
+    "logic_clarity": 74.0,
+    "type_safety": 71.0,
+    "contract_coherence": 72.0,
+    "error_consistency": 68.0,
+    "initialization_coupling": 60.0,
+    "convention_outlier": 86.0,
+    "authorization_consistency": 64.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Naming is mostly domain-aligned, but some key names remain ambiguous or legacy-flavored (e.g., package-global `mu` in goseg/broadcast/broadcast.go and `eventBus` in goseg/routines/docker.go without domain qualifiers).",
+        "Function/comment naming drift appears in handler code (`sigRemove` function with test named `TestSigRemove`, and comment `take a guess` above LogoutHandler), reducing intent precision in security-sensitive paths."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Several core coordination primitives and auth-adjacent helpers still use generic or stylistically inconsistent naming that obscures ownership."
+    },
+    "logic_clarity": {
+      "evidence": [
+        "goseg/handler/newship.go `newShipToggleRemote` returns after one scan even when matching subdomain status is not `ok`, because `continue` only advances the inner loop and function returns unconditionally after the loop.",
+        "goseg/handler/newship.go `waitForShipReady` and `newShipToggleRemote` run ticker loops without timeout/cancellation path, allowing indefinite waits during degraded external conditions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "type_safety": {
+      "evidence": [
+        "goseg/structs/configs.go models several boolean/string fields as `any` (`DisableShipRestarts`, `StartramReminder`, `ChopOnUpgrade`, `CustomPierLocation`), forcing runtime assertions downstream.",
+        "goseg/structs/configs.go `UnmarshalJSON` performs unchecked assertions like `v.(bool)` and `v.(string)`, which can panic on malformed or migrated config values."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "goseg/handler/handler.go `PwHandler` calls `LogoutHandler(msg)` with a password payload, but `LogoutHandler` expects `WsLogoutPayload`; the returned error is ignored, so post-password-change logout is not guaranteed.",
+        "goseg/handler/upload.go returns `Failed to open upload endpoint: <endpoint>` even when `importer.SetUploadSession` fails for other reasons (token mismatch/drive validation), violating an accurate error contract."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Fatal-path behavior is inconsistent across startup boundaries: `panic` in goseg/config/config.go and goseg/broadcast/broadcast.go, `os.Exit` in goseg/system/wifi.go, and silent error dropping in `main.startServer` (`ListenAndServe` return values ignored).",
+        "Handler-level contracts mix returned errors and silent success/failure states (e.g., goseg/handler/handler.go `PwHandler` does nothing when old password mismatches and still returns nil)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Multiple packages perform heavy side effects in `init()`: file I/O/config mutation in goseg/config/config.go, network/session bootstrap goroutines in goseg/auth/auth.go, filesystem creation in goseg/importer/importer.go, and runtime bootstrapping in goseg/broadcast/broadcast.go.",
+        "goseg/system/wifi.go `init()` probes hardware and starts a long-running goroutine (`wifiInfoLoop`), binding package import order to host environment availability."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "File and error style drift persists: mixed legacy `ioutil` usage with newer patterns across assigned files, and mixed fatal strategies (`panic`, `os.Exit`, returned errors) in neighboring runtime modules.",
+        "Some handlers include ad-hoc inline closures for error broadcasting while sibling handlers return direct errors, creating style islands for similar control paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Operationally similar modules still diverge in file I/O and failure-handling conventions, increasing maintenance friction."
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "goseg/importer/importer.go `HTTPUploadHandler` authorizes uploads by URL session presence alone; token/user-agent binding is absent and explicitly noted as TODO in `VerifySession`.",
+        "goseg/handler/upload.go lets clients define arbitrary `endpoint` session keys, and importer session validation later compares struct token only at setup time, not at HTTP upload request time."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "init_side_effect_bootstrap_chain",
+      "summary": "Package init functions perform runtime bootstrap, filesystem mutation, and long-lived goroutine startup, creating brittle import-order coupling.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/auth/auth.go",
+        "goseg/importer/importer.go",
+        "goseg/system/wifi.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/support.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "config.init creates/updates config files, key files, hashes binaries, and starts `ConfChannel` goroutine.",
+        "auth.init loads sessions from config and starts periodic cleanup goroutine.",
+        "system/wifi.init does hardware probing and starts `wifiInfoLoop`.",
+        "broadcast.init bootstraps global state and starts broadcast loop; failure path panics."
+      ],
+      "suggestion": "Move side effects from package `init()` into explicit startup phases (e.g., `BootstrapConfig`, `BootstrapAuth`, `StartWifiMonitor`) orchestrated from `main`, with dependency-injected readiness and clear error propagation.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_bootstrap"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "upload_session_not_request_bound",
+      "summary": "Upload authorization is not bound to request identity; possession of a session path key is sufficient to upload.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/handler/upload.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` only checks `uploadSessions[session]` existence and never validates `WsTokenStruct` against the HTTP request.",
+        "`VerifySession` contains TODO for token checks and currently returns true on map existence alone.",
+        "`SetUploadSession` accepts client-provided endpoint identifiers and stores session metadata keyed by that endpoint."
+      ],
+      "suggestion": "Require signed, short-lived upload tokens (or HMAC session IDs) and verify token ID + token hash + request metadata in `HTTPUploadHandler` before accepting chunks; reject session keys not server-generated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_auth_gap"
+    },
+    {
+      "dimension": "logic_clarity",
+      "identifier": "newship_remote_wait_exit_condition",
+      "summary": "Remote readiness loop can return before readiness and both readiness loops can wait forever without cancellation.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/handler/urbit.go"
+      ],
+      "evidence": [
+        "`newShipToggleRemote` returns after iterating subdomains even when matching status is not `ok`, because there is no outer-loop gating flag.",
+        "`waitForShipReady` and `newShipToggleRemote` use ticker loops with no timeout/context cancellation, risking stuck goroutines."
+      ],
+      "suggestion": "Refactor readiness checks to explicit predicate functions with timeout/context, and only exit loops when success criteria are met or timeout/error is emitted to transition bus.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_state_polling"
+    },
+    {
+      "dimension": "type_safety",
+      "identifier": "config_any_and_unsafe_assertions",
+      "summary": "Config model uses `any` plus unchecked type assertions, creating panic-prone runtime paths.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/routines/docker.go",
+        "goseg/handler/urbit.go"
+      ],
+      "evidence": [
+        "`UrbitDocker` stores fields like `DisableShipRestarts`, `StartramReminder`, and `CustomPierLocation` as `any`.",
+        "`UnmarshalJSON` contains direct assertions `v.(bool)` / `v.(string)` for multiple keys without type checks.",
+        "Downstream call sites perform ad-hoc assertion handling (e.g., `if disableRestart, ok := conf.DisableShipRestarts.(bool)`), indicating unstable type contract."
+      ],
+      "suggestion": "Replace `any` fields with typed pointers/nullable structs and make custom unmarshal use guarded conversions (`type switch`) returning explicit validation errors instead of panicking.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "weak_config_schema"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "password_modify_logout_contract_break",
+      "summary": "Password modify flow claims to invalidate session but passes incompatible payload to logout and ignores failure.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`PwHandler` calls `LogoutHandler(msg)` where `msg` is parsed as `WsPwPayload`, not `WsLogoutPayload`.",
+        "`LogoutHandler` expects a top-level `token` shape for logout and returns an error if unmarshal fails; caller does not check that error."
+      ],
+      "suggestion": "Perform logout directly from `PwHandler` using `pwPayload.Token.ID` (or construct a proper `WsLogoutPayload`) and propagate any logout failure to caller.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "handler_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_fatality_and_silent_failures",
+      "summary": "Failure handling mixes panic/exit/silent continuation across adjacent startup and handler paths.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/system/wifi.go",
+        "goseg/main.go",
+        "goseg/handler/handler.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config.init` and `broadcast.init` can panic; `system.CaptivePortal` calls `os.Exit(1)`; `main.startServer` ignores `ListenAndServe` errors.",
+        "`PwHandler` silently returns nil when old password mismatches, unlike sibling handlers that return explicit action errors.",
+        "`LocalVersion` panics on file and JSON errors while other config reads return errors."
+      ],
+      "suggestion": "Adopt one explicit failure policy by layer (bootstrap returns fatal errors to `main`; handlers return typed errors; goroutines report via channel/log with retry policy) and remove direct `panic/os.Exit` from library packages.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_bootstrap"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "upload_error_context_loss",
+      "summary": "Upload open-endpoint path drops underlying error context and reports misleading endpoint-focused message.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`UploadHandler` wraps all `SetUploadSession` failures as `Failed to open upload endpoint: <endpoint>` without including the actual cause.",
+        "`SetUploadSession` can fail for unrelated reasons (`token mismatch`, block device lookup failure), so caller-visible contract is inaccurate."
+      ],
+      "suggestion": "Wrap importer errors with `%w` and include endpoint as context (`fmt.Errorf(\"open upload endpoint %s: %w\", endpoint, err)`) so callers and logs can act on the true cause.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "handler_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global bootstrap in package `init()` creates hidden lifecycle contracts and fragmented fatal/error behavior.",
+      "Weakly typed config schema (`any` + ad-hoc assertions) pushes validation into runtime call sites.",
+      "Boundary/auth checks are not centralized at HTTP ingestion points, leading to trust inconsistencies."
+    ],
+    "likely_symptoms": [
+      "newship_remote_wait_exit_condition",
+      "upload_error_context_loss",
+      "mixed_fatality_and_silent_failures"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019ca8ab-92d5-7460-bb6b-cfe7222643a6
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 7
+Batch name: Cross-cutting Sweep
+Batch dimensions: naming_quality, logic_clarity, type_safety, contract_coherence, error_consistency, initialization_coupling, convention_outlier, authorization_consistency
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+- goseg/click/hark.go
+- goseg/broadcast/broadcast.go
+- goseg/rectify/rectify.go
+- goseg/defaults/defaults.go
+- goseg/main.go
+- goseg/system/wifi.go
+- goseg/config/wireguard.go
+- goseg/docker/wireguard.go
+- goseg/leak/broadcast.go
+- goseg/routines/docker.go
+- goseg/structs/configs.go
+- goseg/defaults/version.go
+- goseg/routines/rekor.go
+- goseg/broadcast/loop.go
+- goseg/accesspoint/accesspoint.go
+- goseg/docker/urbit.go
+- goseg/docker/llama.go
+- goseg/docker/netdata.go
+- goseg/config/config.go
+- goseg/structs/ws.go
+- goseg/handler/urbit.go
+- goseg/docker/docker.go
+- goseg/routines/version.go
+- goseg/importer/importer.go
+- goseg/docker/minio.go
+- goseg/handler/startram.go
+- goseg/handler/support.go
+- goseg/importer/extract.go
+- goseg/dockerclient/client.go
+- goseg/auth/auth.go
+- goseg/config/urbit.go
+- goseg/handler/newship.go
+- goseg/shipcreator/shipcreator.go
+- goseg/accesspoint/config.go
+- goseg/click/acme.go
+- goseg/click/backup.go
+- goseg/click/click.go
+- goseg/handler/dev.go
+- goseg/handler/handler.go
+- goseg/handler/handler_test.go
+- goseg/routines/backup.go
+- goseg/routines/backup_test.go
+- goseg/routines/chop.go
+- README.md
+- goseg/logger/logger.go
+- goseg/system/system.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+
+thinking
+**Planning file inspection**
+codex
+I’ll inspect the blind review packet first, then read the assigned files to score only the requested dimensions and produce the JSON report without modifying code.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files goseg README.md' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 2299
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "naming_quality",
+    "logic_clarity",
+    "type_safety",
+    "contract_coherence",
+    "error_consistency",
+    "abstraction_fitness",
+    "ai_generated_debt",
+    "high_level_elegance",
+    "mid_level_elegance",
+    "low_level_elegance",
+    "initialization_coupling",
+    "convention_outlier",
+    "dependency_health",
+ succeeded in 50ms:
+README.md
+goseg/rectify/rectify.go
+goseg/rectify/importer.go
+goseg/ws/ws_test.go
+goseg/ws/ws.go
+goseg/ws/logs.go
+goseg/main.go
+goseg/broadcast/broadcast.go
+goseg/broadcast/broadcast_test.go
+goseg/broadcast/loop.go
+goseg/default.pgo
+goseg/backups/backups.go
+goseg/startram/startram.go
+goseg/startram/startram_test.go
+goseg/dockerclient/client.go
+goseg/exporter/exporter.go
+goseg/structs/broadcast.go
+goseg/structs/minio.go
+goseg/structs/ws_test.go
+goseg/structs/ws.go
+
+thinking
+**Planning targeted pattern search**
+codex
+I’ve loaded the packet constraints. Next I’m scanning the assigned files for cross-cutting defects (auth guard consistency, init-time side effects, contract/type mismatches, and naming/logic anomalies) and then I’ll compile scores tied to concrete evidence.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/auth/auth.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/handler/handler.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/main.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/config.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package auth
+
+// package for authenticating websockets
+// we use a homespun jwt knock-off because no tls on lan
+// tokens contain client metadata for authentication
+// authentication adds you to the AuthenticatedClients map
+// broadcasts get sent to members of this map
+
+// todo: purge old sessions from both maps
+
+// client send:
+// {
+// 	"type": "verify",
+// 	"id": "jsgeneratedid",
+// 	"token<optional>": {
+// 	  "id": "servergeneratedid",
+// 	  "token": "encryptedtext"
+// 	}
+// }
+
+ succeeded in 52ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/broadcast"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/leakchannel"
+	"groundseg/structs"
+	"groundseg/system"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/Native-Planet/perigee/libprg"
+	"go.uber.org/zap"
+)
+ succeeded in 51ms:
+package main
+
+// NativePlanet GroundSeg: Go Edition (goseg)
+// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+// This is a Golang rewrite of GroundSeg that serves the v2 json
+// object via websocket.
+// The v2 rewrite decouples the frontend and backend, which makes it
+// straightforward to implement alternative backends.
+//
+// Under development: reimplementing all pyseg functionality.
+// Advantages:
+// - Really, really fast
+// - Event-driven
+// - First-class support for concurrent operations
+// - Very good golang Docker libraries
+
+import (
+	"embed"
+	"fmt"
+	"groundseg/broadcast"
+ succeeded in 51ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"io/ioutil"
+	"math/rand"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+
+thinking
+**Scanning handler files for auth checks**
+codex
+I found strong init-time side effects already (`config`/`auth` package `init()` doing disk/network/session work). I’m now checking handler/action paths for inconsistent authorization and error contracts across sibling modules.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/upload.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/handler/startram.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/dev.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/support.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/newship.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/handler/urbit.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/backups"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var isDev = checkDevMode()
+ succeeded in 52ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/importer"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+func UploadHandler(msg []byte) error {
+	zap.L().Info("Upload")
+	var uploadPayload structs.WsUploadPayload
+	err := json.Unmarshal(msg, &uploadPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+	}
+	switch uploadPayload.Payload.Action {
+	case "open-endpoint":
+ succeeded in 52ms:
+package handler
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/startram"
+	"groundseg/structs"
+	"os"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+// startram action handler
+ succeeded in 51ms:
+package handler
+
+import (
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/shipcreator"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+)
+ succeeded in 51ms:
+package handler
+
+import (
+	"archive/zip"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/dockerclient"
+	"groundseg/logger"
+	"groundseg/structs"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path"
+ succeeded in 51ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/backups"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/exporter"
+	"groundseg/startram"
+	"groundseg/structs"
+	"net"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+
+thinking
+**Planning targeted code inspection**
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '240,560p' goseg/handler/handler.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+			if err != nil {
+				return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+			}
+		*/
+	}
+	return resp, nil
+}
+
+// return the unauth payload
+func UnauthHandler() ([]byte, error) {
+	blob := structs.UnauthBroadcast{
+		Type:      "structure",
+		AuthLevel: "unauthorized",
+		Login: struct {
+			Remainder int `json:"remainder"`
+		}{
+			Remainder: remainder,
+		},
+	}
+	resp, err := json.Marshal(blob)
+
+thinking
+**Checking upload endpoint authorization**
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/importer/importer.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/dockerclient/client.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/importer/extract.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/system.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/system/wifi.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/dockerclient"
+	"groundseg/shipcreator"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+ succeeded in 52ms:
+package importer
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"context"
+	"groundseg/docker"
+	"groundseg/structs"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+func checkExtension(filename string) string {
+	if strings.HasSuffix(filename, ".tar.gz") {
+		return ".tar.gz"
+	}
+ succeeded in 52ms:
+package dockerclient
+
+import (
+	"context"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/docker/docker/api"
+	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/client"
+	"go.uber.org/zap"
+)
+
+const pingTimeout = 5 * time.Second
+
+var (
+	versionMu           sync.RWMutex
+	cachedVersion       string
+ succeeded in 51ms:
+package system
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/accesspoint"
+	"groundseg/structs"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/hsanjuan/go-captive"
+	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
+)
+
+ succeeded in 51ms:
+package system
+
+// for retrieving hw info and managing host
+
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"groundseg/defaults"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
+
+thinking
+**Planning scan for init functions**
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "''^func init'"\\(|panic\\(|os\\.Exit\\(|TODO|FIXME|fmt\\.Errorf\\(\\\"["'^'"\\\"]*%v\\\"|WriteHeader\\(|CheckToken|WsIsAuthenticated|Auth\" goseg/{config/version.go,handler/upload.go,startram/startram.go,click/hark.go,broadcast/broadcast.go,rectify/rectify.go,defaults/defaults.go,main.go,system/wifi.go,config/wireguard.go,docker/wireguard.go,leak/broadcast.go,routines/docker.go,structs/configs.go,defaults/version.go,routines/rekor.go,broadcast/loop.go,accesspoint/accesspoint.go,docker/urbit.go,docker/llama.go,docker/netdata.go,config/config.go,structs/ws.go,handler/urbit.go,docker/docker.go,routines/version.go,importer/importer.go,docker/minio.go,handler/startram.go,handler/support.go,importer/extract.go,dockerclient/client.go,auth/auth.go,config/urbit.go,handler/newship.go,shipcreator/shipcreator.go,accesspoint/config.go,click/acme.go,click/backup.go,click/click.go,handler/dev.go,handler/handler.go,handler/handler_test.go,routines/backup.go,routines/backup_test.go,routines/chop.go,logger/logger.go,system/system.go} README.md" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/auth/auth.go:6:// authentication adds you to the AuthenticatedClients map
+goseg/auth/auth.go:61:func init() {
+goseg/auth/auth.go:63:	authed := conf.Sessions.Authorized
+goseg/auth/auth.go:66:		ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
+goseg/auth/auth.go:78:		AuthClients:   make(map[string][]*structs.MuConn),
+goseg/auth/auth.go:88:func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
+goseg/auth/auth.go:91:	for _, existConn := range ClientManager.AuthClients[token] {
+goseg/auth/auth.go:100:func WsAuthCheck(conn *websocket.Conn) bool {
+goseg/auth/auth.go:106:	for _, clients := range ClientManager.AuthClients {
+goseg/auth/auth.go:121:	if WsAuthCheck(conn) {
+goseg/auth/auth.go:124:		for _, client := range ClientManager.AuthClients {
+goseg/auth/auth.go:158:func TokenIdAuthed(clientManager *structs.ClientManager, token string) bool {
+goseg/auth/auth.go:161:	_, exists := clientManager.AuthClients[token]
+goseg/auth/auth.go:169:func AddToAuthMap(conn *websocket.Conn, token map[string]string, authed bool) error {
+goseg/auth/auth.go:178:			ClientManager.AddAuthClient(tokenId, muConn)
+goseg/auth/auth.go:192:func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
+goseg/auth/auth.go:193:	if fromAuthorized {
+goseg/auth/auth.go:195:		delete(ClientManager.AuthClients, tokenId)
+goseg/auth/auth.go:205:func CheckToken(token map[string]string, r *http.Request) (string, bool) {
+goseg/auth/auth.go:226:		if TokenIdAuthed(ClientManager, token["id"]) {
+
+thinking
+**Assessing auth and contract inconsistencies**
+codex
+I’ve identified a few material defects already (password-change logout path, weak upload-session trust boundary, and heavy package `init()` side effects). I’m validating these against neighboring files/tests before finalizing scores and findings.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/handler_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/structs/ws.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/defaults/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/docker.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/broadcast/broadcast.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package structs
+
+// contained herein: structs for managing mutexed maps of
+// mutexed websocket connections to avoid panics;
+// actual writing is done via broadcast package;
+// auth map management is done via auth package
+// 🐝 Careful! ❤️
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+var (
+	WsEventBus      = make(chan WsChanEvent, 100)
+	InactiveSession = &MuConn{}
+ succeeded in 52ms:
+//go:build integration
+
+package handler
+
+import (
+	"os"
+	"testing"
+)
+
+func TestCheckDevMode(t *testing.T) {
+	original := os.Args
+	t.Cleanup(func() {
+		os.Args = original
+	})
+
+	os.Args = []string{"groundseg", "dev"}
+	if !checkDevMode() {
+		t.Fatal("expected dev mode when dev arg is present")
+	}
+
+ succeeded in 51ms:
+package defaults
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/structs"
+	"log/slog"
+	"os"
+
+	"go.uber.org/zap"
+)
+
+var (
+	logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	DefaultVersionText = `
+{
+  "groundseg": {
+    "canary": {
+      "groundseg": {
+        "amd64_sha256": "653863b4db936794c15b9eff7ba0310458859c84ec6de11d68c0fc13cbf34e9e",
+ succeeded in 51ms:
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	VersionServerReady = false
+	VersionInfo        structs.Channel
+)
+ succeeded in 51ms:
+package routines
+
+import (
+	"context"
+	"fmt"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/dockerclient"
+	"groundseg/structs"
+	"net/http"
+	"strings"
+	"time"
+
+	eventtypes "github.com/docker/docker/api/types/events"
+	"go.uber.org/zap"
+)
+
+var (
+ succeeded in 51ms:
+package broadcast
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker"
+	"groundseg/leak"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+thinking
+**Drafting detailed security findings**
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/structs/configs.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package structs
+
+import (
+	"encoding/json"
+	"time"
+)
+
+// system.json config struct
+type SysConfig struct {
+	RemoteBackupPassword string   `json:"remoteBackupPassword"`
+	GracefulExit         bool     `json:"gracefulExit"`
+	LastKnownMDNS        string   `json:"lastKnownMDNS"`
+	Setup                string   `json:"setup"`
+	EndpointUrl          string   `json:"endpointUrl"`
+	ApiVersion           string   `json:"apiVersion"`
+	Piers                []string `json:"piers"`
+	NetCheck             string   `json:"netCheck"`
+	UpdateMode           string   `json:"updateMode"`
+	UpdateUrl            string   `json:"updateUrl"`
+	UpdateBranch         string   `json:"updateBranch"`
+
+thinking
+**Evaluating contract and naming consistency**
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"type WsPwPayload|type WsLogoutPayload|type WsUploadPayload|type WsTokenStruct\" goseg/structs/ws.go && sed -n '260,520p' goseg/structs/ws.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+354:type WsUploadPayload struct {
+399:type WsTokenStruct struct {
+416:type WsPwPayload struct {
+441:type WsLogoutPayload struct {
+
+type C2CPayload struct {
+	Type     string `json:"type"`
+	SSID     string `json:"ssid"`
+	Password string `json:"password"`
+}
+
+type WsPayload struct {
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Payload interface{}   `json:"payload"`
+	Token   WsTokenStruct `json:"token"`
+}
+
+type GallsegPayload struct {
+	Payload struct {
+
+thinking
+**Scoring and structuring dimension findings**
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "naming_quality": 88.0,
+    "logic_clarity": 74.0,
+    "type_safety": 71.0,
+    "contract_coherence": 72.0,
+    "error_consistency": 68.0,
+    "initialization_coupling": 60.0,
+    "convention_outlier": 86.0,
+    "authorization_consistency": 64.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Naming is mostly domain-aligned, but some key names remain ambiguous or legacy-flavored (e.g., package-global `mu` in goseg/broadcast/broadcast.go and `eventBus` in goseg/routines/docker.go without domain qualifiers).",
+        "Function/comment naming drift appears in handler code (`sigRemove` function with test named `TestSigRemove`, and comment `take a guess` above LogoutHandler), reducing intent precision in security-sensitive paths."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Several core coordination primitives and auth-adjacent helpers still use generic or stylistically inconsistent naming that obscures ownership."
+    },
+    "logic_clarity": {
+      "evidence": [
+        "goseg/handler/newship.go `newShipToggleRemote` returns after one scan even when matching subdomain status is not `ok`, because `continue` only advances the inner loop and function returns unconditionally after the loop.",
+        "goseg/handler/newship.go `waitForShipReady` and `newShipToggleRemote` run ticker loops without timeout/cancellation path, allowing indefinite waits during degraded external conditions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "type_safety": {
+      "evidence": [
+        "goseg/structs/configs.go models several boolean/string fields as `any` (`DisableShipRestarts`, `StartramReminder`, `ChopOnUpgrade`, `CustomPierLocation`), forcing runtime assertions downstream.",
+        "goseg/structs/configs.go `UnmarshalJSON` performs unchecked assertions like `v.(bool)` and `v.(string)`, which can panic on malformed or migrated config values."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "goseg/handler/handler.go `PwHandler` calls `LogoutHandler(msg)` with a password payload, but `LogoutHandler` expects `WsLogoutPayload`; the returned error is ignored, so post-password-change logout is not guaranteed.",
+        "goseg/handler/upload.go returns `Failed to open upload endpoint: <endpoint>` even when `importer.SetUploadSession` fails for other reasons (token mismatch/drive validation), violating an accurate error contract."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Fatal-path behavior is inconsistent across startup boundaries: `panic` in goseg/config/config.go and goseg/broadcast/broadcast.go, `os.Exit` in goseg/system/wifi.go, and silent error dropping in `main.startServer` (`ListenAndServe` return values ignored).",
+        "Handler-level contracts mix returned errors and silent success/failure states (e.g., goseg/handler/handler.go `PwHandler` does nothing when old password mismatches and still returns nil)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Multiple packages perform heavy side effects in `init()`: file I/O/config mutation in goseg/config/config.go, network/session bootstrap goroutines in goseg/auth/auth.go, filesystem creation in goseg/importer/importer.go, and runtime bootstrapping in goseg/broadcast/broadcast.go.",
+        "goseg/system/wifi.go `init()` probes hardware and starts a long-running goroutine (`wifiInfoLoop`), binding package import order to host environment availability."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "File and error style drift persists: mixed legacy `ioutil` usage with newer patterns across assigned files, and mixed fatal strategies (`panic`, `os.Exit`, returned errors) in neighboring runtime modules.",
+        "Some handlers include ad-hoc inline closures for error broadcasting while sibling handlers return direct errors, creating style islands for similar control paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Operationally similar modules still diverge in file I/O and failure-handling conventions, increasing maintenance friction."
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "goseg/importer/importer.go `HTTPUploadHandler` authorizes uploads by URL session presence alone; token/user-agent binding is absent and explicitly noted as TODO in `VerifySession`.",
+        "goseg/handler/upload.go lets clients define arbitrary `endpoint` session keys, and importer session validation later compares struct token only at setup time, not at HTTP upload request time."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "init_side_effect_bootstrap_chain",
+      "summary": "Package init functions perform runtime bootstrap, filesystem mutation, and long-lived goroutine startup, creating brittle import-order coupling.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/auth/auth.go",
+        "goseg/importer/importer.go",
+        "goseg/system/wifi.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/support.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "config.init creates/updates config files, key files, hashes binaries, and starts `ConfChannel` goroutine.",
+        "auth.init loads sessions from config and starts periodic cleanup goroutine.",
+        "system/wifi.init does hardware probing and starts `wifiInfoLoop`.",
+        "broadcast.init bootstraps global state and starts broadcast loop; failure path panics."
+      ],
+      "suggestion": "Move side effects from package `init()` into explicit startup phases (e.g., `BootstrapConfig`, `BootstrapAuth`, `StartWifiMonitor`) orchestrated from `main`, with dependency-injected readiness and clear error propagation.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_bootstrap"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "upload_session_not_request_bound",
+      "summary": "Upload authorization is not bound to request identity; possession of a session path key is sufficient to upload.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/handler/upload.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` only checks `uploadSessions[session]` existence and never validates `WsTokenStruct` against the HTTP request.",
+        "`VerifySession` contains TODO for token checks and currently returns true on map existence alone.",
+        "`SetUploadSession` accepts client-provided endpoint identifiers and stores session metadata keyed by that endpoint."
+      ],
+      "suggestion": "Require signed, short-lived upload tokens (or HMAC session IDs) and verify token ID + token hash + request metadata in `HTTPUploadHandler` before accepting chunks; reject session keys not server-generated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_auth_gap"
+    },
+    {
+      "dimension": "logic_clarity",
+      "identifier": "newship_remote_wait_exit_condition",
+      "summary": "Remote readiness loop can return before readiness and both readiness loops can wait forever without cancellation.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/handler/urbit.go"
+      ],
+      "evidence": [
+        "`newShipToggleRemote` returns after iterating subdomains even when matching status is not `ok`, because there is no outer-loop gating flag.",
+        "`waitForShipReady` and `newShipToggleRemote` use ticker loops with no timeout/context cancellation, risking stuck goroutines."
+      ],
+      "suggestion": "Refactor readiness checks to explicit predicate functions with timeout/context, and only exit loops when success criteria are met or timeout/error is emitted to transition bus.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_state_polling"
+    },
+    {
+      "dimension": "type_safety",
+      "identifier": "config_any_and_unsafe_assertions",
+      "summary": "Config model uses `any` plus unchecked type assertions, creating panic-prone runtime paths.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/routines/docker.go",
+        "goseg/handler/urbit.go"
+      ],
+      "evidence": [
+        "`UrbitDocker` stores fields like `DisableShipRestarts`, `StartramReminder`, and `CustomPierLocation` as `any`.",
+        "`UnmarshalJSON` contains direct assertions `v.(bool)` / `v.(string)` for multiple keys without type checks.",
+        "Downstream call sites perform ad-hoc assertion handling (e.g., `if disableRestart, ok := conf.DisableShipRestarts.(bool)`), indicating unstable type contract."
+      ],
+      "suggestion": "Replace `any` fields with typed pointers/nullable structs and make custom unmarshal use guarded conversions (`type switch`) returning explicit validation errors instead of panicking.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "weak_config_schema"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "password_modify_logout_contract_break",
+      "summary": "Password modify flow claims to invalidate session but passes incompatible payload to logout and ignores failure.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`PwHandler` calls `LogoutHandler(msg)` where `msg` is parsed as `WsPwPayload`, not `WsLogoutPayload`.",
+        "`LogoutHandler` expects a top-level `token` shape for logout and returns an error if unmarshal fails; caller does not check that error."
+      ],
+      "suggestion": "Perform logout directly from `PwHandler` using `pwPayload.Token.ID` (or construct a proper `WsLogoutPayload`) and propagate any logout failure to caller.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "handler_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_fatality_and_silent_failures",
+      "summary": "Failure handling mixes panic/exit/silent continuation across adjacent startup and handler paths.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/system/wifi.go",
+        "goseg/main.go",
+        "goseg/handler/handler.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config.init` and `broadcast.init` can panic; `system.CaptivePortal` calls `os.Exit(1)`; `main.startServer` ignores `ListenAndServe` errors.",
+        "`PwHandler` silently returns nil when old password mismatches, unlike sibling handlers that return explicit action errors.",
+        "`LocalVersion` panics on file and JSON errors while other config reads return errors."
+      ],
+      "suggestion": "Adopt one explicit failure policy by layer (bootstrap returns fatal errors to `main`; handlers return typed errors; goroutines report via channel/log with retry policy) and remove direct `panic/os.Exit` from library packages.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_bootstrap"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "upload_error_context_loss",
+      "summary": "Upload open-endpoint path drops underlying error context and reports misleading endpoint-focused message.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`UploadHandler` wraps all `SetUploadSession` failures as `Failed to open upload endpoint: <endpoint>` without including the actual cause.",
+        "`SetUploadSession` can fail for unrelated reasons (`token mismatch`, block device lookup failure), so caller-visible contract is inaccurate."
+      ],
+      "suggestion": "Wrap importer errors with `%w` and include endpoint as context (`fmt.Errorf(\"open upload endpoint %s: %w\", endpoint, err)`) so callers and logs can act on the true cause.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "handler_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global bootstrap in package `init()` creates hidden lifecycle contracts and fragmented fatal/error behavior.",
+      "Weakly typed config schema (`any` + ad-hoc assertions) pushes validation into runtime call sites.",
+      "Boundary/auth checks are not centralized at HTTP ingestion points, leading to trust inconsistencies."
+    ],
+    "likely_symptoms": [
+      "newship_remote_wait_exit_condition",
+      "upload_error_context_loss",
+      "mixed_fatality_and_silent_failures"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+80,058
+

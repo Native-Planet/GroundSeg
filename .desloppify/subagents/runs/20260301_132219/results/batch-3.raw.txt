@@ -1,0 +1,157 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 68.5
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/handler/newship.go` and `goseg/importer/importer.go` duplicate near-identical ship-ready polling, remote toggle waiting, Startram registration, and cleanup orchestration with only transition types/messages differing.",
+        "`goseg/handler/urbit_operations.go` repeats the same stop/reconfigure/start/wait/recover lifecycle in `ChopPier`, `rollChopPier`, and `packMeldPier`, including repeated transition publish and restart restoration logic.",
+        "`goseg/broadcast/broadcast.go:150-394` (`ConstructPierInfo`) combines filesystem backup discovery, docker state reads, network/service checks, click desk probes, and DTO assembly in one function.",
+        "`goseg/config/config.go:60-173` performs process bootstrap, key generation, config migration, hashing, persistence, and goroutine startup in `init()`, creating broad startup coupling.",
+        "`goseg/system/wifi.go:117-282` mixes system command orchestration, AP lifecycle, websocket API handling, and client broadcast loops in one module."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "ship_lifecycle_orchestration_duplication",
+      "summary": "New-ship and import flows duplicate the same asynchronous lifecycle orchestration, causing parallel logic drift risk.",
+      "related_files": [
+        "goseg/handler/newship.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`waitForShipReady` in `newship.go` (lines 173-226) and `importer.go` (lines 577-643) both poll `click.GetLusCode`, conditionally switch to wireguard, delete/restart containers, and finalize transitions.",
+        "`newShipToggleRemote` (lines 228-246) and `importShipToggleRemote` (lines 645-663) are effectively the same loop with different transition publishers.",
+        "`newShipRegisterService` (lines 284-288) and `registerServices` (lines 786-790) duplicate the same Startram registration call."
+      ],
+      "suggestion": "Extract a shared `ShipProvisioningOrchestrator` (phase runner + transition adapter) used by both new-ship and import flows, with pluggable transition emitters and optional phases (e.g., extraction/fix-acme).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_maintenance_workflow_copy_paste",
+      "summary": "Urbit maintenance operations reimplement the same multi-step container lifecycle instead of using a common operation primitive.",
+      "related_files": [
+        "goseg/handler/urbit_operations.go",
+        "goseg/handler/urbit.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "`ChopPier` (471-540), `rollChopPier` (980-1063), and `packMeldPier` (295-380+) all perform status check, conditional stop with `|exit`, `WaitComplete`, boot-status mutation, restart, and transition publish cycles.",
+        "These functions duplicate error-wrapper closures and delayed transition cleanup (`time.Sleep` + publish empty event), which increases divergence surface for behavior fixes.",
+        "`WaitComplete` exists as shared polling in `urbit.go` (147-190), but higher-level maintenance choreography remains copy-pasted."
+      ],
+      "suggestion": "Introduce a reusable maintenance state-machine helper that accepts ordered phases (`stop`, `run bootStatus`, `wait`, `restore`) and transition metadata, then have chop/roll/pack-meld compose phase lists.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_ship_lifecycle_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_state_builder_god_function",
+      "summary": "Broadcast state construction is concentrated in one large function that mixes unrelated responsibilities.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/config/urbit.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` (150-394) performs local backup filesystem scanning, remote backup flattening, docker status/stats retrieval, click desk probing, Startram subdomain readiness checks, and UI struct assembly in one routine.",
+        "The function reads from config, docker, click, filesystem, and cached broadcast state in one pass, making behavior changes cross-cutting and hard to test in isolation.",
+        "The same function contains domain normalization logic (pack day/date defaults, alias visibility, backup projections), not just data collection."
+      ],
+      "suggestion": "Split into composable providers: `backupSnapshot`, `runtimeSnapshot`, `startramSnapshot`, and `urbitViewAssembler`; keep `ConstructPierInfo` as thin coordination only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_read_model_layer"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "action_handlers_embed_ui_transition_protocol",
+      "summary": "Domain handlers directly embed websocket/UI transition protocol details, coupling business orchestration to transport semantics.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/support.go",
+        "goseg/handler/newship.go"
+      ],
+      "evidence": [
+        "Multiple handlers inline repeated event lifecycle patterns (`Publish... loading/error/success`, `time.Sleep`, clear) instead of a shared transition transaction helper.",
+        "`startram.go` repeats local `handleError` closures in separate actions (`handleStartramRegister`, `handleStartramEndpoint`, `handleStartramCancel`) with slightly different event types and reset behavior.",
+        "`support.go` and `newship.go` also encode transition timing and cleanup sequencing directly in business flow, making orchestration logic depend on UI event choreography."
+      ],
+      "suggestion": "Create a shared transition-emitter utility (start/progress/fail/succeed/clear with policy-driven delays) and keep handlers focused on domain steps + typed outcomes.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_domain_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_bootstrap_and_runtime_concerns_conflated",
+      "summary": "Configuration package combines initialization, migration, key management, runtime state, and utility concerns in one central module.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go",
+        "goseg/config/urbit.go",
+        "goseg/config/mc.go"
+      ],
+      "evidence": [
+        "`config.go` is 1205 lines and `init()` (60-173) performs filesystem creation, key setup, merge/migration, hash computation, persistence, and starts a goroutine (`ConfChannel`).",
+        "The package also stores mutable runtime registries (`GSContainers`, `startramConfig`, minio password map) alongside disk persistence and random/hash helpers.",
+        "Sibling files (`urbit.go`, `version.go`, `mc.go`) use better-scoped persistence helpers, but `config.go` remains a catch-all orchestration center."
+      ],
+      "suggestion": "Split `config` into explicit subpackages/components: `bootstrap`, `store` (disk persistence), `runtime_state`, and `credentials`; make initialization explicit from `main` instead of heavy `init()` side effects.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_centralization"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_module_mixes_transport_and_system_orchestration",
+      "summary": "WiFi module mixes OS command orchestration, AP lifecycle, websocket request handling, and periodic broadcast loops in one package surface.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "`C2CMode`, `C2CConnect`, and `UnaliveC2C` orchestrate system services and shell commands, while `CaptiveAPI` handles websocket protocol parsing and `announceNetworks` manages long-lived client broadcasts in the same file.",
+        "`C2CConnect` includes system reboot side effects (`execCommandForWiFi(\"reboot\")`), while `CaptiveAPI` may also restart groundseg, indicating competing lifecycle paths in transport-facing code.",
+        "Shared mutable `clients` map is managed in the same module that executes networking shell commands, increasing responsibility spread."
+      ],
+      "suggestion": "Separate WiFi domain service (connect/AP state transitions) from captive websocket transport handlers and from network-announcement publisher; expose a narrow service API consumed by handlers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_domain_conflation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing shared orchestration primitives for repeated ship/container lifecycle flows",
+      "Transport event protocols embedded directly into domain handlers",
+      "Global state centralization in large coordinator modules (`config`, `broadcast`)"
+    ],
+    "likely_symptoms": [
+      "ship_lifecycle_orchestration_duplication",
+      "urbit_maintenance_workflow_copy_paste",
+      "action_handlers_embed_ui_transition_protocol"
+    ],
+    "possible_false_positives": []
+  }
+}

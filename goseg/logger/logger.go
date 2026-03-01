@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -24,6 +25,7 @@ var (
 	SysLogSessions      []*websocket.Conn
 	DockerLogSessions   = make(map[string]map[*websocket.Conn]bool)
 	SysSessionsToRemove []*websocket.Conn
+	loggerInitOnce      sync.Once
 )
 
 // File Writer
@@ -60,66 +62,72 @@ func (cw ChanWriter) Sync() error {
 	return nil
 }
 
-func init() {
-	// write logs to file
-	fw := FileWriter{}
-	fileWriteSyncer := zapcore.AddSync(fw)
+func Initialize() {
+	loggerInitOnce.Do(func() {
+		// write logs to file
+		fw := FileWriter{}
+		fileWriteSyncer := zapcore.AddSync(fw)
 
-	// stdout
-	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
+		// stdout
+		consoleWriteSyncer := zapcore.AddSync(os.Stdout)
 
-	// channel
-	cw := ChanWriter{}
-	wsWriteSyncer := zapcore.AddSync(cw)
+		// channel
+		cw := ChanWriter{}
+		wsWriteSyncer := zapcore.AddSync(cw)
 
-	// encoder config
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
+		// encoder config
+		encoderConfig := zap.NewDevelopmentEncoderConfig()
 
-	// encoder
-	encoder := zapcore.NewJSONEncoder(encoderConfig)
+		// encoder
+		encoder := zapcore.NewJSONEncoder(encoderConfig)
 
-	// trigger dev mode with `./groundseg dev`
-	logLevel := zap.InfoLevel
-	for _, arg := range os.Args[1:] {
-		if arg == "dev" {
-			logLevel = zap.DebugLevel
+		// trigger dev mode with `./groundseg dev`
+		logLevel := zap.InfoLevel
+		for _, arg := range os.Args[1:] {
+			if arg == "dev" {
+				logLevel = zap.DebugLevel
+			}
 		}
-	}
 
-	// zap core
-	core := zapcore.NewTee(
-		zapcore.NewCore(encoder, fileWriteSyncer, logLevel),
-		zapcore.NewCore(encoder, consoleWriteSyncer, logLevel),
-		zapcore.NewCore(encoder, wsWriteSyncer, logLevel),
-	)
+		// zap core
+		core := zapcore.NewTee(
+			zapcore.NewCore(encoder, fileWriteSyncer, logLevel),
+			zapcore.NewCore(encoder, consoleWriteSyncer, logLevel),
+			zapcore.NewCore(encoder, wsWriteSyncer, logLevel),
+		)
 
-	// instantiate global logger
-	zap.ReplaceGlobals(zap.Must(zap.New(core, zap.AddCaller()), nil))
+		// instantiate global logger
+		zap.ReplaceGlobals(zap.Must(zap.New(core, zap.AddCaller()), nil))
 
-	fmt.Println("                                       !G#:\n                                   " +
-		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
-		"@&Y^  \n    ?&@@@@@@@@@&J             !G@@@@B?. .^ \n   Y@@@@@@@@@@@@@J         :?B@@@@G!  :" +
-		"Y&&:\n   @@@@@@@@@@@@@@B       ^Y&@@@&5^  ~P&@@@:\n   Y@@@@@@@@@@@@@J     !P&@@@#J.  7B@@@@G" +
-		"! \n    ?#@@@@@@@@@&?   .7B@@@@G7  :J#@@@&5~   \n     .!YGBBBGY7.  :J#@@@&P~  ^5&@@@#J:  !?." +
-		"\n                ^5&@@@#J:  !G@@@@G7. .?B@@:\n             .7G@@@@G7. :J#@@@&P~  ^Y#@@@&:\n" +
-		"            .P&&&&G!   ~B&&&#5^   ~#&&&&&P. \n\nＮａｔｉｖｅ Ｐｌａｎｅｔ")
-	fmt.Println(" ▄▄ • ▄▄▄        ▄• ▄▌ ▐ ▄ ·▄▄▄▄  .▄▄ · ▄▄▄ . ▄▄ • 𝐯𝟐!\n▐█ ▀ ▪▀▄ █·▪     █▪██▌•" +
-		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
-		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
-		" ·▀▀▀▀ (~)")
+		fmt.Println("                                       !G#:\n                                   " +
+			" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
+			"@&Y^  \n    ?&@@@@@@@@@&J             !G@@@@B?. .^ \n   Y@@@@@@@@@@@@@J         :?B@@@@G!  :" +
+			"Y&&:\n   @@@@@@@@@@@@@@B       ^Y&@@@&5^  ~P&@@@:\n   Y@@@@@@@@@@@@@J     !P&@@@#J.  7B@@@@G" +
+			"! \n    ?#@@@@@@@@@&?   .7B@@@@G7  :J#@@@&5~   \n     .!YGBBBGY7.  :J#@@@&P~  ^5&@@@#J:  !?." +
+			"\n                ^5&@@@#J:  !G@@@@G7. .?B@@:\n             .7G@@@@G7. :J#@@@&P~  ^Y#@@@&:\n" +
+			"            .P&&&&G!   ~B&&&#5^   ~#&&&&&P. \n\nＮａｔｉｖｅ Ｐｌａｎｅｔ")
+		fmt.Println(" ▄▄ • ▄▄▄        ▄• ▄▌ ▐ ▄ ·▄▄▄▄  .▄▄ · ▄▄▄ . ▄▄ • 𝐯𝟐!\n▐█ ▀ ▪▀▄ █·▪     █▪██▌•" +
+			"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
+			"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
+			" ·▀▀▀▀ (~)")
 
-	LogPath = makeLogPath()
-	err := os.MkdirAll(LogPath, 0755)
-	if err != nil {
-		fmt.Printf("Failed to create log directory: %v\n", err)
-		fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
-		fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
-			"\n   (  >< )\n Love, Native Planet\n")
-		fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
-		panic("")
-	}
-	zap.L().Info("Starting GroundSeg")
-	zap.L().Info("Urbit is love <3")
+		LogPath = makeLogPath()
+		err := os.MkdirAll(LogPath, 0755)
+		if err != nil {
+			fmt.Printf("Failed to create log directory: %v\n", err)
+			fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
+			fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
+				"\n   (  >< )\n Love, Native Planet\n")
+			fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+			LogPath = "/tmp/groundseg-logs/"
+			if mkErr := os.MkdirAll(LogPath, 0755); mkErr != nil {
+				fmt.Printf("Failed to create fallback log directory: %v\n", mkErr)
+				return
+			}
+		}
+		zap.L().Info("Starting GroundSeg")
+		zap.L().Info("Urbit is love <3")
+	})
 }
 
 func SysLogfile() string {
@@ -164,16 +172,16 @@ func makeLogPath() string {
 	}
 	// check if basePath is an absolute path, if it isn't exit
 	if !strings.HasPrefix(basePath, "/") {
-		fmt.Println("base path is not absolute! Exiting...")
-		os.Exit(1)
+		fmt.Println("base path is not absolute! Falling back to default path")
+		basePath = "/opt/nativeplanet/groundseg"
 	}
 	// check if the basePath (or its parents) is a mountpoint with gopsutil
 	bpCopy := basePath
 
 	partitions, err := disk.Partitions(true)
 	if err != nil {
-		fmt.Println("failed to get list of partitions! Exiting...")
-		os.Exit(1)
+		fmt.Println("failed to get list of partitions! Falling back to base path logs")
+		return basePath + "/logs/"
 	}
 
 	/*
@@ -249,7 +257,7 @@ func getDockerLogs(name string) ([]byte, error) {
 	}
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading docker logs: %w", err)
+		return []byte{}, fmt.Errorf("Error reading docker logs: %v", err)
 	}
 	jsArray := fmt.Sprintf("[%s]", strings.Join(logEntries, ", "))
 
@@ -277,7 +285,7 @@ func RetrieveSysLogHistory() ([]byte, error) {
 
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading file: %w", err)
+		return []byte{}, fmt.Errorf("Error reading file: %v", err)
 	}
 
 	// Join the lines slice into a single string resembling a JavaScript array

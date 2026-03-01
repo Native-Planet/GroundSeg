@@ -1,0 +1,95 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "The documented realtime contract declares `send` as Promise-returning and `connect(options)` as void in `ui/src/lib/runtime/contracts/realtime-client.js`, but `ui/src/lib/runtime/transport/websocket-client.js` implements synchronous `send` result objects and `connect()` returning a WebSocket session.",
+        "Command modules are largely pass-through wrappers around transport calls (`createShipCommands`, `createSystemCommands`, `createAuthCommands`) with repeated hand-written payload assembly and ad-hoc parameter renaming (`pwd`->`password`, `val`->`value`).",
+        "`ui/src/lib/stores/logsocket.js` combines socket lifecycle management, auth token retrieval, message parsing, and Svelte store mutation in one module, and `connect()` triggers async `requestLogs()` in `onOpen` without awaiting or surfacing failures."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "realtime_contract_drift",
+      "summary": "Realtime interface contract and websocket implementation diverge, making abstractions unreliable.",
+      "related_files": [
+        "ui/src/lib/runtime/contracts/realtime-client.js",
+        "ui/src/lib/runtime/transport/websocket-client.js",
+        "ui/src/lib/stores/logsocket.js"
+      ],
+      "evidence": [
+        "Contract typedef says `send(payload) => Promise<any>` and `connect(options) => void`.",
+        "Implementation exposes `connect()` with no options and returns a raw session object; `send()` returns sync status objects like `{ ok: false, reason: 'not_open' }`.",
+        "Consumer code in `logsocket.js` treats `send()` as sync result and depends on extra methods (`isOpen`, `getReadyState`) not represented in the contract."
+      ],
+      "suggestion": "Define one authoritative runtime interface and align all producers/consumers: either update the contract to the actual sync status API (including readiness helpers) or adapt `websocket-client` to the documented async shape; add contract-level tests asserting function signatures and result semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_interface_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "command_wrapper_proliferation",
+      "summary": "Command modules repeat boilerplate wrapper patterns instead of using a coherent command schema.",
+      "related_files": [
+        "ui/src/lib/runtime/commands/ship-commands.js",
+        "ui/src/lib/runtime/commands/system-commands.js",
+        "ui/src/lib/runtime/commands/auth-commands.js",
+        "ui/src/lib/runtime/commands/context.js"
+      ],
+      "evidence": [
+        "Most exported command functions only forward constants plus lightly reshaped payloads into `sendActionCommand`/`sendTypeCommand`.",
+        "Parameter naming and payload shaping is inconsistent across wrappers (`pwd`, `val`, `old`) and each function hand-encodes type/action strings.",
+        "Validation policy is uneven: `bootShip` uses `sendValidatedCommand`, while other wrappers with required intent fields bypass it entirely."
+      ],
+      "suggestion": "Replace per-function boilerplate with a shared command descriptor table (type/action/required fields/payload mapper), then generate handlers from descriptors so naming, validation, and transport behavior are centralized and consistent.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_interface_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "logsocket_multi_responsibility_store",
+      "summary": "Log socket store module mixes unrelated responsibilities and hides failure paths.",
+      "related_files": [
+        "ui/src/lib/stores/logsocket.js",
+        "ui/src/lib/runtime/transport/websocket-client.js",
+        "ui/src/lib/runtime/transport/json.js"
+      ],
+      "evidence": [
+        "`logsocket.js` owns session registry (`sessionsByType`), websocket event wiring, token loading (`loadSession()`), request serialization, parse handling, and UI state mutation (`logs.update`) in one file.",
+        "`connect()` returns `{ ok: true }` immediately after `socketClient.connect()` regardless of actual open/error outcomes.",
+        "`onOpen` calls async `requestLogs(logType)` without handling the returned error result, so bootstrapping failures are silent to callers."
+      ],
+      "suggestion": "Split the module into a transport/session service and a pure store reducer layer; make connect/request lifecycle explicit by returning a promise or evented status that includes initial subscription success/failure.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_interface_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single enforced runtime command/realtime interface; docs, implementations, and consumers evolved independently.",
+      "Behavior is encoded in many thin wrappers instead of one declarative command model, causing drift and uneven validation.",
+      "State-management modules absorb transport/auth concerns due to missing boundary between orchestration and storage."
+    ],
+    "likely_symptoms": [
+      "realtime_contract_drift",
+      "command_wrapper_proliferation",
+      "logsocket_multi_responsibility_store"
+    ],
+    "possible_false_positives": []
+  }
+}

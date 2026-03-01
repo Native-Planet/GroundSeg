@@ -37,7 +37,7 @@ var (
 		if [[ ${#patp} -eq 3 ]]; then
 			[[ $suf == *"$patp"* ]] && echo "$patp" && return
 		else
-			for p in "${patp_arr[@]}"; dofa
+			for p in "${patp_arr[@]}"; do
 				[[ ${#p} -eq 6 && $pre == *"${p:0:3}"* && $suf == *"${p:3:3}"* ]] || return
 			done
 			echo "$patp"

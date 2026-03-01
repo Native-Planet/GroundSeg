@@ -79,3 +79,12 @@ stateDiagram-v2
     Operations-->Docker_daemon: manage containers
     Docker_daemon-->Startram: forward webui and ames
 ```
+
+## Local Verification
+
+Run before opening backend/runtime PRs:
+
+1. `go test ./...`
+2. `go test -tags=integration ./broadcast ./handler ./routines ./ws` (requires Docker and runtime dependencies)
+
+When changing API boundaries, prefer explicit fetch vs sync naming (for example `Fetch*` read-only and `Sync*` mutating/persisting).

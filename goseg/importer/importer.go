@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"groundseg/click"
+	"groundseg/auth"
+	"groundseg/click/acme"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/dockerclient"
+	"groundseg/driveresolver"
+	"groundseg/lifecycle"
+	"groundseg/orchestration"
+	"groundseg/shipcleanup"
 	"groundseg/shipcreator"
-	"groundseg/startram"
+	"groundseg/shipworkflow"
 	"groundseg/structs"
 	"groundseg/system"
 	"io"
@@ -35,75 +40,72 @@ type uploadSession struct {
 	SelectedDrive   string
 	CustomDrive     string
 	NeedsFormatting bool
+	ExpiresAt       time.Time
+}
+
+type OpenUploadEndpointCmd struct {
+	Endpoint      string
+	Token         structs.WsTokenStruct
+	Remote        bool
+	Fix           bool
+	SelectedDrive string
 }
 
 var (
 	uploadSessions = make(map[string]uploadSession) // todo: add checkbox data to struct
-	uploadDir      = config.GetStoragePath("uploads")
-	tempDir        = config.GetStoragePath("temp")
+	uploadDir      string
+	tempDir        string
 	uploadMu       sync.Mutex
+	uploadTTL      = 20 * time.Minute
+	uploadKeyRegex = regexp.MustCompile(`^[a-f0-9]{32}$`)
 )
 
-func init() {
-	conf := config.Conf()
-	if !strings.HasPrefix(conf.SwapFile, "/opt") {
+func Initialize() error {
+	uploadDir = config.GetStoragePath("uploads")
+	tempDir = config.GetStoragePath("temp")
+	swapSettings := config.SwapSettingsSnapshot()
+	if !strings.HasPrefix(swapSettings.SwapFile, "/opt") {
 		var tempPath string
-		lastSlashIndex := strings.LastIndex(conf.SwapFile, "/")
+		lastSlashIndex := strings.LastIndex(swapSettings.SwapFile, "/")
 		if lastSlashIndex != -1 {
-			tempPath = conf.SwapFile[:lastSlashIndex]
+			tempPath = swapSettings.SwapFile[:lastSlashIndex]
 			tempDir = filepath.Join(tempPath, "temp")
 			uploadDir = filepath.Join(tempPath, "uploads")
 		}
 	}
-	os.MkdirAll(uploadDir, 0755)
-	os.MkdirAll(tempDir, 0755)
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return err
+	}
+	return nil
 }
 
-func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
+func OpenUploadEndpoint(cmd OpenUploadEndpointCmd) error {
 	uploadMu.Lock()
 	defer uploadMu.Unlock()
 	// grab from payload
-	endpoint := uploadPayload.Payload.Endpoint
-	token := uploadPayload.Token
-	remote := uploadPayload.Payload.Remote
-	fix := uploadPayload.Payload.Fix
-
-	// check which drive the user wants us to keep the pier in
-	sel := uploadPayload.Payload.SelectedDrive
-
-	// custom drive, leave empty if not on other drive
-	var customDrive string
-
-	// we don't need to do anything for system-drive, only if its something else
-	if sel != "system-drive" {
-		blockDevices, err := system.ListHardDisks()
-		if err != nil {
-			return fmt.Errorf("Failed to retrieve block devices: %v", err)
-		}
-
-		// we're looking for the drive the user specified
-		for _, dev := range blockDevices.BlockDevices {
-			// we have the drive
-			if dev.Name == sel {
-				for _, m := range dev.Mountpoints {
-					// check if mountpoint matches groundseg's expectations
-					matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
-					if err != nil {
-						zap.L().Error(fmt.Sprintf("Regex error for mountpoint: %v", m))
-						continue
-					}
-					// yes
-					if matched {
-						customDrive = m
-						// breaks inner loop, we've got our directory
-						break
-					}
-				}
-				// breaks outer loop after we finish getting the info we need
-				break
-			}
-		}
+	endpoint := cmd.Endpoint
+	token := cmd.Token
+	remote := cmd.Remote
+	fix := cmd.Fix
+	if !uploadKeyRegex.MatchString(endpoint) {
+		return errors.New("invalid upload session key format")
 	}
+	if token.ID == "" || token.Token == "" {
+		return errors.New("missing upload auth token")
+	}
+	if !auth.TokenIdAuthed(auth.ClientManager, token.ID) {
+		return errors.New("upload token id is not authorized")
+	}
+
+	driveResolution, err := driveresolver.Resolve(cmd.SelectedDrive)
+	if err != nil {
+		return fmt.Errorf("resolve selected drive: %w", err)
+	}
+	sel := driveResolution.SelectedDrive
+	customDrive := driveResolution.Mountpoint
 
 	// check if endpoint exists
 	existingSession, exists := uploadSessions[endpoint]
@@ -115,7 +117,8 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 			Fix:             fix,
 			SelectedDrive:   sel,
 			CustomDrive:     customDrive,
-			NeedsFormatting: sel != "system-drive" && customDrive == "",
+			NeedsFormatting: driveResolution.NeedsFormatting,
+			ExpiresAt:       time.Now().Add(uploadTTL),
 		}
 		uploadSessions[endpoint] = sesh
 		return nil
@@ -129,11 +132,22 @@ func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
 	existingSession.Fix = fix
 	existingSession.SelectedDrive = sel
 	existingSession.CustomDrive = customDrive
-	existingSession.NeedsFormatting = sel != "system-drive" && customDrive == ""
+	existingSession.NeedsFormatting = driveResolution.NeedsFormatting
+	existingSession.ExpiresAt = time.Now().Add(uploadTTL)
 
 	uploadSessions[endpoint] = existingSession
-	zap.L().Warn(fmt.Sprintf("current upload configuration: %+v", uploadPayload.Payload))
+	zap.L().Warn(fmt.Sprintf("current upload configuration: %+v", cmd))
 	return nil
+}
+
+func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
+	return OpenUploadEndpoint(OpenUploadEndpointCmd{
+		Endpoint:      uploadPayload.Payload.Endpoint,
+		Token:         uploadPayload.Token,
+		Remote:        uploadPayload.Payload.Remote,
+		Fix:           uploadPayload.Payload.Fix,
+		SelectedDrive: uploadPayload.Payload.SelectedDrive,
+	})
 }
 
 func ClearUploadSession(session string) {
@@ -149,17 +163,172 @@ func VerifySession(session string) bool {
 }
 
 func Reset() error {
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: ""}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: ""}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: ""}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "extracted", Value: 0}
+	publishImportStatus("")
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: ""})
+	publishImportError("")
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 0})
 	return nil
 }
 
-func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
+type validatedUploadRequest struct {
+	SessionID string
+	Patp      string
+	Session   uploadSession
+}
+
+func setUploadResponseHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Cache-Control, X-Requested-With")
+}
+
+func sendUploadResponse(w http.ResponseWriter, code int, status, message string) {
+	w.WriteHeader(code)
+	w.Write([]byte(fmt.Sprintf(`{"status": "%s", "message": "%s"}`, status, message)))
+}
+
+func publishImportStatus(event string) {
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "status", Event: event})
+}
+
+func publishImportError(message string) {
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "error", Event: message})
+}
+
+func failUploadRequest(w http.ResponseWriter, code int, message string) {
+	zap.L().Error(fmt.Sprintf("Upload error: %v", message))
+	publishImportError(message)
+	publishImportStatus("aborted")
+	sendUploadResponse(w, code, "failure", message)
+}
+
+func validateUploadRequest(r *http.Request) (validatedUploadRequest, error) {
+	var validated validatedUploadRequest
+	vars := mux.Vars(r)
+	session := vars["uploadSession"]
+	patp := vars["patp"]
+
+	uploadMu.Lock()
+	sesh, validSession := uploadSessions[session]
+	uploadMu.Unlock()
+
+	if !validSession {
+		return validated, fmt.Errorf("invalid upload session")
+	}
+	if time.Now().After(sesh.ExpiresAt) {
+		ClearUploadSession(session)
+		return validated, fmt.Errorf("upload session expired")
+	}
+
+	tokenID := strings.TrimSpace(r.Header.Get("X-Upload-Token-Id"))
+	tokenHash := strings.TrimSpace(r.Header.Get("X-Upload-Token"))
+	if tokenID == "" || tokenHash == "" {
+		return validated, fmt.Errorf("missing upload authorization headers")
+	}
+	if tokenID != sesh.Token.ID || tokenHash != sesh.Token.Token {
+		return validated, fmt.Errorf("upload token does not match upload session")
+	}
+	verifiedToken := map[string]string{
+		"id":    tokenID,
+		"token": tokenHash,
+	}
+	if _, err := auth.ValidateAndAuthorizeRequestToken(verifiedToken["id"], verifiedToken["token"], r); err != nil {
+		return validated, fmt.Errorf("upload token validation failed: %w", err)
+	}
+
+	validated.SessionID = session
+	validated.Patp = patp
+	validated.Session = sesh
+	return validated, nil
+}
+
+func ensureUploadDriveReady(sessionID string, sesh uploadSession) (uploadSession, error) {
+	if sesh.SelectedDrive == "system-drive" || !sesh.NeedsFormatting {
+		return sesh, nil
+	}
+	resolution, err := driveresolver.EnsureReady(driveresolver.Resolution{
+		SelectedDrive:   sesh.SelectedDrive,
+		Mountpoint:      sesh.CustomDrive,
+		NeedsFormatting: sesh.NeedsFormatting,
+	})
+	if err != nil {
+		return sesh, err
+	}
+
+	uploadMu.Lock()
+	defer uploadMu.Unlock()
+	sesh.NeedsFormatting = resolution.NeedsFormatting
+	sesh.CustomDrive = resolution.Mountpoint
+	uploadSessions[sessionID] = sesh
+	return sesh, nil
+}
+
+func parseUploadChunkMetadata(r *http.Request, filename string) (int, int, error) {
+	chunkIndex := r.FormValue("dzchunkindex")
+	totalChunks := r.FormValue("dztotalchunkcount")
+	zap.L().Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
+
+	index, err := strconv.Atoi(chunkIndex)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid chunk index")
+	}
+	total, err := strconv.Atoi(totalChunks)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid total chunk count")
+	}
+	return index, total, nil
+}
+
+func persistChunkToTemp(file io.Reader, filename string, index int) error {
+	tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
+	tempFile, err := os.Create(tempFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer tempFile.Close()
+
+	buffer := make([]byte, 32*1024)
+	if _, err := io.CopyBuffer(tempFile, file, buffer); err != nil {
+		os.Remove(tempFilePath)
+		return fmt.Errorf("failed to save chunk: %w", err)
+	}
+	return nil
+}
+
+func combineChunksWithTimeout(filename string, total int, timeout time.Duration) error {
+	combineCtx, combineCancel := context.WithTimeout(context.Background(), timeout)
+	defer combineCancel()
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- combineChunks(filename, total)
+	}()
+	select {
+	case err := <-resultCh:
+		return err
+	case <-combineCtx.Done():
+		return fmt.Errorf("timed out while combining chunks")
+	}
+}
+
+func runImportPhases(filename, patp, customDrive string, steps ...lifecycle.Step) error {
+	return orchestration.RunPhases(
+		steps,
+		func(phase lifecycle.Phase) {
+			if phase == "" {
+				return
+			}
+			publishImportStatus(string(phase))
+		},
+		func(_ lifecycle.Phase, err error) {
+			errorCleanup(filename, patp, customDrive, err.Error())
+		},
+		nil,
+		nil,
+	)
+}
+
+func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
+	setUploadResponseHeaders(w)
 
 	// Handle pre-flight OPTIONS request
 	if r.Method == "OPTIONS" {
@@ -172,138 +341,66 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	r = r.WithContext(ctx)
 
-	vars := mux.Vars(r)
-	session := vars["uploadSession"]
-	patp := vars["patp"]
-
-	// Helper function for error responses
-	handleSend := func(requestCode int, status, message string) {
-		if status == "failure" {
-			zap.L().Error(fmt.Sprintf("Upload error: %v", message))
-			docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: message}
-			docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
-		}
-		w.WriteHeader(requestCode)
-		w.Write([]byte(fmt.Sprintf(`{"status": "%s", "message": "%s"}`, status, message)))
+	validated, err := validateUploadRequest(r)
+	if err != nil {
+		failUploadRequest(w, http.StatusUnauthorized, err.Error())
+		return
 	}
+	sesh := validated.Session
+	patp := validated.Patp
 
-	// Verify session
-	uploadMu.Lock()
-	sesh, validSession := uploadSessions[session]
-	uploadMu.Unlock()
+	// Debug session info
+	zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", validated.SessionID, sesh))
 
-	if !validSession {
-		zap.L().Error(fmt.Sprintf("Invalid upload session request %v", session))
-		handleSend(http.StatusUnauthorized, "failure", "Invalid upload session")
+	// Drive handling
+	sesh, err = ensureUploadDriveReady(validated.SessionID, sesh)
+	if err != nil {
+		failUploadRequest(w, http.StatusBadRequest, "Failed to format and use custom drive")
 		return
 	}
 
-	// Debug session info
-	zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", session, sesh))
-
-	// Drive handling
-	if sesh.SelectedDrive != "system-drive" {
-		if sesh.NeedsFormatting {
-			mountpoint, err := system.CreateGroundSegFilesystem(sesh.SelectedDrive)
-			if err != nil {
-				handleSend(http.StatusBadRequest, "failure", "Failed to format and use custom drive")
-				return
-			}
-
-			uploadMu.Lock()
-			sesh.NeedsFormatting = false
-			sesh.CustomDrive = mountpoint
-			uploadSessions[session] = sesh
-			uploadMu.Unlock()
-		}
-	}
-
 	// Update status
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "patp", Event: patp}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "uploading"}
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
+	publishImportStatus("uploading")
 
 	// Handle file upload with streaming to disk
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Unable to read uploaded file: %v", err))
+		failUploadRequest(w, http.StatusBadRequest, fmt.Sprintf("Unable to read uploaded file: %v", err))
 		return
 	}
 	defer file.Close()
 
 	filename := fileHeader.Filename
-	chunkIndex := r.FormValue("dzchunkindex")
-	totalChunks := r.FormValue("dztotalchunkcount")
-
-	zap.L().Debug(fmt.Sprintf("%v chunkIndex: %v, totalChunks: %v", filename, chunkIndex, totalChunks))
-
-	index, err := strconv.Atoi(chunkIndex)
+	index, total, err := parseUploadChunkMetadata(r, filename)
 	if err != nil {
-		handleSend(http.StatusBadRequest, "failure", "Invalid chunk index")
+		failUploadRequest(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	total, err := strconv.Atoi(totalChunks)
-	if err != nil {
-		handleSend(http.StatusBadRequest, "failure", "Invalid total chunk count")
-		return
-	}
-
-	// Create temp file for this chunk with streaming
-	tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, index))
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to create temp file: %v", err))
-		return
-	}
-	defer tempFile.Close()
-
-	// Use a buffer for streaming data efficiently
-	buffer := make([]byte, 32*1024) // 32KB buffer
-	_, err = io.CopyBuffer(tempFile, file, buffer)
-	if err != nil {
-		os.Remove(tempFilePath) // Clean up on error
-		handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to save chunk: %v", err))
+	if err := persistChunkToTemp(file, filename, index); err != nil {
+		failUploadRequest(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Check if all chunks have been received
 	if allChunksReceived(filename, total) {
-		// Create a dedicated context for the combine operation
-		combineCtx, combineCancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer combineCancel()
-
-		// Use a channel to handle the result of the combine operation
-		resultCh := make(chan error, 1)
-
-		go func() {
-			resultCh <- combineChunks(filename, total)
-		}()
-
-		// Wait for combine to complete or timeout
-		select {
-		case err := <-resultCh:
-			if err != nil {
-				handleSend(http.StatusBadRequest, "failure", fmt.Sprintf("Failed to combine chunks: %v", err))
-				return
+		if err := combineChunksWithTimeout(filename, total, 30*time.Minute); err != nil {
+			if strings.Contains(err.Error(), "timed out") {
+				failUploadRequest(w, http.StatusRequestTimeout, err.Error())
+			} else {
+				failUploadRequest(w, http.StatusBadRequest, fmt.Sprintf("Failed to combine chunks: %v", err))
 			}
-
-			handleSend(http.StatusOK, "success", "Upload successful")
-
-			// Clear session
-			ClearUploadSession(session)
-
-			// Configure the pier in the background
-			go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
-			return
-
-		case <-combineCtx.Done():
-			handleSend(http.StatusRequestTimeout, "failure", "Timed out while combining chunks")
 			return
 		}
+		sendUploadResponse(w, http.StatusOK, "success", "Upload successful")
+		ClearUploadSession(validated.SessionID)
+		go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
+		return
 	}
 
 	// If we get here, just acknowledge the chunk reception
-	handleSend(http.StatusOK, "success", "Chunk received successfully")
+	sendUploadResponse(w, http.StatusOK, "success", "Chunk received successfully")
 }
 
 func allChunksReceived(filename string, total int) bool {
@@ -319,7 +416,7 @@ func combineChunks(filename string, total int) error {
 	destFilePath := filepath.Join(uploadDir, filename)
 	destFile, err := os.Create(destFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to create destination file: %v", err)
+		return fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer destFile.Close()
 
@@ -332,7 +429,7 @@ func combineChunks(filename string, total int) error {
 		// Open each chunk file
 		partFile, err := os.Open(partFilePath)
 		if err != nil {
-			return fmt.Errorf("failed to open chunk file %d: %v", i, err)
+			return fmt.Errorf("failed to open chunk file %d: %w", i, err)
 		}
 
 		// Stream the chunk file to the destination using the buffer
@@ -340,7 +437,7 @@ func combineChunks(filename string, total int) error {
 		partFile.Close() // Close immediately after copying
 
 		if err != nil {
-			return fmt.Errorf("failed to copy chunk %d: %v", i, err)
+			return fmt.Errorf("failed to copy chunk %d: %w", i, err)
 		}
 
 		// Remove the chunk file after successful copy
@@ -355,269 +452,159 @@ func combineChunks(filename string, total int) error {
 
 func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
 	defer system.RemoveMultipartFiles("/tmp")
-
-	extractionTimeout := time.NewTimer(4 * time.Hour)
-	extractionDone := make(chan bool, 1)
-
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
-
-	defer system.RemoveMultipartFiles("/tmp") // remove multipart-* which are uploaded chunks
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "creating"}
-	// create pier config
 	var customPath string
 	if dirPath != "" {
 		customPath = dirPath
 	}
-	err := shipcreator.CreateUrbitConfig(patp, customPath)
-	if err != nil {
-		errmsg := fmt.Sprintf("Failed to create urbit config: %v", err)
-		zap.L().Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
-		return
-	}
-	// update system.json
-	err = shipcreator.AppendSysConfigPier(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("Failed to update system.json: %v", err)
-		zap.L().Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
-		return
-	}
-	// Prepare environment for pier
-	zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
-	// delete container if exists
-	err = docker.DeleteContainer(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		zap.L().Error(errmsg)
-	}
-	// delete volume if exists
-	err = docker.DeleteVolume(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v (harmless)", err)
-		zap.L().Info(errmsg)
-	}
-	if customPath == "" { // no custom path provided
-		// create new docker volume
-		err = docker.CreateVolume(patp)
-		if err != nil {
-			errmsg := fmt.Sprintf("failed to create volume: %v", err)
-			zap.L().Error(errmsg)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	} else { // create custom directory for upload
-		if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
-			errmsg := fmt.Sprintf("create custom pier directory error: %v", err)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	}
-	// extract file to volume directory
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "extracting"}
-	// set default path
 	volPath := filepath.Join(config.DockerDir, patp, "_data")
-	// modify if custom path
 	if customPath != "" {
 		volPath = filepath.Join(customPath, patp)
 	}
-	go func() {
-		select {
-		case <-extractionTimeout.C:
-			// Force completion if extraction gets stuck
-			docker.ImportShipTransBus <- structs.UploadTransition{
-				Type:  "extracted",
-				Value: 100,
-			}
-			docker.ImportShipTransBus <- structs.UploadTransition{
-				Type:  "status",
-				Event: "checking",
-			}
-		case <-extractionDone:
-			// Extraction completed normally
-			extractionTimeout.Stop()
-		}
-	}()
-	compressedPath := filepath.Join(uploadDir, filename)
-	switch checkExtension(filename) {
-	case ".zip":
-		err := extractZip(compressedPath, volPath)
-		if err != nil {
-			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	case ".tar.gz", ".tgz":
-		err := extractTarGz(compressedPath, volPath)
-		if err != nil {
-			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	case ".tar":
-		err := extractTar(compressedPath, volPath)
-		if err != nil {
-			errmsg := fmt.Sprintf("Failed to extract %v: %v", filename, err)
-			errorCleanup(filename, patp, errmsg)
-			return
-		}
-	default:
-		errmsg := fmt.Sprintf("Unsupported file type %v", filename)
-		errorCleanup(filename, patp, errmsg)
-		return
-	}
-	extractionDone <- true
-	zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
-	// run restructure
-	if err := restructureDirectory(patp); err != nil {
-		errorCleanup(filename, patp, fmt.Sprintf("Failed to restructure directory: %v", err))
-		return
-	}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "booting"}
-	// start container
-	zap.L().Info(fmt.Sprintf("Starting extracted pier: %v", patp))
-	info, err := docker.StartContainer(patp, "vere")
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		zap.L().Error(errmsg)
-		errorCleanup(filename, patp, errmsg)
-		return
-	}
-	config.UpdateContainerState(patp, info)
-	os.Remove(filepath.Join(uploadDir, filename))
 
-	// debug, force error
-	//errmsg := "Self induced error, for debugging purposes"
-	//errorCleanup(filename, patp, errmsg)
-	//return
+	err := runImportPhases(
+		filename,
+		patp,
+		customPath,
+		lifecycle.Step{
+			Phase: lifecycle.Phase("creating"),
+			Run: func() error {
+				if err := shipcreator.CreateUrbitConfig(patp, customPath); err != nil {
+					return fmt.Errorf("failed to create urbit config: %w", err)
+				}
+				if err := shipcreator.AppendSysConfigPier(patp); err != nil {
+					return fmt.Errorf("failed to update system.json: %w", err)
+				}
+				zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
+				if err := docker.DeleteContainer(patp); err != nil {
+					zap.L().Error(fmt.Sprintf("%v", err))
+				}
+				if err := docker.DeleteVolume(patp); err != nil {
+					zap.L().Info(fmt.Sprintf("%v (harmless)", err))
+				}
+				if customPath == "" {
+					if err := docker.CreateVolume(patp); err != nil {
+						return fmt.Errorf("failed to create volume: %w", err)
+					}
+					return nil
+				}
+				if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
+					return fmt.Errorf("create custom pier directory error: %w", err)
+				}
+				return nil
+			},
+		},
+		lifecycle.Step{
+			Phase: lifecycle.Phase("extracting"),
+			Run: func() error {
+				extractionTimeout := time.NewTimer(4 * time.Hour)
+				extractionDone := make(chan struct{})
+				go func() {
+					select {
+					case <-extractionTimeout.C:
+						docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
+						publishImportStatus("checking")
+					case <-extractionDone:
+						extractionTimeout.Stop()
+					}
+				}()
+				defer close(extractionDone)
+
+				compressedPath := filepath.Join(uploadDir, filename)
+				switch checkExtension(filename) {
+				case ".zip":
+					if err := extractZip(compressedPath, volPath); err != nil {
+						return fmt.Errorf("failed to extract %v: %w", filename, err)
+					}
+				case ".tar.gz", ".tgz":
+					if err := extractTarGz(compressedPath, volPath); err != nil {
+						return fmt.Errorf("failed to extract %v: %w", filename, err)
+					}
+				case ".tar":
+					if err := extractTar(compressedPath, volPath); err != nil {
+						return fmt.Errorf("failed to extract %v: %w", filename, err)
+					}
+				default:
+					return fmt.Errorf("unsupported file type %v", filename)
+				}
+				zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
+				if err := restructureDirectory(patp); err != nil {
+					return fmt.Errorf("failed to restructure directory: %w", err)
+				}
+				return nil
+			},
+		},
+		lifecycle.Step{
+			Phase: lifecycle.Phase("booting"),
+			Run: func() error {
+				zap.L().Info(fmt.Sprintf("Starting extracted pier: %v", patp))
+				info, err := docker.StartContainer(patp, "vere")
+				if err != nil {
+					return fmt.Errorf("failed to start imported ship: %w", err)
+				}
+				config.UpdateContainerState(patp, info)
+				if err := os.Remove(filepath.Join(uploadDir, filename)); err != nil {
+					zap.L().Warn(fmt.Sprintf("Failed to remove uploaded archive %s: %v", filename, err))
+				}
+				return nil
+			},
+		},
+	)
+	if err != nil {
+		return
+	}
 
 	// if startram is registered
-	conf := config.Conf()
-	if conf.WgRegistered {
+	startramSettings := config.StartramSettingsSnapshot()
+	if startramSettings.WgRegistered {
 		// Register Services
 		go registerServices(patp)
 	}
 	// check for +code
-	go waitForShipReady(filename, patp, remote, fix)
+	go waitForShipReady(filename, patp, remote, fix, customPath)
 }
 
-func waitForShipReady(filename, patp string, remote, fix bool) {
+func waitForShipReady(filename, patp string, remote, fix bool, customDrive string) {
 	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
-	lusCodeTicker := time.NewTicker(1 * time.Second)
-	for {
-		select {
-		case <-lusCodeTicker.C:
-			code, err := click.GetLusCode(patp)
-			if err != nil {
-				continue
-			}
-			if len(code) == 27 {
-				break
-			} else {
-				continue
-			}
+	shipworkflow.WaitForBootCode(patp, 1*time.Second)
+	if fix {
+		if err := acme.Fix(patp); err != nil {
+			errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
+			zap.L().Error(errmsg)
 		}
-		if fix {
-			if err := click.FixAcme(patp); err != nil {
-				errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
-				zap.L().Error(errmsg)
-			}
-		}
-		conf := config.Conf()
-		if conf.WgRegistered && conf.WgOn && remote {
-			importShipToggleRemote(patp)
-			shipConf := config.UrbitConf(patp)
-			shipConf.Network = "wireguard"
-			update := make(map[string]structs.UrbitDocker)
-			update[patp] = shipConf
-			if err := config.UpdateUrbitConfig(update); err != nil {
-				errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
-				errorCleanup(filename, patp, errmsg)
-				return
-			}
-			zap.L().Debug(fmt.Sprintf("Deleting container %s for switching networks", patp))
-			statuses, err := docker.GetShipStatus([]string{patp})
-			if err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to get statuses for %s when rebuilding container: %v", patp, err))
-			}
-			status, exists := statuses[patp]
-			if !exists {
-				zap.L().Error(fmt.Sprintf("%s status doesn't exist", patp))
-			}
-			isRunning := strings.Contains(status, "Up")
-			if isRunning {
-				if err := click.BarExit(patp); err != nil {
-					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for rebuilding container: %v", patp, err))
-				}
-			}
-			if err := docker.DeleteContainer(patp); err != nil {
-				errmsg := fmt.Sprintf("Failed to delete local container for imported ship: %v", err)
-				zap.L().Error(errmsg)
-			}
-			docker.StartContainer("minio_"+patp, "minio")
-			zap.L().Debug(fmt.Sprintf("Starting container %s after switching networks", patp))
-			info, err := docker.StartContainer(patp, "vere")
-			if err != nil {
-				errmsg := fmt.Sprintf("%v", err)
-				zap.L().Error(errmsg)
-				errorCleanup(filename, patp, errmsg)
-				return
-			}
-			config.UpdateContainerState(patp, info)
-		}
-		docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "completed"}
-		return
 	}
-}
-
-func importShipToggleRemote(patp string) {
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "remote"}
-	remoteTicker := time.NewTicker(1 * time.Second)
-	// break if all subdomains with this patp has status of "ok"
-	for {
-		select {
-		case <-remoteTicker.C:
-			tramConf := config.StartramConfig
-			for _, subd := range tramConf.Subdomains {
-				if strings.Contains(subd.URL, patp) {
-					if subd.Status != "ok" {
-						continue
-					}
-				}
-			}
+	startramSettings := config.StartramSettingsSnapshot()
+	if startramSettings.WgRegistered && startramSettings.WgOn && remote {
+		publishImportStatus("remote")
+		shipworkflow.WaitForRemoteReady(patp, 1*time.Second)
+		if err := shipworkflow.SwitchShipToWireguard(patp, true); err != nil {
+			errmsg := fmt.Sprintf("%v", err)
+			zap.L().Error(errmsg)
+			errorCleanup(filename, patp, customDrive, errmsg)
 			return
 		}
 	}
+	publishImportStatus("completed")
 }
 
-func errorCleanup(filename, patp, errmsg string) {
+func errorCleanup(filename, patp, customDrive, errmsg string) {
 	// notify that we are cleaning up
 	zap.L().Info(fmt.Sprintf("Pier import process failed: %s: %s", patp, errmsg))
 	zap.L().Info(fmt.Sprintf("Running cleanup routine"))
-	//remove file
-	zap.L().Info(fmt.Sprintf("Removing %v", filename))
-	os.Remove(filepath.Join(uploadDir, filename))
-	// remove <patp>.json
-	zap.L().Info(fmt.Sprintf("Removing Urbit Config: %s", patp))
-	if err := config.RemoveUrbitConfig(patp); err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		zap.L().Error(errmsg)
+
+	customPierPath := ""
+	if customDrive != "" {
+		customPierPath = filepath.Join(customDrive, patp)
 	}
-	// remove patp from system.json
-	zap.L().Info(fmt.Sprintf("Removing pier entry from System Config: %v", patp))
-	err := shipcreator.RemoveSysConfigPier(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		zap.L().Error(errmsg)
+	if err := shipcleanup.RollbackProvisioning(patp, shipcleanup.RollbackOptions{
+		UploadArchivePath:    filepath.Join(uploadDir, filename),
+		CustomPierPath:       customPierPath,
+		RemoveContainer:      true,
+		RemoveContainerState: true,
+	}); err != nil {
+		zap.L().Error(fmt.Sprintf("Import rollback encountered errors: %v", err))
 	}
-	// remove docker volume
-	err = docker.DeleteVolume(patp)
-	if err != nil {
-		errmsg := fmt.Sprintf("%v", err)
-		zap.L().Error(errmsg)
-	}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "error", Event: errmsg}
-	docker.ImportShipTransBus <- structs.UploadTransition{Type: "status", Event: "aborted"}
+	publishImportError(errmsg)
+	publishImportStatus("aborted")
 	return
 }
 
@@ -712,7 +699,7 @@ func restructureDirectory(patp string) error {
 }
 
 func registerServices(patp string) {
-	if err := startram.RegisterNewShip(patp); err != nil {
+	if err := shipworkflow.RegisterShipServices(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
 	}
 }

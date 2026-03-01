@@ -1,0 +1,94 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "high_level_elegance": 72.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/handler/handler.go combines websocket auth/session handlers (LoginHandler, LogoutHandler), ship provisioning flow (NewShipHandler), connectivity action handling (C2CHandler), and password management (PwHandler) in one top-level file, creating unclear ownership boundaries for the handler package.",
+        "goseg/handler/dev.go places development-only operational controls (backup upload/restore, StarTram reminder toggles, disk mount inspection) in the same package as production handlers and wires directly into backupsvc, startram, click, config, and system from one file.",
+        "goseg/click/click.go exports a broad cross-domain facade (acme fix, desk operations, notifications, backup/restore, storage linking) while goseg/click/code.go also owns in-memory +code caching and execution orchestration, indicating a flattened package boundary rather than domain-focused subpackage APIs.",
+        "goseg/routines/backup.go and goseg/routines/chop.go host long-running scheduler loops plus operational policy and direct service calls, with package-level mutable seams and globals, which blurs whether routines is orchestration-only or business-logic owning."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "handler_package_mixed_ownership",
+      "summary": "The handler package mixes unrelated capabilities (auth/session, ship lifecycle, connectivity, dev operations), obscuring ownership and change boundaries.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/handler/dev.go",
+        "goseg/handler/dev_test.go"
+      ],
+      "evidence": [
+        "goseg/handler/handler.go includes LoginHandler/LogoutHandler, NewShipHandler, C2CHandler, UnauthHandler, and PwHandler in one file.",
+        "goseg/handler/dev.go adds development backup/restore and StarTram reminder controls in the same package, with direct imports of backupsvc, startram, click, config, and system.",
+        "goseg/handler/dev_test.go must reset many package-level seams for these mixed responsibilities, signaling weak internal boundaries."
+      ],
+      "suggestion": "Split handler into bounded subpackages/files by capability (e.g., handler/auth, handler/ship, handler/connectivity, handler/devtools) with a thin transport entry layer that dispatches to dedicated services.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flattened_boundary_management"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "click_facade_domain_flattening",
+      "summary": "The click package acts as a broad multi-domain facade, flattening distinct domains into one API surface and weakening package role clarity.",
+      "related_files": [
+        "goseg/click/click.go",
+        "goseg/click/code.go",
+        "goseg/click/click_test.go"
+      ],
+      "evidence": [
+        "goseg/click/click.go exports unrelated concerns together: FixAcme, desk lifecycle methods, SendNotification, storage link/unlink, RestoreTlon, BackupTlon.",
+        "goseg/click/code.go keeps +code cache state and click execution plumbing in the same package API family rather than behind narrower domain modules.",
+        "goseg/click/click_test.go validates dispatch via package-level seam overrides, reflecting a large, centralized package surface."
+      ],
+      "suggestion": "Refactor click into explicit domain subpackages (e.g., click/desk, click/notify, click/backup, click/luscode) and keep click root as a minimal composition layer or remove it entirely.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flattened_boundary_management"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "routines_orchestration_boundary_blur",
+      "summary": "Background routines combine scheduler lifecycle, policy decisions, and direct infrastructure calls, making directory boundaries in routines ambiguous.",
+      "related_files": [
+        "goseg/routines/backup.go",
+        "goseg/routines/chop.go",
+        "goseg/routines/backup_test.go"
+      ],
+      "evidence": [
+        "goseg/routines/backup.go contains infinite-loop scheduling, backup window policy (time checks), and direct backupsvc/config calls in one unit.",
+        "goseg/routines/chop.go contains periodic scheduling plus direct docker stats access and chop execution policy.",
+        "Both files define package-level seam vars and mutable globals, suggesting routines owns both orchestration and service logic instead of delegating policy/services behind clearer boundaries."
+      ],
+      "suggestion": "Separate routines into scheduler drivers (tick/lifecycle) and injected policy/service components (backup policy, chop policy, infrastructure adapters) so routines directory represents orchestration only.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flattened_boundary_management"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Feature growth appears to have accumulated in package-root files as convenience entry points, producing flattened ownership boundaries.",
+      "Package-level seam variables encourage centralized files that absorb unrelated responsibilities over time."
+    ],
+    "likely_symptoms": [
+      "handler_package_mixed_ownership",
+      "click_facade_domain_flattening",
+      "routines_orchestration_boundary_blur"
+    ],
+    "possible_false_positives": []
+  }
+}

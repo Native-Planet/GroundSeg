@@ -1,0 +1,104 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "package_organization": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md defines `ui/src/` as frontend source-of-truth and says generated `goseg/web/_app/immutable/` files should not be hand-edited, but the reviewed runtime is committed only as minified hashed artifacts (`apps-page.svelte.85e3c543.js`, `captive-page.svelte.525c6d92.js`, `boot-existing-page.svelte.509e2e47.js`) with no embedded provenance or source mapping contract in-file.",
+        "`apps-page.svelte.85e3c543.js` and `captive-page.svelte.525c6d92.js` import exact hashed dependencies (for example `../chunks/websocket.84e20bf3.js`), creating tight cross-file hash coupling that requires atomic regeneration of all related assets.",
+        "README quality gate lists `npm run test` and `npm run build` but does not define a compatibility/publish gate that verifies committed immutable artifacts are atomically regenerated and internally consistent with the referenced hashed imports."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "Holistic structure data shows `goseg/web/_app/immutable/chunks/` has 49 generated files and `goseg/web/_app/immutable/entry/` has 31 generated files; both exceed the >10 mixed-file threshold and are organized by build output type rather than ownership domain.",
+        "Reviewed entry files (`apps-page.svelte.85e3c543.js`, `boot-existing-page.svelte.509e2e47.js`, `captive-page.svelte.525c6d92.js`) pull directly from shared hashed chunk files, reinforcing a flat build-artifact graph that is difficult to navigate by feature/change boundary.",
+        "README documents source/runtime ownership but keeps generated artifacts under `goseg/web/_app/immutable/` in the main tree, so package layout still exposes low-navigability generated internals as first-class repository structure."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "missing_atomic_runtime_contract",
+      "summary": "Hashed runtime modules are tightly coupled without an enforceable atomic compatibility contract.",
+      "related_files": [
+        "README.md",
+        "goseg/web/_app/immutable/entry/apps-page.svelte.85e3c543.js",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js"
+      ],
+      "evidence": [
+        "README mandates generated runtime ownership but does not define a lockstep publish rule for hashed asset sets.",
+        "`apps-page.svelte.85e3c543.js` imports `../chunks/websocket.84e20bf3.js`; this creates hard hash-level coupling between entry and chunk artifacts.",
+        "Any partial refresh of committed generated files can leave import references stale without a documented compatibility check."
+      ],
+      "suggestion": "Add an explicit build-compatibility contract: generate a manifest (entry->chunk hash map + source commit + build tool versions), require CI to run `cd ui && npm ci && npm run build`, compare regenerated `goseg/web/_app/immutable/` against committed artifacts, and fail on partial/hash-inconsistent updates; document this atomic publish rule in README.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_runtime_governance_gap"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "opaque_generated_boundary",
+      "summary": "Committed generated runtime lacks traceability metadata to its source boundary.",
+      "related_files": [
+        "README.md",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js",
+        "goseg/web/_app/immutable/entry/boot-existing-page.svelte.509e2e47.js"
+      ],
+      "evidence": [
+        "README states source-of-truth is `ui/src/`, but reviewed generated files are minified bundles with hashed names and no embedded origin/provenance markers.",
+        "`urbit.f551ce98.js` and `boot-existing-page.svelte.509e2e47.js` expose runtime behavior but do not indicate source module lineage or build identity in-file.",
+        "This weakens architecture-governance review because boundary drift cannot be audited from committed runtime artifacts alone."
+      ],
+      "suggestion": "Emit and commit machine-readable provenance alongside immutable output (for example `goseg/web/_app/immutable/manifest.json` with source path mapping, source commit SHA, and build timestamp/toolchain), then link that artifact from README and enforce its refresh in CI.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_runtime_governance_gap"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "generated_tree_overexposed_in_main_layout",
+      "summary": "Generated immutable artifacts are organized as primary package structure instead of a bounded distribution package.",
+      "related_files": [
+        "README.md",
+        "goseg/web/_app/immutable/entry/captive-page.svelte.525c6d92.js",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js"
+      ],
+      "evidence": [
+        "Structure profile shows large generated directories (`entry/` 31 files, `chunks/` 49 files), indicating flat artifact-heavy layout beyond cohesive package boundaries.",
+        "Reviewed files mix feature semantics (apps/captive/boot) with bundler-oriented placement (`entry` vs `chunks`), which is optimized for runtime loading, not repository ownership.",
+        "README warns against hand-editing these files, confirming they are distribution outputs, yet they remain exposed under a path that behaves like ordinary package structure."
+      ],
+      "suggestion": "Staged reorg plan: (1) create `goseg/web/generated/<build-id>/` as the sole committed distribution package with `manifest.json`; (2) move `entry/*` first, then `chunks/*`, preserving relative references via manifest-driven path rewrite; (3) update serving/config references to the new generated root; (4) run `cd ui && npm ci && npm run build` then validate with `rg -n \"_app/immutable|generated/<build-id>\" README.md goseg` and a startup smoke test to confirm imports resolve.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "generated_runtime_governance_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance is documented at a high level, but runtime artifact compatibility and provenance contracts are not concretely encoded.",
+      "Build-output directory conventions are used as repository package boundaries, reducing navigability by ownership/domain."
+    ],
+    "likely_symptoms": [
+      "missing_atomic_runtime_contract",
+      "opaque_generated_boundary",
+      "generated_tree_overexposed_in_main_layout"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -20,6 +20,9 @@ var (
 	cachedVersion       string
 	versionDetected     bool
 	ignoredAPIEnvWarned sync.Once
+
+	detectAPIVersionForClient  = detectAPIVersion
+	newClientWithOptsForClient = client.NewClientWithOpts
 )
 
 // New returns a Docker client that pings the daemon once to discover the API
@@ -38,7 +41,7 @@ func New(extraOpts ...client.Opt) (*client.Client, error) {
 		opts = append(opts, client.WithVersion(apiVersion))
 	}
 	opts = append(opts, extraOpts...)
-	return client.NewClientWithOpts(opts...)
+	return newClientWithOptsForClient(opts...)
 }
 
 func getAPIVersion() (string, error) {
@@ -55,7 +58,7 @@ func getAPIVersion() (string, error) {
 		return cachedVersion, nil
 	}
 
-	version, err := detectAPIVersion()
+	version, err := detectAPIVersionForClient()
 	if err != nil {
 		return "", err
 	}

@@ -2,11 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker"
+	"groundseg/driveresolver"
 	"groundseg/leakchannel"
 	"groundseg/structs"
 	"groundseg/system"
@@ -30,7 +32,9 @@ const (
 	LockoutDuration = 2 * time.Minute
 )
 
-func init() {
+var ErrInvalidLoginCredentials = errors.New("invalid login credentials")
+
+func Initialize() {
 	go HandleLeakAction()
 }
 
@@ -40,14 +44,14 @@ func NewShipHandler(msg []byte) error {
 	var shipPayload structs.WsNewShipPayload
 	err := json.Unmarshal(msg, &shipPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal new ship payload: %v", err)
+		return fmt.Errorf("Couldn't unmarshal new ship payload: %w", err)
 	}
 	switch shipPayload.Payload.Action {
 	case "boot":
 		handleError := func(err error) {
-			docker.NewShipTransBus <- structs.NewShipTransition{Type: "freeError", Event: err.Error()}
+			docker.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: err.Error()})
 			time.Sleep(5 * time.Second)
-			docker.NewShipTransBus <- structs.NewShipTransition{Type: "freeError", Event: ""}
+			docker.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: ""})
 		}
 		keyType := shipPayload.Payload.KeyType
 		if keyType == "master-ticket" {
@@ -61,45 +65,22 @@ func NewShipHandler(msg []byte) error {
 			}
 			kf, err := libprg.Keyfile(shipPayload.Payload.Patp, masterTicket, "", 0)
 			if err != nil {
-				handleError(fmt.Errorf("Couldn't get keyfile: %v", err.Error()))
+				handleError(fmt.Errorf("Couldn't get keyfile: %w", err))
 				return err
 			}
 			shipPayload.Payload.Key = kf
 		}
-		// handle filesystem
-		sel := shipPayload.Payload.SelectedDrive //string
-		// if not using system-drive, that means custom location
-		if sel != "system-drive" {
-			// get list of devices -- lsblk -f
-			blockDevices, err := system.ListHardDisks()
-			if err != nil {
-				errMsg := fmt.Errorf("Failed to retrieve block devices: %v", err)
-				handleError(errMsg)
-				return errMsg
-			}
-			// we're looking for the drive the user specified
-			for _, dev := range blockDevices.BlockDevices {
-				if dev.Name == sel {
-					// lets see if its structured correctly
-					for _, m := range dev.Mountpoints {
-						matched, err := regexp.MatchString(`^/groundseg-\d+$`, m)
-						if err != nil {
-							errMsg := fmt.Errorf("Regex match error: %v", err)
-							handleError(errMsg)
-							return errMsg
-						}
-						// device provided in payload does not match groundseg's format
-						if !matched {
-							// we overwrite the fs
-							if _, err := system.CreateGroundSegFilesystem(sel); err != nil {
-								errMsg := fmt.Errorf("Failed to create groundseg filesystem: %v", err)
-								handleError(errMsg)
-								return errMsg
-							}
-						}
-					}
-				}
-			}
+		driveResolution, err := driveresolver.Resolve(shipPayload.Payload.SelectedDrive)
+		if err != nil {
+			errMsg := fmt.Errorf("Failed to resolve selected drive: %w", err)
+			handleError(errMsg)
+			return errMsg
+		}
+		driveResolution, err = driveresolver.EnsureReady(driveResolution)
+		if err != nil {
+			errMsg := fmt.Errorf("Failed to prepare selected drive: %w", err)
+			handleError(errMsg)
+			return errMsg
 		}
 		// Check if patp is valid
 		patp := sigRemove(shipPayload.Payload.Patp)
@@ -109,7 +90,7 @@ func NewShipHandler(msg []byte) error {
 			// handleError(errMsg)
 			return errMsg
 		}
-		go createUrbitShip(patp, shipPayload)
+		go createUrbitShip(patp, shipPayload, driveResolution.Mountpoint)
 	case "reset":
 		err := resetNewShip()
 		if err != nil {
@@ -127,10 +108,10 @@ func NewShipHandler(msg []byte) error {
 		}
 		deleteMsg, err := json.Marshal(deletePayload)
 		if err != nil {
-			return fmt.Errorf("Failed to marshall payload for newly created %s for deletion: %v payload=%+v", patp, err, deletePayload)
+			return fmt.Errorf("Failed to marshall payload for newly created %s for deletion: %w payload=%+v", patp, err, deletePayload)
 		}
 		if err := UrbitHandler(deleteMsg); err != nil {
-			return fmt.Errorf("Failed to delete newly created %v: %v", patp, err)
+			return fmt.Errorf("Failed to delete newly created %v: %w", patp, err)
 		}
 		if err := resetNewShip(); err != nil {
 			return err
@@ -148,7 +129,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
-		return make(map[string]string), fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+		return make(map[string]string), fmt.Errorf("Couldn't unmarshal login payload: %w", err)
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
@@ -162,7 +143,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 			"token": newToken,
 		}
 		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
-			return make(map[string]string), fmt.Errorf("Unable to process login: %v", err)
+			return make(map[string]string), fmt.Errorf("Unable to process login: %w", err)
 		}
 		zap.L().Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return token, nil
@@ -177,7 +158,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 			"message": "Login failed. Please try again.",
 		})
 		conn.Write(loginError)
-		return map[string]string{"id": loginPayload.Token.ID, "token": loginPayload.Token.Token}, nil
+		return map[string]string{}, ErrInvalidLoginCredentials
 	}
 }
 
@@ -212,7 +193,7 @@ func LogoutHandler(msg []byte) error {
 	var logoutPayload structs.WsLogoutPayload
 	err := json.Unmarshal(msg, &logoutPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal login payload: %v", err)
+		return fmt.Errorf("Couldn't unmarshal login payload: %w", err)
 	}
 	auth.RemoveFromAuthMap(logoutPayload.Token.ID, true)
 	return nil
@@ -223,12 +204,14 @@ func C2CHandler(msg []byte) ([]byte, error) {
 	var c2cPayload structs.WsC2cPayload
 	err := json.Unmarshal(msg, &c2cPayload)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't unmarshal c2c payload: %v", err)
+		return nil, fmt.Errorf("Couldn't unmarshal c2c payload: %w", err)
 	}
 	var resp []byte
 	switch c2cPayload.Payload.Type {
 	case "c2c":
-		system.C2CConnect(c2cPayload.Payload.SSID, c2cPayload.Payload.Password)
+		if err := system.C2CConnect(c2cPayload.Payload.SSID, c2cPayload.Payload.Password); err != nil {
+			return nil, fmt.Errorf("c2c connect failed: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("Invalid c2c request")
 		/*
@@ -238,7 +221,7 @@ func C2CHandler(msg []byte) ([]byte, error) {
 			}
 			resp, err = json.Marshal(blob)
 			if err != nil {
-				return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+				return nil, fmt.Errorf("Error unmarshalling message: %w", err)
 			}
 		*/
 	}
@@ -258,7 +241,7 @@ func UnauthHandler() ([]byte, error) {
 	}
 	resp, err := json.Marshal(blob)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshalling message: %v", err)
+		return nil, fmt.Errorf("Error unmarshalling message: %w", err)
 	}
 	return resp, nil
 }
@@ -268,25 +251,27 @@ func PwHandler(msg []byte, urbitMode bool) error {
 	var pwPayload structs.WsPwPayload
 	err := json.Unmarshal(msg, &pwPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal password payload: %v", err)
+		return fmt.Errorf("Couldn't unmarshal password payload: %w", err)
 	}
 	switch pwPayload.Payload.Action {
 	case "modify":
 		zap.L().Info("Setting new password")
 		conf := config.Conf()
 		if auth.Hasher(pwPayload.Payload.Old) == conf.PwHash {
-			update := map[string]interface{}{
-				"pwHash": auth.Hasher(pwPayload.Payload.Password),
-			}
-			if err := config.UpdateConf(update); err != nil {
-				return fmt.Errorf("Unable to update password: %v", err)
+			if err := config.UpdateConfTyped(config.WithPwHash(auth.Hasher(pwPayload.Payload.Password))); err != nil {
+				return fmt.Errorf("Unable to update password: %w", err)
 			}
 			if urbitMode {
 				leakchannel.Logout <- struct{}{}
 				return nil
 			}
-			LogoutHandler(msg)
+			if pwPayload.Token.ID == "" {
+				return fmt.Errorf("Missing token id for logout after password update")
+			}
+			auth.RemoveFromAuthMap(pwPayload.Token.ID, true)
+			return nil
 		}
+		return fmt.Errorf("Current password is incorrect")
 	default:
 		return fmt.Errorf("Unrecognized password action: %v", pwPayload.Payload.Action)
 	}

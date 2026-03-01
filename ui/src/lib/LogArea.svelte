@@ -4,22 +4,24 @@
   import { URBIT_MODE } from '$lib/stores/data'
   import { wsPort } from '$lib/stores/websocket'
   import { logs, connect, disconnect } from '$lib/stores/logsocket'
+  import { runtimeModeConfig } from '$lib/runtime/config/mode-config.js'
+  import { resolveWebsocketUrl } from '$lib/runtime/transport/url.js'
   import Clipboard from 'clipboard'
 
   export let type
   let copied = false
   let latest = true
-  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
   $: lines = ($logs[type]) || []
 
   onMount(()=> {
-    const hostname = $page.url.hostname
     if (!$URBIT_MODE) {
-      if (customHostname) {
-        connect("ws://" + customHostname + ":" + $wsPort + "/logs",type) // if GS_CUSTOM_HOSTNAME is set
-      } else {
-        connect("ws://" + hostname + ":" + $wsPort + "/logs",type)
-      }
+      const url = resolveWebsocketUrl({
+        hostname: $page.url.hostname,
+        port: $wsPort,
+        path: '/logs',
+        customHostname: runtimeModeConfig.customHostname
+      })
+      connect(url, type)
     }
   })
   onDestroy(()=>disconnect(type))

@@ -1,13 +1,8 @@
 package docker
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
-	"groundseg/config"
-	"groundseg/dockerclient"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,39 +13,53 @@ import (
 	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+type wireguardRuntime = dockerRuntime
+
+func newWireguardRuntime() wireguardRuntime {
+	return newDockerRuntime()
+}
+
 func LoadWireguard() error {
+	return loadWireguard(newWireguardRuntime())
+}
+
+func loadWireguard(rt wireguardRuntime) error {
 	zap.L().Info("Loading Startram Wireguard container")
-	confPath := filepath.Join(config.BasePath, "settings", "wireguard.json")
-	_, err := os.Open(confPath)
+	confPath := filepath.Join(rt.basePath(), "settings", "wireguard.json")
+	_, err := rt.osOpen(confPath)
 	if err != nil {
 		// create a default container conf if it doesn't exist
-		err = config.CreateDefaultWGConf()
+		err = rt.createDefaultWGConf()
 		if err != nil {
 			// error if we can't create it
 			return err
 		}
 	}
 	// create wg0.conf or update it
-	err = WriteWgConf()
+	err = rt.writeWgConf(rt)
 	if err != nil {
 		return err
 	}
 	zap.L().Info("Running Wireguard")
-	info, err := StartContainer("wireguard", "wireguard")
+	info, err := rt.startContainer("wireguard", "wireguard")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error starting wireguard: %v", err))
 		return err
 	}
-	config.UpdateContainerState("wireguard", info)
+	rt.updateContainerState("wireguard", info)
 	return nil
 }
 
 // wireguard container config builder
 func wgContainerConf() (container.Config, container.HostConfig, error) {
+	return wgContainerConfWithRuntime(newWireguardRuntime())
+}
+
+func wgContainerConfWithRuntime(rt wireguardRuntime) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	// construct the container metadata from version server info
-	containerInfo, err := GetLatestContainerInfo("wireguard")
+	containerInfo, err := rt.getLatestContainerInfo("wireguard")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
@@ -70,7 +79,7 @@ func wgContainerConf() (container.Config, container.HostConfig, error) {
 			Target: "/config",
 		},
 	}
-	wgConfig, err := config.GetWgConf()
+	wgConfig, err := rt.getWgConf()
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
@@ -86,54 +95,66 @@ func wgContainerConf() (container.Config, container.HostConfig, error) {
 
 // wg0.conf builder
 func buildWgConf() (string, error) {
-	confB64 := config.StartramConfig.Conf
+	return buildWgConfWithRuntime(newWireguardRuntime())
+}
+
+func buildWgConfWithRuntime(rt wireguardRuntime) (string, error) {
+	confB64 := rt.getStartramConfig().Conf
 	confBytes, err := base64.StdEncoding.DecodeString(confB64)
 	if err != nil {
 		return "", fmt.Errorf("Failed to decode remote WG base64: %v", err)
 	}
 	conf := string(confBytes)
-	configData := config.Conf()
+	configData := rt.conf()
 	res := strings.Replace(conf, "privkey", configData.Privkey, -1)
 	return res, nil
 }
 
 // write latest conf
 func WriteWgConf() error {
-	newConf, err := buildWgConf()
+	return writeWgConfWithRuntime(newWireguardRuntime())
+}
+
+func writeWgConfWithRuntime(rt wireguardRuntime) error {
+	newConf, err := buildWgConfWithRuntime(rt)
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(config.DockerDir, "wireguard", "_data", "wg0.conf")
-	existingConf, err := ioutil.ReadFile(filePath)
+	filePath := filepath.Join(rt.dockerDir(), "wireguard", "_data", "wg0.conf")
+	existingConf, err := rt.readFile(filePath)
 	if err != nil {
 		// assume it doesn't exist, so write the current config
 		zap.L().Info("Creating WG config")
-		return writeWgConfToFile(filePath, newConf)
+		return writeWgConfToFileWithRuntime(rt, filePath, newConf)
 	}
 	if string(existingConf) != newConf {
 		// If they differ, overwrite
 		zap.L().Info("Updating WG config")
-		return writeWgConfToFile(filePath, newConf)
+		return writeWgConfToFileWithRuntime(rt, filePath, newConf)
 	}
 	return nil
 }
 
 // either write directly or create volumes
 func writeWgConfToFile(filePath string, content string) error {
+	return writeWgConfToFileWithRuntime(newWireguardRuntime(), filePath, content)
+}
+
+func writeWgConfToFileWithRuntime(rt wireguardRuntime, filePath string, content string) error {
 	// try writing
-	err := ioutil.WriteFile(filePath, []byte(content), 0644)
+	err := rt.writeFile(filePath, []byte(content), 0644)
 	if err == nil {
 		return nil
 	}
 	// ensure the directory structure exists
 	dir := filepath.Dir(filePath)
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = rt.mkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	// try writing again
-	err = ioutil.WriteFile(filePath, []byte(content), 0644)
+	err = rt.writeFile(filePath, []byte(content), 0644)
 	if err != nil {
-		err = copyWGFileToVolume(filePath, "/etc/wireguard/", "wireguard")
+		err = rt.copyWGFileToVolume(rt, filePath, "/etc/wireguard/", "wireguard")
 		// otherwise create the volume
 		if err != nil {
 			return fmt.Errorf("Failed to copy WG config file to volume: %v", err)
@@ -144,50 +165,17 @@ func writeWgConfToFile(filePath string, content string) error {
 
 // write wg conf to volume
 func copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
-	ctx := context.Background()
-	cli, err := dockerclient.New()
-	if err != nil {
-		return err
-	}
-	defer cli.Close()
-	containerInfo, err := GetLatestContainerInfo("wireguard")
-	if err != nil {
-		return err
-	}
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
-	// temp container to mount
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: desiredImage,
-	}, &container.HostConfig{
-		Binds: []string{volumeName + ":" + targetPath},
-	}, nil, nil, "wg_writer")
-	if err != nil {
-		return err
-	}
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return err
-	}
-	file, err := os.Open(filepath.Join(filePath))
-	if err != nil {
-		return fmt.Errorf("failed to open wg0 file: %v", err)
-	}
-	defer file.Close()
-	// Copy the file to the volume via the temporary container
-	err = cli.CopyToContainer(ctx, resp.ID, targetPath, file, container.CopyToContainerOptions{})
-	if err != nil {
-		return err
-	}
-	// remove temporary container
-	if err := StopContainerByName("wg_writer"); err != nil {
-		return err
-	}
-	if err := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
-		return err
-	}
-	defer func() {
-		if removeErr := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); removeErr != nil {
-			zap.L().Error(fmt.Sprintf("Failed to remove temporary container: %v", removeErr))
-		}
-	}()
-	return nil
+	return copyWGFileToVolumeWithRuntime(newWireguardRuntime(), filePath, targetPath, volumeName)
+}
+
+func copyWGFileToVolumeWithRuntime(rt wireguardRuntime, filePath string, targetPath string, volumeName string) error {
+	return rt.copyFileToVolumeWithTempContainer(
+		filePath,
+		targetPath,
+		volumeName,
+		"wg_writer",
+		func() (string, error) {
+			return rt.latestContainerImage("wireguard")
+		},
+	)
 }

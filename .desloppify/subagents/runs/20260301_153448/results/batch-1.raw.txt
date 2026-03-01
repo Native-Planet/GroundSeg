@@ -1,0 +1,72 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "high_level_elegance": 74.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/system/wifi_transport_adapter.go combines websocket transport lifecycle (upgrade/read loop/client tracking), domain command handling (`payload.Payload.Action == \"connect\"`), and host process control (`systemctl restart groundseg`) in one adapter type.",
+        "goseg/system/wifi_transport_adapter.go hard-codes action routing with a string literal (`\"connect\"`) while goseg/uploadsvc/service.go models actions as a typed command surface (`type Action`, `Command`, `Executor`), showing inconsistent top-level orchestration patterns across neighboring subsystems.",
+        "goseg/uploadsvc/service.go maintains both a global `supportedActions` list and an executor-local dispatch map, creating split ownership for action capability declaration.",
+        "goseg/startram/errors.go is a very thin policy wrapper file (single constant and one wrapping function), indicating fragmentation of architecture concerns into micro-files without a broader cohesive boundary in this batch."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "wifi_adapter_mixes_transport_and_system_orchestration",
+      "summary": "The Wi‑Fi transport adapter owns unrelated layers (websocket transport, command semantics, and process restart policy), blurring subsystem ownership boundaries.",
+      "related_files": [
+        "goseg/system/wifi_transport_adapter.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "captiveTransportAdapter manages websocket upgrader/client registry/read loop and also performs command interpretation in `processMessage`.",
+        "`processMessage` triggers infrastructure side effects via `connectToWiFi` and `restartGroundSeg`, while `restartGroundSegService` shells out to `systemctl restart groundseg`.",
+        "In contrast, uploadsvc/service.go separates command dispatch behind `Executor` and `Service`, highlighting that system package bypasses a comparable application-service seam."
+      ],
+      "suggestion": "Extract a captive portal application service that receives typed commands and owns Wi‑Fi/restart orchestration, while keeping `captiveTransportAdapter` limited to transport concerns (decode/encode, connection lifecycle). Route `processMessage` through that service instead of performing side effects directly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_boundary_enforcement_between_subsystems"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "action_contracts_have_split_and_inconsistent_ownership",
+      "summary": "Action contract definition is inconsistent and partially duplicated, reducing predictability of top-level behavior ownership.",
+      "related_files": [
+        "goseg/system/wifi_transport_adapter.go",
+        "goseg/uploadsvc/service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "wifi transport uses raw string matching (`payload.Payload.Action != \"connect\"`) with no typed contract.",
+        "uploadsvc defines typed actions (`ActionOpenEndpoint`, `ActionReset`) plus `UnsupportedActionError`, but also keeps a separate global `supportedActions` slice and dispatch map in `Executor`.",
+        "adapter test asserts mapping by converting action constants to/from strings, showing cross-layer dependence on literal protocol values instead of a single canonical action contract owner."
+      ],
+      "suggestion": "Standardize action handling on a single contract pattern: define typed action enums plus parse/validate helpers at boundary adapters, and make one source of truth for supported actions (derive from dispatch or registration API, not parallel lists).",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_boundary_enforcement_between_subsystems"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transport adapters are taking on orchestration responsibilities instead of terminating at boundary translation.",
+      "Subsystems use different command/action architecture styles without an enforced project-level pattern."
+    ],
+    "likely_symptoms": [
+      "wifi_adapter_mixes_transport_and_system_orchestration",
+      "action_contracts_have_split_and_inconsistent_ownership"
+    ],
+    "possible_false_positives": []
+  }
+}

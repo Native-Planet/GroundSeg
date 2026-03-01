@@ -4,98 +4,235 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/defaults"
+	"groundseg/httpx"
 	"groundseg/structs"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
 
+type versionHTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 var (
-	VersionServerReady = false
-	VersionInfo        structs.Channel
+	versionStore           VersionStore    = newInMemoryVersionStore()
+	versionHTTPClient      versionHTTPDoer = http.DefaultClient
+	versionFetchRetryCount                 = 10
+	versionFetchRetryDelay                 = time.Second
+	versionFetchSleep                      = time.Sleep
 )
 
-// check the version server and return struct
-func CheckVersion() (structs.Channel, bool) {
-	versMutex.Lock()
-	defer versMutex.Unlock()
-	conf := Conf()
-	releaseChannel := conf.UpdateBranch
-	const retries = 10
-	const delay = time.Second
+type VersionState struct {
+	Channel     structs.Channel
+	ServerReady bool
+}
+
+type VersionStore interface {
+	Snapshot() VersionState
+	SetState(channel structs.Channel, ready bool)
+	SetChannel(channel structs.Channel)
+	SetServerReady(ready bool)
+}
+
+type inMemoryVersionStore struct {
+	mu          sync.RWMutex
+	channel     structs.Channel
+	serverReady bool
+}
+
+func newInMemoryVersionStore() *inMemoryVersionStore {
+	return &inMemoryVersionStore{}
+}
+
+func (store *inMemoryVersionStore) Snapshot() VersionState {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	return VersionState{
+		Channel:     store.channel,
+		ServerReady: store.serverReady,
+	}
+}
+
+func (store *inMemoryVersionStore) SetState(channel structs.Channel, ready bool) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.channel = channel
+	store.serverReady = ready
+}
+
+func (store *inMemoryVersionStore) SetChannel(channel structs.Channel) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.channel = channel
+}
+
+func (store *inMemoryVersionStore) SetServerReady(ready bool) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.serverReady = ready
+}
+
+func SetVersionStore(store VersionStore) {
+	if store != nil {
+		versionStore = store
+	}
+}
+
+func SetVersionHTTPClient(client versionHTTPDoer) {
+	if client != nil {
+		versionHTTPClient = client
+	}
+}
+
+func SetVersionFetchRetryPolicy(retries int, delay time.Duration) {
+	if retries > 0 {
+		versionFetchRetryCount = retries
+	}
+	if delay > 0 {
+		versionFetchRetryDelay = delay
+	}
+}
+
+func GetVersionState() VersionState {
+	return versionStore.Snapshot()
+}
+
+func GetVersionChannel() structs.Channel {
+	return versionStore.Snapshot().Channel
+}
+
+func SetVersionChannel(channel structs.Channel) {
+	versionStore.SetChannel(channel)
+}
+
+func IsVersionServerReady() bool {
+	return versionStore.Snapshot().ServerReady
+}
+
+func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
+	retries := versionFetchRetryCount
+	if retries < 1 {
+		retries = 1
+	}
+	delay := versionFetchRetryDelay
 	url := globalConfig.UpdateUrl
 	var fetchedVersion structs.Version
 	for i := 0; i < retries; i++ {
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
+			return structs.Version{}, err
 		}
 		userAgent := "NativePlanet.GroundSeg-" + conf.GsVersion
 		req.Header.Set("User-Agent", userAgent)
-		resp, err := http.DefaultClient.Do(req)
+
+		resp, err := versionHTTPClient.Do(req)
 		if err != nil {
 			errmsg := fmt.Sprintf("Unable to connect to update server: %v", err)
 			zap.L().Warn(errmsg)
 			if i < retries-1 {
-				time.Sleep(delay)
+				versionFetchSleep(delay)
 				continue
-			} else {
-				VersionServerReady = false
-				return VersionInfo, false
 			}
+			return structs.Version{}, fmt.Errorf("request version metadata: %w", err)
 		}
-		// read the body bytes
-		body, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			errmsg := fmt.Sprintf("Error reading version info: %v", err)
+
+		if err := httpx.ReadJSON(resp, url, &fetchedVersion); err != nil {
+			errmsg := fmt.Sprintf("Error decoding version metadata: %v", err)
 			zap.L().Warn(errmsg)
 			if i < retries-1 {
-				time.Sleep(delay)
+				versionFetchSleep(delay)
 				continue
-			} else {
-				VersionServerReady = false
-				return VersionInfo, false
 			}
+			return structs.Version{}, fmt.Errorf("decode version metadata: %w", err)
 		}
-		// unmarshal values into Version struct
-		err = json.Unmarshal(body, &fetchedVersion)
-		if err != nil {
-			errmsg := fmt.Sprintf("Error unmarshalling JSON: %v", err)
-			zap.L().Warn(errmsg)
-			if i < retries-1 {
-				time.Sleep(delay)
-				continue
-			} else {
-				VersionServerReady = false
-				return VersionInfo, false
-			}
-		}
-		VersionInfo = fetchedVersion.Groundseg[releaseChannel]
-		// debug: re-marshal and write the entire fetched version to disk
-		confPath := filepath.Join(BasePath, "settings", "version_info.json")
-		file, err := os.Create(confPath)
-		if err != nil {
-			errmsg := fmt.Sprintf("Failed to create file: %v", err)
-			zap.L().Error(errmsg)
-			VersionServerReady = false
-			return VersionInfo, false
-		}
-		defer file.Close()
-		encoder := json.NewEncoder(file)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(&fetchedVersion); err != nil {
-			errmsg := fmt.Sprintf("Failed to write JSON: %v", err)
-			zap.L().Error(errmsg)
-		}
-		VersionServerReady = true
-		return VersionInfo, true
+
+		return fetchedVersion, nil
 	}
-	VersionServerReady = false
-	return VersionInfo, false
+	return structs.Version{}, fmt.Errorf("version fetch failed after retries")
+}
+
+func persistVersionInfo(version structs.Version) error {
+	confPath := filepath.Join(BasePath, "settings", "version_info.json")
+	file, err := os.Create(confPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "    ")
+	return encoder.Encode(&version)
+}
+
+func resolveVersionForConfiguredChannel(version structs.Version, releaseChannel string) (structs.Channel, error) {
+	channel, exists := version.Groundseg[releaseChannel]
+	if !exists {
+		return structs.Channel{}, fmt.Errorf("missing release channel %s", releaseChannel)
+	}
+	return channel, nil
+}
+
+// ResolveLatestChannel fetches remote metadata and resolves the configured channel without mutating state.
+func ResolveLatestChannel(conf structs.SysConfig) (structs.Version, structs.Channel, error) {
+	fetchedVersion, err := fetchVersionFromServer(conf)
+	if err != nil {
+		return structs.Version{}, structs.Channel{}, err
+	}
+	channel, err := resolveVersionForConfiguredChannel(fetchedVersion, conf.UpdateBranch)
+	if err != nil {
+		return structs.Version{}, structs.Channel{}, err
+	}
+	return fetchedVersion, channel, nil
+}
+
+// PublishVersionMetadata persists release metadata and publishes current channel state.
+func PublishVersionMetadata(version structs.Version, channel structs.Channel) error {
+	if err := persistVersionInfo(version); err != nil {
+		return err
+	}
+	versionStore.SetState(channel, true)
+	return nil
+}
+
+// CheckVersion fetches release metadata and returns the channel for the current branch.
+func CheckVersion() (structs.Channel, bool) {
+	versMutex.Lock()
+	defer versMutex.Unlock()
+
+	conf := Conf()
+	_, channel, err := ResolveLatestChannel(conf)
+	if err != nil {
+		return GetVersionChannel(), false
+	}
+	return channel, true
+}
+
+// SyncVersionInfo fetches remote metadata, persists it, and refreshes version globals.
+func SyncVersionInfo() (structs.Channel, bool) {
+	versMutex.Lock()
+	defer versMutex.Unlock()
+
+	conf := Conf()
+	fetchedVersion, channel, err := ResolveLatestChannel(conf)
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to resolve latest version channel: %v", err))
+		versionStore.SetServerReady(false)
+		return GetVersionChannel(), false
+	}
+
+	if err := PublishVersionMetadata(fetchedVersion, channel); err != nil {
+		errmsg := fmt.Sprintf("Failed to persist version metadata: %v", err)
+		zap.L().Error(errmsg)
+		versionStore.SetServerReady(false)
+		return GetVersionChannel(), false
+	}
+	return GetVersionChannel(), true
 }
 
 // write the defaults.VersionInfo value to disk
@@ -119,27 +256,32 @@ func CreateDefaultVersion() error {
 
 // return the existing local version info or create default
 func LocalVersion() structs.Version {
+	defaultVersion := func() structs.Version {
+		var fallback structs.Version
+		if err := json.Unmarshal([]byte(defaults.DefaultVersionText), &fallback); err != nil {
+			zap.L().Error(fmt.Sprintf("Unable to decode embedded default version metadata: %v", err))
+		}
+		return fallback
+	}
 	confPath := filepath.Join(BasePath, "settings", "version_info.json")
 	_, err := os.Open(confPath)
 	if err != nil {
 		// create a default if it doesn't exist
 		err = CreateDefaultVersion()
 		if err != nil {
-			// panic if we can't create it
-			errmsg := fmt.Sprintf("Unable to write version info! %v", err)
-			zap.L().Error(errmsg)
-			panic(errmsg)
+			zap.L().Error(fmt.Sprintf("Unable to write version info! %v", err))
+			return defaultVersion()
 		}
 	}
 	file, err := ioutil.ReadFile(confPath)
 	if err != nil {
-		errmsg := fmt.Sprintf("Unable to load version info: %v", err)
-		panic(errmsg)
+		zap.L().Error(fmt.Sprintf("Unable to load version info: %v", err))
+		return defaultVersion()
 	}
 	var versionStruct structs.Version
 	if err := json.Unmarshal(file, &versionStruct); err != nil {
-		errmsg := fmt.Sprintf("Error decoding version JSON: %v", err)
-		panic(errmsg)
+		zap.L().Error(fmt.Sprintf("Error decoding version JSON: %v", err))
+		return defaultVersion()
 	}
 	return versionStruct
 }

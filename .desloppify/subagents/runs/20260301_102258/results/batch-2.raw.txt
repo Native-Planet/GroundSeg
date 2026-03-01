@@ -1,0 +1,146 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 64.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`config.Conf()` is pulled directly across handlers, routines, docker loaders, and startram client functions, so most modules depend on the full `SysConfig` bag rather than narrow domain inputs.",
+        "`UpdateConfTyped` in `goseg/config/config.go` presents typed options but immediately converts to `map[string]interface{}` string-key mutations via `UpdateConf`, so the abstraction boundary is not type-safe end-to-end.",
+        "Near-identical file-to-volume writer flows exist in `copyWGFileToVolume` and `copyNDFileToVolume`, including the same temp-container lifecycle and duplicate remove calls.",
+        "Transition/event signaling is exposed as package-level mutable channels (`docker.UTransBus`, `docker.SysTransBus`, `docker.ImportShipTransBus`, `startram.EventBus`) that are written/read directly from unrelated packages, bypassing a cohesive interface.",
+        "A declared abstraction (`PortSetter` interface in `structs/configs.go`) has no consumers, while direct field assignment and concrete setter calls dominate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 57.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 54.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_sysconfig_bag_coupling",
+      "summary": "Global `SysConfig` access forms an ambient context bag that weakens module boundaries and inflates dependency surface.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/startram/startram.go",
+        "goseg/handler/system.go",
+        "goseg/handler/startram.go",
+        "goseg/routines/version.go",
+        "goseg/docker/minio.go"
+      ],
+      "evidence": [
+        "`config.Conf()` returns the full global config object and is used repeatedly in unrelated domains (e.g., startram API functions, websocket handlers, docker loaders, version routines).",
+        "Call sites pull broad config then read only a few fields (`EndpointUrl`, `Pubkey`, `WgOn`, `Piers`, `SwapFile`, etc.), indicating missing narrow domain abstractions.",
+        "This pattern makes logic implicitly depend on global mutable state instead of explicit parameters or scoped services."
+      ],
+      "suggestion": "Introduce domain-scoped read interfaces (for example `StartramSettings`, `RuntimeSettings`, `ShipSettings`) and inject those into modules; keep `SysConfig` global only inside a configuration service that materializes typed snapshots.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_ambient_context"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "typed_conf_update_is_thin_wrapper",
+      "summary": "`UpdateConfTyped` is a pass-through facade over string-key map mutation, so interface safety is mostly cosmetic.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/handler/system.go",
+        "goseg/handler/startram.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`ConfUpdateOption` is defined as `func(map[string]interface{})`, and each `With...` helper writes string keys into a generic map.",
+        "`UpdateConfTyped` forwards directly to `UpdateConf(values)` which merges untyped key/value pairs into JSON (`map[string]interface{}`) without compile-time field guarantees.",
+        "Many handlers/routines use these helpers assuming type safety, but the underlying contract remains dynamic and key-string based."
+      ],
+      "suggestion": "Replace map-based mutation with a typed patch struct plus explicit apply logic (or field-specific mutator methods), so keys and types are validated at compile time and centrally enforced.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_ambient_context"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "docker_volume_writer_duplication",
+      "summary": "Wireguard and Netdata duplicate the same temp-container volume-write orchestration instead of sharing a reusable abstraction.",
+      "related_files": [
+        "goseg/docker/wireguard.go",
+        "goseg/docker/netdata.go"
+      ],
+      "evidence": [
+        "`copyWGFileToVolume` and `copyNDFileToVolume` both: create docker client, resolve image, create temporary container with bind, start it, copy file, stop/remove, then defer another remove.",
+        "Both functions embed nearly identical lifecycle/error handling with only container names and paths changed.",
+        "The same pattern appears because there is no shared helper for 'write file into named volume via ephemeral container'."
+      ],
+      "suggestion": "Extract a shared helper in `goseg/docker` that takes image selector, writer container name, source file, target path, and volume name; make both wireguard/netdata wrappers call it.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "docker_orchestration_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_event_bus_leaks_domain_contracts",
+      "summary": "Package-level event channels are used as cross-module mutable globals, creating leaky and weakly-typed coordination contracts.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/startram/startram.go",
+        "goseg/handler/system.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`docker` exports multiple global channels (`UTransBus`, `SysTransBus`, `ImportShipTransBus`, etc.) and `startram` exports `EventBus`.",
+        "Handlers/importer write directly to these channels, while `rectify` reads and maps stringly-typed `event.Type` values in large switches.",
+        "Because contracts are global and implicit, abstraction boundaries rely on shared knowledge of event strings instead of an owned interface/service."
+      ],
+      "suggestion": "Encapsulate buses behind dedicated publishers/subscribers per domain (e.g., transition service interfaces) and replace ad-hoc string event types with strongly typed enums/struct variants.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_event_bus_leakage"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "unused_portsetter_abstraction",
+      "summary": "`PortSetter` is a declared abstraction with no consumers, while concrete update logic bypasses it.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`type PortSetter interface { SetPort(port any) }` is declared but has no usages in the codebase.",
+        "`UrbitDocker` defines specific setters (`SetWgHTTPPort`, `SetWgAmesPort`, etc.), but call sites use concrete fields/setters directly rather than polymorphism.",
+        "In `rectify`, remote port sync writes concrete `UrbitDocker` fields (`local.WgHTTPPort`, `local.WgAmesPort`, `local.WgS3Port`, `local.WgConsolePort`) with no interface participation."
+      ],
+      "suggestion": "Either remove `PortSetter` and keep direct concrete setters, or introduce a real typed port-update abstraction that is actually consumed where port synchronization occurs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "config_ambient_context"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Overreliance on package-level globals for config and event coordination",
+      "Incremental wrappers added without converting underlying dynamic contracts to typed boundaries",
+      "Operational docker workflows copied across services instead of extracted into reusable primitives"
+    ],
+    "likely_symptoms": [
+      "typed_conf_update_is_thin_wrapper",
+      "docker_volume_writer_duplication",
+      "unused_portsetter_abstraction"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -265,7 +265,7 @@ func keepMostRecentFiles(dirPath string) error {
 	// Read the directory
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
+		return fmt.Errorf("failed to read directory: %v", err)
 	}
 
 	// Create a slice to store LogFile structs

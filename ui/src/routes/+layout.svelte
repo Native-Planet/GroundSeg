@@ -9,6 +9,8 @@
   import { wsPort, connect } from '$lib/stores/websocket'
   import { firstLoad, URBIT_MODE, DEV_PANEL } from '$lib/stores/data'
   import { wide } from '$lib/stores/display'
+  import { runtimeModeConfig } from '$lib/runtime/config/mode-config.js'
+  import { startRuntimeSession } from '$lib/runtime/session/session-orchestrator.js'
 
   import Redirector from './Redirector.svelte'
   import ApiSpinner from './ApiSpinner.svelte'
@@ -19,23 +21,16 @@
   // Style
   import "../theme.css"
 
-  const isUrbitMode = process.env.GS_URBIT_MODE;
-  const showDevPanel = process.env.GS_DEV_PANEL;
-  const customHostname = process.env.GS_CUSTOM_HOSTNAME;
-
   onMount(()=> {
-    URBIT_MODE.set(isUrbitMode)
-    DEV_PANEL.set(showDevPanel)
-    const hostname = $page.url.hostname
-    if ($URBIT_MODE) {
-      subscribe(window.ship)
-    } else {
-      if (customHostname) {
-        connect("ws://" + customHostname + ":" + $wsPort + "/ws") // if GS_CUSTOM_HOSTNAME is set
-      } else {
-        connect("ws://" + hostname + ":" + $wsPort + "/ws")
-      }
-    }
+    startRuntimeSession({
+      pageUrl: $page.url,
+      wsPort: $wsPort,
+      urbitModeEnabled: $URBIT_MODE,
+      customHostname: runtimeModeConfig.customHostname,
+      connectWebsocket: connect,
+      subscribeUrbit: subscribe,
+      ship: window.ship
+    })
   })
 
 	const vert = (h,w) => {
@@ -58,6 +53,6 @@
 {#if $URBIT_MODE}
   <KeepAlive />
 {/if}
-{#if showDevPanel}
+{#if $DEV_PANEL}
   <DevPanel />
 {/if}

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
+	"groundseg/httpx"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +18,18 @@ const (
 	tufUrl         = "https://tuf-repo-cdn.sigstore.dev"
 	defaultTimeout = 30 * time.Second
 	keyPath        = ".sigstore/root/targets/rekor.pub"
+)
+
+var (
+	fetchTimestampForRekor   = fetchTimestamp
+	fetchSnapshotForRekor    = fetchSnapshot
+	fetchTargetsForRekor     = fetchTargets
+	downloadMetadataForRekor = downloadMetadata
+	readCachedKeyForRekor    = readCachedKey
+	userHomeDirForRekor      = os.UserHomeDir
+	mkdirAllForRekor         = os.MkdirAll
+	writeFileForRekor        = os.WriteFile
+	timeUntilForRekor        = time.Until
 )
 
 type timestamp struct {
@@ -57,7 +69,7 @@ type targets struct {
 	} `json:"signed"`
 }
 
-func init() {
+func PrimeRekorKey() {
 	_, err := rekorKey()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to retrieve rekor pubkey: %v", err))
@@ -65,19 +77,19 @@ func init() {
 }
 
 func rekorKey() (string, error) {
-	ts, err := fetchTimestamp()
+	ts, err := fetchTimestampForRekor()
 	if err != nil {
-		return "", fmt.Errorf("fetching timestamp: %w", err)
+		return "", fmt.Errorf("fetching timestamp: %v", err)
 	}
 
-	snap, err := fetchSnapshot(ts.Signed.Meta["snapshot.json"].Version)
+	snap, err := fetchSnapshotForRekor(ts.Signed.Meta["snapshot.json"].Version)
 	if err != nil {
-		return "", fmt.Errorf("fetching snapshot: %w", err)
+		return "", fmt.Errorf("fetching snapshot: %v", err)
 	}
 
-	targ, err := fetchTargets(snap.Signed.Meta["targets.json"].Version)
+	targ, err := fetchTargetsForRekor(snap.Signed.Meta["targets.json"].Version)
 	if err != nil {
-		return "", fmt.Errorf("fetching targets: %w", err)
+		return "", fmt.Errorf("fetching targets: %v", err)
 	}
 
 	rekorKeyInfo, ok := targ.Signed.Targets["rekor.pub"]
@@ -89,16 +101,16 @@ func rekorKey() (string, error) {
 		return "", fmt.Errorf("rekor.pub key is not active: %s", rekorKeyInfo.Custom.Sigstore.Status)
 	}
 
-	home, err := os.UserHomeDir()
+	home, err := userHomeDirForRekor()
 	if err != nil {
-		return "", fmt.Errorf("getting home directory: %w", err)
+		return "", fmt.Errorf("getting home directory: %v", err)
 	}
 
 	fullKeyPath := filepath.Join(home, keyPath)
 	needsUpdate := true
 
-	if time.Until(targ.Signed.Expires) > 0 {
-		if cachedKey, err := readCachedKey(fullKeyPath); err == nil {
+	if timeUntilForRekor(targ.Signed.Expires) > 0 {
+		if cachedKey, err := readCachedKeyForRekor(fullKeyPath); err == nil {
 			h := sha256.Sum256(cachedKey)
 			if hex.EncodeToString(h[:]) == rekorKeyInfo.Hashes["sha256"] {
 				needsUpdate = false
@@ -107,13 +119,13 @@ func rekorKey() (string, error) {
 	}
 
 	if needsUpdate {
-		if err := os.MkdirAll(filepath.Dir(fullKeyPath), 0755); err != nil {
-			return "", fmt.Errorf("creating cache directory: %w", err)
+		if err := mkdirAllForRekor(filepath.Dir(fullKeyPath), 0755); err != nil {
+			return "", fmt.Errorf("creating cache directory: %v", err)
 		}
 
-		keyData, err := downloadMetadata("https://rekor.sigstore.dev/api/v1/log/publicKey")
+		keyData, err := downloadMetadataForRekor("https://rekor.sigstore.dev/api/v1/log/publicKey")
 		if err != nil {
-			return "", fmt.Errorf("downloading key data: %w", err)
+			return "", fmt.Errorf("downloading key data: %v", err)
 		}
 
 		h := sha256.Sum256(keyData)
@@ -122,8 +134,8 @@ func rekorKey() (string, error) {
 				hex.EncodeToString(h[:]), rekorKeyInfo.Hashes["sha256"])
 		}
 
-		if err := os.WriteFile(fullKeyPath, keyData, 0644); err != nil {
-			return "", fmt.Errorf("caching rekor key: %w", err)
+		if err := writeFileForRekor(fullKeyPath, keyData, 0644); err != nil {
+			return "", fmt.Errorf("caching rekor key: %v", err)
 		}
 	}
 
@@ -131,7 +143,7 @@ func rekorKey() (string, error) {
 }
 
 func fetchTimestamp() (*timestamp, error) {
-	data, err := downloadMetadata(fmt.Sprintf("%s/timestamp.json", tufUrl))
+	data, err := downloadMetadataForRekor(fmt.Sprintf("%s/timestamp.json", tufUrl))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +155,7 @@ func fetchTimestamp() (*timestamp, error) {
 }
 
 func fetchSnapshot(version int) (*snapshot, error) {
-	data, err := downloadMetadata(fmt.Sprintf("%s/%d.snapshot.json", tufUrl, version))
+	data, err := downloadMetadataForRekor(fmt.Sprintf("%s/%d.snapshot.json", tufUrl, version))
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +167,7 @@ func fetchSnapshot(version int) (*snapshot, error) {
 }
 
 func fetchTargets(version int) (*targets, error) {
-	data, err := downloadMetadata(fmt.Sprintf("%s/%d.targets.json", tufUrl, version))
+	data, err := downloadMetadataForRekor(fmt.Sprintf("%s/%d.targets.json", tufUrl, version))
 	if err != nil {
 		return nil, err
 	}
@@ -172,13 +184,7 @@ func downloadMetadata(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("got status code %d from %s", resp.StatusCode, url)
-	}
-
-	return io.ReadAll(resp.Body)
+	return httpx.ReadBody(resp, url)
 }
 
 func readCachedKey(path string) ([]byte, error) {

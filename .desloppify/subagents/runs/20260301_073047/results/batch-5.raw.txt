@@ -1,0 +1,147 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 68.0,
+    "high_level_elegance": 64.0,
+    "test_strategy": 61.0,
+    "package_organization": 58.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js conditionally routes the same command payload to two different transports (`if(S(f))w(t); else ... p.send(...)`), coupling websocket and urbit transport behavior behind a runtime branch.",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js and websocket.84e20bf3.js both own connection lifecycle concerns (retry/reconnect/session handling), so transport boundaries are not isolated.",
+        "Entry bundles (apps-page.svelte.85e3c543.js, captive-page.svelte.525c6d92.js) import command functions directly from websocket chunk, making page modules depend on transport contract details."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "README.md describes installation/uninstall and build, but does not define frontend/runtime architectural boundaries or transport ownership despite the control-plane complexity in bundled runtime files.",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js combines auth token persistence, connection orchestration, and a large command surface for unrelated domains (setup/system/startram/urbit/dev).",
+        "Pages such as apps-page.svelte.85e3c543.js and captive-page.svelte.525c6d92.js bind directly to minified bundle exports, obscuring domain ownership and change boundaries."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md contains install/build/uninstall instructions but no test or CI quality-gate contract for high-risk flows.",
+        "websocket.84e20bf3.js exposes critical commands (`system` power/update, setup, urbit lifecycle actions) and mutable connection state without an adjacent documented verification strategy.",
+        "boot-existing-page.svelte.509e2e47.js and captive-page.svelte.525c6d92.js implement multi-step operational workflows that depend on websocket command correctness, but this batch provides no explicit regression gate documentation."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/web/_app/immutable/chunks/` has 49 files and `.../entry/` has 31 files (both >10 flat-directory overload threshold) with generated artifacts as primary tree content.",
+        "existing_findings in the packet already flag flat directory debt for both immutable directories (`flat_dirs`), and assigned files live inside those flat buckets.",
+        "Assigned files mix transport/runtime infra (`chunks/urbit`, `chunks/websocket`) and page orchestration (`entry/apps-page`, `entry/boot-existing-page`, `entry/captive-page`) under hashed generated paths, reducing navigability and ownership clarity."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "runtime_ownership_not_defined",
+      "summary": "Runtime control-plane ownership is blurred across docs and bundled modules.",
+      "related_files": [
+        "README.md",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/entry/apps-page.svelte.85e3c543.js"
+      ],
+      "evidence": [
+        "README.md does not define module ownership/contracts for frontend runtime despite exposing operationally critical behavior.",
+        "websocket.84e20bf3.js centralizes unrelated responsibilities (auth storage, transport orchestration, and many domain commands) in one bundle-level module.",
+        "apps-page.svelte.85e3c543.js imports minified command exports directly, coupling page behavior to opaque bundle internals."
+      ],
+      "suggestion": "Define and document top-level ownership boundaries: `transport`, `command-api`, and `feature pages`. Refactor so pages call a stable command API module, command API delegates to transport adapters, and transport internals are hidden. Update README with a short architecture contract section listing module responsibilities and allowed dependencies.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "compiled_runtime_as_source_of_truth"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "implicit_dual_transport_contract",
+      "summary": "A hidden dual-transport path creates boundary drift between websocket and urbit modules.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js",
+        "goseg/web/_app/immutable/entry/captive-page.svelte.525c6d92.js"
+      ],
+      "evidence": [
+        "websocket.84e20bf3.js sends the same payload via two paths (`if(S(f))w(t)` vs websocket `send`), making behavior depend on hidden runtime state.",
+        "urbit.f551ce98.js separately manages SSE/channel lifecycle and command delivery, overlapping transport responsibilities with websocket chunk.",
+        "captive-page.svelte.525c6d92.js consumes websocket-exported actions directly, so feature modules cannot reason about which transport contract they are actually invoking."
+      ],
+      "suggestion": "Introduce an explicit transport interface (`sendCommand`, `subscribeEvents`, `connect`) with concrete `urbitSseTransport` and `wsTransport` implementations selected in one composition root. Remove direct cross-calls between transport modules and have pages depend only on the interface-backed command service.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "compiled_runtime_as_source_of_truth"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "no_governance_for_control_plane_tests",
+      "summary": "Critical control-plane behavior lacks documented quality gates and contract tests.",
+      "related_files": [
+        "README.md",
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/entry/boot-existing-page.svelte.509e2e47.js"
+      ],
+      "evidence": [
+        "README.md includes installation/build instructions but no required test command, coverage target, or CI gate.",
+        "websocket.84e20bf3.js handles privileged actions (power/restart/update/setup/urbit control) and stateful reconnect/token logic.",
+        "boot-existing-page.svelte.509e2e47.js drives multi-step boot/import flow that depends on command sequencing and error handling."
+      ],
+      "suggestion": "Add a documented quality-gate section in README: required unit tests for command routing and token/reconnect logic, integration tests for boot/setup flows, and CI pass criteria. Stage 1: add transport/command contract tests; Stage 2: add workflow integration tests for boot and captive flows; Stage 3: enforce in CI with a blocking `test` job.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_gap_on_runtime_contracts"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "generated_flat_tree_obscures_boundaries",
+      "summary": "Large flat generated directories are carrying mixed concerns and hiding ownership.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/websocket.84e20bf3.js",
+        "goseg/web/_app/immutable/chunks/urbit.f551ce98.js",
+        "goseg/web/_app/immutable/entry/apps-page.svelte.85e3c543.js",
+        "goseg/web/_app/immutable/entry/captive-page.svelte.525c6d92.js"
+      ],
+      "evidence": [
+        "holistic_context.structure reports 49 files in `immutable/chunks/` and 31 in `immutable/entry/` (both exceed flat-directory overload guidance).",
+        "Packet existing_findings already flag both directories as flat-dir debt; assigned files are inside those buckets.",
+        "Transport internals and feature pages are represented as hashed generated files in adjacent flat paths, making intent and ownership hard to navigate."
+      ],
+      "suggestion": "Staged reorg plan: (1) create source-owned folders under `ui/src` such as `ui/src/lib/transport/`, `ui/src/lib/commands/`, `ui/src/features/apps/`, `ui/src/features/boot/`, `ui/src/features/captive/`; (2) move transport primitives first, then command facade, then page feature modules; (3) keep generated output confined to a build artifact directory and exclude from governance review scope. Import-update commands: `rg -n \"from '../chunks/websocket|from './urbit'\" ui/src goseg/web`, then update imports to source modules and run `npm --prefix ui run build` (or project-equivalent build) to regenerate artifacts; validation commands: `rg -n \"immutable/(chunks|entry)/\" README.md ui/src` to confirm docs/source point to source paths, plus CI test/build job execution.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "compiled_runtime_as_source_of_truth"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Generated bundle artifacts are treated as a primary maintained surface instead of a derived output.",
+      "Runtime transport and command contracts are implicit and not governed by documented architectural/test policies."
+    ],
+    "likely_symptoms": [
+      "runtime_ownership_not_defined",
+      "implicit_dual_transport_contract",
+      "generated_flat_tree_obscures_boundaries"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 61.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js combines transport lifecycle concerns (connect/reconnect/session verification/message handling) with a very large catalog of domain-specific command constructors in one module.",
+        "The same payload-construction pattern is duplicated across dozens of exported functions in websocket.js, with protocol literals and field names embedded at each callsite.",
+        "ui/src/lib/stores/uploader.js contains a partially implemented upload pipeline (validation, chunking, hashing, IndexedDB persistence, manifest behavior) left as large commented blocks, while websocket.js separately owns upload endpoint commands."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "ws_store_mixed_responsibility",
+      "summary": "WebSocket store is a mixed-responsibility hub that couples connection orchestration with all feature command definitions.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "websocket.js defines core session behavior (`connect`, `reconnect`, `handleOpen`, `handleMessage`, `send`) and also exports many feature-specific command functions (auth/setup/system/startram/upload/urbit/support/logs/c2c/penpai/dev).",
+        "Uploader-related operations are split between modules: uploader.js is expected to run upload workflow logic, while websocket.js embeds transport actions (`openUploadEndpoint`, `modifyUploadEndpoint`, `closeUploadEndpoint`, `resetImportShip`) with no cohesive upload boundary."
+      ],
+      "suggestion": "Split websocket.js into a transport client module plus feature-scoped command modules (for example `commands/auth`, `commands/system`, `commands/upload`) that share a single request dispatcher.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_command_layer_boundary"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "ws_command_pattern_duplication",
+      "summary": "Command construction is duplicated as ad-hoc literals instead of using a central command abstraction.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "Most exports in websocket.js repeat the same shape: create `payload` object with string literals and call `send(payload)`.",
+        "Field conventions vary by command (`password` vs `pwd` parameter names, mixed snake_case like `cpu_profile` and camelCase keys elsewhere), making protocol details distributed and harder to reason about.",
+        "uploader.js imports websocket integration (`uploadManifest`) but does not use a shared typed/factory command API, reinforcing loose coupling through raw payload assumptions."
+      ],
+      "suggestion": "Introduce a small command factory/schema layer (e.g., `command(type, action, body)`) and centralize key naming/validation so feature modules declare intent instead of duplicating payload boilerplate.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_command_layer_boundary"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "uploader_abandoned_pipeline",
+      "summary": "Uploader module mixes concerns and keeps a large disabled implementation, leaving upload design incomplete and unclear.",
+      "related_files": [
+        "ui/src/lib/stores/uploader.js",
+        "ui/src/lib/stores/websocket.js"
+      ],
+      "evidence": [
+        "uploader.js `processFile` includes validation and chunk-planning logic but the actual chunk/hash/IndexedDB flow is left as extensive commented-out blocks.",
+        "uploader.js imports `Sha256`, `uploadManifest`, and `toBase64`, but current active code does not execute the upload pipeline or manifest sync path.",
+        "websocket.js still exposes upload endpoint controls, so upload behavior is structurally split between an inactive local pipeline and active remote command functions."
+      ],
+      "suggestion": "Either complete and extract the uploader workflow into focused helpers (validation/chunking/persistence/network) or remove dead pipeline code and keep a minimal uploader facade that delegates to one clear upload strategy.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_upload_workflow_boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No explicit boundary between transport infrastructure and domain command API.",
+      "No shared command-definition abstraction, leading to copy-paste payload constructors.",
+      "Upload workflow ownership is split between an inactive local implementation and active websocket endpoint controls."
+    ],
+    "likely_symptoms": [
+      "ws_store_mixed_responsibility",
+      "ws_command_pattern_duplication",
+      "uploader_abandoned_pipeline"
+    ],
+    "possible_false_positives": []
+  }
+}

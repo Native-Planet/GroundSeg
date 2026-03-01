@@ -3,6 +3,7 @@
 	"version": "2.0.0",
 	"scripts": {
 		"dev": "vite dev",
+		"test": "vitest run",
 		"build": "vite build",
 		"preview": "vite preview"
 	},
@@ -28,6 +29,7 @@
 		"tweetnacl": "^1.0.3",
 		"tweetnacl-util": "^0.15.1",
 		"vite": "^4.1.4",
+		"vitest": "^0.34.6",
 		"ws": "^8.13.0"
 	},
 	"type": "module"

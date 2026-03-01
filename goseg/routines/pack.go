@@ -23,7 +23,7 @@ func PackScheduleLoop() {
 	//ticker := time.NewTicker(15 * time.Second)
 	for {
 		select {
-		case <-broadcast.SchedulePackBus:
+		case <-broadcast.SchedulePackEvents():
 			if err := queuePack(); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
 			}
@@ -207,15 +207,15 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 	}
 	// error handling
 	packError := func(err error) {
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"}
+		docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "pack", Event: "error"})
 		return
 	}
 	// clear transition after end
 	defer func() {
 		time.Sleep(3 * time.Second)
-		docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""}
+		docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "pack", Event: ""})
 	}()
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"}
+	docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "pack", Event: "packing"})
 	statuses, err := docker.GetShipStatus([]string{patp})
 	if err != nil {
 		packError(fmt.Errorf("Failed to get ship status for %s: %v", patp, err))
@@ -242,9 +242,10 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 		}
 		// switch boot status to pack
 		shipConf.BootStatus = "pack"
-		update := make(map[string]structs.UrbitDocker)
-		update[patp] = shipConf
-		err := config.UpdateUrbitConfig(update)
+		err := config.UpdateUrbit(patp, func(conf *structs.UrbitDocker) error {
+			conf.BootStatus = shipConf.BootStatus
+			return nil
+		})
 		if err != nil {
 			packError(fmt.Errorf("Failed to update %s urbit config to pack: %v", patp, err))
 			return
@@ -260,13 +261,14 @@ func setScheduledPackTimer(patp string, delay time.Duration) {
 	// set last meld
 	now := time.Now().Unix()
 	shipConf.MeldLast = strconv.FormatInt(now, 10)
-	update := make(map[string]structs.UrbitDocker)
-	update[patp] = shipConf
-	err = config.UpdateUrbitConfig(update)
+	err = config.UpdateUrbit(patp, func(conf *structs.UrbitDocker) error {
+		conf.MeldLast = shipConf.MeldLast
+		return nil
+	})
 	if err != nil {
 		packError(fmt.Errorf("Failed to update %s urbit config with last meld time: %v", patp, err))
 		return
 	}
-	docker.UTransBus <- structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"}
+	docker.PublishUrbitTransition(structs.UrbitTransition{Patp: patp, Type: "pack", Event: "success"})
 	return
 }

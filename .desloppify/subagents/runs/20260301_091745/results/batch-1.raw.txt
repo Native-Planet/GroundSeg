@@ -1,0 +1,155 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 1,
+  "assessments": {
+    "api_surface_coherence": 70.0,
+    "contract_coherence": 62.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "WebSocket action schemas are inconsistent: `WsUrbitAction.Action`, `WsStartramAction.Action`, `WsSystemAction.Action` are `string`, but `WsLogsAction.Action` is `bool` (`goseg/structs/ws.go`).",
+        "`StartramHandler` dispatches almost every action via `go ...` and returns `nil` immediately, while sibling handlers like `UrbitHandler` and `UploadHandler` execute synchronously and return operation errors directly (`goseg/handler/startram.go`, `goseg/handler/urbit.go`, `goseg/handler/upload.go`).",
+        "`C2CHandler` is typed as `([]byte, error)` but success path performs side effects only and returns `nil` payload, unlike `UnauthHandler` which always returns a serialized payload (`goseg/handler/handler.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "`UrbitDocker.UnmarshalJSON` uses unchecked assertions like `v.(bool)` and `v.(string)` while returning `error`; malformed or shape-drifted JSON can panic instead of returning an error (`goseg/structs/configs.go`, consumed by `json.Unmarshal` in `goseg/config/urbit.go`).",
+        "`GetContainerRunningStatus` ignores Docker client construction errors, then unconditionally defers `cli.Close()`, creating a panic path where callers expect `(string, error)` behavior (`goseg/docker/docker.go`, called in `goseg/docker/minio.go`).",
+        "Auth-related handlers encode failure as success-like return values: `LoginHandler` returns `nil` error on failed auth and `PwHandler` returns `nil` when old password is wrong (no explicit failure contract) (`goseg/handler/handler.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "ws_action_field_type_drift",
+      "summary": "WebSocket action schema is inconsistent because `action` is a bool in logs payload but a string elsewhere.",
+      "related_files": [
+        "goseg/structs/ws.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`WsLogsAction` defines `Action bool `json:\"action\"`` while neighboring action structs use `Action string` (`WsUrbitAction`, `WsStartramAction`, `WsSystemAction`).",
+        "Handlers in `handler.go` switch on string actions (for example `PwHandler`, `C2CHandler`), reinforcing string-based action semantics across the API."
+      ],
+      "suggestion": "Normalize action fields across all WS payloads to a single type (string), or introduce a separate boolean field name for logs and document it as a deliberate exception in the protocol contract.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "ws_protocol_shape_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "handler_sync_async_contract_split",
+      "summary": "Handler API behavior is unpredictable because sibling handlers mix synchronous error-return semantics with fire-and-forget goroutine dispatch.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/urbit.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "`StartramHandler` starts background goroutines for actions (`go handleStartram...`) then returns `nil` immediately.",
+        "`UrbitHandler` and `UploadHandler` process actions inline and return concrete errors for operation failures."
+      ],
+      "suggestion": "Define one consistent boundary contract for websocket handlers (either command accepted/asynchronous with explicit ack event, or synchronous completion/error) and apply it uniformly across handler modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "ws_protocol_shape_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "c2c_return_shape_mismatch",
+      "summary": "C2C handler advertises response payload output but returns nil payload on success, unlike other payload-producing handlers.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`C2CHandler` signature is `([]byte, error)` and declares `resp []byte`, but on valid `c2c` action it only calls `system.C2CConnect(...)` and returns `resp` (nil).",
+        "The commented-out response marshalling block in `C2CHandler` shows the response contract was partially removed, leaving an ambiguous API shape."
+      ],
+      "suggestion": "Either change `C2CHandler` to `error`-only command semantics or restore explicit response payload generation and ensure callers always receive a non-nil structured response.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "ws_protocol_shape_drift"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "urbitdocker_unmarshal_can_panic",
+      "summary": "Custom unmarshal path violates error-return contract by panicking on unexpected JSON types instead of returning an error.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/urbit.go"
+      ],
+      "evidence": [
+        "`UnmarshalJSON` uses direct assertions such as `u.MinIOLinked = v.(bool)` and `u.DisableShipRestarts = v.(bool)`.",
+        "`LoadUrbitConfig` relies on `json.Unmarshal(..., &targetStruct)` expecting decode failures as `error`; panic escapes this contract."
+      ],
+      "suggestion": "Replace direct assertions with checked type switches/conversions and return descriptive decode errors (`fmt.Errorf(\"field X type invalid\")`) for all unsupported shapes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_inconsistency"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "docker_status_api_has_panic_path",
+      "summary": "Container-status API advertises `(string, error)` but has an internal nil-deref path due to ignored client initialization errors.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/docker/minio.go"
+      ],
+      "evidence": [
+        "`GetContainerRunningStatus` captures `cli, err := dockerclient.New()` then ignores `err` and immediately `defer cli.Close()`.",
+        "`minioContainerConf`/`mcContainerConf` call `GetContainerRunningStatus(...)` and expect normal error signaling to control startup sequencing."
+      ],
+      "suggestion": "Return immediately on docker client creation error and guard `defer cli.Close()` behind a non-nil client; add a test for client-init failure behavior.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_inconsistency"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "auth_handlers_signal_failure_as_success",
+      "summary": "Authentication and password handlers blur success/failure contracts by returning nil errors for rejected operations.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "In `LoginHandler`, failed authentication writes a `login-failed` message but returns `(tokenMap, nil)`.",
+        "In `PwHandler`, when old password does not match stored hash, execution falls through and returns `nil` without indicating failure."
+      ],
+      "suggestion": "Make rejection states explicit in function contracts (typed result or non-nil error), and keep websocket broadcast side effects separate from return-value signaling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "WebSocket command layer lacks a single, enforced contract for request/response semantics.",
+      "Error handling is treated inconsistently across boundaries, mixing side-effect signaling with return-value signaling.",
+      "Schema evolution appears ad hoc, with protocol fields drifting without centralized compatibility checks."
+    ],
+    "likely_symptoms": [
+      "handler_sync_async_contract_split",
+      "c2c_return_shape_mismatch",
+      "auth_handlers_signal_failure_as_success",
+      "docker_status_api_has_panic_path"
+    ],
+    "possible_false_positives": []
+  }
+}

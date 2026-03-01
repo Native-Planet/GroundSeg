@@ -18,7 +18,7 @@ import (
 
 func UrbitTransitionHandler() {
 	for {
-		event := <-docker.UTransBus
+		event := <-docker.UrbitTransitions()
 		current := broadcast.GetState()
 		urbitStruct, exists := current.Urbits[event.Patp]
 		if exists {
@@ -90,7 +90,7 @@ func UrbitTransitionHandler() {
 
 func NewShipTransitionHandler() {
 	for {
-		event := <-docker.NewShipTransBus
+		event := <-docker.NewShipTransitions()
 		switch event.Type {
 		case "error":
 			current := broadcast.GetState()
@@ -127,7 +127,7 @@ func NewShipTransitionHandler() {
 
 func RectifyUrbit() {
 	for {
-		event := <-startram.EventBus
+		event := <-startram.Events()
 		switch event.Type {
 		case "restart":
 			// startram - restarting wireguard container
@@ -182,7 +182,7 @@ func RectifyUrbit() {
 				if exists {
 					running := containerState.ActualStatus == "running"
 					current.Profile.Startram.Info.Running = running
-					if err := config.UpdateConf(map[string]interface{}{"wgOn": running}); err != nil {
+					if err := config.UpdateConfTyped(config.WithWgOn(running)); err != nil {
 						zap.L().Error(fmt.Sprintf("%v", err))
 					}
 				}
@@ -195,7 +195,7 @@ func RectifyUrbit() {
 			for patp, _ := range config.UrbitConfAll() {
 				modified := false
 				serviceCreated := true
-				startramConfig := config.StartramConfig // a structs.StartramRetrieve
+				startramConfig := config.GetStartramConfig() // a structs.StartramRetrieve
 				config.LoadUrbitConfig(patp)
 				local := config.UrbitConf(patp) // a structs.UrbitDocker
 				// check if existing ship was not created
@@ -275,7 +275,12 @@ func RectifyUrbit() {
 					}
 				}
 				if modified {
-					config.UpdateUrbitConfig(map[string]structs.UrbitDocker{patp: local})
+					if err := config.UpdateUrbit(patp, func(conf *structs.UrbitDocker) error {
+						*conf = local
+						return nil
+					}); err != nil {
+						zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s urbit config updates: %v", patp, err))
+					}
 				}
 				current := broadcast.GetState()
 				urbitStruct, ok := current.Urbits[patp]
@@ -299,7 +304,7 @@ func RectifyUrbit() {
 
 func SystemTransitionHandler() {
 	for {
-		event := <-docker.SysTransBus
+		event := <-docker.SystemTransitions()
 		current := broadcast.GetState()
 		switch event.Type {
 		case "wifiConnect":

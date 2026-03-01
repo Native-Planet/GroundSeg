@@ -52,6 +52,53 @@ sudo wget -O - only.groundseg.app | bash
 1. Have docker installed
 2. run `build.sh`
 
+## Frontend Source And Runtime Ownership
+
+- Source of truth for frontend runtime code is `ui/src/`.
+- Generated web artifacts are output to `goseg/web/` by the UI build process.
+- Do not hand-edit generated files under `goseg/web/_app/immutable/`; update `ui/src/` and rebuild.
+
+Architecture and package-boundary details are documented in
+`docs/architecture/frontend-runtime.md`.
+
+## Frontend Quality Gate
+
+Required checks before shipping frontend/runtime changes:
+
+1. `cd ui && npm ci`
+2. `npm run test`
+3. `npm run build`
+
+Only refresh committed `goseg/web/` artifacts after all checks pass.
+
+## Backend Quality Gate
+
+Required checks before shipping Go backend/runtime changes:
+
+1. `cd goseg`
+2. `go test ./...`
+3. `go test -tags=integration ./broadcast ./handler ./routines ./ws` (run only in environments with Docker + runtime dependencies available)
+
+Runtime boundary expectations for backend changes:
+
+1. Preserve explicit error propagation (`%w`) at handler/service boundaries.
+2. Keep fetch-only APIs separate from state-mutating sync APIs (for example `Fetch*` vs `Sync*`).
+3. For flows that touch registration/version/upload paths, include at least one deterministic unit test in the changed package.
+4. For upload action routing (`goseg/handler/ws/upload.go`), maintain an explicit branch matrix in tests:
+   decode failure, `open-endpoint` success/failure, `reset` success/failure, and unsupported action.
+   Keep transport-to-domain translation inside `goseg/uploadsvc/adapters` so websocket handlers stay importer-agnostic.
+5. For upload command dispatch (`goseg/uploadsvc/service.go`), require a dispatch-table parity test that exercises every value from `SupportedActions()` and validates the routed service method.
+6. For masked external errors (for example `goseg/startram/errors.go`), require tests that assert:
+   redacted outward message and preserved internal cause chain (`errors.Is`/`Unwrap`).
+7. Use shared boundary helpers for edge contracts:
+   dependency-injected handlers (no package-global service mutation) and shared masked-error wrappers (`goseg/errpolicy`) for outward error semantics.
+
+CI policy checks:
+
+1. `Runtime Contract Gate` (`.github/workflows/upload-contract-gate.yml`) runs a path-aware check that fails if contract surfaces change without paired tests:
+   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`.
+2. The same gate runs targeted contract tests via `.github/scripts/check-upload-contract.sh` for upload branch matrix, upload dispatch parity, and startram masked-error semantics.
+
 ## Removing GroundSeg (Uninstall)
 
 ### Standard Removal (Recommended)

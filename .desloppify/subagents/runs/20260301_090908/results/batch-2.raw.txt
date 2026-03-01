@@ -1,0 +1,142 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 76.0,
+    "test_strategy": 68.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go defines package-level mutable state (`EventBus`, `Regions`) at lines 33-36 and mutates it in `SyncRegions` (line 73) and `SyncRetrieve` (line 138), creating implicit cross-module coordination paths.",
+        "goseg/config/version.go also relies on package-level mutable globals (`VersionServerReady`, `VersionInfo`) at lines 17-20 and mutates them in `SyncVersionInfo` (lines 120, 133, 137-138), coupling callers to hidden shared state.",
+        "README.md lines 55-72 document explicit frontend source/runtime ownership and quality gate, but no equivalent backend boundary/contract policy is documented for the stateful Go runtime modules reviewed."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "goseg/startram/startram.go contains critical registration/retrieval and state mutation flows (`FetchRegions`, `Retrieve`, `SyncRetrieve`, `Register`, `SvcCreate`, `SvcDelete`) across lines 38-343, but goseg/startram/startram_test.go only tests `maskPubkey` and encrypt/decrypt helpers.",
+        "goseg/config/version.go implements retrying network fetch, channel selection, persistence, and global state mutation (lines 22-139), but available config tests do not cover these version paths.",
+        "goseg/handler/upload.go is a command-dispatch boundary for importer actions (lines 12-31), while handler tests shown are integration-tagged utility tests and do not validate upload action routing or error contracts.",
+        "README.md frontend quality gate (lines 64-72) enforces only UI checks (`npm run test`, `npm run build`) and does not define a backend gate for these Go runtime-critical paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_boundary_drift",
+      "summary": "Core runtime contracts depend on mutable package globals, creating implicit cross-module coupling and brittle behavior boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`startram.go` exposes and mutates `EventBus`/`Regions` as globals (lines 33-36, 73, 138), so consumers are coupled to package state and call ordering instead of explicit interfaces.",
+        "`version.go` similarly maintains global readiness/version state (lines 17-20, 120, 133, 137-138), making behavior depend on prior invocations across modules.",
+        "README describes frontend ownership/contracts but no backend runtime contract boundaries for these shared-state modules (lines 55-72)."
+      ],
+      "suggestion": "Introduce explicit service structs for version/startram operations with injected dependencies and return values, move mutable state behind narrow interfaces, and document backend module ownership/contracts in README architecture sections to align runtime behavior with governance docs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_shared_state_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_read_sync_contract_split",
+      "summary": "Startram read/sync API variants encode side effects inconsistently, leaving compatibility paths that blur architectural intent.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`FetchRegions` is side-effect-free while `SyncRegions` mutates global cache, but `GetRegions` is kept for compatibility and routes to fetch-only behavior (lines 38-80), leaving three near-overlapping entry points.",
+        "The file mixes fetch-only and mutating variants (`Retrieve` vs `SyncRetrieve`, lines 82-140) without a documented backend contract in README."
+      ],
+      "suggestion": "Consolidate to a single explicit read API and a clearly named sync/update API, deprecate compatibility aliases with a documented migration policy, and add backend contract notes in README describing which calls are pure reads vs state-mutating sync operations.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_shared_state_contracts"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_startram_paths_untested",
+      "summary": "High-risk network and state-transition flows in startram are effectively unprotected by tests.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/startram/startram_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`startram.go` implements registration/retrieval/service lifecycle over HTTP with config mutation and event emission (lines 38-343).",
+        "`startram_test.go` only covers masking and encrypt/decrypt helpers, with no tests for HTTP failures, response parsing contracts, or state mutation behavior.",
+        "README quality gate is frontend-only and does not require backend test execution for these paths (lines 64-72)."
+      ],
+      "suggestion": "Add table-driven tests around `FetchRegions`/`Retrieve`/`Register`/`SvcCreate`/`SvcDelete` using `httptest` servers and isolated config state, then extend the documented quality gate to include Go test execution for runtime modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "version_update_contract_untested",
+      "summary": "Version sync behavior lacks contract tests despite retries, persistence, and global state updates.",
+      "related_files": [
+        "goseg/config/version.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`version.go` contains retry loops, channel selection, file persistence, and global readiness state changes (lines 22-139).",
+        "No tests in reviewed coverage validate malformed payload handling, missing channel behavior, persistence failures, or global state transitions.",
+        "README quality gate does not define backend checks that would fail on regressions in this runtime path."
+      ],
+      "suggestion": "Introduce dedicated tests for `fetchVersionFromServer`, `resolveVersionForConfiguredChannel`, and `SyncVersionInfo` (success/failure matrix including invalid JSON, missing branch, write failure), and require these tests in the documented quality gate.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "upload_dispatch_unverified",
+      "summary": "Upload command dispatch lacks focused tests for action routing and error contract integrity.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`UploadHandler` branches on action strings and maps failures to user-facing errors (lines 12-31), including a path that drops the underlying `SetUploadSession` error detail.",
+        "Reviewed test surface does not show targeted tests validating recognized actions, unknown action rejection, and propagation/format of returned errors for this handler boundary.",
+        "README quality gate does not require backend handler-level tests."
+      ],
+      "suggestion": "Add unit tests for `UploadHandler` covering each action and error path (including malformed JSON and unknown action), with importer dependencies stubbed so routing and error contracts are asserted deterministically.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Backend governance is under-specified compared to frontend, so runtime contracts are enforced mostly by convention.",
+      "Package-level mutable state is used as an integration mechanism instead of explicit interfaces, increasing hidden coupling.",
+      "Quality gates emphasize UI checks while high-risk Go runtime paths lack equivalent mandatory test coverage."
+    ],
+    "likely_symptoms": [
+      "startram_read_sync_contract_split",
+      "version_update_contract_untested",
+      "upload_dispatch_unverified"
+    ],
+    "possible_false_positives": []
+  }
+}

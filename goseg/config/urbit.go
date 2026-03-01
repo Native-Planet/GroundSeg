@@ -9,7 +9,6 @@ import (
 	"groundseg/defaults"
 	"groundseg/dockerclient"
 	"groundseg/structs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +21,8 @@ import (
 var (
 	UrbitsConfig = make(map[string]structs.UrbitDocker)
 	urbitMutex   sync.RWMutex
+
+	getImageTagByContainerNameForUrbit = getImageTagByContainerName
 )
 
 // retrieve struct corresponding with urbit json file
@@ -39,35 +40,23 @@ func GetMinIOLinkedStatus(patp string) bool {
 
 // retrieve map of urbit config structs
 func UrbitConfAll() map[string]structs.UrbitDocker {
-	urbitMutex.Lock()
-	defer urbitMutex.Unlock()
-	return UrbitsConfig
+	urbitMutex.RLock()
+	defer urbitMutex.RUnlock()
+	configCopy := make(map[string]structs.UrbitDocker, len(UrbitsConfig))
+	for pier, conf := range UrbitsConfig {
+		configCopy[pier] = conf
+	}
+	return configCopy
 }
 
 // load urbit conf json into memory
 func LoadUrbitConfig(pier string) error {
 	urbitMutex.Lock()
 	defer urbitMutex.Unlock()
-	// pull docker info from json
-	confPath := filepath.Join(BasePath, "settings", "pier", pier+".json")
-	file, err := ioutil.ReadFile(confPath)
+	targetStruct, err := loadUrbitConfigFromDisk(pier)
 	if err != nil {
-		return fmt.Errorf("Unable to load %s config: %w", pier, err)
-		// todo: write a new conf
+		return err
 	}
-	// Unmarshal JSON
-	var targetStruct structs.UrbitDocker
-	if err := json.Unmarshal(file, &targetStruct); err != nil {
-		return fmt.Errorf("Error decoding %s JSON: %w", pier, err)
-	}
-	// set startram reminder
-	if targetStruct.StartramReminder == nil {
-		targetStruct.StartramReminder = defaults.UrbitConfig.StartramReminder
-	}
-	if targetStruct.SnapTime == 0 {
-		targetStruct.SnapTime = 60
-	}
-	// Store in var
 	UrbitsConfig[pier] = targetStruct
 	return nil
 }
@@ -87,43 +76,97 @@ func RemoveUrbitConfig(pier string) error {
 func UpdateUrbitConfig(inputConfig map[string]structs.UrbitDocker) error {
 	urbitMutex.Lock()
 	defer urbitMutex.Unlock()
-	// update UrbitsConfig with the values from inputConfig
 	for pier, config := range inputConfig {
-		ver, err := getImageTagByContainerName(pier)
-		if err == nil {
-			config.UrbitVersion = ver
-		}
-		UrbitsConfig[pier] = config
-		// also update the corresponding json files
-		path := filepath.Join(BasePath, "settings", "pier", pier+".json")
-		if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		if err := persistUrbitConfigLocked(pier, config); err != nil {
 			return err
 		}
-		tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
-		if err != nil {
-			return fmt.Errorf("error creating temp file: %v", err)
-		}
-		// write and validate temp file before overwriting
-		tmpPath := tmpFile.Name()
-		defer os.Remove(tmpPath)
-		encoder := json.NewEncoder(tmpFile)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(&config); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("error encoding config: %v", err)
-		}
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("error closing temp file: %v", err)
-		}
-		if fi, err := os.Stat(tmpPath); err != nil {
-			return fmt.Errorf("error checking temp file: %v", err)
-		} else if fi.Size() == 0 {
-			return fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
-		}
-		if err := os.Rename(tmpPath, path); err != nil {
-			return fmt.Errorf("error moving temp file: %v", err)
-		}
 	}
+	return nil
+}
+
+// UpdateUrbit centralizes single-ship config mutation so callsites don't need ad-hoc map scaffolding.
+func UpdateUrbit(pier string, mutateFn func(*structs.UrbitDocker) error) error {
+	if mutateFn == nil {
+		return fmt.Errorf("mutate function is required")
+	}
+	urbitMutex.Lock()
+	defer urbitMutex.Unlock()
+
+	current, ok := UrbitsConfig[pier]
+	if !ok {
+		loaded, err := loadUrbitConfigFromDisk(pier)
+		if err != nil {
+			return err
+		}
+		current = loaded
+	}
+	if err := mutateFn(&current); err != nil {
+		return err
+	}
+	return persistUrbitConfigLocked(pier, current)
+}
+
+func loadUrbitConfigFromDisk(pier string) (structs.UrbitDocker, error) {
+	confPath := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	file, err := os.ReadFile(confPath)
+	if err != nil {
+		return structs.UrbitDocker{}, fmt.Errorf("unable to load %s config: %v", pier, err)
+	}
+	var targetStruct structs.UrbitDocker
+	if err := json.Unmarshal(file, &targetStruct); err != nil {
+		return structs.UrbitDocker{}, fmt.Errorf("error decoding %s JSON: %v", pier, err)
+	}
+	normalizeUrbitConfig(&targetStruct)
+	return targetStruct, nil
+}
+
+func normalizeUrbitConfig(conf *structs.UrbitDocker) {
+	if conf.StartramReminder == nil {
+		conf.StartramReminder = defaults.UrbitConfig.StartramReminder
+	}
+	if conf.SnapTime == 0 {
+		conf.SnapTime = 60
+	}
+}
+
+func persistUrbitConfigLocked(pier string, conf structs.UrbitDocker) error {
+	normalizeUrbitConfig(&conf)
+	if ver, err := getImageTagByContainerNameForUrbit(pier); err == nil {
+		conf.UrbitVersion = ver
+	}
+
+	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		return fmt.Errorf("error creating urbit config dir for %s: %v", pier, err)
+	}
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), pier+".json.*")
+	if err != nil {
+		return fmt.Errorf("error creating temp file for %s: %v", pier, err)
+	}
+	// write and validate temp file before overwriting
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	encoder := json.NewEncoder(tmpFile)
+	encoder.SetIndent("", "    ")
+	if err := encoder.Encode(&conf); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("error encoding %s config: %v", pier, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("error closing temp file for %s: %v", pier, err)
+	}
+	fi, err := os.Stat(tmpPath)
+	if err != nil {
+		return fmt.Errorf("error checking temp file for %s: %v", pier, err)
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("refusing to persist empty configuration for pier %s", pier)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("error moving temp file for %s: %v", pier, err)
+	}
+	UrbitsConfig[pier] = conf
 	return nil
 }
 
@@ -133,7 +176,7 @@ func getImageTagByContainerName(containerName string) (string, error) {
 	// Create a new Docker client
 	cli, err := dockerclient.New()
 	if err != nil {
-		return "", fmt.Errorf("failed to create docker client: %w", err)
+		return "", fmt.Errorf("failed to create docker client: %v", err)
 	}
 	defer cli.Close()
 
@@ -144,7 +187,7 @@ func getImageTagByContainerName(containerName string) (string, error) {
 	// List containers using the filter
 	containers, err := cli.ContainerList(ctx, container.ListOptions{Filters: filterArgs, All: true})
 	if err != nil {
-		return "", fmt.Errorf("failed to list containers: %w", err)
+		return "", fmt.Errorf("failed to list containers: %v", err)
 	}
 
 	// Check if any container matches the exact given name

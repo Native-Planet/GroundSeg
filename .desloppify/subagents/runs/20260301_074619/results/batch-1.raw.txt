@@ -1,0 +1,126 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 68.5
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js defines a layered command wrapper stack (`sendTypeCommand` -> `sendActionCommand` -> domain helpers) and then dozens of exported one-line command functions that only forward string literals and params.",
+        "ui/src/lib/stores/websocket.js `sendCommand` multiplexes two distinct transports (`sendPoke(payload)` in URBIT mode vs raw `SESSION.send(JSON.stringify(data))` in websocket mode), so one abstraction carries divergent runtime semantics.",
+        "goseg/web/_app/immutable/chunks/1.0d44cf41.js, 10.35bd59a0.js, 11.9463674b.js, and 12.0b2f13c7.js are pass-through re-export stubs (`import default as t ...; export { t as component };`) adding indirection without policy/translation.",
+        "goseg/web/_app/immutable/chunks/index.cac2eef5.js and goseg/web/_app/immutable/entry/start.a9edaa26.js show dense wrapper-heavy runtime indirection chains from bundled output, obscuring domain boundaries in reviewed artifacts."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 61.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 80.5
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "websocket_command_surface_passthrough_fascade",
+      "summary": "Command API is a large pass-through facade with minimal behavioral leverage and heavy stringly-typed forwarding.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/data.js"
+      ],
+      "evidence": [
+        "websocket.js declares helper wrappers (`sendTypeCommand`, `sendActionCommand`, `sendSystemCommand`, `sendSetupCommand`, `sendStartramCommand`, `sendUrbitCommand`, `sendDevCommand`) and then a long list of exports that each just pass literals and params.",
+        "Many exports differ only by action strings and shallow object construction (for example `toggleWifi`, `connectWifi`, `startramRegister`, `toggleBackups`, `submitReport`), indicating low-cohesion command surface growth.",
+        "Global state stores in data.js (`URBIT_MODE`, `connected`, `structure`) are manipulated from the same module, increasing API breadth in one place."
+      ],
+      "suggestion": "Replace one-function-per-command wrappers with a typed command registry (domain + action schema + payload validator) and generate thin call sites from that registry; keep only behavior-bearing functions in the store module.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_command_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "transport_abstraction_leak_in_send_command",
+      "summary": "Single `sendCommand` abstraction leaks two different transport contracts behind one interface.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/data.js",
+        "ui/vite.config.js"
+      ],
+      "evidence": [
+        "In websocket.js, `sendCommand` branches on `URBIT_MODE`: one path calls `sendPoke(payload)`, the other generates ids/tokens and writes serialized JSON via websocket `SESSION.send`.",
+        "Because the mode flag comes from a writable store (`URBIT_MODE` in data.js), call sites cannot infer which transport semantics apply from the function contract.",
+        "vite.config.js injects mode flags (`GS_URBIT_MODE`) at build/runtime boundaries, so transport behavior is externally toggled without an explicit transport interface boundary in code."
+      ],
+      "suggestion": "Introduce explicit transport adapters (e.g., `UrbitTransport`, `WebSocketTransport`) implementing a shared interface with documented request/ack semantics, and inject the selected adapter once during initialization instead of branching in each command send.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_command_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "generated_chunk_reexport_indirection",
+      "summary": "Multiple immutable chunk files are pure re-export wrappers that add call/import depth without domain value.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/1.0d44cf41.js",
+        "goseg/web/_app/immutable/chunks/10.35bd59a0.js",
+        "goseg/web/_app/immutable/chunks/11.9463674b.js",
+        "goseg/web/_app/immutable/chunks/12.0b2f13c7.js",
+        "goseg/web/_app/immutable/chunks/0.f72efb1a.js",
+        "goseg/web/_app/immutable/chunks/3.1bf9a0f6.js"
+      ],
+      "evidence": [
+        "Each file is effectively only an import+export alias (`export { t as component }` and sometimes a `universal` re-export), with no behavior, policy, or translation.",
+        "These wrappers create additional module hops in the reviewed dependency surface while not serving as stable hand-written interfaces."
+      ],
+      "suggestion": "Treat these immutable build outputs as generated artifacts outside abstraction review/fix loops (review the source Svelte/routes instead), or stop committing these files where possible to avoid evaluating compiler indirection as architecture.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_artifact_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bundle_indirection_obscures_boundaries",
+      "summary": "Bundled runtime files contain deep wrapper/utility indirection that obscures actual ownership boundaries for dependency analysis.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/index.cac2eef5.js",
+        "goseg/web/_app/immutable/entry/start.a9edaa26.js",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js",
+        "goseg/web/_app/immutable/chunks/store.7482f421.js",
+        "goseg/web/_app/immutable/chunks/Modals.27437324.js",
+        "goseg/web/_app/immutable/chunks/Nav.ad85b0b2.js"
+      ],
+      "evidence": [
+        "index.cac2eef5.js contains large numbers of micro-wrappers/aliases (e.g., identity wrappers and adapter helpers) that mostly serve compilation/runtime internals.",
+        "entry/start.a9edaa26.js and app.e0ffcb44.js orchestrate routing/runtime behavior through minified aliases and indirection chains, making abstraction boundaries non-honest from a maintainer perspective.",
+        "Modals/Nav compiled chunks import broad runtime symbol sets from index.cac2eef5.js, reinforcing low-signal dependency edges at artifact level."
+      ],
+      "suggestion": "Shift architectural review scope to pre-build source modules and keep immutable bundles out of abstraction health scoring; if bundles must remain, isolate them in a non-scored generated zone and add review guards to prevent artifact-level abstraction findings from masking real source-level issues.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "generated_artifact_indirection"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Command/API growth in websocket store was handled by additive wrappers around string literals instead of a typed command model.",
+      "Generated immutable artifacts are being reviewed as if they were hand-written architecture, inflating indirection defects."
+    ],
+    "likely_symptoms": [
+      "websocket_command_surface_passthrough_fascade",
+      "transport_abstraction_leak_in_send_command",
+      "generated_chunk_reexport_indirection",
+      "runtime_bundle_indirection_obscures_boundaries"
+    ],
+    "possible_false_positives": [
+      "Some immutable-file indirection is compiler-required and may be mis-scoped as maintainability debt if generated-zone policy is not enforced."
+    ]
+  }
+}

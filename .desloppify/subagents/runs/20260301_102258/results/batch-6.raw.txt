@@ -1,0 +1,235 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 58.0,
+    "error_consistency": 54.0,
+    "abstraction_fitness": 57.0,
+    "test_strategy": 42.0,
+    "design_coherence": 50.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Multiple packages perform runtime side effects in init(): goseg/config/config.go:60 loads/persists config and starts ConfChannel goroutine; goseg/docker/docker.go:35 stops containers and probes Docker server; goseg/auth/auth.go:61 reads session state and starts cleanup goroutine.",
+        "Main boot path still orchestrates another large startup graph (goseg/main.go:245-336) that assumes package-level globals/channels are already initialized.",
+        "Shared mutable package state is used cross-module (e.g., config.globalConfig in goseg/config/config.go:31, startram.Regions/EventBus in goseg/startram/startram.go:34-36, docker transition buses in goseg/docker/docker.go:27-31), increasing change blast radius."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "Error wrapping strategy is inconsistent: many paths use fmt.Errorf with %v and lose chainability (e.g., goseg/setup/setup.go:37, goseg/handler/urbit.go:178, goseg/importer/importer.go:94) while others use %w (e.g., goseg/backups/backups.go:24, goseg/handler/upload.go:22).",
+        "Operational failures are silently downgraded: WaitComplete suppresses docker status errors by returning (false, nil) in goseg/handler/urbit.go:148-154, and killSwitch ignores reboot command failure (cmd.Run() unchecked) in goseg/main.go:94-95.",
+        "Server startup errors are not propagated/handled consistently: go server.ListenAndServe() in goseg/main.go:162 ignores returned error while wsServer.ListenAndServe() at line 163 blocks and also ignores error value."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Click command implementations repeat the same createHoon -> defer deleteHoon -> clickExec -> filterResponse control flow in many functions (e.g., goseg/click/acme.go:19-39, goseg/click/storage.go:28-93, goseg/click/hark.go:22-138).",
+        "The repetition shows missing shared command-executor abstraction; most functions differ only in Hoon payload text and error strings.",
+        "Wide global config access pattern (many direct config.Conf() reads across handler/docker/startram/importer) indicates policy and state access are not encapsulated by narrower interfaces."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 52.0,
+        "indirection_cost": 40.0,
+        "interface_honesty": 61.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "High-risk orchestration files in this batch lack dedicated tests: goseg/handler/urbit.go (1233 LOC), goseg/importer/importer.go (755 LOC), goseg/startram/startram.go (923 LOC), goseg/broadcast/broadcast.go (657 LOC).",
+        "Available tests in reviewed areas are sparse and concentrated elsewhere (e.g., handler_test, docker_test, config_test, accesspoint_test), leaving many cross-module flows in untested production paths.",
+        "Error-heavy and side-effect-heavy paths (container lifecycle, registration/retrieve, upload/import, websocket command dispatch) have little evidence of integration coverage in assigned files."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "design_coherence": {
+      "evidence": [
+        "goseg/handler/urbit.go centralizes command routing plus numerous operational concerns (DNS checks, docker state polling, config updates, backup/schedule toggles), indicating mixed responsibilities in one file.",
+        "Startup orchestration in goseg/main.go spans networking mode, update checks, transition loops, docker service loading, logging pipelines, and server startup in a single procedural flow.",
+        "Near-duplicate log-file parsing/sorting logic exists in both goseg/handler/support.go:425-479 and goseg/routines/logs.go:255-321, suggesting coherent logic is not consolidated."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "init_side_effect_bootstrap_coupling",
+      "summary": "Package init() functions execute cross-cutting runtime work, creating implicit startup dependencies and weak module boundaries.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/docker/docker.go",
+        "goseg/auth/auth.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "goseg/config/config.go:60 init() performs config file I/O, mutates globalConfig, and launches ConfChannel goroutine.",
+        "goseg/docker/docker.go:35 init() stops containers, kills port 80 containers, and performs Docker server probe.",
+        "goseg/auth/auth.go:61 init() reads persisted sessions and starts periodic cleanup goroutine.",
+        "goseg/handler/handler.go:36 init() launches HandleLeakAction goroutine."
+      ],
+      "suggestion": "Move side-effectful initialization into explicit bootstrap phases in main (e.g., config bootstrap, infrastructure bootstrap, runtime workers). Keep init() pure/minimal so dependency order is explicit and test harnesses can compose subsystems deterministically.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_lifecycle"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_hub_coupling",
+      "summary": "Cross-module behavior depends on mutable package-level state hubs instead of explicit interfaces, increasing blast radius.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/startram/startram.go",
+        "goseg/docker/docker.go",
+        "goseg/main.go",
+        "goseg/shipcreator/shipcreator.go"
+      ],
+      "evidence": [
+        "goseg/config/config.go:31 defines globalConfig and Conf() accessor used widely across modules.",
+        "goseg/startram/startram.go:34-36 defines global EventBus and Regions map.",
+        "goseg/docker/docker.go:27-33 defines global transition buses and stats maps consumed by handlers/routines/rectify.",
+        "goseg/main.go:245-336 wires many goroutines around these shared globals."
+      ],
+      "suggestion": "Introduce subsystem structs (ConfigService, RuntimeBus, StartramService) passed through constructors so modules depend on explicit contracts instead of package globals; reserve package-level globals for truly immutable constants.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_lifecycle"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_error_wrapping_strategy",
+      "summary": "Error wrapping is inconsistent (%v vs %w), which breaks reliable error chaining and handling across module boundaries.",
+      "related_files": [
+        "goseg/setup/setup.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/backups/backups.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "Non-wrapping patterns: goseg/setup/setup.go:37, goseg/handler/urbit.go:178, goseg/importer/importer.go:94 use fmt.Errorf(... %v, err).",
+        "Wrapping patterns exist elsewhere: goseg/backups/backups.go:24 and goseg/handler/upload.go:22 use %w.",
+        "This inconsistency prevents uniform errors.Is/errors.As behavior in higher layers."
+      ],
+      "suggestion": "Standardize on wrapping with %w when propagating underlying errors, and only use non-wrapped messages for terminal/user-facing boundaries. Add linting/tests for wrapping policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "silent_operational_error_suppression",
+      "summary": "Several control paths suppress runtime failures, causing ambiguous behavior and reduced observability.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/main.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "goseg/handler/urbit.go:148-154 WaitComplete converts docker status retrieval failures into (false, nil), hiding real faults during polling.",
+        "goseg/main.go:94-95 executes reboot command without checking cmd.Run() result.",
+        "goseg/main.go:162-163 ignores ListenAndServe errors for both HTTP servers.",
+        "goseg/importer/importer.go:103-107 logs regex errors and continues loop, potentially masking malformed mount-state handling."
+      ],
+      "suggestion": "Define a consistent operational error policy: classify retryable vs terminal failures, propagate terminal errors to callers/transition buses, and emit structured logs with context for retries.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "click_command_template_duplication",
+      "summary": "Click command functions duplicate the same execution template, indicating a missing reusable command abstraction.",
+      "related_files": [
+        "goseg/click/acme.go",
+        "goseg/click/storage.go",
+        "goseg/click/hark.go",
+        "goseg/click/desk.go",
+        "goseg/click/restore.go"
+      ],
+      "evidence": [
+        "Repeated sequence appears across files: createHoon -> defer deleteHoon -> clickExec -> filterResponse with nearly identical error handling.",
+        "Examples: goseg/click/acme.go:25-38, goseg/click/storage.go:42-58 and 75-91, goseg/click/hark.go:42-57 / 81-97 / 120-136."
+      ],
+      "suggestion": "Create a shared helper (e.g., executeClickCommand) that accepts command metadata (file name, hoon payload, success token, optional success predicate) to collapse boilerplate and centralize response/error policy.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_click_executor_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "god_handler_and_orchestration_mix",
+      "summary": "Core handler/orchestration files mix unrelated responsibilities, reducing clarity and increasing regression risk.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/main.go",
+        "goseg/handler/handler.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "goseg/handler/urbit.go is 1233 lines and combines websocket action dispatch, domain validation, docker lifecycle operations, scheduling, backups, and transition signaling.",
+        "goseg/main.go combines connectivity mode switching, update coordination, service loading, goroutine orchestration, and HTTP server startup in one flow (notably lines 245-336).",
+        "goseg/handler/handler.go NewShipHandler also embeds validation, filesystem provisioning, and cross-handler invocation."
+      ],
+      "suggestion": "Split by bounded responsibilities: separate command parsing, domain services (ship lifecycle, scheduling, backup), and infrastructure adapters; keep handlers thin and make orchestration explicit through service interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "monolithic_orchestration_units"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_orchestration_paths_undertested",
+      "summary": "Large, high-risk orchestration modules in this batch have little to no direct test coverage.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/startram/startram.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "Core files are large and side-effect heavy (urbit.go 1233 LOC, importer.go 755 LOC, startram.go 923 LOC, broadcast.go 657 LOC).",
+        "Test files in reviewed modules are limited to a small subset (e.g., handler_test, docker_test, config_test, accesspoint_test, startram_test, routines/backup_test), with no dedicated tests for the listed high-complexity handler/importer/broadcast workflows."
+      ],
+      "suggestion": "Add integration-focused tests around websocket command flows, import/upload lifecycle transitions, startram retrieval/registration state application, and broadcast payload correctness; prioritize table-driven failure-mode tests for each critical path.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "insufficient_critical_path_test_harness"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Implicit global runtime lifecycle via package-level init and shared mutable state",
+      "No unified error-propagation contract across handlers/services",
+      "Missing domain-level abstractions for repeated command execution patterns",
+      "Complex orchestration concentrated in monolithic files without matching integration tests"
+    ],
+    "likely_symptoms": [
+      "mixed_error_wrapping_strategy",
+      "silent_operational_error_suppression",
+      "click_command_template_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

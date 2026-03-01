@@ -1,0 +1,145 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 62.0,
+    "incomplete_migration": 58.0,
+    "low_level_elegance": 64.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "goseg/accesspoint/config.go builds a long hostapd template via raw string + repeated inline comments that restate each directive instead of encoding intent in structure.",
+        "makeConfig in goseg/accesspoint/config.go returns (string, error) but has no failing branch, which is a defensive signature pattern without functional value.",
+        "writeHostapdConfig uses fmt.Sprintf only to pass a single formatted string into zap.L().Info, a boilerplate/logging pattern that adds noise."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "goseg/accesspoint/config.go imports io/ioutil and uses ioutil.WriteFile, which is a deprecated pre-Go-1.16 API path.",
+        "The file still follows legacy write-path patterns while adjacent tests in goseg/accesspoint/accesspoint_test.go validate behavior at the string level only, leaving no guard for migration-safe file write behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "makeConfig in goseg/accesspoint/config.go performs manual string concatenation for each dynamic field, creating a brittle config emitter that is hard to reason about for escaping and line-shape guarantees.",
+        "The function exposes an error return that is never produced, forcing callers (goseg/accesspoint/accesspoint.go) to carry dead-path error handling.",
+        "Current tests in goseg/accesspoint/accesspoint_test.go only check simple substring presence and do not validate malformed-value edge cases caused by direct interpolation."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "incomplete_migration",
+      "identifier": "legacy_ioutil_writefile",
+      "summary": "Deprecated ioutil.WriteFile API is still used for hostapd config emission.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "goseg/accesspoint/config.go imports io/ioutil and calls ioutil.WriteFile(hostapdConfigPath, []byte(config), 0644).",
+        "writeHostapdConfig is invoked from goseg/accesspoint/accesspoint.go Start(), so the legacy API remains in active runtime flow."
+      ],
+      "suggestion": "Replace ioutil.WriteFile with os.WriteFile and keep behavior identical; add a small test seam for write failure/success to prevent regression during future stdlib migrations.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "legacy_api_carryover"
+    },
+    {
+      "dimension": "ai_generated_debt",
+      "identifier": "comment_heavy_template_blob",
+      "summary": "Hostapd template is an over-commented monolithic string that mirrors directive names rather than expressing domain intent.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "goseg/accesspoint/config.go embeds dozens of line comments inside the literal template that restate obvious hostapd keys (e.g., comments directly above interface/ssid/channel/wpa fields).",
+        "Tests in goseg/accesspoint/accesspoint_test.go assert only literal substring presence, reinforcing the blob format instead of structured generation."
+      ],
+      "suggestion": "Refactor config generation to a typed template/struct-backed builder with concise rationale comments outside the literal; keep only non-obvious operational constraints in comments.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "string_blob_configuration"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "nonfunctional_error_contract",
+      "summary": "makeConfig declares an error return but cannot fail, creating dead-path branching in callers.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "makeConfig signature is (string, error) but body always returns hostapdConf, nil and has no validation or failing operations.",
+        "writeHostapdConfig performs redundant error branching around makeConfig despite the absence of error-producing logic."
+      ],
+      "suggestion": "Either remove the error from makeConfig and simplify callers, or introduce real validation/escaping failures so the error contract becomes honest and meaningful.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "string_blob_configuration"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "unsafe_direct_interpolation",
+      "summary": "Direct interpolation of wlan/ssid/passphrase into config text lacks escaping and makes output formatting fragile.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "goseg/accesspoint/config.go concatenates unescaped values directly into lines: interface= + wlan, ssid= + ssid, wpa_passphrase= + wpaPassphrase.",
+        "goseg/accesspoint/accesspoint_test.go validates only happy-path tokens and does not cover newline or delimiter injection that could break config shape."
+      ],
+      "suggestion": "Use a constrained formatter/builder that validates allowed characters and escapes or rejects invalid input; extend tests with malformed-value cases to lock in safe output behavior.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "string_blob_configuration"
+    },
+    {
+      "dimension": "ai_generated_debt",
+      "identifier": "mechanical_logging_format",
+      "summary": "Logging uses fmt.Sprintf before zap.Info, adding mechanical boilerplate without value.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "goseg/accesspoint/config.go: zap.L().Info(fmt.Sprintf(\"Hostapd config saved to %s\", hostapdConfigPath)).",
+        "goseg/accesspoint/accesspoint.go shows similar string-format logging style, indicating repeated mechanical pattern instead of structured fields."
+      ],
+      "suggestion": "Use structured zap fields (e.g., zap.String(\"path\", hostapdConfigPath)) and plain message strings to reduce noise and improve log queryability.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "mechanical_boilerplate_patterns"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Config generation is treated as an unstructured string-assembly task instead of a validated domain object/template.",
+      "Legacy and mechanical coding patterns were retained without cleanup passes (deprecated stdlib API, nonfunctional error signatures, formatting-heavy logging)."
+    ],
+    "likely_symptoms": [
+      "comment_heavy_template_blob",
+      "nonfunctional_error_contract",
+      "unsafe_direct_interpolation",
+      "mechanical_logging_format"
+    ],
+    "possible_false_positives": []
+  }
+}

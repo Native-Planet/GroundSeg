@@ -127,38 +127,29 @@ type UrbitDocker struct {
 	SnapTime            int    `json:"snap_time"`
 }
 
-// Define the interface
-type PortSetter interface {
-	SetPort(port any)
-}
-
-// Add SetPort methods for relevant fields in the struct
-func (u *UrbitDocker) SetWgHTTPPort(port any) {
-	u.WgHTTPPort = toInt(port)
-}
-
-func (u *UrbitDocker) SetWgAmesPort(port any) {
-	u.WgAmesPort = toInt(port)
-}
-
-func (u *UrbitDocker) SetWgS3Port(port any) {
-	u.WgS3Port = toInt(port)
-}
-
-func (u *UrbitDocker) SetWgConsolePort(port any) {
-	u.WgConsolePort = toInt(port)
-}
-
-func (u *UrbitDocker) SetSizeLimit(size any) {
-	u.SizeLimit = toInt(size)
-}
-
 // Helper function to convert a value to int, returns 0 if not an int
 func toInt(value any) int {
 	if v, ok := value.(float64); ok { // JSON numbers are float64
 		return int(v)
 	}
 	return 0
+}
+
+func toBool(value any, defaultValue bool) bool {
+	if value == nil {
+		return defaultValue
+	}
+	if v, ok := value.(bool); ok {
+		return v
+	}
+	return defaultValue
+}
+
+func toString(value any) string {
+	if v, ok := value.(string); ok {
+		return v
+	}
+	return ""
 }
 
 // Custom unmarshaler
@@ -170,9 +161,9 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 	for k, v := range raw {
 		switch k {
 		case "minio_linked":
-			u.MinIOLinked = v.(bool)
+			u.MinIOLinked = toBool(v, false)
 		case "pier_name":
-			u.PierName, _ = v.(string)
+			u.PierName = toString(v)
 		case "http_port":
 			u.HTTPPort = toInt(v)
 		case "ames_port":
@@ -202,13 +193,13 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 		case "wg_url":
 			u.WgURL, _ = v.(string)
 		case "wg_http_port":
-			u.SetWgHTTPPort(v)
+			u.WgHTTPPort = toInt(v)
 		case "wg_ames_port":
-			u.SetWgAmesPort(v)
+			u.WgAmesPort = toInt(v)
 		case "wg_s3_port":
-			u.SetWgS3Port(v)
+			u.WgS3Port = toInt(v)
 		case "wg_console_port":
-			u.SetWgConsolePort(v)
+			u.WgConsolePort = toInt(v)
 		case "meld_schedule":
 			u.MeldSchedule, _ = v.(bool)
 		case "meld_schedule_type":
@@ -228,11 +219,7 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 		case "boot_status":
 			u.BootStatus, _ = v.(string)
 		case "disable_ship_restarts":
-			if v == nil {
-				u.DisableShipRestarts = false
-			} else {
-				u.DisableShipRestarts = v.(bool)
-			}
+			u.DisableShipRestarts = toBool(v, false)
 		case "custom_urbit_web":
 			u.CustomUrbitWeb, _ = v.(string)
 		case "custom_s3_web":
@@ -244,37 +231,21 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 		case "click":
 			u.Click, _ = v.(bool)
 		case "startram_reminder":
-			if v == nil {
-				u.StartramReminder = true
-			} else {
-				u.StartramReminder = v.(bool)
-			}
+			u.StartramReminder = toBool(v, true)
 		case "custom_pier_location":
 			if v == nil {
 				u.CustomPierLocation = nil
 			} else {
-				u.CustomPierLocation = v.(string)
+				u.CustomPierLocation = toString(v)
 			}
 		case "chop_on_upgrade":
-			if v == nil {
-				u.ChopOnUpgrade = true
-			} else {
-				u.ChopOnUpgrade = v.(bool)
-			}
+			u.ChopOnUpgrade = toBool(v, true)
 		case "size_limit":
-			u.SetSizeLimit(v)
+			u.SizeLimit = toInt(v)
 		case "remote_tlon_backup":
-			if v == nil {
-				u.RemoteTlonBackup = true
-			} else {
-				u.RemoteTlonBackup = v.(bool)
-			}
+			u.RemoteTlonBackup = toBool(v, true)
 		case "local_tlon_backup":
-			if v == nil {
-				u.LocalTlonBackup = true
-			} else {
-				u.LocalTlonBackup = v.(bool)
-			}
+			u.LocalTlonBackup = toBool(v, true)
 		case "backup_time":
 			u.BackupTime, _ = v.(string)
 		case "snap_time":

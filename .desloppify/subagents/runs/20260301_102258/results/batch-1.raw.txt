@@ -1,0 +1,89 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Shared package-level mutable state is used as cross-module coordination in multiple places: `config/version.go` exposes and mutates `VersionServerReady` and `VersionInfo` (`SyncVersionInfo` writes them), while `startram/startram.go` exposes and mutates `Regions` (`SyncRegions` writes it).",
+        "`startram/startram.go` combines external API calls, config writes (`config.UpdateConfTyped`), local persistence side effects (`ApplyRetrieveState` via `SyncRetrieve`), Docker command execution (`exec.Command`), and filesystem restore operations in one package/module boundary.",
+        "`handler/upload.go` passes transport DTOs (`structs.WsUploadPayload`) directly into importer operations (`importer.SetUploadSession`), coupling websocket message schema to non-handler module behavior instead of translating to a narrower application command."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_package_state_coupling",
+      "summary": "Cross-module state is coordinated through mutable package globals rather than explicit state services.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`config/version.go` defines package globals `VersionServerReady` and `VersionInfo` and mutates them inside `SyncVersionInfo`.",
+        "`startram/startram.go` defines global `Regions` map and replaces it in `SyncRegions`.",
+        "These globals are part of public package surface and become implicit synchronization points for other modules, increasing hidden coupling and change blast radius."
+      ],
+      "suggestion": "Replace mutable package globals with explicit state providers (for example, `VersionStore` and `RegionStore`) injected into callers; keep fetch functions pure and move state mutation behind a narrow interface with synchronization semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_state_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_boundary_collapse",
+      "summary": "Startram module collapses domain, infrastructure, and persistence boundaries into one hub.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`startram/startram.go` handles API orchestration (`Register`, `SvcCreate`, `Alias*`, `Retrieve`), config mutation (`config.UpdateConfTyped`), restore persistence (`os.WriteFile`, `os.MkdirAll`), and runtime infrastructure (`exec.Command(\"docker\", ...)`) in one module.",
+        "The same broad side-effect pattern exists in `config/version.go`, where remote fetch and local persistence/global-state mutation are tightly coupled inside one package API (`SyncVersionInfo`).",
+        "This shared pattern indicates architectural drift toward side-effect-heavy hub modules instead of separated adapters and application services."
+      ],
+      "suggestion": "Split startram into explicit layers: API client adapter, registration application service, and backup/restore infrastructure service; similarly keep version fetching separate from persistence/state publication to restore one-way dependency flow.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_application_service_layer"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_schema_leaks_across_boundary",
+      "summary": "WebSocket transport payload types leak from handler layer into importer workflow boundary.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`UploadHandler` unmarshals websocket message into `structs.WsUploadPayload` and passes that full payload directly to `importer.SetUploadSession`, tying importer behavior to handler transport schema.",
+        "In `startram/startram.go`, public workflow functions similarly operate directly on config/network DTO concerns (`config.Conf()` and API request structs inside service-level functions) instead of receiving boundary-neutral commands.",
+        "Both patterns indicate missing translation layer between transport/config representations and core use-case inputs."
+      ],
+      "suggestion": "Introduce use-case command structs decoupled from websocket/API DTOs (e.g., `OpenUploadEndpointCmd`, `RegisterServiceCmd`), and perform all message/config translation only at boundary adapters (handler/client packages).",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_application_service_layer"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing explicit state ownership boundaries encourages package-global mutable state.",
+      "No dedicated application-service layer between transport/adapters and side-effecting infrastructure."
+    ],
+    "likely_symptoms": [
+      "shared_package_state_coupling",
+      "transport_schema_leaks_across_boundary"
+    ],
+    "possible_false_positives": []
+  }
+}

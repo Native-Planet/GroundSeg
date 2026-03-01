@@ -2,6 +2,8 @@ package click
 
 import (
 	"fmt"
+	"groundseg/click/acme"
+	backupdomain "groundseg/click/backup"
 	"groundseg/structs"
 	"strings"
 	"sync"
@@ -12,12 +14,20 @@ var (
 	shipDesks  = make(map[string]map[string]structs.ClickDesks)
 	codeMutex  sync.Mutex
 	desksMutex sync.Mutex
+
+	sendStartramReminderFn = sendStartramReminder
+	sendDiskSpaceWarningFn = sendDiskSpaceWarning
+	sendSmartWarningFn     = sendSmartWarning
+
+	fixAcmeFn      = acme.Fix
+	backupTlonFn   = backupdomain.BackupTlon
+	restoreAgentFn = restoreAgent
 )
 
 // Exports
 
 // acme.go
-func FixAcme(patp string) error { return fixAcme(patp) }
+func FixAcme(patp string) error { return fixAcmeFn(patp) }
 
 // code.go
 func ClearLusCode(patp string)               { clearLusCode(patp) }
@@ -38,11 +48,11 @@ func BarExit(patp string) error { return barExit(patp) }
 func SendNotification(patp string, payload structs.HarkNotification) error {
 	switch payload.Type {
 	case "startram-reminder":
-		return sendStartramReminder(patp, payload.StartramDaysLeft)
+		return sendStartramReminderFn(patp, payload.StartramDaysLeft)
 	case "disk-warning":
-		return sendDiskSpaceWarning(patp, payload.DiskName, payload.DiskUsage)
+		return sendDiskSpaceWarningFn(patp, payload.DiskName, payload.DiskUsage)
 	case "smart-fail":
-		return sendSmartWarning(patp, payload.DiskName)
+		return sendSmartWarningFn(patp, payload.DiskName)
 		/*
 			case "cpu-temperature":
 				return sendCPUTempWarning(patp)
@@ -69,12 +79,12 @@ func RestoreTlon(patp string) error {
 		name string
 		err  error
 	}{
-		{"activity", restoreAgent(patp, "activity")},
-		{"channels", restoreAgent(patp, "channels")},
-		{"channels-server", restoreAgent(patp, "channels-server")},
-		{"groups", restoreAgent(patp, "groups")},
-		{"profile", restoreAgent(patp, "profile")},
-		{"chat", restoreAgent(patp, "chat")},
+		{"activity", restoreAgentFn(patp, "activity")},
+		{"channels", restoreAgentFn(patp, "channels")},
+		{"channels-server", restoreAgentFn(patp, "channels-server")},
+		{"groups", restoreAgentFn(patp, "groups")},
+		{"profile", restoreAgentFn(patp, "profile")},
+		{"chat", restoreAgentFn(patp, "chat")},
 	}
 
 	for _, component := range components {
@@ -91,30 +101,4 @@ func RestoreTlon(patp string) error {
 }
 
 // backup.go
-func BackupTlon(patp string) error {
-	var errors []string
-
-	components := []struct {
-		name string
-		err  error
-	}{
-		{"activity", backupAgent(patp, "activity")},
-		{"channels", backupAgent(patp, "channels")},
-		{"channels-server", backupAgent(patp, "channels-server")},
-		{"groups", backupAgent(patp, "groups")},
-		{"profile", backupAgent(patp, "profile")},
-		{"chat", backupAgent(patp, "chat")},
-	}
-
-	for _, component := range components {
-		if component.err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", component.name, component.err))
-		}
-	}
-
-	if len(errors) == 0 {
-		return nil // No errors, return nil
-	}
-
-	return fmt.Errorf("backup errors: %s", strings.Join(errors, ", "))
-}
+func BackupTlon(patp string) error { return backupTlonFn(patp) }

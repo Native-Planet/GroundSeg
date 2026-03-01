@@ -19,6 +19,12 @@ var (
 		"startram": 2,
 		"complete": 3,
 	}
+
+	updateConfTypedForSetup  = config.UpdateConfTyped
+	hasherForSetup           = auth.Hasher
+	cycleWgKeyForSetup       = config.CycleWgKey
+	startramRegisterForSetup = startram.Register
+	addToAuthMapForSetup     = auth.AddToAuthMap
 )
 
 /*
@@ -34,50 +40,44 @@ func Setup(msg []byte, conn *structs.MuConn, token map[string]string) error {
 	zap.L().Info("Setup")
 	err := json.Unmarshal(msg, &setupPayload)
 	if err != nil {
-		return fmt.Errorf("Couldn't unmarshal setup payload: %v", err)
+		return fmt.Errorf("Couldn't unmarshal setup payload: %w", err)
 	}
 	for {
 		switch setupPayload.Payload.Action {
 		case "begin":
-			if err = config.UpdateConf(map[string]interface{}{
-				"setup": "profile",
-			}); err != nil {
-				return fmt.Errorf("Unable to begin profile setup: %v", err)
+			if err = updateConfTypedForSetup(config.WithSetup("profile")); err != nil {
+				return fmt.Errorf("Unable to begin profile setup: %w", err)
 			}
 		case "password":
 			password := setupPayload.Payload.Password
-			hashed := auth.Hasher(password)
-			if err = config.UpdateConf(map[string]interface{}{
-				"setup":  "startram",
-				"pwHash": hashed,
-			}); err != nil {
-				return fmt.Errorf("Unable to set password: %v", err)
+			hashed := hasherForSetup(password)
+			if err = updateConfTypedForSetup(
+				config.WithSetup("startram"),
+				config.WithPwHash(hashed),
+			); err != nil {
+				return fmt.Errorf("Unable to set password: %w", err)
 			}
 		case "startram":
-			if err := config.CycleWgKey(); err != nil {
-				return fmt.Errorf("Failed to reset registration key: %v", err)
+			if err := cycleWgKeyForSetup(); err != nil {
+				return fmt.Errorf("Failed to reset registration key: %w", err)
 			}
 			key := setupPayload.Payload.Key
 			region := setupPayload.Payload.Region
-			if err = startram.Register(key, region); err != nil {
-				return fmt.Errorf("Failed registration: %v", err)
+			if err = startramRegisterForSetup(key, region); err != nil {
+				return fmt.Errorf("Failed registration: %w", err)
 			}
-			if err = config.UpdateConf(map[string]interface{}{
-				"setup": "complete",
-			}); err != nil {
-				return fmt.Errorf("Unable to update config: %v", err)
+			if err = updateConfTypedForSetup(config.WithSetup("complete")); err != nil {
+				return fmt.Errorf("Unable to update config: %w", err)
 			}
-			if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
-				return fmt.Errorf("Error moving session to auth: %v", err)
+			if err := addToAuthMapForSetup(conn.Conn, token, true); err != nil {
+				return fmt.Errorf("Error moving session to auth: %w", err)
 			}
 		case "skip":
-			if err = config.UpdateConf(map[string]interface{}{
-				"setup": "complete",
-			}); err != nil {
-				return fmt.Errorf("Unable to update config: %v", err)
+			if err = updateConfTypedForSetup(config.WithSetup("complete")); err != nil {
+				return fmt.Errorf("Unable to update config: %w", err)
 			}
-			if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
-				return fmt.Errorf("Error moving session to auth: %v", err)
+			if err := addToAuthMapForSetup(conn.Conn, token, true); err != nil {
+				return fmt.Errorf("Error moving session to auth: %w", err)
 			}
 		default:
 			return fmt.Errorf("Invalid setup action: %v", setupPayload.Payload.Action)

@@ -13,6 +13,13 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+var (
+	confForWG               = Conf
+	getVersionChannelForWG  = GetVersionChannel
+	wgKeyGenForCycle        = WgKeyGen
+	updateConfTypedForCycle = UpdateConfTyped
+)
+
 // retrieve struct corresponding with urbit json file
 func GetWgConf() (structs.WgConfig, error) {
 	var wgConf structs.WgConfig
@@ -54,11 +61,12 @@ func CreateDefaultWGConf() error {
 
 // write a container conf to disk from version server info
 func UpdateWGConf() error {
-	conf := Conf()
+	conf := confForWG()
+	versionInfo := getVersionChannelForWG()
 	releaseChannel := conf.UpdateBranch
-	wgRepo := VersionInfo.Wireguard.Repo
-	amdHash := VersionInfo.Wireguard.Amd64Sha256
-	armHash := VersionInfo.Wireguard.Arm64Sha256
+	wgRepo := versionInfo.Wireguard.Repo
+	amdHash := versionInfo.Wireguard.Amd64Sha256
+	armHash := versionInfo.Wireguard.Arm64Sha256
 	newConfig := structs.WgConfig{
 		WireguardName:    "wireguard",
 		WireguardVersion: releaseChannel,
@@ -103,15 +111,15 @@ func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
 
 // cycle on re-reg
 func CycleWgKey() error {
-	priv, pub, err := WgKeyGen()
+	priv, pub, err := wgKeyGenForCycle()
 	if err != nil {
-		return fmt.Errorf("Couldn't reset WG keys: %w", err)
+		return fmt.Errorf("Couldn't reset WG keys: %v", err)
 	}
-	if err := UpdateConf(map[string]interface{}{
-		"pubkey":  pub,
-		"privkey": priv,
-	}); err != nil {
-		return fmt.Errorf("Couldn't update new WG keys: %w", err)
+	if err := updateConfTypedForCycle(
+		WithPubkey(pub),
+		WithPrivkey(priv),
+	); err != nil {
+		return fmt.Errorf("Couldn't update new WG keys: %v", err)
 	}
 	return nil
 }

@@ -4,11 +4,11 @@
 
 export const saveSession = async token => {
   if ((token.id === "") || (token.token === "")) {
-    console.log("empty token field")
+    return false
   } else {
-    console.log("saving token")
     localStorage.setItem('id',token.id)
     localStorage.setItem('token',token.token)
+    return true
   }
 }
 
@@ -34,4 +34,6 @@ export const toBase64 = arrayBuffer => {
 //
 
 export const generateRandom = n => 
-    [...Array(n)].map(() => Math.floor(Math.random() * 16).toString(16)).join('')
+    Array.from(crypto.getRandomValues(new Uint8Array(Math.ceil(n / 2))), byte =>
+      byte.toString(16).padStart(2, '0')
+    ).join('').slice(0, n)

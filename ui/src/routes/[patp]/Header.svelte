@@ -3,7 +3,7 @@
   import { onMount } from 'svelte'
   import { registerServiceAgain } from '$lib/stores/websocket';
   import { structure } from '$lib/stores/data'
-  import { devShipClass } from '$lib/stores/devclass'
+  import { devShipClass } from '$lib/stores/dev/devclass'
   export let patp
 
   $: ship = ($structure?.urbits?.[patp]?.info) || {}

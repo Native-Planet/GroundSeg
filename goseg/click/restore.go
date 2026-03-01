@@ -6,6 +6,11 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	executeClickCommandForRestore = executeClickCommand
+	filterResponseForRestore      = filterResponse
+)
+
 func restoreAgent(patp, agent string) error {
 	file := fmt.Sprintf("restore-%s", agent)
 	hoon := joinGap([]string{
@@ -20,18 +25,11 @@ func restoreAgent(patp, agent string) error {
 		";<", "~", "bind:m", "(take-poke-ack /pokeas)",
 		"(pure:m !>('success'))",
 	})
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click %s failed to create hoon: %v", file, err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
+	response, err := executeClickCommandForRestore(patp, file, hoon, "", "", fmt.Sprintf("Click %s", file))
 	if err != nil {
-		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
+		return err
 	}
-	println(response)
-	_, succeeded, err := filterResponse("success", response)
+	_, succeeded, err := filterResponseForRestore("success", response)
 	if err != nil {
 		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
 	}

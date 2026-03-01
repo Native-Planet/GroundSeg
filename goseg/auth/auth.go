@@ -47,6 +47,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	fernet "github.com/fernet/fernet-go"
@@ -56,21 +57,24 @@ import (
 
 var (
 	ClientManager = NewClientManager()
+	authInitOnce  sync.Once
 )
 
-func init() {
-	conf := config.Conf()
-	authed := conf.Sessions.Authorized
-	for key := range authed {
-		zap.L().Debug(fmt.Sprintf("Cached auth session: %v", key))
-		ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
-	}
-	go func() {
-		for {
-			time.Sleep(10 * time.Minute)
-			ClientManager.CleanupStaleSessions(30 * time.Minute)
+func Initialize() {
+	authInitOnce.Do(func() {
+		settings := config.AuthSettingsSnapshot()
+		authed := settings.AuthorizedSessions
+		for key := range authed {
+			zap.L().Debug(fmt.Sprintf("Cached auth session: %v", key))
+			ClientManager.AddAuthClient(key, &structs.MuConn{Active: false})
 		}
-	}()
+		go func() {
+			for {
+				time.Sleep(10 * time.Minute)
+				ClientManager.CleanupStaleSessions(30 * time.Minute)
+			}
+		}()
+	})
 }
 
 func NewClientManager() *structs.ClientManager {
@@ -86,31 +90,12 @@ func GetClientManager() *structs.ClientManager {
 
 // check if websocket-token pair is auth'd
 func WsIsAuthenticated(conn *websocket.Conn, token string) bool {
-	ClientManager.Mu.RLock()
-	defer ClientManager.Mu.RUnlock()
-	for _, existConn := range ClientManager.AuthClients[token] {
-		if existConn.Conn == conn {
-			return true
-		}
-	}
-	return false
+	return ClientManager.HasAuthConnection(token, conn)
 }
 
 // quick check if websocket is authed at all for unauth broadcast (not for auth on its own)
 func WsAuthCheck(conn *websocket.Conn) bool {
-	if conn == nil {
-		return false
-	}
-	ClientManager.Mu.RLock()
-	defer ClientManager.Mu.RUnlock()
-	for _, clients := range ClientManager.AuthClients {
-		for _, client := range clients {
-			if client != nil && client.Conn == conn {
-				return true
-			}
-		}
-	}
-	return false
+	return ClientManager.HasAnyAuthConnection(conn)
 }
 
 // deactivate ws session
@@ -118,38 +103,8 @@ func WsNilSession(conn *websocket.Conn) error {
 	if conn == nil {
 		return fmt.Errorf("Invalid session")
 	}
-	if WsAuthCheck(conn) {
-		ClientManager.Mu.Lock()
-		defer ClientManager.Mu.Unlock()
-		for _, client := range ClientManager.AuthClients {
-			for _, existClient := range client {
-				if existClient == nil {
-					continue
-				}
-				if existClient.Conn != nil {
-					if existClient.Conn == conn {
-						existClient.Active = false
-						return nil
-					}
-				}
-			}
-		}
-	} else {
-		ClientManager.Mu.Lock()
-		defer ClientManager.Mu.Unlock()
-		for _, client := range ClientManager.UnauthClients {
-			for _, existClient := range client {
-				if existClient == nil {
-					continue
-				}
-				if existClient.Conn != nil {
-					if existClient.Conn == conn {
-						existClient.Active = false
-						return nil
-					}
-				}
-			}
-		}
+	if ClientManager.DeactivateConnection(conn) {
+		return nil
 	}
 	return fmt.Errorf("Session not in client manager")
 }
@@ -202,55 +157,59 @@ func RemoveFromAuthMap(tokenId string, fromAuthorized bool) {
 }
 
 // check the validity of the token
-func CheckToken(token map[string]string, r *http.Request) (string, bool) {
-	// great you have token. we see if valid.
-	if token["token"] == "" {
-		return "", false
+func requestIdentityFromRequest(r *http.Request) (string, string) {
+	if r == nil {
+		return "", ""
 	}
-	conf := config.Conf()
-	key := conf.KeyFile
-	res, err := KeyfileDecrypt(token["token"], key)
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		return strings.Split(forwarded, ",")[0], r.Header.Get("User-Agent")
+	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	return ip, r.Header.Get("User-Agent")
+}
+
+func ValidateAndAuthorizeRequestToken(tokenID, tokenValue string, r *http.Request) (string, error) {
+	if tokenValue == "" {
+		return "", fmt.Errorf("missing token value")
+	}
+	key := config.AuthSettingsSnapshot().KeyFile
+	res, err := KeyfileDecrypt(tokenValue, key)
+	if err != nil {
+		return tokenValue, fmt.Errorf("decrypt token: %w", err)
+	}
+	ip, userAgent := requestIdentityFromRequest(r)
+	if !TokenIdAuthed(ClientManager, tokenID) {
+		return tokenValue, fmt.Errorf("token id %s is not authorized", tokenID)
+	}
+	if ip != res["ip"] || userAgent != res["user_agent"] || res["id"] != tokenID {
+		return tokenValue, fmt.Errorf("token request context mismatch")
+	}
+	if res["authorized"] == "true" {
+		return tokenValue, nil
+	}
+	res["authorized"] = "true"
+	encryptedText, err := KeyfileEncrypt(res, key)
+	if err != nil {
+		return tokenValue, fmt.Errorf("encrypt authorized token: %w", err)
+	}
+	return encryptedText, nil
+}
+
+func CheckToken(token map[string]string, r *http.Request) (string, bool) {
+	authorizedToken, err := ValidateAndAuthorizeRequestToken(token["id"], token["token"], r)
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return token["token"], false
-	} else {
-		// so you decrypt. now we see the useragent and ip.
-		var ip string
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			ip = strings.Split(forwarded, ",")[0]
-		} else {
-			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
-		}
-		userAgent := r.Header.Get("User-Agent")
-		// you in auth map?
-		if TokenIdAuthed(ClientManager, token["id"]) {
-			// check the decrypted token contents
-			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token["id"] {
-				// already marked authorized? yes
-				if res["authorized"] == "true" {
-					return token["token"], true
-				} else {
-					res["authorized"] = "true"
-					encryptedText, err := KeyfileEncrypt(res, key)
-					if err != nil {
-						zap.L().Error("Error encrypting token")
-						return token["token"], false
-					}
-					return encryptedText, true
-				}
-			} else {
-				zap.L().Warn("TokenId doesn't match session!")
-				return token["token"], false
-			}
-		}
 	}
-	return token["token"], false
+	return authorizedToken, true
 }
 
 // make a token authed
 func AuthToken(token string) (string, error) {
-	conf := config.Conf()
-	key := conf.KeyFile
+	key := config.AuthSettingsSnapshot().KeyFile
 	res, err := KeyfileDecrypt(token, key)
 	if err != nil {
 		return "", err
@@ -274,7 +233,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string
 		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
 	}
 	userAgent := r.Header.Get("User-Agent")
-	conf := config.Conf()
+	settings := config.AuthSettingsSnapshot()
 	now := time.Now().Format("2006-01-02_15:04:05")
 	// generate random strings for id, secret, and padding
 	id := config.RandString(32)
@@ -290,7 +249,7 @@ func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string
 		"created":    now,
 	}
 	// encrypt the contents
-	key := conf.KeyFile
+	key := settings.KeyFile
 	encryptedText, err := KeyfileEncrypt(contents, key)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("failed to encrypt token: %v", err))
@@ -312,26 +271,12 @@ func AddSession(tokenID string, hash string, created string, authorized bool) er
 		Created: created,
 	}
 	if authorized {
-		update := map[string]interface{}{
-			"sessions": map[string]interface{}{
-				"authorized": map[string]structs.SessionInfo{
-					tokenID: session,
-				},
-			},
-		}
-		if err := config.UpdateConf(update); err != nil {
+		if err := config.UpdateConfTyped(config.WithAuthorizedSession(tokenID, session)); err != nil {
 			return fmt.Errorf("Error adding session: %v", err)
 		}
 		RemoveFromAuthMap(tokenID, false)
 	} else {
-		update := map[string]interface{}{
-			"sessions": map[string]interface{}{
-				"unauthorized": map[string]structs.SessionInfo{
-					tokenID: session,
-				},
-			},
-		}
-		if err := config.UpdateConf(update); err != nil {
+		if err := config.UpdateConfTyped(config.WithUnauthorizedSession(tokenID, session)); err != nil {
 			return fmt.Errorf("Error adding session: %v", err)
 		}
 		RemoveFromAuthMap(tokenID, true)
@@ -382,62 +327,29 @@ func KeyfileDecrypt(tokenStr string, keyStr string) (map[string]string, error) {
 }
 
 // salted sha512
-func Hasher(password string) string {
-	conf := config.Conf()
-	salt := conf.Salt
+func hashWithSalt(password, salt string) string {
 	toHash := salt + password
 	res := sha512.Sum512([]byte(toHash))
 	return hex.EncodeToString(res[:])
 }
 
+func Hasher(password string) string {
+	salt := config.AuthSettingsSnapshot().Salt
+	return hashWithSalt(password, salt)
+}
+
 // check if pw matches sysconfig
 func AuthenticateLogin(password string) bool {
-	conf := config.Conf()
-	hash := Hasher(password)
-	if hash == conf.PwHash {
-		return true
-	} else {
-		return false
-	}
+	settings := config.AuthSettingsSnapshot()
+	hash := hashWithSalt(password, settings.Salt)
+	return hash == settings.PasswordHash
 }
 
 func LogTokenCheck(token structs.WsTokenStruct, r *http.Request) bool {
-	conf := config.Conf()
-	key := conf.KeyFile
-	res, err := KeyfileDecrypt(token.Token, key)
+	_, err := ValidateAndAuthorizeRequestToken(token.ID, token.Token, r)
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Invalid token provided: %v", err))
 		return false
-	} else {
-		// so you decrypt. now we see the useragent and ip.
-		var ip string
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			ip = strings.Split(forwarded, ",")[0]
-		} else {
-			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
-		}
-		userAgent := r.Header.Get("User-Agent")
-		// you in auth map?
-		if TokenIdAuthed(ClientManager, token.ID) {
-			// check the decrypted token contents
-			if ip == res["ip"] && userAgent == res["user_agent"] && res["id"] == token.ID {
-				// already marked authorized? yes
-				if res["authorized"] == "true" {
-					return true
-				} else {
-					res["authorized"] = "true"
-					_, err := KeyfileEncrypt(res, key)
-					if err != nil {
-						zap.L().Error("Error encrypting token")
-						return false
-					}
-					return true
-				}
-			} else {
-				zap.L().Warn("TokenId doesn't match session!")
-				return false
-			}
-		}
 	}
-	return false
+	return true
 }

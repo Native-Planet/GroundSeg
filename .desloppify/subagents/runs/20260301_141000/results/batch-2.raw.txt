@@ -1,0 +1,123 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 63.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Single-implementation pass-through interface in `goseg/shipcreator/shipcreator.go` (`ConfigService`) only forwards to package globals in `goseg/config/config.go` (`Conf`, `UrbitConf`, `UpdateConfTyped`) without adding policy/translation.",
+        "Repeated wrapper pattern `publicFunc -> withRuntime(newRuntime())` appears across `goseg/docker/wireguard.go`, `goseg/docker/netdata.go`, `goseg/docker/minio.go`, `goseg/docker/urbit.go`, `goseg/routines/docker.go`, and `goseg/routines/version.go`, increasing call depth and duplicated seam wiring.",
+        "Cross-module code bypasses focused config snapshots by reading/mutating broad global config directly (`config.Conf`, `config.UrbitConf`, `config.UpdateConfTyped`) in `goseg/auth/auth.go`, `goseg/handler/startram.go`, `goseg/handler/urbit_operations.go`, and `goseg/broadcast/broadcast.go`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 60.0,
+        "indirection_cost": 55.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "shipcreator_configservice_passthrough",
+      "summary": "The `ConfigService` abstraction in ship creation is a single-implementation pass-through that adds indirection but no domain boundary.",
+      "related_files": [
+        "goseg/shipcreator/shipcreator.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`ConfigService` methods (`Conf`, `UrbitConf`, `UrbitConfAll`, `UpdateUrbitConfig`, `UpdatePiers`) map 1:1 to `config` package functions.",
+        "`configService` implementation is only forwarding calls (e.g., `return config.Conf()` and `return config.UpdateConfTyped(config.WithPiers(piers))`) with no validation, caching, policy, or translation."
+      ],
+      "suggestion": "Either remove `ConfigService` and depend on concrete config APIs directly, or make it a true domain port by narrowing it to ship-creation intents (e.g., `AllocatePorts`, `CreateShipConfig`, `PersistShip`) with an implementation that encapsulates config details.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "non_leveraged_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_wrapper_sprawl",
+      "summary": "Runtime seam structs are duplicated across modules, creating a broad wrapper chain pattern with high maintenance cost.",
+      "related_files": [
+        "goseg/docker/wireguard.go",
+        "goseg/docker/netdata.go",
+        "goseg/docker/minio.go",
+        "goseg/docker/urbit.go",
+        "goseg/routines/version.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "Each module defines large runtime structs of function fields (`wireguardRuntime`, `netdataRuntime`, `minioRuntime`, `urbitRuntime`, `versionRuntime`, `dockerRoutineRuntime`) plus `new*Runtime()` constructors with repeated wiring of globals.",
+        "Many exported functions are thin wrappers (`LoadWireguard`, `WriteWgConf`, `LoadNetdata`, `WriteNDConf`, `LoadMinIOs`, `LoadUrbits`, `CheckVersionLoop`, `DockerSubscriptionHandler`) that only call `*WithRuntime(new*Runtime())`."
+      ],
+      "suggestion": "Extract a shared seam strategy: keep seam injection only at subsystem entrypoints, and collapse repetitive `newRuntime + withRuntime` scaffolding into reusable factories or a smaller number of explicit interfaces per subsystem.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "non_leveraged_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_config_bag_leakage",
+      "summary": "A global `SysConfig` bag leaks through multiple layers, so callers depend on broad mutable state instead of bounded configuration contracts.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/auth/auth.go",
+        "goseg/handler/startram.go",
+        "goseg/handler/urbit_operations.go",
+        "goseg/routines/docker.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`config.Conf()` returns full global config and is consumed directly in unrelated concerns (auth session state, orchestration, docker health loops), e.g., `auth.Initialize`, `ValidateAndAuthorizeRequestToken`, `routines.check502Loop`.",
+        "Modules mix narrow snapshot helpers (`StartramSettingsSnapshot`, `ConnectivitySettingsSnapshot`) with direct global config and per-ship calls (`config.UrbitConf`, `config.UpdateConfTyped`), indicating no stable boundary.",
+        "`broadcast.assembleUrbitView` and handler flows repeatedly pull config values from multiple global getters instead of receiving domain-scoped settings objects."
+      ],
+      "suggestion": "Define small read/write ports per domain (auth settings, startram settings, ship runtime settings) and migrate modules from `Conf()`/global bag access to those ports; reserve `Conf()` for internal config package use.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_boundary_missing"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "transition_workflow_duplication",
+      "summary": "Operation handlers duplicate the same transition/error lifecycle logic instead of using a shared orchestration abstraction.",
+      "related_files": [
+        "goseg/handler/urbit_operations.go",
+        "goseg/handler/startram.go",
+        "goseg/importer/importer.go",
+        "goseg/click/hark.go"
+      ],
+      "evidence": [
+        "`urbit_operations.go` repeats the same pattern across actions: publish `loading`, define local `handleError`, perform action, publish `success`, sleep, clear transition.",
+        "`startram.go` and `importer.go` replicate similar manual event-state choreography with repeated status/error emissions.",
+        "`click/hark.go` has near-identical command-generation and execution flow in multiple functions (`sendStartramReminder`, `sendDiskSpaceWarning`, `sendSmartWarning`) without shared template abstraction."
+      ],
+      "suggestion": "Introduce a shared operation runner abstraction (e.g., `RunTransitionedAction`) that standardizes start/error/success/done transitions and timing behavior, plus reusable templating helpers for repeated click/hark command construction.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_workflow_abstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Test seam design favored function-field runtime structs everywhere, but the pattern expanded beyond high-value boundaries.",
+      "Configuration ownership was never partitioned into domain-level contracts, so `SysConfig` became a shared bag API.",
+      "Long-running orchestration flows evolved independently in handlers without a common action lifecycle abstraction."
+    ],
+    "likely_symptoms": [
+      "shipcreator_configservice_passthrough",
+      "runtime_seam_wrapper_sprawl",
+      "transition_workflow_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

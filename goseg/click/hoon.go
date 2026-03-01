@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+var execDockerCommandForClick = docker.ExecDockerCommand
+
 func createHoon(patp, file, hoon string) error {
 	shipConf := config.UrbitConf(patp)
 	location := filepath.Join(config.DockerDir, patp, "_data")
@@ -51,7 +53,7 @@ func clickExec(patp, file, dependency string) (string, error) {
 		patp,
 		dependency,
 	}
-	res, err := docker.ExecDockerCommand(patp, execCommand)
+	res, err := execDockerCommandForClick(patp, execCommand)
 	if err != nil {
 		return "", err
 	}

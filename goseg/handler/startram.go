@@ -3,9 +3,9 @@ package handler
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/broadcast"
-	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/startram"
@@ -17,6 +17,26 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	startramServicesActionHandler = handleStartramServices
+	startramRegionsActionHandler  = handleStartramRegions
+	startramRegisterActionHandler = handleStartramRegister
+	startramToggleActionHandler   = handleStartramToggle
+	startramRestartActionHandler  = handleStartramRestart
+	startramCancelActionHandler   = handleStartramCancel
+	startramEndpointActionHandler = handleStartramEndpoint
+	startramReminderActionHandler = handleStartramReminder
+	startramSetBackupPWHandler    = handleStartramSetBackupPassword
+)
+
+func runStartramAsync(action string, fn func() error) {
+	go func() {
+		if err := fn(); err != nil {
+			zap.L().Error(fmt.Sprintf("startram action %s failed: %v", action, err))
+		}
+	}()
+}
+
 // startram action handler
 // gonna get confusing if we have varied startram structs
 func StartramHandler(msg []byte) error {
@@ -27,26 +47,34 @@ func StartramHandler(msg []byte) error {
 	}
 	switch startramPayload.Payload.Action {
 	case "services":
-		go handleStartramServices()
+		runStartramAsync("services", startramServicesActionHandler)
 	case "regions":
-		go handleStartramRegions()
+		runStartramAsync("regions", startramRegionsActionHandler)
 	case "register":
 		regCode := startramPayload.Payload.Key
 		region := startramPayload.Payload.Region
-		go handleStartramRegister(regCode, region)
+		runStartramAsync("register", func() error {
+			return startramRegisterActionHandler(regCode, region)
+		})
 	case "toggle":
-		go handleStartramToggle()
+		runStartramAsync("toggle", startramToggleActionHandler)
 	case "restart":
-		go handleStartramRestart()
+		runStartramAsync("restart", startramRestartActionHandler)
 	case "cancel":
 		key := startramPayload.Payload.Key
 		reset := startramPayload.Payload.Reset
-		go handleStartramCancel(key, reset)
+		runStartramAsync("cancel", func() error {
+			return startramCancelActionHandler(key, reset)
+		})
 	case "endpoint":
 		endpoint := startramPayload.Payload.Endpoint
-		go handleStartramEndpoint(endpoint)
+		runStartramAsync("endpoint", func() error {
+			return startramEndpointActionHandler(endpoint)
+		})
 	case "reminder":
-		go handleStartramReminder(startramPayload.Payload.Remind)
+		runStartramAsync("reminder", func() error {
+			return startramReminderActionHandler(startramPayload.Payload.Remind)
+		})
 		/*
 			case "restore-backup":
 				go handleStartramRestoreBackup(startramPayload.Payload.Target, startramPayload.Payload.Patp, startramPayload.Payload.Backup, startramPayload.Payload.Key)
@@ -54,109 +82,104 @@ func StartramHandler(msg []byte) error {
 				go handleStartramUploadBackup(startramPayload.Payload.Patp)
 		*/
 	case "set-backup-password":
-		go handleStartramSetBackupPassword(startramPayload.Payload.Password)
+		runStartramAsync("set-backup-password", func() error {
+			return startramSetBackupPWHandler(startramPayload.Payload.Password)
+		})
 	default:
 		return fmt.Errorf("Unrecognized startram action: %v", startramPayload.Payload.Action)
 	}
 	return nil
 }
 
-func handleStartramServices() {
-	go broadcast.GetStartramServices()
+func handleStartramServices() error {
+	return broadcast.GetStartramServices()
 }
 
-func handleStartramRegions() {
-	go broadcast.LoadStartramRegions()
+func handleStartramRegions() error {
+	return broadcast.LoadStartramRegions()
 }
 
-func handleStartramRestart() {
-	zap.L().Info("Restarting StarTram")
-	startram.EventBus <- structs.Event{Type: "restart", Data: "startram"}
-	conf := config.Conf()
-	// only restart if startram is on
-	if conf.WgOn {
-		// record all remote ships
-		wgShips := map[string]bool{}
-		piers := conf.Piers
-		pierStatus, err := docker.GetShipStatus(piers)
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to retrieve ship information: %v", err))
-		}
-		for pier, status := range pierStatus {
-			dockerConfig := config.UrbitConf(pier)
-			if dockerConfig.Network == "wireguard" {
-				wgShips[pier] = (status == "Up" || strings.HasPrefix(status, "Up "))
-			}
-		}
-		zap.L().Debug(fmt.Sprintf("Containers: %+v", wgShips))
-		// restart wireguard container
-		if err := docker.RestartContainer("wireguard"); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't restart Wireguard: %v", err))
-		}
-		// operate on urbit ships
-		zap.L().Info("Recreating containers")
-		for patp, isRunning := range wgShips {
-			if isRunning {
-				if err := click.BarExit(patp); err != nil {
-					zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for startram restart: %v", patp, err))
-				} else {
-					for {
-						exited, err := shipExited(patp)
-						if err == nil {
-							if !exited {
-								continue
-							}
-						}
-						break
-					}
-				}
-			}
-			// delete container
-			if err := docker.DeleteContainer(patp); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", patp, err))
-			}
-			minio := fmt.Sprintf("minio_%s", patp)
-			if err := docker.DeleteContainer(minio); err != nil {
-				zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
-			}
-		}
-		// delete mc
-		if err := docker.DeleteContainer("mc"); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
-		}
-		// create startram containers
-		startram.EventBus <- structs.Event{Type: "restart", Data: "urbits"}
-		if err := docker.LoadUrbits(); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to load urbits: %v", err))
-		}
-		startram.EventBus <- structs.Event{Type: "restart", Data: "minios"}
-		if err := docker.LoadMC(); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
-		}
-		if err := docker.LoadMinIOs(); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
-		}
-		startram.EventBus <- structs.Event{Type: "restart", Data: "done"}
-		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "restart", Data: ""}
+func appendOrchestrationError(stepErrors *[]error, context string, err error) {
+	if err == nil {
+		return
 	}
+	wrapped := fmt.Errorf("%s: %w", context, err)
+	*stepErrors = append(*stepErrors, wrapped)
+	zap.L().Error(wrapped.Error())
 }
 
-func handleStartramToggle() {
-	startram.EventBus <- structs.Event{Type: "toggle", Data: "loading"}
-	conf := config.Conf()
-	if conf.WgOn {
-		if err := config.UpdateConf(map[string]interface{}{
-			"wgOn": false,
-		}); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
+func publishStartramError(eventType, errmsg string, shouldLog bool) {
+	if shouldLog {
+		zap.L().Error(errmsg)
+	}
+	publishTransitionWithPolicy(
+		startram.PublishEvent,
+		structs.Event{Type: eventType, Data: fmt.Sprintf("Error: %s", errmsg)},
+		structs.Event{Type: eventType, Data: nil},
+		3*time.Second,
+	)
+}
+
+func publishStartramCompletion(eventType string, data interface{}) {
+	publishTransitionWithPolicy(
+		startram.PublishEvent,
+		structs.Event{Type: eventType, Data: data},
+		structs.Event{Type: eventType, Data: nil},
+		3*time.Second,
+	)
+}
+
+func handleStartramRestart() error {
+	zap.L().Info("Restarting StarTram")
+	startram.PublishEvent(structs.Event{Type: "restart", Data: "startram"})
+	settings := config.StartramSettingsSnapshot()
+	// only restart if startram is on
+	if !settings.WgOn {
+		publishTransitionWithPolicy(
+			startram.PublishEvent,
+			structs.Event{Type: "restart", Data: "Error: startram is disabled"},
+			structs.Event{Type: "restart", Data: ""},
+			3*time.Second,
+		)
+		return fmt.Errorf("startram is disabled")
+	}
+
+	zap.L().Info("Recreating containers")
+	startram.PublishEvent(structs.Event{Type: "restart", Data: "urbits"})
+	startram.PublishEvent(structs.Event{Type: "restart", Data: "minios"})
+	if err := RecoverWireguardFleet(settings.Piers, true); err != nil {
+		publishTransitionWithPolicy(
+			startram.PublishEvent,
+			structs.Event{Type: "restart", Data: fmt.Sprintf("Error: %v", err)},
+			structs.Event{Type: "restart", Data: ""},
+			3*time.Second,
+		)
+		return fmt.Errorf("recover wireguard fleet: %w", err)
+	}
+
+	publishTransitionWithPolicy(
+		startram.PublishEvent,
+		structs.Event{Type: "restart", Data: "done"},
+		structs.Event{Type: "restart", Data: ""},
+		3*time.Second,
+	)
+	return nil
+}
+
+func handleStartramToggle() error {
+	startram.PublishEvent(structs.Event{Type: "toggle", Data: "loading"})
+	settings := config.StartramSettingsSnapshot()
+	var stepErrors []error
+	if settings.WgOn {
+		if err := config.UpdateConfTyped(config.WithWgOn(false)); err != nil {
+			appendOrchestrationError(&stepErrors, "update config to disable wireguard", err)
 		}
 		err := docker.StopContainerByName("wireguard")
 		if err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
+			appendOrchestrationError(&stepErrors, "stop wireguard container", err)
 		}
 		// toggle ships back to local
-		for _, patp := range conf.Piers {
+		for _, patp := range settings.Piers {
 			dockerConfig := config.UrbitConf(patp)
 			if dockerConfig.Network == "wireguard" {
 				payload := structs.WsUrbitPayload{
@@ -168,117 +191,107 @@ func handleStartramToggle() {
 				}
 				jsonData, err := json.Marshal(payload)
 				if err != nil {
-					zap.L().Error(fmt.Sprintf("Error marshalling JSON for %v: %v", patp, err))
+					appendOrchestrationError(&stepErrors, fmt.Sprintf("marshal toggle-network payload for %s", patp), err)
 					continue
 				}
 				if err := UrbitHandler(jsonData); err != nil {
-					zap.L().Error(fmt.Sprintf("Error sending action to UrbitHandler for %v: %v", patp, err))
+					appendOrchestrationError(&stepErrors, fmt.Sprintf("dispatch toggle-network for %s", patp), err)
 				}
 			}
 		}
 	} else {
-		if err := config.UpdateConf(map[string]interface{}{
-			"wgOn": true,
-		}); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
+		if err := config.UpdateConfTyped(config.WithWgOn(true)); err != nil {
+			appendOrchestrationError(&stepErrors, "update config to enable wireguard", err)
 		}
 		_, err := docker.StartContainer("wireguard", "wireguard")
 		if err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
+			appendOrchestrationError(&stepErrors, "start wireguard container", err)
 		}
 	}
 	// delete mc
 	if err := docker.DeleteContainer("mc"); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to delete minio client: %v", err))
+		appendOrchestrationError(&stepErrors, "delete minio client container", err)
 	}
 	// load mc
 	if err := docker.LoadMC(); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to load minio client: %v", err))
+		appendOrchestrationError(&stepErrors, "load minio client container", err)
 	}
-	for _, patp := range conf.Piers {
+	for _, patp := range settings.Piers {
 		// delete minio
 		minio := fmt.Sprintf("minio_%s", patp)
 		if err := docker.DeleteContainer(minio); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to delete %s: %v", minio, err))
+			appendOrchestrationError(&stepErrors, fmt.Sprintf("delete %s container", minio), err)
 		}
 	}
 	// load minio
 	if err := docker.LoadMinIOs(); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to load minios: %v", err))
+		appendOrchestrationError(&stepErrors, "load minio containers", err)
 	}
-	startram.EventBus <- structs.Event{Type: "toggle", Data: nil}
+	if joinedErr := errors.Join(stepErrors...); joinedErr != nil {
+		publishTransitionWithPolicy(
+			startram.PublishEvent,
+			structs.Event{Type: "toggle", Data: fmt.Sprintf("Error: %v", joinedErr)},
+			structs.Event{Type: "toggle", Data: nil},
+			3*time.Second,
+		)
+		return joinedErr
+	}
+	startram.PublishEvent(structs.Event{Type: "toggle", Data: nil})
+	return nil
 }
 
-func handleStartramRegister(regCode, region string) {
-	// error handling
-	handleError := func(errmsg string) {
-		msg := fmt.Sprintf("Error: %s", errmsg)
-		zap.L().Error(errmsg)
-		startram.EventBus <- structs.Event{Type: "register", Data: msg}
-		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "register", Data: nil}
-	}
-	startram.EventBus <- structs.Event{Type: "register", Data: "key"}
+func handleStartramRegister(regCode, region string) error {
+	startram.PublishEvent(structs.Event{Type: "register", Data: "key"})
 	// Reset Key Pair
 	err := config.CycleWgKey()
 	if err != nil {
-		handleError(fmt.Sprintf("%v", err))
-		return
+		publishStartramError("register", fmt.Sprintf("%v", err), true)
+		return fmt.Errorf("cycle wireguard key: %w", err)
 	}
 	// Register startram key
 	if err := startram.Register(regCode, region); err != nil {
-		handleError(fmt.Sprintf("Failed registration: %v", err))
-		return
+		publishStartramError("register", fmt.Sprintf("Failed registration: %v", err), true)
+		return fmt.Errorf("startram register: %w", err)
 	}
 	// Register Services
-	startram.EventBus <- structs.Event{Type: "register", Data: "services"}
+	startram.PublishEvent(structs.Event{Type: "register", Data: "services"})
 	if err := startram.RegisterExistingShips(); err != nil {
-		handleError(fmt.Sprintf("Unable to register ships: %v", err))
-		return
+		publishStartramError("register", fmt.Sprintf("Unable to register ships: %v", err), true)
+		return fmt.Errorf("register existing ships: %w", err)
 	}
 	// Start Wireguard
-	startram.EventBus <- structs.Event{Type: "register", Data: "starting"}
+	startram.PublishEvent(structs.Event{Type: "register", Data: "starting"})
 	if err := docker.LoadWireguard(); err != nil {
-		handleError(fmt.Sprintf("Unable to start Wireguard: %v", err))
-		return
+		publishStartramError("register", fmt.Sprintf("Unable to start Wireguard: %v", err), true)
+		return fmt.Errorf("start wireguard: %w", err)
 	}
 	// Finish
-	startram.EventBus <- structs.Event{Type: "register", Data: "complete"}
-
 	// debug
 	//time.Sleep(2 * time.Second)
 	//handleError("Self inflicted error for debug purposes")
 
-	// Clear
-	time.Sleep(3 * time.Second)
-	startram.EventBus <- structs.Event{Type: "register", Data: nil}
+	publishStartramCompletion("register", "complete")
+	return nil
 }
 
 // endpoint action
-func handleStartramEndpoint(endpoint string) {
-	// error handling
-	handleError := func(errmsg string) {
-		msg := fmt.Sprintf("Error: %s", errmsg)
-		startram.EventBus <- structs.Event{Type: "endpoint", Data: msg}
-		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "endpoint", Data: nil}
-	}
+func handleStartramEndpoint(endpoint string) error {
 	// initialize
-	startram.EventBus <- structs.Event{Type: "endpoint", Data: "init"}
-	conf := config.Conf()
+	startram.PublishEvent(structs.Event{Type: "endpoint", Data: "init"})
+	settings := config.StartramSettingsSnapshot()
 	// stop wireguard if running
-	if conf.WgOn {
-		startram.EventBus <- structs.Event{Type: "endpoint", Data: "stopping"}
+	if settings.WgOn {
+		startram.PublishEvent(structs.Event{Type: "endpoint", Data: "stopping"})
 		if err := docker.StopContainerByName("wireguard"); err != nil {
-			handleError(fmt.Sprintf("%v", err))
-			return
+			publishStartramError("endpoint", fmt.Sprintf("%v", err), false)
+			return fmt.Errorf("stop wireguard: %w", err)
 		}
 	}
 	// Wireguard registered
-	if conf.WgRegistered {
+	if settings.WgRegistered {
 		// unregister startram services if exists
-		startram.EventBus <- structs.Event{Type: "endpoint", Data: "unregistering"}
-		for _, p := range conf.Piers {
+		startram.PublishEvent(structs.Event{Type: "endpoint", Data: "unregistering"})
+		for _, p := range settings.Piers {
 			if err := startram.SvcDelete(p, "urbit"); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", p))
 			}
@@ -288,79 +301,70 @@ func handleStartramEndpoint(endpoint string) {
 		}
 	}
 	// reset pubkey
-	startram.EventBus <- structs.Event{Type: "endpoint", Data: "configuring"}
+	startram.PublishEvent(structs.Event{Type: "endpoint", Data: "configuring"})
 	err := config.CycleWgKey()
 	if err != nil {
-		handleError(fmt.Sprintf("%v", err))
-		return
+		publishStartramError("endpoint", fmt.Sprintf("%v", err), false)
+		return fmt.Errorf("cycle wireguard key: %w", err)
 	}
 	// set endpoint to config and persist
-	startram.EventBus <- structs.Event{Type: "endpoint", Data: "finalizing"}
-	err = config.UpdateConf(map[string]interface{}{
-		"endpointUrl":  endpoint,
-		"wgRegistered": false,
-	})
+	startram.PublishEvent(structs.Event{Type: "endpoint", Data: "finalizing"})
+	err = config.UpdateConfTyped(
+		config.WithEndpointURL(endpoint),
+		config.WithWgRegistered(false),
+	)
 	if err != nil {
-		handleError(fmt.Sprintf("%v", err))
-		return
+		publishStartramError("endpoint", fmt.Sprintf("%v", err), false)
+		return fmt.Errorf("persist endpoint: %w", err)
 	}
 
-	// Finish
-	startram.EventBus <- structs.Event{Type: "endpoint", Data: "complete"}
-
-	// debug
-	//time.Sleep(2 * time.Second)
-	//handleError("Self inflicted error for debug purposes")
-
-	// Clear
-	time.Sleep(3 * time.Second)
-	startram.EventBus <- structs.Event{Type: "endpoint", Data: nil}
+	publishStartramCompletion("endpoint", "complete")
+	return nil
 }
 
 // cancel subscription with reg code
-func handleStartramCancel(key string, reset bool) {
-	handleError := func(errmsg string) {
-		msg := fmt.Sprintf("Error: %s", errmsg)
-		zap.L().Error(errmsg)
-		startram.EventBus <- structs.Event{Type: "cancelSub", Data: msg}
-		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "cancelSub", Data: nil}
-	}
+func handleStartramCancel(key string, reset bool) error {
 	if reset {
-		for _, svc := range config.StartramConfig.Subdomains {
+		for _, svc := range config.GetStartramConfig().Subdomains {
 			if err := startram.SvcDelete(svc.URL, svc.SvcType); err != nil {
 				zap.L().Error(fmt.Sprintf("Couldn't delete service %v: %v", svc.URL, err))
 			}
 		}
 	}
 	if err := startram.CancelSub(key); err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't cancel subscription: %v", err))
-		return
+		publishStartramError("cancelSub", fmt.Sprintf("Couldn't cancel subscription: %v", err), true)
+		return fmt.Errorf("cancel subscription: %w", err)
 	}
 	if err := config.CycleWgKey(); err != nil {
-		handleError(fmt.Sprintf("%v", err))
-		return
+		publishStartramError("cancelSub", fmt.Sprintf("%v", err), true)
+		return fmt.Errorf("cycle wireguard key: %w", err)
 	}
+	publishStartramCompletion("cancelSub", nil)
+	return nil
 }
 
-func handleStartramReminder(remind bool) {
-	conf := config.Conf()
-	for _, patp := range conf.Piers {
-		update := make(map[string]structs.UrbitDocker)
-		shipConf := config.UrbitConf(patp)
-		shipConf.StartramReminder = remind
-		update[patp] = shipConf
-		if err := config.UpdateUrbitConfig(update); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't update urbit config: %v", err))
+func handleStartramReminder(remind bool) error {
+	ships := config.ShipSettingsSnapshot()
+	var stepErrors []error
+	for _, patp := range ships.Piers {
+		if err := config.UpdateUrbit(patp, func(shipConf *structs.UrbitDocker) error {
+			shipConf.StartramReminder = remind
+			return nil
+		}); err != nil {
+			stepErrors = append(stepErrors, fmt.Errorf("update startram reminder for %s: %w", patp, err))
 		}
 	}
+	if joined := errors.Join(stepErrors...); joined != nil {
+		return joined
+	}
+	return nil
 }
 
 /*
 // download the source backup, decrypt with key, and restore to target
 func handleStartramRestoreBackup(target, source string, backup int, key string) {
 	keyFile := "backup.key"
-	startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "init"}
+	startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: "init"})
 	if key == "" {
 		keyBytes, err := os.ReadFile(keyFile)
 		if err != nil || len(keyBytes) == 0 {
@@ -381,28 +385,28 @@ func handleStartramRestoreBackup(target, source string, backup int, key string) 
 			zap.L().Info("Backup key is saved.")
 		} else {
 			zap.L().Error(fmt.Sprintf("No key provided and failed to read private key file: %v", err))
-			startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "error"}
+			startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: "error"})
 			time.Sleep(3 * time.Second)
-			startram.EventBus <- structs.Event{Type: "restoreBackup", Data: nil}
+			startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: nil})
 			return
 		}
 	}
-	startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "download"}
+	startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: "download"})
 	backupFile, err := startram.GetBackup(source, fmt.Sprintf("%d", backup), key)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to get backup: %v", err))
-		startram.EventBus <- structs.Event{Type: "restoreBackup", Data: "error"}
+		startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: "error"})
 		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "restoreBackup", Data: nil}
+		startram.PublishEvent(structs.Event{Type: "restoreBackup", Data: nil})
 		return
 	}
-	startram.EventBus <- structs.Event{Type: "backup", Data: nil}
+	startram.PublishEvent(structs.Event{Type: "backup", Data: nil})
 	handleNotImplement(fmt.Sprintf("restore %s from %s backup %v", target, source, backupFile))
 }
 */
 
 func handleStartramUploadBackup(patp string) {
-	startram.EventBus <- structs.Event{Type: "uploadBackup", Data: "upload"}
+	startram.PublishEvent(structs.Event{Type: "uploadBackup", Data: "upload"})
 	filePath := "backup.key"
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {
@@ -418,12 +422,12 @@ func handleStartramUploadBackup(patp string) {
 	err = startram.UploadBackup(patp, pk, filePath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to upload backup: %v", err))
-		startram.EventBus <- structs.Event{Type: "uploadBackup", Data: fmt.Sprintf("%v", err)}
+		startram.PublishEvent(structs.Event{Type: "uploadBackup", Data: fmt.Sprintf("%v", err)})
 		time.Sleep(3 * time.Second)
-		startram.EventBus <- structs.Event{Type: "uploadBackup", Data: nil}
+		startram.PublishEvent(structs.Event{Type: "uploadBackup", Data: nil})
 		return
 	}
-	startram.EventBus <- structs.Event{Type: "uploadBackup", Data: nil}
+	startram.PublishEvent(structs.Event{Type: "uploadBackup", Data: nil})
 	handleNotImplement("upload backup")
 }
 
@@ -432,29 +436,10 @@ func handleNotImplement(action string) {
 	zap.L().Error(fmt.Sprintf("temp error: %v not implemented", action))
 }
 
-func shipExited(patp string) (bool, error) {
-	for {
-		statuses, err := docker.GetShipStatus([]string{patp})
-		if err != nil {
-			return false, fmt.Errorf("Failed to get statuses for %s: %v", patp, err)
-		}
-		status, exists := statuses[patp]
-		if !exists {
-			return false, fmt.Errorf("%s status doesn't exist", patp)
-		}
-		if strings.Contains(status, "Up") {
-			continue
-		}
-		return true, nil
-	}
-}
-
-func handleStartramSetBackupPassword(password string) {
-	err := config.UpdateConf(map[string]interface{}{
-		"remoteBackupPassword": password,
-	})
+func handleStartramSetBackupPassword(password string) error {
+	err := config.UpdateConfTyped(config.WithRemoteBackupPassword(password))
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to set backup password: %v", err))
-		return
+		return fmt.Errorf("set backup password: %w", err)
 	}
+	return nil
 }

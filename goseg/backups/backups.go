@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"groundseg/click"
+	backupdomain "groundseg/click/backup"
 	"io"
 	"os"
 	"os/exec"
@@ -18,19 +18,30 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	backupTlonFn = backupdomain.BackupTlon
+	nowFn        = time.Now
+	getVolumeFn  = func(patp string) (string, error) {
+		cmd := exec.Command("docker", "inspect", "-f", "{{ range .Mounts }}{{ if eq .Type \"volume\" }}{{ .Source }}{{ end }}{{ end }}", patp)
+		output, err := cmd.Output()
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(output)), nil
+	}
+)
+
 func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMonthly string) error {
-	err := click.BackupTlon(patp)
+	err := backupTlonFn(patp)
 	if err != nil {
 		return fmt.Errorf("routine failed to backup tlon: %w", err)
 	}
 	// Get the Docker volume location for the ship
-	cmd := exec.Command("docker", "inspect", "-f", "{{ range .Mounts }}{{ if eq .Type \"volume\" }}{{ .Source }}{{ end }}{{ end }}", patp)
-	output, err := cmd.Output()
+	volumePath, err := getVolumeFn(patp)
 	if err != nil {
 		return fmt.Errorf("failed to get Docker volume location: %w", err)
 	}
 
-	volumePath := strings.TrimSpace(string(output))
 	if volumePath == "" {
 		return fmt.Errorf("no Docker volume found for container %s", patp)
 	}
@@ -58,10 +69,10 @@ func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMo
 		if err != nil {
 			return fmt.Errorf("failed to open jam file: %w", err)
 		}
-		defer file.Close()
 
 		info, err := file.Stat()
 		if err != nil {
+			file.Close()
 			return fmt.Errorf("failed to get file info: %w", err)
 		}
 
@@ -73,11 +84,16 @@ func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMo
 		header.Name = filepath.Base(jamFile)
 
 		if err := tw.WriteHeader(header); err != nil {
+			file.Close()
 			return fmt.Errorf("failed to write tar header: %w", err)
 		}
 
 		if _, err := io.Copy(tw, file); err != nil {
+			file.Close()
 			return fmt.Errorf("failed to write file to tar: %w", err)
+		}
+		if err := file.Close(); err != nil {
+			return fmt.Errorf("failed to close jam file: %w", err)
 		}
 	}
 
@@ -95,7 +111,8 @@ func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMo
 	compressor.Close()
 
 	// Generate filename with current Unix timestamp
-	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	now := nowFn()
+	timestamp := strconv.FormatInt(now.Unix(), 10)
 	filenameDaily := filepath.Join(shipBackupDirDaily, timestamp)     // tar.zst
 	filenameWeekly := filepath.Join(shipBackupDirWeekly, timestamp)   // tar.zst
 	filenameMonthly := filepath.Join(shipBackupDirMonthly, timestamp) // tar.zst
@@ -105,74 +122,57 @@ func CreateBackup(patp, shipBackupDirDaily, shipBackupDirWeekly, shipBackupDirMo
 		return fmt.Errorf("failed to write compressed backup: %w", err)
 	}
 	// if timestamp falls on sunday, also write to weekly
-	if time.Now().Weekday() == time.Sunday {
+	if now.Weekday() == time.Sunday {
 		if err := os.WriteFile(filenameWeekly, compressedData, 0644); err != nil {
 			return fmt.Errorf("failed to write compressed backup: %w", err)
 		}
 	}
 	// if timestamp falls on first day of month, also write to monthly
-	if time.Now().Day() == 1 {
+	if now.Day() == 1 {
 		if err := os.WriteFile(filenameMonthly, compressedData, 0644); err != nil {
 			return fmt.Errorf("failed to write compressed backup: %w", err)
 		}
 	}
 
-	// Remove old backups, keeping only the most recent 3
-	files, err := os.ReadDir(shipBackupDirDaily)
-	if err != nil {
-		return fmt.Errorf("failed to read backup directory: %w", err)
+	if err := pruneBackups(shipBackupDirDaily, 3); err != nil {
+		return fmt.Errorf("failed to prune daily backups: %w", err)
+	}
+	if err := pruneBackups(shipBackupDirWeekly, 3); err != nil {
+		return fmt.Errorf("failed to prune weekly backups: %w", err)
+	}
+	if err := pruneBackups(shipBackupDirMonthly, 3); err != nil {
+		return fmt.Errorf("failed to prune monthly backups: %w", err)
 	}
 
-	// Sort files by name (timestamp) in descending order
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() > files[j].Name()
-	})
+	return nil
+}
 
-	// Keep the first 3 files (most recent) and remove the rest
-	for i := 3; i < len(files); i++ {
-		oldBackup := filepath.Join(shipBackupDirDaily, files[i].Name())
+func backupTimestampFromName(name string) int64 {
+	value, err := strconv.ParseInt(name, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return value
+}
+
+func pruneBackups(backupDir string, keep int) error {
+	files, err := os.ReadDir(backupDir)
+	if err != nil {
+		return err
+	}
+	sort.Slice(files, func(i, j int) bool {
+		iTime := backupTimestampFromName(files[i].Name())
+		jTime := backupTimestampFromName(files[j].Name())
+		if iTime == jTime {
+			return files[i].Name() > files[j].Name()
+		}
+		return iTime > jTime
+	})
+	for i := keep; i < len(files); i++ {
+		oldBackup := filepath.Join(backupDir, files[i].Name())
 		if err := os.Remove(oldBackup); err != nil {
 			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
 		}
 	}
-
-	// Remove old backups, keeping only the most recent 3
-	files, err = os.ReadDir(shipBackupDirWeekly)
-	if err != nil {
-		return fmt.Errorf("failed to read backup directory: %w", err)
-	}
-
-	// Sort files by name (timestamp) in descending order
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() > files[j].Name()
-	})
-
-	// Keep the first 3 files (most recent) and remove the rest
-	for i := 3; i < len(files); i++ {
-		oldBackup := filepath.Join(shipBackupDirWeekly, files[i].Name())
-		if err := os.Remove(oldBackup); err != nil {
-			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
-		}
-	}
-
-	// Remove old backups, keeping only the most recent 3
-	files, err = os.ReadDir(shipBackupDirMonthly)
-	if err != nil {
-		return fmt.Errorf("failed to read backup directory: %w", err)
-	}
-
-	// Sort files by name (timestamp) in descending order
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() > files[j].Name()
-	})
-
-	// Keep the first 3 files (most recent) and remove the rest
-	for i := 3; i < len(files); i++ {
-		oldBackup := filepath.Join(shipBackupDirMonthly, files[i].Name())
-		if err := os.Remove(oldBackup); err != nil {
-			zap.L().Warn("Failed to remove old backup", zap.String("file", oldBackup), zap.Error(err))
-		}
-	}
-
 	return nil
 }

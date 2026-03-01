@@ -1,0 +1,90 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows very large mixed directories for this slice: goseg/handler/ has 26 files, goseg/click/ has 25 files, goseg/routines/ has 20 files.",
+        "goseg/routines/chop.go imports groundseg/handler and invokes handler.ChopPier, pulling a transport-facing package into background routines and blurring directory ownership boundaries.",
+        "goseg/handler/dev.go and goseg/routines/backup.go both define package-level BackupDir initialization with nearly identical mount/base-path logic, indicating shared infrastructure logic split across unrelated directories."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "routines_depends_on_handler_layer",
+      "summary": "Background routines depend on handler package, reversing expected directory layering",
+      "related_files": [
+        "goseg/routines/chop.go",
+        "goseg/handler/handler.go",
+        "goseg/handler/dev.go"
+      ],
+      "evidence": [
+        "goseg/routines/chop.go imports groundseg/handler solely to call handler.ChopPier from periodic maintenance flow.",
+        "Assigned handler files are request/WS entry logic (DevHandler, Login/NewShip/C2C handlers), so routines->handler coupling ties scheduler code to transport directory ownership."
+      ],
+      "suggestion": "Stage 1: create a domain/service target folder (for example `goseg/urbitops/`) and move `ChopPier` there with handler and routines both consuming that service. Stage 2: update imports in `goseg/routines/chop.go` and handler callers to the new package. Stage 3: validate with `go test ./goseg/routines ./goseg/handler` then `go test ./...`, and verify no residual handler dependency from routines via `rg \"groundseg/handler\" goseg/routines`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_placement_drift"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "duplicated_backup_path_ownership",
+      "summary": "Backup storage path ownership is duplicated across handler and routines packages",
+      "related_files": [
+        "goseg/handler/dev.go",
+        "goseg/routines/backup.go",
+        "goseg/click/backup.go"
+      ],
+      "evidence": [
+        "goseg/handler/dev.go defines `BackupDir` using `system.IsMountedMMC(config.BasePath)` and fallback `filepath.Join(config.BasePath, \"backup\")`.",
+        "goseg/routines/backup.go defines another `BackupDir` using equivalent logic via `setBackupDir()`, creating split ownership of backup filesystem placement policy."
+      ],
+      "suggestion": "Stage 1: introduce a single target folder for backup infrastructure policy (for example `goseg/backups/path/` or extend `goseg/backups/`) with one exported resolver function. Stage 2: move both `BackupDir` initializations to consume that resolver in `goseg/handler/dev.go` and `goseg/routines/backup.go`. Stage 3: run import updates and validation with `go test ./goseg/handler ./goseg/routines ./goseg/backups` then `go test ./...`; confirm only one path policy definition remains using `rg \"IsMountedMMC\\(config.BasePath\\)|BackupDir =\" goseg`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_placement_drift"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "flat_click_package_mixes_domains",
+      "summary": "click directory is overloaded with many domain commands and command infrastructure in one flat package",
+      "related_files": [
+        "goseg/click/acme.go",
+        "goseg/click/backup.go",
+        "goseg/click/acme_test.go"
+      ],
+      "evidence": [
+        "holistic_context.structure.directory_profiles reports goseg/click/ has 25 files (13 production, 12 tests), which exceeds the mixed-concern threshold for flat packages.",
+        "Assigned files show domain-specific command wrappers (`fixAcme`, `backupAgent`) co-located with shared execution/filter seams instead of separated by domain vs runtime infrastructure."
+      ],
+      "suggestion": "Stage 1: create target subfolders under click, e.g. `goseg/click/commands/acme`, `goseg/click/commands/backup`, and `goseg/click/runtime` for shared exec/filter/hoon helpers. Stage 2: move domain files first (`acme.go`, `backup.go`, matching tests), then move shared helpers and update package imports. Stage 3: run `go test ./goseg/click` and `go test ./...`, then check navigability by listing grouped files (`rg --files goseg/click`).",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_placement_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Directory boundaries are organized around historical file growth rather than stable ownership seams (transport handlers, background routines, and shared backup/click infrastructure).",
+      "Cross-cutting operational concerns (backup paths, ship operations) lack a dedicated service package, causing logic to settle in whichever package needed it first."
+    ],
+    "likely_symptoms": [
+      "routines_depends_on_handler_layer",
+      "duplicated_backup_path_ownership",
+      "flat_click_package_mixes_domains"
+    ],
+    "possible_false_positives": []
+  }
+}

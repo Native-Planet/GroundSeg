@@ -1,0 +1,93 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "high_level_elegance": 61.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "goseg/startram/startram.go combines API client calls (FetchRegions/Retrieve/Register), state sync (SyncRetrieve/SyncRegions), backup crypto (encryptFile/decryptFile), backup transport (UploadBackup/GetBackup/downloadAndVerify), filesystem/tar restore (writeBackupToVolume), and docker orchestration (exec.Command(\"docker\", ...)) in one package file.",
+        "goseg/config/version.go mixes remote version fetching, retry policy, JSON persistence, and mutation of package globals (VersionInfo/VersionServerReady), making the config package both transport client and state store.",
+        "goseg/handler/upload.go encodes action protocol strings and directly dispatches importer control operations, while related orchestration/state concerns live in other packages without a consistent top-level service boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "startram_god_module_mixed_ownership",
+      "summary": "The StarTram module is a god file owning unrelated domains (API, orchestration, crypto, backup restore, and process execution), obscuring architectural boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go is ~900 lines with 25+ functions spanning network API methods, event/cache globals, encryption/decryption, backup download/upload, tar extraction, and docker inspect execution.",
+        "The same module both defines public API operations (Register/SvcCreate/AliasCreate) and low-level implementation details (writeBackupToVolume, encryptFile, decryptFile), forcing broad ripple changes for unrelated features.",
+        "goseg/config/version.go shows a similar boundary blur (remote fetch + persistence + global mutation), reinforcing missing subsystem decomposition rather than isolated file growth."
+      ],
+      "suggestion": "Split StarTram into focused packages (e.g., `startram/client`, `startram/registry`, `startram/backup`, `startram/state`) and keep the top-level package as a thin orchestration facade. Move version transport/persistence into dedicated `config/versionstore` + `config/versionclient` components with explicit interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_domain_boundaries"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "cross_package_state_mutation_side_effects",
+      "summary": "Core flows mutate package globals and persistent config as hidden side effects, making ownership and lifecycle behavior unpredictable.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "SyncRetrieve writes `config.StartramConfig`, conditionally calls `config.UpdateConf`, and publishes on `EventBus` in one call path, coupling retrieval to global state and event emission.",
+        "SyncVersionInfo mutates `VersionInfo` and `VersionServerReady` and writes `version_info.json`; callers get a channel result but also trigger global + filesystem changes.",
+        "This pattern makes function intent ambiguous (query vs command), reducing reliability of top-level module contracts."
+      ],
+      "suggestion": "Introduce explicit service contracts separating read operations from stateful sync commands. Return domain results from pure client methods, and centralize state mutation/event publication in a coordinator layer with clearly named command methods.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_domain_boundaries"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "distributed_string_protocols_no_central_contract",
+      "summary": "Operational protocols are scattered as string literals across handlers and StarTram flows instead of a coherent domain contract.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "UploadHandler switches on raw action strings (`\"open-endpoint\"`, `\"reset\"`) and routes directly to importer internals.",
+        "startram.go uses service/event/status strings (`\"urbit\"`, `\"minio\"`, `\"retrieve\"`, `\"ok\"`, `\"No record\"`) across control paths, binding behavior to ad-hoc literals.",
+        "Protocol semantics are spread across modules, so adding or changing actions requires cross-file edits and implicit knowledge."
+      ],
+      "suggestion": "Define shared typed enums/constants and request/command objects for action, service type, and status values. Route handler actions through a single application service interface so protocol evolution is localized.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_domain_boundaries"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Subsystem boundaries are defined by historical accumulation rather than explicit domain ownership.",
+      "State management and side effects are embedded inside retrieval/client methods instead of a dedicated orchestration layer.",
+      "Protocol contracts are implicit string conventions rather than centralized typed APIs."
+    ],
+    "likely_symptoms": [
+      "startram_god_module_mixed_ownership",
+      "cross_package_state_mutation_side_effects",
+      "distributed_string_protocols_no_central_contract"
+    ],
+    "possible_false_positives": [
+      "Prior import-time side-effect concern appears reduced in these files; observed side effects are runtime-invocation side effects, not heavy import-time I/O initialization."
+    ]
+  }
+}

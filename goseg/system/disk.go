@@ -19,12 +19,27 @@ import (
 )
 
 var (
-	SmartResults = make(map[string]bool)
+	SmartResults      = make(map[string]bool)
+	runDiskCommandFn  = runCommand
+	listPartitionsFn  = disk.Partitions
+	checkSataDriveFn  = checkSataDrive
+	checkNvmeDriveFn  = checkNvmeDrive
+	removeMultipartFn = RemoveMultipartFiles
+	isMountedMMCFn    = IsMountedMMC
+	mkdirAllFn        = os.MkdirAll
+	removeAllFn       = os.RemoveAll
+	symlinkFn         = os.Symlink
+	lstatFn           = os.Lstat
+	mkdirFn           = os.Mkdir
+	openFn            = os.Open
+	openFileFn        = os.OpenFile
+	mountAllCommandFn = func() error { return exec.Command("mount", "-a").Run() }
+	mkfsExt4CommandFn = func(uuid, devPath string) error { return exec.Command("mkfs.ext4", "-U", uuid, "-F", devPath).Run() }
 )
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
 	var dev structs.LSBLKDevice
-	out, err := runCommand("lsblk", "-f", "--json", "--bytes")
+	out, err := runDiskCommandFn("lsblk", "-f", "--json", "--bytes")
 	if err != nil {
 		return dev, fmt.Errorf("Failed to lsblk: %v", err)
 	}
@@ -56,17 +71,15 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		}
 	}
 	// Create the directory since it doesn't exist
-	err := os.Mkdir(dirPath, 0755)
+	err := mkdirFn(dirPath, 0755)
 	if err != nil {
 		return "", fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
 	}
 	// Create an ext4 filesystem on this drive using it in its entirety.
 	devPath := "/dev/" + sel
 	uuid := uuid.NewString()
-	cmd := exec.Command("mkfs.ext4", "-U", uuid, "-F", devPath)
-
 	// Run the command and wait for it to complete
-	err = cmd.Run()
+	err = mkfsExt4CommandFn(uuid, devPath)
 	if err != nil {
 		return "", fmt.Errorf("Failed to create ext4 filesystem: %v", err)
 	}
@@ -81,7 +94,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		if dev.Name == sel {
 			fstabEntry := fmt.Sprintf("UUID=%s %s %s %s %s %s\n", uuid, dirPath, "ext4", "defaults,nofail", "0", "2")
 			// Read the existing fstab file
-			file, err := os.Open("/etc/fstab")
+			file, err := openFn("/etc/fstab")
 			if err != nil {
 				return "", fmt.Errorf("Error opening fstab: %v", err)
 			}
@@ -100,7 +113,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 			lines = append(lines, fstabEntry)
 
 			// Write the updated content back to /etc/fstab
-			file, err = os.OpenFile("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
+			file, err = openFileFn("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
 				return "", fmt.Errorf("Error opening fstab for writing: %v", err)
 			}
@@ -115,8 +128,7 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 			}
 			writer.Flush()
 			// Mount the newly created ext4 filesystem at /groundseg-<n>
-			cmd = exec.Command("mount", "-a")
-			err = cmd.Run()
+			err = mountAllCommandFn()
 			if err != nil {
 				return "", fmt.Errorf("Failed to mount filesystem: %v", err)
 			}
@@ -155,12 +167,12 @@ func SetupTmpDir() error {
 	symlink := "/tmp"
 
 	// remove old uploads
-	if err := RemoveMultipartFiles(symlink); err != nil {
+	if err := removeMultipartFn(symlink); err != nil {
 		zap.L().Warn(fmt.Sprintf("failed to remove multiparts: %v", err))
 	}
 
 	// check if /tmp is on emmc
-	mmc, err := isMountedMMC(symlink)
+	mmc, err := isMountedMMCFn(symlink)
 	if err != nil {
 		return fmt.Errorf("failed to check check /tmp mountpoint: %v", err)
 	}
@@ -168,7 +180,7 @@ func SetupTmpDir() error {
 	// is mounted on emmc
 	if mmc {
 		isSym := false
-		tmpDir, err := os.Lstat(symlink)
+		tmpDir, err := lstatFn(symlink)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return fmt.Errorf("failed to get /tmp info: %v", err)
@@ -181,17 +193,17 @@ func SetupTmpDir() error {
 		if !isSym {
 			altDir := "/media/data/tmp"
 			// make alt dir
-			if err := os.MkdirAll(altDir, 1777); err != nil {
+			if err := mkdirAllFn(altDir, 1777); err != nil {
 				return fmt.Errorf("failed to create alternate tmp directory: %v", err)
 			}
 
 			// delete /tmp
-			if err := os.RemoveAll(symlink); err != nil {
+			if err := removeAllFn(symlink); err != nil {
 				return fmt.Errorf("failed to remove %v: %v", symlink, err)
 			}
 
 			// create symlink
-			if err := os.Symlink(altDir, symlink); err != nil {
+			if err := symlinkFn(altDir, symlink); err != nil {
 				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink, err)
 			}
 		}
@@ -199,10 +211,10 @@ func SetupTmpDir() error {
 	return nil
 }
 
-func isMountedMMC(dirPath string) (bool, error) {
-	partitions, err := disk.Partitions(true)
+func IsMountedMMC(dirPath string) (bool, error) {
+	partitions, err := listPartitionsFn(true)
 	if err != nil {
-		return false, fmt.Errorf("failed to get list of partitions")
+		return false, fmt.Errorf("failed to get list of partitions: %v", err)
 	}
 	/*
 		the outer loop loops from child up the unix path
@@ -233,7 +245,7 @@ func SmartCheckAllDrives(devices structs.LSBLKDevice) map[string]bool {
 	for _, disk := range devices.BlockDevices {
 		if strings.Contains(disk.Name, "sd") {
 			// sata
-			pass, err := checkSataDrive(disk.Name)
+			pass, err := checkSataDriveFn(disk.Name)
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to do SMART check sata drive %v: %v", disk.Name, err))
 				continue
@@ -242,7 +254,7 @@ func SmartCheckAllDrives(devices structs.LSBLKDevice) map[string]bool {
 			}
 		} else if strings.Contains(disk.Name, "nvme") {
 			// nvme
-			pass, err := checkNvmeDrive(disk.Name)
+			pass, err := checkNvmeDriveFn(disk.Name)
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to do SMART check nvme drive %v: %v", disk.Name, err))
 				continue

@@ -11,6 +11,15 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	withStartramReminderOneForRenewal   = config.WithStartramReminderOne
+	withStartramReminderThreeForRenewal = config.WithStartramReminderThree
+	withStartramReminderSevenForRenewal = config.WithStartramReminderSeven
+	updateConfTypedForRenewal           = config.UpdateConfTyped
+	urbitConfForRenewal                 = config.UrbitConf
+	sendNotificationForRenewal          = click.SendNotification
+)
+
 func StartramRenewalReminder() {
 	for {
 		zap.L().Debug(fmt.Sprintf("Checking StarTram renewal status.."))
@@ -87,12 +96,20 @@ func StartramRenewalReminder() {
 }
 
 func setReminder(daysType string, reminded bool) {
-	if err := config.UpdateConf(map[string]interface{}{
-		"startramSetReminder": map[string]bool{
-			daysType: reminded,
-		},
-	}); err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't reset startram reminder: %v", err))
+	var option config.ConfUpdateOption
+	switch daysType {
+	case "one":
+		option = withStartramReminderOneForRenewal(reminded)
+	case "three":
+		option = withStartramReminderThreeForRenewal(reminded)
+	case "seven":
+		option = withStartramReminderSevenForRenewal(reminded)
+	default:
+		zap.L().Warn(fmt.Sprintf("Unknown startram reminder type: %s", daysType))
+		return
+	}
+	if err := updateConfTypedForRenewal(option); err != nil {
+		zap.L().Error(fmt.Sprintf("Couldn't set startram reminder: %v", err))
 	}
 }
 
@@ -100,9 +117,9 @@ func sendStartramHarkNotification(daysLeft int, piers []string) {
 	noti := structs.HarkNotification{Type: "startram-reminder", StartramDaysLeft: daysLeft}
 	// Send notification
 	for _, patp := range piers {
-		shipConf := config.UrbitConf(patp)
+		shipConf := urbitConfForRenewal(patp)
 		if shipConf.StartramReminder == true {
-			if err := click.SendNotification(patp, noti); err != nil {
+			if err := sendNotificationForRenewal(patp, noti); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to send dev startram reminder to %s: %v", patp, err))
 			}
 		}

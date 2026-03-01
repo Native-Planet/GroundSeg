@@ -33,8 +33,9 @@ var (
 	BasePath = getBasePath()
 	// only amd64 or arm64
 	Architecture = getArchitecture()
-	// struct of /retrieve blob
-	StartramConfig structs.StartramRetrieve
+	// cached /retrieve blob
+	startramConfig        structs.StartramRetrieve
+	startramConfigUpdated time.Time
 	// struct of minio passwords
 	minIOPasswords = make(map[string]string)
 	// set with `./groundseg dev` (enables verbose logging)
@@ -49,9 +50,10 @@ var (
 	keyPath       = filepath.Join(BasePath, "settings", "session.key")
 	isEMMCMachine bool
 	confMutex     sync.Mutex
-	contMutex     sync.Mutex
+	contMutex     sync.RWMutex
 	versMutex     sync.Mutex
 	minioPwdMutex sync.Mutex
+	startramMu    sync.RWMutex
 )
 
 // try initializing from system.json on disk
@@ -74,20 +76,24 @@ func init() {
 			fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
 			fmt.Print("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet\n")
 			fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
-			panic("")
+			return
 		}
-		file, _ = os.Open(confPath)
+		file, err = os.Open(confPath)
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Unable to open config after creation: %v", err))
+			return
+		}
 		salt := RandString(32)
 		wgPriv, wgPub, err := WgKeyGen()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		} else {
-			if err = UpdateConf(map[string]interface{}{
-				"pubkey":  wgPub,
-				"privkey": wgPriv,
-				"salt":    salt,
-				"keyfile": keyPath,
-			}); err != nil {
+			if err = UpdateConfTyped(
+				WithPubkey(wgPub),
+				WithPrivkey(wgPriv),
+				WithSalt(salt),
+				WithKeyfile(keyPath),
+			); err != nil {
 				zap.L().Error(fmt.Sprintf("%v", err))
 			}
 		}
@@ -140,11 +146,16 @@ func init() {
 		errmsg := fmt.Sprintf("Error persisting JSON: %v", err)
 		zap.L().Error(errmsg)
 	}
+	if err := file.Close(); err != nil {
+		zap.L().Warn(fmt.Sprintf("Error closing JSON before reload: %v", err))
+	}
 	file, err = os.Open(confPath)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error opening JSON: %v", err)
 		zap.L().Error(errmsg)
+		return
 	}
+	defer file.Close()
 	decoder = json.NewDecoder(file)
 	err = decoder.Decode(&globalConfig)
 	if err != nil {
@@ -162,10 +173,7 @@ func init() {
 				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
 			}
 		}
-		file, _ = os.Open(confPath)
-		if err = UpdateConf(map[string]interface{}{
-			"keyfile": keyPath,
-		}); err != nil {
+		if err = UpdateConfTyped(WithKeyfile(keyPath)); err != nil {
 			zap.L().Error(fmt.Sprintf("%v", err))
 		}
 	}
@@ -177,6 +185,184 @@ func Conf() structs.SysConfig {
 	confMutex.Lock()
 	defer confMutex.Unlock()
 	return globalConfig
+}
+
+type StartramConfigSnapshot struct {
+	Value     structs.StartramRetrieve
+	UpdatedAt time.Time
+	Fresh     bool
+}
+
+type StartramSettings struct {
+	EndpointURL          string
+	Pubkey               string
+	RemoteBackupPassword string
+	WgRegistered         bool
+	WgOn                 bool
+	Piers                []string
+}
+
+type AuthSettings struct {
+	KeyFile            string
+	Salt               string
+	PasswordHash       string
+	AuthorizedSessions map[string]structs.SessionInfo
+}
+
+type PenpaiSettings struct {
+	Models      []structs.Penpai
+	Allowed     bool
+	ActiveModel string
+	Running     bool
+	ActiveCores int
+}
+
+type Check502Settings struct {
+	Piers      []string
+	WgOn       bool
+	Disable502 bool
+}
+
+type ShipSettings struct {
+	Piers []string
+}
+
+type ConnectivitySettings struct {
+	C2cInterval int
+}
+
+type UpdateSettings struct {
+	UpdateMode   string
+	UpdateBranch string
+}
+
+type SwapSettings struct {
+	SwapFile string
+	SwapVal  int
+}
+
+type ShipRuntimeSettings struct {
+	SnapTime int
+}
+
+type RuntimeSettings struct {
+	BasePath     string
+	Architecture string
+	DebugMode    bool
+}
+
+func SetStartramConfig(retrieve structs.StartramRetrieve) {
+	startramMu.Lock()
+	defer startramMu.Unlock()
+	startramConfig = retrieve
+	startramConfigUpdated = time.Now()
+}
+
+func GetStartramConfig() structs.StartramRetrieve {
+	startramMu.RLock()
+	defer startramMu.RUnlock()
+	return startramConfig
+}
+
+func StartramSettingsSnapshot() StartramSettings {
+	conf := Conf()
+	return StartramSettings{
+		EndpointURL:          conf.EndpointUrl,
+		Pubkey:               conf.Pubkey,
+		RemoteBackupPassword: conf.RemoteBackupPassword,
+		WgRegistered:         conf.WgRegistered,
+		WgOn:                 conf.WgOn,
+		Piers:                append([]string(nil), conf.Piers...),
+	}
+}
+
+func AuthSettingsSnapshot() AuthSettings {
+	conf := Conf()
+	authorizedSessions := make(map[string]structs.SessionInfo, len(conf.Sessions.Authorized))
+	for tokenID, session := range conf.Sessions.Authorized {
+		authorizedSessions[tokenID] = session
+	}
+	return AuthSettings{
+		KeyFile:            conf.KeyFile,
+		Salt:               conf.Salt,
+		PasswordHash:       conf.PwHash,
+		AuthorizedSessions: authorizedSessions,
+	}
+}
+
+func PenpaiSettingsSnapshot() PenpaiSettings {
+	conf := Conf()
+	return PenpaiSettings{
+		Models:      append([]structs.Penpai(nil), conf.PenpaiModels...),
+		Allowed:     conf.PenpaiAllow,
+		ActiveModel: conf.PenpaiActive,
+		Running:     conf.PenpaiRunning,
+		ActiveCores: conf.PenpaiCores,
+	}
+}
+
+func Check502SettingsSnapshot() Check502Settings {
+	conf := Conf()
+	return Check502Settings{
+		Piers:      append([]string(nil), conf.Piers...),
+		WgOn:       conf.WgOn,
+		Disable502: conf.Disable502,
+	}
+}
+
+func ShipSettingsSnapshot() ShipSettings {
+	conf := Conf()
+	return ShipSettings{
+		Piers: append([]string(nil), conf.Piers...),
+	}
+}
+
+func ConnectivitySettingsSnapshot() ConnectivitySettings {
+	conf := Conf()
+	return ConnectivitySettings{
+		C2cInterval: conf.C2cInterval,
+	}
+}
+
+func UpdateSettingsSnapshot() UpdateSettings {
+	conf := Conf()
+	return UpdateSettings{
+		UpdateMode:   conf.UpdateMode,
+		UpdateBranch: conf.UpdateBranch,
+	}
+}
+
+func SwapSettingsSnapshot() SwapSettings {
+	conf := Conf()
+	return SwapSettings{
+		SwapFile: conf.SwapFile,
+		SwapVal:  conf.SwapVal,
+	}
+}
+
+func ShipRuntimeSettingsSnapshot() ShipRuntimeSettings {
+	conf := Conf()
+	return ShipRuntimeSettings{
+		SnapTime: conf.SnapTime,
+	}
+}
+
+func RuntimeSettingsSnapshot() RuntimeSettings {
+	return RuntimeSettings{
+		BasePath:     BasePath,
+		Architecture: Architecture,
+		DebugMode:    DebugMode,
+	}
+}
+
+func GetStartramConfigSnapshot() StartramConfigSnapshot {
+	startramMu.RLock()
+	defer startramMu.RUnlock()
+	return StartramConfigSnapshot{
+		Value:     startramConfig,
+		UpdatedAt: startramConfigUpdated,
+		Fresh:     !startramConfigUpdated.IsZero(),
+	}
 }
 
 func checkIsEMMCMachine() bool {
@@ -265,13 +451,429 @@ func ConfChannel() {
 		case "c2cInterval":
 			conf := Conf()
 			if conf.C2cInterval == 0 {
-				if err := UpdateConf(map[string]interface{}{
-					"c2cInterval": 600,
-				}); err != nil {
+				if err := UpdateConfTyped(WithC2cInterval(600)); err != nil {
 					zap.L().Error(fmt.Sprintf("Couldn't set C2C interval: %v", err))
 				}
 			}
 		}
+	}
+}
+
+type ConfUpdateOption func(*ConfPatch)
+
+type ConfPatch struct {
+	Piers                 *[]string
+	WgOn                  *bool
+	StartramReminderOne   *bool
+	StartramReminderThree *bool
+	StartramReminderSeven *bool
+	PenpaiAllow           *bool
+	GracefulExit          *bool
+	SwapVal               *int
+	PenpaiRunning         *bool
+	PenpaiActive          *string
+	PenpaiCores           *int
+	EndpointURL           *string
+	WgRegistered          *bool
+	RemoteBackupPassword  *string
+	Pubkey                *string
+	Privkey               *string
+	Salt                  *string
+	KeyFile               *string
+	C2cInterval           *int
+	Setup                 *string
+	PwHash                *string
+	AuthorizedSessions    map[string]structs.SessionInfo
+	UnauthorizedSessions  map[string]structs.SessionInfo
+	DiskWarning           *map[string]structs.DiskWarning
+	LastKnownMDNS         *string
+	DisableSlsa           *bool
+	GSVersion             *string
+	BinHash               *string
+}
+
+func (patch *ConfPatch) hasUpdates() bool {
+	return patch.Piers != nil ||
+		patch.WgOn != nil ||
+		patch.StartramReminderOne != nil ||
+		patch.StartramReminderThree != nil ||
+		patch.StartramReminderSeven != nil ||
+		patch.PenpaiAllow != nil ||
+		patch.GracefulExit != nil ||
+		patch.SwapVal != nil ||
+		patch.PenpaiRunning != nil ||
+		patch.PenpaiActive != nil ||
+		patch.PenpaiCores != nil ||
+		patch.EndpointURL != nil ||
+		patch.WgRegistered != nil ||
+		patch.RemoteBackupPassword != nil ||
+		patch.Pubkey != nil ||
+		patch.Privkey != nil ||
+		patch.Salt != nil ||
+		patch.KeyFile != nil ||
+		patch.C2cInterval != nil ||
+		patch.Setup != nil ||
+		patch.PwHash != nil ||
+		len(patch.AuthorizedSessions) > 0 ||
+		len(patch.UnauthorizedSessions) > 0 ||
+		patch.DiskWarning != nil ||
+		patch.LastKnownMDNS != nil ||
+		patch.DisableSlsa != nil ||
+		patch.GSVersion != nil ||
+		patch.BinHash != nil
+}
+
+// UpdateConfTyped applies typed mutations to SysConfig and persists them.
+func UpdateConfTyped(opts ...ConfUpdateOption) error {
+	if len(opts) == 0 {
+		return nil
+	}
+
+	patch := &ConfPatch{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(patch)
+		}
+	}
+	if !patch.hasUpdates() {
+		return nil
+	}
+
+	return updateConfFromPatch(patch)
+}
+
+func updateConfFromPatch(patch *ConfPatch) error {
+	confMutex.Lock()
+	defer confMutex.Unlock()
+
+	file, err := ioutil.ReadFile(confPath)
+	if err != nil {
+		return fmt.Errorf("Unable to load config: %v", err)
+	}
+
+	var configStruct structs.SysConfig
+	if err := json.Unmarshal(file, &configStruct); err != nil {
+		return fmt.Errorf("Error decoding JSON: %v", err)
+	}
+
+	var configMap map[string]interface{}
+	if err := json.Unmarshal(file, &configMap); err != nil {
+		return fmt.Errorf("Error decoding JSON map: %v", err)
+	}
+
+	applyConfPatch(&configStruct, patch)
+
+	typedMap, err := structToMap(configStruct)
+	if err != nil {
+		return fmt.Errorf("Error encoding typed config map: %v", err)
+	}
+	for key, value := range typedMap {
+		configMap[key] = value
+	}
+
+	if err := persistConf(configMap); err != nil {
+		return fmt.Errorf("Unable to persist config update: %v", err)
+	}
+	return nil
+}
+
+func applyConfPatch(configStruct *structs.SysConfig, patch *ConfPatch) {
+	if patch.Piers != nil {
+		configStruct.Piers = append([]string(nil), (*patch.Piers)...)
+	}
+	if patch.WgOn != nil {
+		configStruct.WgOn = *patch.WgOn
+	}
+	if patch.StartramReminderOne != nil {
+		configStruct.StartramSetReminder.One = *patch.StartramReminderOne
+	}
+	if patch.StartramReminderThree != nil {
+		configStruct.StartramSetReminder.Three = *patch.StartramReminderThree
+	}
+	if patch.StartramReminderSeven != nil {
+		configStruct.StartramSetReminder.Seven = *patch.StartramReminderSeven
+	}
+	if patch.PenpaiAllow != nil {
+		configStruct.PenpaiAllow = *patch.PenpaiAllow
+	}
+	if patch.GracefulExit != nil {
+		configStruct.GracefulExit = *patch.GracefulExit
+	}
+	if patch.SwapVal != nil {
+		configStruct.SwapVal = *patch.SwapVal
+	}
+	if patch.PenpaiRunning != nil {
+		configStruct.PenpaiRunning = *patch.PenpaiRunning
+	}
+	if patch.PenpaiActive != nil {
+		configStruct.PenpaiActive = *patch.PenpaiActive
+	}
+	if patch.PenpaiCores != nil {
+		configStruct.PenpaiCores = *patch.PenpaiCores
+	}
+	if patch.EndpointURL != nil {
+		configStruct.EndpointUrl = *patch.EndpointURL
+	}
+	if patch.WgRegistered != nil {
+		configStruct.WgRegistered = *patch.WgRegistered
+	}
+	if patch.RemoteBackupPassword != nil {
+		configStruct.RemoteBackupPassword = *patch.RemoteBackupPassword
+	}
+	if patch.Pubkey != nil {
+		configStruct.Pubkey = *patch.Pubkey
+	}
+	if patch.Privkey != nil {
+		configStruct.Privkey = *patch.Privkey
+	}
+	if patch.Salt != nil {
+		configStruct.Salt = *patch.Salt
+	}
+	if patch.KeyFile != nil {
+		configStruct.KeyFile = *patch.KeyFile
+	}
+	if patch.C2cInterval != nil {
+		configStruct.C2cInterval = *patch.C2cInterval
+	}
+	if patch.Setup != nil {
+		configStruct.Setup = *patch.Setup
+	}
+	if patch.PwHash != nil {
+		configStruct.PwHash = *patch.PwHash
+	}
+	if len(patch.AuthorizedSessions) > 0 {
+		if configStruct.Sessions.Authorized == nil {
+			configStruct.Sessions.Authorized = make(map[string]structs.SessionInfo)
+		}
+		for tokenID, session := range patch.AuthorizedSessions {
+			configStruct.Sessions.Authorized[tokenID] = session
+		}
+	}
+	if len(patch.UnauthorizedSessions) > 0 {
+		if configStruct.Sessions.Unauthorized == nil {
+			configStruct.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
+		}
+		for tokenID, session := range patch.UnauthorizedSessions {
+			configStruct.Sessions.Unauthorized[tokenID] = session
+		}
+	}
+	if patch.DiskWarning != nil {
+		copied := make(map[string]structs.DiskWarning, len(*patch.DiskWarning))
+		for key, warning := range *patch.DiskWarning {
+			copied[key] = warning
+		}
+		configStruct.DiskWarning = copied
+	}
+	if patch.LastKnownMDNS != nil {
+		configStruct.LastKnownMDNS = *patch.LastKnownMDNS
+	}
+	if patch.DisableSlsa != nil {
+		configStruct.DisableSlsa = *patch.DisableSlsa
+	}
+	if patch.GSVersion != nil {
+		configStruct.GsVersion = *patch.GSVersion
+	}
+	if patch.BinHash != nil {
+		configStruct.BinHash = *patch.BinHash
+	}
+}
+
+func structToMap(configStruct structs.SysConfig) (map[string]interface{}, error) {
+	configBytes, err := json.Marshal(configStruct)
+	if err != nil {
+		return nil, err
+	}
+	configMap := make(map[string]interface{})
+	if err := json.Unmarshal(configBytes, &configMap); err != nil {
+		return nil, err
+	}
+	return configMap, nil
+}
+
+func WithPiers(piers []string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		copied := append([]string(nil), piers...)
+		patch.Piers = &copied
+	}
+}
+
+func WithWgOn(enabled bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.WgOn = &enabled
+	}
+}
+
+func WithStartramReminderOne(reminded bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.StartramReminderOne = &reminded
+	}
+}
+
+func WithStartramReminderThree(reminded bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.StartramReminderThree = &reminded
+	}
+}
+
+func WithStartramReminderSeven(reminded bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.StartramReminderSeven = &reminded
+	}
+}
+
+func WithStartramReminderAll(reminded bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.StartramReminderOne = &reminded
+		patch.StartramReminderThree = &reminded
+		patch.StartramReminderSeven = &reminded
+	}
+}
+
+func WithPenpaiAllow(enabled bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.PenpaiAllow = &enabled
+	}
+}
+
+func WithGracefulExit(enabled bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.GracefulExit = &enabled
+	}
+}
+
+func WithSwapVal(value int) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.SwapVal = &value
+	}
+}
+
+func WithPenpaiRunning(running bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.PenpaiRunning = &running
+	}
+}
+
+func WithPenpaiActive(model string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.PenpaiActive = &model
+	}
+}
+
+func WithPenpaiCores(cores int) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.PenpaiCores = &cores
+	}
+}
+
+func WithEndpointURL(endpoint string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.EndpointURL = &endpoint
+	}
+}
+
+func WithWgRegistered(registered bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.WgRegistered = &registered
+	}
+}
+
+func WithRemoteBackupPassword(password string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.RemoteBackupPassword = &password
+	}
+}
+
+func WithPubkey(pubkey string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.Pubkey = &pubkey
+	}
+}
+
+func WithPrivkey(privkey string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.Privkey = &privkey
+	}
+}
+
+func WithSalt(salt string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.Salt = &salt
+	}
+}
+
+func WithKeyfile(path string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.KeyFile = &path
+	}
+}
+
+func WithC2cInterval(seconds int) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.C2cInterval = &seconds
+	}
+}
+
+func WithSetup(step string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.Setup = &step
+	}
+}
+
+func WithPwHash(hash string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.PwHash = &hash
+	}
+}
+
+func WithAuthorizedSession(tokenID string, session structs.SessionInfo) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		if patch.AuthorizedSessions == nil {
+			patch.AuthorizedSessions = make(map[string]structs.SessionInfo)
+		}
+		patch.AuthorizedSessions[tokenID] = session
+	}
+}
+
+func WithUnauthorizedSession(tokenID string, session structs.SessionInfo) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		if patch.UnauthorizedSessions == nil {
+			patch.UnauthorizedSessions = make(map[string]structs.SessionInfo)
+		}
+		patch.UnauthorizedSessions[tokenID] = session
+	}
+}
+
+func WithDiskWarning(warning map[string]structs.DiskWarning) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		copied := make(map[string]structs.DiskWarning, len(warning))
+		for key, val := range warning {
+			copied[key] = val
+		}
+		patch.DiskWarning = &copied
+	}
+}
+
+func WithLastKnownMDNS(url string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.LastKnownMDNS = &url
+	}
+}
+
+func WithDisableSlsa(disable bool) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.DisableSlsa = &disable
+	}
+}
+
+func WithGSVersion(version string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.GSVersion = &version
+	}
+}
+
+func WithBinHash(hash string) ConfUpdateOption {
+	return func(patch *ConfPatch) {
+		patch.BinHash = &hash
 	}
 }
 
@@ -360,9 +962,13 @@ func DeleteContainerState(name string) {
 
 // get the current container state
 func GetContainerState() map[string]structs.ContainerState {
-	contMutex.Lock()
-	defer contMutex.Unlock()
-	return GSContainers
+	contMutex.RLock()
+	defer contMutex.RUnlock()
+	stateCopy := make(map[string]structs.ContainerState, len(GSContainers))
+	for name, state := range GSContainers {
+		stateCopy[name] = state
+	}
+	return stateCopy
 }
 
 // write a default conf to disk

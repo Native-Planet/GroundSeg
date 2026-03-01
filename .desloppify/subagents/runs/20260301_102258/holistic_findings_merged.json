@@ -1,0 +1,807 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 36.4,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 55.4,
+        "Indirection Cost": 54.4,
+        "Interface Honesty": 56.2
+      }
+    },
+    "cross_module_architecture": 40.0,
+    "design_coherence": 31.3,
+    "error_consistency": 37.6,
+    "test_strategy": 36.6
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Shared package-level mutable state is used as cross-module coordination in multiple places: `config/version.go` exposes and mutates `VersionServerReady` and `VersionInfo` (`SyncVersionInfo` writes them), while `startram/startram.go` exposes and mutates `Regions` (`SyncRegions` writes it).",
+        "`startram/startram.go` combines external API calls, config writes (`config.UpdateConfTyped`), local persistence side effects (`ApplyRetrieveState` via `SyncRetrieve`), Docker command execution (`exec.Command`), and filesystem restore operations in one package/module boundary.",
+        "`handler/upload.go` passes transport DTOs (`structs.WsUploadPayload`) directly into importer operations (`importer.SetUploadSession`), coupling websocket message schema to non-handler module behavior instead of translating to a narrower application command."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`config.Conf()` is pulled directly across handlers, routines, docker loaders, and startram client functions, so most modules depend on the full `SysConfig` bag rather than narrow domain inputs.",
+        "`UpdateConfTyped` in `goseg/config/config.go` presents typed options but immediately converts to `map[string]interface{}` string-key mutations via `UpdateConf`, so the abstraction boundary is not type-safe end-to-end.",
+        "Near-identical file-to-volume writer flows exist in `copyWGFileToVolume` and `copyNDFileToVolume`, including the same temp-container lifecycle and duplicate remove calls.",
+        "Transition/event signaling is exposed as package-level mutable channels (`docker.UTransBus`, `docker.SysTransBus`, `docker.ImportShipTransBus`, `startram.EventBus`) that are written/read directly from unrelated packages, bypassing a cohesive interface.",
+        "A declared abstraction (`PortSetter` interface in `structs/configs.go`) has no consumers, while direct field assignment and concrete setter calls dominate."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 57.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 54.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md requires deterministic unit test coverage for registration/version/upload flows, but the reviewed runtime files are built around hardwired effects that reduce deterministic-test seams.",
+        "goseg/config/version.go calls `http.DefaultClient.Do` and global config/state directly, making transport behavior and retries difficult to isolate in tests without global monkey-patching.",
+        "goseg/handler/upload.go branches on action strings and immediately invokes importer side effects, with no injected collaborator or interface for isolated unit verification.",
+        "goseg/startram/startram.go directly performs network I/O, filesystem writes, Docker `exec.Command` calls, and crypto operations in the same call paths, increasing reliance on integration-style environments and weakening small deterministic tests."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "Large orchestrator functions combine unrelated responsibilities: `broadcast.ConstructPierInfo` builds backup inventories, reads config, queries docker status, inspects desks, computes scheduling defaults, and assembles response models in one routine.",
+        "`importer.configureUploadedPier` mixes upload state transitions, filesystem extraction/restructure, config mutation, docker lifecycle, and remote service registration inside one flow.",
+        "`docker.StartContainer` and `docker.CreateContainer` duplicate container-type switch/config selection logic and image selection scaffolding, increasing divergence risk for future container additions.",
+        "`auth.CheckToken` and `auth.LogTokenCheck` replicate near-identical token decryption/request-metadata validation logic with slightly different outputs, signaling duplicated policy paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Silent/ignored errors appear in operational paths: `goseg/system/system.go` ignores failures in `GetMemory`, `GetCPU`, `getDiskLabel`, and `addCron` writes/close.",
+        "Handler orchestration frequently logs and continues instead of surfacing failures (`goseg/handler/startram.go` restart/toggle paths), then emits completion events.",
+        "HTTP boundary handling is inconsistent: some modules check non-200 responses (`goseg/routines/rekor.go:177-179`) while others immediately unmarshal body (`goseg/startram/startram.go:49-63`, `goseg/config/version.go:46-66`).",
+        "Error wrapping is inconsistent across adjacent call paths (`%w` in `goseg/handler/upload.go:22-26` vs `%v`/string-only wrapping in `goseg/startram/startram.go:139-151`, `goseg/routines/version.go:224-249`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_package_state_coupling",
+      "summary": "Cross-module state is coordinated through mutable package globals rather than explicit state services.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`config/version.go` defines package globals `VersionServerReady` and `VersionInfo` and mutates them inside `SyncVersionInfo`.",
+        "`startram/startram.go` defines global `Regions` map and replaces it in `SyncRegions`.",
+        "These globals are part of public package surface and become implicit synchronization points for other modules, increasing hidden coupling and change blast radius."
+      ],
+      "suggestion": "Replace mutable package globals with explicit state providers (for example, `VersionStore` and `RegionStore`) injected into callers; keep fetch functions pure and move state mutation behind a narrow interface with synchronization semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_state_boundary"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_boundary_collapse",
+      "summary": "Startram module collapses domain, infrastructure, and persistence boundaries into one hub.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`startram/startram.go` handles API orchestration (`Register`, `SvcCreate`, `Alias*`, `Retrieve`), config mutation (`config.UpdateConfTyped`), restore persistence (`os.WriteFile`, `os.MkdirAll`), and runtime infrastructure (`exec.Command(\"docker\", ...)`) in one module.",
+        "The same broad side-effect pattern exists in `config/version.go`, where remote fetch and local persistence/global-state mutation are tightly coupled inside one package API (`SyncVersionInfo`).",
+        "This shared pattern indicates architectural drift toward side-effect-heavy hub modules instead of separated adapters and application services."
+      ],
+      "suggestion": "Split startram into explicit layers: API client adapter, registration application service, and backup/restore infrastructure service; similarly keep version fetching separate from persistence/state publication to restore one-way dependency flow.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_application_service_layer"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_schema_leaks_across_boundary",
+      "summary": "WebSocket transport payload types leak from handler layer into importer workflow boundary.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`UploadHandler` unmarshals websocket message into `structs.WsUploadPayload` and passes that full payload directly to `importer.SetUploadSession`, tying importer behavior to handler transport schema.",
+        "In `startram/startram.go`, public workflow functions similarly operate directly on config/network DTO concerns (`config.Conf()` and API request structs inside service-level functions) instead of receiving boundary-neutral commands.",
+        "Both patterns indicate missing translation layer between transport/config representations and core use-case inputs."
+      ],
+      "suggestion": "Introduce use-case command structs decoupled from websocket/API DTOs (e.g., `OpenUploadEndpointCmd`, `RegisterServiceCmd`), and perform all message/config translation only at boundary adapters (handler/client packages).",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_application_service_layer"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ambient_sysconfig_bag_coupling",
+      "summary": "Global `SysConfig` access forms an ambient context bag that weakens module boundaries and inflates dependency surface.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/startram/startram.go",
+        "goseg/handler/system.go",
+        "goseg/handler/startram.go",
+        "goseg/routines/version.go",
+        "goseg/docker/minio.go"
+      ],
+      "evidence": [
+        "`config.Conf()` returns the full global config object and is used repeatedly in unrelated domains (e.g., startram API functions, websocket handlers, docker loaders, version routines).",
+        "Call sites pull broad config then read only a few fields (`EndpointUrl`, `Pubkey`, `WgOn`, `Piers`, `SwapFile`, etc.), indicating missing narrow domain abstractions.",
+        "This pattern makes logic implicitly depend on global mutable state instead of explicit parameters or scoped services."
+      ],
+      "suggestion": "Introduce domain-scoped read interfaces (for example `StartramSettings`, `RuntimeSettings`, `ShipSettings`) and inject those into modules; keep `SysConfig` global only inside a configuration service that materializes typed snapshots.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_ambient_context"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "typed_conf_update_is_thin_wrapper",
+      "summary": "`UpdateConfTyped` is a pass-through facade over string-key map mutation, so interface safety is mostly cosmetic.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/handler/system.go",
+        "goseg/handler/startram.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`ConfUpdateOption` is defined as `func(map[string]interface{})`, and each `With...` helper writes string keys into a generic map.",
+        "`UpdateConfTyped` forwards directly to `UpdateConf(values)` which merges untyped key/value pairs into JSON (`map[string]interface{}`) without compile-time field guarantees.",
+        "Many handlers/routines use these helpers assuming type safety, but the underlying contract remains dynamic and key-string based."
+      ],
+      "suggestion": "Replace map-based mutation with a typed patch struct plus explicit apply logic (or field-specific mutator methods), so keys and types are validated at compile time and centrally enforced.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_ambient_context"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "docker_volume_writer_duplication",
+      "summary": "Wireguard and Netdata duplicate the same temp-container volume-write orchestration instead of sharing a reusable abstraction.",
+      "related_files": [
+        "goseg/docker/wireguard.go",
+        "goseg/docker/netdata.go"
+      ],
+      "evidence": [
+        "`copyWGFileToVolume` and `copyNDFileToVolume` both: create docker client, resolve image, create temporary container with bind, start it, copy file, stop/remove, then defer another remove.",
+        "Both functions embed nearly identical lifecycle/error handling with only container names and paths changed.",
+        "The same pattern appears because there is no shared helper for 'write file into named volume via ephemeral container'."
+      ],
+      "suggestion": "Extract a shared helper in `goseg/docker` that takes image selector, writer container name, source file, target path, and volume name; make both wireguard/netdata wrappers call it.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "docker_orchestration_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_event_bus_leaks_domain_contracts",
+      "summary": "Package-level event channels are used as cross-module mutable globals, creating leaky and weakly-typed coordination contracts.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/startram/startram.go",
+        "goseg/handler/system.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`docker` exports multiple global channels (`UTransBus`, `SysTransBus`, `ImportShipTransBus`, etc.) and `startram` exports `EventBus`.",
+        "Handlers/importer write directly to these channels, while `rectify` reads and maps stringly-typed `event.Type` values in large switches.",
+        "Because contracts are global and implicit, abstraction boundaries rely on shared knowledge of event strings instead of an owned interface/service."
+      ],
+      "suggestion": "Encapsulate buses behind dedicated publishers/subscribers per domain (e.g., transition service interfaces) and replace ad-hoc string event types with strongly typed enums/struct variants.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_event_bus_leakage"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "unused_portsetter_abstraction",
+      "summary": "`PortSetter` is a declared abstraction with no consumers, while concrete update logic bypasses it.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`type PortSetter interface { SetPort(port any) }` is declared but has no usages in the codebase.",
+        "`UrbitDocker` defines specific setters (`SetWgHTTPPort`, `SetWgAmesPort`, etc.), but call sites use concrete fields/setters directly rather than polymorphism.",
+        "In `rectify`, remote port sync writes concrete `UrbitDocker` fields (`local.WgHTTPPort`, `local.WgAmesPort`, `local.WgS3Port`, `local.WgConsolePort`) with no interface participation."
+      ],
+      "suggestion": "Either remove `PortSetter` and keep direct concrete setters, or introduce a real typed port-update abstraction that is actually consumed where port synchronization occurs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "config_ambient_context"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "stateful_package_contracts",
+      "summary": "Implicit global state contracts across packages increase coupling and blur module boundaries.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "goseg/config/version.go exposes mutable package globals (`VersionInfo`, `VersionServerReady`) updated by `SyncVersionInfo` and read by other paths.",
+        "goseg/startram/startram.go exposes mutable package globals (`Regions`, `EventBus`) and mutating sync methods (`SyncRegions`, `SyncRetrieve`) that act as hidden shared state contracts.",
+        "README.md states boundary expectations, but these globals make behavior depend on execution order and package state rather than explicit module interfaces."
+      ],
+      "suggestion": "Replace package-global mutable state with explicit service structs (e.g., VersionService, RegionService) that own cache/state and are passed at composition boundaries; keep exported APIs pure where possible and return state explicitly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_stateful_boundaries"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_god_module",
+      "summary": "Startram runtime mixes transport, orchestration, backup crypto, and host-runtime operations in one module, weakening contract clarity.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go contains API fetch/sync logic, registration lifecycle operations, backup encryption/decryption, and Docker volume restore flows in a single file.",
+        "Functions such as `RestoreBackup`, `writeBackupToVolume`, `GetBackup`, and registration methods combine distinct concerns that should be split into boundary-specific components.",
+        "README.md documents runtime-boundary expectations, but this concentration creates a high-blast-radius module where changes to one concern risk others."
+      ],
+      "suggestion": "Split `startram.go` into boundary-oriented components (API client, registration service, backup crypto service, restore/runtime adapter), then compose them through narrow interfaces to reduce blast radius and enforce explicit contracts.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_stateful_boundaries"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "policy_testability_gap",
+      "summary": "Quality-gate policy requires deterministic tests for registration/version/upload flows, but current design offers weak deterministic-test seams.",
+      "related_files": [
+        "README.md",
+        "goseg/config/version.go",
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "README.md explicitly requires deterministic unit tests for registration/version/upload changes.",
+        "goseg/config/version.go hardcodes `http.DefaultClient` and retries in function scope, limiting controlled test injection.",
+        "goseg/handler/upload.go directly calls importer side effects with string-dispatch actions, making behavior hard to verify without package-level side effects.",
+        "goseg/startram/startram.go directly executes network/file/Docker operations inside core flows, increasing dependence on environment-heavy tests."
+      ],
+      "suggestion": "Introduce injectable collaborators (HTTP client interface, importer service interface, runtime command/filesystem adapters) and table-driven unit tests for action dispatch, retry behavior, and registration/restore decision paths; reserve Docker/network for targeted integration tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_stateful_boundaries"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_god_functions",
+      "summary": "Core request flows are implemented as large multi-concern orchestrators instead of composable domain steps.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` performs filesystem backup discovery, docker status/network inspection, desk probing, config reads, and UI projection assembly in one pass.",
+        "`configureUploadedPier` handles extraction control, persistence updates, volume/container lifecycle, transition events, and asynchronous follow-up boot logic in one function.",
+        "`NewShipHandler` bundles key normalization/validation, drive formatting decisions, patp validation, action dispatch, and transition/error channel behavior."
+      ],
+      "suggestion": "Split each flow into explicit phases with narrow contracts (input validation, infrastructure I/O, domain mutation, projection/broadcast). Introduce small coordinator functions that compose these phases and keep side effects isolated per phase.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_lifecycle_duplication",
+      "summary": "Transition/status lifecycle logic is duplicated across handlers, causing repeated state-machine code and inconsistent semantics.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "Urbit action handlers repeatedly implement the same pattern: emit loading, define local error helper, poll for completion, emit success/error, delay, then clear transition.",
+        "Importer flow repeats similar status progression (`uploading`, `creating`, `extracting`, `booting`, `completed`/`aborted`) via direct channel writes sprinkled through control logic.",
+        "Broadcast layer stores and relays transition snapshots, but lifecycle rules live in many callers rather than one reusable transition policy."
+      ],
+      "suggestion": "Introduce a shared transition runner/state-machine utility with typed phases and standardized completion/error cleanup hooks; make urbit/importer handlers declare phase steps rather than manually emitting bus events.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "container_lifecycle_branch_duplication",
+      "summary": "Container creation/start paths duplicate container-type branching and image-prep logic, increasing change amplification.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`StartContainer` and `CreateContainer` both maintain near-identical switch blocks for `vere/netdata/minio/miniomc/wireguard/llama-api` and repeat image info resolution/pull steps.",
+        "Both routines reconstruct similar `ContainerState` payloads after inspect, with only lifecycle policy differences.",
+        "Callers in handler/importer rely on these paths for critical operations, so duplicated branching makes container-type evolution brittle across core workflows."
+      ],
+      "suggestion": "Extract a shared container plan builder (type -> config/host/image/state metadata) and separate lifecycle executors (`ensure_running`, `ensure_created`) to centralize type-specific logic once.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_policy_path_duplication",
+      "summary": "Authentication policy is implemented through duplicated validation routines and repeated map scans rather than a single coherent auth service.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`CheckToken` and `LogTokenCheck` both decrypt token, derive request IP/user-agent, verify token id/session, and authorize with mostly duplicated logic.",
+        "Session lookup patterns are repeated across `WsIsAuthenticated`, `WsAuthCheck`, `WsNilSession`, and `ClientManager.GetMuConn` with full-map scans in multiple places.",
+        "Importer adds another authorization gate by manually validating upload headers and then invoking token checks, further scattering auth behavior."
+      ],
+      "suggestion": "Consolidate token/session verification into a single auth policy component (shared request-context validator + session repository methods) and replace ad-hoc map scans with dedicated indexed access paths.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "scattered_security_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_errors_in_system_paths",
+      "summary": "Critical system paths ignore command/probe errors, causing silent degradation and potential panics",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/wifi.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`goseg/system/system.go:32-39` ignores errors from `mem.VirtualMemory()` and `cpu.Percent()` and still dereferences returned values.",
+        "`goseg/system/system.go:207-210` ignores `crontab -l`, `WriteString`, and `Close` errors in `addCron`.",
+        "`goseg/system/wifi.go:118-121`, `139-147`, `167-169` ignore `getWifiDevice()` errors and index `dev[0]` directly.",
+        "`goseg/routines/version.go:50` discards `config.SyncVersionInfo()` success flag and proceeds with potentially stale/zero version data."
+      ],
+      "suggestion": "Define and enforce a no-silent-failure policy for system/ops code: return errors from probe helpers, check all command/file write results, and guard slice indexing after device discovery. For periodic loops, explicitly branch on sync failure and skip update logic when state is invalid.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_error_suppression"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_continue_orchestration",
+      "summary": "Handler orchestration reports progress as successful even when required steps fail",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/handler.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/handler/startram.go:93-135` logs errors for restart/delete/load operations but still emits `restart: done` and clears state.",
+        "`goseg/handler/startram.go:143-199` toggle path logs multiple errors and still emits completion (`toggle` with nil data).",
+        "`goseg/handler/handler.go:233-248` `C2CHandler` calls `system.C2CConnect(...)` without any returned status and returns nil error/empty response.",
+        "`goseg/system/wifi.go:136-163` `C2CConnect` is void and internally swallows failures by logging or fallback calls."
+      ],
+      "suggestion": "Make orchestration steps return structured errors and aggregate them into explicit failed/succeeded event states. Convert `C2CConnect` to return `error` (or async result) and have callers propagate that into websocket responses instead of unconditional success-shaped completion.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fire_and_forget_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "http_status_handling_drift",
+      "summary": "HTTP callers apply inconsistent status-code checks, yielding misleading parse errors",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "goseg/routines/rekor.go"
+      ],
+      "evidence": [
+        "`goseg/startram/startram.go:49-63` and `94-107` parse response bodies without validating HTTP status first.",
+        "`goseg/config/version.go:46-66` reads/unmarshals body after request without checking `resp.StatusCode`.",
+        "`goseg/routines/rekor.go:177-179` does enforce status checks before reading/parsing, showing a conflicting strategy in the same codebase."
+      ],
+      "suggestion": "Standardize HTTP error contracts with shared helpers (`doJSON`/`readJSON`) that always validate status code and return typed boundary errors including URL and status before parse attempts.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "http_boundary_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_wrapping_contract_is_inconsistent",
+      "summary": "Mixed `%w`, `%v`, and string-only reformatting breaks reliable causal chains",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/routines/version.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "`goseg/handler/upload.go:22-26` wraps with `%w`, preserving causes.",
+        "`goseg/startram/startram.go:139-151` and `155-166` use `%v` wrapping, and `:143` converts failures into masked string-only errors.",
+        "`goseg/routines/version.go:224-249` repeatedly wraps with `%v` in provenance verification paths."
+      ],
+      "suggestion": "Adopt a single wrapping rule for internal propagation (`fmt.Errorf(\"...: %w\", err)`), and only redact at final user-facing boundaries. Keep masked/log-safe presentation separate from the returned internal error chain.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_chain_loss"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "init_side_effect_bootstrap_coupling",
+      "summary": "Package init() functions execute cross-cutting runtime work, creating implicit startup dependencies and weak module boundaries.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/docker/docker.go",
+        "goseg/auth/auth.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "goseg/config/config.go:60 init() performs config file I/O, mutates globalConfig, and launches ConfChannel goroutine.",
+        "goseg/docker/docker.go:35 init() stops containers, kills port 80 containers, and performs Docker server probe.",
+        "goseg/auth/auth.go:61 init() reads persisted sessions and starts periodic cleanup goroutine.",
+        "goseg/handler/handler.go:36 init() launches HandleLeakAction goroutine."
+      ],
+      "suggestion": "Move side-effectful initialization into explicit bootstrap phases in main (e.g., config bootstrap, infrastructure bootstrap, runtime workers). Keep init() pure/minimal so dependency order is explicit and test harnesses can compose subsystems deterministically.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_lifecycle"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_hub_coupling",
+      "summary": "Cross-module behavior depends on mutable package-level state hubs instead of explicit interfaces, increasing blast radius.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/startram/startram.go",
+        "goseg/docker/docker.go",
+        "goseg/main.go",
+        "goseg/shipcreator/shipcreator.go"
+      ],
+      "evidence": [
+        "goseg/config/config.go:31 defines globalConfig and Conf() accessor used widely across modules.",
+        "goseg/startram/startram.go:34-36 defines global EventBus and Regions map.",
+        "goseg/docker/docker.go:27-33 defines global transition buses and stats maps consumed by handlers/routines/rectify.",
+        "goseg/main.go:245-336 wires many goroutines around these shared globals."
+      ],
+      "suggestion": "Introduce subsystem structs (ConfigService, RuntimeBus, StartramService) passed through constructors so modules depend on explicit contracts instead of package globals; reserve package-level globals for truly immutable constants.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_lifecycle"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_error_wrapping_strategy",
+      "summary": "Error wrapping is inconsistent (%v vs %w), which breaks reliable error chaining and handling across module boundaries.",
+      "related_files": [
+        "goseg/setup/setup.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/backups/backups.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "Non-wrapping patterns: goseg/setup/setup.go:37, goseg/handler/urbit.go:178, goseg/importer/importer.go:94 use fmt.Errorf(... %v, err).",
+        "Wrapping patterns exist elsewhere: goseg/backups/backups.go:24 and goseg/handler/upload.go:22 use %w.",
+        "This inconsistency prevents uniform errors.Is/errors.As behavior in higher layers."
+      ],
+      "suggestion": "Standardize on wrapping with %w when propagating underlying errors, and only use non-wrapped messages for terminal/user-facing boundaries. Add linting/tests for wrapping policy.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "silent_operational_error_suppression",
+      "summary": "Several control paths suppress runtime failures, causing ambiguous behavior and reduced observability.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/main.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "goseg/handler/urbit.go:148-154 WaitComplete converts docker status retrieval failures into (false, nil), hiding real faults during polling.",
+        "goseg/main.go:94-95 executes reboot command without checking cmd.Run() result.",
+        "goseg/main.go:162-163 ignores ListenAndServe errors for both HTTP servers.",
+        "goseg/importer/importer.go:103-107 logs regex errors and continues loop, potentially masking malformed mount-state handling."
+      ],
+      "suggestion": "Define a consistent operational error policy: classify retryable vs terminal failures, propagate terminal errors to callers/transition buses, and emit structured logs with context for retries.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "click_command_template_duplication",
+      "summary": "Click command functions duplicate the same execution template, indicating a missing reusable command abstraction.",
+      "related_files": [
+        "goseg/click/acme.go",
+        "goseg/click/storage.go",
+        "goseg/click/hark.go",
+        "goseg/click/desk.go",
+        "goseg/click/restore.go"
+      ],
+      "evidence": [
+        "Repeated sequence appears across files: createHoon -> defer deleteHoon -> clickExec -> filterResponse with nearly identical error handling.",
+        "Examples: goseg/click/acme.go:25-38, goseg/click/storage.go:42-58 and 75-91, goseg/click/hark.go:42-57 / 81-97 / 120-136."
+      ],
+      "suggestion": "Create a shared helper (e.g., executeClickCommand) that accepts command metadata (file name, hoon payload, success token, optional success predicate) to collapse boilerplate and centralize response/error policy.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_click_executor_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "god_handler_and_orchestration_mix",
+      "summary": "Core handler/orchestration files mix unrelated responsibilities, reducing clarity and increasing regression risk.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/main.go",
+        "goseg/handler/handler.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "goseg/handler/urbit.go is 1233 lines and combines websocket action dispatch, domain validation, docker lifecycle operations, scheduling, backups, and transition signaling.",
+        "goseg/main.go combines connectivity mode switching, update coordination, service loading, goroutine orchestration, and HTTP server startup in one flow (notably lines 245-336).",
+        "goseg/handler/handler.go NewShipHandler also embeds validation, filesystem provisioning, and cross-handler invocation."
+      ],
+      "suggestion": "Split by bounded responsibilities: separate command parsing, domain services (ship lifecycle, scheduling, backup), and infrastructure adapters; keep handlers thin and make orchestration explicit through service interfaces.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "monolithic_orchestration_units"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_orchestration_paths_undertested",
+      "summary": "Large, high-risk orchestration modules in this batch have little to no direct test coverage.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/startram/startram.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "Core files are large and side-effect heavy (urbit.go 1233 LOC, importer.go 755 LOC, startram.go 923 LOC, broadcast.go 657 LOC).",
+        "Test files in reviewed modules are limited to a small subset (e.g., handler_test, docker_test, config_test, accesspoint_test, startram_test, routines/backup_test), with no dedicated tests for the listed high-complexity handler/importer/broadcast workflows."
+      ],
+      "suggestion": "Add integration-focused tests around websocket command flows, import/upload lifecycle transitions, startram retrieval/registration state application, and broadcast payload correctness; prioritize table-driven failure-mode tests for each critical path.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "insufficient_critical_path_test_harness"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 6,
+    "dimension_coverage": 0.367,
+    "evidence_density": 1.413,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 74.26,
+    "dimensions_with_findings": 5
+  },
+  "review_scope": {
+    "reviewed_files_count": 85,
+    "successful_batch_count": 6,
+    "full_sweep_included": true,
+    "total_files": 108,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/config/version.go",
+    "goseg/handler/upload.go",
+    "goseg/startram/startram.go",
+    "goseg/click/hark.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/rectify/rectify.go",
+    "goseg/defaults/defaults.go",
+    "goseg/main.go",
+    "goseg/system/wifi.go",
+    "goseg/config/wireguard.go",
+    "goseg/docker/wireguard.go",
+    "goseg/leak/broadcast.go",
+    "goseg/routines/docker.go",
+    "goseg/structs/configs.go",
+    "goseg/defaults/version.go",
+    "goseg/routines/rekor.go",
+    "goseg/broadcast/loop.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/docker/urbit.go",
+    "goseg/docker/llama.go",
+    "goseg/docker/netdata.go",
+    "goseg/config/config.go",
+    "goseg/structs/ws.go",
+    "goseg/docker/docker.go",
+    "goseg/handler/urbit.go",
+    "goseg/routines/version.go",
+    "goseg/importer/importer.go",
+    "goseg/docker/minio.go",
+    "goseg/handler/startram.go",
+    "goseg/handler/support.go",
+    "goseg/handler/system.go",
+    "goseg/auth/auth.go",
+    "goseg/importer/extract.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipcreator/shipcreator.go",
+    "README.md",
+    "goseg/handler/handler.go",
+    "goseg/logger/logger.go",
+    "goseg/system/system.go",
+    "goseg/accesspoint/config.go",
+    "goseg/accesspoint/parameters.go",
+    "goseg/accesspoint/router.go",
+    "goseg/backups/backups.go",
+    "goseg/click/acme.go",
+    "goseg/click/backup.go",
+    "goseg/click/click.go",
+    "goseg/click/code.go",
+    "goseg/click/desk.go",
+    "goseg/click/exit.go",
+    "goseg/click/filter.go",
+    "goseg/click/hoon.go",
+    "goseg/click/pack.go",
+    "goseg/click/restore.go",
+    "goseg/click/storage.go",
+    "goseg/config/mc.go",
+    "goseg/config/minio.go",
+    "goseg/config/netdata.go",
+    "goseg/config/urbit.go",
+    "goseg/defaults/scripts.go",
+    "goseg/docker/stats.go",
+    "goseg/docker/status.go",
+    "goseg/exporter/exporter.go",
+    "goseg/handler/dev.go",
+    "goseg/handler/leak.go",
+    "goseg/handler/newship.go",
+    "goseg/handler/penpai.go",
+    "goseg/handler/urbit_backup_service.go",
+    "goseg/handler/workflow.go",
+    "goseg/leak/handler.go",
+    "goseg/leak/ipc.go",
+    "goseg/leak/leak.go",
+    "goseg/leak/ports.go",
+    "goseg/leak/structs.go",
+    "goseg/leakchannel/leakchannel.go",
+    "goseg/rectify/importer.go",
+    "goseg/routines/backup.go",
+    "goseg/routines/chop.go",
+    "goseg/routines/disk.go",
+    "goseg/routines/logs.go",
+    "goseg/routines/pack.go",
+    "goseg/routines/renewal.go",
+    "goseg/routines/system.go",
+    "goseg/setup/setup.go",
+    "goseg/startram/boundaries.go",
+    "goseg/startram/client.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_102258",
+    "created_at": "2026-03-01T10:26:30+00:00",
+    "batch_count": 6,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "a43b5bd756f8fa7b5643de9be756b9684fafc90de71d1c07cdad7d15ee28fb8b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture",
+      "error_consistency",
+      "abstraction_fitness",
+      "test_strategy",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

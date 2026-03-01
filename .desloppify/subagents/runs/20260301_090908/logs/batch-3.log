@@ -1,0 +1,694 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_090908/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 71.8
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Adjacent public APIs expose incompatible failure contracts: config.CheckVersion()/SyncVersionInfo() return (structs.Channel, bool) and suppress underlying errors, while config.LocalVersion() panics on file or JSON failures.",
+        "Startram public transport methods use inconsistent HTTP contracts: FetchRegions() and Retrieve() do not validate HTTP status before JSON decode, but GetBackup() and UploadBackup() explicitly gate on status codes.",
+        "Startram includes overlapping read APIs (FetchRegions, GetRegions, SyncRegions; Retrieve, SyncRetrieve) where similarly named functions differ in side effects (cache mutation, config mutation, event emission), making behavior hard to predict from names alone.",
+        "README documents frontend quality gates only, while backend exported APIs in handler/config/startram have no stated error contract or naming/side-effect contract guidance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "mixed_failure_contracts_config_vs_startram",
+      "summary": "Public API failures are represented inconsistently (bool sentinel, panic, and error returns), making caller handling non-uniform.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "config.CheckVersion() and config.SyncVersionInfo() return (structs.Channel, bool) and drop concrete error context on fetch/parse failures.",
+        "config.LocalVersion() panics on read/unmarshal failure instead of returning an error value.",
+        "Most startram exported methods (for example Register, SvcCreate, Retrieve) return error and expect explicit caller handling."
+      ],
+      "suggestion": "Standardize exported runtime API error contracts across modules: return typed/errors-wrapped `error` from version APIs, remove panic from LocalVersion (or isolate panic-only boot path behind internal function), and keep sentinel booleans only as additive status fields where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "startram_http_contract_drift",
+      "summary": "Similar Startram HTTP-facing APIs enforce response validity differently, creating unpredictable success/failure behavior.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "startram.FetchRegions() and startram.Retrieve() read and unmarshal bodies without checking HTTP status code, so non-2xx JSON-like payloads can be treated as valid decode attempts.",
+        "startram.GetBackup() and startram.UploadBackup() explicitly check response status and return contract-aware errors.",
+        "config.fetchVersionFromServer() also omits HTTP status checks and directly unmarshals response bodies, mirroring the same inconsistency in another module."
+      ],
+      "suggestion": "Introduce a shared HTTP response helper for exported API functions that enforces status-code validation, body parsing, and consistent wrapped errors before unmarshalling across config and startram.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "ambiguous_sync_fetch_naming_sideeffects",
+      "summary": "Region and retrieve APIs have overlapping names but materially different side effects, weakening API discoverability.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "FetchRegions() is read-only, SyncRegions() mutates package-global Regions, and GetRegions() is a compatibility alias for FetchRegions() despite getter naming usually implying cached read.",
+        "Retrieve() is read-only, while SyncRetrieve() mutates config.StartramConfig, may mutate persisted config via UpdateConf, and emits EventBus events.",
+        "README does not document backend naming/side-effect conventions, so callers have to inspect implementation to know mutation behavior."
+      ],
+      "suggestion": "Refactor to explicit verb contracts (`Load*` for pure fetch, `Refresh*` for state mutation) and document side effects in exported API docs and README backend section; deprecate ambiguous aliases like GetRegions().",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "semantic_naming_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "overloaded_signature_and_dead_param_backup_api",
+      "summary": "Backup APIs expose overloaded booleans and dead parameters, signaling unstable boundary design.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl) includes backupPassword but never uses it in request construction or auth flow.",
+        "RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) multiplexes multiple behaviors via booleans (`remote`, `dev`) and mode string (`bakType`) in one public entrypoint.",
+        "README has no backend API contract section clarifying these modes, increasing misuse risk."
+      ],
+      "suggestion": "Replace multi-flag signatures with request structs or separate explicit operations (for example RestoreRemoteBackup/RestoreLocalBackup) and remove unused params from exported signatures to keep contracts honest.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_shape_overload"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "upload_action_contract_is_stringly_and_underdocumented",
+      "summary": "Upload handler command surface is stringly typed and inconsistent with actionable error reporting.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "UploadHandler switches on raw action strings (`open-endpoint`, `reset`) with no typed constants or shared enum-like contract.",
+        "On SetUploadSession failure, error message reports endpoint value rather than wrapped underlying error, reducing contract clarity for callers.",
+        "README does not define upload action names/shape, leaving external clients dependent on code internals."
+      ],
+      "suggestion": "Define canonical upload action constants/schema in shared structs, validate payloads against that contract, and return wrapped underlying errors; add a backend API action table to README or dedicated docs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_shape_overload"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified contract standard for exported backend APIs (error model, naming semantics, side-effect signaling).",
+      "Transport and domain concerns are repeatedly implemented ad hoc, causing drift in status handling and parameter design.",
+      "Documentation governance is frontend-focused, leaving backend API conventions implicit."
+    ],
+    "likely_symptoms": [
+      "mixed_failure_contracts_config_vs_startram",
+      "startram_http_contract_drift",
+      "ambiguous_sync_fetch_naming_sideeffects",
+      "overloaded_signature_and_dead_param_backup_api",
+      "upload_action_contract_is_stringly_and_underdocumented"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019ca8a8-9fb8-7270-9bcd-076c813ab687
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Cross-cutting Sweep
+Batch dimensions: api_surface_coherence
+Batch rationale: selected dimensions had no direct batch mapping; review representative cross-cutting files
+
+Files assigned:
+- goseg/config/version.go
+- goseg/handler/upload.go
+- goseg/startram/startram.go
+- README.md
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+
+thinking
+**Planning JSON generation from files**
+codex
+Reviewing the blind packet and the four assigned files now, then I’ll produce a strict JSON assessment for `api_surface_coherence` only.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/config/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/upload.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/startram/startram.go" in /Users/chuah/NP/GroundSeg succeeded in 81ms:
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	VersionServerReady = false
+	VersionInfo        structs.Channel
+)
+ succeeded in 82ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 82ms:
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "api_surface_coherence",
+    "cross_module_architecture",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "api_surface_coherence": {
+      "description": "Inconsistent API shapes, mixed sync/async, overloaded interfaces",
+      "look_for": [
+        "Inconsistent API shapes: similar functions with different parameter ordering or naming",
+        "Mixed sync/async in the same module's public API",
+        "Overloaded interfaces: one function doing too many things based on argument types",
+        "Missing error contracts: no documentation or types indicating what can fail",
+        "Public functions with >5 parameters (API boundary may be wrong)"
+      ],
+      "skip": [
+ succeeded in 86ms:
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/importer"
+	"groundseg/structs"
+
+	"go.uber.org/zap"
+)
+
+func UploadHandler(msg []byte) error {
+	zap.L().Info("Upload")
+	var uploadPayload structs.WsUploadPayload
+	err := json.Unmarshal(msg, &uploadPayload)
+	if err != nil {
+		return fmt.Errorf("Couldn't unmarshal upload payload: %v", err)
+	}
+	switch uploadPayload.Payload.Action {
+	case "open-endpoint":
+ succeeded in 90ms:
+package startram
+
+import (
+	"archive/tar"
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"math"
+	"mime/multipart"
+	"net/http"
+
+thinking
+**Planning targeted code inspection**
+codex
+I’ve pulled the primary file contents; next I’m checking more of `startram.go` for API-shape inconsistencies and side-effect mismatches before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '1,420p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package startram
+     2	
+     3	import (
+     4		"archive/tar"
+     5		"bytes"
+     6		"crypto/aes"
+     7		"crypto/cipher"
+     8		"crypto/md5"
+     9		"crypto/rand"
+    10		"crypto/sha256"
+    11		"encoding/json"
+    12		"fmt"
+    13		"groundseg/click"
+    14		"groundseg/config"
+    15		"groundseg/structs"
+    16		"groundseg/system"
+    17		"io"
+    18		"math"
+    19		"mime/multipart"
+    20		"net/http"
+
+thinking
+**Listing exported functions**
+exec
+/opt/homebrew/bin/zsh -lc "rg -n '"'^func [A-Z]'"' goseg/startram/startram.go goseg/config/version.go goseg/handler/upload.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/startram/startram.go:39:func FetchRegions() (map[string]structs.StartramRegion, error) {
+goseg/startram/startram.go:68:func SyncRegions() (map[string]structs.StartramRegion, error) {
+goseg/startram/startram.go:78:func GetRegions() (map[string]structs.StartramRegion, error) {
+goseg/startram/startram.go:83:func Retrieve() (structs.StartramRetrieve, error) {
+goseg/startram/startram.go:116:func SyncRetrieve() (structs.StartramRetrieve, error) {
+goseg/startram/startram.go:143:func Register(regCode string, region string) error {
+goseg/startram/startram.go:192:func SvcCreate(subdomain string, svcType string) error {
+goseg/startram/startram.go:230:func SvcDelete(subdomain string, svcType string) error {
+goseg/startram/startram.go:267:func AliasCreate(subdomain string, alias string) error {
+goseg/startram/startram.go:304:func AliasDelete(subdomain string, alias string) error {
+goseg/startram/startram.go:380:func RegisterExistingShips() error {
+goseg/startram/startram.go:402:func RegisterNewShip(ship string) error {
+goseg/startram/startram.go:417:func CancelSub(key string) error {
+goseg/startram/startram.go:475:func GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl string) (string, error) {
+goseg/startram/startram.go:506:func UploadBackup(ship, privateKey, filePath string) error {
+goseg/startram/startram.go:624:func RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) error {
+goseg/config/version.go:95:func CheckVersion() (structs.Channel, bool) {
+goseg/config/version.go:113:func SyncVersionInfo() (structs.Channel, bool) {
+goseg/config/version.go:143:func CreateDefaultVersion() error {
+goseg/config/version.go:162:func LocalVersion() structs.Version {
+
+thinking
+**Inspecting API method with many parameters**
+codex
+I found additional exported APIs in `startram.go`; I’m inspecting the backup-related functions now because they likely contain the strongest API-surface defects.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startram/startram.go | sed -n '420,760p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+   420		var respObj structs.CancelStartramSub
+   421		url := "https://" + conf.EndpointUrl + "/v1/stripe/cancel"
+   422		cancelObj := map[string]interface{}{
+   423			"reg_key": key,
+   424		}
+   425		cancelJSON, err := json.Marshal(cancelObj)
+   426		if err != nil {
+   427			return fmt.Errorf("Couldn't marshal registration: %v", err)
+   428		}
+   429		resp, err := http.Post(url, "application/json", bytes.NewBuffer(cancelJSON))
+   430		if err != nil {
+   431			return fmt.Errorf("%s", maskPubkey(fmt.Sprintf("Unable to connect to API server: %v", err)))
+   432		}
+   433		body, err := io.ReadAll(resp.Body)
+   434		resp.Body.Close()
+   435		if err != nil {
+   436			return fmt.Errorf("Error reading response: %v", err)
+   437		}
+   438		if err = json.Unmarshal(body, &respObj); err != nil {
+   439			return fmt.Errorf("Error unmarshalling response: %v", err)
+
+thinking
+**Checking for existing flagged issues key**
+exec
+/opt/homebrew/bin/zsh -lc "jq 'keys' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+[
+  "command",
+  "config",
+  "dimension_prompts",
+  "dimensions",
+  "holistic_context",
+  "invalid_dimensions",
+  "investigation_batches",
+  "lang_guidance",
+  "language",
+  "mode",
+  "review_context",
+  "system_prompt",
+  "total_files",
+  "workflow"
+]
+
+thinking
+**Checking context flag usage**
+codex
+I’m checking `review_context` in the packet to verify whether any prior flagged issues must be revalidated in this batch.
+exec
+/opt/homebrew/bin/zsh -lc "jq '.review_context' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+{
+  "naming_vocabulary": {
+    "prefixes": {
+      "to": 3,
+      "is": 2
+    },
+    "total_names": 142
+  },
+  "error_conventions": {
+    "result_type": 7
+  },
+  "module_patterns": {
+    "accesspoint/": {
+      "fmt": 4,
+      "strings": 4,
+      "go.uber.org/zap": 3
+    },
+    "auth/": {
+      "crypto/sha512": 1,
+      "encoding/hex": 1,
+
+thinking
+**Planning API surface findings**
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 71.8
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Adjacent public APIs expose incompatible failure contracts: config.CheckVersion()/SyncVersionInfo() return (structs.Channel, bool) and suppress underlying errors, while config.LocalVersion() panics on file or JSON failures.",
+        "Startram public transport methods use inconsistent HTTP contracts: FetchRegions() and Retrieve() do not validate HTTP status before JSON decode, but GetBackup() and UploadBackup() explicitly gate on status codes.",
+        "Startram includes overlapping read APIs (FetchRegions, GetRegions, SyncRegions; Retrieve, SyncRetrieve) where similarly named functions differ in side effects (cache mutation, config mutation, event emission), making behavior hard to predict from names alone.",
+        "README documents frontend quality gates only, while backend exported APIs in handler/config/startram have no stated error contract or naming/side-effect contract guidance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "mixed_failure_contracts_config_vs_startram",
+      "summary": "Public API failures are represented inconsistently (bool sentinel, panic, and error returns), making caller handling non-uniform.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "config.CheckVersion() and config.SyncVersionInfo() return (structs.Channel, bool) and drop concrete error context on fetch/parse failures.",
+        "config.LocalVersion() panics on read/unmarshal failure instead of returning an error value.",
+        "Most startram exported methods (for example Register, SvcCreate, Retrieve) return error and expect explicit caller handling."
+      ],
+      "suggestion": "Standardize exported runtime API error contracts across modules: return typed/errors-wrapped `error` from version APIs, remove panic from LocalVersion (or isolate panic-only boot path behind internal function), and keep sentinel booleans only as additive status fields where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "startram_http_contract_drift",
+      "summary": "Similar Startram HTTP-facing APIs enforce response validity differently, creating unpredictable success/failure behavior.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "startram.FetchRegions() and startram.Retrieve() read and unmarshal bodies without checking HTTP status code, so non-2xx JSON-like payloads can be treated as valid decode attempts.",
+        "startram.GetBackup() and startram.UploadBackup() explicitly check response status and return contract-aware errors.",
+        "config.fetchVersionFromServer() also omits HTTP status checks and directly unmarshals response bodies, mirroring the same inconsistency in another module."
+      ],
+      "suggestion": "Introduce a shared HTTP response helper for exported API functions that enforces status-code validation, body parsing, and consistent wrapped errors before unmarshalling across config and startram.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "ambiguous_sync_fetch_naming_sideeffects",
+      "summary": "Region and retrieve APIs have overlapping names but materially different side effects, weakening API discoverability.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "FetchRegions() is read-only, SyncRegions() mutates package-global Regions, and GetRegions() is a compatibility alias for FetchRegions() despite getter naming usually implying cached read.",
+        "Retrieve() is read-only, while SyncRetrieve() mutates config.StartramConfig, may mutate persisted config via UpdateConf, and emits EventBus events.",
+        "README does not document backend naming/side-effect conventions, so callers have to inspect implementation to know mutation behavior."
+      ],
+      "suggestion": "Refactor to explicit verb contracts (`Load*` for pure fetch, `Refresh*` for state mutation) and document side effects in exported API docs and README backend section; deprecate ambiguous aliases like GetRegions().",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "semantic_naming_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "overloaded_signature_and_dead_param_backup_api",
+      "summary": "Backup APIs expose overloaded booleans and dead parameters, signaling unstable boundary design.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl) includes backupPassword but never uses it in request construction or auth flow.",
+        "RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) multiplexes multiple behaviors via booleans (`remote`, `dev`) and mode string (`bakType`) in one public entrypoint.",
+        "README has no backend API contract section clarifying these modes, increasing misuse risk."
+      ],
+      "suggestion": "Replace multi-flag signatures with request structs or separate explicit operations (for example RestoreRemoteBackup/RestoreLocalBackup) and remove unused params from exported signatures to keep contracts honest.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_shape_overload"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "upload_action_contract_is_stringly_and_underdocumented",
+      "summary": "Upload handler command surface is stringly typed and inconsistent with actionable error reporting.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "UploadHandler switches on raw action strings (`open-endpoint`, `reset`) with no typed constants or shared enum-like contract.",
+        "On SetUploadSession failure, error message reports endpoint value rather than wrapped underlying error, reducing contract clarity for callers.",
+        "README does not define upload action names/shape, leaving external clients dependent on code internals."
+      ],
+      "suggestion": "Define canonical upload action constants/schema in shared structs, validate payloads against that contract, and return wrapped underlying errors; add a backend API action table to README or dedicated docs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_shape_overload"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified contract standard for exported backend APIs (error model, naming semantics, side-effect signaling).",
+      "Transport and domain concerns are repeatedly implemented ad hoc, causing drift in status handling and parameter design.",
+      "Documentation governance is frontend-focused, leaving backend API conventions implicit."
+    ],
+    "likely_symptoms": [
+      "mixed_failure_contracts_config_vs_startram",
+      "startram_http_contract_drift",
+      "ambiguous_sync_fetch_naming_sideeffects",
+      "overloaded_signature_and_dead_param_backup_api",
+      "upload_action_contract_is_stringly_and_underdocumented"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+48,249
+

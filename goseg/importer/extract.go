@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"groundseg/docker"
 	"groundseg/structs"
 	"io"
@@ -103,18 +104,18 @@ func extractZip(src, dest string) error {
 				percentExtracted = 99
 			}
 
-			docker.ImportShipTransBus <- structs.UploadTransition{
+			docker.PublishImportShipTransition(structs.UploadTransition{
 				Type:  "extracted",
 				Value: percentExtracted,
-			}
+			})
 		}
 	}
 
 	// Send explicit 100% when complete
-	docker.ImportShipTransBus <- structs.UploadTransition{
+	docker.PublishImportShipTransition(structs.UploadTransition{
 		Type:  "extracted",
 		Value: 100,
-	}
+	})
 	return nil
 }
 
@@ -158,10 +159,10 @@ func extractTarGz(src, dest string) error {
 			header, err := tr.Next()
 			if err == io.EOF {
 				// Send explicit 100% when complete
-				docker.ImportShipTransBus <- structs.UploadTransition{
+				docker.PublishImportShipTransition(structs.UploadTransition{
 					Type:  "extracted",
 					Value: 100,
-				}
+				})
 				return nil
 			}
 			if err != nil {
@@ -207,10 +208,10 @@ func extractTarGz(src, dest string) error {
 						percentExtracted = 99
 					}
 
-					docker.ImportShipTransBus <- structs.UploadTransition{
+					docker.PublishImportShipTransition(structs.UploadTransition{
 						Type:  "extracted",
 						Value: percentExtracted,
-					}
+					})
 					lastUpdate = time.Now()
 				}
 			}
@@ -247,7 +248,10 @@ func extractTar(src, dest string) error {
 	var fileCount int = 0
 
 	// First count files
-	tmpFile, _ := os.Open(src)
+	tmpFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open tar source for entry count: %w", err)
+	}
 	defer tmpFile.Close()
 	tmpTr := tar.NewReader(tmpFile)
 	for {
@@ -271,10 +275,10 @@ func extractTar(src, dest string) error {
 			header, err := tr.Next()
 			if err == io.EOF {
 				// Send explicit 100% when complete
-				docker.ImportShipTransBus <- structs.UploadTransition{
+				docker.PublishImportShipTransition(structs.UploadTransition{
 					Type:  "extracted",
 					Value: 100,
-				}
+				})
 				return nil
 			}
 			if err != nil {
@@ -325,10 +329,10 @@ func extractTar(src, dest string) error {
 						percentExtracted = 99
 					}
 
-					docker.ImportShipTransBus <- structs.UploadTransition{
+					docker.PublishImportShipTransition(structs.UploadTransition{
 						Type:  "extracted",
 						Value: percentExtracted,
-					}
+					})
 					lastUpdate = time.Now()
 				}
 			}

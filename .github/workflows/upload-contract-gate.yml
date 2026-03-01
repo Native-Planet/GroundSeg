@@ -1,0 +1,40 @@
+name: Runtime Contract Gate
+
+on:
+  pull_request:
+    paths:
+      - "goseg/handler/ws/upload.go"
+      - "goseg/handler/ws/upload_test.go"
+      - "goseg/uploadsvc/service.go"
+      - "goseg/uploadsvc/service_test.go"
+      - "goseg/startram/errors.go"
+      - "goseg/startram/errors_test.go"
+      - ".github/scripts/check-upload-contract.sh"
+      - ".github/workflows/upload-contract-gate.yml"
+      - "README.md"
+  push:
+    paths:
+      - "goseg/handler/ws/upload.go"
+      - "goseg/handler/ws/upload_test.go"
+      - "goseg/uploadsvc/service.go"
+      - "goseg/uploadsvc/service_test.go"
+      - "goseg/startram/errors.go"
+      - "goseg/startram/errors_test.go"
+      - ".github/scripts/check-upload-contract.sh"
+      - ".github/workflows/upload-contract-gate.yml"
+      - "README.md"
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: goseg/go.mod
+
+      - name: Enforce runtime boundary contracts
+        run: ./.github/scripts/check-upload-contract.sh

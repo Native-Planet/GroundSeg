@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 76.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/handler/upload.go uses a package-global mutable dependency (`var defaultUploadService UploadService`) that can be replaced via `SetUploadService`, creating hidden runtime coupling through shared state rather than explicit wiring.",
+        "goseg/handler/upload.go binds the handler boundary directly to importer-domain command construction (`importer.OpenUploadEndpointCmd`), so API-handler changes and importer contract changes are tightly coupled.",
+        "goseg/startram/errors.go introduces a package-local boundary/error wrapper (`maskedWrappedError`, `wrapAPIConnectionError`) instead of using a shared cross-package boundary contract, reinforcing fragmented edge-policy patterns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_boundary_policy",
+      "summary": "Cross-module boundary policies are implemented ad hoc per package, creating inconsistent coupling patterns and hidden integration costs.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "upload.go uses a mutable package-level service locator (`defaultUploadService` + `SetUploadService`) to coordinate dependencies.",
+        "errors.go defines a custom package-local wrapping/redaction boundary (`maskedWrappedError`) for external API failures.",
+        "Both files implement edge-boundary behavior locally with different mechanisms, indicating no shared architectural contract for dependency injection and boundary error semantics."
+      ],
+      "suggestion": "Define a shared boundary pattern for edge modules: constructor-injected dependencies (no package-global mutation) plus a common boundary error contract/utilities package for redaction and wrapping. Migrate handler/startram edges to that contract and remove ad hoc local patterns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_shared_boundary_contract"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_handler_global_mutable_dependency",
+      "summary": "Upload handler relies on mutable global service state, creating order-dependent behavior across modules.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "upload.go declares `var defaultUploadService UploadService = importerUploadService{}` and allows runtime replacement via `SetUploadService`.",
+        "Handler execution (`UploadHandler`) reads this global directly, so behavior depends on who last mutated shared package state.",
+        "Compared with startram/errors.go's pure function-style wrapper (`wrapAPIConnectionError(err)`), this mutable approach introduces broader cross-module side-effect risk."
+      ],
+      "suggestion": "Replace `SetUploadService`/global state with explicit dependency injection (e.g., a handler struct receiving `UploadService`), and pass that dependency from composition root to eliminate shared mutable coordination.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_boundary_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified architectural contract for module boundaries (dependency wiring + boundary error semantics).",
+      "Reliance on package-local patterns encourages drift and uneven coupling decisions."
+    ],
+    "likely_symptoms": [
+      "upload_handler_global_mutable_dependency"
+    ],
+    "possible_false_positives": []
+  }
+}

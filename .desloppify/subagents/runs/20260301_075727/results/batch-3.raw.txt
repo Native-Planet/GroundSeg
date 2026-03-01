@@ -1,0 +1,77 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 3,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure.directory_profiles shows `goseg/web/_app/immutable/chunks/` with 49 generated files and `goseg/web/_app/immutable/entry/` with 31 generated files; assigned files use hashed build-artifact names like `0.f72efb1a.js`, `10.35bd59a0.js`, `(home)-page.svelte.3cdaa764.js`.",
+        "Assigned chunk/entry files are one-line compiled outputs that import other hashed compiled modules (for example `chunks/0.f72efb1a.js` -> `entry/_layout.svelte.8a290471.js`), indicating build products are organized as first-class source tree content rather than isolated artifact output.",
+        "holistic_context.structure shows `ui/src/lib/stores/` has 17 files (>10 threshold), while assigned files in that folder mix unrelated concerns: global app flags and date helper in `data.js`, isolated dev-only class store in `devclass.js`, and colocated unit test `data.test.js`."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "generated_bundle_committed_as_runtime_package",
+      "summary": "Generated Svelte build artifacts are organized as stable package structure, obscuring ownership boundaries.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/0.f72efb1a.js",
+        "goseg/web/_app/immutable/chunks/1.0d44cf41.js",
+        "goseg/web/_app/immutable/chunks/10.35bd59a0.js",
+        "goseg/web/_app/immutable/entry/(home)-layout.svelte.443ba7fd.js",
+        "goseg/web/_app/immutable/entry/(home)-page.svelte.3cdaa764.js",
+        "goseg/web/_app/immutable/entry/_layout.js.984db11e.js"
+      ],
+      "evidence": [
+        "All assigned files are hashed/minified outputs (single-line compiled JS) under `goseg/web/_app/immutable/*`, not human-owned modules.",
+        "File naming and imports encode build fingerprinting (`*.443ba7fd.js`, `*.35bd59a0.js`) and cross-reference other fingerprinted files, which creates unstable path ownership and poor navigability for architectural reasoning.",
+        "holistic_context.structure marks both `chunks/` and `entry/` directories as fully `generated`, confirming directory boundaries represent build internals rather than domain boundaries."
+      ],
+      "suggestion": "Staged reorg plan: (1) create a dedicated artifact root such as `goseg/web/dist/_app/immutable/` (or keep out of repo entirely) and reserve `goseg/web/src/` for authored code; (2) move current `goseg/web/_app/immutable/chunks/*` then `goseg/web/_app/immutable/entry/*` into the artifact root; (3) update static serving/build config to point to the new artifact root and add ignore rules for hashed outputs if they should not be versioned; (4) run import/build validation commands: `cd goseg/web && npm run build`, `npm run test` (or project equivalent), and `rg \"_app/immutable\" goseg/web` to verify no stale paths remain.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "artifact_and_source_boundary_blur"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "stores_directory_mixes_domain_state_with_misc_utilities",
+      "summary": "The stores package is overloaded with mixed concerns, reducing clear placement boundaries.",
+      "related_files": [
+        "ui/src/lib/stores/data.js",
+        "ui/src/lib/stores/devclass.js",
+        "ui/src/lib/stores/data.test.js"
+      ],
+      "evidence": [
+        "`data.js` combines multiple global state stores with a generic date utility (`daysUntilDate`) that is not store-specific.",
+        "`devclass.js` is a tiny dev-only writable export in the same broad stores folder, indicating weak sub-package boundaries for environment-specific vs shared runtime state.",
+        "holistic_context.structure.directory_profiles reports `ui/src/lib/stores/` has 17 files (>10 mixed-concern threshold), suggesting flat-folder overload where placement no longer signals ownership cleanly."
+      ],
+      "suggestion": "Staged reorg plan: (1) create focused folders `ui/src/lib/stores/runtime/`, `ui/src/lib/stores/dev/`, and `ui/src/lib/utils/date/`; (2) move `devclass.js` to `stores/dev/devclass.js` and split `daysUntilDate` from `data.js` into `utils/date/daysUntilDate.js`; (3) keep `data.js` for state exports only (or rename to a domain-specific store module) and move `data.test.js` beside the extracted helper/store it validates; (4) run import-update and validation commands: `cd ui && rg \"from './data|stores/devclass|daysUntilDate' src`, update paths, then run `npm run test` and `npm run build` to confirm boundary-safe moves.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "artifact_and_source_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Generated artifacts and authored modules are not cleanly separated by directory ownership.",
+      "Flat folder growth in `ui/src/lib/stores/` allowed unrelated state and utility concerns to accumulate without sub-boundaries."
+    ],
+    "likely_symptoms": [
+      "generated_bundle_committed_as_runtime_package",
+      "stores_directory_mixes_domain_state_with_misc_utilities"
+    ],
+    "possible_false_positives": [
+      "If deployment intentionally requires committed immutable bundles under `goseg/web/_app`, severity should be reduced but folder boundary guidance still applies."
+    ]
+  }
+}

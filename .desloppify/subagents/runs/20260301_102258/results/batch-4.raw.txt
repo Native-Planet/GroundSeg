@@ -1,0 +1,114 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 61.8
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Large orchestrator functions combine unrelated responsibilities: `broadcast.ConstructPierInfo` builds backup inventories, reads config, queries docker status, inspects desks, computes scheduling defaults, and assembles response models in one routine.",
+        "`importer.configureUploadedPier` mixes upload state transitions, filesystem extraction/restructure, config mutation, docker lifecycle, and remote service registration inside one flow.",
+        "`docker.StartContainer` and `docker.CreateContainer` duplicate container-type switch/config selection logic and image selection scaffolding, increasing divergence risk for future container additions.",
+        "`auth.CheckToken` and `auth.LogTokenCheck` replicate near-identical token decryption/request-metadata validation logic with slightly different outputs, signaling duplicated policy paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration_god_functions",
+      "summary": "Core request flows are implemented as large multi-concern orchestrators instead of composable domain steps.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/importer/importer.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` performs filesystem backup discovery, docker status/network inspection, desk probing, config reads, and UI projection assembly in one pass.",
+        "`configureUploadedPier` handles extraction control, persistence updates, volume/container lifecycle, transition events, and asynchronous follow-up boot logic in one function.",
+        "`NewShipHandler` bundles key normalization/validation, drive formatting decisions, patp validation, action dispatch, and transition/error channel behavior."
+      ],
+      "suggestion": "Split each flow into explicit phases with narrow contracts (input validation, infrastructure I/O, domain mutation, projection/broadcast). Introduce small coordinator functions that compose these phases and keep side effects isolated per phase.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_lifecycle_duplication",
+      "summary": "Transition/status lifecycle logic is duplicated across handlers, causing repeated state-machine code and inconsistent semantics.",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "Urbit action handlers repeatedly implement the same pattern: emit loading, define local error helper, poll for completion, emit success/error, delay, then clear transition.",
+        "Importer flow repeats similar status progression (`uploading`, `creating`, `extracting`, `booting`, `completed`/`aborted`) via direct channel writes sprinkled through control logic.",
+        "Broadcast layer stores and relays transition snapshots, but lifecycle rules live in many callers rather than one reusable transition policy."
+      ],
+      "suggestion": "Introduce a shared transition runner/state-machine utility with typed phases and standardized completion/error cleanup hooks; make urbit/importer handlers declare phase steps rather than manually emitting bus events.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "container_lifecycle_branch_duplication",
+      "summary": "Container creation/start paths duplicate container-type branching and image-prep logic, increasing change amplification.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`StartContainer` and `CreateContainer` both maintain near-identical switch blocks for `vere/netdata/minio/miniomc/wireguard/llama-api` and repeat image info resolution/pull steps.",
+        "Both routines reconstruct similar `ContainerState` payloads after inspect, with only lifecycle policy differences.",
+        "Callers in handler/importer rely on these paths for critical operations, so duplicated branching makes container-type evolution brittle across core workflows."
+      ],
+      "suggestion": "Extract a shared container plan builder (type -> config/host/image/state metadata) and separate lifecycle executors (`ensure_running`, `ensure_created`) to centralize type-specific logic once.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_workflow_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_policy_path_duplication",
+      "summary": "Authentication policy is implemented through duplicated validation routines and repeated map scans rather than a single coherent auth service.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`CheckToken` and `LogTokenCheck` both decrypt token, derive request IP/user-agent, verify token id/session, and authorize with mostly duplicated logic.",
+        "Session lookup patterns are repeated across `WsIsAuthenticated`, `WsAuthCheck`, `WsNilSession`, and `ClientManager.GetMuConn` with full-map scans in multiple places.",
+        "Importer adds another authorization gate by manually validating upload headers and then invoking token checks, further scattering auth behavior."
+      ],
+      "suggestion": "Consolidate token/session verification into a single auth policy component (shared request-context validator + session repository methods) and replace ad-hoc map scans with dedicated indexed access paths.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "scattered_security_policy"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Workflow/state-machine behavior is encoded imperatively in handlers instead of reusable orchestration primitives.",
+      "Domain boundaries between transport handling, infrastructure I/O, and projection/state publication are weak.",
+      "Cross-cutting concerns (auth policy, transition lifecycle, container planning) lack centralized service abstractions."
+    ],
+    "likely_symptoms": [
+      "transition_lifecycle_duplication",
+      "container_lifecycle_branch_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

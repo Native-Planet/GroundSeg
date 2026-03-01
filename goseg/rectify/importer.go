@@ -10,7 +10,7 @@ import (
 
 func ImportShipTransitionHandler() {
 	for {
-		event := <-docker.ImportShipTransBus
+		event := <-docker.ImportShipTransitions()
 		current := broadcast.GetState()
 		uploadStruct := current.Upload
 		switch event.Type {

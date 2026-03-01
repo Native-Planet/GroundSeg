@@ -1,31 +1,36 @@
 package docker
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"groundseg/config"
 	"groundseg/structs"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"go.uber.org/zap"
 )
 
+type minioRuntime = dockerRuntime
+
+func newMinIORuntime() minioRuntime {
+	return newDockerRuntime()
+}
+
 func LoadMC() error {
-	conf := config.Conf()
+	return loadMC(newMinIORuntime())
+}
+
+func loadMC(rt minioRuntime) error {
+	conf := rt.conf()
 	if conf.WgRegistered {
 		zap.L().Info("Loading MC container")
-		confPath := filepath.Join(config.BasePath, "settings", "mc.json")
-		_, err := os.Open(confPath)
+		confPath := filepath.Join(rt.basePath(), "settings", "mc.json")
+		_, err := rt.osOpen(confPath)
 		if err != nil {
 			// create a default if it doesn't exist
-			err = config.CreateDefaultMcConf()
+			err = rt.createDefaultMcConf()
 			if err != nil {
 				// error if we can't create it
 				errmsg := fmt.Sprintf("Unable to create MC config! %v", err)
@@ -33,12 +38,12 @@ func LoadMC() error {
 			}
 		}
 		zap.L().Info("Running MC")
-		info, err := StartContainer("mc", "miniomc")
+		info, err := rt.startContainer("mc", "miniomc")
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Error starting MC: %v", err))
 			return err
 		}
-		config.UpdateContainerState("mc", info)
+		rt.updateContainerState("mc", info)
 	}
 	return nil
 }
@@ -46,17 +51,21 @@ func LoadMC() error {
 // iterate through each ship and create a minio
 // version stuff is offloaded to version server struct
 func LoadMinIOs() error {
-	conf := config.Conf()
+	return loadMinIOs(newMinIORuntime())
+}
+
+func loadMinIOs(rt minioRuntime) error {
+	conf := rt.conf()
 	if conf.WgRegistered {
 		zap.L().Info("Loading MinIO containers")
 		for _, pier := range conf.Piers {
 			label := "minio_" + pier
-			info, err := StartContainer(label, "minio")
+			info, err := rt.startContainer(label, "minio")
 			if err != nil {
 				zap.L().Error(fmt.Sprintf("Error starting %s Minio: %v", pier, err))
 				continue
 			}
-			config.UpdateContainerState(label, info)
+			rt.updateContainerState(label, info)
 		}
 	}
 	return nil
@@ -64,17 +73,24 @@ func LoadMinIOs() error {
 
 // minio container config builder
 func minioContainerConf(containerName string) (container.Config, container.HostConfig, error) {
+	return minioContainerConfWithRuntime(newMinIORuntime(), containerName)
+}
+
+func minioContainerConfWithRuntime(rt minioRuntime, containerName string) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
-	shipName := strings.Split(containerName, "_")[1]
-	err := config.LoadUrbitConfig(shipName)
+	shipName, err := getPatpFromMinIOName(containerName)
+	if err != nil {
+		return containerConfig, hostConfig, err
+	}
+	err = rt.loadUrbitConfig(shipName)
 	if err != nil {
 		errmsg := fmt.Errorf("Error loading %s config: %v", shipName, err)
 		return containerConfig, hostConfig, errmsg
 	}
-	shipConf := config.UrbitConf(shipName)
+	shipConf := rt.urbitConf(shipName)
 	// construct the container metadata from version server info
-	containerInfo, err := GetLatestContainerInfo("minio")
+	containerInfo, err := rt.getLatestContainerInfo("minio")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
@@ -82,13 +98,13 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 	// Create a byte slice of length 16
 	randomBytes := make([]byte, 16)
 	// Generate random bytes
-	_, err = rand.Read(randomBytes)
+	_, err = rt.randRead(randomBytes)
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
 	// Convert to a 32-character long hex string
 	minIOPwd := hex.EncodeToString(randomBytes)
-	if err := config.SetMinIOPassword(containerName, minIOPwd); err != nil {
+	if err := rt.setMinIOPassword(containerName, minIOPwd); err != nil {
 		return containerConfig, hostConfig, err
 	}
 
@@ -125,29 +141,29 @@ func minioContainerConf(containerName string) (container.Config, container.HostC
 		NetworkMode: "container:wireguard",
 		Mounts:      mounts,
 	}
-	ticker := time.NewTicker(500 * time.Millisecond)
-minioNetworkLoop:
 	for {
-		select {
-		case <-ticker.C:
-			status, err := GetContainerRunningStatus("wireguard")
-			if err != nil {
-				return containerConfig, hostConfig, err
-			}
-			if strings.Contains(status, "Up") {
-				break minioNetworkLoop
-			}
+		status, err := rt.getContainerRunningStatus("wireguard")
+		if err != nil {
+			return containerConfig, hostConfig, err
 		}
+		if strings.Contains(status, "Up") {
+			break
+		}
+		rt.sleep(rt.pollInterval)
 	}
 	return containerConfig, hostConfig, nil
 }
 
 // miniomc container config builder
 func mcContainerConf() (container.Config, container.HostConfig, error) {
+	return mcContainerConfWithRuntime(newMinIORuntime())
+}
+
+func mcContainerConfWithRuntime(rt minioRuntime) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	// construct the container metadata from version server info
-	containerInfo, err := GetLatestContainerInfo("miniomc")
+	containerInfo, err := rt.getLatestContainerInfo("miniomc")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
@@ -163,45 +179,41 @@ func mcContainerConf() (container.Config, container.HostConfig, error) {
 	hostConfig = container.HostConfig{
 		NetworkMode: "container:wireguard",
 	}
-	ticker := time.NewTicker(500 * time.Millisecond)
-mcNetworkLoop:
 	for {
-		select {
-		case <-ticker.C:
-			status, err := GetContainerRunningStatus("wireguard")
-			if err != nil {
-				return containerConfig, hostConfig, err
-			}
-			if strings.Contains(status, "Up") {
-				break mcNetworkLoop
-			}
+		status, err := rt.getContainerRunningStatus("wireguard")
+		if err != nil {
+			return containerConfig, hostConfig, err
 		}
+		if strings.Contains(status, "Up") {
+			break
+		}
+		rt.sleep(rt.pollInterval)
 	}
 	return containerConfig, hostConfig, nil
 }
 
 func setMinIOAdminAccount(containerName string) error {
+	return setMinIOAdminAccountWithRuntime(newMinIORuntime(), containerName)
+}
+
+func setMinIOAdminAccountWithRuntime(rt minioRuntime, containerName string) error {
 	// get patp
 	patp, err := getPatpFromMinIOName(containerName)
 	if err != nil {
 		return err
 	}
 	// get urbit config
-	urbConf := config.UrbitConf(patp)
+	urbConf := rt.urbitConf(patp)
 	// make sure mc is running
-	ticker := time.NewTicker(500 * time.Millisecond)
-mcRunning:
 	for {
-		select {
-		case <-ticker.C:
-			status, _ := GetContainerRunningStatus("mc")
-			if strings.Contains(status, "Up") {
-				break mcRunning
-			}
+		status, _ := rt.getContainerRunningStatus("mc")
+		if strings.Contains(status, "Up") {
+			break
 		}
+		rt.sleep(rt.pollInterval)
 	}
 	// get password
-	pwd, err := config.GetMinIOPassword(fmt.Sprintf("minio_%s", patp))
+	pwd, err := rt.getMinIOPassword(fmt.Sprintf("minio_%s", patp))
 	if err != nil {
 		return err
 	}
@@ -215,7 +227,7 @@ mcRunning:
 		patp,
 		pwd,
 	}
-	if _, err := ExecDockerCommand(containerName, aliasCommand); err != nil {
+	if _, err := rt.execDockerCommand(containerName, aliasCommand); err != nil {
 		return err
 	}
 	// make bucket
@@ -225,7 +237,7 @@ mcRunning:
 		"--ignore-existing",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
-	if _, err := ExecDockerCommand(containerName, createCommand); err != nil {
+	if _, err := rt.execDockerCommand(containerName, createCommand); err != nil {
 		return err
 	}
 
@@ -234,8 +246,8 @@ mcRunning:
 		`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::%s/*"]}]}`,
 		"bucket",
 	)
-	scriptPath := filepath.Join(config.DockerDir, containerName, "_data", "policy.json")
-	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	scriptPath := filepath.Join(rt.dockerDir(), containerName, "_data", "policy.json")
+	err = rt.writeFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return err
 	}
@@ -246,7 +258,7 @@ mcRunning:
 		"/data/policy.json",
 		fmt.Sprintf("patp_%s/bucket", patp),
 	}
-	if _, err := ExecDockerCommand(containerName, policyCommand); err != nil {
+	if _, err := rt.execDockerCommand(containerName, policyCommand); err != nil {
 		return err
 	}
 	return nil
@@ -263,13 +275,17 @@ func getPatpFromMinIOName(containerName string) (string, error) {
 }
 
 func CreateMinIOServiceAccount(patp string) (structs.MinIOServiceAccount, error) {
+	return createMinIOServiceAccountWithRuntime(newMinIORuntime(), patp)
+}
+
+func createMinIOServiceAccountWithRuntime(rt minioRuntime, patp string) (structs.MinIOServiceAccount, error) {
 	var svcAccount structs.MinIOServiceAccount
 	svcAccount.AccessKey = "urbit_minio"
 	svcAccount.Alias = fmt.Sprintf("patp_%s", patp)
 	svcAccount.User = patp
 	// create secret key
 	bytes := make([]byte, 20) // 20 bytes * 2 (hex encoding) = 40 characters
-	_, err := rand.Read(bytes)
+	_, err := rt.randRead(bytes)
 	if err != nil {
 		return svcAccount, err
 	}
@@ -285,7 +301,7 @@ func CreateMinIOServiceAccount(patp string) (structs.MinIOServiceAccount, error)
 		svcAccount.Alias,
 		fmt.Sprintf("%s", svcAccount.AccessKey),
 	}
-	response, err := ExecDockerCommand(containerName, cmd)
+	response, err := rt.execDockerCommand(containerName, cmd)
 	if err != nil {
 		return svcAccount, fmt.Errorf("Failed to remove old service account for %s: %v", patp, err)
 	}
@@ -305,7 +321,7 @@ func CreateMinIOServiceAccount(patp string) (structs.MinIOServiceAccount, error)
 			svcAccount.Alias,
 			svcAccount.User,
 		}
-		response, err := ExecDockerCommand(containerName, cmd)
+		response, err := rt.execDockerCommand(containerName, cmd)
 		if err != nil {
 			return svcAccount, fmt.Errorf("Failed to create service account for %s: %v", patp, err)
 		}

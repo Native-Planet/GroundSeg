@@ -1,0 +1,475 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 8,
+  "assessments": {
+    "naming_quality": 72.0,
+    "logic_clarity": 61.0,
+    "type_safety": 58.0,
+    "contract_coherence": 57.0,
+    "error_consistency": 49.0,
+    "abstraction_fitness": 44.0,
+    "ai_generated_debt": 54.0,
+    "high_level_elegance": 52.0,
+    "mid_level_elegance": 48.0,
+    "low_level_elegance": 56.0,
+    "cross_module_architecture": 45.0,
+    "initialization_coupling": 62.0,
+    "convention_outlier": 67.0,
+    "dependency_health": 63.0,
+    "test_strategy": 35.0,
+    "api_surface_coherence": 43.0,
+    "authorization_consistency": 41.0,
+    "incomplete_migration": 52.0,
+    "package_organization": 59.0,
+    "design_coherence": 47.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js exports many generic verbs (send, verify, login, logout, toggleX) with mixed domain and transport responsibilities.",
+        "ui/src/lib/stores/gs-crypto.js function name generateRandom does not communicate it returns a hex string ID rather than generic random data."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "logic_clarity": {
+      "evidence": [
+        "ui/src/lib/stores/patp.js validates syllables by substring membership on long concatenated strings (`pre.includes`, `suf.includes`) rather than exact token sets, allowing accidental cross-boundary matches.",
+        "ui/src/lib/stores/data.js daysUntilDate uses Math.abs(targetDate-currentDate), so past dates produce positive days and lose temporal direction."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "type_safety": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js and ui/src/lib/stores/logsocket.js accept untyped dynamic message payloads and access nested fields (`data.log.container_id`, `msg.type`) without schema checks.",
+        "ui/src/lib/stores/gs-crypto.js saveSession assumes token.id/token.token shape but performs no object/field type guard."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "contract_coherence": {
+      "evidence": [
+        "ui/src/lib/stores/gs-crypto.js declares async saveSession/loadSession although saveSession has no await and returns no status, while callers treat side effects as guaranteed.",
+        "ui/src/lib/stores/websocket.js restoreBackup accepts backupFile but hardcodes file: \"this must fail\", violating its apparent API contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js and ui/src/lib/stores/logsocket.js handle failures mostly via console.log/console.error and continue; no consistent propagation, retry policy, or error state store.",
+        "ui/src/lib/stores/urbit.js parse failure is handled with return in one path, while poke/subscribe errors are just logged, creating mixed failure semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js contains transport setup, auth/session, command construction, response parsing, logging, and domain-specific action builders in a single module.",
+        "ui/src/lib/stores/logsocket.js duplicates connection/message concerns already present in websocket.js instead of sharing a reusable transport abstraction."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 38.0,
+        "indirection_cost": 57.0,
+        "interface_honesty": 41.0
+      }
+    },
+    "ai_generated_debt": {
+      "evidence": [
+        "ui/src/lib/stores/uploader.js contains large commented-out implementation blocks and step-by-step narrative comments without active logic.",
+        "ui/src/lib/stores/websocket.js repeats near-identical payload boilerplate across dozens of exported functions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js acts as a command omnibus for setup/system/startram/urbit/support/dev domains, blurring subsystem ownership.",
+        "ui/src/routes/boot/existing/store.js and ui/src/routes/boot/new/store.js duplicate the same store, indicating route-level boundaries not aligned to distinct behavior."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js couples UI command functions directly to raw transport payload wire format; no translation seam exists.",
+        "ui/src/lib/stores/urbit.js and websocket.js are two parallel command paths (poke vs websocket) selected by URBIT_MODE with divergent error and lifecycle handling."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js mutates object state inside Svelte store updates and returns the same object reference, reducing local reasoning clarity.",
+        "ui/src/lib/stores/uploader.js mixes active code with dead/commented branches, leaving function internals partially inert."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "cross_module_architecture": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js imports and orchestrates gs-crypto, data store, and urbit transport while exposing broad command APIs, making it a hub with wide blast radius.",
+        "ui/src/lib/stores/logsocket.js and websocket.js implement overlapping socket lifecycle logic rather than a shared lower-level module."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js and ui/src/lib/stores/logsocket.js keep module-level mutable SESSION/PENDING singletons whose behavior depends on call order (connect before send/disconnect).",
+        "ui/svelte.config.js performs console logging during config construction, introducing import-time side effects in build configuration."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "convention_outlier": {
+      "evidence": [
+        "ui/src/routes/boot/existing/store.js and ui/src/routes/boot/new/store.js are duplicated single-store modules rather than shared convention-based store placement.",
+        "Equality and style conventions vary across files (`==` in urbit.js and websocket.js alongside strict checks elsewhere)."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "dependency_health": {
+      "evidence": [
+        "Two websocket clients are maintained separately (ui/src/lib/stores/websocket.js and ui/src/lib/stores/logsocket.js), increasing maintenance and divergence risk.",
+        "ui/src/lib/stores/uploader.js imports Sha256/uploadManifest/toBase64 but current active flow never uses them."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "Packet existing findings report no tests for major stores (websocket.js, uploader.js, gs-crypto.js, patp.js), and no tests are present in assigned scope.",
+        "High-risk logic (patp validation, session handling, command payload mapping) is unguarded by unit/integration tests."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js exposes a very wide public API with inconsistent parameter shapes and ordering (e.g., setupStarTram(key,region) vs setPackSchedule(patp,frequency,intervalType,time,day,date)).",
+        "Mixed sync/async declarations for similar command wrappers (many async without await, others sync) create inconsistent caller expectations."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js sends privileged actions even when token is absent (token is optional in send), relying on backend rejection instead of consistent client-side auth gating.",
+        "ui/src/lib/stores/gs-crypto.js logs session lifecycle messages while manipulating auth token storage, but no unified authorization boundary is enforced across websocket and urbit command paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "ui/src/lib/stores/uploader.js contains a partially removed IndexedDB/chunk-upload pipeline with large disabled blocks and imports aligned to old flow.",
+        "ui/src/lib/stores/websocket.js still includes placeholder behavior (`file: \"this must fail\"`) indicating migration-in-progress API stubs shipped in production code."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "package_organization": {
+      "evidence": [
+        "holistic_context.structure shows ui/src/lib/stores has 9 files and 1375 LOC, with websocket.js dominating behavior while route-level stores are fragmented into tiny single-purpose files.",
+        "directory_profiles show route subdirectories holding near-empty store modules (e.g., ui/src/routes/[patp]/ total_loc 4) while related state logic is centralized elsewhere, indicating split ownership.",
+        "Staged reorg plan: create ui/src/lib/api/{transport,commands,session}/ and ui/src/lib/state/{global,route}/; move websocket/logsocket/urbit first into api, then merge duplicated route stores into shared state; update imports using `rg \"from '.*store\" ui/src -n` then apply path rewrites; validate with `npm run check` and `npm run build`."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "design_coherence": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js aggregates many unrelated concerns and accumulates repeated structural patterns (payload wrappers) better represented by data-driven command descriptors.",
+        "ui/src/lib/stores/uploader.js and gs-crypto.js reveal unfinished/placeholder behavior coexisting with active paths, reducing design integrity."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "ws_command_hub_mixed_concerns",
+      "summary": "websocket store is a multi-domain god module combining transport, auth, command building, and response handling.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/urbit.js",
+        "ui/src/lib/stores/logsocket.js"
+      ],
+      "evidence": [
+        "websocket.js exports large sets of domain commands (setup/system/startram/urbit/support/dev) plus low-level socket lifecycle.",
+        "websocket.js directly owns auth/session behavior (verify/login/saveSession) and parsing of inbound protocol events."
+      ],
+      "suggestion": "Split into `transportClient`, `sessionClient`, and domain command modules; keep websocket.js as thin facade initially, then migrate callers by domain in stages.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "store_hub_overreach"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "parallel_socket_stacks_no_shared_core",
+      "summary": "Two independent socket implementations duplicate lifecycle and message patterns without a shared boundary.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "ui/src/lib/stores/gs-crypto.js"
+      ],
+      "evidence": [
+        "Both files define SESSION globals, connect/disconnect/send flows, and message callbacks.",
+        "Token/session concerns are reimplemented via gs-crypto usage in both paths rather than a unified authenticated transport."
+      ],
+      "suggestion": "Extract a common websocket transport module with pluggable message handlers and optional auth token provider; reuse it for main and log channels.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "store_hub_overreach"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "socket_error_handling_is_log_only",
+      "summary": "Network and parse failures are mostly logged to console and not surfaced through predictable error channels.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "ui/src/lib/stores/urbit.js"
+      ],
+      "evidence": [
+        "onerror handlers only call console.log/console.error and do not update an error store or reject pending operations.",
+        "JSON parse on inbound socket data is unguarded in websocket.js/logsocket.js; malformed payload can throw and bypass controlled recovery."
+      ],
+      "suggestion": "Introduce shared error-state stores and standardized boundary handling (parse guard + structured error object + retry/backoff policy).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "restore_backup_ignores_input",
+      "summary": "restoreBackup API accepts a backup file argument but sends a hardcoded failure placeholder instead.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "restoreBackup(patp, backupFile) constructs payload with `file: \"this must fail\"`.",
+        "Uploader module implies file-transfer intent but active flow is disabled, leaving restore contract broken."
+      ],
+      "suggestion": "Either wire `backupFile` into the actual transfer protocol or remove/feature-flag the API until implemented to keep caller contract honest.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "unfinished_upload_migration"
+    },
+    {
+      "dimension": "logic_clarity",
+      "identifier": "patp_validation_substring_false_accepts",
+      "summary": "patp validation uses substring checks on concatenated syllable tables, which can accept invalid values across token boundaries.",
+      "related_files": [
+        "ui/src/lib/stores/patp.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "checkPatp uses `pre.includes(word.substring(0,3))` and `suf.includes(...)` where pre/suf are single long strings.",
+        "Substring membership does not enforce token boundaries; correctness of uploader filename validation depends on this function."
+      ],
+      "suggestion": "Convert pre/suf into Sets of exact 3-char tokens and validate by set membership; add unit tests for edge and boundary cases.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "async_surface_without_async_semantics",
+      "summary": "Multiple exported functions are marked async without await/async behavior, obscuring their true contract.",
+      "related_files": [
+        "ui/src/lib/stores/gs-crypto.js",
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "saveSession is async but only performs synchronous localStorage writes and no return contract.",
+        "Several websocket command wrappers are async with no await, while sibling wrappers are synchronous."
+      ],
+      "suggestion": "Normalize command wrappers to synchronous functions unless awaiting IO, and reserve async for explicit Promise-based contracts.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "type_safety",
+      "identifier": "unvalidated_message_shapes",
+      "summary": "Inbound and outbound message objects are used with implicit shapes and no schema validation.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "ui/src/lib/stores/urbit.js"
+      ],
+      "evidence": [
+        "Code dereferences nested fields like data.log.container_id and data.response without guards.",
+        "Outgoing payloads are plain objects built ad hoc across many functions without shared typing/schema."
+      ],
+      "suggestion": "Define runtime validators (zod/io-ts or explicit guards) for inbound event variants and central payload builders for outbound commands.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "privileged_commands_not_client_gated",
+      "summary": "Client sends privileged command payloads regardless of authentication state, making authorization behavior inconsistent and backend-dependent.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/gs-crypto.js",
+        "ui/src/lib/stores/urbit.js"
+      ],
+      "evidence": [
+        "send() adds token only if present and still transmits actions for system/urbit/dev domains.",
+        "No central guard blocks command dispatch when session is missing/expired across websocket and urbit paths."
+      ],
+      "suggestion": "Create a command gate that enforces authenticated session for privileged action types before dispatch, with explicit allowlist for public actions.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transport_contract_drift"
+    },
+    {
+      "dimension": "incomplete_migration",
+      "identifier": "uploader_pipeline_partially_removed",
+      "summary": "Uploader retains a large disabled IndexedDB/chunk pipeline and stale imports, indicating an unfinished migration path.",
+      "related_files": [
+        "ui/src/lib/stores/uploader.js",
+        "ui/src/lib/stores/websocket.js"
+      ],
+      "evidence": [
+        "uploader.js has extensive commented-out chunk/hash/IndexedDB logic and currently returns early in key flows.",
+        "websocket.js still exposes upload-related actions while uploader implementation is incomplete."
+      ],
+      "suggestion": "Choose one migration direction: complete the chunked uploader or remove legacy path; then delete dead blocks/imports and align websocket upload APIs to the chosen flow.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "unfinished_upload_migration"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "route_store_fragmentation_with_centralized_logic",
+      "summary": "State is split into many tiny route-local stores while most real state/commands are centralized in lib stores, creating navigational mismatch.",
+      "related_files": [
+        "ui/src/routes/boot/existing/store.js",
+        "ui/src/routes/boot/new/store.js",
+        "ui/src/routes/profile/store.js",
+        "ui/src/routes/system/store.js",
+        "ui/src/lib/stores/websocket.js"
+      ],
+      "evidence": [
+        "directory_profiles: ui/src/lib/stores has 9 files/1375 LOC, while several route store files are 1-3 lines and duplicate patterns.",
+        "boot existing/new store files are identical (`warningDone`), signaling misplaced or duplicated package boundaries."
+      ],
+      "suggestion": "Staged reorg: (1) create `ui/src/lib/state/boot.js` and `ui/src/lib/state/ui.js`; (2) move duplicate route store flags there; (3) keep route folders view-focused; (4) run `rg \"warningDone|showLogs|show.*Modal\" ui/src/routes -n` to update imports; (5) validate with `npm run check && npm run build`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "store_hub_overreach"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "command_api_parameter_inconsistency",
+      "summary": "Command wrappers expose inconsistent parameter ordering, cardinality, and naming, increasing misuse risk.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/urbit.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "Mixed shapes range from single object-like args to long positional lists (e.g., setPackSchedule with 6 positional params).",
+        "Similar command intent uses different naming styles (`pwd`, `password`, `value`, `keyType`) without a stable API convention."
+      ],
+      "suggestion": "Standardize public command APIs to single options objects per action family and enforce schema per family (`system`, `urbit`, `startram`, `setup`).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "store_hub_overreach"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_store_paths_untested",
+      "summary": "Critical command, validation, and session logic in stores has no direct test coverage.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/patp.js",
+        "ui/src/lib/stores/gs-crypto.js",
+        "ui/src/lib/stores/uploader.js"
+      ],
+      "evidence": [
+        "Packet existing findings identify these files as untested/orphaned and no tests are present in reviewed scope.",
+        "High-risk paths include protocol parsing, auth token persistence, and validation logic with complex rule tables."
+      ],
+      "suggestion": "Add targeted tests in stages: first patp and gs-crypto unit tests, then websocket command-builder/parser tests with mocked socket, then integration tests for login/verify/restore flow.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change"
+    },
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "module_singletons_depend_on_call_order",
+      "summary": "Store modules rely on mutable module-scope singleton state that is fragile to import and invocation order.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "ui/src/lib/stores/logsocket.js",
+        "ui/src/lib/stores/urbit.js"
+      ],
+      "evidence": [
+        "SESSION objects are module globals and methods assume connect was called before send/disconnect.",
+        "urbit singleton object is created at module scope and later mutated by subscribe (setting ship and callbacks)."
+      ],
+      "suggestion": "Encapsulate connection/session state in factory-created clients and inject them into stores or route loaders instead of mutable module globals.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "store_hub_overreach"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "A single-store hub pattern accumulated cross-domain responsibilities without stable internal boundaries.",
+      "Transport/message contracts are implicit and ad hoc, causing repeated shape, error, and auth inconsistencies.",
+      "Migration work appears partially landed, leaving placeholder logic and dead branches in production modules."
+    ],
+    "likely_symptoms": [
+      "command_api_parameter_inconsistency",
+      "route_store_fragmentation_with_centralized_logic",
+      "socket_error_handling_is_log_only"
+    ],
+    "possible_false_positives": [
+      "existing orphaned-file flags may be inflated by analyzer import-graph limitations in Svelte route resolution"
+    ]
+  }
+}

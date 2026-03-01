@@ -2,6 +2,13 @@ package click
 
 import "fmt"
 
+var (
+	createHoonForExit     = createHoon
+	deleteHoonForExit     = deleteHoon
+	clickExecForExit      = clickExec
+	filterResponseForExit = filterResponse
+)
+
 // |exit
 func barExit(patp string) error {
 	defer ClearLusCode(patp)
@@ -10,18 +17,18 @@ func barExit(patp string) error {
 	// actual hoon
 	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  ~  bind:m  (poke [our %hood] %drum-exit !>(~))  (pure:m !>('success'))"
 	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
+	if err := createHoonForExit(patp, file, hoon); err != nil {
 		return fmt.Errorf("Click |exit for %v failed to create hoon: %v", patp, err)
 	}
 	// defer hoon file deletion
-	defer deleteHoon(patp, file)
+	defer deleteHoonForExit(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file, "")
+	response, err := clickExecForExit(patp, file, "")
 	if err != nil {
 		return fmt.Errorf("Click |exit for %v failed to get exec: %v", patp, err)
 	}
 	// retrieve code
-	_, success, err := filterResponse("success", response)
+	_, success, err := filterResponseForExit("success", response)
 	if err != nil {
 		return fmt.Errorf("Click |exit for %v failed to get exec: %v", patp, err)
 	}

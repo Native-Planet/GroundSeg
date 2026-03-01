@@ -1,94 +1,82 @@
-import Urbit from '@urbit/http-api';
-import { writable } from 'svelte/store';
-import { connected, structure, firstLoad } from './data.js'
+import { writable } from 'svelte/store'
+import { routeGroundsegBroadcast, parseBroadcastCord } from '../runtime/handlers/groundseg-events.js'
+import { createUrbitSseClient } from '../runtime/transport/urbit-sse-client.js'
 
-// urbit object
-const urbit = new Urbit("")
+let realtimeClient = createUrbitSseClient('')
 
 // broadcast json string
-export const broadcast = writable("")
+export const broadcast = writable('')
 
 // login string
 export const gallsegLoginInfo = writable({})
 
-export const sendPoke = payload => {
-  let wrapped = {"payload":payload}
-  urbit.poke({
-    app: "groundseg",
-    mark: "action",
-    json: {"action":JSON.stringify(wrapped)},
-    onSuccess: handlePokeSuccess,
-    onError: handlePokeError
-  })
+export const setRealtimeClient = client => {
+  realtimeClient = client
 }
 
-const handlePokeSuccess = () => {
-  console.log("poke succeeded")
-}
-
-const handlePokeError = event => {
-  console.log(event)
+export const sendPoke = async payload => {
+  const result = await realtimeClient.sendAction(payload)
+  if (result.ok) {
+    console.log('poke succeeded')
+  } else {
+    console.log(result.error)
+  }
+  return result
 }
 
 // subscribe to path
 export const subscribe = ship => {
-  urbit.ship = ship
-  urbit.onOpen =  ()=> console.log("onOpen opened")
-  urbit.onRetry = ()=> console.log("onRetry called")
-  urbit.onError = e => console.error("onError: "+e)
-  urbit.subscribe({
-    app: "groundseg",
-    path: "/broadcast",
-    event: handleEvent,
-    quit: handleQuit,
-    err: handleErr
+  realtimeClient.subscribe({
+    ship,
+    onOpen: () => console.log('onOpen opened'),
+    onRetry: () => console.log('onRetry called'),
+    onError: error => console.error(`onError: ${error}`),
+    onEvent: handleEvent,
+    onQuit: handleQuit,
+    onSubscriptionError: handleErr
   })
 }
 
 const handleEvent = event => {
-  if (typeof event.cord === 'string') {
-    let broadcast
-    try {
-     broadcast = JSON.parse(event.cord)
-    } catch (error) {
-      console.error("Failed to parse: ", error)
-      return
-    }
-    handleBroadcast(broadcast)
+  if (typeof event.cord !== 'string') {
+    return
   }
+
+  const parsedBroadcast = parseBroadcastCord(event.cord)
+  if (!parsedBroadcast) {
+    return
+  }
+
+  handleBroadcast(parsedBroadcast)
 }
+
 const handleQuit = () => {
- console.error("quit called") 
+  console.error('quit called')
 }
+
 const handleErr = () => {
-  console.error("error called")
+  console.error('error called')
 }
 
-const handleBroadcast = broadcast => {
-  console.log(broadcast)
-  if (broadcast.type == "init") {
-    console.log("Sub initiated")
-    connected.set(true)
-  } else if (broadcast.type == "structure") {
-    structure.set(broadcast)
-    firstLoad.set(false)
-  } else if (broadcast.type == "urbit-activity") {
-    handleUrbitActivity(broadcast)
-  }
-}
+const handleBroadcast = parsedBroadcast => {
+  console.log(parsedBroadcast)
 
-const handleUrbitActivity = broadcast => {
-  if (broadcast.payloadType == "login") {
-    gallsegLoginInfo.set(broadcast)
-  }
-}
-
-export const sendHeartbeat = () => {
-  urbit.poke({
-    app: "groundseg",
-    mark: "heartbeat",
-    json: {"action":""},
-    onSuccess: handlePokeSuccess,
-    onError: handlePokeError
+  routeGroundsegBroadcast({
+    broadcast: parsedBroadcast,
+    onLoginActivity: loginActivity => {
+      gallsegLoginInfo.set(loginActivity)
+    }
   })
+}
+
+export { parseBroadcastCord }
+
+export const sendHeartbeat = async () => {
+  const result = await realtimeClient.sendHeartbeat()
+  if (result.ok) {
+    console.log('poke succeeded')
+  } else {
+    console.log(result.error)
+  }
+  return result
 }

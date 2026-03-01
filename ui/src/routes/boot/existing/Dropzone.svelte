@@ -22,6 +22,17 @@
 
   const endpoint = generateRandom(32)
   const dispatch = createEventDispatcher()
+  const buildUploadHeaders = () => {
+    const tokenId = localStorage.getItem('id')
+    const token = localStorage.getItem('token')
+    if (!tokenId || !token) {
+      return {}
+    }
+    return {
+      'X-Upload-Token-Id': tokenId,
+      'X-Upload-Token': token
+    }
+  }
 
   /**********************
   |   DEFAULT VALUES    |
@@ -53,6 +64,7 @@
       /* HTTP */
       /*withCredentials: true,*/
       url: handleAddr,
+      headers: buildUploadHeaders(),
       /* Chunking */
       chunkSize: 50000000, // bytes
       chunking: true,

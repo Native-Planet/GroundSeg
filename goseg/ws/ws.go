@@ -7,10 +7,12 @@ import (
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/handler"
+	handlerws "groundseg/handler/ws"
 	"groundseg/setup"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
+	"groundseg/uploadsvc/importeradapter"
 	"net/http"
 	"strings"
 
@@ -28,7 +30,16 @@ var (
 			return true // Allow all origins
 		},
 	}
+	uploadMessageHandler = mustUploadMessageHandler()
 )
+
+func mustUploadMessageHandler() handlerws.UploadMessageHandler {
+	uploadHandler, err := handlerws.NewUploadMessageHandler(importeradapter.New())
+	if err != nil {
+		panic(fmt.Sprintf("failed to wire upload message handler: %v", err))
+	}
+	return uploadHandler
+}
 
 // switch on ws event cases
 func WsHandler(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +98,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			AuthLevel: "setup",
 			Stage:     conf.Setup,
 			Page:      setup.Stages[conf.Setup],
-			Regions:   startram.Regions,
+			Regions:   startram.RegionsSnapshot(),
 		}
 		respJSON, err := json.Marshal(resp)
 		if err != nil {
@@ -192,7 +203,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "pier_upload":
-				if err = handler.UploadHandler(msg); err != nil {
+				if err = uploadMessageHandler.Handle(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -293,7 +304,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					AuthLevel: "setup",
 					Stage:     conf.Setup,
 					Page:      setup.Stages[conf.Setup],
-					Regions:   startram.Regions,
+					Regions:   startram.RegionsSnapshot(),
 				}
 				respJSON, err := json.Marshal(resp)
 				if err != nil {
@@ -317,12 +328,14 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			MuCon.Write(respJson)
 			// unauthenticated action handlers
 		} else {
+			responseErr := "null"
 			switch msgType.Payload.Type {
 			case "login":
 				newToken, err := handler.LoginHandler(MuCon, msg)
 				if err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
+					responseErr = err.Error()
 				} else {
 					token = newToken
 				}
@@ -349,12 +362,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				MuCon.Write(resp)
 				ack = "nack"
+				responseErr = "unsupported unauthenticated request"
 			}
 			// ack/nack for unauth broadcast
 			result := map[string]interface{}{
 				"type":     "activity",
 				"id":       payload.ID,
-				"error":    "null",
+				"error":    responseErr,
 				"response": ack,
 				"token":    token,
 			}

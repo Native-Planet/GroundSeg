@@ -47,7 +47,7 @@ func filterResponse(resType string, response string) (string, bool, error) {
 				match := regex.FindStringSubmatch(line)
 				// Check if a match was found
 				if len(match) >= 2 {
-					appStatus := match[1]
+					appStatus := strings.TrimSuffix(match[1], "]")
 					return appStatus, false, nil
 				} else {
 					return "not-found", false, nil

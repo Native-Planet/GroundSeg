@@ -1,0 +1,118 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Silent/ignored errors appear in operational paths: `goseg/system/system.go` ignores failures in `GetMemory`, `GetCPU`, `getDiskLabel`, and `addCron` writes/close.",
+        "Handler orchestration frequently logs and continues instead of surfacing failures (`goseg/handler/startram.go` restart/toggle paths), then emits completion events.",
+        "HTTP boundary handling is inconsistent: some modules check non-200 responses (`goseg/routines/rekor.go:177-179`) while others immediately unmarshal body (`goseg/startram/startram.go:49-63`, `goseg/config/version.go:46-66`).",
+        "Error wrapping is inconsistent across adjacent call paths (`%w` in `goseg/handler/upload.go:22-26` vs `%v`/string-only wrapping in `goseg/startram/startram.go:139-151`, `goseg/routines/version.go:224-249`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_errors_in_system_paths",
+      "summary": "Critical system paths ignore command/probe errors, causing silent degradation and potential panics",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/wifi.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`goseg/system/system.go:32-39` ignores errors from `mem.VirtualMemory()` and `cpu.Percent()` and still dereferences returned values.",
+        "`goseg/system/system.go:207-210` ignores `crontab -l`, `WriteString`, and `Close` errors in `addCron`.",
+        "`goseg/system/wifi.go:118-121`, `139-147`, `167-169` ignore `getWifiDevice()` errors and index `dev[0]` directly.",
+        "`goseg/routines/version.go:50` discards `config.SyncVersionInfo()` success flag and proceeds with potentially stale/zero version data."
+      ],
+      "suggestion": "Define and enforce a no-silent-failure policy for system/ops code: return errors from probe helpers, check all command/file write results, and guard slice indexing after device discovery. For periodic loops, explicitly branch on sync failure and skip update logic when state is invalid.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_error_suppression"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_continue_orchestration",
+      "summary": "Handler orchestration reports progress as successful even when required steps fail",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/handler.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/handler/startram.go:93-135` logs errors for restart/delete/load operations but still emits `restart: done` and clears state.",
+        "`goseg/handler/startram.go:143-199` toggle path logs multiple errors and still emits completion (`toggle` with nil data).",
+        "`goseg/handler/handler.go:233-248` `C2CHandler` calls `system.C2CConnect(...)` without any returned status and returns nil error/empty response.",
+        "`goseg/system/wifi.go:136-163` `C2CConnect` is void and internally swallows failures by logging or fallback calls."
+      ],
+      "suggestion": "Make orchestration steps return structured errors and aggregate them into explicit failed/succeeded event states. Convert `C2CConnect` to return `error` (or async result) and have callers propagate that into websocket responses instead of unconditional success-shaped completion.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fire_and_forget_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "http_status_handling_drift",
+      "summary": "HTTP callers apply inconsistent status-code checks, yielding misleading parse errors",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "goseg/routines/rekor.go"
+      ],
+      "evidence": [
+        "`goseg/startram/startram.go:49-63` and `94-107` parse response bodies without validating HTTP status first.",
+        "`goseg/config/version.go:46-66` reads/unmarshals body after request without checking `resp.StatusCode`.",
+        "`goseg/routines/rekor.go:177-179` does enforce status checks before reading/parsing, showing a conflicting strategy in the same codebase."
+      ],
+      "suggestion": "Standardize HTTP error contracts with shared helpers (`doJSON`/`readJSON`) that always validate status code and return typed boundary errors including URL and status before parse attempts.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "http_boundary_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_wrapping_contract_is_inconsistent",
+      "summary": "Mixed `%w`, `%v`, and string-only reformatting breaks reliable causal chains",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/routines/version.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "`goseg/handler/upload.go:22-26` wraps with `%w`, preserving causes.",
+        "`goseg/startram/startram.go:139-151` and `155-166` use `%v` wrapping, and `:143` converts failures into masked string-only errors.",
+        "`goseg/routines/version.go:224-249` repeatedly wraps with `%v` in provenance verification paths."
+      ],
+      "suggestion": "Adopt a single wrapping rule for internal propagation (`fmt.Errorf(\"...: %w\", err)`), and only redact at final user-facing boundaries. Keep masked/log-safe presentation separate from the returned internal error chain.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_chain_loss"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Operational code relies on log-and-continue behavior instead of explicit error contracts.",
+      "No shared boundary helpers for HTTP and command execution, so each module reinvents failure handling.",
+      "Error presentation concerns (masking/user message) are mixed with propagation concerns."
+    ],
+    "likely_symptoms": [
+      "ignored_errors_in_system_paths",
+      "log_and_continue_orchestration",
+      "http_status_handling_drift",
+      "error_wrapping_contract_is_inconsistent"
+    ],
+    "possible_false_positives": []
+  }
+}

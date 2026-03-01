@@ -2,6 +2,7 @@ package accesspoint
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,20 +18,40 @@ var (
 	ip                = "192.168.45.1"
 	netmask           = "255.255.255.0"
 	ssid              = "NativePlanetConnect"
-	password          = "nativeplanet"
+	password          = resolveAPPassword()
 	rootDir           = "/etc/accesspoint/"
 	hostapdConfigPath = filepath.Join(rootDir, "hostapd.config")
 )
 
-func init() {
+func ensureRootDir() error {
 	if _, err := os.Stat(rootDir); os.IsNotExist(err) {
-		os.Mkdir(rootDir, os.ModePerm)
+		return os.Mkdir(rootDir, os.ModePerm)
 	}
+	return nil
+}
+
+func resolveAPPassword() string {
+	envPassword := strings.TrimSpace(os.Getenv("GROUNDSEG_AP_PASSWORD"))
+	if envPassword != "" {
+		return envPassword
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		hostname = "groundseg"
+	}
+
+	seed := fmt.Sprintf("%s|%s|%s", hostname, wlan, ip)
+	hash := sha256.Sum256([]byte(seed))
+	return fmt.Sprintf("np-%x", hash)[:16]
 }
 
 func Start(dev string) error {
 	zap.L().Info(fmt.Sprintf("Starting router on %v", dev))
 	wlan = dev
+	if err := ensureRootDir(); err != nil {
+		return err
+	}
 	// make sure dependencies are met
 	if err := checkDependencies(); err != nil {
 		return err
@@ -48,7 +69,7 @@ func Start(dev string) error {
 		zap.L().Info("Accesspoint already started")
 	}
 	// dump config to file
-	if err := writeHostapdConfig(); err != nil {
+	if err := writeHostapdConfig(wlan, ssid, password); err != nil {
 		return err
 	}
 	// start the router

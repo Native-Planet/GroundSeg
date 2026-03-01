@@ -1,0 +1,112 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "error_consistency": 72.5
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error values are discarded on critical file-open paths (`file, _ = os.Open(confPath)` in `goseg/config/config.go`, `tmpFile, _ := os.Open(src)` followed by `defer tmpFile.Close()` in `goseg/importer/extract.go`), creating panic risk and unreported setup failures.",
+        "Several operational flows log failures but still return success/nil (`gracefulShipExit` logs ship status retrieval failure then returns nil in `goseg/routines/docker.go`; `dumpBugReport` logs repeated copy/log-dump failures and still returns nil in `goseg/handler/support.go`).",
+        "Error wrapping is inconsistent at module boundaries, mixing `%w` and `%v`, which breaks reliable upstream unwrapping/classification (`goseg/system/system.go` uses `%w` while `goseg/routines/docker.go` and `goseg/handler/dev.go` frequently use `%v`).",
+        "Some request/handler paths convert rich errors into logs-only side effects without propagating an error contract (`goseg/system/wifi.go` captive API loop and `goseg/handler/startram.go` helper actions), while adjacent handlers return errors directly."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ignored_open_errors_create_hidden_failures",
+      "summary": "Critical file-open errors are ignored, creating nil-dereference and silent-failure behavior instead of predictable error returns.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/importer/extract.go"
+      ],
+      "evidence": [
+        "`goseg/config/config.go` reopens config with `file, _ = os.Open(confPath)` and later unconditionally defers `file.Close()`, so reopen failures are dropped and can crash or misinitialize configuration.",
+        "`goseg/importer/extract.go` uses `tmpFile, _ := os.Open(src)` then `defer tmpFile.Close()` and `tar.NewReader(tmpFile)`, so open failures are not surfaced and can panic when counting archive entries."
+      ],
+      "suggestion": "Stop using blank-identifier error drops on I/O; check and wrap open failures with `%w`, and only defer close after non-nil file handles. Add regression tests for missing/unreadable source paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_drop_on_io_boundaries"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_continue_masks_operation_failure",
+      "summary": "Multiple flows log serious runtime errors but still return nil/success, producing inconsistent failure semantics for callers.",
+      "related_files": [
+        "goseg/routines/docker.go",
+        "goseg/handler/support.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "In `goseg/routines/docker.go`, `gracefulShipExit` logs failure from `rt.getShipStatus(piers)` but continues and returns nil, so callers cannot detect inability to determine ship state.",
+        "In `goseg/handler/support.go`, `dumpBugReport` logs numerous copy/log-dump errors and still returns nil, yielding partial reports without explicit failure status.",
+        "In `goseg/broadcast/broadcast.go`, `minIOPwd, _ = config.GetMinIOPassword(...)` discards credential retrieval errors and continues with empty password output."
+      ],
+      "suggestion": "Define a consistent policy for recoverable vs fatal errors in long-running routines; aggregate non-fatal errors and return a structured error summary (or typed partial-success result) instead of unconditional nil.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "side_effect_only_error_handling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "error_wrapping_contract_is_inconsistent",
+      "summary": "Mixed `%w` and `%v` wrapping across packages causes uneven context preservation and prevents reliable `errors.Is/As` handling.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/routines/docker.go",
+        "goseg/handler/dev.go",
+        "goseg/handler/handler.go"
+      ],
+      "evidence": [
+        "`goseg/system/system.go` preserves causal chains with `%w` (for example `read virtual memory stats: %w`), but `goseg/routines/docker.go` uses `%v` for similar boundary errors (for example `Failed to get statuses for %s: %v`).",
+        "`goseg/handler/handler.go` uses wrapped errors in many handlers, while `goseg/handler/dev.go` often formats with `%v`, creating inconsistent upstream behavior for classification/retry logic."
+      ],
+      "suggestion": "Adopt a package-wide rule: wrap propagated errors with `%w`, reserve `%v` for terminal logging only, and migrate high-traffic boundary functions first (handlers, routines, system).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "handler_error_surface_varies_between_returned_and_side_channel_failures",
+      "summary": "Adjacent handler pathways expose failures through incompatible channels (returned error vs log/event side effects), making caller behavior unpredictable.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/system/wifi.go",
+        "goseg/handler/startram.go"
+      ],
+      "evidence": [
+        "`goseg/handler/upload.go` consistently returns wrapped errors to caller (`open upload endpoint ...: %w`), enabling deterministic propagation.",
+        "`goseg/system/wifi.go` captive websocket loop mostly logs and continues on decode/connect/write failures, with no propagated error to HTTP layer.",
+        "`goseg/handler/startram.go` helper actions frequently log and return from void functions, reporting status via events only, not a shared error-return contract."
+      ],
+      "suggestion": "Standardize handler-facing error semantics: either return typed errors from action handlers and translate once at transport boundary, or formalize an explicit result/event contract used consistently across handlers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_error_contracts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No enforced cross-package error-handling contract for propagation vs logging-only behavior.",
+      "Legacy code paths still use convenience patterns (`_` error drops, `%v` wrapping) alongside newer wrapped-error conventions."
+    ],
+    "likely_symptoms": [
+      "ignored_open_errors_create_hidden_failures",
+      "log_and_continue_masks_operation_failure",
+      "error_wrapping_contract_is_inconsistent"
+    ],
+    "possible_false_positives": []
+  }
+}

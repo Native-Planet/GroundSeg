@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/backupsvc"
 	"groundseg/click"
 	"groundseg/config"
 	"groundseg/docker"
@@ -11,16 +12,13 @@ import (
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
-	"path"
+	"maps"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 )
 
@@ -28,25 +26,47 @@ var (
 	broadcastInterval = 1 * time.Second // how often we refresh system info
 	broadcastState    structs.AuthBroadcast
 	scheduledPacks    = make(map[string]time.Time)
-	UrbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
-	SchedulePackBus   = make(chan string)
-	SystemTransitions structs.SystemTransitionBroadcast
-	PackMu            sync.RWMutex
-	UrbTransMu        sync.RWMutex
-	SysTransMu        sync.RWMutex
+	urbitTransitions  = make(map[string]structs.UrbitTransitionBroadcast)
+	schedulePackBus   = make(chan string)
+	systemTransitions structs.SystemTransitionBroadcast
+	packMu            sync.RWMutex
+	urbTransMu        sync.RWMutex
+	sysTransMu        sync.RWMutex
 	mu                sync.RWMutex // synchronize access to broadcastState
-	BackupDir         = setBackupDir()
+	leakSink          = func(bState structs.AuthBroadcast) {
+		leak.LeakChan <- bState
+	}
+	BackupDir = backupsvc.ResolveBackupRoot(config.BasePath)
 )
 
-func init() {
-	// initialize broadcastState global var
+// SetLeakSinkForTests replaces the side effect used by BroadcastToClients.
+// Pass nil to restore the default leak-based sink.
+func SetLeakSinkForTests(sink func(structs.AuthBroadcast)) {
+	if sink == nil {
+		leakSink = func(bState structs.AuthBroadcast) {
+			leak.LeakChan <- bState
+		}
+		return
+	}
+	leakSink = sink
+}
+
+func PublishSchedulePack(reason string) {
+	schedulePackBus <- reason
+}
+
+func SchedulePackEvents() <-chan string {
+	return schedulePackBus
+}
+
+func Initialize() error {
 	if err := bootstrapBroadcastState(); err != nil {
-		panic(fmt.Sprintf("Unable to initialize broadcast: %v", err))
+		return fmt.Errorf("unable to initialize broadcast state: %v", err)
 	}
 	if err := LoadStartramRegions(); err != nil {
 		zap.L().Error("Couldn't load StarTram regions")
 	}
-	// go WsDigester()
+	return nil
 }
 
 // serialized single thread for ws writes (mutex instead so this isnt necessary)
@@ -66,15 +86,15 @@ func init() {
 // }
 
 func UpdateScheduledPack(patp string, meldNext time.Time) error {
-	PackMu.Lock()
-	defer PackMu.Unlock()
+	packMu.Lock()
+	defer packMu.Unlock()
 	scheduledPacks[patp] = meldNext
 	return nil
 }
 
 func GetScheduledPack(patp string) time.Time {
-	PackMu.Lock()
-	defer PackMu.Unlock()
+	packMu.Lock()
+	defer packMu.Unlock()
 	nextPack, exists := scheduledPacks[patp]
 	if !exists {
 		return time.Time{}
@@ -129,7 +149,7 @@ func GetStartramServices() error {
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
 	zap.L().Info("Retrieving StarTram region info")
-	regions, err := startram.GetRegions()
+	regions, err := startram.SyncRegions()
 	if err != nil {
 		return err
 	} else {
@@ -142,398 +162,185 @@ func LoadStartramRegions() error {
 
 // this is for building the broadcast objects describing piers
 func ConstructPierInfo() (map[string]structs.Urbit, error) {
-	// get a list of piers
-	conf := config.Conf()
-	piers := conf.Piers
+	settings := config.StartramSettingsSnapshot()
+	piers := settings.Piers
+	updates := make(map[string]structs.Urbit)
 
-	// retrieve backup information
-	remoteBackups := config.StartramConfig.Backups
+	backups := backupSnapshotForPiers(piers, config.GetStartramConfig().Backups)
+	runtimeSnapshot, err := runtimeSnapshotForPiers(piers)
+	if err != nil {
+		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
+		zap.L().Error(errmsg)
+		return updates, err
+	}
+	startramSnapshot := startramSnapshotForPiers(config.GetStartramConfig().Subdomains)
+
+	for pier, status := range runtimeSnapshot.pierStatus {
+		urbit, ok := assembleUrbitView(
+			pier,
+			status,
+			settings,
+			runtimeSnapshot,
+			backups,
+			startramSnapshot,
+		)
+		if ok {
+			updates[pier] = urbit
+		}
+	}
+	return updates, nil
+}
+
+type pierBackupSnapshot struct {
+	remote       structs.Backup
+	localDaily   structs.Backup
+	localWeekly  structs.Backup
+	localMonthly structs.Backup
+}
+
+type pierRuntimeSnapshot struct {
+	currentState structs.AuthBroadcast
+	shipNetworks map[string]string
+	pierStatus   map[string]string
+	hostName     string
+}
+
+type pierStartramSnapshot struct {
+	remoteReadyByURL map[string]bool
+}
+
+func backupSnapshotForPiers(piers []string, remoteBackups []structs.Backup) pierBackupSnapshot {
+	return pierBackupSnapshot{
+		remote:       flattenRemoteBackups(remoteBackups),
+		localDaily:   localBackupsForPeriod(piers, "daily"),
+		localWeekly:  localBackupsForPeriod(piers, "weekly"),
+		localMonthly: localBackupsForPeriod(piers, "monthly"),
+	}
+}
+
+func flattenRemoteBackups(remoteBackups []structs.Backup) structs.Backup {
 	remoteBackupMap := make(structs.Backup)
 	for _, backup := range remoteBackups {
 		for ship, backupInfo := range backup {
 			remoteBackupMap[ship] = backupInfo
 		}
 	}
-	localDailyBackups := make(structs.Backup)
-	localWeeklyBackups := make(structs.Backup)
-	localMonthlyBackups := make(structs.Backup)
-	// get local backups
-	// BackupDir has been set in init
-	// inside BackupDir there is a folder for each ship
-	// each of those folders contains a number of numbered files with no file extension, they are all unix timestamps
-	// backupInfo is a struct with a timestamp and md5
-	// we want to get all the backups for a given ship and add them to localBackups
-	for _, ship := range piers {
-		dailyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "daily", "*"))
-		if err != nil {
-			continue
-		}
-		weeklyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "weekly", "*"))
-		if err != nil {
-			continue
-		}
-		monthlyShipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, "monthly", "*"))
-		if err != nil {
-			continue
-		}
-		for _, backup := range dailyShipBackups {
-			// each backup is a path with the filename being the unix timestamp
-			// strip off the dir and filename to get the timestamp
-			timestamp, err := strconv.Atoi(filepath.Base(backup))
-			if err != nil {
-				continue
-			}
-			localDailyBackups[ship] = append(localDailyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
-		}
-		for _, backup := range weeklyShipBackups {
-			timestamp, err := strconv.Atoi(filepath.Base(backup))
-			if err != nil {
-				continue
-			}
-			localWeeklyBackups[ship] = append(localWeeklyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
-		}
-		for _, backup := range monthlyShipBackups {
-			timestamp, err := strconv.Atoi(filepath.Base(backup))
-			if err != nil {
-				continue
-			}
-			localMonthlyBackups[ship] = append(localMonthlyBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
-		}
-	}
+	return remoteBackupMap
+}
 
-	docker.ContainerStatList = piers
-	updates := make(map[string]structs.Urbit)
-	// load fresh broadcast state
-	currentState := GetState()
-	// get the networks containers are attached to
-	shipNetworks := GetContainerNetworks(piers)
-	// find out whether they're running
-	pierStatus, err := docker.GetShipStatus(piers)
-	if err != nil {
-		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
-		zap.L().Error(errmsg)
-		return updates, err
+func localBackupsForPeriod(piers []string, period string) structs.Backup {
+	localBackups := make(structs.Backup)
+	for _, ship := range piers {
+		shipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, period, "*"))
+		if err != nil {
+			continue
+		}
+		for _, backup := range shipBackups {
+			timestamp, err := strconv.Atoi(filepath.Base(backup))
+			if err != nil {
+				continue
+			}
+			localBackups[ship] = append(localBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
+		}
 	}
+	return localBackups
+}
+
+func runtimeSnapshotForPiers(piers []string) (pierRuntimeSnapshot, error) {
+	return runtimeSnapshotCollector{}.collect(piers)
+}
+
+func resolveBroadcastHostName() string {
 	hostName := system.LocalUrl
 	if hostName == "" {
 		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
 	}
-	// convert the running status into bools
-	for pier, status := range pierStatus {
-		// pull urbit info from json
-		err := config.LoadUrbitConfig(pier)
-		if err != nil {
-			errmsg := fmt.Sprintf("Unable to load %s config: %v", pier, err)
-			zap.L().Error(errmsg)
-			continue
-		}
-		dockerConfig := config.UrbitConf(pier)
-		// get container stats from docker
+	return hostName
+}
 
-		dockerStats := docker.GetContainerStats(pier)
-		urbit := structs.Urbit{}
-		if existingUrbit, exists := currentState.Urbits[pier]; exists {
-			// If the ship already exists in broadcastState, use its current state
-			urbit = existingUrbit
-		}
-		isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-		bootStatus := true
-		if dockerConfig.BootStatus == "ignore" {
-			bootStatus = false
-		}
-		setRemote := false
-		urbitURL := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
-		if dockerConfig.Network == "wireguard" {
-			urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
-			setRemote = true
-		}
-		remoteReady := false
-		for _, subdomain := range config.StartramConfig.Subdomains {
-			if subdomain.URL == dockerConfig.WgURL {
-				if subdomain.Status == "ok" {
-					remoteReady = true
-				}
-			}
-		}
-		urbitAlias := dockerConfig.CustomUrbitWeb
-		minIOAlias := dockerConfig.CustomS3Web
-		showUrbAlias := false
-		if dockerConfig.ShowUrbitWeb == "custom" {
-			showUrbAlias = true
-		}
-		minIOUrl := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
-		minIOPwd := ""
-		if conf.WgRegistered && conf.WgOn {
-			minIOPwd, err = config.GetMinIOPassword(fmt.Sprintf("minio_%s", pier))
-			if err != nil {
-				//zap.L().Debug(fmt.Sprintf("Failed to get MinIO Password: %v", err))
-			}
-		}
-		var disableShipRestarts bool
-		if boolValue, ok := dockerConfig.DisableShipRestarts.(bool); ok {
-			disableShipRestarts = !boolValue
-		}
-		var lusCode string
-		if strings.Contains(pierStatus[pier], "Up") {
-			lusCode, _ = click.GetLusCode(pier)
-		}
-
-		minioLinked := config.GetMinIOLinkedStatus(pier)
-
-		var penpaiCompanionInstalled bool
-		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "penpai", false)
-			if err != nil {
-				penpaiCompanionInstalled = false
-				zap.L().Debug(fmt.Sprintf("Broadcast failed to get penpai desk info for %v: %v", pier, err))
-			}
-			penpaiCompanionInstalled = deskStatus == "running"
-		}
-
-		var gallsegInstalled bool
-		if strings.Contains(pierStatus[pier], "Up") {
-			deskStatus, err := click.GetDesk(pier, "groundseg", false)
-			if err != nil {
-				gallsegInstalled = false
-				zap.L().Debug(fmt.Sprintf("Broadcast failed to get groundseg desk info for %v: %v", pier, err))
-			}
-			gallsegInstalled = deskStatus == "running"
-		}
-
-		startramReminder := true
-		if dockerConfig.StartramReminder == false {
-			startramReminder = false
-		}
-
-		chopOnUpgrade := true
-		if dockerConfig.ChopOnUpgrade == false {
-			chopOnUpgrade = false
-		}
-
-		// pack day
-		days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-		packDay := "Monday"
-		for _, v := range days {
-			if v == dockerConfig.MeldDay {
-				packDay = strings.Title(dockerConfig.MeldDay)
-			}
-		}
-
-		// pack date
-		packDate := 1
-		if dockerConfig.MeldDate > 1 {
-			packDate = dockerConfig.MeldDate
-		}
-
-		// collate all the info from our sources into the struct
-		urbit.Info.LusCode = lusCode
-		urbit.Info.Running = isRunning
-		urbit.Info.Network = shipNetworks[pier]
-		urbit.Info.URL = urbitURL
-		urbit.Info.LoomSize = dockerConfig.LoomSize
-		urbit.Info.DiskUsage = dockerStats.DiskUsage
-		urbit.Info.MemUsage = dockerStats.MemoryUsage
-		urbit.Info.DevMode = dockerConfig.DevMode
-		urbit.Info.Vere = dockerConfig.UrbitVersion
-		urbit.Info.DetectBootStatus = bootStatus
-		urbit.Info.Remote = setRemote
-		urbit.Info.RemoteReady = remoteReady
-		urbit.Info.Vere = dockerConfig.UrbitVersion
-		urbit.Info.MinIOUrl = minIOUrl
-		urbit.Info.MinIOPwd = minIOPwd
-		urbit.Info.UrbitAlias = urbitAlias
-		urbit.Info.MinIOAlias = minIOAlias
-		urbit.Info.ShowUrbAlias = showUrbAlias
-		urbit.Info.MinIOLinked = minioLinked
-		urbit.Info.PackScheduleActive = dockerConfig.MeldSchedule
-		urbit.Info.PackDay = packDay
-		urbit.Info.PackDate = packDate
-		urbit.Info.PackTime = dockerConfig.MeldTime
-		urbit.Info.LastPack = dockerConfig.MeldLast
-		urbit.Info.NextPack = strconv.FormatInt(GetScheduledPack(pier).Unix(), 10)
-		urbit.Info.PackIntervalType = dockerConfig.MeldScheduleType
-		urbit.Info.PackIntervalValue = dockerConfig.MeldFrequency
-		urbit.Info.PenpaiCompanion = penpaiCompanionInstalled
-		urbit.Info.Gallseg = gallsegInstalled
-		urbit.Info.StartramReminder = startramReminder
-		urbit.Info.ChopOnUpgrade = chopOnUpgrade
-		urbit.Info.SizeLimit = dockerConfig.SizeLimit
-		urbit.Info.RemoteTlonBackupsEnabled = dockerConfig.RemoteTlonBackup
-		urbit.Info.LocalTlonBackupsEnabled = dockerConfig.LocalTlonBackup
-		urbit.Info.DisableShipRestarts = disableShipRestarts
-		urbit.Info.BackupTime = dockerConfig.BackupTime
-		urbit.Info.SnapTime = dockerConfig.SnapTime
-		if remoteBak, exists := remoteBackupMap[pier]; exists {
-			urbit.Info.RemoteTlonBackups = remoteBak
-		}
-		if localDailyBak, exists := localDailyBackups[pier]; exists {
-			urbit.Info.LocalDailyTlonBackups = localDailyBak
-		}
-		if localWeeklyBak, exists := localWeeklyBackups[pier]; exists {
-			urbit.Info.LocalWeeklyTlonBackups = localWeeklyBak
-		}
-		if localMonthlyBak, exists := localMonthlyBackups[pier]; exists {
-			urbit.Info.LocalMonthlyTlonBackups = localMonthlyBak
-		}
-		//urbit.Info.Backups = backups
-		UrbTransMu.RLock()
-		urbit.Transition = UrbitTransitions[pier]
-		UrbTransMu.RUnlock()
-
-		// and insert the struct into the map we will use as input for the broadcast struct
-		updates[pier] = urbit
+func startramSnapshotForPiers(subdomains []structs.Subdomain) pierStartramSnapshot {
+	readyByURL := make(map[string]bool, len(subdomains))
+	for _, subdomain := range subdomains {
+		readyByURL[subdomain.URL] = subdomain.Status == "ok"
 	}
-	return updates, nil
+	return pierStartramSnapshot{
+		remoteReadyByURL: readyByURL,
+	}
+}
+
+func assembleUrbitView(
+	pier string,
+	status string,
+	settings config.StartramSettings,
+	runtimeSnapshot pierRuntimeSnapshot,
+	backups pierBackupSnapshot,
+	startramSnapshot pierStartramSnapshot,
+) (structs.Urbit, bool) {
+	return urbitViewMapper{}.assemble(
+		pier,
+		status,
+		settings,
+		runtimeSnapshot,
+		backups,
+		startramSnapshot,
+	)
+}
+
+func lusCodeIfRunning(pier string, status string) string {
+	if strings.Contains(status, "Up") {
+		lusCode, _ := click.GetLusCode(pier)
+		return lusCode
+	}
+	return ""
+}
+
+func deskInstalledIfRunning(pier string, status string, desk string) bool {
+	if !strings.Contains(status, "Up") {
+		return false
+	}
+	deskStatus, err := click.GetDesk(pier, desk, false)
+	if err != nil {
+		zap.L().Debug(fmt.Sprintf("Broadcast failed to get %s desk info for %v: %v", desk, pier, err))
+		return false
+	}
+	return deskStatus == "running"
+}
+
+func boolSettingWithDefaultTrue(setting any) bool {
+	if value, ok := setting.(bool); ok {
+		return value
+	}
+	return true
+}
+
+func normalizePackSchedule(meldDay string, meldDate int) (string, int) {
+	days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+	packDay := "Monday"
+	for _, day := range days {
+		if day == meldDay {
+			packDay = strings.Title(meldDay)
+			break
+		}
+	}
+	packDate := 1
+	if meldDate > 1 {
+		packDate = meldDate
+	}
+	return packDay, packDate
 }
 
 func constructAppsInfo() structs.Apps {
-	var apps structs.Apps
-	conf := config.Conf()
-
-	// penpai
-	var modelTitles []string
-	// Iterate through penpais to extract modelTitle
-	for _, penpaiInfo := range conf.PenpaiModels {
-		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
-	}
-	apps.Penpai.Info.Models = modelTitles
-	apps.Penpai.Info.Allowed = conf.PenpaiAllow
-	apps.Penpai.Info.ActiveModel = conf.PenpaiActive
-	apps.Penpai.Info.Running = conf.PenpaiRunning
-	apps.Penpai.Info.MaxCores = runtime.NumCPU() - 1
-	apps.Penpai.Info.ActiveCores = conf.PenpaiCores
-	return apps
+	return appInfoCollector{}.collect()
 }
 
 func constructProfileInfo() structs.Profile {
-	// Build startram struct
-	var startramInfo structs.Startram
-	// Information from config
-	conf := config.Conf()
-	startramInfo.Info.Registered = conf.WgRegistered
-	startramInfo.Info.Running = conf.WgOn
-	startramInfo.Info.Endpoint = conf.EndpointUrl
-	startramInfo.Info.RemoteBackupReady = conf.RemoteBackupPassword != ""
-	startramInfo.Info.BackupTime = config.BackupTime.Format("3:04PM MST")
-	// Information from startram
-	startramInfo.Info.Region = config.StartramConfig.Region
-	startramInfo.Info.Expiry = config.StartramConfig.Lease
-	startramInfo.Info.Renew = config.StartramConfig.Ongoing == 0
-	startramInfo.Info.UrlID = config.StartramConfig.UrlID
-
-	startramServices := []string{}
-	for _, subdomain := range config.StartramConfig.Subdomains {
-		// examples of subdomain.URL
-		/*
-			console.s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
-			console.s3.worbep-halrec-nallux-dozryl.nativeplanet.live
-			s3.watmyl-ponrup-nallux-dozryl.nativeplanet.live
-			s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
-			fadlyn-rivsul-nallux-dozryl.nativeplanet.live
-			ames.lablet-nallux-dozryl.nativeplanet.live
-			ames.ladsec-rinwyt-nallux-dozryl.nativeplanet.live
-			bucket.s3.wolryx-rosbyn-nallux-dozryl.nativeplanet.live
-			bucket.s3.worbep-halrec-nallux-dozryl.nativeplanet.live
-			console.s3.fadlyn-rivsul-nallux-dozryl.nativeplanet.live
-			console.s3.lablet-nallux-dozryl.nativeplanet.live
-		*/
-		//startramServices := make(map[string]structs.StartramService)
-		parts := strings.Split(subdomain.URL, ".")
-		// Check if there are at least three elements
-		if len(parts) < 3 {
-			zap.L().Warn(fmt.Sprintf("startram services information invalid url: %s", subdomain.URL))
-			continue
-		} else {
-			// Select the third last item
-			patp := parts[len(parts)-3]
-
-			// Put ships in slice
-			shipExists := false
-			for _, ship := range startramServices {
-				if ship == patp {
-					shipExists = true
-					break
-				}
-			}
-			if !shipExists {
-				startramServices = append(startramServices, patp)
-			}
-		}
-	}
-	startramInfo.Info.StartramServices = startramServices
-
-	// Get Regions
-	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
-	// Build profile struct
-	var profile structs.Profile
-	profile.Startram = startramInfo
-	return profile
+	return profileInfoCollector{}.collect()
 }
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
-	// init
-	var ramObj []uint64
-	var sysInfo structs.System
-	conf := config.Conf()
-
-	// Linux update
-	sysInfo.Info.Updates = system.SystemUpdates
-
-	// Wifi
-	sysInfo.Info.Wifi = system.WifiInfo
-	// Sys details
-	usedRam, totalRam := system.GetMemory()
-	sysInfo.Info.Usage.RAM = append(ramObj, usedRam, totalRam)
-	sysInfo.Info.Usage.CPU = system.GetCPU()
-	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
-	if diskUsage, err := system.GetDisk(); err != nil {
-		zap.L().Warn(fmt.Sprintf("Error getting disk usage: %v", err))
-	} else {
-		sysInfo.Info.Usage.Disk = diskUsage
-		sysInfo.Info.Usage.SwapFile = conf.SwapVal
-	}
-	drives := make(map[string]structs.SystemDrive)
-	// Block Devices
-	if blockDevices, err := system.ListHardDisks(); err != nil {
-		zap.L().Warn(fmt.Sprintf("Error getting block devices: %v", err))
-	} else {
-		for _, dev := range blockDevices.BlockDevices {
-			if strings.HasPrefix(dev.Name, "mmcblk") {
-				continue
-			}
-			// groundseg formatted drives do not have partitions
-			if len(dev.Children) < 1 {
-				// is the device mounted?
-				if system.IsDevMounted(dev) {
-					// check if mountpoint meets convention
-					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
-					matches := re.FindStringSubmatch(dev.Mountpoints[0])
-					if len(matches) > 1 {
-						n, err := strconv.Atoi(matches[1])
-						if err != nil {
-							continue
-						}
-						drives[dev.Name] = structs.SystemDrive{
-							DriveID: n,
-						}
-					}
-				} else { // device not mounted
-					drives[dev.Name] = structs.SystemDrive{
-						DriveID: 0, // default value, only for empty
-					}
-				}
-			}
-			sysInfo.Info.SMART = system.SmartResults
-		}
-	}
-	sysInfo.Info.Drives = drives
-
-	// Transition
-	sysInfo.Transition = SystemTransitions
-
-	return sysInfo
+	return systemInfoCollector{}.collect()
 }
 
 // return a map of ships and their networks
@@ -563,7 +370,42 @@ func UpdateBroadcast(broadcast structs.AuthBroadcast) {
 func GetState() structs.AuthBroadcast {
 	mu.RLock()
 	defer mu.RUnlock()
-	return broadcastState
+	return cloneBroadcastState(broadcastState)
+}
+
+func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
+	out := in
+	if in.Urbits != nil {
+		out.Urbits = make(map[string]structs.Urbit, len(in.Urbits))
+		for patp, urbit := range in.Urbits {
+			cloned := urbit
+			cloned.Info.RemoteTlonBackups = append([]structs.BackupObject(nil), urbit.Info.RemoteTlonBackups...)
+			cloned.Info.LocalDailyTlonBackups = append([]structs.BackupObject(nil), urbit.Info.LocalDailyTlonBackups...)
+			cloned.Info.LocalWeeklyTlonBackups = append([]structs.BackupObject(nil), urbit.Info.LocalWeeklyTlonBackups...)
+			cloned.Info.LocalMonthlyTlonBackups = append([]structs.BackupObject(nil), urbit.Info.LocalMonthlyTlonBackups...)
+			out.Urbits[patp] = cloned
+		}
+	}
+	if in.System.Info.Drives != nil {
+		out.System.Info.Drives = maps.Clone(in.System.Info.Drives)
+	}
+	if in.System.Info.SMART != nil {
+		out.System.Info.SMART = maps.Clone(in.System.Info.SMART)
+	}
+	if in.System.Info.Usage.Disk != nil {
+		out.System.Info.Usage.Disk = maps.Clone(in.System.Info.Usage.Disk)
+	}
+	out.System.Info.Usage.RAM = append([]uint64(nil), in.System.Info.Usage.RAM...)
+	out.System.Info.Wifi.Networks = append([]string(nil), in.System.Info.Wifi.Networks...)
+	if in.Profile.Startram.Info.Regions != nil {
+		out.Profile.Startram.Info.Regions = maps.Clone(in.Profile.Startram.Info.Regions)
+	}
+	out.Profile.Startram.Info.StartramServices = append([]string(nil), in.Profile.Startram.Info.StartramServices...)
+	out.System.Transition.Error = append([]string(nil), in.System.Transition.Error...)
+	out.Logs.Containers.Wireguard.Logs = append([]any(nil), in.Logs.Containers.Wireguard.Logs...)
+	out.Logs.System.Logs = append([]any(nil), in.Logs.System.Logs...)
+	out.Apps.Penpai.Info.Models = append([]string(nil), in.Apps.Penpai.Info.Models...)
+	return out
 }
 
 // return json string of current broadcast state
@@ -584,7 +426,7 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
 	bState := GetState()
-	leak.LeakChan <- bState // vere 3.0
+	leakSink(bState) // vere 3.0
 	cm := auth.GetClientManager()
 	if cm.HasAuthSession() {
 		authJson, err := GetStateJson(bState)
@@ -613,43 +455,4 @@ func ReloadUrbits() error {
 	broadcastState.Urbits = urbits
 	mu.Unlock()
 	return nil
-}
-
-func setBackupDir() string {
-	mmc, _ := isMountedMMC(config.BasePath)
-	if mmc {
-		return "/media/data/backup"
-	} else {
-		return filepath.Join(config.BasePath, "backup")
-	}
-
-}
-
-func isMountedMMC(dirPath string) (bool, error) {
-	partitions, err := disk.Partitions(true)
-	if err != nil {
-		return false, fmt.Errorf("failed to get list of partitions")
-	}
-	/*
-		the outer loop loops from child up the unix path
-		until a mountpoint is found
-	*/
-OuterLoop:
-	for {
-		for _, p := range partitions {
-			if p.Mountpoint == dirPath {
-				devType := "mmc"
-				if strings.Contains(p.Device, devType) {
-					return true, nil
-				} else {
-					break OuterLoop
-				}
-			}
-		}
-		if dirPath == "/" {
-			break
-		}
-		dirPath = path.Dir(dirPath) // Reduce the path by one level
-	}
-	return false, nil
 }

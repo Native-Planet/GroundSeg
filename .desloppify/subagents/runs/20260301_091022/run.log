@@ -1,0 +1,40 @@
+2026-03-01T09:10:23+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=60m selected=[1, 2, 3, 4, 5, 6, 7]
+2026-03-01T09:10:23+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_091022
+2026-03-01T09:10:23+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260301_091022.json
+2026-03-01T09:10:23+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-01T09:10:23+00:00 batch-queued batch=1 position=1/7
+2026-03-01T09:10:23+00:00 batch-start batch=1 position=1/7
+2026-03-01T09:10:23+00:00 batch-queued batch=2 position=2/7
+2026-03-01T09:10:23+00:00 batch-start batch=2 position=2/7
+2026-03-01T09:10:23+00:00 batch-queued batch=3 position=3/7
+2026-03-01T09:10:23+00:00 batch-start batch=3 position=3/7
+2026-03-01T09:10:23+00:00 batch-queued batch=4 position=4/7
+2026-03-01T09:10:23+00:00 batch-queued batch=5 position=5/7
+2026-03-01T09:10:23+00:00 batch-queued batch=6 position=6/7
+2026-03-01T09:10:23+00:00 batch-queued batch=7 position=7/7
+2026-03-01T09:10:38+00:00 heartbeat active=[1, 2, 3] queued=[4, 5, 6, 7] elapsed={1:15, 2:15, 3:15}
+2026-03-01T09:10:53+00:00 heartbeat active=[1, 2, 3] queued=[4, 5, 6, 7] elapsed={1:30, 2:30, 3:30}
+2026-03-01T09:11:02+00:00 batch-start batch=4 position=4/7
+2026-03-01T09:11:02+00:00 batch-done batch=3 position=3/7 code=0 elapsed=39
+2026-03-01T09:11:13+00:00 batch-start batch=5 position=5/7
+2026-03-01T09:11:13+00:00 batch-done batch=1 position=1/7 code=0 elapsed=50
+2026-03-01T09:11:28+00:00 heartbeat active=[2, 4, 5] queued=[6, 7] elapsed={2:65, 4:26, 5:15}
+2026-03-01T09:11:43+00:00 heartbeat active=[2, 4, 5] queued=[6, 7] elapsed={2:80, 4:41, 5:30}
+2026-03-01T09:11:58+00:00 heartbeat active=[2, 4, 5] queued=[6, 7] elapsed={2:95, 4:56, 5:45}
+2026-03-01T09:12:13+00:00 heartbeat active=[2, 4, 5] queued=[6, 7] elapsed={2:110, 4:71, 5:60}
+2026-03-01T09:12:15+00:00 batch-start batch=6 position=6/7
+2026-03-01T09:12:15+00:00 batch-done batch=2 position=2/7 code=0 elapsed=112
+2026-03-01T09:12:22+00:00 batch-start batch=7 position=7/7
+2026-03-01T09:12:22+00:00 batch-done batch=5 position=5/7 code=0 elapsed=69
+2026-03-01T09:12:26+00:00 batch-done batch=4 position=4/7 code=0 elapsed=84
+2026-03-01T09:12:41+00:00 heartbeat active=[6, 7] queued=[] elapsed={6:26, 7:19}
+2026-03-01T09:12:56+00:00 heartbeat active=[6, 7] queued=[] elapsed={6:41, 7:34}
+2026-03-01T09:13:11+00:00 heartbeat active=[6, 7] queued=[] elapsed={6:56, 7:49}
+2026-03-01T09:13:26+00:00 heartbeat active=[6, 7] queued=[] elapsed={6:71, 7:64}
+2026-03-01T09:13:41+00:00 heartbeat active=[6, 7] queued=[] elapsed={6:86, 7:79}
+2026-03-01T09:13:55+00:00 batch-done batch=6 position=6/7 code=0 elapsed=100
+2026-03-01T09:14:10+00:00 heartbeat active=[7] queued=[] elapsed={7:108}
+2026-03-01T09:14:25+00:00 heartbeat active=[7] queued=[] elapsed={7:123}
+2026-03-01T09:14:27+00:00 batch-done batch=7 position=7/7 code=0 elapsed=125
+2026-03-01T09:14:27+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_091022/run_summary.json
+2026-03-01T09:14:27+00:00 run-finished successful=[1, 2, 3, 4, 5, 6, 7] failed=[] imported=/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_091022/holistic_findings_merged.json

@@ -1,0 +1,406 @@
+{
+  "assessments": {
+    "api_surface_coherence": 47.8,
+    "cross_module_architecture": 46.4,
+    "test_strategy": 53.6
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Global mutable coordination points are spread across packages: `config.VersionServerReady`/`config.VersionInfo` are package vars in `goseg/config/version.go` and mutated in `SyncVersionInfo`, while `startram.Regions` and `startram.EventBus` are package vars in `goseg/startram/startram.go` and mutated/emitted in `SyncRegions`/`SyncRetrieve`.",
+        "`goseg/startram/startram.go` mixes remote API calls, config mutation (`config.UpdateConf`), event publication, docker command execution, filesystem restore logic, archive extraction, and cryptography in one package-level module, creating a large change blast radius.",
+        "`goseg/handler/upload.go` routes websocket actions by string literals and directly invokes importer session mutation (`importer.SetUploadSession`, `importer.Reset`), tying transport message shape to importer lifecycle APIs without an explicit boundary contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "test_strategy": {
+      "evidence": [
+        "goseg/startram/startram.go contains critical registration/retrieval and state mutation flows (`FetchRegions`, `Retrieve`, `SyncRetrieve`, `Register`, `SvcCreate`, `SvcDelete`) across lines 38-343, but goseg/startram/startram_test.go only tests `maskPubkey` and encrypt/decrypt helpers.",
+        "goseg/config/version.go implements retrying network fetch, channel selection, persistence, and global state mutation (lines 22-139), but available config tests do not cover these version paths.",
+        "goseg/handler/upload.go is a command-dispatch boundary for importer actions (lines 12-31), while handler tests shown are integration-tagged utility tests and do not validate upload action routing or error contracts.",
+        "README.md frontend quality gate (lines 64-72) enforces only UI checks (`npm run test`, `npm run build`) and does not define a backend gate for these Go runtime-critical paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Adjacent public APIs expose incompatible failure contracts: config.CheckVersion()/SyncVersionInfo() return (structs.Channel, bool) and suppress underlying errors, while config.LocalVersion() panics on file or JSON failures.",
+        "Startram public transport methods use inconsistent HTTP contracts: FetchRegions() and Retrieve() do not validate HTTP status before JSON decode, but GetBackup() and UploadBackup() explicitly gate on status codes.",
+        "Startram includes overlapping read APIs (FetchRegions, GetRegions, SyncRegions; Retrieve, SyncRetrieve) where similarly named functions differ in side effects (cache mutation, config mutation, event emission), making behavior hard to predict from names alone.",
+        "README documents frontend quality gates only, while backend exported APIs in handler/config/startram have no stated error contract or naming/side-effect contract guidance."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_coordination_hub",
+      "summary": "Cross-package workflows depend on mutable package globals rather than explicit state interfaces.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`goseg/config/version.go` defines package globals (`VersionServerReady`, `VersionInfo`) and mutates them in `SyncVersionInfo` (lines 120-139), making version state implicitly shared.",
+        "`goseg/startram/startram.go` defines `EventBus` and `Regions` as package globals (lines 33-35), then mutates/sends from `SyncRegions` and `SyncRetrieve` (lines 73, 138), coupling callers to hidden singleton state.",
+        "`SyncRetrieve` also mutates external package global state (`config.StartramConfig` at line 122), extending hidden write paths across package boundaries."
+      ],
+      "suggestion": "Introduce explicit stateful services (e.g., `VersionService`, `StartramService`) with injected dependencies and synchronized internal state; expose read/write methods instead of exported mutable globals and cross-package direct global assignment.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_singleton_state"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_god_module_boundary_collapse",
+      "summary": "The startram package centralizes unrelated responsibilities, creating a god-module dependency hub.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`goseg/startram/startram.go` (~900 lines) combines HTTP client operations (`FetchRegions`, `Register`, `GetBackup`), config persistence side effects (`config.UpdateConf`, `config.StartramConfig`), event publication (`EventBus <- ...`), and backup restore internals (`writeBackupToVolume`, archive extraction, docker inspect command execution).",
+        "Direct external boundary calls are interleaved with domain logic (`exec.Command` in `writeBackupToVolume`, `os.WriteFile` to `/opt/nativeplanet/groundseg/restore`, and network calls via `http.Get`/`http.Post`) with no adapter boundaries.",
+        "By contrast, `goseg/config/version.go` already isolates version-fetch and persistence helpers, showing that startram\u2019s mixed concerns are not forced by project style."
+      ],
+      "suggestion": "Split startram into boundary-focused components: API client, registration orchestration, backup transport/crypto, and restore I/O adapters; keep orchestration layer free of direct `os/exec/http` primitives.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_boundary_abstractions"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_to_domain_string_coupling",
+      "summary": "Websocket handler logic is tightly coupled to importer internals through action-string dispatch and direct side-effect calls.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`UploadHandler` switches on raw action strings (`open-endpoint`, `reset`) and directly calls importer mutators (`importer.SetUploadSession`, `importer.Reset`) in the transport layer.",
+        "No typed command boundary or service interface is present in `upload.go`, so adding/renaming upload actions requires cross-module edits and synchronized string contracts.",
+        "A similar pattern appears in startram where endpoint paths and behavior are embedded directly in package functions, indicating repeated boundary leakage instead of stable module interfaces."
+      ],
+      "suggestion": "Introduce a typed upload command/service boundary: parse transport payload into domain commands, then dispatch via an interface implemented by importer/session services; centralize action constants and validation in one module.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_boundary_abstractions"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "environment_path_and_runtime_coupling",
+      "summary": "Core flows are hard-coupled to host filesystem and runtime tooling paths, reducing boundary integrity and portability.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`startram.go` writes restore artifacts to fixed host paths (`/opt/nativeplanet/groundseg/restore`, `/media/data/backup`) and shells out to `docker inspect` for volume discovery, binding domain operations to a specific runtime environment.",
+        "`version.go` persists metadata directly under `BasePath/settings/version_info.json`, combining version domain behavior with local file layout assumptions.",
+        "These direct environment dependencies are embedded in business methods rather than behind injected storage/runtime adapters."
+      ],
+      "suggestion": "Move filesystem/runtime specifics behind interfaces (`BackupStore`, `VolumeResolver`, `VersionStore`) and pass concrete implementations from bootstrap wiring; keep domain methods path/tool agnostic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_infrastructure_dependencies"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_boundary_drift",
+      "summary": "Core runtime contracts depend on mutable package globals, creating implicit cross-module coupling and brittle behavior boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`startram.go` exposes and mutates `EventBus`/`Regions` as globals (lines 33-36, 73, 138), so consumers are coupled to package state and call ordering instead of explicit interfaces.",
+        "`version.go` similarly maintains global readiness/version state (lines 17-20, 120, 133, 137-138), making behavior depend on prior invocations across modules.",
+        "README describes frontend ownership/contracts but no backend runtime contract boundaries for these shared-state modules (lines 55-72)."
+      ],
+      "suggestion": "Introduce explicit service structs for version/startram operations with injected dependencies and return values, move mutable state behind narrow interfaces, and document backend module ownership/contracts in README architecture sections to align runtime behavior with governance docs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_shared_state_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_read_sync_contract_split",
+      "summary": "Startram read/sync API variants encode side effects inconsistently, leaving compatibility paths that blur architectural intent.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`FetchRegions` is side-effect-free while `SyncRegions` mutates global cache, but `GetRegions` is kept for compatibility and routes to fetch-only behavior (lines 38-80), leaving three near-overlapping entry points.",
+        "The file mixes fetch-only and mutating variants (`Retrieve` vs `SyncRetrieve`, lines 82-140) without a documented backend contract in README."
+      ],
+      "suggestion": "Consolidate to a single explicit read API and a clearly named sync/update API, deprecate compatibility aliases with a documented migration policy, and add backend contract notes in README describing which calls are pure reads vs state-mutating sync operations.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_shared_state_contracts"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "critical_startram_paths_untested",
+      "summary": "High-risk network and state-transition flows in startram are effectively unprotected by tests.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/startram/startram_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`startram.go` implements registration/retrieval/service lifecycle over HTTP with config mutation and event emission (lines 38-343).",
+        "`startram_test.go` only covers masking and encrypt/decrypt helpers, with no tests for HTTP failures, response parsing contracts, or state mutation behavior.",
+        "README quality gate is frontend-only and does not require backend test execution for these paths (lines 64-72)."
+      ],
+      "suggestion": "Add table-driven tests around `FetchRegions`/`Retrieve`/`Register`/`SvcCreate`/`SvcDelete` using `httptest` servers and isolated config state, then extend the documented quality gate to include Go test execution for runtime modules.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "version_update_contract_untested",
+      "summary": "Version sync behavior lacks contract tests despite retries, persistence, and global state updates.",
+      "related_files": [
+        "goseg/config/version.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`version.go` contains retry loops, channel selection, file persistence, and global readiness state changes (lines 22-139).",
+        "No tests in reviewed coverage validate malformed payload handling, missing channel behavior, persistence failures, or global state transitions.",
+        "README quality gate does not define backend checks that would fail on regressions in this runtime path."
+      ],
+      "suggestion": "Introduce dedicated tests for `fetchVersionFromServer`, `resolveVersionForConfiguredChannel`, and `SyncVersionInfo` (success/failure matrix including invalid JSON, missing branch, write failure), and require these tests in the documented quality gate.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "upload_dispatch_unverified",
+      "summary": "Upload command dispatch lacks focused tests for action routing and error contract integrity.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`UploadHandler` branches on action strings and maps failures to user-facing errors (lines 12-31), including a path that drops the underlying `SetUploadSession` error detail.",
+        "Reviewed test surface does not show targeted tests validating recognized actions, unknown action rejection, and propagation/format of returned errors for this handler boundary.",
+        "README quality gate does not require backend handler-level tests."
+      ],
+      "suggestion": "Add unit tests for `UploadHandler` covering each action and error path (including malformed JSON and unknown action), with importer dependencies stubbed so routing and error contracts are asserted deterministically.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "backend_quality_gate_gap"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "mixed_failure_contracts_config_vs_startram",
+      "summary": "Public API failures are represented inconsistently (bool sentinel, panic, and error returns), making caller handling non-uniform.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "config.CheckVersion() and config.SyncVersionInfo() return (structs.Channel, bool) and drop concrete error context on fetch/parse failures.",
+        "config.LocalVersion() panics on read/unmarshal failure instead of returning an error value.",
+        "Most startram exported methods (for example Register, SvcCreate, Retrieve) return error and expect explicit caller handling."
+      ],
+      "suggestion": "Standardize exported runtime API error contracts across modules: return typed/errors-wrapped `error` from version APIs, remove panic from LocalVersion (or isolate panic-only boot path behind internal function), and keep sentinel booleans only as additive status fields where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "startram_http_contract_drift",
+      "summary": "Similar Startram HTTP-facing APIs enforce response validity differently, creating unpredictable success/failure behavior.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "startram.FetchRegions() and startram.Retrieve() read and unmarshal bodies without checking HTTP status code, so non-2xx JSON-like payloads can be treated as valid decode attempts.",
+        "startram.GetBackup() and startram.UploadBackup() explicitly check response status and return contract-aware errors.",
+        "config.fetchVersionFromServer() also omits HTTP status checks and directly unmarshals response bodies, mirroring the same inconsistency in another module."
+      ],
+      "suggestion": "Introduce a shared HTTP response helper for exported API functions that enforces status-code validation, body parsing, and consistent wrapped errors before unmarshalling across config and startram.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transport_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "ambiguous_sync_fetch_naming_sideeffects",
+      "summary": "Region and retrieve APIs have overlapping names but materially different side effects, weakening API discoverability.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "FetchRegions() is read-only, SyncRegions() mutates package-global Regions, and GetRegions() is a compatibility alias for FetchRegions() despite getter naming usually implying cached read.",
+        "Retrieve() is read-only, while SyncRetrieve() mutates config.StartramConfig, may mutate persisted config via UpdateConf, and emits EventBus events.",
+        "README does not document backend naming/side-effect conventions, so callers have to inspect implementation to know mutation behavior."
+      ],
+      "suggestion": "Refactor to explicit verb contracts (`Load*` for pure fetch, `Refresh*` for state mutation) and document side effects in exported API docs and README backend section; deprecate ambiguous aliases like GetRegions().",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "semantic_naming_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "overloaded_signature_and_dead_param_backup_api",
+      "summary": "Backup APIs expose overloaded booleans and dead parameters, signaling unstable boundary design.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl) includes backupPassword but never uses it in request construction or auth flow.",
+        "RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string) multiplexes multiple behaviors via booleans (`remote`, `dev`) and mode string (`bakType`) in one public entrypoint.",
+        "README has no backend API contract section clarifying these modes, increasing misuse risk."
+      ],
+      "suggestion": "Replace multi-flag signatures with request structs or separate explicit operations (for example RestoreRemoteBackup/RestoreLocalBackup) and remove unused params from exported signatures to keep contracts honest.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "boundary_shape_overload"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "upload_action_contract_is_stringly_and_underdocumented",
+      "summary": "Upload handler command surface is stringly typed and inconsistent with actionable error reporting.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "UploadHandler switches on raw action strings (`open-endpoint`, `reset`) with no typed constants or shared enum-like contract.",
+        "On SetUploadSession failure, error message reports endpoint value rather than wrapped underlying error, reducing contract clarity for callers.",
+        "README does not define upload action names/shape, leaving external clients dependent on code internals."
+      ],
+      "suggestion": "Define canonical upload action constants/schema in shared structs, validate payloads against that contract, and return wrapped underlying errors; add a backend API action table to README or dedicated docs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_shape_overload"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.444,
+    "evidence_density": 0.983,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 35.544,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 4,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 104,
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "cross_module_architecture",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/config/version.go",
+    "goseg/handler/upload.go",
+    "goseg/startram/startram.go",
+    "README.md"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_090908",
+    "created_at": "2026-03-01T09:10:05+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "6c6714f4e3f94b9e99ded233c3c7e6cd6050a6d631b7b6e27af03a007431b52b"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "api_surface_coherence",
+      "cross_module_architecture",
+      "test_strategy"
+    ],
+    "imported_dimensions": [
+      "api_surface_coherence",
+      "cross_module_architecture",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

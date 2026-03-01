@@ -10,50 +10,71 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	getClientManagerForLoop   = auth.GetClientManager
+	getLickStatusesForLoop    = leak.GetLickStatuses
+	constructSystemInfoForLoop = constructSystemInfo
+	constructPierInfoForLoop   = ConstructPierInfo
+	constructAppsInfoForLoop   = constructAppsInfo
+	constructProfileInfoForLoop = constructProfileInfo
+	updateBroadcastForLoop     = UpdateBroadcast
+	broadcastToClientsForLoop  = BroadcastToClients
+)
+
 func BroadcastLoop() {
 	ticker := time.NewTicker(broadcastInterval)
 	for {
 		select {
 		case <-ticker.C:
-			cm := auth.GetClientManager()
-			if cm.HasAuthSession() || len(leak.GetLickStatuses()) > 0 {
-				// refresh loop for host info
-				systemInfo := constructSystemInfo()
-
-				// pier info
-				pierInfo, err := ConstructPierInfo()
-				if err != nil {
-					zap.L().Error(fmt.Sprintf("Unable to build pier info: %v", err))
-				}
-
-				// apps info
-				appsInfo := constructAppsInfo()
-
-				// profile info
-				profileInfo := constructProfileInfo()
-
-				// Retrieve broadcastState
-				mu.RLock()
-				newState := broadcastState
-				mu.RUnlock()
-
-				// Preserve transitions
-				systemInfo = PreserveSystemTransitions(newState, systemInfo)
-				pierInfo = PreserveUrbitsTransitions(newState, pierInfo)
-				profileInfo = PreserveProfileTransitions(newState, profileInfo)
-
-				// Update broadcast state
-				newState.System = systemInfo
-				newState.Urbits = pierInfo
-				newState.Apps = appsInfo
-				newState.Profile = profileInfo
-
-				UpdateBroadcast(newState)
-
-				// broadcast
-				BroadcastToClients()
-			}
+			runBroadcastTick()
 		}
+	}
+}
+
+func runBroadcastTick() {
+	cm := getClientManagerForLoop()
+	if cm == nil {
+		return
+	}
+	if cm.HasAuthSession() || len(getLickStatusesForLoop()) > 0 {
+		// refresh loop for host info
+		systemInfo := constructSystemInfoForLoop()
+
+		// pier info
+		pierInfo, err := constructPierInfoForLoop()
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("Unable to build pier info: %v", err))
+		}
+		if pierInfo == nil {
+			pierInfo = make(map[string]structs.Urbit)
+		}
+
+		// apps info
+		appsInfo := constructAppsInfoForLoop()
+
+		// profile info
+		profileInfo := constructProfileInfoForLoop()
+
+		// Retrieve broadcastState
+		mu.RLock()
+		newState := broadcastState
+		mu.RUnlock()
+
+		// Preserve transitions
+		systemInfo = PreserveSystemTransitions(newState, systemInfo)
+		pierInfo = PreserveUrbitsTransitions(newState, pierInfo)
+		profileInfo = PreserveProfileTransitions(newState, profileInfo)
+
+		// Update broadcast state
+		newState.System = systemInfo
+		newState.Urbits = pierInfo
+		newState.Apps = appsInfo
+		newState.Profile = profileInfo
+
+		updateBroadcastForLoop(newState)
+
+		// broadcast
+		broadcastToClientsForLoop()
 	}
 }
 

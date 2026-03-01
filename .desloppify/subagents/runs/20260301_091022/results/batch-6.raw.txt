@@ -1,0 +1,118 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 63.5
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/handler/urbit.go` combines transport dispatch, domain mutation, Docker lifecycle control, DNS checks, and transition signaling in a single 1400+ line module (e.g., action switch at lines 34-113 plus operational flows at 224-594).",
+        "Cross-package startup behavior is encoded in multiple `init()` functions with side effects (`goseg/config/config.go` 58-173, `goseg/docker/docker.go` 35-59, `goseg/broadcast/broadcast.go` 39-48, `goseg/auth/auth.go` 61-74, `goseg/system/wifi.go` 45-55), creating implicit runtime coupling.",
+        "Same control choreography is hand-copied across features, especially transition/error wrappers and polling loops (`goseg/handler/urbit.go` 224-390, `goseg/importer/importer.go` 504-591, `goseg/docker/docker.go` 262-503 vs 426-503)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "handler_god_module_action_router",
+      "summary": "Urbit handler file is a god module with mixed orchestration and domain logic",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/handler/handler.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`UrbitHandler` routes >30 string actions in one switch (`goseg/handler/urbit.go` 34-113), while the same file also implements long-running operational flows (desk install/uninstall, pack/meld lifecycle, DNS alias checks).",
+        "`NewShipHandler` in `goseg/handler/handler.go` repeats similar orchestration concerns (payload parsing, filesystem decisions, side-effect execution, transition signaling) rather than delegating to focused service layers.",
+        "`configureUploadedPier` in `goseg/importer/importer.go` similarly mixes workflow state machine, storage setup, container lifecycle, and post-boot networking concerns."
+      ],
+      "suggestion": "Split websocket action dispatch from operational workflows: keep thin handlers that decode/validate and delegate to dedicated services (`ship_lifecycle_service`, `desk_service`, `backup_service`). Replace string-switch routing with a map of action -> command handler to isolate responsibilities and reduce growth pressure in single files.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_orchestration_not_separated_from_transport"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "repeated_transition_workflow_templates",
+      "summary": "Transition/error/polling workflows are duplicated instead of abstracted",
+      "related_files": [
+        "goseg/handler/urbit.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "Install/uninstall flows for `penpai` and `gallseg` in `goseg/handler/urbit.go` (224-390) duplicate the same template: set loading transition, local `handleError`, sleep/poll loop, success transition, deferred reset.",
+        "`waitForShipReady` and `importShipToggleRemote` in `goseg/importer/importer.go` use ad-hoc ticker loops with similar 'poll until condition then transition' choreography instead of shared primitives.",
+        "`StartContainer` and `CreateContainer` in `goseg/docker/docker.go` duplicate container-type switch/config assembly and image-resolution setup logic (262-309 vs 431-466 and 311-320 vs 467-476)."
+      ],
+      "suggestion": "Introduce reusable workflow helpers: a generic transition runner (`runTransitionedOperation`) and a bounded poll utility with timeout/cancel semantics. Extract shared container-config/image preparation into one internal builder used by both start/create paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_orchestration_not_separated_from_transport"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "init_time_side_effect_coupling",
+      "summary": "Critical runtime behavior is hidden in package init side effects",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/docker/docker.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/auth/auth.go",
+        "goseg/system/wifi.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`config.init()` performs config creation/mutation, key generation, persistence, and spawns `ConfChannel` goroutine (58-173).",
+        "`docker.init()` stops containers and probes Docker daemon (35-59); `broadcast.init()` bootstraps state and starts loop (39-113); `auth.init()` rehydrates sessions and starts cleanup goroutine (61-74).",
+        "`system/wifi.init()` chooses device and starts periodic loop (45-55), while `logger.init()` replaces global logger and may panic/exit paths (63-123, 160-177)."
+      ],
+      "suggestion": "Move side effects out of `init()` into explicit startup phases from main (`InitConfig`, `InitDocker`, `InitBroadcast`, etc.) with dependency ordering and failure handling in one place. Keep `init()` minimal (constants/cheap defaults only).",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_lifecycle_management"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "state_ownership_and_mutability_blur",
+      "summary": "Shared mutable state ownership is unclear across config/auth/broadcast",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`GetContainerState()` returns the internal `GSContainers` map directly after unlocking (`goseg/config/config.go` 362-366), allowing external mutation without synchronization.",
+        "`auth` and `structs.ClientManager` both manipulate client/session maps through mixed direct map iteration and helper methods, while broadcast reads/writes these structures concurrently (`auth.go` 88-155, `ws.go` 115-240, `broadcast.go` 583-603).",
+        "`broadcastState` and transition maps are global package state with multiple ad-hoc mutexes (`goseg/broadcast/broadcast.go` 25-37), increasing the chance of inconsistent update conventions."
+      ],
+      "suggestion": "Define clear ownership boundaries for shared state: expose read-only snapshots/copies from config state getters, centralize session-map mutation behind one API in `ClientManager`, and encapsulate broadcast state in a single state store struct with consistent locking semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_lifecycle_management"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Workflow orchestration is embedded directly in transport handlers instead of service-layer abstractions.",
+      "Package-level globals and `init()` side effects are being used as lifecycle management primitives.",
+      "Repeated operational templates were copied feature-by-feature without extracting shared workflow components."
+    ],
+    "likely_symptoms": [
+      "handler_god_module_action_router",
+      "repeated_transition_workflow_templates",
+      "state_ownership_and_mutability_blur"
+    ],
+    "possible_false_positives": []
+  }
+}

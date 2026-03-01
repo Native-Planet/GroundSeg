@@ -1,0 +1,129 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 1,
+  "assessments": {
+    "contract_coherence": 71.0,
+    "api_surface_coherence": 68.0
+  },
+  "dimension_notes": {
+    "contract_coherence": {
+      "evidence": [
+        "Functions declared with error-returning contracts terminate process instead of returning errors, e.g. `config.LocalVersion()` panics on read/unmarshal failure (goseg/config/version.go:172,178,183) and `system.CaptivePortal()` calls `os.Exit(1)` inside `func ... error` (goseg/system/wifi.go:188-193).",
+        "Startup/config paths mix panic, os.Exit, and error returns for similar failures (`config.init` panics on default-config creation failure in goseg/config/config.go:77; logger path setup exits in goseg/logger/logger.go:168,176), making caller expectations non-uniform.",
+        "Action handlers encode business failure as success return values: `LoginHandler` returns `nil` error on failed authentication and sends side-channel WS message instead (goseg/handler/handler.go:169-181), which diverges from the usual error-return contract used by sibling handlers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Configuration mutation API is untyped and stringly (`UpdateConf(values map[string]interface{})`) and is called across many subsystems with ad-hoc key names (e.g. goseg/handler/startram.go:143-176,293-296; goseg/routines/version.go:186-202; goseg/handler/dev.go:165-171), creating inconsistent boundary semantics.",
+        "Public payload surface mixes strongly typed and untyped request forms: `structs.WsPayload` uses `Payload interface{}` (goseg/structs/ws.go:267-271) while parallel typed payload structs exist (`WsUrbitPayload`, `WsDevPayload`, etc.), yielding two incompatible API shapes.",
+        "Backup APIs expose overloaded/flag-heavy boundaries: `RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string)` and `GetBackup(ship, timestamp, backupPassword, pubkey, endpointUrl string)` in goseg/startram/startram.go:475,624 indicate mode-switching via booleans and long positional argument lists."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "mixed_failure_contracts_panic_exit",
+      "summary": "Error-returning APIs are not honoring recoverable-failure contracts because sibling paths panic or exit the process.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/system/wifi.go",
+        "goseg/config/config.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`LocalVersion()` panics on failures instead of returning an error (goseg/config/version.go:172,178,183).",
+        "`CaptivePortal(dev string) error` exits process (`os.Exit(1)`) rather than returning an error (goseg/system/wifi.go:188-193).",
+        "Config/logger startup code paths use `panic` and `os.Exit` for operational errors (`goseg/config/config.go:77`, `goseg/logger/logger.go:168,176`)."
+      ],
+      "suggestion": "Standardize process-level failure policy: convert library/package functions to return typed errors, reserve `os.Exit` for `main`, and centralize fatal shutdown decisions in one bootstrap layer.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "inconsistent_error_boundary_policy"
+    },
+    {
+      "dimension": "contract_coherence",
+      "identifier": "login_failure_signaled_as_success",
+      "summary": "Login handler reports failed authentication as a successful call contract and relies on side-channel messaging for failure semantics.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "On failed auth, `LoginHandler` writes a `login-failed` message to websocket but returns `(token, nil)` (goseg/handler/handler.go:175-181).",
+        "Sibling handlers generally return non-nil errors on invalid actions/payloads (e.g. UploadHandler and UrbitHandler return explicit errors for unknown actions).",
+        "This makes the return contract ambiguous for callers expecting `error` to represent operation failure."
+      ],
+      "suggestion": "Make `LoginHandler` return a typed authentication error on invalid credentials and have callers uniformly map errors to websocket responses; keep side-channel messages as presentation, not primary contract.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_error_boundary_policy"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "stringly_typed_config_mutation_api",
+      "summary": "Core configuration updates use a map-of-any write API that creates inconsistent and unverifiable call contracts across modules.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/handler/startram.go",
+        "goseg/handler/dev.go",
+        "goseg/routines/version.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`UpdateConf(values map[string]interface{})` blindly applies arbitrary keys/values (goseg/config/config.go:279-295).",
+        "Callers pass heterogeneous nested maps and primitives (e.g. `startramSetReminder` map in goseg/handler/dev.go:165-171; endpoint/wireguard toggles in goseg/handler/startram.go:143-176,293-296; version fields in goseg/routines/version.go:199-202).",
+        "No compile-time field contract exists for these write paths, so API usage consistency depends on string literals and runtime behavior."
+      ],
+      "suggestion": "Replace `UpdateConf(map[string]interface{})` with typed update methods or command structs per domain (networking, auth, updates, reminders), validating allowed fields and coercions at compile time.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "untyped_boundary_design"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "overloaded_and_inconsistent_action_api_shapes",
+      "summary": "Public action/backup APIs mix generic payload envelopes, flag-heavy function signatures, and typed handlers, producing inconsistent API shapes.",
+      "related_files": [
+        "goseg/structs/ws.go",
+        "goseg/handler/handler.go",
+        "goseg/startram/startram.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "Generic websocket envelope uses `Payload interface{}` (goseg/structs/ws.go:267-271) while dedicated typed envelopes exist in the same module (e.g. `WsUrbitPayload`, `WsDevPayload`).",
+        "Backup API exposes long positional parameters and mode flags (`GetBackup(...5 args...)`, `RestoreBackup(...6 args with booleans...)`) in goseg/startram/startram.go:475,624.",
+        "Similar workflows expose different return/error shapes (`C2CConnect` returns void and performs reboot side effect in goseg/system/wifi.go:137-164, while adjacent WiFi APIs return errors such as `ConnectToWifi`)."
+      ],
+      "suggestion": "Normalize boundary shapes: define typed request structs per action family, replace boolean mode flags with explicit command types, and align related operations to consistent return/error contracts.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "untyped_boundary_design"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No single policy for error/failure boundaries (library return vs process termination vs side-channel signaling).",
+      "Configuration and action boundaries evolved with dynamic maps/flags instead of typed domain APIs."
+    ],
+    "likely_symptoms": [
+      "mixed_failure_contracts_panic_exit",
+      "login_failure_signaled_as_success",
+      "stringly_typed_config_mutation_api",
+      "overloaded_and_inconsistent_action_api_shapes"
+    ],
+    "possible_false_positives": []
+  }
+}

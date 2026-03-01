@@ -16,7 +16,10 @@ import (
 )
 
 var (
-	containers = make(map[string]structs.ContainerStats)
+	containers             = make(map[string]structs.ContainerStats)
+	getMemoryUsageForStats = getMemoryUsage
+	getDiskUsageForStats   = getDiskUsage
+	nowForStats            = time.Now
 )
 
 func GetContainerStats(name string) structs.ContainerStats {
@@ -25,9 +28,9 @@ func GetContainerStats(name string) structs.ContainerStats {
 		// Check if the LastContact was at least 1 minute ago
 		if time.Since(stats.LastContact) >= time.Minute {
 			// More than 1 minute has passed, update stats
-			stats.MemoryUsage = getMemoryUsage(name)
-			stats.DiskUsage = getDiskUsage(name)
-			stats.LastContact = time.Now()
+			stats.MemoryUsage = getMemoryUsageForStats(name)
+			stats.DiskUsage = getDiskUsageForStats(name)
+			stats.LastContact = nowForStats()
 			containers[name] = stats // update the map with the new stats
 		}
 		// Return the stats (either updated or as they were)
@@ -39,11 +42,11 @@ func GetContainerStats(name string) structs.ContainerStats {
 
 func ForceUpdateContainerStats(name string) structs.ContainerStats {
 	// Container not found in map, get new stats
-	memUsage := getMemoryUsage(name)
-	diskUsage := getDiskUsage(name) // assuming getDiskUsage(name) returns an int64
+	memUsage := getMemoryUsageForStats(name)
+	diskUsage := getDiskUsageForStats(name) // assuming getDiskUsage(name) returns an int64
 	// Create new ContainerStats struct
 	newStats := structs.ContainerStats{
-		LastContact: time.Now(),
+		LastContact: nowForStats(),
 		MemoryUsage: memUsage,
 		DiskUsage:   diskUsage,
 	}

@@ -1,5 +1,5 @@
 <script>
-  import { devShipClass } from '$lib/stores/devclass'
+  import { devShipClass } from '$lib/stores/dev/devclass'
   import { resetSetup } from '$lib/stores/websocket'
 </script>
   <div class="wrapper">

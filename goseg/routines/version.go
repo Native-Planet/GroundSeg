@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"groundseg/config"
-	"groundseg/docker"
-	"groundseg/handler"
 	"groundseg/structs"
 	"io"
 	"net/http"
@@ -23,8 +21,18 @@ import (
 	"go.uber.org/zap"
 )
 
+type versionRuntime = routineRuntime
+
+func newVersionRuntime() versionRuntime {
+	return newRoutineRuntime()
+}
+
 func CheckVersionLoop() {
-	conf := config.Conf()
+	checkVersionLoopWithRuntime(newVersionRuntime())
+}
+
+func checkVersionLoopWithRuntime(rt versionRuntime) {
+	conf := rt.getConf()
 	var updateInterval int
 	if conf.UpdateInterval < 60 {
 		updateInterval = 60
@@ -35,48 +43,56 @@ func CheckVersionLoop() {
 	ticker := time.NewTicker(checkInterval)
 	releaseChannel := conf.UpdateBranch
 	if conf.UpdateMode == "auto" {
-		callUpdater(releaseChannel)
+		callUpdaterWithRuntime(rt, releaseChannel)
 		for {
 			select {
 			case <-ticker.C:
-				callUpdater(releaseChannel)
+				callUpdaterWithRuntime(rt, releaseChannel)
 			}
 		}
 	}
 }
 
 func callUpdater(releaseChannel string) {
+	callUpdaterWithRuntime(newVersionRuntime(), releaseChannel)
+}
+
+func callUpdaterWithRuntime(rt versionRuntime, releaseChannel string) {
 	// Get latest information
-	latestVersion, _ := config.CheckVersion()
-	currentChannelVersion := config.VersionInfo
+	latestVersion, synced := rt.syncVersionInfo()
+	if !synced {
+		zap.L().Warn("Skipping update cycle because version metadata sync failed")
+		return
+	}
+	currentChannelVersion := rt.getVersionChannel()
 	latestChannelVersion := latestVersion
 	// check docker updates
 	if latestChannelVersion != currentChannelVersion {
-		updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
-		config.VersionInfo = latestVersion
+		rt.updateDocker(releaseChannel, currentChannelVersion, latestChannelVersion)
+		rt.setVersionChannel(latestVersion)
 	}
 	// Check for gs binary updates based on hash
-	binPath := filepath.Join(config.BasePath, "groundseg")
-	currentHash, err := getSha256(binPath)
+	binPath := filepath.Join(rt.basePath(), "groundseg")
+	currentHash, err := rt.getSha256(binPath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash binary: %v", err))
 		return
 	}
 	latestHash := latestVersion.Groundseg.Amd64Sha256
-	if config.Architecture != "amd64" {
+	if rt.architecture() != "amd64" {
 		latestHash = latestVersion.Groundseg.Arm64Sha256
 	}
 	if currentHash != latestHash {
 		zap.L().Info("GroundSeg Binary update!")
 		// updateBinary will likely restart the program, so
 		// we don't have to care about the docker updates.
-		updateBinary(releaseChannel, latestVersion)
+		rt.updateBinary(rt, releaseChannel, latestVersion)
 	}
 }
 
-func updateBinary(branch string, versionInfo structs.Channel) {
+func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel) {
 	// get config
-	conf := config.Conf()
+	conf := rt.getConf()
 	var displayedBranch string
 	if branch != "latest" {
 		displayedBranch = fmt.Sprintf("-%v", branch)
@@ -89,17 +105,17 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	)
 	zap.L().Info(msg)
 	// delete old instance of groundseg_new if it exists
-	if _, err := os.Stat(filepath.Join(config.BasePath, "groundseg_new")); err == nil {
+	if _, err := os.Stat(filepath.Join(rt.basePath(), "groundseg_new")); err == nil {
 		// Remove the file
 		zap.L().Info("Deleting old groundseg_new download")
-		if err := os.Remove(filepath.Join(config.BasePath, "groundseg_new")); err != nil {
+		if err := os.Remove(filepath.Join(rt.basePath(), "groundseg_new")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg_new: %v", err))
 			return
 		}
 	}
 	// download new binary, name it groundseg_new
 	url := versionInfo.Groundseg.Arm64URL
-	if config.Architecture == "amd64" {
+	if rt.architecture() == "amd64" {
 		url = versionInfo.Groundseg.Amd64URL
 	}
 	// Create a new HTTP GET request
@@ -117,7 +133,7 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 
 	// Create a new file to save the downloaded content
 	zap.L().Info("Creating groundseg_new")
-	file, err := os.Create(filepath.Join(config.BasePath, "groundseg_new"))
+	file, err := os.Create(filepath.Join(rt.basePath(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
 		return
@@ -132,16 +148,16 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// Chmod groundseg_new
 	zap.L().Info("Modifying groundseg_new permissions")
-	binaryPath := filepath.Join(config.BasePath, "groundseg_new")
+	binaryPath := filepath.Join(rt.basePath(), "groundseg_new")
 	if err := os.Chmod(binaryPath, 0755); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
 	newVersionHash := versionInfo.Groundseg.Arm64Sha256
-	if config.Architecture == "amd64" {
+	if rt.architecture() == "amd64" {
 		newVersionHash = versionInfo.Groundseg.Amd64Sha256
 	}
-	newBinHash, err := config.GetSHA256(filepath.Join(config.BasePath, "groundseg_new"))
+	newBinHash, err := config.GetSHA256(filepath.Join(rt.basePath(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get SHA for new binary: %v", err))
 		return
@@ -166,26 +182,24 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	}
 	// delete groundseg binary if exists
 	zap.L().Info("Deleting old groundseg")
-	if _, err := os.Stat(filepath.Join(config.BasePath, "groundseg")); err == nil {
+	if _, err := os.Stat(filepath.Join(rt.basePath(), "groundseg")); err == nil {
 		// Remove the file
-		if err := os.Remove(filepath.Join(config.BasePath, "groundseg")); err != nil {
+		if err := os.Remove(filepath.Join(rt.basePath(), "groundseg")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg: %v", err))
 			return
 		}
 	}
 	// rename groundseg_new to groundseg
 	zap.L().Info("Renaming groundseg_new to groundseg")
-	oldPath := filepath.Join(config.BasePath, "groundseg_new")
-	newPath := filepath.Join(config.BasePath, "groundseg")
+	oldPath := filepath.Join(rt.basePath(), "groundseg_new")
+	newPath := filepath.Join(rt.basePath(), "groundseg")
 	if err := os.Rename(oldPath, newPath); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
 	}
 	// re-disable bypass after one update
 	if conf.DisableSlsa {
-		if err := config.UpdateConf(map[string]interface{}{
-			"disableSlsa": false,
-		}); err != nil {
+		if err := config.UpdateConfTyped(config.WithDisableSlsa(false)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
 		}
 	}
@@ -196,16 +210,16 @@ func updateBinary(branch string, versionInfo structs.Channel) {
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
 	}
-	if err := config.UpdateConf(map[string]interface{}{
-		"gsVersion": versionStr,
-		"binHash":   binHash,
-	}); err != nil {
+	if err := config.UpdateConfTyped(
+		config.WithGSVersion(versionStr),
+		config.WithBinHash(binHash),
+	); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't update config: %v", err))
 	}
 	// systemctl restart groundseg
-	if config.DebugMode {
-		zap.L().Debug("DebugMode detected. Skipping systemd command. Exiting istead..")
-		os.Exit(0)
+	if rt.debugMode() {
+		zap.L().Debug("DebugMode detected. Skipping systemd command.")
+		return
 	} else {
 		zap.L().Info("Restarting GroundSeg systemd service")
 		cmd := exec.Command("systemctl", "restart", "groundseg")
@@ -223,13 +237,13 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 	}
 	provenanceFile, err := os.CreateTemp("", "provenance-*.intoto.jsonl")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file for provenance: %v", err)
+		return fmt.Errorf("failed to create temp file for provenance: %w", err)
 	}
 	defer os.Remove(provenanceFile.Name())
 	defer provenanceFile.Close()
 	resp, err := http.Get(provenanceURL)
 	if err != nil {
-		return fmt.Errorf("failed to download provenance: %v", err)
+		return fmt.Errorf("failed to download provenance: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -238,7 +252,7 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 	}
 	_, err = io.Copy(provenanceFile, resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to write provenance file: %v", err)
+		return fmt.Errorf("failed to write provenance file: %w", err)
 	}
 	verifyCmd := &verify.VerifyArtifactCommand{
 		ProvenancePath:  provenanceFile.Name(),
@@ -248,7 +262,7 @@ func verifySlsaProvenance(provenanceURL string, binaryPath string, sourceURI str
 	ctx := context.Background()
 	trustedBuilder, err := verifyCmd.Exec(ctx, []string{binaryPath})
 	if err != nil {
-		return fmt.Errorf("SLSA verification failed: %v", err)
+		return fmt.Errorf("SLSA verification failed: %w", err)
 	}
 	zap.L().Info(fmt.Sprintf("Verified by trusted builder: %v", trustedBuilder))
 	zap.L().Info("Info: https://github.blog/security/supply-chain-security/slsa-3-compliance-with-github-actions/")
@@ -265,13 +279,23 @@ func contains(slice []string, item string) bool {
 }
 
 func updateDocker(release string, currentVersion structs.Channel, latestVersion structs.Channel) {
+	updateDockerWithRuntime(newVersionRuntime(), release, currentVersion, latestVersion)
+}
+
+func updateDockerWithRuntime(rt versionRuntime, release string, currentVersion structs.Channel, latestVersion structs.Channel) {
 	zap.L().Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
 	zap.L().Info(fmt.Sprintf(
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
 		release, currentVersion, latestVersion,
 	))
-	conf := config.Conf()
-	statuses, err := docker.GetShipStatus(conf.Piers)
+	setBootStatus := func(pier, bootStatus string) error {
+		return rt.updateUrbit(pier, func(urbConf *structs.UrbitDocker) error {
+			urbConf.BootStatus = bootStatus
+			return nil
+		})
+	}
+	conf := rt.getConf()
+	statuses, err := rt.getShipStatus(conf.Piers)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get ship statuses: %v", err))
 		return
@@ -282,168 +306,95 @@ func updateDocker(release string, currentVersion structs.Channel, latestVersion 
 	typeOfVersion := valCurrent.Type()
 
 	for i := 0; i < valCurrent.NumField(); i++ {
-		sw := typeOfVersion.Field(i).Name
-		if sw != "groundseg" {
-			currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
-			latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
-			if config.Architecture == "amd64" {
-				if latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256 {
-					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
-						docker.StartContainer(sw, sw)
-					} else if sw == "vere" {
-						for pier, status := range statuses {
-							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-							urbConf := config.UrbitConf(pier)
+		component := strings.ToLower(typeOfVersion.Field(i).Name)
+		if component == "groundseg" {
+			continue
+		}
+		currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
+		latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
+		hashChanged := latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256
+		if rt.architecture() != "amd64" {
+			hashChanged = latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256
+		}
+		if !hashChanged {
+			continue
+		}
+		switch component {
+		case "netdata", "wireguard", "miniomc":
+			if _, err := rt.startContainer(component, component); err != nil {
+				zap.L().Warn(fmt.Sprintf("Failed to refresh %s image: %v", component, err))
+			}
+		case "vere":
+			for pier, status := range statuses {
+				isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+				if err := rt.loadUrbitConfig(pier); err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to load config for %s: %v", pier, err))
+					continue
+				}
+				urbConf := rt.urbitConf(pier)
 
-							// Stop ship if running
-							if isRunning {
-								zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
-								if err := docker.StopContainerByName(pier); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
-									continue
-								}
-							}
-
-							// Run urbit prep with old image (always, regardless of running status)
-							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
-							urbConf.BootStatus = "prep"
-							update := make(map[string]structs.UrbitDocker)
-							update[pier] = urbConf
-							if err := config.UpdateUrbitConfig(update); err != nil {
-								zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
-								continue
-							}
-
-							// Start container to run prep
-							_, err := docker.StartContainer(pier, "vere")
-							if err != nil {
-								zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
-								continue
-							}
-
-							// Wait for prep to complete
-							zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
-							handler.WaitComplete(pier)
-
-							// Set boot status appropriately after prep
-							if isRunning {
-								// Ship was running before, boot it with new image
-								zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
-								urbConf.BootStatus = "boot"
-								update = make(map[string]structs.UrbitDocker)
-								update[pier] = urbConf
-								if err := config.UpdateUrbitConfig(update); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
-									continue
-								}
-								_, err = docker.StartContainer(pier, "vere")
-								if err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
-									continue
-								}
-							} else {
-								// Ship was not running, keep it stopped but update config
-								zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
-								urbConf.BootStatus = "noboot"
-								update = make(map[string]structs.UrbitDocker)
-								update[pier] = urbConf
-								if err := config.UpdateUrbitConfig(update); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
-								}
-							}
-
-							// Check if it wants a chop after upgrade (only if running)
-							if isRunning && urbConf.ChopOnUpgrade == true {
-								go handler.ChopPier(pier, urbConf)
-							}
-						}
-					} else if sw == "minio" {
-						for pier, status := range statuses {
-							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-							if isRunning {
-								docker.StartContainer("minio_"+pier, "minio")
-							}
-						}
+				// Stop ship if running
+				if isRunning {
+					zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
+					if err := rt.stopContainer(pier); err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
+						continue
 					}
 				}
-			} else {
-				if latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256 {
-					if contains([]string{"netdata", "wireguard", "miniomc"}, sw) {
-						docker.StartContainer(sw, sw)
-					} else if sw == "vere" {
-						for pier, status := range statuses {
-							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-							urbConf := config.UrbitConf(pier)
 
-							// Stop ship if running
-							if isRunning {
-								zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
-								if err := docker.StopContainerByName(pier); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
-									continue
-								}
-							}
+				// Run urbit prep with old image (always, regardless of running status)
+				zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
+				if err := setBootStatus(pier, "prep"); err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
+					continue
+				}
 
-							// Run urbit prep with old image (always, regardless of running status)
-							zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
-							urbConf.BootStatus = "prep"
-							update := make(map[string]structs.UrbitDocker)
-							update[pier] = urbConf
-							if err := config.UpdateUrbitConfig(update); err != nil {
-								zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
-								continue
-							}
+				// Start container to run prep
+				_, err := rt.startContainer(pier, "vere")
+				if err != nil {
+					zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
+					continue
+				}
 
-							// Start container to run prep
-							_, err := docker.StartContainer(pier, "vere")
-							if err != nil {
-								zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
-								continue
-							}
+				// Wait for prep to complete
+				zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
+				if err := rt.waitComplete(pier); err != nil {
+					zap.L().Error(fmt.Sprintf("Wait for prep completion failed for %s: %v", pier, err))
+					continue
+				}
 
-							// Wait for prep to complete
-							zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
-							handler.WaitComplete(pier)
+				// Set boot status appropriately after prep
+				if isRunning {
+					// Ship was running before, boot it with new image
+					zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
+					if err := setBootStatus(pier, "boot"); err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
+						continue
+					}
+					_, err = rt.startContainer(pier, "vere")
+					if err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
+						continue
+					}
+				} else {
+					// Ship was not running, keep it stopped but update config
+					zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
+					if err := setBootStatus(pier, "noboot"); err != nil {
+						zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
+					}
+				}
 
-							// Set boot status appropriately after prep
-							if isRunning {
-								// Ship was running before, boot it with new image
-								zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
-								urbConf.BootStatus = "boot"
-								update = make(map[string]structs.UrbitDocker)
-								update[pier] = urbConf
-								if err := config.UpdateUrbitConfig(update); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
-									continue
-								}
-								_, err = docker.StartContainer(pier, "vere")
-								if err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
-									continue
-								}
-							} else {
-								// Ship was not running, keep it stopped but update config
-								zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
-								urbConf.BootStatus = "noboot"
-								update = make(map[string]structs.UrbitDocker)
-								update[pier] = urbConf
-								if err := config.UpdateUrbitConfig(update); err != nil {
-									zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
-								}
-							}
-
-							// Check if it wants a chop after upgrade (only if running)
-							if isRunning && urbConf.ChopOnUpgrade == true {
-								go handler.ChopPier(pier, urbConf)
-							}
-						}
-					} else if sw == "minio" {
-						for pier, status := range statuses {
-							isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
-							if isRunning {
-								docker.StartContainer("minio_"+pier, "minio")
-							}
-						}
+				// Check if it wants a chop after upgrade (only if running)
+				if isRunning && urbConf.ChopOnUpgrade == true {
+					go rt.chopPier(pier, urbConf)
+				}
+			}
+		case "minio":
+			for pier, status := range statuses {
+				isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
+				if isRunning {
+					if _, err := rt.startContainer("minio_"+pier, "minio"); err != nil {
+						zap.L().Warn(fmt.Sprintf("Failed to refresh minio for %s: %v", pier, err))
 					}
 				}
 			}

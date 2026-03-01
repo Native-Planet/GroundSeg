@@ -1,0 +1,91 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "ai_generated_debt": 90.0,
+    "incomplete_migration": 72.0,
+    "low_level_elegance": 74.0
+  },
+  "dimension_notes": {
+    "ai_generated_debt": {
+      "evidence": [
+        "No restating comments, chatty debug logging, or trivial pass-through wrappers were found in ui/src/routes/+layout.js (only `export const prerender = true;`).",
+        "The heavy boilerplate in goseg/web/_app/immutable/chunks/clipboard.750479b4.js and goseg/web/_app/immutable/chunks/sigil-js.esm.0c91ed14.js appears bundle/minifier output rather than direct handwritten AI-style ceremony."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The reviewed scope is dominated by generated/minified artifacts, so AI-debt attribution confidence is limited; source-level files should be reviewed for a stronger score."
+    },
+    "incomplete_migration": {
+      "evidence": [
+        "goseg/web/_app/immutable/chunks/clipboard.750479b4.js embeds clipboard.js v2.0.11 and still calls `document.execCommand(...)`, a legacy clipboard path.",
+        "goseg/web/_app/immutable/chunks/sigil-js.esm.0c91ed14.js embeds React v17.0.2 and legacy compatibility/polyfill code in a hashed immutable bundle.",
+        "The batch mixes source route code (`ui/src/routes/+layout.js`) with checked-in hashed build artifacts (`goseg/web/_app/immutable/chunks/...`), indicating dual source-vs-built ownership."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "Both immutable chunk files are effectively huge single-line minified blobs (6 and 12 lines respectively), making control flow and side effects non-auditable in normal code review.",
+        "Legacy/runtime shims and bundled third-party internals are interleaved with project artifacts, which raises local reasoning cost for even small behavior changes."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "incomplete_migration",
+      "identifier": "prebuilt_legacy_bundle_committed",
+      "summary": "Checked-in immutable bundles retain legacy runtime paths instead of completed modern migration.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/clipboard.750479b4.js",
+        "goseg/web/_app/immutable/chunks/sigil-js.esm.0c91ed14.js",
+        "ui/src/routes/+layout.js"
+      ],
+      "evidence": [
+        "clipboard chunk still uses `document.execCommand(\"copy\"|\"cut\")` through bundled clipboard.js v2.0.11 code.",
+        "sigil chunk embeds React v17.0.2 and broad compatibility boilerplate in hashed output.",
+        "Source route file exists alongside committed hashed artifacts, showing unresolved source/build separation."
+      ],
+      "suggestion": "Complete the migration to source-owned frontend code: stop committing hashed immutable chunk outputs, regenerate them in CI/deploy, and replace legacy clipboard usage with `navigator.clipboard` at source level before rebundling.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "prebuilt_artifacts_in_source_tree"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "minified_blob_review_barrier",
+      "summary": "Minified single-line bundle blobs materially reduce local readability and change safety.",
+      "related_files": [
+        "goseg/web/_app/immutable/chunks/clipboard.750479b4.js",
+        "goseg/web/_app/immutable/chunks/sigil-js.esm.0c91ed14.js"
+      ],
+      "evidence": [
+        "clipboard chunk is 6 lines and sigil chunk is 12 lines but contain very large minified statements with dense helper indirection.",
+        "Function internals, branch behavior, and side effects are not practically reviewable in this form."
+      ],
+      "suggestion": "Keep minified bundles out of reviewable source paths; review and maintain unminified source modules (or checked-in readable vendor source) and let bundling/minification happen only in build outputs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "prebuilt_artifacts_in_source_tree"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Build artifacts are committed as if they were source, creating persistent migration and maintainability debt.",
+      "Legacy dependency/runtime paths remain embedded in distributed chunks without a completed modernization boundary."
+    ],
+    "likely_symptoms": [
+      "prebuilt_legacy_bundle_committed",
+      "minified_blob_review_barrier"
+    ],
+    "possible_false_positives": []
+  }
+}

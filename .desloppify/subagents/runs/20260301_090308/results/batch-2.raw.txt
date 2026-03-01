@@ -1,0 +1,120 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 62.0,
+    "test_strategy": 48.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go combines transport calls (http.Get/http.Post), configuration writes (config.UpdateConf and config.StartramConfig assignment), and cross-module signaling (EventBus channel) inside the same public operations such as Retrieve and Register.",
+        "goseg/config/version.go CheckVersion performs remote fetch, JSON parsing, global state mutation (VersionInfo/VersionServerReady), and filesystem persistence to settings/version_info.json in one function.",
+        "Both goseg/startram/startram.go and goseg/config/version.go expose package-level mutable globals (EventBus/Regions and VersionInfo/VersionServerReady), creating implicit contracts across packages instead of explicit interfaces."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md defines a quality gate only for frontend/runtime changes (npm ci/test/build) and does not define any required backend checks for Go modules that implement runtime-critical network/config behavior.",
+        "goseg/startram/startram.go and goseg/config/version.go use hardwired network/time dependencies (http.Get/http.Post/http.DefaultClient/time.Sleep) and side effects, with no boundary interfaces in these files for deterministic isolation tests.",
+        "goseg/handler/upload.go routes privileged actions (open-endpoint/reset) directly to importer operations but has no contract-level validation hooks or documented test requirement in README.md."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "startram_boundary_collapse",
+      "summary": "Startram service operations collapse transport, state mutation, and event publication into single entrypoints, creating hidden cross-module contracts.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Retrieve updates config.StartramConfig, conditionally writes wgRegistered via config.UpdateConf, and emits EventBus events after remote API reads.",
+        "Register/SvcDelete/AliasCreate call remote APIs and then trigger Retrieve-driven state synchronization, coupling endpoint behavior to local config/event semantics.",
+        "README.md documents frontend ownership/contracts but no backend module-boundary contract for Startram side effects."
+      ],
+      "suggestion": "Introduce a Startram boundary layer that separates API client, state reconciliation, and event emission into distinct interfaces; document the backend boundary contract in README so callers depend on explicit outputs rather than side effects.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_service_boundary_and_contract_tests"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_mutable_runtime_state",
+      "summary": "Package-level mutable state in configuration/version and Startram modules creates non-local coupling and broad blast radius for behavior changes.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "goseg/config/version.go exposes and mutates VersionInfo and VersionServerReady globally in CheckVersion.",
+        "goseg/startram/startram.go exposes EventBus and Regions as globals and mutates them inside request paths.",
+        "These globals are updated during I/O-heavy flows, making behavior depend on call ordering across modules rather than explicit contracts."
+      ],
+      "suggestion": "Encapsulate mutable runtime state behind owned structs with constructor-injected dependencies; return immutable result objects to callers and publish events through an interface-owned dispatcher.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_service_boundary_and_contract_tests"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "backend_quality_gate_gap",
+      "summary": "Documented quality gates cover frontend only, leaving critical Go runtime paths without an enforced verification contract.",
+      "related_files": [
+        "README.md",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "README.md Frontend Quality Gate requires npm ci/test/build but defines no required Go test/lint/integration gate.",
+        "startram.go handles registration lifecycle, retries, and backup transfer behavior that can alter system state and external registration state.",
+        "Without a documented backend gate, these critical paths can change without mandatory contract verification."
+      ],
+      "suggestion": "Add a backend quality gate section in README requiring targeted Go unit/integration tests for config/version, startram registration flows, and upload handler behavior before merge/release.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_service_boundary_and_contract_tests"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "hardwired_io_prevents_reliable_tests",
+      "summary": "Hardcoded HTTP/time/filesystem dependencies in critical functions make deterministic contract tests difficult and encourage under-testing.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "CheckVersion directly uses http.DefaultClient.Do, retry sleeps, and direct file writes to settings/version_info.json in one flow.",
+        "Startram functions use direct http.Get/http.Post and internal retry/backoff loops (backoffRetrieve) without injected clock/client.",
+        "UploadHandler directly invokes importer.SetUploadSession/importer.Reset based on action strings, with no local seam for controlled behavioral tests."
+      ],
+      "suggestion": "Refactor these modules to accept injected HTTP client, clock/sleeper, and persistence/action interfaces, then add table-driven tests for success/failure/timeout branches and action validation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_service_boundary_and_contract_tests"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Operational side effects are embedded directly in orchestration methods instead of being isolated behind explicit service boundaries.",
+      "Governance docs define frontend contracts but do not establish backend compatibility/testing policies for critical runtime modules."
+    ],
+    "likely_symptoms": [
+      "backend_quality_gate_gap",
+      "hardwired_io_prevents_reliable_tests"
+    ],
+    "possible_false_positives": []
+  }
+}

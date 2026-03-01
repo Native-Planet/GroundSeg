@@ -23,39 +23,33 @@ import (
 )
 
 var (
-	VolumeDir          = config.DockerDir
-	UTransBus          = make(chan structs.UrbitTransition, 100)   // urbit transition bus
-	SysTransBus        = make(chan structs.SystemTransition, 100)  // system transition bus
-	NewShipTransBus    = make(chan structs.NewShipTransition, 100) // transition event bus
-	ImportShipTransBus = make(chan structs.UploadTransition, 100)  // transition event bus
-	ContainerStats     = make(map[string]structs.ContainerStats)   // used for broadcast
-	ContainerStatList  []string                                    // slice of containers to poll for resource use
+	VolumeDir      = config.DockerDir
+	ContainerStats = make(map[string]structs.ContainerStats) // used for broadcast
 )
 
-func init() {
+func Initialize() error {
 	// kill old webui container if running
 	_, err := FindContainer("groundseg-webui")
 	if err == nil {
 		if err = StopContainerByName("groundseg-webui"); err != nil {
-			zap.L().Error(fmt.Sprintf("Couldn't stop old webui container: %v", err))
+			zap.L().Warn(fmt.Sprintf("Couldn't stop old webui container: %v", err))
 		}
 	}
 	if err = killContainerUsingPort(80); err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
+		zap.L().Warn(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
 	cli, err := dockerclient.New()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Error creating Docker client: %v", err))
-		return
+		return fmt.Errorf("error creating docker client: %v", err)
 	}
 	defer cli.Close()
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Error getting Docker version: %v", err))
-		return
+		return fmt.Errorf("error getting docker version: %v", err)
 	}
 	//go getContainerStats()
 	zap.L().Info(fmt.Sprintf("Docker version: %s", version.Version))
+	return nil
 }
 
 func killContainerUsingPort(n uint16) error {
@@ -259,67 +253,158 @@ func WriteFileToVolume(name string, file string, content string) error {
 // start a container by name + type
 // contructs a container.Config, then runs through whether to boot/restart/etc
 // saves the current container state in memory after completion
-func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
-	zap.L().Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
-	// bundle of info about container
-	var containerState structs.ContainerState
-	// config params for container
+type containerPlan struct {
+	Name         string
+	Type         string
+	Config       container.Config
+	HostConfig   container.HostConfig
+	ImageInfo    map[string]string
+	DesiredImage string
+}
+
+func containerConfigForType(containerName string, containerType string) (container.Config, container.HostConfig, error) {
 	var containerConfig container.Config
-	// host config for container
 	var hostConfig container.HostConfig
-	// init error
 	var err error
-	containerState.Type = containerType
-	// switch on containerType to process containerConfig
 	switch containerType {
 	case "vere":
 		containerConfig, hostConfig, err = urbitContainerConf(containerName)
-		if err != nil {
-			return containerState, err
-		}
 	case "netdata":
 		containerConfig, hostConfig, err = netdataContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	case "minio":
 		DeleteContainer(containerName)
 		containerConfig, hostConfig, err = minioContainerConf(containerName)
-		if err != nil {
-			return containerState, err
-		}
 	case "miniomc":
 		containerConfig, hostConfig, err = mcContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	case "wireguard":
 		containerConfig, hostConfig, err = wgContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	case "llama-api":
 		containerConfig, hostConfig, err = llamaApiContainerConf()
-		if err != nil {
-			return containerState, err
-		}
 	default:
-		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
-		return containerState, errmsg
+		return containerConfig, hostConfig, fmt.Errorf("Unrecognized container type %s", containerType)
 	}
-	// get the desired tag and hash from config
+	if err != nil {
+		return containerConfig, hostConfig, err
+	}
+	return containerConfig, hostConfig, nil
+}
+
+func buildContainerPlan(containerName string, containerType string) (containerPlan, error) {
+	plan := containerPlan{
+		Name: containerName,
+		Type: containerType,
+	}
+	containerConfig, hostConfig, err := containerConfigForType(containerName, containerType)
+	if err != nil {
+		return plan, err
+	}
+	plan.Config = containerConfig
+	plan.HostConfig = hostConfig
+
 	imageInfo, err := GetLatestContainerInfo(containerType)
 	if err != nil {
-		return containerState, err
+		return plan, err
 	}
-	// check if the desired image is available locally
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-	_, err = PullImageIfNotExist(desiredImage, imageInfo)
+	plan.ImageInfo = imageInfo
+	plan.DesiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
+	if _, err := PullImageIfNotExist(plan.DesiredImage, imageInfo); err != nil {
+		return plan, err
+	}
+	return plan, nil
+}
+
+func createAndStartContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
+	if _, err := cli.ContainerCreate(ctx, &plan.Config, &plan.HostConfig, nil, nil, plan.Name); err != nil {
+		return err
+	}
+	if err := cli.ContainerStart(ctx, plan.Name, container.StartOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func recreateContainerIfImageChanged(ctx context.Context, cli *client.Client, plan containerPlan, currentImage string) error {
+	digestParts := strings.Split(currentImage, "@sha256:")
+	currentDigest := ""
+	if len(digestParts) > 1 {
+		currentDigest = digestParts[1]
+	}
+	if currentDigest == plan.ImageInfo["hash"] {
+		return nil
+	}
+	if plan.Type == "vere" {
+		gracefulTimeout := 60
+		stopOpts := container.StopOptions{Timeout: &gracefulTimeout}
+		zap.L().Info(fmt.Sprintf("Gracefully stopping %s (60s timeout) before update", plan.Name))
+		if err := cli.ContainerStop(ctx, plan.Name, stopOpts); err != nil {
+			zap.L().Warn(fmt.Sprintf("Graceful stop failed for %s: %v, forcing removal", plan.Name, err))
+		}
+	}
+	if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
+		zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", plan.Name))
+	}
+	if err := createAndStartContainer(ctx, cli, plan); err != nil {
+		return err
+	}
+	zap.L().Info(fmt.Sprintf("Restarted %s with image %s", plan.Name, plan.DesiredImage))
+	return nil
+}
+
+func ensureRunningContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
+	existingContainer, _ := FindContainer(plan.Name)
+	switch {
+	case existingContainer == nil:
+		if err := createAndStartContainer(ctx, cli, plan); err != nil {
+			return err
+		}
+		zap.L().Info(fmt.Sprintf("%s started with image %s", plan.Name, plan.DesiredImage))
+	case existingContainer.State == "exited":
+		if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
+			return err
+		}
+		if err := createAndStartContainer(ctx, cli, plan); err != nil {
+			return err
+		}
+		zap.L().Info(fmt.Sprintf("Started stopped container %s", plan.Name))
+	case existingContainer.State == "created":
+		if err := cli.ContainerStart(ctx, plan.Name, container.StartOptions{}); err != nil {
+			return err
+		}
+		zap.L().Info(fmt.Sprintf("Started created container %s", plan.Name))
+	default:
+		if err := recreateContainerIfImageChanged(ctx, cli, plan, existingContainer.Image); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureCreatedContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
+	_, err := cli.ContainerCreate(ctx, &plan.Config, &plan.HostConfig, nil, nil, plan.Name)
+	return err
+}
+
+func containerStateFromInspect(plan containerPlan, desiredStatus string, containerDetails container.InspectResponse) structs.ContainerState {
+	return structs.ContainerState{
+		ID:            containerDetails.ID,           // container id hash
+		Name:          plan.Name,                     // name (eg @p)
+		Image:         plan.DesiredImage,             // full repo:tag@hash string
+		Type:          plan.Type,                     // eg `vere` (corresponds with version server label)
+		DesiredStatus: desiredStatus,                 // what the user sets
+		ActualStatus:  containerDetails.State.Status, // what the daemon reports
+		CreatedAt:     containerDetails.Created,      // this is a string
+		Config:        plan.Config,                   // container.Config struct constructed above
+		Host:          plan.HostConfig,               // host.Config struct constructed above
+	}
+}
+
+func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
+	zap.L().Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
+	var containerState structs.ContainerState
+	plan, err := buildContainerPlan(containerName, containerType)
 	if err != nil {
 		return containerState, err
 	}
-	// check if container exists
-	existingContainer, _ := FindContainer(containerName)
 
 	ctx := context.Background()
 	cli, err := dockerclient.New()
@@ -327,75 +412,8 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 		return containerState, err
 	}
 	defer cli.Close()
-	switch {
-	case existingContainer == nil:
-		// if the container does not exist, create and start it
-		_, err := cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-		if err != nil {
-			return containerState, err
-		}
-		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
-		if err != nil {
-			return containerState, err
-		}
-		msg := fmt.Sprintf("%s started with image %s", containerName, desiredImage)
-		zap.L().Info(msg)
-	case existingContainer.State == "exited":
-		err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
-		if err != nil {
-			return containerState, err
-		}
-		_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-		if err != nil {
-			return containerState, err
-		}
-		err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
-		if err != nil {
-			return containerState, err
-		}
-		msg := fmt.Sprintf("Started stopped container %s", containerName)
-		zap.L().Info(msg)
-	case existingContainer.State == "created":
-		err := cli.ContainerStart(ctx, containerName, container.StartOptions{})
-		if err != nil {
-			return containerState, err
-		}
-		msg := fmt.Sprintf("Started created container %s", containerName)
-		zap.L().Info(msg)
-	default:
-		// if container is running, check the image digest
-		currentImage := existingContainer.Image
-		digestParts := strings.Split(currentImage, "@sha256:")
-		currentDigest := ""
-		if len(digestParts) > 1 {
-			currentDigest = digestParts[1]
-		}
-		if currentDigest != imageInfo["hash"] {
-			// if the hashes don't match, recreate the container with the new one
-			// for vere containers, gracefully stop with a 60s timeout before removing
-			if containerType == "vere" {
-				gracefulTimeout := 60
-				stopOpts := container.StopOptions{Timeout: &gracefulTimeout}
-				zap.L().Info(fmt.Sprintf("Gracefully stopping %s (60s timeout) before update", containerName))
-				if err := cli.ContainerStop(ctx, containerName, stopOpts); err != nil {
-					zap.L().Warn(fmt.Sprintf("Graceful stop failed for %s: %v, forcing removal", containerName, err))
-				}
-			}
-			err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
-			if err != nil {
-				zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", containerName))
-			}
-			_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-			if err != nil {
-				return containerState, err
-			}
-			err = cli.ContainerStart(ctx, containerName, container.StartOptions{})
-			if err != nil {
-				return containerState, err
-			}
-			msg := fmt.Sprintf("Restarted %s with image %s", containerName, desiredImage)
-			zap.L().Info(msg)
-		}
+	if err := ensureRunningContainer(ctx, cli, plan); err != nil {
+		return containerState, err
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
@@ -406,71 +424,14 @@ func StartContainer(containerName string, containerType string) (structs.Contain
 			return containerState, fmt.Errorf("failed to set admin account %s: %v", containerName, err)
 		}
 	}
-	desiredStatus := "running"
-	// save the current state of the container in memory for reference
-	containerState = structs.ContainerState{
-		ID:            containerDetails.ID,           // container id hash
-		Name:          containerName,                 // name (eg @p)
-		Image:         desiredImage,                  // full repo:tag@hash string
-		Type:          containerType,                 // eg `vere` (corresponds with version server label)
-		DesiredStatus: desiredStatus,                 // what the user sets
-		ActualStatus:  containerDetails.State.Status, // what the daemon reports
-		CreatedAt:     containerDetails.Created,      // this is a string
-		Config:        containerConfig,               // container.Config struct constructed above
-		Host:          hostConfig,                    // host.Config struct constructed above
-	}
+	containerState = containerStateFromInspect(plan, "running", containerDetails)
 	return containerState, err
 }
 
 // create a stopped container
 func CreateContainer(containerName string, containerType string) (structs.ContainerState, error) {
 	var containerState structs.ContainerState
-	var containerConfig container.Config
-	var hostConfig container.HostConfig
-	var err error
-	switch containerType {
-	case "vere":
-		containerConfig, hostConfig, err = urbitContainerConf(containerName)
-		if err != nil {
-			return containerState, err
-		}
-	case "netdata":
-		containerConfig, hostConfig, err = netdataContainerConf()
-		if err != nil {
-			return containerState, err
-		}
-	case "minio":
-		DeleteContainer(containerName)
-		containerConfig, hostConfig, err = minioContainerConf(containerName)
-		if err != nil {
-			return containerState, err
-		}
-	case "miniomc":
-		containerConfig, hostConfig, err = mcContainerConf()
-		if err != nil {
-			return containerState, err
-		}
-	case "wireguard":
-		containerConfig, hostConfig, err = wgContainerConf()
-		if err != nil {
-			return containerState, err
-		}
-	case "llama-api":
-		containerConfig, hostConfig, err = llamaApiContainerConf()
-		if err != nil {
-			return containerState, err
-		}
-	default:
-		errmsg := fmt.Errorf("Unrecognized container type %s", containerType)
-		return containerState, errmsg
-	}
-	imageInfo, err := GetLatestContainerInfo(containerType)
-	if err != nil {
-		return containerState, err
-	}
-	// check if the desired image is available locally
-	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-	_, err = PullImageIfNotExist(desiredImage, imageInfo)
+	plan, err := buildContainerPlan(containerName, containerType)
 	if err != nil {
 		return containerState, err
 	}
@@ -480,25 +441,14 @@ func CreateContainer(containerName string, containerType string) (structs.Contai
 		return containerState, err
 	}
 	defer cli.Close()
-	_, err = cli.ContainerCreate(ctx, &containerConfig, &hostConfig, nil, nil, containerName)
-	if err != nil {
+	if err := ensureCreatedContainer(ctx, cli, plan); err != nil {
 		return containerState, err
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
 	}
-	containerState = structs.ContainerState{
-		ID:            containerDetails.ID,           // container id hash
-		Name:          containerName,                 // name (eg @p)
-		Image:         desiredImage,                  // full repo:tag@hash string
-		Type:          containerType,                 // eg `vere` (corresponds with version server label)
-		DesiredStatus: "stopped",                     // what the user sets
-		ActualStatus:  containerDetails.State.Status, // what the daemon reports
-		CreatedAt:     containerDetails.Created,      // this is a string
-		Config:        containerConfig,               // container.Config struct constructed above
-		Host:          hostConfig,                    // host.Config struct constructed above
-	}
+	containerState = containerStateFromInspect(plan, "stopped", containerDetails)
 	return containerState, err
 }
 
@@ -516,7 +466,7 @@ func GetLatestContainerInfo(containerType string) (map[string]string, error) {
 	}
 	arch := config.Architecture
 	hashLabel := arch + "_sha256"
-	versionInfo := config.VersionInfo
+	versionInfo := config.GetVersionChannel()
 	jsonData, err := json.Marshal(versionInfo)
 	if err != nil {
 		return res, err

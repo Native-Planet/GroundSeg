@@ -1,0 +1,187 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"groundseg/structs"
+)
+
+func preserveVersionGlobals(t *testing.T) {
+	t.Helper()
+	originalStore := versionStore
+	originalClient := versionHTTPClient
+	originalRetryCount := versionFetchRetryCount
+	originalRetryDelay := versionFetchRetryDelay
+	originalSleep := versionFetchSleep
+	originalConfig := globalConfig
+	originalBasePath := BasePath
+	t.Cleanup(func() {
+		versionStore = originalStore
+		versionHTTPClient = originalClient
+		versionFetchRetryCount = originalRetryCount
+		versionFetchRetryDelay = originalRetryDelay
+		versionFetchSleep = originalSleep
+		globalConfig = originalConfig
+		BasePath = originalBasePath
+	})
+}
+
+func TestInMemoryVersionStoreSetters(t *testing.T) {
+	store := newInMemoryVersionStore()
+	first := structs.Channel{Groundseg: structs.VersionDetails{Repo: "repo-a"}}
+	second := structs.Channel{Groundseg: structs.VersionDetails{Repo: "repo-b"}}
+
+	store.SetState(first, true)
+	snap := store.Snapshot()
+	if !snap.ServerReady || snap.Channel.Groundseg.Repo != "repo-a" {
+		t.Fatalf("unexpected snapshot after SetState: %+v", snap)
+	}
+
+	store.SetChannel(second)
+	store.SetServerReady(false)
+	snap = store.Snapshot()
+	if snap.ServerReady || snap.Channel.Groundseg.Repo != "repo-b" {
+		t.Fatalf("unexpected snapshot after SetChannel/SetServerReady: %+v", snap)
+	}
+}
+
+func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	versionFetchRetryCount = 1
+	versionFetchRetryDelay = time.Millisecond
+	versionFetchSleep = func(time.Duration) {}
+	globalConfig.UpdateUrl = "https://updates.example/version"
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{
+			{resp: newHTTPResponse(200, `{"groundseg":{"beta":{"groundseg":{"repo":"repo-beta"}}}}`)},
+		},
+	}
+
+	metadata, channel, err := ResolveLatestChannel(structs.SysConfig{GsVersion: "1.0.0", UpdateBranch: "beta"})
+	if err != nil {
+		t.Fatalf("ResolveLatestChannel failed: %v", err)
+	}
+	if channel.Groundseg.Repo != "repo-beta" {
+		t.Fatalf("unexpected channel: %+v", channel)
+	}
+
+	BasePath = t.TempDir()
+	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+		t.Fatalf("mkdir settings failed: %v", err)
+	}
+	versionStore = newInMemoryVersionStore()
+	if err := PublishVersionMetadata(metadata, channel); err != nil {
+		t.Fatalf("PublishVersionMetadata failed: %v", err)
+	}
+	if !IsVersionServerReady() {
+		t.Fatalf("expected version server ready after publish")
+	}
+	if GetVersionChannel().Groundseg.Repo != "repo-beta" {
+		t.Fatalf("unexpected published channel: %+v", GetVersionChannel())
+	}
+	if _, err := os.Stat(filepath.Join(BasePath, "settings", "version_info.json")); err != nil {
+		t.Fatalf("expected persisted version_info.json: %v", err)
+	}
+}
+
+func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	existing := structs.Channel{Groundseg: structs.VersionDetails{Repo: "existing-repo"}}
+	store := newInMemoryVersionStore()
+	store.SetState(existing, true)
+	versionStore = store
+
+	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.GsVersion = "1.0.0"
+	globalConfig.UpdateBranch = "latest"
+	versionFetchRetryCount = 1
+	versionFetchRetryDelay = time.Millisecond
+	versionFetchSleep = func(time.Duration) {}
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{{err: os.ErrDeadlineExceeded}},
+	}
+
+	got, ok := CheckVersion()
+	if ok {
+		t.Fatalf("expected CheckVersion to report failure")
+	}
+	if got.Groundseg.Repo != "existing-repo" {
+		t.Fatalf("expected existing channel fallback, got %+v", got)
+	}
+}
+
+func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	BasePath = t.TempDir()
+	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+		t.Fatalf("mkdir settings failed: %v", err)
+	}
+	versionStore = newInMemoryVersionStore()
+	versionFetchRetryCount = 1
+	versionFetchRetryDelay = time.Millisecond
+	versionFetchSleep = func(time.Duration) {}
+	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.GsVersion = "1.0.0"
+	globalConfig.UpdateBranch = "latest"
+
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{
+			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
+		},
+	}
+	channel, ok := SyncVersionInfo()
+	if !ok || channel.Groundseg.Repo != "repo-latest" {
+		t.Fatalf("expected SyncVersionInfo success, got channel=%+v ok=%v", channel, ok)
+	}
+	if !IsVersionServerReady() {
+		t.Fatalf("expected server ready after successful sync")
+	}
+
+	globalConfig.UpdateBranch = "missing"
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{
+			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
+		},
+	}
+	channel, ok = SyncVersionInfo()
+	if ok {
+		t.Fatalf("expected SyncVersionInfo failure for missing channel")
+	}
+	if channel.Groundseg.Repo != "repo-latest" {
+		t.Fatalf("expected previous channel fallback, got %+v", channel)
+	}
+	if IsVersionServerReady() {
+		t.Fatalf("expected server ready false after failure")
+	}
+}
+
+func TestCreateDefaultVersionAndLocalVersionFallback(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	BasePath = t.TempDir()
+	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+		t.Fatalf("mkdir settings failed: %v", err)
+	}
+
+	if err := CreateDefaultVersion(); err != nil {
+		t.Fatalf("CreateDefaultVersion failed: %v", err)
+	}
+	loaded := LocalVersion()
+	if len(loaded.Groundseg) == 0 {
+		t.Fatalf("expected non-empty default local version metadata")
+	}
+
+	if err := os.WriteFile(filepath.Join(BasePath, "settings", "version_info.json"), []byte("{invalid"), 0o644); err != nil {
+		t.Fatalf("write invalid version file failed: %v", err)
+	}
+	fallback := LocalVersion()
+	if len(fallback.Groundseg) == 0 {
+		t.Fatalf("expected fallback metadata for invalid file")
+	}
+}

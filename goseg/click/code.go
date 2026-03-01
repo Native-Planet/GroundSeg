@@ -8,6 +8,13 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	createHoonForCode     = createHoon
+	deleteHoonForCode     = deleteHoon
+	clickExecForCode      = clickExec
+	filterResponseForCode = filterResponse
+)
+
 func clearLusCode(patp string) {
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
@@ -33,19 +40,19 @@ func getLusCode(patp string) (string, error) {
 	// actual hoon
 	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  code=@p  bind:m  (scry @p /j/code/(scot %p our))  (pure:m !>((crip (slag 1 (scow %p code)))))"
 	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
+	if err := createHoonForCode(patp, file, hoon); err != nil {
 		return "", fmt.Errorf("Click +code failed to create hoon: %v", err)
 	}
 	// defer hoon file deletion
-	defer deleteHoon(patp, file)
+	defer deleteHoonForCode(patp, file)
 	// execute hoon file
-	response, err := clickExec(patp, file, "")
+	response, err := clickExecForCode(patp, file, "")
 	if err != nil {
 		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
 	}
 	// retrieve code
-	code, _, err := filterResponse("code", response)
+	code, _, err := filterResponseForCode("code", response)
 	if err != nil {
 		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)

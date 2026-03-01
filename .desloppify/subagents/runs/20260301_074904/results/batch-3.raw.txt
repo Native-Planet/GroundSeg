@@ -1,0 +1,122 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 74.0,
+    "error_consistency": 66.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js exposes many exported command functions (e.g., login, setupStarTram, setPackSchedule, submitReport) that are synchronous wrappers but all route through async sendCommand, so callers cannot distinguish fire-and-forget from awaitable/failable operations.",
+        "ui/src/lib/stores/data.js hard-codes URBIT_MODE and DEV_PANEL writable defaults, while ui/vite.config.js defines GS_URBIT_MODE and GS_DEV_PANEL environment values, creating conflicting configuration surfaces.",
+        "ui/src/lib/stores/websocket.js has public API fan-out through sendTypeCommand/sendActionCommand/sendSystemCommand/sendSetupCommand/sendStartramCommand/sendUrbitCommand/sendDevCommand but no explicit contract on success/failure semantics for any exported command."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "ui/src/lib/stores/websocket.js safeParseSocketMessage catches JSON.parse errors and returns null, silently dropping inbound messages after logging; this differs from outbound paths that allow throw/reject behavior.",
+        "ui/src/lib/stores/websocket.js sendCommand calls SESSION.send without readyState/SESSION existence checks or try/catch, so transport failures can surface as uncaught runtime exceptions.",
+        "ui/src/lib/stores/websocket.js reconnect loops via setTimeout(()=>connect(url),1000) and SESSION.onerror only logs to console; failures are not normalized into a shared error channel/store.",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js uses a global handleError hook that only console.error logs, which reinforces log-only error handling instead of consistent user-facing or structured propagation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ws_outbound_unhandled_transport_errors",
+      "summary": "Outbound websocket commands can fail with uncaught exceptions because send paths do not enforce connection state or normalize failures.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js"
+      ],
+      "evidence": [
+        "ui/src/lib/stores/websocket.js: sendCommand executes SESSION.send(JSON.stringify(data)) without checking SESSION existence or SESSION.readyState.",
+        "ui/src/lib/stores/websocket.js: SESSION.onerror only does console.log(error), and reconnect schedules another connect without structured failure handling.",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js: top-level handleError hook only logs with console.error, so runtime faults are not converted into consistent application error state."
+      ],
+      "suggestion": "Introduce a single transport error contract: gate send operations on OPEN readyState, wrap send failures into a typed error/result channel, and update shared stores so callers/UI can handle retry/auth/session faults consistently instead of relying on console logs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_unified_error_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ws_inbound_parse_error_swallow",
+      "summary": "Inbound parse failures are swallowed by returning null, causing silent message loss and inconsistent failure behavior versus other paths.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js"
+      ],
+      "evidence": [
+        "ui/src/lib/stores/websocket.js: safeParseSocketMessage catches JSON.parse error, logs at most once per 5s, and returns null.",
+        "ui/src/lib/stores/websocket.js: connect onmessage only calls handleMessage when parsed is truthy; malformed frames are dropped without stateful error signaling.",
+        "goseg/web/_app/immutable/entry/app.e0ffcb44.js: global error hook is log-only, so malformed inbound payload conditions are not surfaced through a consistent user-observable channel."
+      ],
+      "suggestion": "Replace null-swallow behavior with explicit parse-failure events (e.g., error store or typed message result), include payload metadata, and route through the same error handling surface used for transport and command failures.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_unified_error_contract"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "env_config_surface_drift",
+      "summary": "Runtime feature/config API is split between injected env defines and hard-coded writable defaults, making behavior source-of-truth unclear.",
+      "related_files": [
+        "ui/vite.config.js",
+        "ui/src/lib/stores/data.js"
+      ],
+      "evidence": [
+        "ui/vite.config.js defines process.env.GS_URBIT_MODE and process.env.GS_DEV_PANEL values from environment.",
+        "ui/src/lib/stores/data.js sets URBIT_MODE = writable(true) and DEV_PANEL = writable(false) with comments referencing config, but does not read the injected values.",
+        "This creates two competing API surfaces for the same settings (build-time env define vs runtime hard-coded store defaults)."
+      ],
+      "suggestion": "Establish one configuration boundary: initialize stores from a single config module that reads injected env values once (with validation/defaults), and remove hard-coded divergent defaults from feature stores.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "configuration_source_of_truth_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "command_api_fire_and_forget_contract_ambiguity",
+      "summary": "Public command API shape hides async/failure semantics by exposing mostly synchronous wrappers over async transport.",
+      "related_files": [
+        "ui/src/lib/stores/websocket.js",
+        "goseg/web/_app/immutable/entry/boot-new-page.svelte.3dc93e94.js"
+      ],
+      "evidence": [
+        "ui/src/lib/stores/websocket.js: exported commands (e.g., login, bootShip, submitReport, setPackSchedule) return nothing and delegate to async sendCommand.",
+        "ui/src/lib/stores/websocket.js: sendCommand itself awaits async token/id generation and transport send, but the wrapper API does not return a Promise/result to callers.",
+        "goseg/web/_app/immutable/entry/boot-new-page.svelte.3dc93e94.js is one of multiple generated route entries consuming websocket command exports, so ambiguous command contracts propagate broadly across UI routes."
+      ],
+      "suggestion": "Define a consistent command interface (e.g., Promise<Result> or explicit fire-and-forget naming split) and apply it across all exported websocket actions so callers can reliably reason about completion, ack, and failure handling.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "api_contract_ambiguity"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No unified error contract across websocket transport, message parsing, and app-level error boundaries.",
+      "Configuration ownership is split between build-time injection and runtime store defaults.",
+      "Command layer grew as wrapper fan-out without a formal async/result API contract."
+    ],
+    "likely_symptoms": [
+      "ws_outbound_unhandled_transport_errors",
+      "ws_inbound_parse_error_swallow",
+      "command_api_fire_and_forget_contract_ambiguity"
+    ],
+    "possible_false_positives": []
+  }
+}

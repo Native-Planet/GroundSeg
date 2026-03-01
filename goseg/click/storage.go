@@ -1,9 +1,10 @@
 package click
 
 import (
-	"fmt"
 	"groundseg/structs"
 )
+
+var executeClickCommandForStorage = executeClickCommand
 
 /*
 =/  m  (strand ,vase)
@@ -26,9 +27,7 @@ import (
 */
 
 func unlinkStorage(patp string) error {
-	// <file>.hoon
 	file := "unlinkstorage"
-	// actual hoon
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "our=@p", "bind:m", "get-our",
@@ -38,30 +37,11 @@ func unlinkStorage(patp string) error {
 		storageAction("%set-current-bucket", ""),
 		"(pure:m !>('success'))",
 	})
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click unlink storage failed to create hoon: %v", err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
-	if err != nil {
-		return fmt.Errorf("Click unlink storage failed to get exec: %v", err)
-	}
-	_, succeeded, err := filterResponse("success", response)
-	if err != nil {
-		return fmt.Errorf("Click unlink storage failed to get exec: %v", err)
-	}
-	if !succeeded {
-		return fmt.Errorf("Click unlink storage failed poke: %s", patp)
-	}
-	return nil
+	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click unlink storage")
+	return err
 }
 func linkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) error {
-	// <file>.hoon
 	file := "linkstorage"
-	// actual hoon
 	hoon := joinGap([]string{
 		"=/", "m", "(strand ,vase)",
 		";<", "our=@p", "bind:m", "get-our",
@@ -71,23 +51,6 @@ func linkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 		storageAction("%set-current-bucket", "bucket"),
 		"(pure:m !>('success'))",
 	})
-	// create hoon file
-	if err := createHoon(patp, file, hoon); err != nil {
-		return fmt.Errorf("Click link storage failed to create hoon: %v", err)
-	}
-	// defer hoon file deletion
-	defer deleteHoon(patp, file)
-	// execute hoon file
-	response, err := clickExec(patp, file, "")
-	if err != nil {
-		return fmt.Errorf("Click link storage failed to get exec: %v", err)
-	}
-	_, succeeded, err := filterResponse("success", response)
-	if err != nil {
-		return fmt.Errorf("Click link storage failed to get exec: %v", err)
-	}
-	if !succeeded {
-		return fmt.Errorf("Click link storage failed poke: %s", patp)
-	}
-	return nil
+	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click link storage")
+	return err
 }

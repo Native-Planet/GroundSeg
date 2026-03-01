@@ -4,15 +4,68 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/defaults"
+	"groundseg/structs"
 	"path/filepath"
 	"sort"
 
 	"go.uber.org/zap"
 )
 
+type ShipConfigPort interface {
+	ExistingPiers() []string
+	ExistingShipPorts() ([]int, []int)
+	SaveShipConfig(patp string, conf structs.UrbitDocker) error
+	SavePiers(piers []string) error
+}
+
+type configShipPort struct{}
+
+func (configShipPort) ExistingPiers() []string {
+	return config.ShipSettingsSnapshot().Piers
+}
+
+func (configShipPort) ExistingShipPorts() ([]int, []int) {
+	piers := config.ShipSettingsSnapshot().Piers
+	httpPorts := make([]int, 0, len(piers))
+	amesPorts := make([]int, 0, len(piers))
+	for _, pier := range piers {
+		uConf := config.UrbitConf(pier)
+		httpPorts = append(httpPorts, uConf.HTTPPort)
+		amesPorts = append(amesPorts, uConf.AmesPort)
+	}
+	return httpPorts, amesPorts
+}
+
+func (configShipPort) SaveShipConfig(patp string, conf structs.UrbitDocker) error {
+	urbConfs := config.UrbitConfAll()
+	urbConfs[patp] = conf
+	return config.UpdateUrbitConfig(urbConfs)
+}
+
+func (configShipPort) SavePiers(piers []string) error {
+	return config.UpdateConfTyped(config.WithPiers(piers))
+}
+
+type Service struct {
+	store ShipConfigPort
+}
+
+func NewService(cfg ShipConfigPort) *Service {
+	if cfg == nil {
+		cfg = configShipPort{}
+	}
+	return &Service{store: cfg}
+}
+
+var defaultService = NewService(nil)
+
 func CreateUrbitConfig(patp, customDrive string) error {
+	return defaultService.CreateUrbitConfig(patp, customDrive)
+}
+
+func (s *Service) CreateUrbitConfig(patp, customDrive string) error {
 	// get unused http and ames ports
-	httpPort, amesPort := getOpenUrbitPorts()
+	httpPort, amesPort := s.getOpenUrbitPorts()
 	// get default urbit config
 	conf := defaults.UrbitConfig
 	// replace values
@@ -24,33 +77,19 @@ func CreateUrbitConfig(patp, customDrive string) error {
 	if customDrive != "" {
 		conf.CustomPierLocation = filepath.Join(customDrive, patp)
 	}
-	// get urbit config map
-	urbConf := config.UrbitConfAll()
-	// add to map
-	urbConf[patp] = conf
 	// persist config
-	err := config.UpdateUrbitConfig(urbConf)
+	err := s.store.SaveShipConfig(patp, conf)
 	return err
 }
 
-func getOpenUrbitPorts() (int, int) {
+func (s *Service) getOpenUrbitPorts() (int, int) {
 	// default ports
 	// 8080 and 34343 is reserved
 	httpPort := 8081
 	amesPort := 34344
 
-	// get piers
-	conf := config.Conf()
-	piers := conf.Piers
-
 	// get used ports
-	var amesAll []int
-	var httpAll []int
-	for _, pier := range piers {
-		uConf := config.UrbitConf(pier)
-		httpAll = append(httpAll, uConf.HTTPPort)
-		amesAll = append(amesAll, uConf.AmesPort)
-	}
+	httpAll, amesAll := s.store.ExistingShipPorts()
 
 	// sort them in ascending order
 	sort.Ints(amesAll)
@@ -83,8 +122,11 @@ func contains(sortedSlice []int, val int) bool {
 }
 
 func AppendSysConfigPier(patp string) error {
-	conf := config.Conf()
-	piers := conf.Piers
+	return defaultService.AppendSysConfigPier(patp)
+}
+
+func (s *Service) AppendSysConfigPier(patp string) error {
+	piers := s.store.ExistingPiers()
 	// Check if value already exists in slice
 	exists := false
 	for _, v := range piers {
@@ -97,9 +139,7 @@ func AppendSysConfigPier(patp string) error {
 	if !exists {
 		piers = append(piers, patp)
 	}
-	err := config.UpdateConf(map[string]interface{}{
-		"piers": piers,
-	})
+	err := s.store.SavePiers(piers)
 	if err != nil {
 		return err
 	}
@@ -108,16 +148,17 @@ func AppendSysConfigPier(patp string) error {
 
 // Remove all instances of patp from system config Piers
 func RemoveSysConfigPier(patp string) error {
-	conf := config.Conf()
-	piers := conf.Piers
+	return defaultService.RemoveSysConfigPier(patp)
+}
+
+func (s *Service) RemoveSysConfigPier(patp string) error {
+	piers := s.store.ExistingPiers()
 	var updated []string
 	for _, memShip := range piers {
 		if memShip != patp {
 			updated = append(updated, memShip)
 		}
 	}
-	err := config.UpdateConf(map[string]interface{}{
-		"piers": updated,
-	})
+	err := s.store.SavePiers(updated)
 	return err
 }

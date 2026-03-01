@@ -1,0 +1,127 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 72.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Public network-facing APIs use inconsistent failure shapes across adjacent modules: `config.CheckVersion()`/`config.SyncVersionInfo()` return `(structs.Channel, bool)` while `startram.FetchRegions()`/`startram.Retrieve()` return `(data, error)`.",
+        "`handler.UploadHandler(msg []byte)` is a string-dispatched multiplexer (`open-endpoint`, `reset`) that routes multiple operations through one untyped action surface, unlike explicit operation-specific exported functions in `startram` (e.g. `SvcCreate`, `SvcDelete`, `AliasCreate`, `AliasDelete`).",
+        "`startram.RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string)` exposes a 6-parameter public API with mixed concerns (source selection, mode selection, integrity input, type routing), signaling a boundary that is hard to use safely.",
+        "Error contract style is inconsistent for comparable boundary failures: `config.LocalVersion()` panics on read/decode errors, `config.CheckVersion()` hides root cause behind `false`, and most `startram` APIs return rich `error` values.",
+        "`UploadHandler` drops actionable error context in `open-endpoint` path by returning endpoint text instead of the underlying importer error, reducing predictability for callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "mixed_failure_contracts_public_io",
+      "summary": "Comparable public IO APIs expose conflicting failure contracts (`bool`, `error`, and panic), making call-site handling unpredictable.",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "`CheckVersion` and `SyncVersionInfo` return `(structs.Channel, bool)` and suppress underlying error causes.",
+        "`FetchRegions`, `Retrieve`, and related StarTram calls return explicit `error` values with context.",
+        "`LocalVersion` panics on file read/unmarshal failures instead of returning an error."
+      ],
+      "suggestion": "Standardize public boundary methods on `(..., error)` and migrate `CheckVersion`/`SyncVersionInfo`/`LocalVersion` to explicit typed errors; keep compatibility wrappers temporarily if needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "undocumented_inconsistent_error_semantics"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "upload_handler_overloaded_action_api",
+      "summary": "Single entrypoint `UploadHandler` overloads multiple commands via string action dispatch, creating a weak and inconsistent API surface.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`UploadHandler(msg []byte)` decodes generic payload and switches on string literals (`open-endpoint`, `reset`).",
+        "No contract documentation in README describing accepted upload actions or expected per-action payload/error behavior."
+      ],
+      "suggestion": "Replace stringly action multiplexing with explicit command handlers or typed command enum + validated command schema, and document supported operations plus failure contracts.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "command_bus_without_typed_contract"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "wide_restore_backup_signature",
+      "summary": "`RestoreBackup` exposes an overly wide public signature that mixes independent concerns in positional parameters.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`RestoreBackup(ship string, remote bool, timestamp int, md5hash string, dev bool, bakType string)` has 6 parameters including mode toggles and transport/integrity values.",
+        "No external contract documentation in README for parameter semantics or valid combinations."
+      ],
+      "suggestion": "Introduce a `RestoreBackupOptions` struct (or separate `RestoreRemoteBackup`/`RestoreLocalBackup` APIs) with validation to make call intent explicit and reduce misuse risk.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parameter_bag_boundary_design"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "error_surface_loses_causal_context_upload",
+      "summary": "Upload API returns misleading error text in one branch, weakening a consistent and debuggable boundary contract.",
+      "related_files": [
+        "goseg/handler/upload.go",
+        "goseg/startram/startram.go"
+      ],
+      "evidence": [
+        "In `UploadHandler` open-endpoint case, failure returns `Failed to open upload endpoint: <endpoint>` and omits wrapped importer error.",
+        "Elsewhere (e.g., many `startram` methods), errors typically include causal context from failing operation."
+      ],
+      "suggestion": "Wrap and return the underlying importer error (`%w`) while keeping endpoint context, so callers can inspect or match root causes consistently.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "undocumented_inconsistent_error_semantics"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "compat_alias_expands_public_surface_without_contract_value",
+      "summary": "Compatibility alias `GetRegions` duplicates `FetchRegions` behavior, adding API surface area without distinct semantics.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`GetRegions` is exported and directly returns `FetchRegions()` with no added behavior or contract differentiation.",
+        "README does not document deprecation or preferred region-retrieval API, leaving both names active and ambiguous."
+      ],
+      "suggestion": "Deprecate one entrypoint (or make one unexported), document the canonical method, and enforce a single stable naming convention for retrieval APIs.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_alias_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Public API evolution appears incremental and compatibility-driven without a unified boundary contract policy for errors, naming, and operation shape.",
+      "Command-style workflows are split between typed function-per-operation surfaces and string-dispatched multiplexers, causing drift in API predictability."
+    ],
+    "likely_symptoms": [
+      "upload_handler_overloaded_action_api",
+      "mixed_failure_contracts_public_io",
+      "wide_restore_backup_signature",
+      "compat_alias_expands_public_surface_without_contract_value"
+    ],
+    "possible_false_positives": []
+  }
+}

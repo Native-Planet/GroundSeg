@@ -5,6 +5,7 @@ package system
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"groundseg/defaults"
 	"io/ioutil"
@@ -28,15 +29,24 @@ var (
 )
 
 // get memory total/used in bytes
-func GetMemory() (uint64, uint64) {
-	v, _ := mem.VirtualMemory()
-	return v.Total, v.Used
+func GetMemory() (uint64, uint64, error) {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		return 0, 0, fmt.Errorf("read virtual memory stats: %w", err)
+	}
+	return v.Total, v.Used, nil
 }
 
 // get cpu usage as %
-func GetCPU() int {
-	percent, _ := cpu.Percent(time.Second, false)
-	return int(percent[0])
+func GetCPU() (int, error) {
+	percent, err := cpu.Percent(time.Second, false)
+	if err != nil {
+		return 0, fmt.Errorf("read CPU usage: %w", err)
+	}
+	if len(percent) == 0 {
+		return 0, fmt.Errorf("read CPU usage: empty CPU percentage response")
+	}
+	return int(percent[0]), nil
 }
 
 // get used/avail disk in bytes with labels
@@ -204,10 +214,23 @@ func addCron(job string) error {
 		return err
 	}
 	defer os.Remove(tmpfile.Name())
-	out, _ := exec.Command("crontab", "-l").Output()
-	tmpfile.WriteString(string(out))
-	tmpfile.WriteString(job)
-	tmpfile.Close()
+	out, err := exec.Command("crontab", "-l").Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || !strings.Contains(string(exitErr.Stderr), "no crontab for") {
+			return fmt.Errorf("read existing crontab: %w", err)
+		}
+		out = []byte{}
+	}
+	if _, err := tmpfile.WriteString(string(out)); err != nil {
+		return fmt.Errorf("write existing crontab to temp file: %w", err)
+	}
+	if _, err := tmpfile.WriteString(job); err != nil {
+		return fmt.Errorf("append cron job to temp file: %w", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		return fmt.Errorf("close crontab temp file: %w", err)
+	}
 	cmd := exec.Command("crontab", tmpfile.Name())
 	return cmd.Run()
 }

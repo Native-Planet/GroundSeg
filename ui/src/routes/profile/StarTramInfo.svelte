@@ -1,6 +1,7 @@
 <script>
   import { startramRestart } from '$lib/stores/websocket'
-  import { startramMaxReminderDays, structure, daysUntilDate } from '$lib/stores/data'
+  import { startramMaxReminderDays, structure } from '$lib/stores/data'
+  import { daysUntilDate } from '$lib/utils/date/days-until-date'
   import Fa from 'svelte-fa'
   import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
   import { openModal } from 'svelte-modals'

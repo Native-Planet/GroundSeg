@@ -1,0 +1,90 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/startram.go defines package globals (`EventBus`, `Regions`) and mutates them from request functions (`GetRegions`, `Retrieve`), creating hidden cross-module stateful behavior.",
+        "goseg/startram/startram.go `Retrieve` mutates `config.StartramConfig` and persists config via `config.UpdateConf`, so a transport-facing module writes directly into another module’s global/runtime state.",
+        "goseg/config/version.go `CheckVersion` combines remote HTTP fetch, global state mutation (`VersionInfo`, `VersionServerReady`), and local file persistence (`settings/version_info.json`) in one boundary-crossing function."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_state_cross_boundary_coupling",
+      "summary": "Cross-module coordination relies on mutable package globals, creating hidden coupling and broad change blast radius.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go:33-36 defines mutable globals (`EventBus`, `Regions`), and `GetRegions` overwrites `Regions` at line 64.",
+        "goseg/startram/startram.go:98 writes into external package global `config.StartramConfig` during `Retrieve`.",
+        "goseg/config/version.go:17-20 defines mutable globals (`VersionServerReady`, `VersionInfo`) and `CheckVersion` mutates/returns them as implicit shared state (lines 46-47, 77, 94-95)."
+      ],
+      "suggestion": "Introduce explicit state owners with interfaces (e.g., `StartramStore`, `VersionStore`) and inject them into call sites; replace package-global mutable variables with encapsulated structs guarded by synchronization where needed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "transport_domain_persistence_mixed_in_single_modules",
+      "summary": "Network transport logic is tightly mixed with config persistence and event emission, collapsing module boundaries.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go",
+        "goseg/handler/upload.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go `Retrieve` performs HTTP, decodes payload, mutates config state (`config.UpdateConf` at lines 107-109), and emits module event (`EventBus <- ...` at line 117) in one flow.",
+        "goseg/config/version.go `CheckVersion` performs HTTP polling and also writes a persisted JSON snapshot to disk (`os.Create` line 80, encoder writes lines 88-90).",
+        "goseg/handler/upload.go delegates directly to importer session mutation (`importer.SetUploadSession`, `importer.Reset`) from websocket action dispatch, without an intermediate application service boundary."
+      ],
+      "suggestion": "Split responsibilities into explicit layers: API client layer for HTTP calls, domain service layer for registration/version workflows, and persistence/event adapters; handlers should call service interfaces, not storage/session primitives directly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_orchestration"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "bidirectional_config_startram_dependency_drift",
+      "summary": "Startram and config modules are mutually entangled through reads and writes, weakening dependency direction.",
+      "related_files": [
+        "goseg/startram/startram.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "goseg/startram/startram.go depends on config for runtime reads (`config.Conf()` throughout) and writes (`config.UpdateConf`, `config.StartramConfig` mutation).",
+        "goseg/config/version.go maintains its own remote-fetch orchestration and global status state rather than depending on a dedicated outbound service abstraction, reinforcing horizontal coupling between runtime config and external API concerns."
+      ],
+      "suggestion": "Define a narrow configuration interface consumed by startram (read/update methods only) and move external API orchestration into dedicated service packages so config remains a state provider instead of a peer orchestrator.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_orchestration"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Package-level mutable singletons are used as integration points instead of explicit service interfaces.",
+      "Workflow orchestration (HTTP + persistence + eventing) is implemented inside boundary modules rather than composed via layered abstractions."
+    ],
+    "likely_symptoms": [
+      "global_state_cross_boundary_coupling",
+      "transport_domain_persistence_mixed_in_single_modules",
+      "bidirectional_config_startram_dependency_drift"
+    ],
+    "possible_false_positives": []
+  }
+}

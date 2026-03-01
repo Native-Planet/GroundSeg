@@ -2,7 +2,7 @@
   import { toggleNetwork } from '$lib/stores/websocket';
   import { structure } from '$lib/stores/data'
 
-  import { devShipClass } from '$lib/stores/devclass'
+  import { devShipClass } from '$lib/stores/dev/devclass'
 
   import Sigil from './Sigil.svelte'
   import StartramToggle from './StartramToggle.svelte'
