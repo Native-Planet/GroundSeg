@@ -136,15 +136,102 @@ Output schema:
 }
 
 
-STATUS: running
-STARTED AT: 2026-03-01T15:44:22+00:00
-ELAPSED: 20s
-OUTPUT FILE: /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_154421/results/batch-3.raw.txt (missing)
+STDOUT:
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 78.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "handler.StartramHandler in `goseg/handler/startram.go` enqueues all actions via `runStartramAsync` and returns immediately, while sibling entrypoints in `goseg/handler/handler.go` (for example `LoginHandler`, `LogoutHandler`, `C2CHandler`, `UnauthHandler`) return direct results/errors and do not consistently follow an async completion contract.",
+        "In `goseg/broadcast/broadcast.go`, `BroadcastToClients` executes `GetStateJson` and calls `auth.ClientManager.BroadcastAuth(authJson)` before checking `err`, and then calls it again on the success path, creating inconsistent observable outcomes for the same API call.",
+        "`goseg/system/system.go` exposes telemetry APIs with mixed error contracts (`GetCPU`, `GetMemory`, `GetDisk` return errors, while `GetTemp` returns only `float64` and logs/returns `0` on failure), and this diverges from the same package's public resource-status surface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "handler_action_contracts_are_heterogeneous",
+      "summary": "Handler dispatch APIs in the same package expose incompatible request/response contracts, especially for action completion and failure signaling.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/handler.go",
+        "goseg/handler/urbit.go",
+        "goseg/handler/urbit_operations.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartramHandler` in `goseg/handler/startram.go` wraps each action with `runStartramAsync(...)` and immediately returns `nil`, so caller-visible failures are pushed into internal logs/transitions instead of a unified handler return path.",
+        "`UrbitHandler` in `goseg/handler/urbit.go` and other request handlers in `goseg/handler/handler.go` execute and return `error`/payload directly, creating a different API contract for conceptually similar incoming websocket action endpoints.",
+        "`main.go` registers multiple handler entrypoints through a shared request path, so this mismatch affects how callers can reliably reason about response/error behavior across action families."
+      ],
+      "suggestion": "Define one handler contract across action entrypoints in `handler/` (e.g., synchronous result + error, or explicit async operation handle + completion/error channel) and standardize all handler dispatch paths to use it.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "handler_dispatch_contract_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "broadcast_to_clients_double_emit",
+      "summary": "The broadcast API can emit duplicate auth events and can emit an invalid payload path when JSON marshal fails.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `GetStateJson(bState)` and then `BroadcastAuth(authJson)` before the error check, and calls `BroadcastAuth(authJson)` again when no error occurs.",
+        "That means a successful broadcast is emitted twice, and an error path can still trigger a broadcast with potentially nil/undefined bytes before returning."
+      ],
+      "suggestion": "In `BroadcastToClients`, validate `GetStateJson` error first, return immediately on failure, and emit exactly one auth broadcast on success; optionally dedupe by moving all side effects behind the error check.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "metric_apis_inconsistent_error_contract",
+      "summary": "System telemetry APIs expose inconsistent error signaling for the same conceptual surface (`GetTemp` has no error return while neighboring metrics APIs do).",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/broadcast/collectors_and_mappers.go"
+      ],
+      "evidence": [
+        "`GetMemory`, `GetCPU`, and `GetDisk` in `goseg/system/system.go` return `(value, error)` on failure, while `GetTemp` returns only `float64` and logs failures internally while returning `0`.",
+        "`collectors_and_mappers.go` treats these APIs as similar status-gathering operations in one pass and therefore cannot distinguish a real temperature read failure from valid zero/near-zero values."
+      ],
+      "suggestion": "Align the telemetry API surface in `system` by making `GetTemp` return `(float64, error)` (or explicit sentinel + bool) and update collectors/tests to handle temperature-read failures consistently with other metrics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_contract_inconsistency_cross_api_families"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "handler_dispatch_contract_drift",
+      "api_contract_inconsistency_cross_api_families",
+      "side_effect_drift_in_success_paths"
+    ],
+    "likely_symptoms": [
+      "Inconsistent caller behavior expectations between handler families",
+      "Duplicate websocket broadcast frames under auth-session updates",
+      "Silent telemetry regression masking in temperature monitoring"
+    ],
+    "possible_false_positives": [
+      "If async handler behavior in `StartramHandler` is an intentional API choice (not intended for request/response-style callers), normalize may be deferred as a design decision rather than defect"
+    ]
+  }
+}
 
-STDOUT (live):
 
-
-STDERR (live):
+STDERR:
 OpenAI Codex v0.106.0 (research preview)
 --------
 workdir: /Users/chuah/NP/GroundSeg
@@ -879,4 +966,380 @@ exec
 	}
 	return packDay, packDate
 }
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '220,400p' goseg/system/wifi.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+		if trimmed != "" {
+			wifiDevices = append(wifiDevices, trimmed)
+		}
+	}
+	if len(wifiDevices) == 0 {
+		return nil, fmt.Errorf("no WiFi device found")
+	}
+	return wifiDevices, nil
+}
+
+func primaryWifiDevice() (string, error) {
+	wifiDevices, err := getWifiDevice()
+	if err != nil {
+		return "", err
+	}
+	if len(wifiDevices) == 0 {
+		return "", fmt.Errorf("no WiFi device found")
+	}
+	return wifiDevices[0], nil
+}
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,320p' goseg/structs/ws.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package structs
+
+// contained herein: structs for managing mutexed maps of
+// mutexed websocket connections to avoid panics;
+// actual writing is done via broadcast package;
+// auth map management is done via auth package
+// 🐝 Careful! ❤️
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+var (
+	WsEventBus      = make(chan WsChanEvent, 100)
+	InactiveSession = &MuConn{}
+exec
+/opt/homebrew/bin/zsh -lc "python - <<'PY'
+import re,glob
+files=[
+'goseg/broadcast/collectors_and_mappers.go','goseg/broadcast/state_test.go','goseg/rectify/rectify.go','goseg/broadcast/broadcast.go','goseg/broadcast/loop_test.go','goseg/defaults/defaults.go','goseg/main.go','goseg/config/wireguard.go','goseg/docker/wireguard_test.go','goseg/rectify/rectify_test.go','goseg/docker/wireguard.go','goseg/leak/broadcast.go','goseg/leak/broadcast_test.go','goseg/routines/docker.go','goseg/system/wifi.go','goseg/leak/leak_test.go','goseg/routines/docker_test.go','goseg/structs/configs.go','goseg/defaults/version.go','goseg/routines/system_test.go','goseg/docker/docker.go','goseg/handler/urbit_operations.go','goseg/handler/startram.go','goseg/handler/urbit_operations_test.go','goseg/importer/importer.go','goseg/docker/runtime_seams.go','goseg/routines/runtime_seams.go','goseg/routines/version.go','goseg/setup/setup_test.go','goseg/handler/support.go','goseg/auth/auth.go','goseg/config/config.go','goseg/docker/llama_test.go','goseg/importer/extract.go','goseg/chopsvc/service.go','goseg/dockerclient/client.go','goseg/config/urbit.go','goseg/docker/minio.go','goseg/docker/urbit_test.go','goseg/click/backup/service.go','goseg/click/filter.go','goseg/click/hoon.go','goseg/config/mc.go','goseg/docker/netdata.go','goseg/handler/newship.go','goseg/handler/urbit.go','goseg/leak/handler.go','goseg/accesspoint/accesspoint_test.go','goseg/config/version.go','goseg/handler/handler.go','goseg/handler/urbit_test.go','goseg/importer/extract_test.go','goseg/importer/importer_test.go','goseg/leak/handler_test.go','goseg/logger/logger.go','goseg/startram/backup_runtime_test.go','goseg/structs/ws.go','goseg/system/disk.go','goseg/system/system.go']
+pat=re.compile(r'"'^func'"\\s+([A-Z][A-Za-z0-9_]*)\\s*\\((["'^)]*)'"\\)')
+for f in files:
+    try:
+        txt=open(f).read().splitlines()
+    except Exception:
+        continue
+    for i,l in enumerate(txt,1):
+        m=pat.match(l.strip())
+        if not m: continue
+        args=m.group(2).strip()
+        count=0
+        if args and args"'!='"'...':
+            # simple split not perfect with funcs callbacks
+            count=len([a for a in re.split(r',(?"'![''^()]*'"\\))',args) if a.strip()"'!='"''])
+        if count>5:
+            print(f\"{f}:{i}:{m.group(1)}:{count}:{args}\")
+PY" in /Users/chuah/NP/GroundSeg exited 127 in 51ms:
+zsh:1: command not found: python
+codex
+I found a tooling constraint (no `python` in PATH), so I’ll use shell/Go tools instead to inspect public function shapes without re-reading files.
+exec
+/opt/homebrew/bin/zsh -lc "perl -ne 'if(/"'^func'"\\s+([A-Z][A-Za-z0-9_]*)\\s*\\((["'^)]*)'"\\)/){"'$f=$1;$a=$2;$a=~s/'"\\s+//g;@p=split(/,(?"'![''^()]*'"\\))/,"'$a);$n=@p; $n=0 if $a eq ""; print "$ARGV:$.":":$f:$n'"\\n\" if "'$n>5}'"' goseg/broadcast/collectors_and_mappers.go goseg/broadcast/state_test.go goseg/rectify/rectify.go goseg/broadcast/broadcast.go goseg/broadcast/loop_test.go goseg/defaults/defaults.go goseg/main.go goseg/config/wireguard.go goseg/docker/wireguard_test.go goseg/rectify/rectify_test.go goseg/docker/wireguard.go goseg/leak/broadcast.go goseg/leak/broadcast_test.go goseg/routines/docker.go goseg/system/wifi.go goseg/leak/leak_test.go goseg/routines/docker_test.go goseg/structs/configs.go goseg/defaults/version.go goseg/routines/system_test.go goseg/docker/docker.go goseg/handler/urbit_operations.go goseg/handler/startram.go goseg/handler/urbit_operations_test.go goseg/importer/importer.go goseg/docker/runtime_seams.go goseg/routines/runtime_seams.go goseg/routines/version.go goseg/setup/setup_test.go goseg/handler/support.go goseg/auth/auth.go goseg/config/config.go goseg/docker/llama_test.go goseg/importer/extract.go goseg/chopsvc/service.go goseg/dockerclient/client.go goseg/config/urbit.go goseg/docker/minio.go goseg/docker/urbit_test.go goseg/click/backup/service.go goseg/click/filter.go goseg/click/hoon.go goseg/config/mc.go goseg/docker/netdata.go goseg/handler/newship.go goseg/handler/urbit.go goseg/leak/handler.go goseg/accesspoint/accesspoint_test.go goseg/config/version.go goseg/handler/handler.go goseg/handler/urbit_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/handler_test.go goseg/logger/logger.go goseg/startram/backup_runtime_test.go goseg/structs/ws.go goseg/system/disk.go goseg/system/system.go" in /Users/chuah/NP/GroundSeg exited 255 in 52ms:
+syntax error at -e line 1, near ""$ARGV:$.":"
+Execution of -e aborted due to compilation errors.
+exec
+/opt/homebrew/bin/zsh -lc "awk 'BEGIN{FS=\"\\(\"} /"'^func [A-Z][A-Za-z0-9_]*'"\\(/ {split("'$0,a,"("); fn=$0; match(a[1], /func ([A-Z][A-Za-z0-9_]*)/,m); signature=$2; sub(/'"\\).*/,\"\",signature); gsub(/ /,\"\",signature); n=split(signature,args,\",\"); if(signature==\"\"||args[1]==\"\"){n=0} if(n>5) print FILENAME \":\" FNR \":\" m[1] \":\" n \":\" signature }' goseg/broadcast/collectors_and_mappers.go goseg/broadcast/state_test.go goseg/rectify/rectify.go goseg/broadcast/broadcast.go goseg/broadcast/loop_test.go goseg/defaults/defaults.go goseg/main.go goseg/config/wireguard.go goseg/docker/wireguard_test.go goseg/rectify/rectify_test.go goseg/docker/wireguard.go goseg/leak/broadcast.go goseg/leak/broadcast_test.go goseg/routines/docker.go goseg/system/wifi.go goseg/leak/leak_test.go goseg/routines/docker_test.go goseg/structs/configs.go goseg/defaults/version.go goseg/routines/system_test.go goseg/docker/docker.go goseg/handler/urbit_operations.go goseg/handler/startram.go goseg/handler/urbit_operations_test.go goseg/importer/importer.go goseg/docker/runtime_seams.go goseg/routines/runtime_seams.go goseg/routines/version.go goseg/setup/setup_test.go goseg/handler/support.go goseg/auth/auth.go goseg/config/config.go goseg/docker/llama_test.go goseg/importer/extract.go goseg/chopsvc/service.go goseg/dockerclient/client.go goseg/config/urbit.go goseg/docker/minio.go goseg/docker/urbit_test.go goseg/click/backup/service.go goseg/click/filter.go goseg/click/hoon.go goseg/config/mc.go goseg/docker/netdata.go goseg/handler/newship.go goseg/handler/urbit.go goseg/leak/handler.go goseg/accesspoint/accesspoint_test.go goseg/config/version.go goseg/handler/handler.go goseg/handler/urbit_test.go goseg/importer/extract_test.go goseg/importer/importer_test.go goseg/leak/handler_test.go goseg/logger/logger.go goseg/startram/backup_runtime_test.go goseg/structs/ws.go goseg/system/disk.go goseg/system/system.go" in /Users/chuah/NP/GroundSeg exited 2 in 52ms:
+awk: syntax error at source line 1
+ context is
+	BEGIN{FS="\("} /^func [A-Z][A-Za-z0-9_]*\(/ {split($0,a,"("); fn=$0; match(a[1], /func >>>  ([A-Z][A-Za-z0-9_]*)/, <<< 
+awk: illegal statement at source line 1
+awk: illegal statement at source line 1
+codex
+I’ve identified a couple of concrete API-surface concerns and will verify the remaining candidate endpoints, especially handler and importer exports where sibling functions currently return different result envelopes for similar operations.
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "func (HTTPUploadHandler|failUploadRequest|validateUploadRequest|OpenUploadEndpoint|SetUploadSession|handle.*|process.*)" goseg/importer/importer.go goseg/handler/handler.go goseg/handler/urbit.go goseg/handler/startram.go goseg/handler/support.go goseg/routines/docker.go goseg/system/wifi.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/importer/importer.go:85:func OpenUploadEndpoint(cmd OpenUploadEndpointCmd) error {
+goseg/importer/importer.go:143:func SetUploadSession(uploadPayload structs.WsUploadPayload) error {
+goseg/importer/importer.go:198:func failUploadRequest(w http.ResponseWriter, code int, message string) {
+goseg/importer/importer.go:205:func validateUploadRequest(r *http.Request) (validatedUploadRequest, error) {
+goseg/importer/importer.go:330:func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
+goseg/handler/startram.go:94:func handleStartramServices() error {
+goseg/handler/startram.go:98:func handleStartramRegions() error {
+goseg/handler/startram.go:132:func handleStartramRestart() error {
+goseg/handler/startram.go:169:func handleStartramToggle() error {
+goseg/handler/startram.go:243:func handleStartramRegister(regCode, region string) error {
+goseg/handler/startram.go:278:func handleStartramEndpoint(endpoint string) error {
+goseg/handler/startram.go:326:func handleStartramCancel(key string, reset bool) error {
+goseg/handler/startram.go:346:func handleStartramReminder(remind bool) error {
+goseg/handler/startram.go:365:func handleStartramRestoreBackup(target, source string, backup int, key string) {
+goseg/handler/startram.go:408:func handleStartramUploadBackup(patp string) {
+goseg/handler/startram.go:435:func handleNotImplement(action string) {
+goseg/handler/startram.go:439:func handleStartramSetBackupPassword(password string) error {
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '220,500p' goseg/handler/startram.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/routines/docker.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '300,460p' goseg/importer/importer.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+		// delete minio
+		minio := fmt.Sprintf("minio_%s", patp)
+		if err := docker.DeleteContainer(minio); err != nil {
+			appendOrchestrationError(&stepErrors, fmt.Sprintf("delete %s container", minio), err)
+		}
+	}
+	// load minio
+	if err := docker.LoadMinIOs(); err != nil {
+		appendOrchestrationError(&stepErrors, "load minio containers", err)
+	}
+	if joinedErr := errors.Join(stepErrors...); joinedErr != nil {
+		publishTransitionWithPolicy(
+			startram.PublishEvent,
+			structs.Event{Type: "toggle", Data: fmt.Sprintf("Error: %v", joinedErr)},
+			structs.Event{Type: "toggle", Data: nil},
+			3*time.Second,
+		)
+		return joinedErr
+	}
+	startram.PublishEvent(structs.Event{Type: "toggle", Data: nil})
+ succeeded in 52ms:
+	defer combineCancel()
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- combineChunks(filename, total)
+	}()
+	select {
+	case err := <-resultCh:
+		return err
+	case <-combineCtx.Done():
+		return fmt.Errorf("timed out while combining chunks")
+	}
+}
+
+func runImportPhases(filename, patp, customDrive string, steps ...lifecycle.Step) error {
+	return orchestration.RunPhases(
+		steps,
+		func(phase lifecycle.Phase) {
+			if phase == "" {
+				return
+			}
+ succeeded in 52ms:
+package routines
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/dockerclient"
+	"groundseg/structs"
+	"net/http"
+	"strings"
+	"time"
+
+	eventtypes "github.com/docker/docker/api/types/events"
+	"go.uber.org/zap"
+)
+
+var (
+	eventBus           = make(chan structs.Event, 100)
+	DisableShipRestart = false
+)
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,300p' goseg/system/disk.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package system
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"groundseg/structs"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"strings"
+
+	"github.com/anatol/smart.go"
+	"github.com/google/uuid"
+	"github.com/shirou/gopsutil/disk"
+	"go.uber.org/zap"
+)
+
+codex
+I’m now validating whether similar APIs can fail silently (no error reporting) versus returning explicit errors, as that’s the main cross-cutting consistency signal for this batch.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/wireguard.go && sed -n '1,260p' goseg/config/urbit.go && sed -n '1,260p' goseg/defaults/defaults.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package config
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+var (
+	confForWG               = Conf
+	getVersionChannelForWG  = GetVersionChannel
+	wgKeyGenForCycle        = WgKeyGen
+	updateConfTypedForCycle = UpdateConfTyped
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "func UnauthHandler|func PwHandler|func C2CHandler|func LoginHandler|func LogoutHandler|func NewShipHandler|func runStartramAsync|func runTransition" goseg/handler/handler.go goseg/handler/startram.go goseg/handler/urbit.go goseg/handler/newship.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/handler/handler.go:41:func NewShipHandler(msg []byte) error {
+goseg/handler/handler.go:126:func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
+goseg/handler/handler.go:192:func LogoutHandler(msg []byte) error {
+goseg/handler/handler.go:203:func C2CHandler(msg []byte) ([]byte, error) {
+goseg/handler/handler.go:232:func UnauthHandler() ([]byte, error) {
+goseg/handler/handler.go:250:func PwHandler(msg []byte, urbitMode bool) error {
+goseg/handler/startram.go:32:func runStartramAsync(action string, fn func() error) {
+codex
+I have enough concrete evidence for two high-confidence API-surface defects in this batch and will produce findings plus scoring notes aligned to `api_surface_coherence`.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '220,340p' goseg/handler/handler.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+				SSIDS: system.C2CStoredSSIDs,
+			}
+			resp, err = json.Marshal(blob)
+			if err != nil {
+				return nil, fmt.Errorf("Error unmarshalling message: %w", err)
+			}
+		*/
+	}
+	return resp, nil
+}
+
+// return the unauth payload
+func UnauthHandler() ([]byte, error) {
+	blob := structs.UnauthBroadcast{
+		Type:      "structure",
+		AuthLevel: "unauthorized",
+		Login: struct {
+			Remainder int `json:"remainder"`
+		}{
+			Remainder: remainder,
+codex
+I’ve got two strong findings and I’m checking whether there is a reusable pattern across other modules (e.g., inconsistent return contracts for similar telemetry APIs) to justify a third, broader issue.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"GetTemp\\(|GetCPU\\(|GetMemory\\(|GetDisk\\(\" goseg | head -n 80" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+goseg/broadcast/collectors_and_mappers.go:220:	if usedRam, totalRam, err := system.GetMemory(); err != nil {
+goseg/broadcast/collectors_and_mappers.go:225:	if cpuUsage, err := system.GetCPU(); err != nil {
+goseg/broadcast/collectors_and_mappers.go:230:	sysInfo.Info.Usage.CPUTemp = system.GetTemp()
+goseg/broadcast/collectors_and_mappers.go:231:	if diskUsage, err := system.GetDisk(); err != nil {
+goseg/system/system.go:32:func GetMemory() (uint64, uint64, error) {
+goseg/system/system.go:41:func GetCPU() (int, error) {
+goseg/system/system.go:53:func GetDisk() (map[string][2]uint64, error) {
+goseg/system/system.go:124:func GetTemp() float64 {
+goseg/routines/disk.go:44:		if diskUsage, err := system.GetDisk(); err != nil {
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '200,260p' goseg/broadcast/collectors_and_mappers.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+		}
+	}
+	startramInfo.Info.StartramServices = startramServices
+	startramInfo.Info.Regions = broadcastState.Profile.Startram.Info.Regions
+
+	var profile structs.Profile
+	profile.Startram = startramInfo
+	return profile
+}
+
+type systemInfoCollector struct{}
+
+func (systemInfoCollector) collect() structs.System {
+	var ramObj []uint64
+	var sysInfo structs.System
+	swapSettings := config.SwapSettingsSnapshot()
+
+	sysInfo.Info.Updates = system.SystemUpdates
+	sysInfo.Info.Wifi = system.WifiInfoSnapshot()
+
+codex
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 78.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "handler.StartramHandler in `goseg/handler/startram.go` enqueues all actions via `runStartramAsync` and returns immediately, while sibling entrypoints in `goseg/handler/handler.go` (for example `LoginHandler`, `LogoutHandler`, `C2CHandler`, `UnauthHandler`) return direct results/errors and do not consistently follow an async completion contract.",
+        "In `goseg/broadcast/broadcast.go`, `BroadcastToClients` executes `GetStateJson` and calls `auth.ClientManager.BroadcastAuth(authJson)` before checking `err`, and then calls it again on the success path, creating inconsistent observable outcomes for the same API call.",
+        "`goseg/system/system.go` exposes telemetry APIs with mixed error contracts (`GetCPU`, `GetMemory`, `GetDisk` return errors, while `GetTemp` returns only `float64` and logs/returns `0` on failure), and this diverges from the same package's public resource-status surface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "handler_action_contracts_are_heterogeneous",
+      "summary": "Handler dispatch APIs in the same package expose incompatible request/response contracts, especially for action completion and failure signaling.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/handler.go",
+        "goseg/handler/urbit.go",
+        "goseg/handler/urbit_operations.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartramHandler` in `goseg/handler/startram.go` wraps each action with `runStartramAsync(...)` and immediately returns `nil`, so caller-visible failures are pushed into internal logs/transitions instead of a unified handler return path.",
+        "`UrbitHandler` in `goseg/handler/urbit.go` and other request handlers in `goseg/handler/handler.go` execute and return `error`/payload directly, creating a different API contract for conceptually similar incoming websocket action endpoints.",
+        "`main.go` registers multiple handler entrypoints through a shared request path, so this mismatch affects how callers can reliably reason about response/error behavior across action families."
+      ],
+      "suggestion": "Define one handler contract across action entrypoints in `handler/` (e.g., synchronous result + error, or explicit async operation handle + completion/error channel) and standardize all handler dispatch paths to use it.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "handler_dispatch_contract_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "broadcast_to_clients_double_emit",
+      "summary": "The broadcast API can emit duplicate auth events and can emit an invalid payload path when JSON marshal fails.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `GetStateJson(bState)` and then `BroadcastAuth(authJson)` before the error check, and calls `BroadcastAuth(authJson)` again when no error occurs.",
+        "That means a successful broadcast is emitted twice, and an error path can still trigger a broadcast with potentially nil/undefined bytes before returning."
+      ],
+      "suggestion": "In `BroadcastToClients`, validate `GetStateJson` error first, return immediately on failure, and emit exactly one auth broadcast on success; optionally dedupe by moving all side effects behind the error check.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "metric_apis_inconsistent_error_contract",
+      "summary": "System telemetry APIs expose inconsistent error signaling for the same conceptual surface (`GetTemp` has no error return while neighboring metrics APIs do).",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/broadcast/collectors_and_mappers.go"
+      ],
+      "evidence": [
+        "`GetMemory`, `GetCPU`, and `GetDisk` in `goseg/system/system.go` return `(value, error)` on failure, while `GetTemp` returns only `float64` and logs failures internally while returning `0`.",
+        "`collectors_and_mappers.go` treats these APIs as similar status-gathering operations in one pass and therefore cannot distinguish a real temperature read failure from valid zero/near-zero values."
+      ],
+      "suggestion": "Align the telemetry API surface in `system` by making `GetTemp` return `(float64, error)` (or explicit sentinel + bool) and update collectors/tests to handle temperature-read failures consistently with other metrics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_contract_inconsistency_cross_api_families"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "handler_dispatch_contract_drift",
+      "api_contract_inconsistency_cross_api_families",
+      "side_effect_drift_in_success_paths"
+    ],
+    "likely_symptoms": [
+      "Inconsistent caller behavior expectations between handler families",
+      "Duplicate websocket broadcast frames under auth-session updates",
+      "Silent telemetry regression masking in temperature monitoring"
+    ],
+    "possible_false_positives": [
+      "If async handler behavior in `StartramHandler` is an intentional API choice (not intended for request/response-style callers), normalize may be deferred as a design decision rather than defect"
+    ]
+  }
+}
+tokens used
+109,004
 

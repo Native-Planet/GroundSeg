@@ -1,0 +1,107 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "error_consistency": 70.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Asynchronous orchestration in the importer path launches background work (`go configureUploadedPier(...)`) and does not propagate returned failures from the underlying import workflow back to request/observer paths.",
+        "Several hot paths mix error handling strategies: some functions return wrapped/specific errors while nearby utility paths log/print and continue with default values, then treat the operation as successful.",
+        "Error-to-response mapping is done with string matching (`strings.Contains(err.Error(), \"timed out\")`) rather than typed/canonical error categories, making behavior dependent on caller formatting."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERRC-001",
+      "summary": "Importer workflow failures can be dropped because async execution ignores returned errors from upload processing.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/extract.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` starts `configureUploadedPier` in a goroutine instead of awaiting the result.",
+        "Inside `configureUploadedPier`, `runImportedPierWorkflow` is invoked and its returned error is ignored, so failures are not surfaced to caller-facing status handling."
+      ],
+      "suggestion": "Run import workflow synchronously and propagate the resulting error to request-level handling, or return errors through a bounded channel with an explicit completion/error path so upload status transitions and failure signals are based on actual workflow outcomes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "async-boundary-error-loss"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERRC-002",
+      "summary": "Timeout handling is determined by string matching on `err.Error()`, creating brittle and non-authoritative error contracts.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/extract.go"
+      ],
+      "evidence": [
+        "The importer maps outcomes with a substring check (`strings.Contains(err.Error(), \"timed out\")`), then emits a specific status code.",
+        "This makes behavior depend on textual formatting rather than typed sentinel/wrapped errors and can silently misclassify unrelated errors that happen to contain that phrase."
+      ],
+      "suggestion": "Return typed sentinel errors (e.g., `ErrRequestTimeout`) from workflow/execution layers and switch on concrete error values with `errors.Is/As`, keeping message text as diagnostic detail only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "async-boundary-error-loss"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERRC-003",
+      "summary": "Filesystem rewrite path reports success while ignoring writer flush failures.",
+      "related_files": [
+        "goseg/system/disk.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "In `CreateGroundSegFilesystem`, writes to the temp mount file use `bufio.Writer` with per-line error checks, but `writer.Flush()` is not checked before success is returned.",
+        "In the same area, errors are partially handled during write but final durability errors can be dropped, allowing corrupted or partially written output to be treated as success."
+      ],
+      "suggestion": "Check and return `writer.Flush()` errors (and defer/validate file close) so failed buffered writes fail the operation instead of being reported as successful.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "io-error-handling-inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERRC-004",
+      "summary": "Core system helper silently downgrades I/O parse errors to a zero-value success result.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/disk.go"
+      ],
+      "evidence": [
+        "`GetTemp` logs an error to stdout on read/parse failure and returns `0` instead of returning or propagating an error.",
+        "The function exists in a subsystem where similar operations normally report errors, causing callers to interpret a malformed/failed read as a valid temperature reading."
+      ],
+      "suggestion": "Refactor `GetTemp` to return an error return value and preserve the distinction between real zero-value data and failed reads; update callers to handle that error explicitly.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "io-error-handling-inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error contracts are not consistently propagated across asynchronous and I/O-heavy paths, creating silent failure channels.",
+      "String-based error interpretation is used as control flow in places where typed errors should drive behavior."
+    ],
+    "likely_symptoms": [
+      "ERRC-001",
+      "ERRC-002",
+      "ERRC-004"
+    ],
+    "possible_false_positives": [
+      "Some helper functions may intentionally log-and-continue for best-effort telemetry, though this is not documented and still should be explicit."
+    ]
+  }
+}

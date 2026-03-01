@@ -3,26 +3,17 @@ package config
 // functions related to managing urbit config jsons & corresponding structs
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"groundseg/defaults"
-	"groundseg/dockerclient"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
-
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 )
 
 var (
 	UrbitsConfig = make(map[string]structs.UrbitDocker)
 	urbitMutex   sync.RWMutex
-
-	getImageTagByContainerNameForUrbit = getImageTagByContainerName
 )
 
 // retrieve struct corresponding with urbit json file
@@ -121,9 +112,6 @@ func loadUrbitConfigFromDisk(pier string) (structs.UrbitDocker, error) {
 }
 
 func normalizeUrbitConfig(conf *structs.UrbitDocker) {
-	if conf.StartramReminder == nil {
-		conf.StartramReminder = defaults.UrbitConfig.StartramReminder
-	}
 	if conf.SnapTime == 0 {
 		conf.SnapTime = 60
 	}
@@ -131,10 +119,6 @@ func normalizeUrbitConfig(conf *structs.UrbitDocker) {
 
 func persistUrbitConfigLocked(pier string, conf structs.UrbitDocker) error {
 	normalizeUrbitConfig(&conf)
-	if ver, err := getImageTagByContainerNameForUrbit(pier); err == nil {
-		conf.UrbitVersion = ver
-	}
-
 	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return fmt.Errorf("error creating urbit config dir for %s: %v", pier, err)
@@ -168,42 +152,4 @@ func persistUrbitConfigLocked(pier string, conf structs.UrbitDocker) error {
 	}
 	UrbitsConfig[pier] = conf
 	return nil
-}
-
-func getImageTagByContainerName(containerName string) (string, error) {
-	ctx := context.Background()
-
-	// Create a new Docker client
-	cli, err := dockerclient.New()
-	if err != nil {
-		return "", fmt.Errorf("failed to create docker client: %v", err)
-	}
-	defer cli.Close()
-
-	// Set up a filter to search for the container by name using a filter
-	filterArgs := filters.NewArgs()
-	filterArgs.Add("name", containerName)
-
-	// List containers using the filter
-	containers, err := cli.ContainerList(ctx, container.ListOptions{Filters: filterArgs, All: true})
-	if err != nil {
-		return "", fmt.Errorf("failed to list containers: %v", err)
-	}
-
-	// Check if any container matches the exact given name
-	for _, container := range containers {
-		for _, name := range container.Names {
-			// Docker names are prefixed with "/", so we need to trim it
-			if strings.TrimPrefix(name, "/") == containerName {
-				// Extract the image tag from the container's image name
-				imageParts := strings.Split(container.Image, ":")
-				if len(imageParts) > 1 {
-					return strings.Split(imageParts[1], "@")[0], nil
-				}
-				return "latest", nil // Default tag if no specific tag is found
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no exact match found for container with name %s", containerName)
 }

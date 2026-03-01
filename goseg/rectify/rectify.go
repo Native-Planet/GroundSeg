@@ -11,6 +11,7 @@ import (
 	"groundseg/docker"
 	"groundseg/startram"
 	"groundseg/structs"
+	"groundseg/transition"
 	"strings"
 
 	"go.uber.org/zap"
@@ -19,126 +20,173 @@ import (
 func UrbitTransitionHandler() {
 	for {
 		event := <-docker.UrbitTransitions()
-		current := broadcast.GetState()
-		urbitStruct, exists := current.Urbits[event.Patp]
-		if exists {
-			switch event.Type {
-			case "rollChop":
-				urbitStruct.Transition.RollChop = event.Event
-			case "chopOnUpgrade":
-				urbitStruct.Transition.ChopOnUpgrade = event.Event
-			case "chop":
-				urbitStruct.Transition.Chop = event.Event
-			case "pack":
-				urbitStruct.Transition.Pack = event.Event
-			case "packMeld":
-				urbitStruct.Transition.PackMeld = event.Event
-			case "loom":
-				urbitStruct.Transition.Loom = event.Event
-			case "snapTime":
-				urbitStruct.Transition.SnapTime = event.Event
-			case "urbitDomain":
-				urbitStruct.Transition.UrbitDomain = event.Event
-			case "minioDomain":
-				urbitStruct.Transition.MinIODomain = event.Event
-			case "rebuildContainer":
-				urbitStruct.Transition.RebuildContainer = event.Event
-			case "toggleDevMode":
-				urbitStruct.Transition.ToggleDevMode = event.Event
-			case "togglePower":
-				urbitStruct.Transition.TogglePower = event.Event
-			case "toggleNetwork":
-				urbitStruct.Transition.ToggleNetwork = event.Event
-			case "exportShip":
-				urbitStruct.Transition.ExportShip = event.Event
-			case "shipCompressed":
-				urbitStruct.Transition.ShipCompressed = event.Value
-			case "exportBucket":
-				urbitStruct.Transition.ExportBucket = event.Event
-			case "bucketCompressed":
-				urbitStruct.Transition.BucketCompressed = event.Value
-			case "deleteShip":
-				urbitStruct.Transition.DeleteShip = event.Event
-			case "toggleMinIOLink":
-				urbitStruct.Transition.ToggleMinIOLink = event.Event
-			case "penpaiCompanion":
-				urbitStruct.Transition.PenpaiCompanion = event.Event
-			case "gallseg":
-				urbitStruct.Transition.Gallseg = event.Event
-			case "deleteService":
-				urbitStruct.Transition.StartramServices = event.Event
-			case "localTlonBackupsEnabled":
-				urbitStruct.Transition.LocalTlonBackupsEnabled = event.Event
-			case "remoteTlonBackupsEnabled":
-				urbitStruct.Transition.RemoteTlonBackupsEnabled = event.Event
-			case "localTlonBackup":
-				urbitStruct.Transition.LocalTlonBackup = event.Event
-			case "localTlonBackupSchedule":
-				urbitStruct.Transition.LocalTlonBackupSchedule = event.Event
-			case "handleRestoreTlonBackup":
-				urbitStruct.Transition.HandleRestoreTlonBackup = event.Event
-			default:
-				zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
-				continue
+		applyTransitionUpdate("urbit", func(current *structs.AuthBroadcast) {
+			urbitStruct, exists := current.Urbits[event.Patp]
+			if !exists {
+				return
+			}
+			if !setUrbitTransition(&urbitStruct.Transition, event) {
+				zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", event.Type))
+				return
 			}
 			current.Urbits[event.Patp] = urbitStruct
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		}
+		})
 	}
+}
+
+func setUrbitTransition(transitionState *structs.UrbitTransitionBroadcast, event structs.UrbitTransition) bool {
+	switch transition.UrbitTransitionType(event.Type) {
+	case transition.UrbitTransitionRollChop:
+		transitionState.RollChop = event.Event
+	case transition.UrbitTransitionChopOnUpgrade:
+		transitionState.ChopOnUpgrade = event.Event
+	case transition.UrbitTransitionChop:
+		transitionState.Chop = event.Event
+	case transition.UrbitTransitionPack:
+		transitionState.Pack = event.Event
+	case transition.UrbitTransitionPackMeld:
+		transitionState.PackMeld = event.Event
+	case transition.UrbitTransitionLoom:
+		transitionState.Loom = event.Event
+	case transition.UrbitTransitionSnapTime:
+		transitionState.SnapTime = event.Event
+	case transition.UrbitTransitionUrbitDomain:
+		transitionState.UrbitDomain = event.Event
+	case transition.UrbitTransitionMinIODomain:
+		transitionState.MinIODomain = event.Event
+	case transition.UrbitTransitionRebuildContainer:
+		transitionState.RebuildContainer = event.Event
+	case transition.UrbitTransitionToggleDevMode:
+		transitionState.ToggleDevMode = event.Event
+	case transition.UrbitTransitionTogglePower:
+		transitionState.TogglePower = event.Event
+	case transition.UrbitTransitionToggleNetwork:
+		transitionState.ToggleNetwork = event.Event
+	case transition.UrbitTransitionExportShip:
+		transitionState.ExportShip = event.Event
+	case transition.UrbitTransitionShipCompressed:
+		transitionState.ShipCompressed = event.Value
+	case transition.UrbitTransitionExportBucket:
+		transitionState.ExportBucket = event.Event
+	case transition.UrbitTransitionBucketCompressed:
+		transitionState.BucketCompressed = event.Value
+	case transition.UrbitTransitionDeleteShip:
+		transitionState.DeleteShip = event.Event
+	case transition.UrbitTransitionToggleMinIOLink:
+		transitionState.ToggleMinIOLink = event.Event
+	case transition.UrbitTransitionPenpaiCompanion:
+		transitionState.PenpaiCompanion = event.Event
+	case transition.UrbitTransitionGallseg:
+		transitionState.Gallseg = event.Event
+	case transition.UrbitTransitionDeleteService:
+		transitionState.StartramServices = event.Event
+	case transition.UrbitTransitionLocalTlonBackupsEnabled:
+		transitionState.LocalTlonBackupsEnabled = event.Event
+	case transition.UrbitTransitionRemoteTlonBackupsEnabled:
+		transitionState.RemoteTlonBackupsEnabled = event.Event
+	case transition.UrbitTransitionLocalTlonBackup:
+		transitionState.LocalTlonBackup = event.Event
+	case transition.UrbitTransitionLocalTlonBackupSchedule:
+		transitionState.LocalTlonBackupSchedule = event.Event
+	case transition.UrbitTransitionHandleRestoreTlonBackup:
+		transitionState.HandleRestoreTlonBackup = event.Event
+	case transition.UrbitTransitionServiceRegistrationStatus:
+		transitionState.ServiceRegistrationStatus = event.Event
+	default:
+		return false
+	}
+	return true
 }
 
 func NewShipTransitionHandler() {
 	for {
 		event := <-docker.NewShipTransitions()
-		switch event.Type {
-		case "error":
-			current := broadcast.GetState()
-			current.NewShip.Transition.Error = event.Event
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "bootStage":
-			// Events
-			// starting: setting up docker and config
-			// creating: actually create and start the container
-			// booting: waiting until +code shows up
-			// completed: ready to reset
-			// aborted: something went wrong and we ran the cleanup routine
-			// <empty>: free for new ship
-			current := broadcast.GetState()
-			current.NewShip.Transition.BootStage = event.Event
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "patp":
-			current := broadcast.GetState()
-			current.NewShip.Transition.Patp = event.Event
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "freeError":
-			current := broadcast.GetState()
-			current.NewShip.Transition.FreeError = event.Event
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		default:
-			zap.L().Warn(fmt.Sprintf("Urecognized transition: %v", event.Type))
+		applyTransitionUpdate("new ship", func(current *structs.AuthBroadcast) {
+			if !setNewShipTransition(&current.NewShip, event) {
+				zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", event.Type))
+			}
+		})
+	}
+}
+
+func setNewShipTransition(target *structs.NewShip, event structs.NewShipTransition) bool {
+	switch transition.NewShipTransitionType(event.Type) {
+	case transition.NewShipTransitionError:
+		target.Transition.Error = event.Event
+	case transition.NewShipTransitionBootStage:
+		// Events
+		// starting: setting up docker and config
+		// creating: actually create and start the container
+		// booting: waiting until +code shows up
+		// completed: ready to reset
+		// aborted: something went wrong and we ran the cleanup routine
+		// <empty>: free for new ship
+		target.Transition.BootStage = event.Event
+	case transition.NewShipTransitionPatp:
+		target.Transition.Patp = event.Event
+	case transition.NewShipTransitionFreeError:
+		target.Transition.FreeError = event.Event
+	default:
+		return false
+	}
+	return true
+}
+
+func setSystemTransition(target *structs.SystemTransitionBroadcast, event structs.SystemTransition) bool {
+	switch transition.SystemTransitionType(event.Type) {
+	case transition.SystemTransitionWifiConnect:
+		target.WifiConnect = event.Event
+	case transition.SystemTransitionSwap:
+		target.Swap = event.BoolEvent
+	case transition.SystemTransitionBugReport:
+		target.BugReport = event.Event
+	case transition.SystemTransitionBugReportError:
+		target.BugReportError = event.Event
+	default:
+		return false
+	}
+	return true
+}
+
+func setStartramTransition(target *structs.StartramTransition, eventType string, eventData any) bool {
+	switch transition.EventType(eventType) {
+	case transition.StartramTransitionRestart:
+		target.Restart = fmt.Sprintf("%v", eventData)
+	case transition.StartramTransitionEndpoint:
+		if eventData == nil {
+			target.Endpoint = ""
+		} else {
+			target.Endpoint = fmt.Sprintf("%v", eventData)
 		}
+	case transition.StartramTransitionToggle:
+		target.Toggle = eventData
+	case transition.StartramTransitionRegister:
+		target.Register = eventData
+	default:
+		return false
+	}
+	return true
+}
+
+func applyTransitionUpdate(context string, mutate func(*structs.AuthBroadcast)) {
+	if err := broadcast.ApplyBroadcastUpdate(true, mutate); err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to publish %s transition update: %v", context, err))
 	}
 }
 
 func RectifyUrbit() {
 	for {
 		event := <-startram.Events()
-		switch event.Type {
-		case "restart":
+		switch transition.EventType(event.Type) {
+		case transition.StartramTransitionRestart:
 			// startram - restarting wireguard container
 			// urbits - recreating urbit containers
 			// minios - recreating minio containers
 			// done - completed
-			current := broadcast.GetState()
-			current.Profile.Startram.Transition.Restart = fmt.Sprintf("%v", event.Data)
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "endpoint":
+			applyTransitionUpdate("startram", func(current *structs.AuthBroadcast) {
+				_ = setStartramTransition(&current.Profile.Startram.Transition, string(event.Type), event.Data)
+			})
+		case transition.StartramTransitionEndpoint:
 			//init - started
 			// unregistering - startram services unregistering
 			// stopping - wireguard stopping
@@ -147,61 +195,57 @@ func RectifyUrbit() {
 			// complete - successfully changed endpoint
 			// Error: <text> - Error with info
 			// nil/null - Empty, ready for action
-			current := broadcast.GetState()
-			if event.Data != nil {
-				current.Profile.Startram.Transition.Endpoint = fmt.Sprintf("%v", event.Data)
-			} else {
-				current.Profile.Startram.Transition.Endpoint = ""
-			}
-			if event.Data == "complete" {
-				conf := config.Conf()
-				current.Profile.Startram.Info.Endpoint = conf.EndpointUrl
-			}
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "toggle":
+			applyTransitionUpdate("startram", func(current *structs.AuthBroadcast) {
+				_ = setStartramTransition(&current.Profile.Startram.Transition, string(event.Type), event.Data)
+				if event.Data == transition.StartramTransitionComplete {
+					conf := config.Conf()
+					current.Profile.Startram.Info.Endpoint = conf.EndpointUrl
+				}
+			})
+		case transition.StartramTransitionToggle:
 			// loading - loading
 			// nil/null - Empty
-			current := broadcast.GetState()
-			current.Profile.Startram.Transition.Toggle = event.Data
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "register":
+			applyTransitionUpdate("startram", func(current *structs.AuthBroadcast) {
+				_ = setStartramTransition(&current.Profile.Startram.Transition, string(event.Type), event.Data)
+			})
+		case transition.StartramTransitionRegister:
 			// key - registering startram key
 			// services - registering startram services
 			// starting - applying wg0.conf and starting container
 			// complete - successfully finished registering
 			// Error: <text> - Error with info
 			// nil/null - Empty, ready for action
-			current := broadcast.GetState()
-			current.Profile.Startram.Transition.Register = event.Data
-			if event.Data == "complete" {
-				conf := config.Conf()
-				current.Profile.Startram.Info.Running = conf.WgOn
-				containerState, exists := config.GetContainerState()["wireguard"]
-				if exists {
-					running := containerState.ActualStatus == "running"
-					current.Profile.Startram.Info.Running = running
-					if err := config.UpdateConfTyped(config.WithWgOn(running)); err != nil {
-						zap.L().Error(fmt.Sprintf("%v", err))
+			applyTransitionUpdate("startram", func(current *structs.AuthBroadcast) {
+				_ = setStartramTransition(&current.Profile.Startram.Transition, string(event.Type), event.Data)
+				if event.Data == transition.StartramTransitionComplete {
+					conf := config.Conf()
+					current.Profile.Startram.Info.Running = conf.WgOn
+					containerState, exists := config.GetContainerState()[string(transition.ContainerTypeWireguard)]
+					if exists {
+						running := containerState.ActualStatus == string(transition.ContainerStatusRunning)
+						current.Profile.Startram.Info.Running = running
+						if err := config.UpdateConfTyped(config.WithWgOn(running)); err != nil {
+							zap.L().Error(fmt.Sprintf("%v", err))
+						}
 					}
+					current.Profile.Startram.Info.Registered = conf.WgRegistered
 				}
-				current.Profile.Startram.Info.Registered = conf.WgRegistered
-			}
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "retrieve":
+			})
+		case transition.StartramTransitionRetrieve:
 			conf := config.Conf()
-			for patp, _ := range config.UrbitConfAll() {
+			for patp := range config.UrbitConfAll() {
 				modified := false
 				serviceCreated := true
-				startramConfig := config.GetStartramConfig() // a structs.StartramRetrieve
+				startramConfig := config.GetStartramConfig()
 				config.LoadUrbitConfig(patp)
-				local := config.UrbitConf(patp) // a structs.UrbitDocker
+				local := config.UrbitConf(patp)
 				// check if existing ship was not created
 				found := false
 				for _, remote := range startramConfig.Subdomains {
 					endpointUrl := strings.Split(conf.EndpointUrl, ".")
+					if len(endpointUrl) < 2 {
+						continue
+					}
 					rootUrl := strings.Join(endpointUrl[1:len(endpointUrl)], ".")
 					if patp+"."+rootUrl == remote.URL {
 						found = true
@@ -214,12 +258,16 @@ func RectifyUrbit() {
 					startram.SvcCreate("s3."+patp, "minio")
 				}
 				for _, remote := range startramConfig.Subdomains {
-					if remote.Status == "creating" {
+					if remote.Status == string(transition.StartramServiceStatusCreating) {
 						serviceCreated = false
 					}
+					parts := strings.Split(remote.URL, ".")
+					if len(parts) < 2 {
+						continue
+					}
 					// for urbit web
-					subd := strings.Split(remote.URL, ".")[0]
-					if subd == patp && remote.SvcType == "urbit-web" && remote.Status == "ok" {
+					subd := parts[0]
+					if subd == patp && remote.SvcType == string(transition.StartramServiceTypeUrbitWeb) && remote.Status == string(transition.StartramServiceStatusOk) {
 						// update alias
 						if remote.Alias == "null" && local.CustomUrbitWeb != "" {
 							zap.L().Debug(fmt.Sprintf("Retrieve: Resetting %v alias", patp))
@@ -245,8 +293,11 @@ func RectifyUrbit() {
 						continue
 					}
 					// for urbit ames
-					nestd := strings.Join(strings.Split(remote.URL, ".")[:2], ".")
-					if nestd == "ames."+patp && remote.SvcType == "urbit-ames" && remote.Status == "ok" {
+					nestd := ""
+					if len(parts) >= 2 {
+						nestd = strings.Join(parts[:2], ".")
+					}
+					if nestd == "ames."+patp && remote.SvcType == string(transition.StartramServiceTypeUrbitAmes) && remote.Status == string(transition.StartramServiceStatusOk) {
 						if remote.Port != local.WgAmesPort {
 							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v ames port to %v", patp, remote.Port))
 							local.WgAmesPort = remote.Port
@@ -254,8 +305,7 @@ func RectifyUrbit() {
 						}
 						continue
 					}
-					// for minio
-					if nestd == "s3."+patp && remote.SvcType == "minio" && remote.Status == "ok" {
+					if nestd == "s3."+patp && remote.SvcType == string(transition.StartramServiceTypeMinio) && remote.Status == string(transition.StartramServiceStatusOk) {
 						if remote.Port != local.WgS3Port {
 							zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v minio port to %v", patp, remote.Port))
 							local.WgS3Port = remote.Port
@@ -264,8 +314,11 @@ func RectifyUrbit() {
 						continue
 					}
 					// for minio console
-					consd := strings.Join(strings.Split(remote.URL, ".")[:3], ".")
-					if consd == "console.s3."+patp && remote.SvcType == "minio-console" && remote.Status == "ok" {
+					consd := ""
+					if len(parts) >= 3 {
+						consd = strings.Join(parts[:3], ".")
+					}
+					if consd == "console.s3."+patp && remote.SvcType == string(transition.StartramServiceTypeMinioAdmin) && remote.Status == string(transition.StartramServiceStatusOk) {
 						zap.L().Debug(fmt.Sprintf("Retrieve: Setting %v console port to %v", patp, remote.Port))
 						if remote.Port != local.WgConsolePort {
 							local.WgConsolePort = remote.Port
@@ -282,45 +335,35 @@ func RectifyUrbit() {
 						zap.L().Warn(fmt.Sprintf("Retrieve: unable to persist %s urbit config updates: %v", patp, err))
 					}
 				}
-				current := broadcast.GetState()
-				urbitStruct, ok := current.Urbits[patp]
-				if ok {
-					if serviceCreated {
-						urbitStruct.Transition.ServiceRegistrationStatus = ""
-					} else {
-						urbitStruct.Transition.ServiceRegistrationStatus = "creating"
-					}
-
-					// Put the modified struct back into the map
-					current.Urbits[patp] = urbitStruct
-				}
-				broadcast.UpdateBroadcast(current)
-				broadcast.BroadcastToClients()
+				publishUrbitServiceRegistrationTransition(patp, serviceCreated)
 			}
 		default:
 		}
 	}
 }
 
+func publishUrbitServiceRegistrationTransition(patp string, serviceCreated bool) {
+	applyTransitionUpdate("urbit", func(current *structs.AuthBroadcast) {
+		urbitStruct, ok := current.Urbits[patp]
+		if !ok {
+			return
+		}
+		if serviceCreated {
+			urbitStruct.Transition.ServiceRegistrationStatus = string(transition.TransitionStatusEmpty)
+		} else {
+			urbitStruct.Transition.ServiceRegistrationStatus = string(transition.StartramServiceStatusCreating)
+		}
+		current.Urbits[patp] = urbitStruct
+	})
+}
+
 func SystemTransitionHandler() {
 	for {
 		event := <-docker.SystemTransitions()
-		current := broadcast.GetState()
-		switch event.Type {
-		case "wifiConnect":
-			current.System.Transition.WifiConnect = event.Event
-		case "swap":
-			current.System.Transition.Swap = event.BoolEvent
-		case "bugReport":
-			current.System.Transition.BugReport = event.Event
-			broadcast.UpdateBroadcast(current)
-			broadcast.BroadcastToClients()
-		case "bugReportError":
-			current.System.Transition.BugReportError = event.Event
-		default:
-			zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", event.Type))
-		}
-		broadcast.UpdateBroadcast(current)
-		broadcast.BroadcastToClients()
+		applyTransitionUpdate("system", func(current *structs.AuthBroadcast) {
+			if !setSystemTransition(&current.System.Transition, event) {
+				zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", event.Type))
+			}
+		})
 	}
 }

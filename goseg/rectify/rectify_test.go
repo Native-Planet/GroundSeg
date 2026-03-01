@@ -23,9 +23,8 @@ var (
 
 func initializeRectifyTestEnv() {
 	rectifyTestEnvOnce.Do(func() {
-		// BroadcastToClients can block on default unbuffered leak channel.
-		// Keep tests deterministic by using a no-op sink in this test suite.
-		broadcast.SetLeakSinkForTests(func(structs.AuthBroadcast) {})
+		// BroadcastToClients can be triggered during transition updates.
+		// The loop now publishes to leak asynchronously to avoid test deadlocks.
 	})
 }
 

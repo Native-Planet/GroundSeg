@@ -1,0 +1,91 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "test_strategy": 82.0
+  },
+  "dimension_notes": {
+    "test_strategy": {
+      "evidence": [
+        "There are no tests in the listed file set for `goseg/system/wifi/service/c2c_service.go`, even though it is the command-inbound boundary for C2C websocket actions and directly dispatches service-side behavior.",
+        "In the listed tests, `goseg/uploadsvc/adapters/upload_payload_test.go` only exercises adapter payload-to-command mapping; `goseg/uploadsvc/service.go` contains contract-critical dispatch and description logic that is untested in this batch scope.",
+        "`README.md` explicitly requires runtime contract and quality-gate expectations for upload and StarTram paths, but the listed files do not include tests asserting those contract edges (`wrapAPIConnectionError`, executor parse/dispatch guarantees)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "TS-001",
+      "summary": "C2C command boundary has zero direct contract tests despite being a state-mutating inbound control path.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` includes `ProcessC2CMessage`, `ParseC2CAction`, `Execute`, and action binding dispatch logic with error paths, but there is no corresponding test file in this batch to verify parser failure, unsupported action handling, or side-effect execution sequencing.",
+        "The batch’s only test in-scope is adapter mapping (`upload_payload_test.go`), creating a blind spot for this control-plane contract."
+      ],
+      "suggestion": "Add a focused test file for `c2c_service.go` that covers JSON unmarshal failure, supported/unsupported action parsing, unsupported action error, and Execute behavior (including that Connect then restart is called in the expected order for `connect`).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_testing_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "TS-002",
+      "summary": "Upload service executor contract is under-tested; only payload mapping is validated, not dispatcher semantics.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service.go` exposes `Action`, `parseAction`, `ParseAction`, `NewExecutor`, `Execute`, and `DescribeAction`, but the in-scope tests validate only adapter-level `CommandFromWsPayload` mapping and never assert service-level parse/dispatch error handling.",
+        "There is no in-scope coverage for critical branches in `NewExecutor`, `Execute` (`UnsupportedActionError`), or `DescribeAction` fallback behavior."
+      ],
+      "suggestion": "Add unit tests in `goseg/uploadsvc/service` for `ParseAction`, executor construction validation (`nil` service), dispatch of each supported action, unsupported action failure, and description fallback to prevent silent contract drift.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_testing_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "TS-003",
+      "summary": "Error-contract semantics required by governance are not enforced by contract tests in the scoped review set.",
+      "related_files": [
+        "README.md",
+        "goseg/startram/errors.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`README.md` documents backend quality gates that include masked-error and upload contract expectations, including explicit contract script coverage references.",
+        "`goseg/startram/errors.go` defines `wrapAPIConnectionError` as the stable masking contract at transport boundary, but no in-scope test asserts that callers observe stable masked text while preserving cause chaining."
+      ],
+      "suggestion": "Introduce explicit contract tests for masked errors and execution contracts adjacent to governance targets, asserting message stability plus wrapped-cause preservation and mapping behavior for boundary-facing errors.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_testing_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Batch focuses on documentation/contract expectations without corresponding enforcement tests for all required runtime contract boundaries.",
+      "Current test placement skews toward adapter payload shape checks and misses command execution boundaries and error-mask contract validation."
+    ],
+    "likely_symptoms": [
+      "TS-001",
+      "TS-002",
+      "TS-003"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 82.0,
+    "error_consistency": 74.0,
+    "abstraction_fitness": 91.0,
+    "test_strategy": 90.0,
+    "design_coherence": 83.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "config/config.go initializes runtime state in `init()` and silently returns on persistent bootstrap failures, then continues startup across dependent modules.",
+        "`accesspoint/router.go` exposes shell-driven behavior but never propagates command failures, so callers cannot detect partial startup/teardown state.",
+        "error-handling contracts differ across module boundaries (some return typed errors, some log-and-continue), forcing cross-module callers to infer failure state indirectly."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No single module fully owns startup/operation contracts; there is still inconsistent propagation from core modules to their boundary callers."
+    },
+    "error_consistency": {
+      "evidence": [
+        "`docker/docker.go` ignores errors from `dockerclient.New()` in `GetContainerRunningStatus`, then dereferences a nil client and can crash.",
+        "`accesspoint/router.go` runs multiple shell commands via `executeRouterShellFn` and discards returned errors before continuing, returning success regardless of failures.",
+        "`handler/support.go` constructs bug-report submission failures with `resp.Body` in `%s` formatting instead of reading response payload, and ignores multipart write/close errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Most observed issues are inconsistent error contracts across boundaries rather than deep structural abstraction misuse; there is no clear evidence of widespread pure-pass-through abstractions that add no value in this batch.",
+        "Several wrapper seams exist (e.g., dependency function variables and helper facades), but they are used for test seams and seam injection rather than purely decorative layers in the reviewed path."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Small, non-critical cleanup remains (e.g., documenting the boundary error contract for seam functions) but no clear architectural rewrite is justified from this slice alone.",
+      "sub_axes": {
+        "abstraction_leverage": 90.0,
+        "indirection_cost": 82.0,
+        "interface_honesty": 92.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Critical startup and boundary-failure paths are not directly validated (e.g., config bootstrap failure handling, shell command failures in accesspoint startup, malformed HTTP body/error-path behavior in bugreport submission).",
+        "Current tests cover many units, but do not clearly verify system-level propagation of these failure modes across modules."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Adding explicit failure-path tests for these cross-module boundaries would raise confidence without requiring extensive additional production changes."
+    },
+    "design_coherence": {
+      "evidence": [
+        "`accesspoint/router.go` has long linear command sequences with per-command errors ignored, obscuring failure states and making behavior non-transparent at call sites.",
+        "In `config/config.go`, initialization side effects are executed implicitly from `init()`, making control flow during startup harder to reason about and test as a cohesive unit.",
+        "Several boundary helpers return `bool` success while dropping detailed failure metadata, reducing diagnosability of operational behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "err_dg_get_container_running_status_nil_client",
+      "summary": "Docker status helper can dereference a nil client on client construction failure.",
+      "related_files": ["docker/docker.go", "docker/minio.go", "docker/netdata.go"],
+      "evidence": [
+        "`GetContainerRunningStatus` checks `if err != nil {}` and still calls `cli.Close()` and `cli.ContainerList(...)`, so `dockerclient.New()` failures are not handled.",
+        "This helper is used in container config builders and startup loops, so a transient client construction failure can crash dependent flows."
+      ],
+      "suggestion": "Return immediately with wrapped error when `dockerclient.New()` fails, and keep the function’s error contract explicit for all callers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "design_accesspoint_router_ignores_shell_errors",
+      "summary": "Access point start/stop always report success while discarding shell command failures.",
+      "related_files": ["accesspoint/router.go", "accesspoint/accesspoint.go", "accesspoint/parameters.go"],
+      "evidence": [
+        "`startRouter` and `stopRouter` call `executeRouterShellFn(...)` repeatedly with `res, err` but never branch on `err`.",
+        "`Start()` in `accesspoint/accesspoint.go` does not inspect those outcomes and returns nil regardless."
+      ],
+      "suggestion": "Track first command failure through `startRouter`/`stopRouter` and return the concrete error so caller can decide whether to abort, retry, or roll back.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "arch_cfg_init_fatal_continue",
+      "summary": "Config initialization silently tolerates bootstrap failures and allows process startup with partially initialized global state.",
+      "related_files": ["config/config.go", "main.go", "broadcast/broadcast.go"],
+      "evidence": [
+        "`initializeConfig()` logs failures in `openOrCreateConfigFile` and returns without escalating an error.",
+        "`init()` calls `initializeConfig()` unconditionally, while startup in `main.go` proceeds even when config substrate is potentially invalid."
+      ],
+      "suggestion": "Split bootstrap into an explicit `Initialize() error` entry point, fail fast or enter a clearly defined degraded mode on unrecoverable failures, and avoid continuing anonymous side-effectful startup from `init()`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "err_support_submit_bugreport_bad_error_path",
+      "summary": "Bug report sender drops multipart/http operation errors and returns an unhelpful non-200 error value.",
+      "related_files": ["handler/support.go", "handler/system.go"],
+      "evidence": [
+        "`sendBugReport` ignores errors from `writer.WriteField`, `writer.CreateFormFile`, and `writer.Close()`, so malformed requests can pass to `client.Do` and fail later with poor diagnostics.",
+        "On non-200 responses, it returns `fmt.Errorf(\"%s: %s\", resp.Status, resp.Body)` which stringifies an `io.ReadCloser` rather than the server body."
+      ],
+      "suggestion": "Check and propagate multipart writer errors, close the writer before request execution, and read/trim response body before wrapping transport errors.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "structural_boundary_error_contracts",
+      "summary": "Boundary helpers mix typed errors, logging-only behavior, and false-success returns, weakening fault propagation across modules.",
+      "related_files": ["config/config.go", "docker/docker.go", "accesspoint/router.go", "handler/support.go"],
+      "evidence": [
+        "Some boundary functions return rich errors while adjacent helpers only log and continue or return hardcoded `true`.",
+        "This produces inconsistent recovery behavior for callers that coordinate startup and external side effects."
+      ],
+      "suggestion": "Define a consistent cross-module error contract for boundary operations (explicit status + wrapped cause), and align callsites to act on those outcomes before continuing.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "consistent silent/partial-failure handling at module boundaries (log-and-continue, ignored errors, bool success flags)",
+      "implicit `init()`-driven bootstrap with hidden side effects instead of explicit startup contracts"
+    ],
+    "likely_symptoms": [
+      "err_dg_get_container_running_status_nil_client",
+      "design_accesspoint_router_ignores_shell_errors",
+      "arch_cfg_init_fatal_continue",
+      "err_support_submit_bugreport_bad_error_path",
+      "structural_boundary_error_contracts"
+    ],
+    "possible_false_positives": [
+      "Some command failures in networking shell scripts may be intentionally tolerated for idempotent behavior in constrained environments, so any strict fail-fast change should preserve any intentional rollback/forgiveness semantics where required."
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "api_surface_coherence": 78.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "handler.StartramHandler in `goseg/handler/startram.go` enqueues all actions via `runStartramAsync` and returns immediately, while sibling entrypoints in `goseg/handler/handler.go` (for example `LoginHandler`, `LogoutHandler`, `C2CHandler`, `UnauthHandler`) return direct results/errors and do not consistently follow an async completion contract.",
+        "In `goseg/broadcast/broadcast.go`, `BroadcastToClients` executes `GetStateJson` and calls `auth.ClientManager.BroadcastAuth(authJson)` before checking `err`, and then calls it again on the success path, creating inconsistent observable outcomes for the same API call.",
+        "`goseg/system/system.go` exposes telemetry APIs with mixed error contracts (`GetCPU`, `GetMemory`, `GetDisk` return errors, while `GetTemp` returns only `float64` and logs/returns `0` on failure), and this diverges from the same package's public resource-status surface."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "handler_action_contracts_are_heterogeneous",
+      "summary": "Handler dispatch APIs in the same package expose incompatible request/response contracts, especially for action completion and failure signaling.",
+      "related_files": [
+        "goseg/handler/startram.go",
+        "goseg/handler/handler.go",
+        "goseg/handler/urbit.go",
+        "goseg/handler/urbit_operations.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartramHandler` in `goseg/handler/startram.go` wraps each action with `runStartramAsync(...)` and immediately returns `nil`, so caller-visible failures are pushed into internal logs/transitions instead of a unified handler return path.",
+        "`UrbitHandler` in `goseg/handler/urbit.go` and other request handlers in `goseg/handler/handler.go` execute and return `error`/payload directly, creating a different API contract for conceptually similar incoming websocket action endpoints.",
+        "`main.go` registers multiple handler entrypoints through a shared request path, so this mismatch affects how callers can reliably reason about response/error behavior across action families."
+      ],
+      "suggestion": "Define one handler contract across action entrypoints in `handler/` (e.g., synchronous result + error, or explicit async operation handle + completion/error channel) and standardize all handler dispatch paths to use it.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "handler_dispatch_contract_drift"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "broadcast_to_clients_double_emit",
+      "summary": "The broadcast API can emit duplicate auth events and can emit an invalid payload path when JSON marshal fails.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `GetStateJson(bState)` and then `BroadcastAuth(authJson)` before the error check, and calls `BroadcastAuth(authJson)` again when no error occurs.",
+        "That means a successful broadcast is emitted twice, and an error path can still trigger a broadcast with potentially nil/undefined bytes before returning."
+      ],
+      "suggestion": "In `BroadcastToClients`, validate `GetStateJson` error first, return immediately on failure, and emit exactly one auth broadcast on success; optionally dedupe by moving all side effects behind the error check.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "metric_apis_inconsistent_error_contract",
+      "summary": "System telemetry APIs expose inconsistent error signaling for the same conceptual surface (`GetTemp` has no error return while neighboring metrics APIs do).",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/broadcast/collectors_and_mappers.go"
+      ],
+      "evidence": [
+        "`GetMemory`, `GetCPU`, and `GetDisk` in `goseg/system/system.go` return `(value, error)` on failure, while `GetTemp` returns only `float64` and logs failures internally while returning `0`.",
+        "`collectors_and_mappers.go` treats these APIs as similar status-gathering operations in one pass and therefore cannot distinguish a real temperature read failure from valid zero/near-zero values."
+      ],
+      "suggestion": "Align the telemetry API surface in `system` by making `GetTemp` return `(float64, error)` (or explicit sentinel + bool) and update collectors/tests to handle temperature-read failures consistently with other metrics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_contract_inconsistency_cross_api_families"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "handler_dispatch_contract_drift",
+      "api_contract_inconsistency_cross_api_families",
+      "side_effect_drift_in_success_paths"
+    ],
+    "likely_symptoms": [
+      "Inconsistent caller behavior expectations between handler families",
+      "Duplicate websocket broadcast frames under auth-session updates",
+      "Silent telemetry regression masking in temperature monitoring"
+    ],
+    "possible_false_positives": [
+      "If async handler behavior in `StartramHandler` is an intentional API choice (not intended for request/response-style callers), normalize may be deferred as a design decision rather than defect"
+    ]
+  }
+}

@@ -12,8 +12,8 @@ type wifiRadioService interface {
 	RefreshInfo(device string)
 	Enable() error
 	SetLinkUp(device string) error
-	ListSSIDs(device string) []string
 	Connect(ssid, password string) error
+	ListSSIDs(device string) ([]string, error)
 }
 
 type nmcliWiFiRadioService struct{}
@@ -40,7 +40,13 @@ func (nmcliWiFiRadioService) RefreshInfo(device string) {
 	defer client.Close()
 
 	info.Active = getConnectedSSID(client, device)
-	info.Networks = ListWifiSSIDs(device)
+	ssids, err := ListWifiSSIDs(device)
+	if err != nil {
+		zap.L().Error(err.Error())
+		info.Networks = []string{}
+	} else {
+		info.Networks = ssids
+	}
 	setWifiInfo(info)
 }
 
@@ -58,7 +64,7 @@ func (nmcliWiFiRadioService) SetLinkUp(device string) error {
 	return nil
 }
 
-func (nmcliWiFiRadioService) ListSSIDs(device string) []string {
+func (nmcliWiFiRadioService) ListSSIDs(device string) ([]string, error) {
 	return ListWifiSSIDs(device)
 }
 

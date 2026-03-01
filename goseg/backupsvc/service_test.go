@@ -1,161 +1,199 @@
 package backupsvc
 
 import (
-	"errors"
+	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
-func resetBackupSvcSeams() {
-	isMountedMMCFn = func(basePath string) (bool, error) {
-		return false, nil
+type fakeDirEntry struct {
+	name  string
+	isDir bool
+}
+
+func (f fakeDirEntry) Name() string               { return f.name }
+func (f fakeDirEntry) IsDir() bool                { return f.isDir }
+func (f fakeDirEntry) Type() fs.FileMode          { return 0 }
+func (f fakeDirEntry) Info() (fs.FileInfo, error) { return nil, nil }
+
+func TestResolveBackupRootReturnsMMCPathWhenAvailable(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
+
+	isMountedMMCFn = func(path string) (bool, error) {
+		if path != "/mnt/test" {
+			t.Fatalf("expected mount check for /mnt/test, got %s", path)
+		}
+		return true, nil
 	}
-	mkdirAllFn = os.MkdirAll
-	readDirFn = os.ReadDir
-	createBackupFn = func(string, string, string, string) error {
+
+	if got := ResolveBackupRoot("/mnt/test"); got != "/media/data/backup" {
+		t.Fatalf("unexpected backup root, got %q", got)
+	}
+}
+
+func TestEnsureLocalDirsCreatesAllDirectories(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
+
+	created := []string{}
+	mkdirAllFn = func(path string, perm os.FileMode) error {
+		created = append(created, path)
 		return nil
 	}
-	uploadBackupFn = func(string, string, string) error {
+
+	_, err := EnsureLocalDirs("/tmp/base", "~zod")
+	if err != nil {
+		t.Fatalf("EnsureLocalDirs returned error: %v", err)
+	}
+
+	expected := []string{
+		"/tmp/base/~zod",
+		"/tmp/base/~zod/daily",
+		"/tmp/base/~zod/weekly",
+		"/tmp/base/~zod/monthly",
+	}
+	if len(created) != len(expected) {
+		t.Fatalf("expected %d mkdir calls, got %d", len(expected), len(created))
+	}
+	for i, got := range created {
+		if got != expected[i] {
+			t.Fatalf("expected mkdir call %d to be %q, got %q", i, expected[i], got)
+		}
+	}
+}
+
+func TestLatestBackupFileSelectsNewestTimestamp(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
+
+	readDirFn = func(path string) ([]fs.DirEntry, error) {
+		switch path {
+		case "/base/~zod/daily":
+			return []fs.DirEntry{
+				fakeDirEntry{name: "100"},
+				fakeDirEntry{name: "200"},
+				fakeDirEntry{name: "bad"},
+				fakeDirEntry{name: "ignored", isDir: true},
+			}, nil
+		case "/base/~zod/weekly":
+			return []fs.DirEntry{
+				fakeDirEntry{name: "300"},
+			}, nil
+		default:
+			return []fs.DirEntry{}, nil
+		}
+	}
+
+	path, err := LatestBackupFile("/base", "~zod")
+	if err != nil {
+		t.Fatalf("LatestBackupFile returned error: %v", err)
+	}
+	if path != "/base/~zod/weekly/300" {
+		t.Fatalf("expected newest backup path /base/~zod/weekly/300, got %q", path)
+	}
+}
+
+func TestUploadLatestBackupCallsStartramUpload(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
+
+	readDirFn = func(path string) ([]fs.DirEntry, error) {
+		if path == "/base/~zod" {
+			return []fs.DirEntry{
+				fakeDirEntry{name: "100"},
+			}, nil
+		}
+		if path == "/base/~zod/daily" || path == "/base/~zod/weekly" || path == "/base/~zod/monthly" {
+			return []fs.DirEntry{}, nil
+		}
+		return []fs.DirEntry{}, nil
+	}
+
+	var uploaded struct {
+		patp     string
+		password string
+		latest   string
+	}
+	uploadBackupFn = func(patp, password, latestBackup string) error {
+		uploaded = struct {
+			patp     string
+			password string
+			latest   string
+		}{
+			patp:     patp,
+			password: password,
+			latest:   latestBackup,
+		}
 		return nil
 	}
-}
 
-func TestResolveBackupRootUsesMMCWhenMounted(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	isMountedMMCFn = func(string) (bool, error) { return true, nil }
-	if got := ResolveBackupRoot("/base"); got != "/media/data/backup" {
-		t.Fatalf("expected mmc backup root, got %s", got)
+	if err := UploadLatestBackup("~zod", "secret", "/base"); err != nil {
+		t.Fatalf("UploadLatestBackup returned error: %v", err)
+	}
+	if uploaded.latest != "/base/~zod/100" || uploaded.patp != "~zod" || uploaded.password != "secret" {
+		t.Fatalf("unexpected upload args: %+v", uploaded)
 	}
 }
 
-func TestResolveBackupRootFallsBackOnError(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	isMountedMMCFn = func(string) (bool, error) { return false, errors.New("probe failed") }
-	if got := ResolveBackupRoot("/base"); got != filepath.Join("/base", "backup") {
-		t.Fatalf("expected fallback backup root, got %s", got)
-	}
-}
+func TestMostRecentDailyBackupTimeReturnsLatest(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
 
-func TestCreateLocalBackupEnsuresDirsAndDelegates(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	root := t.TempDir()
-	patp := "~zod"
-	createCalled := false
-	createBackupFn = func(ship, daily, weekly, monthly string) error {
-		createCalled = true
-		if ship != patp {
-			t.Fatalf("unexpected ship: %s", ship)
+	readDirFn = func(path string) ([]fs.DirEntry, error) {
+		if path == "/base/~zod/daily" {
+			return []fs.DirEntry{
+				fakeDirEntry{name: "100"},
+				fakeDirEntry{name: "250"},
+				fakeDirEntry{name: "bad", isDir: false},
+			}, nil
 		}
-		for _, dir := range []string{daily, weekly, monthly} {
-			if _, err := os.Stat(dir); err != nil {
-				t.Fatalf("expected backup dir to exist: %s (%v)", dir, err)
-			}
-		}
-		return nil
+		return []fs.DirEntry{}, nil
 	}
-	if err := CreateLocalBackup(patp, root); err != nil {
-		t.Fatalf("CreateLocalBackup failed: %v", err)
+
+	got, err := MostRecentDailyBackupTime("/base", "~zod")
+	if err != nil {
+		t.Fatalf("MostRecentDailyBackupTime returned error: %v", err)
 	}
-	if !createCalled {
-		t.Fatal("expected create backup delegate call")
+	want := time.Unix(250, 0)
+	if got.Unix() != want.Unix() {
+		t.Fatalf("expected latest daily backup time %v, got %v", want, got)
 	}
 }
 
-func TestLatestBackupFileChoosesMostRecentAcrossPeriods(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	root := t.TempDir()
-	patp := "~zod"
-	dirs, err := EnsureLocalDirs(root, patp)
-	if err != nil {
-		t.Fatalf("ensure local dirs failed: %v", err)
+func TestCreateLocalBackupPropagatesCreateErrors(t *testing.T) {
+	restore := resetBackupsvcDependencies()
+	defer restore()
+
+	mkdirAllFn = func(_ string, _ os.FileMode) error { return nil }
+	expected := fmt.Errorf("create backup error")
+	createBackupFn = func(_, _, _, _ string) error {
+		return expected
 	}
-	files := map[string]string{
-		filepath.Join(dirs.Daily, "10"):    "daily",
-		filepath.Join(dirs.Weekly, "500"):  "weekly",
-		filepath.Join(dirs.Monthly, "300"): "monthly",
+
+	err := CreateLocalBackup("~zod", "/base")
+	if err == nil {
+		t.Fatal("expected error")
 	}
-	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("write file failed: %v", err)
-		}
-	}
-	got, err := LatestBackupFile(root, patp)
-	if err != nil {
-		t.Fatalf("LatestBackupFile failed: %v", err)
-	}
-	want := filepath.Join(dirs.Weekly, "500")
-	if got != want {
-		t.Fatalf("expected newest backup %s, got %s", want, got)
+	if err.Error() != "create local backup for ~zod: create backup error" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestUploadLatestBackupDelegatesWithNewestFile(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	root := t.TempDir()
-	patp := "~nec"
-	dirs, err := EnsureLocalDirs(root, patp)
-	if err != nil {
-		t.Fatalf("ensure local dirs failed: %v", err)
-	}
-	latest := filepath.Join(dirs.Daily, "200")
-	if err := os.WriteFile(filepath.Join(dirs.Daily, "100"), []byte("old"), 0644); err != nil {
-		t.Fatalf("write old backup failed: %v", err)
-	}
-	if err := os.WriteFile(latest, []byte("new"), 0644); err != nil {
-		t.Fatalf("write latest backup failed: %v", err)
-	}
-	var gotPath string
-	uploadBackupFn = func(ship, password, path string) error {
-		if ship != patp || password != "pw" {
-			t.Fatalf("unexpected upload args: %s %s %s", ship, password, path)
-		}
-		gotPath = path
-		return nil
-	}
-	if err := UploadLatestBackup(patp, "pw", root); err != nil {
-		t.Fatalf("UploadLatestBackup failed: %v", err)
-	}
-	if gotPath != latest {
-		t.Fatalf("expected latest backup path %s, got %s", latest, gotPath)
-	}
-}
+func resetBackupsvcDependencies() func() {
+	origIsMounted := isMountedMMCFn
+	origMkdirAll := mkdirAllFn
+	origReadDir := readDirFn
+	origCreateBackup := createBackupFn
+	origUploadBackup := uploadBackupFn
 
-func TestMostRecentDailyBackupTimeReturnsZeroWhenMissing(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	got, err := MostRecentDailyBackupTime(t.TempDir(), "~zod")
-	if err != nil {
-		t.Fatalf("MostRecentDailyBackupTime failed: %v", err)
-	}
-	if !got.IsZero() {
-		t.Fatalf("expected zero value time when no backups, got %v", got)
-	}
-}
-
-func TestMostRecentDailyBackupTimeUsesNewestTimestamp(t *testing.T) {
-	t.Cleanup(resetBackupSvcSeams)
-	root := t.TempDir()
-	patp := "~bus"
-	dirs, err := EnsureLocalDirs(root, patp)
-	if err != nil {
-		t.Fatalf("ensure local dirs failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dirs.Daily, "100"), []byte("older"), 0644); err != nil {
-		t.Fatalf("write older backup failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dirs.Daily, "200"), []byte("newer"), 0644); err != nil {
-		t.Fatalf("write newer backup failed: %v", err)
-	}
-	got, err := MostRecentDailyBackupTime(root, patp)
-	if err != nil {
-		t.Fatalf("MostRecentDailyBackupTime failed: %v", err)
-	}
-	if got.Unix() != 200 {
-		t.Fatalf("expected unix 200, got %d", got.Unix())
-	}
-	if got.Location() != time.Local && got.Location() != time.UTC {
-		// keep assertion lightweight and robust across platforms.
-		t.Fatalf("unexpected location on result: %v", got.Location())
+	return func() {
+		isMountedMMCFn = origIsMounted
+		mkdirAllFn = origMkdirAll
+		readDirFn = origReadDir
+		createBackupFn = origCreateBackup
+		uploadBackupFn = origUploadBackup
 	}
 }

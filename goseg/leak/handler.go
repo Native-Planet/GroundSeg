@@ -16,6 +16,10 @@ import (
 )
 
 func handleAction(patp string, result []byte) {
+	if len(result) < 5 {
+		zap.L().Warn("Received malformed leak packet: payload too short")
+		return
+	}
 	stripped := result[5:]
 	reversed := reverseLittleEndian(stripped)
 	jam := new(big.Int).SetBytes(reversed)

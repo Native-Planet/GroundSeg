@@ -1,0 +1,103 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 68.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`routines/runtime_seams.go` and `docker/orchestration/runtime_seams.go` define large function-sets on runtime structs (`dockerRoutineRuntime`, `dockerRuntime`) and instantiate these per call path instead of composing narrow behavior through explicit interfaces.",
+        "`broadcast/loop.go` similarly stores every cross-module collaborator as a function field in `broadcastLoopRuntime`, with thin `WithRuntime` wrappers duplicating orchestration layers.",
+        "`shipworkflow/operations_runtime.go` and `shipworkflow/startram.go` rely on package-level function variables as dependency seams (`SetAliasCNAMELookup`, `SetUrbitCleanupSeams`, `dispatchUrbitPayloadFn`, `recoverWireguardFleetFn`) rather than explicit constructor-injected contracts.",
+        "`broadcast/broadcast.go` adds an interface `broadcastToClientsRuntime` with a single default concrete type, primarily to thread test seams rather than express a stable abstraction boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 28.0,
+        "indirection_cost": 34.0,
+        "interface_honesty": 36.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_function_table_overload",
+      "summary": "Multiple modules wrap production behavior in large runtime function tables and duplicated `WithRuntime` wrappers, creating low-leverage seams and extra call depth with little policy gain.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/broadcast/loop.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/minio.go",
+        "goseg/docker/orchestration/netdata.go"
+      ],
+      "evidence": [
+        "`newDockerRoutineRuntime` and `newVersionRuntime` are populated with many function fields (auth/config/docker/event/logging collaborators) and then threaded into handler functions.",
+        "`BroadcastLoopWithRuntime`/`newBroadcastLoopRuntime` creates another runtime object with 8+ function fields that are direct pass-through to package functions.",
+        "`LoadWireguard`, `LoadMC`, `LoadMinIOs`, `LoadNetdata`, and `runDocker...` call into `...WithRuntime` variants that exist primarily to inject table-backed dependencies.",
+        "In practice, most call chains are `entrypoint -> helper -> ...WithRuntime(newXRuntime()) -> injected field calls`, increasing depth without clearly encapsulating policy."
+      ],
+      "suggestion": "Introduce narrow interfaces for each collaboration boundary (broadcast writer, docker orchestration, startram/ship operations) and inject concrete dependencies at subsystem startup once; keep runtime adapters in one place and avoid duplicative `WithRuntime` wrappers plus giant function tables.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_table_overload"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_defaults_mask_missing_contract",
+      "summary": "Pluggable callback abstractions use placeholder defaults that hide required behavior, so workflows can run through abstractions without actual implementation.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`recoverWireguardFleetFn` is initialized to a no-op function, so `HandleStartramRestart` can silently skip fleet recovery behavior when no setter is installed.",
+        "`dispatchUrbitPayloadFn` defaults to `defaultDispatchUrbitPayload` returning \"no urbit dispatcher configured\", which makes `HandleStartramToggle` fail from an injected-seam abstraction rather than a concrete dependency boundary.",
+        "The only wiring mechanism is package-level `Set*` functions on global vars, but these are not expressed as explicit required dependencies for the workflow constructor.",
+        "These placeholders make the abstraction contract implicit and lossy: callers cannot tell at type level whether required behavior is actually bound."
+      ],
+      "suggestion": "Replace placeholder globals with explicit dependency injection on module initialization (constructor args or context struct), and fail fast if a required adapter is missing; keep default-safe adapters only for non-critical, truly optional behavior.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_contract_ambiguity"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "one_impl_broadcast_runtime_interface",
+      "summary": "The `broadcastToClientsRuntime` interface exists with a single production implementation and no behavior enrichment, reducing abstraction signal while adding layering.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`broadcastToClientsRuntime` has three methods but only `broadcastToClientsRuntimeDefault` is currently provided in production.",
+        "`BroadcastToClients` hardcodes `broadcastToClientsRuntimeDefault{}` and tests can inject behavior only via alternate struct assignment.",
+        "The interface is effectively a test seam wrapper around side-effectful package calls (`auth.ClientManager`) rather than a stable pluggable boundary with alternative implementations in use."
+      ],
+      "suggestion": "Collapse this to a single explicit collaborator dependency in the broadcast runtime (or formalize multiple implementations with clear reason, e.g., ws vs relay transport), and move toward interface usage only where there is real behavioral polymorphism.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "seam_table_overload"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Overreliance on global function seams and function-table runtimes instead of explicit module-level dependency interfaces.",
+      "Testing convenience drove abstractions that are not enforced as required production contracts.",
+      "Interface definitions introduced for seam indirection rather than true implementation variance."
+    ],
+    "likely_symptoms": [
+      "Increased cognitive load for tracing runtime behavior across nested wrappers.",
+      "Harder to reason about production behavior because defaults can be silently replaced or remain placeholders.",
+      "Higher risk of runtime surprises when callbacks are not explicitly bound and no compile-time signal exists."
+    ],
+    "possible_false_positives": []
+  }
+}

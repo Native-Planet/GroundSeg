@@ -1,0 +1,104 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 88.0,
+    "test_strategy": 75.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`system/wifi_transport_adapter.go` defines `c2cAction` and parses websocket payload action strings in `parseC2CAction`.",
+        "`uploadsvc/service.go` defines a separate `Action` enum and dispatch map for upload actions, with no shared action contract type reused by other packages.",
+        "`README.md` documents package interactions at a high level but does not publish the runtime action/error contracts that modules consume and produce."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Cross-module action/error contracts are not centralized, so boundaries remain implicit and drift risk is still present across transport and service packages.",
+      "sub_axes": {}
+    },
+    "test_strategy": {
+      "evidence": [
+        "`uploadsvc/service.go` contains critical dispatch logic (`NewExecutor`, `Execute`, `UnsupportedActionError`) with no corresponding test file in the batch scope.",
+        "`system/wifi_c2c_service.go` and `system/wifi_transport_adapter.go` include orchestration, state, and transport parsing/error paths that are not covered by the listed test file.",
+        "`uploadsvc/adapters/upload_payload_test.go` only validates one successful mapping case and does not cover unsupported actions, malformed payloads, nil injection, or error paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_action_contracts",
+      "summary": "Upload and captive actions use separate enums, but no shared protocol contract binds cross-package compatibility.",
+      "related_files": [
+        "README.md",
+        "system/wifi_transport_adapter.go",
+        "uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`wifi_transport_adapter.go` parses raw c2c action strings with `parseC2CAction` and local `c2cAction` enum (`connect`).",
+        "`uploadsvc/service.go` defines separate action constants (`open-endpoint`, `reset`) and dispatch map logic.",
+        "There is no shared type or registry in the reviewed files connecting websocket payload action values to upload and c2c action surfaces.",
+        "README.md lacks an explicit compatibility contract for transport action names or versioned API behavior."
+      ],
+      "suggestion": "Create a shared protocol contract package for action enums and error semantics (including compatibility/version docs), then have both system and uploadsvc consume it and add a short API contract section in README.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "protocol_contract_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "executor_dispatch_untested",
+      "summary": "Upload executor dispatch contract is untested at command-level boundaries.",
+      "related_files": [
+        "uploadsvc/service.go",
+        "uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`uploadsvc/service.go` exposes `NewExecutor`, `Execute`, `SupportedActions`, and action-to-handler dispatch, but there is no test in reviewed files asserting those behaviors.",
+        "The only test under `uploadsvc/adapters` only checks request field mapping for a happy-path payload."
+      ],
+      "suggestion": "Add unit tests for executor creation and execution: happy path for `ActionOpenEndpoint`, `ActionReset`, and unsupported action handling, plus nil service validation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_pipeline_test_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c_transport_paths_untested",
+      "summary": "C2C parse/execute and websocket transport control paths have no coverage for failure modes.",
+      "related_files": [
+        "system/wifi_transport_adapter.go",
+        "system/wifi_c2c_service.go"
+      ],
+      "evidence": [
+        "`wifi_transport_adapter.go` includes multiple branches in `processMessage`/`handleAPI`/`broadcastNetworks` (JSON parse failure, unsupported action, nil executor, read-loop teardown) with no test coverage in the batch files.",
+        "`wifi_c2c_service.go` includes external effects (`ConnectToWifi`, `systemctl restart`) and error-wrapping behavior (`fmt.Errorf`) in `c2cService.Execute` that are untested in this scope."
+      ],
+      "suggestion": "Inject fakes into `c2cService` and adapter execution points and add tests for parse errors, unsupported action, execute failures, and restart/connect sequencing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_pipeline_test_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol contracts are encoded implicitly and per-module, not as a shared interface.",
+      "Critical execution paths in gateway/system-adapter and dispatch layers lack tests for failure semantics."
+    ],
+    "likely_symptoms": [
+      "runtime breakage when one package renames or extends action strings",
+      "silent regressions in reconnect/dispatch behavior with no safety net"
+    ],
+    "possible_false_positives": [
+      "Some action-domain separation may be intentional, so a shared contract could be over-consolidation if the two action sets were meant to stay isolated."
+    ]
+  }
+}

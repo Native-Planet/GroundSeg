@@ -14,16 +14,14 @@ var (
 	routerSleepFn        = time.Sleep
 )
 
-func startRouter() bool {
-	var res string
-	var err error
+func startRouter() error {
 	preStart()
-	cmd := "ip link set " + wlan + " up"
-	res, err = executeRouterShellFn(cmd)
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-	cmd = "ip addr add " + ip + "/24 dev " + wlan
-	res, err = executeRouterShellFn(cmd)
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand("ip link set " + wlan + " up"); err != nil {
+		return fmt.Errorf("start wlan interface: %w", err)
+	}
+	if err := executeRouterCommand("ip addr add " + ip + "/24 dev " + wlan); err != nil {
+		return fmt.Errorf("assign AP IP address: %w", err)
+	}
 	zap.L().Debug("created interface")
 
 	zap.L().Debug(fmt.Sprintf("wait.."))
@@ -32,85 +30,115 @@ func startRouter() bool {
 	ipParts := ip[:strings.LastIndex(ip, ".")]
 
 	zap.L().Debug(fmt.Sprintf("enabling forward in sysctl."))
-	res, err = executeRouterShellFn("sysctl -w net.ipv4.ip_forward=1")
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand("sysctl -w net.ipv4.ip_forward=1"); err != nil {
+		return fmt.Errorf("enable ipv4 forwarding: %w", err)
+	}
 
 	if inet != "" {
 		zap.L().Debug(fmt.Sprintf("creating NAT using iptables: %s <-> %s", wlan, inet))
-		res, err = executeRouterShellFn("iptables -P FORWARD ACCEPT")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables --table nat --delete-chain")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables --table nat -F")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables --table nat -X")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables -t nat -A POSTROUTING -o " + wlan + " -j MASQUERADE")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables -A FORWARD -i " + wlan + " -o " + wlan + " -j ACCEPT -m state --state RELATED,ESTABLISHED")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-		res, err = executeRouterShellFn("iptables -A FORWARD -i " + wlan + " -o " + wlan + " -j ACCEPT")
-		zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+		if err := executeRouterCommand("iptables -P FORWARD ACCEPT"); err != nil {
+			return fmt.Errorf("set forward policy: %w", err)
+		}
+		if err := executeRouterCommand("iptables --table nat --delete-chain"); err != nil {
+			return fmt.Errorf("delete nat chain: %w", err)
+		}
+		if err := executeRouterCommand("iptables --table nat -F"); err != nil {
+			return fmt.Errorf("flush nat table: %w", err)
+		}
+		if err := executeRouterCommand("iptables --table nat -X"); err != nil {
+			return fmt.Errorf("delete nat chains: %w", err)
+		}
+		if err := executeRouterCommand("iptables -t nat -A POSTROUTING -o " + wlan + " -j MASQUERADE"); err != nil {
+			return fmt.Errorf("configure masquerade: %w", err)
+		}
+		if err := executeRouterCommand("iptables -A FORWARD -i " + wlan + " -o " + wlan + " -j ACCEPT -m state --state RELATED,ESTABLISHED"); err != nil {
+			return fmt.Errorf("configure forward established allow: %w", err)
+		}
+		if err := executeRouterCommand("iptables -A FORWARD -i " + wlan + " -o " + wlan + " -j ACCEPT"); err != nil {
+			return fmt.Errorf("configure forward accept: %w", err)
+		}
 	}
 
-	res, err = executeRouterShellFn("iptables -A OUTPUT --out-interface " + wlan + " -j ACCEPT")
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-	res, err = executeRouterShellFn("iptables -A INPUT --in-interface " + wlan + " -j ACCEPT")
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand("iptables -A OUTPUT --out-interface " + wlan + " -j ACCEPT"); err != nil {
+		return fmt.Errorf("allow output on AP interface: %w", err)
+	}
+	if err := executeRouterCommand("iptables -A INPUT --in-interface " + wlan + " -j ACCEPT"); err != nil {
+		return fmt.Errorf("allow input on AP interface: %w", err)
+	}
 
-	cmd = "dnsmasq --dhcp-authoritative --interface=" + wlan + " --dhcp-range=" + ipParts + ".20," + ipParts + ".100," + netmask + ",4h"
+	cmd := "dnsmasq --dhcp-authoritative --interface=" + wlan + " --dhcp-range=" + ipParts + ".20," + ipParts + ".100," + netmask + ",4h"
 	zap.L().Debug(fmt.Sprintf("running dnsmasq"))
-	res, err = executeRouterShellFn(cmd)
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand(cmd); err != nil {
+		return fmt.Errorf("start dnsmasq: %w", err)
+	}
 
 	cmd = "hostapd -B " + hostapdConfigPath
 	zap.L().Debug(fmt.Sprintf("running hostapd"))
 	zap.L().Debug(fmt.Sprintf("wait.."))
-	res, err = executeRouterShellFn("sleep 2")
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
-	res, err = executeRouterShellFn(cmd)
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand("sleep 2"); err != nil {
+		return fmt.Errorf("hostapd warmup delay: %w", err)
+	}
+	if err := executeRouterCommand(cmd); err != nil {
+		return fmt.Errorf("start hostapd: %w", err)
+	}
 
 	zap.L().Debug(fmt.Sprintf("hotspot is running."))
-	return true
+	return nil
 }
 
 // stopRouter stops the router
-func stopRouter() bool {
-	var res string
-	var err error
+func stopRouter() error {
 	// Bring down the interface
 	cmd := "ip link set " + wlan + " down"
-	res, err = executeRouterShellFn(cmd)
-	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err := executeRouterCommand(cmd); err != nil {
+		return fmt.Errorf("stop wlan interface: %w", err)
+	}
 
 	// Stop hostapd
 	log.Println("stopping hostapd")
-	res, err = executeRouterShellFn("pkill hostapd")
+	if err := executeRouterCommand("pkill hostapd"); err != nil {
+		return fmt.Errorf("stop hostapd: %w", err)
+	}
 
 	// Stop dnsmasq
 	log.Println("stopping dnsmasq")
-	res, err = executeRouterShellFn("killall dnsmasq")
+	if err := executeRouterCommand("killall dnsmasq"); err != nil {
+		return fmt.Errorf("stop dnsmasq: %w", err)
+	}
 
 	// Disable forwarding in iptables
 	log.Println("disabling forward rules in iptables.")
-	res, err = executeRouterShellFn("iptables -P FORWARD DROP")
+	if err := executeRouterCommand("iptables -P FORWARD DROP"); err != nil {
+		return fmt.Errorf("drop forward policy: %w", err)
+	}
 
 	// Delete iptables rules that were added for wlan traffic
 	if wlan != "" {
-		res, err = executeRouterShellFn("iptables -D OUTPUT --out-interface " + wlan + " -j ACCEPT")
-		res, err = executeRouterShellFn("iptables -D INPUT --in-interface " + wlan + " -j ACCEPT")
+		if err := executeRouterCommand("iptables -D OUTPUT --out-interface " + wlan + " -j ACCEPT"); err != nil {
+			return fmt.Errorf("remove output firewall rule: %w", err)
+		}
+		if err := executeRouterCommand("iptables -D INPUT --in-interface " + wlan + " -j ACCEPT"); err != nil {
+			return fmt.Errorf("remove input firewall rule: %w", err)
+		}
 	}
-	res, err = executeRouterShellFn("iptables --table nat --delete-chain")
-	res, err = executeRouterShellFn("iptables --table nat -F")
-	res, err = executeRouterShellFn("iptables --table nat -X")
+	if err := executeRouterCommand("iptables --table nat --delete-chain"); err != nil {
+		return fmt.Errorf("remove nat chain: %w", err)
+	}
+	if err := executeRouterCommand("iptables --table nat -F"); err != nil {
+		return fmt.Errorf("flush nat table: %w", err)
+	}
+	if err := executeRouterCommand("iptables --table nat -X"); err != nil {
+		return fmt.Errorf("delete nat table: %w", err)
+	}
 
 	// Disable forwarding in sysctl
 	log.Println("disabling forward in sysctl.")
-	res, err = executeRouterShellFn("sysctl -w net.ipv4.ip_forward=0")
+	if err := executeRouterCommand("sysctl -w net.ipv4.ip_forward=0"); err != nil {
+		return fmt.Errorf("disable ipv4 forwarding: %w", err)
+	}
 
 	log.Println("hotspot has stopped.")
-	return true
+	return nil
 }
 
 func preStart() {
@@ -131,4 +159,14 @@ func preStart() {
 	// execute 'sleep 1'
 	res, err = executeRouterShellFn("sleep 1")
 	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+}
+
+func executeRouterCommand(cmd string) error {
+	res, err := executeRouterShellFn(cmd)
+	zap.L().Debug(fmt.Sprintf("res: %s, err: %v", res, err))
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("accesspoint command failed: %s: %v", cmd, err))
+		return err
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package leak
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/structs"
 	"net"
@@ -73,37 +74,57 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 	}
 	newBroadcastBytes, err := json.Marshal(newBroadcast)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to marshal broadcast for lick: %v", err))
-		return oldBroadcast, nil
+		return oldBroadcast, fmt.Errorf("failed to marshal full broadcast for lick: %w", err)
 	}
 	statuses := GetLickStatuses()
+	var sendErrors []error
+
 	for patp, status := range statuses {
-		if status.Auth {
-			go func(patp string) {
-				BytesChan[patp] <- string(newBroadcastBytes)
-			}(patp)
-		} else {
-			go func(patp string) {
-				shipInfo, exists := newBroadcast.Urbits[patp]
-				if exists {
-					urbits := make(map[string]structs.Urbit)
-					urbits[patp] = shipInfo
-					wrappedUrbit := structs.AuthBroadcast{
-						Type:      "structure",
-						AuthLevel: patp,
-						Urbits:    urbits,
-					}
-					wrappedUrbit.Profile.Startram.Info.Registered = newBroadcast.Profile.Startram.Info.Registered
-					wrappedUrbit.Profile.Startram.Info.Running = newBroadcast.Profile.Startram.Info.Running
-
-					wrapperUrbitBytes, err := json.Marshal(wrappedUrbit)
-					if err == nil {
-
-						BytesChan[patp] <- string(wrapperUrbitBytes)
-					}
-				}
-			}(patp)
+		channel, exists := BytesChan[patp]
+		if !exists {
+			sendErrors = append(sendErrors, fmt.Errorf("no leak channel for %q", patp))
+			continue
 		}
+
+		if status.Auth {
+			select {
+			case channel <- string(newBroadcastBytes):
+			default:
+				sendErrors = append(sendErrors, fmt.Errorf("dropping authorized broadcast for %q", patp))
+			}
+			continue
+		}
+
+		shipInfo, exists := newBroadcast.Urbits[patp]
+		if !exists {
+			continue
+		}
+
+		urbits := map[string]structs.Urbit{
+			patp: shipInfo,
+		}
+		wrappedUrbit := structs.AuthBroadcast{
+			Type:      "structure",
+			AuthLevel: patp,
+			Urbits:    urbits,
+		}
+		wrappedUrbit.Profile.Startram.Info.Registered = newBroadcast.Profile.Startram.Info.Registered
+		wrappedUrbit.Profile.Startram.Info.Running = newBroadcast.Profile.Startram.Info.Running
+
+		wrapperUrbitBytes, err := json.Marshal(wrappedUrbit)
+		if err != nil {
+			sendErrors = append(sendErrors, fmt.Errorf("marshal scoped broadcast for %q: %w", patp, err))
+			continue
+		}
+		select {
+		case channel <- string(wrapperUrbitBytes):
+		default:
+			sendErrors = append(sendErrors, fmt.Errorf("dropping scoped broadcast for %q", patp))
+		}
+	}
+
+	if len(sendErrors) > 0 {
+		return oldBroadcast, errors.Join(sendErrors...)
 	}
 	return newBroadcast, nil
 }

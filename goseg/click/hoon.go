@@ -10,15 +10,16 @@ import (
 	"strings"
 )
 
-var execDockerCommandForClick = docker.ExecDockerCommand
+var execDockerCommandForClick = func(container string, cmd []string) (string, error) {
+	response, _, err := docker.ExecDockerCommand(container, cmd)
+	return response, err
+}
 
 func createHoon(patp, file, hoon string) error {
 	shipConf := config.UrbitConf(patp)
 	location := filepath.Join(config.DockerDir, patp, "_data")
-	if shipConf.CustomPierLocation != nil {
-		if str, ok := shipConf.CustomPierLocation.(string); ok {
-			location = str
-		}
+	if shipConf.CustomPierLocation != "" {
+		location = shipConf.CustomPierLocation
 	}
 	hoonFile := filepath.Join(location, fmt.Sprintf("%s.hoon", file))
 	if err := ioutil.WriteFile(hoonFile, []byte(hoon), 0644); err != nil {
@@ -31,10 +32,8 @@ func createHoon(patp, file, hoon string) error {
 func deleteHoon(patp, file string) {
 	shipConf := config.UrbitConf(patp)
 	location := filepath.Join(config.DockerDir, patp, "_data")
-	if shipConf.CustomPierLocation != nil {
-		if str, ok := shipConf.CustomPierLocation.(string); ok {
-			location = str
-		}
+	if shipConf.CustomPierLocation != "" {
+		location = shipConf.CustomPierLocation
 	}
 	hoonFile := filepath.Join(location, fmt.Sprintf("%s.hoon", file))
 	if _, err := os.Stat(hoonFile); !os.IsNotExist(err) {

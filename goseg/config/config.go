@@ -54,130 +54,142 @@ var (
 	versMutex     sync.Mutex
 	minioPwdMutex sync.Mutex
 	startramMu    sync.RWMutex
+	initOnce      sync.Once
+	initErr       error
 )
 
-// try initializing from system.json on disk
-func init() {
+// Initialize loads and validates configuration from disk.
+func Initialize() error {
+	initOnce.Do(func() {
+		initErr = initializeConfig()
+	})
+	return initErr
+}
+
+func initializeConfig() error {
 	setDebugMode()
-	BasePath = getBasePath()
+	initializePaths()
 	configureFixerScript()
 	isEMMCMachine = checkIsEMMCMachine()
 	zap.L().Info(fmt.Sprintf("Loading configs from %s", BasePath))
-	confPath = filepath.Join(BasePath, "settings", "system.json")
-	keyPath = filepath.Join(BasePath, "settings", "session.key")
-	file, err := os.Open(confPath)
+
+	file, created, err := openOrCreateConfigFile()
 	if err != nil {
-		// create a default if it doesn't exist
-		err = createDefaultConf()
-		if err != nil {
-			// panic if we can't create it
-			zap.L().Error(fmt.Sprintf("Unable to create config! %v", err))
-			fmt.Printf("Failed to create log directory: %v\n", err)
-			fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
-			fmt.Print("Please run GroundSeg as root!  \n /) /)\n( . . )\n(  >< )\n Love, Native Planet\n")
-			fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
-			return
-		}
-		file, err = os.Open(confPath)
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Unable to open config after creation: %v", err))
-			return
-		}
-		salt := RandString(32)
-		wgPriv, wgPub, err := WgKeyGen()
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		} else {
-			if err = UpdateConfTyped(
-				WithPubkey(wgPub),
-				WithPrivkey(wgPriv),
-				WithSalt(salt),
-				WithKeyfile(keyPath),
-			); err != nil {
-				zap.L().Error(fmt.Sprintf("%v", err))
-			}
-		}
+		return fmt.Errorf("initialize config file: %w", err)
 	}
 	defer file.Close()
-	_, err = os.Open(keyPath)
-	if err != nil {
-		// generate and insert aes & wireguard keys
-		keyfile, err := os.Stat(keyPath)
-		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
-			}
+
+	if created {
+		if err := seedDefaultConfigRuntimeState(); err != nil {
+			return fmt.Errorf("seed default runtime state: %w", err)
 		}
 	}
-	// read the sysconfig to memory
-	decoder := json.NewDecoder(file)
-	if err = decoder.Decode(&globalConfig); err != nil {
-		zap.L().Error(fmt.Sprintf("Error decoding JSON: %v", err))
+	cachedConfig, err := loadSystemConfigOrDefault(file)
+	if err != nil {
+		return fmt.Errorf("load system config: %w", err)
 	}
-	// add mising fields
-	globalConfig = mergeConfigs(defaults.SysConfig(BasePath), globalConfig)
-	// wipe the sessions on each startup
-	//globalConfig.Sessions.Authorized = make(map[string]structs.SessionInfo)
-	globalConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
 
-	// get hash of groundseg binary
+	cachedConfig = mergeConfigs(defaults.SysConfig(BasePath), cachedConfig)
+	cachedConfig.Sessions.Unauthorized = make(map[string]structs.SessionInfo)
+	cachedConfig.BinHash = readCurrentBinaryHash()
+
+	if err := persistConfig(cachedConfig); err != nil {
+		return fmt.Errorf("persist config: %w", err)
+	}
+
+	if err := ensureSessionKeyExists(); err != nil {
+		return fmt.Errorf("ensure session key: %w", err)
+	}
+
+	currentConf := Conf()
+	if currentConf.KeyFile == "" {
+		keyPath := filepath.Join(BasePath, "settings", "session.key")
+		if err := ensureSessionKeyExists(); err != nil {
+			return fmt.Errorf("ensure session key: %w", err)
+		}
+		if err := UpdateConfTyped(WithKeyfile(keyPath)); err != nil {
+			return fmt.Errorf("set session key path: %w", err)
+		}
+	}
+
+	Ready = true
+	go ConfChannel()
+	return nil
+}
+
+func initializePaths() {
+	BasePath = getBasePath()
+	confPath = filepath.Join(BasePath, "settings", "system.json")
+	keyPath = filepath.Join(BasePath, "settings", "session.key")
+}
+
+func loadSystemConfigOrDefault(file *os.File) (structs.SysConfig, error) {
+	var cachedConfig structs.SysConfig
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&cachedConfig); err != nil {
+		return cachedConfig, err
+	}
+	return cachedConfig, nil
+}
+
+func openOrCreateConfigFile() (*os.File, bool, error) {
+	file, err := os.Open(confPath)
+	if err == nil {
+		return file, false, nil
+	}
+
+	// create a default if it doesn't exist
+	if err = createDefaultConf(); err != nil {
+		return nil, false, err
+	}
+	file, err = os.Open(confPath)
+	if err != nil {
+		return nil, false, err
+	}
+	return file, true, nil
+}
+
+func seedDefaultConfigRuntimeState() error {
+	salt := RandString(32)
+	wgPriv, wgPub, err := WgKeyGen()
+	if err != nil {
+		return err
+	}
+	if err = UpdateConfTyped(
+		WithPubkey(wgPub),
+		WithPrivkey(wgPriv),
+		WithSalt(salt),
+		WithKeyfile(keyPath),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func readCurrentBinaryHash() string {
 	hash, err := GetSHA256(filepath.Join(BasePath, "groundseg"))
 	if err != nil {
 		errmsg := fmt.Sprintf("Error getting binary sha256 hash: %v", err)
 		zap.L().Error(errmsg)
+		return ""
 	}
-	globalConfig.BinHash = hash
 	zap.L().Info(fmt.Sprintf("Binary sha256 hash: %v", hash))
+	return hash
+}
 
-	configMap := make(map[string]interface{})
-	configBytes, err := json.Marshal(globalConfig)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error marshaling JSON: %v", err)
-		zap.L().Error(errmsg)
+func ensureSessionKeyExists() error {
+	keyfile, err := os.Stat(keyPath)
+	if err == nil && keyfile.Size() > 0 {
+		return nil
 	}
-	err = json.Unmarshal(configBytes, &configMap)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error unmarshaling JSON: %v", err)
-		zap.L().Error(errmsg)
+	if err != nil && !os.IsNotExist(err) {
+		return err
 	}
-	err = persistConf(configMap)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error persisting JSON: %v", err)
-		zap.L().Error(errmsg)
+	keyContent := RandString(32)
+	if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
+		return fmt.Errorf("Couldn't write keyfile! %v", err)
 	}
-	if err := file.Close(); err != nil {
-		zap.L().Warn(fmt.Sprintf("Error closing JSON before reload: %v", err))
-	}
-	file, err = os.Open(confPath)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error opening JSON: %v", err)
-		zap.L().Error(errmsg)
-		return
-	}
-	defer file.Close()
-	decoder = json.NewDecoder(file)
-	err = decoder.Decode(&globalConfig)
-	if err != nil {
-		errmsg := fmt.Sprintf("Error decoding JSON: %v", err)
-		zap.L().Error(errmsg)
-	}
-	// create a keyfile if you dont have one (gs1)
-	conf := Conf()
-	if conf.KeyFile == "" {
-		keyPath := filepath.Join(BasePath, "settings", "session.key")
-		keyfile, err := os.Stat(keyPath)
-		if err != nil || keyfile.Size() == 0 {
-			keyContent := RandString(32)
-			if err := ioutil.WriteFile(keyPath, []byte(keyContent), 0644); err != nil {
-				zap.L().Error(fmt.Sprintf("Couldn't write keyfile! %v", err))
-			}
-		}
-		if err = UpdateConfTyped(WithKeyfile(keyPath)); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
-	}
-	go ConfChannel()
+	return nil
 }
 
 // return the global conf var
@@ -397,10 +409,11 @@ func GetStoragePath(operation string) string {
 		basePath = "/opt/nativeplanet/groundseg"
 	}
 	var operationPaths = map[string]string{
-		"uploads": "uploads",
-		"temp":    "temp",
-		"exports": "exports",
-		"logs":    "logs",
+		"uploads":     "uploads",
+		"temp":        "temp",
+		"exports":     "exports",
+		"logs":        "logs",
+		"bug-reports": "bug-reports",
 	}
 	opPath, exists := operationPaths[operation]
 	if !exists {
@@ -879,26 +892,210 @@ func WithBinHash(hash string) ConfUpdateOption {
 
 // update by passing in a map of key:values you want to modify
 func UpdateConf(values map[string]interface{}) error {
-	// mutex lock to avoid race conditions
-	confMutex.Lock()
-	defer confMutex.Unlock()
-	file, err := ioutil.ReadFile(confPath)
+	patch, err := buildConfigPatch(values)
 	if err != nil {
-		return fmt.Errorf("Unable to load config: %v", err)
+		return err
 	}
-	// unmarshal the config to struct
-	var configMap map[string]interface{}
-	if err := json.Unmarshal(file, &configMap); err != nil {
-		return fmt.Errorf("Error decoding JSON: %v", err)
-	}
-	// update our unmarshaled struct
+	return updateConfFromPatch(patch)
+}
+
+func buildConfigPatch(values map[string]interface{}) (*ConfPatch, error) {
+	patch := &ConfPatch{}
 	for key, value := range values {
-		configMap[key] = value
+		switch key {
+		case "piers":
+			typed, ok := value.([]interface{})
+			if !ok {
+				items, ok := value.([]string)
+				if !ok {
+					return nil, fmt.Errorf("invalid piers value: %T", value)
+				}
+				patch.Piers = &items
+				continue
+			}
+			piers := make([]string, 0, len(typed))
+			for _, item := range typed {
+				piers = append(piers, fmt.Sprint(item))
+			}
+			patch.Piers = &piers
+		case "wgOn":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid wgOn value: %T", value)
+			}
+			patch.WgOn = &v
+		case "startramSetReminderOne":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid startramSetReminderOne value: %T", value)
+			}
+			patch.StartramReminderOne = &v
+		case "startramSetReminderThree":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid startramSetReminderThree value: %T", value)
+			}
+			patch.StartramReminderThree = &v
+		case "startramSetReminderSeven":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid startramSetReminderSeven value: %T", value)
+			}
+			patch.StartramReminderSeven = &v
+		case "penpaiAllow":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid penpaiAllow value: %T", value)
+			}
+			patch.PenpaiAllow = &v
+		case "gracefulExit":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid gracefulExit value: %T", value)
+			}
+			patch.GracefulExit = &v
+		case "swapVal":
+			v, ok := value.(int)
+			if !ok {
+				return nil, fmt.Errorf("invalid swapVal value: %T", value)
+			}
+			patch.SwapVal = &v
+		case "penpaiRunning":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid penpaiRunning value: %T", value)
+			}
+			patch.PenpaiRunning = &v
+		case "penpaiActive":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid penpaiActive value: %T", value)
+			}
+			patch.PenpaiActive = &v
+		case "penpaiCores":
+			v, ok := value.(int)
+			if !ok {
+				return nil, fmt.Errorf("invalid penpaiCores value: %T", value)
+			}
+			patch.PenpaiCores = &v
+		case "endpointUrl":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid endpointUrl value: %T", value)
+			}
+			patch.EndpointURL = &v
+		case "wgRegistered":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid wgRegistered value: %T", value)
+			}
+			patch.WgRegistered = &v
+		case "remoteBackupPassword":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid remoteBackupPassword value: %T", value)
+			}
+			patch.RemoteBackupPassword = &v
+		case "pubkey":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid pubkey value: %T", value)
+			}
+			patch.Pubkey = &v
+		case "privkey":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid privkey value: %T", value)
+			}
+			patch.Privkey = &v
+		case "salt":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid salt value: %T", value)
+			}
+			patch.Salt = &v
+		case "keyFile":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid keyFile value: %T", value)
+			}
+			patch.KeyFile = &v
+		case "c2cInterval":
+			v, ok := value.(int)
+			if !ok {
+				return nil, fmt.Errorf("invalid c2cInterval value: %T", value)
+			}
+			patch.C2cInterval = &v
+		case "setup":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid setup value: %T", value)
+			}
+			patch.Setup = &v
+		case "pwHash":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid pwHash value: %T", value)
+			}
+			patch.PwHash = &v
+		case "lastKnownMDNS":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid lastKnownMDNS value: %T", value)
+			}
+			patch.LastKnownMDNS = &v
+		case "disableSlsa":
+			v, ok := value.(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid disableSlsa value: %T", value)
+			}
+			patch.DisableSlsa = &v
+		case "gsVersion":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid gsVersion value: %T", value)
+			}
+			patch.GSVersion = &v
+		case "binHash":
+			v, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid binHash value: %T", value)
+			}
+			patch.BinHash = &v
+		case "authorizedSessions":
+			authorized, ok := value.(map[string]structs.SessionInfo)
+			if !ok {
+				return nil, fmt.Errorf("invalid authorizedSessions value: %T", value)
+			}
+			patch.AuthorizedSessions = authorized
+		case "unauthorizedSessions":
+			unauthorized, ok := value.(map[string]structs.SessionInfo)
+			if !ok {
+				return nil, fmt.Errorf("invalid unauthorizedSessions value: %T", value)
+			}
+			patch.UnauthorizedSessions = unauthorized
+		case "diskWarning":
+			warning, ok := value.(map[string]structs.DiskWarning)
+			if !ok {
+				return nil, fmt.Errorf("invalid diskWarning value: %T", value)
+			}
+			patch.DiskWarning = &warning
+		case "isEMMCMachine":
+			// deprecated/unsupported config key kept for explicit failure path
+			return nil, fmt.Errorf("unsupported config key: %s", key)
+		default:
+			return nil, fmt.Errorf("unsupported config key: %s", key)
+		}
 	}
-	if err = persistConf(configMap); err != nil {
-		return fmt.Errorf("Unable to persist config update: %v", err)
+	return patch, nil
+}
+
+func persistConfig(configStruct structs.SysConfig) error {
+	configMap, err := structToMap(configStruct)
+	if err != nil {
+		return err
 	}
-	return nil
+	return persistConf(configMap)
 }
 
 func persistConf(configMap map[string]interface{}) error {

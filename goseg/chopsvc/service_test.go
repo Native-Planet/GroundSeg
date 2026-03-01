@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"groundseg/shipworkflow"
 	"groundseg/structs"
 )
 
@@ -29,7 +30,7 @@ func resetChopSvcSeams() {
 	}
 	waitCompleteFn = WaitComplete
 	sleepFn = time.Sleep
-	waitCompletePollerFn = pollWithTimeout
+	waitCompletePollerFn = shipworkflow.PollWithTimeout
 }
 
 func TestChopPierReturnsErrorWhenStatusFetchFails(t *testing.T) {
@@ -40,7 +41,7 @@ func TestChopPierReturnsErrorWhenStatusFetchFails(t *testing.T) {
 	waitCompleteFn = func(string) error { return nil }
 	sleepFn = func(time.Duration) {}
 
-	err := ChopPier("~zod", structs.UrbitDocker{})
+	err := ChopPier("~zod")
 	if err == nil {
 		t.Fatal("expected status failure")
 	}
@@ -84,7 +85,7 @@ func TestChopPierRunningShipTransitionsToChopAndBackToBoot(t *testing.T) {
 		}
 	}
 
-	if err := ChopPier("~zod", structs.UrbitDocker{}); err != nil {
+	if err := ChopPier("~zod"); err != nil {
 		t.Fatalf("ChopPier failed: %v", err)
 	}
 	if waitCompleteCalls != 2 {

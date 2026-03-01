@@ -1,0 +1,206 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 66.0,
+    "error_consistency": 58.0,
+    "abstraction_fitness": 72.0,
+    "test_strategy": 46.0,
+    "design_coherence": 64.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Side-effect commands are invoked across accesspoint and system handlers through package-local helpers with inconsistent return/error propagation conventions.",
+        "Import path handling and runtime/network leak handling are split per domain without a shared validation/normalization abstraction, so similar trust-boundary concerns are re-implemented manually."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 60.0,
+        "indirection_cost": 52.0,
+        "interface_honesty": 61.0
+      }
+    },
+    "error_consistency": {
+      "evidence": [
+        "goseg/accesspoint/start/stop paths call shell-command helpers but discard execution errors.",
+        "goseg/handler/systemsvc system-control calls return without checking CommandRunner.Run errors.",
+        "goseg/importer/extract.go builds archive destination paths directly from archive entry names without canonicalization checks.",
+        "goseg/leak/handler.go slices incoming payloads without length guard."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "System-side effects (routing, reboot/restart/shutdown, import extraction, leak payload parsing) remain in low-level functions with no shared policy for validation, sanitization, and error semantics.",
+        "Callers receive different error-handling behavior from equivalent side-effect domains, reducing predictability.",
+        "Several high-level handlers pass strings/bytes and let leaf modules decide whether to validate, return errors, or ignore failures."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 55.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 58.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Critical control-plane modules in this batch have no adjacent tests despite containing imperative operational flows.",
+        "Examples include goseg/accesspoint/config.go, goseg/accesspoint/router.go, goseg/accesspoint/parameters.go, goseg/importer/extract.go, goseg/click/filter.go, goseg/click/hoon.go, and goseg/importer/importer.go.",
+        "Observed untested paths include shell orchestration, archive extraction, payload parsing, and shutdown/restart behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "design_coherence": {
+      "evidence": [
+        "Failure-handling semantics vary by subsystem: some operations ignore errors (fire-and-forget style), others validate partially, and others may panic on malformed input.",
+        "Trust-boundary inputs (uploads, network actions) and operational commands are not validated through a single coherent policy chain."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERR-SHELL-001",
+      "summary": "Accesspoint startup/shutdown ignores shell execution failures from router control path.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/router.go",
+        "goseg/accesspoint/parameters.go"
+      ],
+      "evidence": [
+        "config.Start/Stop wires route lifecycle calls through startRouter/stopRouter without checking command outcomes.",
+        "router helpers invoke executeRouterShellFn for multiple operations and discard returned error values.",
+        "Errors in shell orchestration are therefore not surfaced to callers or users."
+      ],
+      "suggestion": "Return and propagate command errors from startRouter/stopRouter through config.Start/Stop, and convert caller-side behavior to fail fast or report actionable status.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fire_and_forget_side_effects"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERR-SHELL-002",
+      "summary": "System control actions ignore command-runner failures during shutdown and reboot flows.",
+      "related_files": [
+        "goseg/handler/systemsvc/system.go",
+        "goseg/handler/system/system.go"
+      ],
+      "evidence": [
+        "System handler invokes deps.ExecCommand(...).Run() and continues without checking returned errors.",
+        "API-layer handlers that forward these service calls therefore can report success despite failed privileged operations."
+      ],
+      "suggestion": "Capture and wrap command-runner errors at the service boundary, and have HTTP handlers return explicit failures with logging/telemetry when reboot/restart/shutdown invocation fails.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "fire_and_forget_side_effects"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERR-ARCHIVE-001",
+      "summary": "Archive extraction permits path traversal and absolute-path writes during import restore flows.",
+      "related_files": [
+        "goseg/importer/extract.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "ZIP/TAR extractors join entry names directly with destination directory without canonicalization or root-prefix checks.",
+        "Only ad-hoc ignores for __MACOSX/.DS_Store are present; '..' and absolute paths are not rejected.",
+        "extractUploadedPier accepts uploaded archive content and passes it into these extractors."
+      ],
+      "suggestion": "Normalize each archive entry path, reject absolute paths and any path that escapes destination via filepath.Clean + prefix checks, and error on invalid entries before writing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "ERR-PANIC-001",
+      "summary": "Leak action parser can panic on short payloads due to unchecked slicing.",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/leak/broadcast.go"
+      ],
+      "evidence": [
+        "handleAction performs result[5:] unconditionally.",
+        "The payload is received as raw bytes from network input and can be shorter than five bytes."
+      ],
+      "suggestion": "Validate message length before slicing; treat undersized payloads as malformed packets and return an error path instead of panicking.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "ARC-SHELL-001",
+      "summary": "Command execution failures are handled inconsistently across modules, creating fragmented operational semantics.",
+      "related_files": [
+        "goseg/accesspoint/router.go",
+        "goseg/handler/systemsvc/system.go",
+        "goseg/click/command_exec.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "Several modules execute privileged or external commands but diverge between propagated, ignored, or partially handled errors.",
+        "No shared orchestration/error policy exists for this cluster of side-effect operations (start/stop routing, system shutdown/reboot, command execution helpers).",
+        "This increases drift in behavior and makes failures hard to reason about during maintenance."
+      ],
+      "suggestion": "Introduce a shared command execution abstraction with unified result/error contract, logging, and retry/cancellation policy, then migrate these modules to it.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "fire_and_forget_side_effects"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "TEST-CRIT-001",
+      "summary": "Critical operational modules in assigned scope remain untested despite high blast-radius behavior.",
+      "related_files": [
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/router.go",
+        "goseg/importer/extract.go",
+        "goseg/click/filter.go",
+        "goseg/click/hoon.go"
+      ],
+      "evidence": [
+        "No test files are present for these modules in the assigned batch.",
+        "These files include shell orchestration, archive extraction, and parser branches where regressions are easy to miss."
+      ],
+      "suggestion": "Add targeted unit tests for command/error-path propagation and extraction-path sanitization, plus integration tests for at least accesspoint lifecycle and importer restore flows.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Operational side-effect calls use ad-hoc error policies, leading to inconsistent propagation and observability.",
+      "Lack of a shared, security-first path/input validation layer at trust boundaries (uploads, broadcasts, command payloads).",
+      "Test debt is concentrated in high-risk control-plane modules, weakening regression protection."
+    ],
+    "likely_symptoms": [
+      "ERR-SHELL-001",
+      "ERR-SHELL-002",
+      "ERR-ARCHIVE-001",
+      "ERR-PANIC-001",
+      "ARC-SHELL-001",
+      "TEST-CRIT-001"
+    ],
+    "possible_false_positives": [
+      "ARC-SHELL-001 may appear weaker if specific modules intentionally ignore non-fatal command errors by design; verify runtime contract docs and caller expectations before broad refactor."
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.5,
+    "test_strategy": 69.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both `goseg/uploadsvc/service.go` and `goseg/system/wifi/service/c2c_service.go` define independent command-action dispatch tables (`actionBindings` / `c2cActionBindings`) with near-identical parse, validate, and execute flow.",
+        "The two modules diverge in constructor contract enforcement: `uploadsvc.NewExecutor` validates `service != nil`, while `system/wifi/service.NewC2CServiceForAdapter` accepts function dependencies without any nil checks, and `ProcessC2CMessage` dereferences the returned service unguarded.",
+        "README explicitly states runtime boundary contract expectations and dedicated package governance docs for both upload and Wi-Fi command paths, but command contracts remain duplicated rather than governed by a shared boundary pattern."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "The listed test coverage (`goseg/uploadsvc/adapters/upload_payload_test.go`) only validates websocket payload-to-command mapping and unsupported-action parsing for uploads.",
+        "There are no tests in scope for `goseg/system/wifi/service/c2c_service.go` critical paths such as JSON parsing, unsupported action handling, and adapter execution error flow.",
+        "There are no tests in scope covering `goseg/uploadsvc/service.go` executor construction failure modes and execution dispatch behavior (including nil-service/unsupported-action runtime paths)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "CG-CMD-001",
+      "summary": "Upload and Wi-Fi command services duplicate action-dispatch abstractions without a shared contract boundary, creating drift risk between public command semantics.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`uploadsvc/service.go` uses `actionBindings`, `parseAction`, and `Execute/SupportedActions` as a command contract core.",
+        "`system/wifi/service/c2c_service.go` mirrors the same pattern with `c2cActionBindings`, `ParseC2CAction`, and `Execute` for C2C actions.",
+        "Both modules now maintain separate sources of truth for near-parallel contract behavior, while README describes governance expectations at package boundary level."
+      ],
+      "suggestion": "Extract a shared internal command-contract helper (or boundary interface + registration metadata) used by both modules to define action literals, parser/validate hooks, and execution descriptors, then generate/consume supported-action surfaces from that shared contract to avoid semantic drift.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "command_dispatch_divergence"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "CG-CMD-002",
+      "summary": "Constructor and boundary precondition checks are inconsistent between command service implementations, weakening shared runtime contract safety.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`uploadsvc.NewExecutor` returns an error when the service dependency is nil.",
+        "`system/wifi/service.NewC2CServiceForAdapter` does not validate injected function dependencies.",
+        "`ProcessC2CMessage` calls `serviceFactory().Execute` without confirming the returned interface is non-nil."
+      ],
+      "suggestion": "Introduce a single constructor contract policy across command-service modules: validate all injected callables/interfaces on creation and before dispatch, and return explicit contract errors for nil/miswired dependencies instead of panics.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "command_dispatch_divergence"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "CG-TEST-001",
+      "summary": "Command contract tests are incomplete for critical service-level execution paths, leaving dispatch and failure behavior unverified.",
+      "related_files": [
+        "goseg/uploadsvc/adapters/upload_payload_test.go",
+        "goseg/uploadsvc/service.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`upload_payload_test.go` only checks `CommandFromWsPayload` mapping and one unsupported-action branch.",
+        "`uploadsvc/service.go` has untested behavior in `NewExecutor` error paths, `Executor.Execute` dispatch, and `DescribeAction` fallback semantics.",
+        "`c2c_service.go` has no tests for `ProcessC2CMessage`, malformed payload handling end-to-end, unsupported action propagation, or adapter nil dependency behavior."
+      ],
+      "suggestion": "Add contract-focused tests in the upload and Wi-Fi command modules: malformed JSON handling, unknown action parsing, nil/misconfigured factory/service behavior, and execute-path tests using fake services to verify operations and wrapped failures.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Duplication of command-dispatch scaffolding between upload and Wi-Fi modules without enforcing a shared boundary contract.",
+      "Uneven constructor validation standards across command-service surfaces."
+    ],
+    "likely_symptoms": [
+      "CG-CMD-001",
+      "CG-CMD-002",
+      "CG-TEST-001"
+    ],
+    "possible_false_positives": []
+  }
+}

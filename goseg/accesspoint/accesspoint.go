@@ -69,11 +69,13 @@ func Start(dev string) error {
 		zap.L().Info("Accesspoint already started")
 	}
 	// dump config to file
-	if err := writeHostapdConfig(wlan, ssid, password); err != nil {
+	if err := writeHostapdConfig(hostapdConfigPath, wlan, ssid, password); err != nil {
 		return err
 	}
 	// start the router
-	startRouter()
+	if err := startRouter(); err != nil {
+		return fmt.Errorf("start router: %w", err)
+	}
 	return nil
 }
 
@@ -91,7 +93,9 @@ func Stop(dev string) error {
 	}
 	// stop the router
 	if running {
-		stopRouter()
+		if err := stopRouter(); err != nil {
+			return fmt.Errorf("stop router: %w", err)
+		}
 	} else {
 		zap.L().Info("Accesspoint already stopped")
 	}

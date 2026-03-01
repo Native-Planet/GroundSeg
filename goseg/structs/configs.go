@@ -110,20 +110,20 @@ type UrbitDocker struct {
 	MeldLast            string `json:"meld_last"`
 	MeldNext            string `json:"meld_next"`
 	BootStatus          string `json:"boot_status"`
-	CustomPierLocation  any    `json:"custom_pier_location"`
+	CustomPierLocation  string `json:"custom_pier_location"`
 	CustomUrbitWeb      string `json:"custom_urbit_web"`
 	CustomS3Web         string `json:"custom_s3_web"`
 	ShowUrbitWeb        string `json:"show_urbit_web"`
 	DevMode             bool   `json:"dev_mode"`
 	Click               bool   `json:"click"`
 	MinIOLinked         bool   `json:"minio_linked"`
-	StartramReminder    any    `json:"startram_reminder"`
-	ChopOnUpgrade       any    `json:"chop_on_upgrade"`
+	StartramReminder    bool   `json:"startram_reminder"`
+	ChopOnUpgrade       bool   `json:"chop_on_upgrade"`
 	SizeLimit           int    `json:"size_limit"`
 	RemoteTlonBackup    bool   `json:"remote_tlon_backup"`
 	LocalTlonBackup     bool   `json:"local_tlon_backup"`
 	BackupTime          string `json:"backup_time"`
-	DisableShipRestarts any    `json:"disable_ship_restarts"`
+	DisableShipRestarts bool   `json:"disable_ship_restarts"`
 	SnapTime            int    `json:"snap_time"`
 }
 
@@ -154,6 +154,9 @@ func toString(value any) string {
 
 // Custom unmarshaler
 func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
+	u.StartramReminder = true
+	u.ChopOnUpgrade = true
+	u.DisableShipRestarts = false
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -233,11 +236,7 @@ func (u *UrbitDocker) UnmarshalJSON(data []byte) error {
 		case "startram_reminder":
 			u.StartramReminder = toBool(v, true)
 		case "custom_pier_location":
-			if v == nil {
-				u.CustomPierLocation = nil
-			} else {
-				u.CustomPierLocation = toString(v)
-			}
+			u.CustomPierLocation = toString(v)
 		case "chop_on_upgrade":
 			u.ChopOnUpgrade = toBool(v, true)
 		case "size_limit":

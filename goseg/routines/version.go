@@ -21,12 +21,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type versionRuntime = routineRuntime
-
-func newVersionRuntime() versionRuntime {
-	return newRoutineRuntime()
-}
-
 func CheckVersionLoop() {
 	checkVersionLoopWithRuntime(newVersionRuntime())
 }
@@ -72,14 +66,14 @@ func callUpdaterWithRuntime(rt versionRuntime, releaseChannel string) {
 		rt.setVersionChannel(latestVersion)
 	}
 	// Check for gs binary updates based on hash
-	binPath := filepath.Join(rt.basePath(), "groundseg")
+	binPath := filepath.Join(rt.BasePath(), "groundseg")
 	currentHash, err := rt.getSha256(binPath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash binary: %v", err))
 		return
 	}
 	latestHash := latestVersion.Groundseg.Amd64Sha256
-	if rt.architecture() != "amd64" {
+	if rt.Architecture() != "amd64" {
 		latestHash = latestVersion.Groundseg.Arm64Sha256
 	}
 	if currentHash != latestHash {
@@ -105,17 +99,17 @@ func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel)
 	)
 	zap.L().Info(msg)
 	// delete old instance of groundseg_new if it exists
-	if _, err := os.Stat(filepath.Join(rt.basePath(), "groundseg_new")); err == nil {
+	if _, err := os.Stat(filepath.Join(rt.BasePath(), "groundseg_new")); err == nil {
 		// Remove the file
 		zap.L().Info("Deleting old groundseg_new download")
-		if err := os.Remove(filepath.Join(rt.basePath(), "groundseg_new")); err != nil {
+		if err := os.Remove(filepath.Join(rt.BasePath(), "groundseg_new")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg_new: %v", err))
 			return
 		}
 	}
 	// download new binary, name it groundseg_new
 	url := versionInfo.Groundseg.Arm64URL
-	if rt.architecture() == "amd64" {
+	if rt.Architecture() == "amd64" {
 		url = versionInfo.Groundseg.Amd64URL
 	}
 	// Create a new HTTP GET request
@@ -133,7 +127,7 @@ func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel)
 
 	// Create a new file to save the downloaded content
 	zap.L().Info("Creating groundseg_new")
-	file, err := os.Create(filepath.Join(rt.basePath(), "groundseg_new"))
+	file, err := os.Create(filepath.Join(rt.BasePath(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
 		return
@@ -148,16 +142,16 @@ func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel)
 	}
 	// Chmod groundseg_new
 	zap.L().Info("Modifying groundseg_new permissions")
-	binaryPath := filepath.Join(rt.basePath(), "groundseg_new")
+	binaryPath := filepath.Join(rt.BasePath(), "groundseg_new")
 	if err := os.Chmod(binaryPath, 0755); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
 		return
 	}
 	newVersionHash := versionInfo.Groundseg.Arm64Sha256
-	if rt.architecture() == "amd64" {
+	if rt.Architecture() == "amd64" {
 		newVersionHash = versionInfo.Groundseg.Amd64Sha256
 	}
-	newBinHash, err := config.GetSHA256(filepath.Join(rt.basePath(), "groundseg_new"))
+	newBinHash, err := config.GetSHA256(filepath.Join(rt.BasePath(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get SHA for new binary: %v", err))
 		return
@@ -182,17 +176,17 @@ func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel)
 	}
 	// delete groundseg binary if exists
 	zap.L().Info("Deleting old groundseg")
-	if _, err := os.Stat(filepath.Join(rt.basePath(), "groundseg")); err == nil {
+	if _, err := os.Stat(filepath.Join(rt.BasePath(), "groundseg")); err == nil {
 		// Remove the file
-		if err := os.Remove(filepath.Join(rt.basePath(), "groundseg")); err != nil {
+		if err := os.Remove(filepath.Join(rt.BasePath(), "groundseg")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg: %v", err))
 			return
 		}
 	}
 	// rename groundseg_new to groundseg
 	zap.L().Info("Renaming groundseg_new to groundseg")
-	oldPath := filepath.Join(rt.basePath(), "groundseg_new")
-	newPath := filepath.Join(rt.basePath(), "groundseg")
+	oldPath := filepath.Join(rt.BasePath(), "groundseg_new")
+	newPath := filepath.Join(rt.BasePath(), "groundseg")
 	if err := os.Rename(oldPath, newPath); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
 		return
@@ -217,7 +211,7 @@ func updateBinary(rt versionRuntime, branch string, versionInfo structs.Channel)
 		zap.L().Error(fmt.Sprintf("Couldn't update config: %v", err))
 	}
 	// systemctl restart groundseg
-	if rt.debugMode() {
+	if rt.DebugMode() {
 		zap.L().Debug("DebugMode detected. Skipping systemd command.")
 		return
 	} else {
@@ -313,7 +307,7 @@ func updateDockerWithRuntime(rt versionRuntime, release string, currentVersion s
 		currentDetail := valCurrent.Field(i).Interface().(structs.VersionDetails)
 		latestDetail := valLatest.Field(i).Interface().(structs.VersionDetails)
 		hashChanged := latestDetail.Amd64Sha256 != currentDetail.Amd64Sha256
-		if rt.architecture() != "amd64" {
+		if rt.Architecture() != "amd64" {
 			hashChanged = latestDetail.Arm64Sha256 != currentDetail.Arm64Sha256
 		}
 		if !hashChanged {
@@ -331,8 +325,6 @@ func updateDockerWithRuntime(rt versionRuntime, release string, currentVersion s
 					zap.L().Error(fmt.Sprintf("Failed to load config for %s: %v", pier, err))
 					continue
 				}
-				urbConf := rt.urbitConf(pier)
-
 				// Stop ship if running
 				if isRunning {
 					zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
@@ -385,8 +377,11 @@ func updateDockerWithRuntime(rt versionRuntime, release string, currentVersion s
 				}
 
 				// Check if it wants a chop after upgrade (only if running)
-				if isRunning && urbConf.ChopOnUpgrade == true {
-					go rt.chopPier(pier, urbConf)
+				if isRunning {
+					conf := rt.urbitConf(pier)
+					if conf.ChopOnUpgrade {
+						go rt.chopPier(pier)
+					}
 				}
 			}
 		case "minio":

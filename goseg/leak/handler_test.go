@@ -224,3 +224,16 @@ func TestHandleActionDecodesAndDispatchesPayload(t *testing.T) {
 		t.Fatal("timed out waiting for handleAction to return")
 	}
 }
+
+func TestHandleActionDoesNotPanicOnShortPacket(t *testing.T) {
+	defer func() {
+		if recover() != nil {
+			t.Fatal("handleAction panicked on short packet")
+		}
+	}()
+
+	shortPackets := [][]byte{{}, {0}, {0, 1, 2, 3}}
+	for _, packet := range shortPackets {
+		handleAction("~zod", packet)
+	}
+}

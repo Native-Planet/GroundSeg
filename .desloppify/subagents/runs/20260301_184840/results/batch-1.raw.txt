@@ -1,0 +1,121 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 60.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Large runtime abstraction tables are assembled via struct-of-function fields in both routine and orchestration layers, but many fields are simple one-to-one pass-throughs to package functions.",
+        "Collectors and broadcast depend on mutable package-level seam variables for almost every external dependency instead of explicit injected interfaces.",
+        "Core state and environment values in `config` are global and mutable, so many packages read them directly and inherit implicit initialization/order coupling."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 48.0,
+        "indirection_cost": 22.0,
+        "interface_honesty": 44.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overbuild",
+      "summary": "Runtime seam structs form broad function-table abstractions that add indirection but little domain behavior, increasing call depth without clear payoff.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`goseg/routines/runtime_seams.go` constructs `dockerRoutineRuntime` by assigning many fields directly to package functions (`getContainerState`, `updateContainerState`, `getShipStatus`, `startContainer`, etc.) without adding translation or policy.",
+        "`goseg/docker/orchestration/runtime_seams.go` defines `dockerRuntime` with a large number of function fields and populates them as direct pass-throughs (`os.Open`, `os.ReadFile`, `config.UpdateContainerState`, `latestContainerImage`, etc.).",
+        "Execution paths in `goseg/docker/orchestration/wireguard.go` consume this runtime by passing the struct through orchestration calls (`loadWireguard(newWireguardRuntime())`, `buildWgConfWithRuntime(rt)`), so the seam depth is driven by infrastructure rather than behavior."
+      ],
+      "suggestion": "Replace broad function-table seams with small, cohesive interfaces at true abstraction boundaries (for example separate container-runtime, system, and config adapters), and keep direct package calls when no alternate implementation exists.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "collectors_seam_global_vars",
+      "summary": "Collector dependencies are exposed as mutable global function vars, creating a brittle package-level abstraction leak instead of an explicit, testable dependency boundary.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/collectors/collectors.go` declares a seam block of mutable package vars for most external interactions (`resolveBackupRoot`, `startramSettingsSnapshot`, `getShipStatus`, `getContainerStats`, `getContainerImageTag`, `startramRegionsFn`, etc.).",
+        "`ConstructPierInfo` and `collectUrbitViewInputs` consume these globals in core assembly paths rather than through an explicit interface passed at call time.",
+        "Broadcast entrypoints (`ConstructPierInfo` in `goseg/broadcast/broadcast.go`) call into these collectors directly, so callers depend on global mutable wiring state instead of explicit contracts."
+      ],
+      "suggestion": "Introduce a `CollectorRuntime` interface/struct constructed in one place and passed into collector entrypoints so each collector method has an explicit dependency set and avoids package-level mutation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_config_singleton",
+      "summary": "Config is used as a mutable process-wide singleton, so consumers inherit hidden coupling to initialization order and environment-backed globals.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/wireguard.go",
+        "goseg/defaults/defaults.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`config/config.go` exposes mutable globals (`globalConfig`, `BasePath`, `Architecture`, `DebugMode`, `GSContainers`, `DockerDir`) that are read across modules.",
+        "`initializePaths` updates derived globals (`BasePath`, `confPath`, `keyPath`) at runtime, while helpers like `GetStoragePath` and `Conf` depend on that mutable surface.",
+        "Downstream modules rely on those globals indirectly through imported package functions (`config.BasePath` in wireguard path resolution and defaults/bootstrap flows), tying cross-cutting behavior to a single mutable source of truth.",
+        "Runtime package constructors and tests must reason about these implicit side effects rather than an explicit config object."
+      ],
+      "suggestion": "Create an explicit immutable runtime config context initialized once at startup and inject it where needed, leaving `config` as a narrow persistence adapter rather than the global source of process behavior.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_singleton_state"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast_transport_leak",
+      "summary": "Broadcast serialization mutates the domain object for protocol metadata instead of using a dedicated transport abstraction.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`GetStateJson` in `goseg/broadcast/broadcast.go` mutates `bState.Type` and `bState.AuthLevel` before marshalling.",
+        "`BroadcastToClients` fetches domain state (`GetState`) and sends it to `GetStateJson` directly, coupling domain state shape to wire envelope requirements.",
+        "The `//temp` comments in the serializer indicate policy that should be owned by a dedicated response-mapping layer, not core state type semantics."
+      ],
+      "suggestion": "Add an explicit outbound DTO/envelope type for websocket transport and keep `AuthBroadcast` as a pure domain model, so serialization and protocol tags are applied in one dedicated mapper.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Global seam-and-seam-table pattern used pervasively as default design, not just test seams.",
+      "Service-locator style config/global state instead of explicit dependency injection contexts."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_overbuild",
+      "collectors_seam_global_vars",
+      "global_config_singleton",
+      "broadcast_transport_leak"
+    ],
+    "possible_false_positives": [
+      "Some seam fields/vars may be intentionally retained for tests, especially in helper/test builds, which can make a strict abstraction-only read look artificially severe."
+    ]
+  }
+}

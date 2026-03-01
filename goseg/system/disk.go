@@ -94,39 +94,44 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		if dev.Name == sel {
 			fstabEntry := fmt.Sprintf("UUID=%s %s %s %s %s %s\n", uuid, dirPath, "ext4", "defaults,nofail", "0", "2")
 			// Read the existing fstab file
-			file, err := openFn("/etc/fstab")
+			readFile, err := openFn("/etc/fstab")
 			if err != nil {
 				return "", fmt.Errorf("Error opening fstab: %v", err)
 			}
-			defer file.Close()
-
 			var lines []string
-			scanner := bufio.NewScanner(file)
+			scanner := bufio.NewScanner(readFile)
 			for scanner.Scan() {
 				lines = append(lines, scanner.Text())
 			}
 			if err := scanner.Err(); err != nil {
 				return "", fmt.Errorf("Error reading fstab: %v", err)
 			}
+			if err := readFile.Close(); err != nil {
+				return "", fmt.Errorf("Error closing fstab read file: %v", err)
+			}
 
 			// Append the new entry
 			lines = append(lines, fstabEntry)
 
 			// Write the updated content back to /etc/fstab
-			file, err = openFileFn("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
+			writeFile, err := openFileFn("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
 				return "", fmt.Errorf("Error opening fstab for writing: %v", err)
 			}
-			defer file.Close()
-
-			writer := bufio.NewWriter(file)
+			writer := bufio.NewWriter(writeFile)
 			for _, line := range lines {
 				_, err := writer.WriteString(line + "\n")
 				if err != nil {
 					return "", fmt.Errorf("Error writing to fstab: %v", err)
 				}
 			}
-			writer.Flush()
+			if err := writer.Flush(); err != nil {
+				return "", fmt.Errorf("Error flushing fstab write: %v", err)
+			}
+			if err := writeFile.Close(); err != nil {
+				return "", fmt.Errorf("Error closing fstab: %v", err)
+			}
+
 			// Mount the newly created ext4 filesystem at /groundseg-<n>
 			err = mountAllCommandFn()
 			if err != nil {

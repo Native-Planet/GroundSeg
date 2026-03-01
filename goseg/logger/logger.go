@@ -5,16 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"groundseg/config"
 	"groundseg/dockerclient"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/gorilla/websocket"
-	"github.com/shirou/gopsutil/disk"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -166,47 +165,7 @@ func PrevSysLogfile() string {
 }
 
 func makeLogPath() string {
-	basePath := os.Getenv("GS_BASE_PATH")
-	if basePath == "" {
-		basePath = "/opt/nativeplanet/groundseg"
-	}
-	// check if basePath is an absolute path, if it isn't exit
-	if !strings.HasPrefix(basePath, "/") {
-		fmt.Println("base path is not absolute! Falling back to default path")
-		basePath = "/opt/nativeplanet/groundseg"
-	}
-	// check if the basePath (or its parents) is a mountpoint with gopsutil
-	bpCopy := basePath
-
-	partitions, err := disk.Partitions(true)
-	if err != nil {
-		fmt.Println("failed to get list of partitions! Falling back to base path logs")
-		return basePath + "/logs/"
-	}
-
-	/*
-		the outer loop loops from child up the unix path
-		until a mountpoint is found
-	*/
-	//var mountpoint string
-OuterLoop:
-	for {
-		for _, p := range partitions {
-			if p.Mountpoint == bpCopy {
-				devType := "mmc"
-				if strings.Contains(p.Device, devType) {
-					return "/media/data/logs/"
-				} else {
-					break OuterLoop
-				}
-			}
-		}
-		if bpCopy == "/" {
-			break
-		}
-		bpCopy = path.Dir(bpCopy) // Reduce the path by one level
-	}
-	return basePath + "/logs/"
+	return config.GetStoragePath("logs")
 }
 
 func RemoveSysSessions() {

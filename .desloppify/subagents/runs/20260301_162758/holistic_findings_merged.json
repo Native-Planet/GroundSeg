@@ -1,0 +1,395 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 57.2,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 66.7,
+        "Indirection Cost": 61.8,
+        "Interface Honesty": 78.4
+      }
+    },
+    "api_surface_coherence": 72.3,
+    "package_organization": 51.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/runtime_seams.go and goseg/routines/runtime_seams.go construct multiple function-pointer runtime structs whose methods are mostly thin pass-through wrappers to package-level functions, then pass those structs through to higher-level flows.",
+        "goseg/shipworkflow/startram.go repeatedly creates a typed payload only to marshal and unmarshal it before dispatching, adding unnecessary conversion layers with no policy added.",
+        "goseg/system/wifi.go defines injectable command hooks (`runCommandForWiFi`, `execCommandForWiFi`) but calls core system commands directly in hot paths, weakening the seam contract and reducing testability consistency."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 66.7,
+        "indirection_cost": 61.8,
+        "interface_honesty": 78.4
+      }
+    },
+    "package_organization": {
+      "evidence": [
+        "The holistic structure snapshot reports `goseg/handler/` with `file_count: 21` and an existing finding `flat_dirs: Flat directory: 21 files \u2014 consider grouping by domain`.",
+        "`goseg/routines/` also reports `file_count: 21` with the same `flat_dirs` finding.",
+        "`goseg/docker/` has `file_count: 19` files and `goseg/docker/docker.go` is marked as large/mixed in existing findings (`large (758 LOC) / complexity score 107`, `13 disconnected function clusters (30 functions)`), indicating mixed concerns concentrated in one package."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Public APIs in the same domain mix error-returning and error-silent signatures (`goseg/system/wifi.go` has `ListWifiSSIDs` returning only `[]string` while neighboring wifi helpers return `error`), creating ambiguous caller behavior.",
+        "Error-returning contract is broken in `goseg/docker/docker.go` where `GetContainerRunningStatus` proceeds after a failed `dockerclient.New()` path and can dereference a nil client before any explicit error return."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_duplication",
+      "summary": "Runtime seam structs duplicate thin pass-through wrappers across container workflows, creating unearned indirection",
+      "related_files": [
+        "goseg/docker/runtime_seams.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/docker.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`goseg/docker/runtime_seams.go` defines `wireguardRuntime`, `netdataRuntime`, `minioRuntime`, and `urbitRuntime` with many function fields that simply forward to package-level helpers (for example `writeWgConf: func(rt wireguardRuntime) error { return writeWgConfWithRuntime(rt) }`).",
+        "`goseg/routines/runtime_seams.go` repeats a similar pattern for `dockerRoutineRuntime` and `versionRuntime`, again wrapping direct package functions without behavioral translation.",
+        "Call paths (`LoadWireguard()`, `wgContainerConf()`, `wgContainerConfWithRuntime`, `dockerSubscriptionHandler(newDockerRoutineRuntime())`) add extra construction and delegation hops before reaching actual logic."
+      ],
+      "suggestion": "Collapse the repeated seam types into a small shared abstraction for dependency injection (or accept direct function calls for non-tested internals), then pass concrete implementations via focused constructor arguments. This reduces duplicate runtime struct shapes, shortens call chains, and keeps seams only where behavior actually changes.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startram_payload_roundtrip",
+      "summary": "Startram transition payloads are serialized and re-parsed before dispatch, adding avoidable abstraction overhead",
+      "related_files": [
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`HandleStartramToggle` builds `jsonData` via `json.Marshal(payload)`, then immediately unmarshals to `wiretramPayload` before calling `dispatchUrbitPayloadFn`, while the original typed value is already available.",
+        "This round-trip has no interface-protecting behavior and only adds allocations and potential marshal/unmarshal errors in the control path."
+      ],
+      "suggestion": "Pass the typed `structs.WsUrbitPayload` directly to `dispatchUrbitPayloadFn` and remove the JSON round-trip conversion. Keep serialization only at package boundaries (transport/API), not in an in-process orchestration loop.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "redundant_serialization"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wifi_seam_inconsistency",
+      "summary": "Command execution seams in wifi are defined but inconsistently applied, creating inconsistent abstraction boundaries",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/main.go",
+        "goseg/handler/system_test.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi.go` declares `runCommandForWiFi` and `execCommandForWiFi` as indirection points, but internal callers mix direct calls (`runCommand`) with seam-backed calls (`execCommandForWiFi`).",
+        "`C2CMode()` uses `runCommand(\"systemctl\", \"stop\", \"systemd-resolved\")` directly, bypassing the seam intended for command injection and making runtime behavior harder to substitute in tests.",
+        "Tests rely on seam-based interception in related packages, so inconsistent use increases fixture brittleness and makes behavior diverge between test and runtime control paths."
+      ],
+      "suggestion": "Use the injected command function consistently for all subprocess invocations in `system/wifi.go` (including `systemctl` calls and similar control-flow commands), and remove direct `exec.Command`/`runCommand` usage inside this package.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_inconsistency"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "handler-domain-overload",
+      "summary": "`handler` package remains a mixed-domain dumping ground instead of domain-focused subpackages.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/handler/dev.go",
+        "goseg/handler/dev_test.go"
+      ],
+      "evidence": [
+        "In `goseg/handler/dev.go`, development endpoint routing and side effects for backup/chop-style operations are mixed with auth/service handler shims in `goseg/handler/handler.go`.",
+        "The packet\u2019s `existing_findings` already flags `goseg/handler/` as a flat directory with 21 files."
+      ],
+      "suggestion": "Create domain-oriented subpackages under `goseg/handler` in stages: (1) create `goseg/handler/auth/`, `goseg/handler/dev/`, and `goseg/handler/ship/`; (2) move `handler.go` responsibilities into `handler/auth` and `handler/dev` (or corresponding domain package facades), then replace with thin delegating types/functions in `handler`; (3) update imports with `rg -n \"goseg/handler/(DevHandler|LoginHandler|NewShipHandler|C2CHandler|UnauthHandler)\"` then `go test ./goseg/...` and `go test ./...`; (4) once package-level exports are stable, remove now-obsolete exports from parent package and rerun `go test ./goseg/handler/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_flat_oversized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "routines-domain-overload",
+      "summary": "`routines` aggregates unrelated periodic jobs and service loops in one package, increasing change friction.",
+      "related_files": [
+        "goseg/routines/backup.go",
+        "goseg/routines/chop.go",
+        "goseg/routines/backup_test.go"
+      ],
+      "evidence": [
+        "`goseg/routines/backup.go` (remote/local backup orchestration) and `goseg/routines/chop.go` (chop policy loop) are unrelated lifecycle domains but live in one folder.",
+        "The packet structure already flags `goseg/routines/` as `file_count: 21` with a `flat_dirs` warning."
+      ],
+      "suggestion": "Split by operational domain first, then recompose via orchestration: (1) create `goseg/routines/backup/` and `goseg/routines/chop/`; (2) move `backup.go`, `backup_test.go`, and related seam vars from root into `backup/`, and move `chop.go` into `chop/`; (3) add stable package-level wrappers in `goseg/routines` (`StartBackupRoutines`, `StartChopRoutines`) to preserve call sites; (4) run `go test ./goseg/routines/...` and `go test ./...`, then prune/normalize imports with `gofmt` + `go test` for any import-cycle regressions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_flat_oversized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "docker-monolith-boundaries",
+      "summary": "Docker domain is overpacked in one package, with startup, lifecycle, storage, networking, and event wiring co-located.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/docker/events.go",
+        "goseg/docker/docker_test.go"
+      ],
+      "evidence": [
+        "`goseg/docker/docker.go` contains initialization, container build/planning, start/create/remove/get/list/pull/image/network helpers in a single package unit.",
+        "`goseg/docker/events.go` defines process-wide channel event bus primitives in the same package, while `docker.go` already carries broad lifecycle responsibility.",
+        "Existing findings for `goseg/docker/docker.go` report high complexity and 13 disconnected function clusters, which is a strong structural signal of mixed concerns."
+      ],
+      "suggestion": "Refactor to subpackages around cohesion boundaries: (1) split `events.go` into `goseg/events` (or `goseg/docker/eventsbus`) and keep only docker-specific event types in `goseg/docker`; (2) split `docker.go` into `goseg/docker/lifecycle`, `goseg/docker/registry`, and `goseg/docker/network`; (3) move and adapt callers in a two-pass approach: first extract read-only query helpers, then mutation/ops helpers; (4) update imports and public API shims in a compatibility layer (`goseg/docker` top-level) and validate with `go test ./goseg/docker/...` then `go test ./...`; (5) verify no package import backflow by running the repo-wide tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "monolithic_cross_concern_packages"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "wifi-transport-boundary-mix",
+      "summary": "Captive portal transport and Wi-Fi action execution are co-located, obscuring ownership boundaries",
+      "related_files": [
+        "goseg/system/wifi_transport_adapter.go",
+        "goseg/system/wifi_c2c_service.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi_transport_adapter.go` handles websocket upgrades, active-client registry, broadcast loop, payload parsing, and dispatch execution in one adapter.",
+        "`goseg/system/wifi_c2c_service.go` implements command execution semantics (`connect` + restart) as a separate layer but is coupled through shared `c2cAction` and package-level globals."
+      ],
+      "suggestion": "Split captive-portal transport and C2C execution into explicit subpackages under `goseg/system/wifi/`: `transport/` for websocket/captive adapter concerns and `actions/` (or `service/`) for command execution semantics. Stage 1: move `wifi_transport_adapter.go` to `goseg/system/wifi/transport/captive_transport_adapter.go` and update package name/imports in callers. Stage 2: move `wifi_c2c_service.go` and its helper factories (`c2cServiceFactory`, `connectToWifiForC2C`, `restartGroundSegForC2C`) to `goseg/system/wifi/service/` and expose an explicit interface contract there. Stage 3: add a small adapter interface in `goseg/system/wifi/` to connect the two packages. Validation: `gosegoseg/system/wifi` package builds/tests via `go test ./goseg/system/...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_boundary_drift_wifi"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "governance-docs-outside-package",
+      "summary": "Governance and compatibility policy for upload/startram/system contracts is centralized in root README instead of package-local contracts",
+      "related_files": [
+        "README.md",
+        "goseg/uploadsvc/service.go",
+        "goseg/startram/errors.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`README.md` codifies API/contract/quality-gate expectations for upload dispatch and masked error behavior.",
+        "The upload package exposes `SupportedActions()` and dispatch in `goseg/uploadsvc/service.go`, but package-local governance metadata or test contract anchors are absent in that package folder.",
+        "Error masking policy is implemented in `goseg/startram/errors.go` via `wrapAPIConnectionError`, while README-level policy is the only place documenting this contract-level expectation."
+      ],
+      "suggestion": "Introduce package-local governance artifacts and colocate compatibility policy: Stage 1: add `goseg/uploadsvc/GOVERNANCE.md` with contract matrix entries for `SupportedActions()` and dispatch parity, plus expected adapter translations; Stage 2: add `goseg/system/wifi/README.md` and `goseg/startram/GOVERNANCE.md` documenting local policy and boundary assumptions; Stage 3: move or reference only cross-cutting rollout notes from root README and keep package docs as the authoritative source for those boundaries. Update CI docs references if needed and validate with `go test ./goseg/uploadsvc/...`, `go test ./goseg/startram/...`, and the existing `upload-contract-gate` workflow invocation path.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "governance_scattered_outside_code"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "PANIC_ON_DOCKER_CLIENT_INIT_FAIL",
+      "summary": "`GetContainerRunningStatus` can panic on Docker client init failure instead of returning an error through its exported API.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`goseg/docker/docker.go` defines `GetContainerRunningStatus(containerName string) (string, error)` and calls `cli, err := dockerclient.New()` with an empty `if err != nil {}` block.",
+        "The function then does `defer cli.Close()` and continues using `cli` regardless of `err`, so a failed client construction can dereference a nil pointer before returning an error.",
+        "`goseg/routines/docker.go` invokes `GetContainerRunningStatus` expecting `(status, err)` semantics; a panic breaks that contract and removes caller-level recovery."
+      ],
+      "suggestion": "In `GetContainerRunningStatus`, return immediately when `dockerclient.New()` fails (e.g., `return \"\", fmt.Errorf(...)`) and add a regression test that verifies a nil/failed client path returns an error instead of panicking.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "WIFI_SSID_SWALLOWS_SCAN_FAILURES",
+      "summary": "Wi\u2011Fi SSID listing collapses operational errors into empty results, obscuring failures as successful empty scans.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/wifi_transport_adapter.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi.go` exposes `func ListWifiSSIDs(dev string) []string` and on `runCommandForWiFi` error returns `[]string{}` after silently ignoring the error.",
+        "The same file\u2019s neighboring API functions (`getWifiDevice`, `C2CConnect`, etc.) return errors, so error-signaling semantics are inconsistent within the same subsystem.",
+        "`goseg/system/wifi_transport_adapter.go` binds `listWirelessSSIDs: ListWifiSSIDs`, which forces callers through a no-error callback shape and prevents distinguishing \"no results\" from \"scan failure\"."
+      ],
+      "suggestion": "Change `ListWifiSSIDs` to return `([]string, error)` and update call sites/adapters in `wifi_transport_adapter.go` and related subsystem code to propagate scan failures explicitly; update tests to assert failure observability.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_inconsistency"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.333,
+    "evidence_density": 1.125,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 26.3,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 52,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 232,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "api_surface_coherence",
+      "package_organization"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/collectors_and_mappers.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/rectify/rectify.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/main.go",
+    "goseg/config/wireguard.go",
+    "goseg/docker/wireguard_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/wireguard.go",
+    "goseg/leak/broadcast.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/routines/docker.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/routines/docker_test.go",
+    "goseg/structs/configs.go",
+    "goseg/defaults/version.go",
+    "goseg/routines/system_test.go",
+    "goseg/docker/docker.go",
+    "goseg/importer/importer.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/docker/runtime_seams.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/routines/version.go",
+    "goseg/setup/setup_test.go",
+    "goseg/handler/support.go",
+    "goseg/auth/auth.go",
+    "goseg/config/config.go",
+    "goseg/docker/llama_test.go",
+    "goseg/importer/extract.go",
+    "goseg/dockerclient/client.go",
+    "goseg/docker/minio.go",
+    "goseg/docker/urbit_test.go",
+    "goseg/handler/system_test.go",
+    "goseg/handler/dev.go",
+    "goseg/handler/dev_test.go",
+    "goseg/handler/handler.go",
+    "goseg/routines/backup.go",
+    "goseg/routines/backup_test.go",
+    "goseg/routines/chop.go",
+    "goseg/docker/docker_test.go",
+    "goseg/docker/events.go",
+    "README.md",
+    "goseg/startram/errors.go",
+    "goseg/system/wifi_c2c_service.go",
+    "goseg/system/wifi_transport_adapter.go",
+    "goseg/uploadsvc/adapters/upload_payload_test.go",
+    "goseg/uploadsvc/service.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_162758",
+    "created_at": "2026-03-01T16:29:16+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "cccdb0e7e8d3b6dd0f11fe704ccbc65867c03774362654e8ddf17ac8df8041a6"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "api_surface_coherence",
+      "package_organization"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "api_surface_coherence",
+      "package_organization"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "authorization_consistency",
+      "incomplete_migration",
+      "design_coherence"
+    ]
+  }
+}

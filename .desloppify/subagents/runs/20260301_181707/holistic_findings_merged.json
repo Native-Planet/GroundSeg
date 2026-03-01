@@ -1,0 +1,376 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 56.0,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 71.0,
+        "Indirection Cost": 68.0,
+        "Interface Honesty": 80.0
+      }
+    },
+    "design_coherence": 60.2,
+    "error_consistency": 72.3
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple packages define parallel seam-runtime structs with function fields to inject dependencies instead of sharing a common abstraction layer (for example, `goseg/routines/runtime_seams.go` and `goseg/docker/orchestration/runtime_seams.go`).",
+        "`DockerListener` and `DockerSubscriptionHandler` in `goseg/routines/docker.go` run unbounded select loops in startup goroutines without coordinated shutdown control, which couples lifecycle management to package-level invocation paths.",
+        "Importer archive extraction paths in `goseg/importer/importer.go` and `goseg/importer/extract.go` split by extension but repeat extraction/monitoring logic instead of a strategy abstraction."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 80.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "auth/auth.go builds a token map with duplicate `\"token\"` literal keys, which is a structural code-quality defect and a sign of fragile auth payload construction.",
+        "`goseg/leak/handler.go` parses protocol data with direct slicing (`result[5:]`) and assumes a fixed framing length without guard checks.",
+        "`goseg/docker/lifecycle/lifecycle.go` schedules a poll loop in `DockerPoller` but exits on first tick, so periodic work is never sustained.",
+        "`goseg/docker/orchestration/minio.go` couples MinIO service-account creation to substring matching of CLI output (`\"successfully\"`), which is brittle and can block idempotent setup."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Multiple orchestration/lifecycle paths discard errors from container-status/lookup calls and continue as if no container exists, which changes outcome from explicit failure to silent recovery attempts.",
+        "In leak broadcast state update, serialization failures are logged but treated as a successful no-error return, so callers cannot distinguish successful state mutation from partial failure."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_runtime_seams",
+      "summary": "Parallel runtime seam abstractions are redefined in multiple packages, creating maintenance drift and inconsistent dependency policy.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`routines/runtime_seams.go` and `docker/orchestration/runtime_seams.go` both define base/runtime structs with duplicated function-pointer dependency members and constructor wiring over the same configuration-backed sources.",
+        "`routines/docker.go` and orchestration modules each rely on these duplicated seams independently, so a policy or dependency change must be replicated across files instead of applied centrally."
+      ],
+      "suggestion": "Introduce a shared seam abstraction layer (for example a small `runtime_dependencies` package) with reusable builder helpers and a minimal cross-package interface for container orchestration/config/logging/test seams; wire package-specific fields as composed overlays instead of duplicating full runtime scaffolding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "duplicate_seam_abstractions"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "docker_listener_no_shutdown_contract",
+      "summary": "Docker event listener/subscriber routines have no explicit stop contract, so background lifecycle control is pushed into global goroutine orchestration rather than the abstraction interface.",
+      "related_files": [
+        "goseg/routines/docker.go",
+        "goseg/main.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "`DockerListener` creates `ctx := context.Background()` and calls `cli.Events(ctx, ...)` while `main.go` launches it as a fire-and-forget goroutine (`go routines.DockerListener()`) with no cancellable handle.",
+        "The function loops forever on `select { case event := <-messages; case err := <-errs }` with no `ctx.Done()` or close-channel handling, so callers cannot express graceful stop/restart boundaries.",
+        "Other background subsystems in the same code path (for example `CheckVersionLoop` and `startServer` flow) are also goroutine-spawned without shared lifecycle wiring, increasing subsystem coupling."
+      ],
+      "suggestion": "Refactor `DockerListener` to accept a runtime context and/or stop channel in its constructor/runtime struct; have `main` own a cancellation scope and close it on shutdown paths so tests and orchestrators can deterministically stop/restart listener loops.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "lifecycle_control_leaks"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "import_extraction_strategy_duplication",
+      "summary": "Archive extraction paths are split by extension with near-duplicate control logic rather than a shared extraction strategy abstraction.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/extract.go"
+      ],
+      "evidence": [
+        "`extractUploadedPier` switches on extensions and delegates to separate extractor functions, then each extractor performs similar event-loop/progress behavior inline.",
+        "`extractZip`, `extractTarGz`, and `extractTar` each manually reimplement timeout setup, directory creation, entry filtering, output writes, and progress publishing details with slight behavioral drift.",
+        "Progress semantics differ between implementations (`fileCount`/size weighting differs per extractor), making extension handlers harder to reason about as independent policy changes evolve."
+      ],
+      "suggestion": "Introduce a common extraction strategy interface with shared archive traversal helpers and a single progress publisher; keep format-specific handlers focused only on parsing/writer-specific reader behavior to reduce duplicated abstraction depth.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicate_seam_abstractions"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_token_map_duplicate_key",
+      "summary": "Auth token payload map declares duplicate `token` key, risking invalid compile/contract behavior.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`CreateToken` sets `\"token\"` twice in the same map literal, making the entry definition ambiguous and likely a real compile-time defect in Go map construction.",
+        "Import path consumers in `importer` expect a single stable token mapping (`Token.ID`, `Token.Token`) and the duplicate obscures intended token output shape."
+      ],
+      "suggestion": "Remove the duplicate key and keep a single canonical `Token` entry; if additional encoded fields are needed, use distinct map keys or a typed payload struct and validate consumers in importer accordingly.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "auth_token_encoding_defects"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "leak_handleaction_unsafe_slice",
+      "summary": "Leak websocket action parser panics on short or malformed packets due unguarded slicing.",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/leak/handler_test.go"
+      ],
+      "evidence": [
+        "`handleAction` calls `stripped := result[5:]` before validating `len(result)`.",
+        "Malformed inputs (malicious or partial network payloads) can cause out-of-range panics and tear down bug-reporting/handler execution paths.",
+        "No defensive protocol-length check exists before `reverseLittleEndian`/decode steps."
+      ],
+      "suggestion": "Add explicit length/frame validation in `handleAction` (e.g., minimum bytes + optional checksum/type checks) and return/log malformed payload errors rather than slicing blindly.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "unsafe_protocol_parsing"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "lifecycle_dockerpoller_single_tick_exit",
+      "summary": "Docker polling loop returns after first tick, so recurring lifecycle work never runs.",
+      "related_files": [
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/netdata.go"
+      ],
+      "evidence": [
+        "`DockerPoller` uses `for { select { case <-ticker.C: ... return } }` which exits on the first tick.",
+        "Name and implementation imply a long-lived poller, but current control flow makes it effectively one-shot."
+      ],
+      "suggestion": "Replace `return` with periodic dispatch (or remove `select` entirely and run the poll handler directly in the loop) so the function continuously polls and calls container orchestration reconciliation work.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "lifecycle_loop_behavior"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "minio_service_account_brittle_command_gate",
+      "summary": "MinIO account bootstrap is coupled to CLI response text and fails when expected phrasing differs.",
+      "related_files": [
+        "goseg/docker/orchestration/minio.go",
+        "goseg/shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "`setMinIOAdminAccountWithRuntime` removes an existing service account and only proceeds to add a new one if command output contains `\"successfully\"`.",
+        "`createMinIOServiceAccount` callers (e.g., `toggleMinIOLink`) interpret this as fatal and cannot enable integration when removal output format differs or no prior account exists."
+      ],
+      "suggestion": "Parse exit codes from `mc` commands directly and make creation idempotent: treat \"not found\" as non-fatal, attempt add after remove (or create directly) and only fail on explicit command errors.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "cli_output_coupling"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "container-lookup-failure-swallowed",
+      "summary": "Decision points ignore container lookup errors and proceed as if conditions are healthy.",
+      "related_files": [
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/minio.go"
+      ],
+      "evidence": [
+        "`ensureRunningContainer` uses `existingContainer, _ := FindContainer(plan.Name)` and treats any non-nil error as `nil` state in the switch, skipping the failure signal and potentially creating/starting containers via blind recovery.",
+        "`cleanupMinIOContainerForStart` also uses `existingContainer, _ := FindContainer(containerName)` and proceeds only on pointer nil, so lookup failures can hide and cause unnecessary delete/start attempts.",
+        "`setMinIOAdminAccountWithRuntime` polls `status, _ := rt.getContainerRunningStatus(\"mc\")` and ignores errors, so transient Docker API failures can turn into indefinite waiting loops."
+      ],
+      "suggestion": "Capture and handle these lookup errors explicitly: return/publish a failure path when status/container queries fail, and only retry on explicit transient classes with bounded backoff. In polling loops, add timeout/circuit-breaker and fail with a surfaced operational error instead of looping forever.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "lookup-error-swallowing"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "marshal-failure-misreported-success",
+      "summary": "Broadcast update returns success when payload marshal fails, masking mutation failure.",
+      "related_files": [
+        "goseg/leak/broadcast.go",
+        "goseg/leak/broadcast_test.go"
+      ],
+      "evidence": [
+        "`updateBroadcast` logs `json.Marshal(newBroadcast)` errors and returns `oldBroadcast, nil` rather than propagating an error.",
+        "`updateBroadcast` also checks per-recipient `wrapperUrbitBytes, err := json.Marshal(wrappedUrbit)` and only sends on nil, but never returns/report this failure to callers.",
+        "Tests in `goseg/leak/broadcast_test.go` validate `updateBroadcast` error behavior but do not observe partial-failure telemetry when marshalling fails, so this silent path is unobservable to callers."
+      ],
+      "suggestion": "Return a wrapped error when either marshal fails, and keep the function output explicit about failed updates (e.g., return unchanged state + error). Also propagate/aggregate per-recipient marshal failures so broadcast callers can react or alert on partial fanout failure.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "lookup-error-swallowing"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 3,
+    "dimension_coverage": 0.333,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 18.506,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 57,
+    "successful_batch_count": 3,
+    "full_sweep_included": false,
+    "total_files": 247,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/collectors_and_mappers.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify.go",
+    "goseg/main.go",
+    "goseg/config/wireguard.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/leak/broadcast.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/routines/docker.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/routines/docker_test.go",
+    "goseg/structs/configs.go",
+    "goseg/defaults/version.go",
+    "goseg/routines/system_test.go",
+    "goseg/importer/importer.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/routines/version.go",
+    "goseg/setup/setup_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/config/config.go",
+    "goseg/auth/auth.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/importer/extract.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/minio.go",
+    "goseg/docker/orchestration/urbit_test.go",
+    "goseg/click/backup/service.go",
+    "goseg/click/hoon.go",
+    "goseg/config/mc.go",
+    "goseg/docker/orchestration/netdata.go",
+    "goseg/docker/orchestration/volume_writer.go",
+    "goseg/leak/handler.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/version.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/structs/ws.go",
+    "goseg/system/disk.go",
+    "goseg/system/system.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_181707",
+    "created_at": "2026-03-01T18:19:05+00:00",
+    "batch_count": 3,
+    "batch_indexes": [
+      1,
+      2,
+      3
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "1bc8d9e9a620492e1a102b39735cb3b76a7f2c3463c5e94179fec0ef82423df2"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "design_coherence",
+      "abstraction_fitness",
+      "error_consistency"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

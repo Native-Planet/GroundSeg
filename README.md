@@ -84,13 +84,11 @@ Runtime boundary expectations for backend changes:
 1. Preserve explicit error propagation (`%w`) at handler/service boundaries.
 2. Keep fetch-only APIs separate from state-mutating sync APIs (for example `Fetch*` vs `Sync*`).
 3. For flows that touch registration/version/upload paths, include at least one deterministic unit test in the changed package.
-4. For upload action routing (`goseg/handler/ws/upload.go`), maintain an explicit branch matrix in tests:
-   decode failure, `open-endpoint` success/failure, `reset` success/failure, and unsupported action.
-   Keep transport-to-domain translation inside `goseg/uploadsvc/adapters` so websocket handlers stay importer-agnostic.
-5. For upload command dispatch (`goseg/uploadsvc/service.go`), require a dispatch-table parity test that exercises every value from `SupportedActions()` and validates the routed service method.
-6. For masked external errors (for example `goseg/startram/errors.go`), require tests that assert:
-   redacted outward message and preserved internal cause chain (`errors.Is`/`Unwrap`).
-7. Use shared boundary helpers for edge contracts:
+4. For upload and Wi-Fi websocket command contracts, follow package governance documents:
+   - `goseg/uploadsvc/GOVERNANCE.md`
+   - `goseg/system/wifi/README.md`
+5. For StarTram external API masking semantics, follow `goseg/startram/GOVERNANCE.md`.
+6. Use shared boundary helpers for edge contracts:
    dependency-injected handlers (no package-global service mutation) and shared masked-error wrappers (`goseg/errpolicy`) for outward error semantics.
 
 CI policy checks:

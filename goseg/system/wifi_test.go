@@ -89,10 +89,23 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 		}, "\n"), nil
 	}
 
-	ssids := ListWifiSSIDs("wlan0")
+	ssids, err := ListWifiSSIDs("wlan0")
+	if err != nil {
+		t.Fatalf("ListWifiSSIDs returned error: %v", err)
+	}
 	want := []string{"HomeWiFi"}
 	if !reflect.DeepEqual(ssids, want) {
 		t.Fatalf("unexpected ssid list: got %v want %v", ssids, want)
+	}
+}
+
+func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	runCommandForWiFi = func(string, ...string) (string, error) {
+		return "", errors.New("nmcli down")
+	}
+	if _, err := ListWifiSSIDs("wlan0"); err == nil {
+		t.Fatal("expected ListWifiSSIDs to return an error")
 	}
 }
 
@@ -161,5 +174,138 @@ func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 	}
 	if err := DisconnectWifi("wlan0"); err == nil {
 		t.Fatal("expected DisconnectWifi to return client creation error")
+	}
+}
+
+func TestParseC2CAction(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	action, err := parseC2CAction(string(c2cActionConnect))
+	if err != nil {
+		t.Fatalf("expected connect action to parse: %v", err)
+	}
+	if action != c2cActionConnect {
+		t.Fatalf("unexpected action: %v", action)
+	}
+}
+
+func TestParseC2CActionRejectsUnsupportedAction(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	if _, err := parseC2CAction("unsupported"); err == nil {
+		t.Fatal("expected parse failure for unsupported action")
+	}
+}
+
+func TestProcessMessageRoutesSupportedAction(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
+	var callCount int
+	adapter.processC2CMessage = func(msg []byte) error {
+		callCount++
+		if string(msg) != `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}` {
+			t.Fatalf("unexpected payload: %s", msg)
+		}
+		return nil
+	}
+
+	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
+	if err := adapter.processMessage([]byte(msg)); err != nil {
+		t.Fatalf("processMessage failed: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected c2c message processor to run once; got %d", callCount)
+	}
+}
+
+func TestProcessMessageRejectsUnsupportedAction(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
+
+	msg := `{"type":"c2c","payload":{"action":"unsupported","ssid":"HomeWiFi","password":"secret"}}`
+	processErr := adapter.processMessage([]byte(msg))
+	if processErr == nil {
+		t.Fatal("expected unsupported action error")
+	}
+	if _, ok := processErr.(unsupportedC2CActionError); !ok {
+		t.Fatalf("expected unsupported action error, got %T: %v", processErr, processErr)
+	}
+}
+
+func TestProcessMessageRejectsWrongEnvelopeType(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	adapter := newCaptiveTransportAdapter(defaultC2CServiceDeps())
+
+	msg := `{"type":"auth","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
+	processErr := adapter.processMessage([]byte(msg))
+	if processErr == nil {
+		t.Fatal("expected wrong envelope type error")
+	}
+}
+
+func TestProcessC2CMessageForAdapter(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	connectCalled := false
+	restartCalled := false
+	deps := c2cServiceDeps{
+		connectToWiFi: func(ssid, password string) error {
+			connectCalled = true
+			if ssid != "HomeWiFi" || password != "secret" {
+				t.Fatalf("unexpected credentials: %s / %s", ssid, password)
+			}
+			return nil
+		},
+		restartGroundSeg: func() error {
+			restartCalled = true
+			return nil
+		},
+	}
+	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
+	if err := processC2CMessageForAdapterWithDeps([]byte(msg), deps); err != nil {
+		t.Fatalf("processC2CMessageForAdapter failed: %v", err)
+	}
+	if !connectCalled || !restartCalled {
+		t.Fatalf("expected connect and restart to be called")
+	}
+}
+
+func TestC2CServiceExecutesConnectAndRestart(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	connectCalled := false
+	restartCalled := false
+	deps := c2cServiceDeps{
+		connectToWiFi: func(ssid, password string) error {
+			connectCalled = true
+			if ssid != "HomeWiFi" || password != "secret" {
+				t.Fatalf("unexpected credentials: %s / %s", ssid, password)
+			}
+			return nil
+		},
+		restartGroundSeg: func() error {
+			restartCalled = true
+			return nil
+		},
+	}
+	service := newC2CServiceForAdapterWithDeps(deps)
+
+	if err := service.Execute(c2cActionConnect, "HomeWiFi", "secret"); err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if !connectCalled || !restartCalled {
+		t.Fatalf("expected connect and restart to be called")
+	}
+}
+
+func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	foundConnect := false
+	for _, action := range supportedC2CActions() {
+		if _, err := parseC2CAction(string(action)); err != nil {
+			t.Fatalf("action %v should be supported by parser", action)
+		}
+		if action == c2cActionConnect {
+			foundConnect = true
+		}
+	}
+	if !foundConnect {
+		t.Fatalf("expected connect action binding")
 	}
 }

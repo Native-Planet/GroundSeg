@@ -1,0 +1,138 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 66.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Several listed files combine orchestration, persistence, transport, and domain logic in the same module (for example, `goseg/handler/system/support.go` and `goseg/config/config.go` contain long handler/setup paths with broad side effects).",
+        "The `goseg/config` package is both the bootstrap/runtime ownership boundary and multiple feature-specific writers (MC/version files), which creates structural coupling where independent concerns share mutable global state.",
+        "The same path-selection pattern for mmc/media placement is duplicated across multiple packages (`config`, `logger`, `handler/system`, `system/disk`), making behavior drift and local fixes inconsistent.",
+        "Container readiness sequencing is implemented inline in multiple orchestrators with ad-hoc polling loops and repeated status checks, increasing drift across lifecycle paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_god_module",
+      "summary": "Split `config` into boot/runtime state and feature-specific config writers to avoid mixed responsibilities",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/mc.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`goseg/config/config.go` owns process bootstrap (`init()`, `initializeConfig`, `initializePaths`), mutable global runtime state (`globalConfig`, `BasePath`, `Conf()`, multiple mutexes), persistence (`persistConf`, `UpdateConfTyped`), and domain snapshots for every subsystem.",
+        "`goseg/config/mc.go` and `goseg/config/version.go` mutate feature-specific config files by directly reading global config state (`BasePath`, `confForMc`, `getVersionChannelForMc`) and performing file I/O in the same package.",
+        "A single change in config loading or storage layout requires touching global and feature behavior in the same module family, making separation and testability weaker."
+      ],
+      "suggestion": "Introduce explicit boundaries: a `configbootstrap` module for startup and env/path setup, a `configstore` module for typed config persistence/state synchronization, and per-feature adapters (`mc`, `version`) that receive dependencies rather than reaching into globals.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "god_config_module"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "support_handler_orchestrates_full_workflow",
+      "summary": "Refactor bug-report HTTP handler into a dedicated coordinator plus smaller domain services",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`SupportHandler` performs request decode, path initialization, artifact collection (`dumpBugReport`), optional CPU profiling, archive creation, HTTP upload (`sendBugReport`), status transitions, and sleep-based transition emissions in one flow.",
+        "The same file also contains low-level helpers for zip creation, JSON sanitization, path selection, and file system cleanup, tightly coupling API handling with transport and packaging internals.",
+        "This coupling makes handler behavior hard to reason about and difficult to unit-test without broad side effects."
+      ],
+      "suggestion": "Create a `support` domain service with explicit steps: `SupportPayload` validation, `BugReportBundleAssembler`, and `BugReportTransport`, and keep `SupportHandler` as only request binding and status orchestration.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestrator_in_transport_handlers"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_covers_crypto_session_and_storage",
+      "summary": "Separate auth token crypto, transport request handling, and session persistence into distinct components",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`goseg/auth/auth.go` mixes token encryption/decryption (`KeyfileEncrypt`, `KeyfileDecrypt`), HTTP/WebSocket identity extraction (`requestIdentityFromRequest`), in-memory websocket map operations (`ClientManager`, `WsIsAuthenticated`, `WsNilSession`), and durable session persistence (`AddSession` calling config updates).",
+        "`ValidateAndAuthorizeRequestToken` and `CreateToken` combine HTTP request identity parsing, crypto, session map updates, and storage updates in a single file path.",
+        "The persistence touchpoints (`AddSession` -> `config.UpdateConfTyped`) force auth changes to couple directly to config implementation details."
+      ],
+      "suggestion": "Extract auth into: (1) transport/context adapter, (2) token crypto strategy, (3) session-state repository for persistence, and keep websocket map updates in a dedicated connection lifecycle service.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mixed_security_orchestration"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_mmcs_media_path_heuristics",
+      "summary": "Centralize mountpoint/media-path selection to avoid divergent mmc/data placement behavior",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/logger/logger.go",
+        "goseg/config/config.go",
+        "goseg/system/disk.go"
+      ],
+      "evidence": [
+        "`goseg/handler/system/support.go:makeBugReportPath` scans `gopsutil.disk.Partitions` and walks parent directories with `path.Dir` to infer mmc/media placement.",
+        "`goseg/logger/logger.go:makeLogPath` performs the same outer-loop mountpoint + `strings.Contains(p.Device, \"mmc\")` decision path with slightly different defaults.",
+        "`goseg/config/config.go:GetStoragePath` and `checkIsEMMCMachine` use another independent variant of the same environment and mountpoint checks.",
+        "`goseg/system/disk.go:IsMountedMMC` duplicates another traversal variant (`listPartitions` + parent loop) for storage placement.",
+        "These copies diverge in fallback values and absolute-path handling, so future policy changes can create silent inconsistencies."
+      ],
+      "suggestion": "Extract a shared storage placement service (e.g., `platform/storage_path.go`) with a single tested API for base path, media-path resolution, and fallback strategy, then use it across these modules.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mountpoint_decision_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "repeated_container_readiness_polling_loops",
+      "summary": "Replace ad-hoc readiness polling loops with a shared container wait abstraction",
+      "related_files": [
+        "goseg/docker/orchestration/minio.go",
+        "goseg/docker/orchestration/netdata.go",
+        "goseg/docker/orchestration/volume_writer.go"
+      ],
+      "evidence": [
+        "Both MinIO and netdata container config builders repeatedly poll `getContainerRunningStatus(\"wireguard\")` in local loops waiting for status text containing `\"Up\"`.",
+        "The loop shape (status fetch, contains-check, sleep/poll) is repeated instead of shared behind one utility with timeout/error semantics.",
+        "The orchestration layer now has multiple bespoke timing and blocking strategies, which increases drift across service startup behavior."
+      ],
+      "suggestion": "Add a testable `ContainerReadiness` utility (with timeout and backoff) and route MinIO/netdata/volume-writer startup dependencies through it to standardize behavior and eliminate duplicated loop control code.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "polling_pattern_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Cross-cutting concerns concentrated in transport-facing files (`support`, `auth`, `config`) with no explicit domain boundaries.",
+      "Duplicate infrastructure heuristics copied across modules instead of shared abstractions (storage-location and startup-readiness patterns).",
+      "Lack of small orchestration utilities causes repeated control-flow loops to reappear as copy-paste readiness logic."
+    ],
+    "likely_symptoms": [
+      "importer and ship/container workflows become harder to test and easier to break during runtime when one coordinator path changes",
+      "inconsistent environment behavior across path resolution and service startup under edge deployment conditions",
+      "tighter coupling between auth/session, websocket state, and config persistence"
+    ],
+    "possible_false_positives": [
+      "Some duplicate loops may be intentional tuning differences per service; check whether status/poll intervals are intentionally divergent before a broad shared utility refactor."
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 2,
+  "assessments": {
+    "package_organization": 74.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "The holistic structure snapshot reports `goseg/handler/` with `file_count: 21` and an existing finding `flat_dirs: Flat directory: 21 files — consider grouping by domain`.",
+        "`goseg/routines/` also reports `file_count: 21` with the same `flat_dirs` finding.",
+        "`goseg/docker/` has `file_count: 19` files and `goseg/docker/docker.go` is marked as large/mixed in existing findings (`large (758 LOC) / complexity score 107`, `13 disconnected function clusters (30 functions)`), indicating mixed concerns concentrated in one package."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "handler-domain-overload",
+      "summary": "`handler` package remains a mixed-domain dumping ground instead of domain-focused subpackages.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/handler/dev.go",
+        "goseg/handler/dev_test.go"
+      ],
+      "evidence": [
+        "In `goseg/handler/dev.go`, development endpoint routing and side effects for backup/chop-style operations are mixed with auth/service handler shims in `goseg/handler/handler.go`.",
+        "The packet’s `existing_findings` already flags `goseg/handler/` as a flat directory with 21 files."
+      ],
+      "suggestion": "Create domain-oriented subpackages under `goseg/handler` in stages: (1) create `goseg/handler/auth/`, `goseg/handler/dev/`, and `goseg/handler/ship/`; (2) move `handler.go` responsibilities into `handler/auth` and `handler/dev` (or corresponding domain package facades), then replace with thin delegating types/functions in `handler`; (3) update imports with `rg -n \"goseg/handler/(DevHandler|LoginHandler|NewShipHandler|C2CHandler|UnauthHandler)\"` then `go test ./goseg/...` and `go test ./...`; (4) once package-level exports are stable, remove now-obsolete exports from parent package and rerun `go test ./goseg/handler/...`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_flat_oversized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "routines-domain-overload",
+      "summary": "`routines` aggregates unrelated periodic jobs and service loops in one package, increasing change friction.",
+      "related_files": [
+        "goseg/routines/backup.go",
+        "goseg/routines/chop.go",
+        "goseg/routines/backup_test.go"
+      ],
+      "evidence": [
+        "`goseg/routines/backup.go` (remote/local backup orchestration) and `goseg/routines/chop.go` (chop policy loop) are unrelated lifecycle domains but live in one folder.",
+        "The packet structure already flags `goseg/routines/` as `file_count: 21` with a `flat_dirs` warning."
+      ],
+      "suggestion": "Split by operational domain first, then recompose via orchestration: (1) create `goseg/routines/backup/` and `goseg/routines/chop/`; (2) move `backup.go`, `backup_test.go`, and related seam vars from root into `backup/`, and move `chop.go` into `chop/`; (3) add stable package-level wrappers in `goseg/routines` (`StartBackupRoutines`, `StartChopRoutines`) to preserve call sites; (4) run `go test ./goseg/routines/...` and `go test ./...`, then prune/normalize imports with `gofmt` + `go test` for any import-cycle regressions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_flat_oversized"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "docker-monolith-boundaries",
+      "summary": "Docker domain is overpacked in one package, with startup, lifecycle, storage, networking, and event wiring co-located.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/docker/events.go",
+        "goseg/docker/docker_test.go"
+      ],
+      "evidence": [
+        "`goseg/docker/docker.go` contains initialization, container build/planning, start/create/remove/get/list/pull/image/network helpers in a single package unit.",
+        "`goseg/docker/events.go` defines process-wide channel event bus primitives in the same package, while `docker.go` already carries broad lifecycle responsibility.",
+        "Existing findings for `goseg/docker/docker.go` report high complexity and 13 disconnected function clusters, which is a strong structural signal of mixed concerns."
+      ],
+      "suggestion": "Refactor to subpackages around cohesion boundaries: (1) split `events.go` into `goseg/events` (or `goseg/docker/eventsbus`) and keep only docker-specific event types in `goseg/docker`; (2) split `docker.go` into `goseg/docker/lifecycle`, `goseg/docker/registry`, and `goseg/docker/network`; (3) move and adapt callers in a two-pass approach: first extract read-only query helpers, then mutation/ops helpers; (4) update imports and public API shims in a compatibility layer (`goseg/docker` top-level) and validate with `go test ./goseg/docker/...` then `go test ./...`; (5) verify no package import backflow by running the repo-wide tests.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "monolithic_cross_concern_packages"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Flat, oversized packages without domain partitioning (`handler`, `routines`) are obscuring ownership and making navigation changes noisy.",
+      "A single large monolithic package (`docker`) is absorbing broad lifecycle + infra concerns plus cross-cutting coordination primitives, reducing boundary clarity."
+    ],
+    "likely_symptoms": [
+      "handler-dir-overload",
+      "routines-domain-overload",
+      "docker-monolith-boundaries"
+    ],
+    "possible_false_positives": [
+      "None identified; evidence is backed by packet structure thresholds and concrete package-level mixed-responsibility observations."
+    ]
+  }
+}

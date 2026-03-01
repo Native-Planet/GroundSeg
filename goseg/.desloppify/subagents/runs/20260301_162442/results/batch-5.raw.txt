@@ -1,0 +1,91 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 79.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Some production call paths execute shell commands and ignore `Run()` failures (e.g., system service restart/power actions), while adjacent code paths in the same domains propagate command failures as first-class errors.",
+        "`docker.GetContainerRunningStatus` proceeds to `defer cli.Close()` and container listing even when `dockerclient.New()` fails, creating a silent failure mode that can panic instead of returning a useful error.",
+        "`ifCheckForWiFi` collapses `nmcli` probe failures to `false`, causing `ToggleDevice` to issue the opposite state-changing command without surfacing the probe failure."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "system_handler_ignores_reboot_restart_errors",
+      "summary": "Handler actions claim success while ignoring OS command failures for restart/shutdown flows",
+      "related_files": [
+        "handler/system.go",
+        "routines/version.go",
+        "system/system.go"
+      ],
+      "evidence": [
+        "`handler/system.go` starts `systemctl restart groundseg`, `shutdown -h now`, and `reboot` via `cmd.Run()` without checking errors before returning success from `SystemHandler`.",
+        "This diverges from nearby control paths that consistently return explicit errors (e.g., wifi-connect and swap update failures in the same handler).",
+        "`routines/version.go` also calls `cmd.Run()` for `systemctl restart groundseg` and only logs; it does not propagate failures to callers that may need deterministic outcomes."
+      ],
+      "suggestion": "Introduce a dedicated command-execution helper used by handlers/runtime flows that returns wrapped errors, and thread that error back to websocket/API responses (or escalate transitions) instead of unconditionally returning nil; treat restart/shutdown as failure paths when command execution fails.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_running_status_client_init_ignored",
+      "summary": "`GetContainerRunningStatus` ignores docker client creation failure and can dereference a nil client",
+      "related_files": [
+        "docker/docker.go"
+      ],
+      "evidence": [
+        "`docker/docker.go:GetContainerRunningStatus` has `if err != nil {}` with an empty block after `dockerclient.New()`, then defers `cli.Close()` and calls `cli.ContainerList(...)` unconditionally.",
+        "The same module otherwise wraps `dockerclient.New()` failures for other container helpers, so this is an inconsistent, bug-prone boundary-handling outlier."
+      ],
+      "suggestion": "Return the constructor error from `dockerclient.New()` (ideally wrapped with context), avoid deferring on nil, and keep error behavior aligned with other docker API functions so callers can distinguish init failures from status misses.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_state_probe_errors_misused_as_state",
+      "summary": "Probe errors are converted into a default toggle direction, producing wrong radio state actions",
+      "related_files": [
+        "system/wifi.go",
+        "handler/system.go"
+      ],
+      "evidence": [
+        "`system/wifi.go` `ifCheckForWiFi()` returns `false` on command failure after logging, with no error signal.",
+        "`system/wifi.go` `ToggleDevice` uses that boolean to choose between `nmcli radio wifi on/off`, so a probe failure silently drives an opposite toggle.",
+        "`handler/system.go` calls this through `wifi-toggle` without surfacing probe failures as actionable handler errors."
+      ],
+      "suggestion": "Change `ifCheckForWiFi`/`ToggleDevice` to return an error on probe failures (e.g., `ifCheckForWiFi() (bool, error)`), and update handler/system test seams so callers fail fast with explicit error context instead of taking an inferred branch.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Command execution failure handling is inconsistent across control-plane code: some paths propagate failures, some log-and-continue, and some silently coerce failures into default behavior.",
+      "Boolean status probes are being used as hard control input despite being unable to represent command failure states."
+    ],
+    "likely_symptoms": [
+      "false positives from system-level actions that report success while the restart/shutdown never executed",
+      "intermittent panics in docker status queries when the docker client cannot be created",
+      "wifi toggle action performing the unintended transition during transient nmcli failures"
+    ],
+    "possible_false_positives": [
+      "The intent to keep some restart/power operations fire-and-forget in future/desired semantics was not explicitly documented, so a few findings may reflect missing comments/contract more than logic."
+    ]
+  }
+}

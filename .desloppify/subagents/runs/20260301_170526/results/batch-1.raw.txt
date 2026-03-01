@@ -1,0 +1,115 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 1,
+  "assessments": {
+    "package_organization": 78.0
+  },
+  "dimension_notes": {
+    "package_organization": {
+      "evidence": [
+        "blind packet structure data shows goseg/handler has 21 files and is flagged with \"flat_dirs: Flat directory: 21 files — consider grouping by domain\"",
+        "blind packet structure data shows goseg/docker has 20 files and is flagged with \"flat_dirs: Flat directory: 20 files — consider grouping by domain\"",
+        "blind packet structure data shows goseg/routines has 20 files and is flagged with \"flat_dirs: Flat directory: 20 files — consider grouping by domain\"",
+        "the assigned files in each of these packages are thin boundary wrappers, which indicates multiple domains being funneled through the same package surface"
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "package_organization",
+      "identifier": "pkg-org-monolith-core",
+      "summary": "Root packages in handler/docker/routines remain overly broad and should be decomposed by domain.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/routines/backup.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "blind packet flags \"flat_dirs\" for goseg/handler (21 files), goseg/docker (20 files), and goseg/routines (20 files)",
+        "file-count and directory-profile data indicates these are large mixed directories rather than cohesive bounded packages",
+        "assigned files show thin orchestration entrypoints spread across multiple operational concerns instead of narrower feature folders"
+      ],
+      "suggestion": "Stage a structural split: (1) introduce feature-oriented subpackages `goseg/handler/dev`, `goseg/handler/ship`, and `goseg/handler/system` (or reuse existing svc namespaces), then move `goseg/handler/dev.go` + `goseg/handler/dev_test.go` into `goseg/handler/dev` and `goseg/handler/handler.go` into a narrow `goseg/handler/api` package; (2) split background runners into `goseg/routines/backup`, `goseg/routines/chop`, and move `backup.go`/`chop.go` + tests there; (3) split docker surface into `goseg/docker/orchestration` and `goseg/docker/config` and move root wrappers like `goseg/docker/docker.go` responsibilities to orchestration edge package; (4) update all imports in callers (e.g., websocket/runner/bootstrap paths) and run `go test ./goseg/handler/...`, `go test ./goseg/routines/...`, `go test ./goseg/docker/...` and `go test ./...` for compile/build validation.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat-package-boundary"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "pkg-org-handler-blend",
+      "summary": "The handler package still combines public API facades with dev-routing test seams, weakening package ownership clarity.",
+      "related_files": [
+        "goseg/handler/handler.go",
+        "goseg/handler/dev.go",
+        "goseg/handler/dev_test.go"
+      ],
+      "evidence": [
+        "`handler.go` re-exports login/auth/c2c handlers and wire-level constants while `dev.go` hosts dev-only orchestration seam wiring, indicating multiple distinct responsibilities inside one package namespace",
+        "`dev.go` defines injectable package-level variables (`listHardDisksForDev`, `confForDev`, etc.), showing test seam behavior that belongs to a lower-level domain package rather than core handler aggregation",
+        "blind packet records this package as flat (21 files), consistent with mixed boundaries"
+      ],
+      "suggestion": "Stage migration: create `goseg/handler/api` for websocket/socket-facing re-exports and `goseg/handler/devsvc` for dev workflow handlers; move `handler.go` to `api` and `dev.go`/`dev_test.go` to `devsvc`, then change callsites to import `goseg/handler/api` for public handlers and `goseg/handler/devsvc` for dev entrypoints; run `go test ./goseg/handler/... && go test ./goseg/...` after updating package names and seam resets.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "flat-package-boundary"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "pkg-org-routines-boundary",
+      "summary": "Routines package is used as a mixed catch-all for unrelated periodic workflows.",
+      "related_files": [
+        "goseg/routines/backup.go",
+        "goseg/routines/chop.go",
+        "goseg/routines/chop_test.go"
+      ],
+      "evidence": [
+        "`backup.go` and `chop.go` each own unrelated scheduler behaviors (remote/local backup vs chop loop), yet both sit in same package root with many other domains",
+        "directory profile size for `goseg/routines` (20 files) and flat-dir warning indicates weak cohesion across workflow domains",
+        "tests already isolate concerns (`chop_test.go` only covers chop scheduling semantics), suggesting better domain partitions are practical"
+      ],
+      "suggestion": "Stage split by workflow domain: create `goseg/routines/backup`, `goseg/routines/chop`, `goseg/routines/system` and move each public entrypoint (`TlonBackupRemote`, `TlonBackupLocal`, `StartBackupRoutines`, `StartChopRoutines`, `ChopAtLimit`) into the corresponding subpackages while keeping only a tiny scheduler registry in `goseg/routines`. Update imports in boot code/tests and run `gofmt` + `go test ./goseg/routines/...` and `go test ./...`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "flat-package-boundary"
+    },
+    {
+      "dimension": "package_organization",
+      "identifier": "pkg-org-docker-conf-lifecycle-mix",
+      "summary": "Docker config resolution performs lifecycle mutation, blurring config and orchestration boundaries.",
+      "related_files": [
+        "goseg/docker/container_config.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "`container_config.go` case `\"minio\"` calls `DeleteContainer(containerName)` inside `containerConfigForType` before returning container config, which is a runtime side-effect in a configuration resolver",
+        "`docker.go` exposes lifecycle wiring (`configureSubpackages`, client factories, registry hooks) in the same package, reinforcing an already broad boundary across config, lifecycle, networking, and registry concerns"
+      ],
+      "suggestion": "Stage a boundary fix: move container cleanup policy into an explicit orchestration path in `goseg/docker/orchestration` (e.g., `StartContainer`) and keep `container_config.go` as a pure config factory with no side effects; rename or remove side-effectful entrypoints and update callers in `goseg/docker/docker.go` + tests, then run `go test ./goseg/docker/...` and `go test ./goseg/...`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "cross-concern-boundary-blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Flat root directories with 20+ files indicate missing domain decomposition (handler/docker/routines)",
+      "Boundary dilution where orchestration, configuration, and tests all share the same package-level API"
+    ],
+    "likely_symptoms": [
+      "pkg-org-monolith-core",
+      "pkg-org-handler-blend",
+      "pkg-org-routines-boundary",
+      "pkg-org-docker-conf-lifecycle-mix"
+    ],
+    "possible_false_positives": [
+      "package-size-based flags may over-report if package is intentionally stable façade layer, though current split patterns do not support that exception"
+    ]
+  }
+}

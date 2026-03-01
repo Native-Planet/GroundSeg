@@ -15,6 +15,7 @@ package main
 // - Very good golang Docker libraries
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"groundseg/auth"
@@ -22,7 +23,8 @@ import (
 	"groundseg/config"
 	"groundseg/docker"
 	"groundseg/exporter"
-	"groundseg/handler"
+	"groundseg/handler/api"
+	"groundseg/handler/router"
 	"groundseg/importer"
 	"groundseg/leak"
 	"groundseg/logger"
@@ -37,9 +39,11 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -54,8 +58,8 @@ var (
 	//go:embed web/_app/immutable/entry/_*
 	// we need to explicitly embed stuff starting with underscore
 	content       embed.FS
-	webContent, _ = fs.Sub(content, "web")
-	fileServer    = http.FileServer(http.FS(webContent))
+	webContent    fs.FS
+	fileServer    http.Handler
 	capContent    embed.FS
 	capFs         = http.FS(capContent)
 	capFileServer = http.FileServer(capFs)
@@ -71,6 +75,15 @@ var (
 	setC2CModeFn  = system.SetC2CMode
 	killSwitchFn  = killSwitch
 )
+
+func init() {
+	var err error
+	webContent, err = fs.Sub(content, "web")
+	if err != nil {
+		panic(err)
+	}
+	fileServer = http.FileServer(http.FS(webContent))
+}
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func C2cCheck() {
@@ -154,7 +167,10 @@ func ContentTypeSetter(next http.Handler) http.Handler {
 	})
 }
 
-func startServer() { // *http.Server {
+func startServer(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	r := mux.NewRouter()
 	// r.PathPrefix("/").Handler(ContentTypeSetter(fileServer))
 	r.PathPrefix("/").Handler(ContentTypeSetter(http.HandlerFunc(fallbackToIndex(http.FS(webContent)))))
@@ -172,13 +188,34 @@ func startServer() { // *http.Server {
 		Addr:    ":3000",
 		Handler: w,
 	}
+	serverShutdownCh := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
 			zap.L().Error(fmt.Sprintf("HTTP server failed: %v", err))
 		}
+		serverShutdownCh <- err
 	}()
-	if err := wsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		zap.L().Error(fmt.Sprintf("Websocket server failed: %v", err))
+	go func() {
+		err := wsServer.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			zap.L().Error(fmt.Sprintf("Websocket server failed: %v", err))
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			zap.L().Error(fmt.Sprintf("Error shutting down HTTP server: %v", err))
+		}
+		if err := wsServer.Shutdown(shutdownCtx); err != nil {
+			zap.L().Error(fmt.Sprintf("Error shutting down websocket server: %v", err))
+		}
+	case err := <-serverShutdownCh:
+		if err != nil && err != http.ErrServerClosed {
+			zap.L().Error(fmt.Sprintf("HTTP server exited unexpectedly: %v", err))
+		}
 	}
 	//go wsServer.ListenAndServe()
 	// http.ListenAndServe(":80", r)
@@ -199,10 +236,17 @@ func fallbackToIndex(fs http.FileSystem) http.HandlerFunc {
 }
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
 	logger.Initialize()
+	if err := config.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize config subsystem: %v", err))
+		return
+	}
 	auth.Initialize()
-	handler.Initialize()
-	handler.InitializeSupport()
+	router.Initialize()
+	api.InitializeSupport()
 	if err := exporter.Initialize(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to initialize exporter subsystem: %v", err))
 	}
@@ -226,9 +270,11 @@ func main() {
 	zap.L().Info(fmt.Sprintf("Internet available: %t", internetAvailable))
 	if err := broadcast.Initialize(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to initialize broadcast subsystem: %v", err))
+		return
 	}
 	if err := docker.Initialize(); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to initialize docker subsystem: %v", err))
+		return
 	}
 	// ongoing connectivity check
 	go C2cCheck()
@@ -286,8 +332,8 @@ func main() {
 	go routines.CheckVersionLoop() // infinite version check loop
 	go routines.AptUpdateLoop()    // check for base OS updates
 	// routines/docker.go
-	go routines.DockerListener()            // listen to docker daemon
-	go routines.DockerSubscriptionHandler() // digest docker events from eventbus
+	go routines.DockerListenerWithContext(ctx)            // listen to docker daemon
+	go routines.DockerSubscriptionHandlerWithContext(ctx) // digest docker events from eventbus
 
 	// digest urbit transition events
 	go rectify.UrbitTransitionHandler()
@@ -329,10 +375,9 @@ func main() {
 	// pack scheduler
 	go routines.PackScheduleLoop()
 	// chop limiter
-	go routines.ChopAtLimit() // vere 3.0
+	go routines.StartChopRoutines() // vere 3.0
 	// backups
-	go routines.TlonBackupLocal()
-	go routines.TlonBackupRemote()
+	go routines.StartBackupRoutines()
 	// block until version info returns
 	if remoteVersion == true {
 		select {
@@ -373,5 +418,5 @@ func main() {
 	loadService(docker.LoadUrbits, "Unable to load Urbit ships!")
 	// Load Penpai
 	loadService(docker.LoadLlama, "Unable to load Llama GPT!")
-	startServer()
+	startServer(ctx)
 }

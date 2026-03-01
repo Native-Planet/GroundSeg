@@ -43,25 +43,23 @@ func (handler UploadMessageHandler) Handle(msg []byte) error {
 	if err != nil {
 		return errpolicy.WrapOperation("Couldn't unmarshal upload payload", err)
 	}
-	command := adapters.CommandFromWsPayload(uploadPayload)
+	command, err := adapters.CommandFromWsPayload(uploadPayload)
+	if err != nil {
+		var unsupported uploadsvc.UnsupportedActionError
+		if errors.As(err, &unsupported) {
+			// Preserve external contract for unknown upload actions.
+			return fmt.Errorf("Unrecognized upload action: %v", uploadPayload.Payload.Action)
+		}
+		return errpolicy.WrapOperation("Unsupported upload action", err)
+	}
 	if err := handler.executor.Execute(command); err != nil {
 		var unsupported uploadsvc.UnsupportedActionError
 		if errors.As(err, &unsupported) {
 			// Preserve external contract for unknown upload actions.
 			return fmt.Errorf("Unrecognized upload action: %v", uploadPayload.Payload.Action)
 		}
-		return errpolicy.WrapOperation(uploadOperation(command.Action, command.OpenEndpointRequest.Endpoint), err)
+		operation, _ := uploadsvc.DescribeAction(command)
+		return errpolicy.WrapOperation(operation, err)
 	}
 	return nil
-}
-
-func uploadOperation(action uploadsvc.Action, endpoint string) string {
-	switch action {
-	case uploadsvc.ActionOpenEndpoint:
-		return fmt.Sprintf("open upload endpoint %s", endpoint)
-	case uploadsvc.ActionReset:
-		return "reset upload session"
-	default:
-		return fmt.Sprintf("upload action %s", action)
-	}
 }

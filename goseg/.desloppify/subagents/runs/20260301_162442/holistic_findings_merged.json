@@ -1,0 +1,627 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 74.2,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 80.0,
+        "Indirection Cost": 79.5,
+        "Interface Honesty": 75.8
+      }
+    },
+    "cross_module_architecture": 59.8,
+    "design_coherence": 55.0,
+    "error_consistency": 52.3,
+    "test_strategy": 67.7
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`system/wifi_transport_adapter.go` defines `c2cAction` and parses websocket payload action strings in `parseC2CAction`.",
+        "`uploadsvc/service.go` defines a separate `Action` enum and dispatch map for upload actions, with no shared action contract type reused by other packages.",
+        "`README.md` documents package interactions at a high level but does not publish the runtime action/error contracts that modules consume and produce."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Cross-module action/error contracts are not centralized, so boundaries remain implicit and drift risk is still present across transport and service packages."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`shipworkflow/startram.go` repeatedly converts an in-process payload to JSON and back to the same struct type immediately before dispatch (`json.Marshal(payload)` then `json.Unmarshal` into `wiretramPayload`) inside `HandleStartramToggle`.",
+        "Core operational modules expose behavior through package-level mutable function vars (e.g., `dispatchUrbitPayloadFn` in `shipworkflow/startram.go`, `netCheckFn/connCheckFn/isNPBoxFn` in `main.go`, and `execCommandForWiFi/runCommandForWiFi` in `system/wifi.go`) that are swapped in tests via reset helpers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 78.0,
+        "interface_honesty": 66.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "`uploadsvc/service.go` contains critical dispatch logic (`NewExecutor`, `Execute`, `UnsupportedActionError`) with no corresponding test file in the batch scope.",
+        "`system/wifi_c2c_service.go` and `system/wifi_transport_adapter.go` include orchestration, state, and transport parsing/error paths that are not covered by the listed test file.",
+        "`uploadsvc/adapters/upload_payload_test.go` only validates one successful mapping case and does not cover unsupported actions, malformed payloads, nil injection, or error paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "`handler/system.go` and `handler/dev.go` each implement large request-type switch handlers that inline payload parsing, policy decisions, external command execution, state updates, transition publishing, and return/error handling in one function.",
+        "`importer/importer.go` couples HTTP request-level concerns (`HTTPUploadHandler`) with persistence orchestration (`combineChunks`, `persistChunkToTemp`), import state transitions, and async ship bootstrap workflow (`configureUploadedPier`/`runImportedPierWorkflow`).",
+        "`routines/docker.go` handles Docker event normalization, container-state mutation, restart policy, and transition emission in one switch loop, making each event branch perform multiple cross-cutting duties."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Some production call paths execute shell commands and ignore `Run()` failures (e.g., system service restart/power actions), while adjacent code paths in the same domains propagate command failures as first-class errors.",
+        "`docker.GetContainerRunningStatus` proceeds to `defer cli.Close()` and container listing even when `dockerclient.New()` fails, creating a silent failure mode that can panic instead of returning a useful error.",
+        "`ifCheckForWiFi` collapses `nmcli` probe failures to `false`, causing `ToggleDevice` to issue the opposite state-changing command without surfacing the probe failure."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_global_c2c_dependency_seams",
+      "summary": "C2C execution flow depends on mutable package-level function indirection rather than explicit dependency wiring.",
+      "related_files": [
+        "system/wifi_c2c_service.go",
+        "system/wifi_transport_adapter.go"
+      ],
+      "evidence": [
+        "`system/wifi_c2c_service.go` defines mutable globals `c2cServiceFactory`, `connectToWifiForC2C`, and `restartGroundSegForC2C` that determine how `c2cService` is created and how actions execute.",
+        "`system/wifi_transport_adapter.go` stores `executeC2CAction` in the adapter struct and initializes it from that global entrypoint, so transport behavior is coupled to package-global state."
+      ],
+      "suggestion": "Replace mutable package globals with an explicit `c2cDeps` interface/struct passed through constructors (e.g., `newCaptiveTransportAdapter(deps c2cDeps)` and `NewC2CService(deps c2cServiceDeps)`), and use immutable concrete adapters in production.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_global_execution_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "shipstar_internal_payload_roundtrip",
+      "summary": "Avoid JSON round-trip for internal payload dispatch in startram orchestration to prevent unnecessary abstraction indirection.",
+      "related_files": [
+        "shipworkflow/startram.go",
+        "shipworkflow/operations_test.go"
+      ],
+      "evidence": [
+        "`shipworkflow/startram.go:HandleStartramToggle` constructs `payload := structs.WsUrbitPayload{...}` and immediately performs `json.Marshal(payload)` followed by `json.Unmarshal(jsonData, &wiretramPayload)` before calling `dispatchUrbitPayloadFn(wiretramPayload)`.",
+        "This converts internal typed data to wire format and back without crossing process/network boundary, creating avoidable transform/cost with no boundary guarantee benefit."
+      ],
+      "suggestion": "Pass `payload` directly to `dispatchUrbitPayloadFn` with a typed signature (or define a narrow internal interface), and remove the immediate marshal/unmarshal pair inside the same process.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "in_process_serialization_as_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_function_seams_as_default_DI",
+      "summary": "Replace widespread mutable global function seams with explicit dependency containers to avoid brittle abstraction boundaries.",
+      "related_files": [
+        "main.go",
+        "system/wifi.go",
+        "shipworkflow/startram.go",
+        "handler/system_test.go"
+      ],
+      "evidence": [
+        "`main.go` assigns runtime behavior through globals (`netCheckFn`, `connCheckFn`, `isNPBoxFn`, `c2cModeFn`, `setC2CModeFn`) rather than explicit injected dependencies.",
+        "`system/wifi.go` exposes command execution behavior via globals (`execCommandForWiFi`, `runCommandForWiFi`, `ifCheckForWiFi`) and replaces these from tests.",
+        "`shipworkflow/startram.go` uses package-level function vars such as `dispatchUrbitPayloadFn` and `recoverWireguardFleetFn`, with mutable override points.",
+        "`handler/system_test.go` contains seam reset helpers that replace many production callables globally for tests, indicating ad hoc DI is the pattern rather than explicit constructor-injected contracts."
+      ],
+      "suggestion": "Introduce small runtime dependency interfaces (e.g., network/command/dispatch/runtime interfaces), pass instances through constructor paths, and avoid mutable package globals so seams are explicit, scoped, and non-racy.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mutable_global_seams"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fragmented_action_contracts",
+      "summary": "Upload and captive actions use separate enums, but no shared protocol contract binds cross-package compatibility.",
+      "related_files": [
+        "README.md",
+        "system/wifi_transport_adapter.go",
+        "uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`wifi_transport_adapter.go` parses raw c2c action strings with `parseC2CAction` and local `c2cAction` enum (`connect`).",
+        "`uploadsvc/service.go` defines separate action constants (`open-endpoint`, `reset`) and dispatch map logic.",
+        "There is no shared type or registry in the reviewed files connecting websocket payload action values to upload and c2c action surfaces.",
+        "README.md lacks an explicit compatibility contract for transport action names or versioned API behavior."
+      ],
+      "suggestion": "Create a shared protocol contract package for action enums and error semantics (including compatibility/version docs), then have both system and uploadsvc consume it and add a short API contract section in README.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "protocol_contract_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "executor_dispatch_untested",
+      "summary": "Upload executor dispatch contract is untested at command-level boundaries.",
+      "related_files": [
+        "uploadsvc/service.go",
+        "uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`uploadsvc/service.go` exposes `NewExecutor`, `Execute`, `SupportedActions`, and action-to-handler dispatch, but there is no test in reviewed files asserting those behaviors.",
+        "The only test under `uploadsvc/adapters` only checks request field mapping for a happy-path payload."
+      ],
+      "suggestion": "Add unit tests for executor creation and execution: happy path for `ActionOpenEndpoint`, `ActionReset`, and unsupported action handling, plus nil service validation.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_pipeline_test_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c_transport_paths_untested",
+      "summary": "C2C parse/execute and websocket transport control paths have no coverage for failure modes.",
+      "related_files": [
+        "system/wifi_transport_adapter.go",
+        "system/wifi_c2c_service.go"
+      ],
+      "evidence": [
+        "`wifi_transport_adapter.go` includes multiple branches in `processMessage`/`handleAPI`/`broadcastNetworks` (JSON parse failure, unsupported action, nil executor, read-loop teardown) with no test coverage in the batch files.",
+        "`wifi_c2c_service.go` includes external effects (`ConnectToWifi`, `systemctl restart`) and error-wrapping behavior (`fmt.Errorf`) in `c2cService.Execute` that are untested in this scope."
+      ],
+      "suggestion": "Inject fakes into `c2cService` and adapter execution points and add tests for parse errors, unsupported action, execute failures, and restart/connect sequencing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_pipeline_test_gap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "monolithic_action_dispatch_handlers",
+      "summary": "Handler entrypoints mix request dispatch, orchestration, and side effects in oversized switches.",
+      "related_files": [
+        "handler/dev.go",
+        "handler/system.go",
+        "handler/support.go",
+        "handler/authsvc/auth.go",
+        "handler/handler.go",
+        "shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`DevHandler` and `SystemHandler` each contain long action switch blocks that perform transport parsing, branching, command/container updates, config writes, and transition publication in the same function body.",
+        "`SupportHandler` similarly handles payload validation, file system staging, compression, network submission, and final transition signaling directly in one flow.",
+        "Related command handling in `authsvc/auth.go` (`LoginHandler`, `PwHandler`, `C2CHandler`) follows the same mixed-responsibility pattern rather than delegating per-action behavior to composable handlers."
+      ],
+      "suggestion": "Introduce a bounded command registry per subsystem (e.g., action -> handler struct/function), where each handler owns one responsibility and returns structured outcomes; keep parse/dispatch glue thin and testable.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "action-handler-monolith"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "importer_pipeline_mixed_layers",
+      "summary": "Importer upload flow bundles transport, validation, persistence, and ship bootstrap logic.",
+      "related_files": [
+        "importer/importer.go",
+        "shipworkflow/urbit_operations.go",
+        "docker/docker.go",
+        "importer/importer_test.go"
+      ],
+      "evidence": [
+        "`HTTPUploadHandler` in `importer/importer.go` sets headers, enforces auth/session validation, manipulates multipart chunks, handles extraction readiness, emits broadcast events, and launches container bootstrap via `configureUploadedPier`.",
+        "`configureUploadedPier` and `runImportedPierWorkflow` continue the coupling by creating orchestration contexts and then starting asynchronous workflows (`beginImportedPierReadinessAndRegistration`).",
+        "`beginImportedPierReadinessAndRegistration` also triggers unrelated registration/readiness flow directly after upload completion, so caller-level behavior now implicitly decides downstream lifecycle policy."
+      ],
+      "suggestion": "Split the import pipeline into explicit stages (HTTP adapter, session validation, chunk persistence, extraction orchestration, post-import registration), each with narrow interfaces and deterministic return values, then orchestrate in one coordinator function.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action-handler-monolith"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "docker_event_loop_multi_responsibility",
+      "summary": "Docker event loop combines event decoding, policy decisions, state mutation, and transition publishing in one place.",
+      "related_files": [
+        "routines/docker.go",
+        "docker/docker.go",
+        "broadcast/broadcast.go",
+        "shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "`dockerSubscriptionHandler` in `routines/docker.go` directly couples event intake, container state bookkeeping, restart policy, state-specific side effects, and broadcast signaling for each action.",
+        "The same file performs ship restart logic (`go routine ... rt.startContainer`) and wireguard/leech state mutation from inside the event switch, so policy and transport handling are tightly entangled.",
+        "This broad responsibility repeats for each event type, increasing branching complexity and making new event policies hard to reason about safely."
+      ],
+      "suggestion": "Move event translation into small handlers (e.g., per action handlers with explicit invariants), and make Docker event routing invoke injected policy modules so runtime/event mechanics are separated from action semantics.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "imperative_event_monolith"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "system_handler_ignores_reboot_restart_errors",
+      "summary": "Handler actions claim success while ignoring OS command failures for restart/shutdown flows",
+      "related_files": [
+        "handler/system.go",
+        "routines/version.go",
+        "system/system.go"
+      ],
+      "evidence": [
+        "`handler/system.go` starts `systemctl restart groundseg`, `shutdown -h now`, and `reboot` via `cmd.Run()` without checking errors before returning success from `SystemHandler`.",
+        "This diverges from nearby control paths that consistently return explicit errors (e.g., wifi-connect and swap update failures in the same handler).",
+        "`routines/version.go` also calls `cmd.Run()` for `systemctl restart groundseg` and only logs; it does not propagate failures to callers that may need deterministic outcomes."
+      ],
+      "suggestion": "Introduce a dedicated command-execution helper used by handlers/runtime flows that returns wrapped errors, and thread that error back to websocket/API responses (or escalate transitions) instead of unconditionally returning nil; treat restart/shutdown as failure paths when command execution fails.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker_running_status_client_init_ignored",
+      "summary": "`GetContainerRunningStatus` ignores docker client creation failure and can dereference a nil client",
+      "related_files": [
+        "docker/docker.go"
+      ],
+      "evidence": [
+        "`docker/docker.go:GetContainerRunningStatus` has `if err != nil {}` with an empty block after `dockerclient.New()`, then defers `cli.Close()` and calls `cli.ContainerList(...)` unconditionally.",
+        "The same module otherwise wraps `dockerclient.New()` failures for other container helpers, so this is an inconsistent, bug-prone boundary-handling outlier."
+      ],
+      "suggestion": "Return the constructor error from `dockerclient.New()` (ideally wrapped with context), avoid deferring on nil, and keep error behavior aligned with other docker API functions so callers can distinguish init failures from status misses.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wifi_state_probe_errors_misused_as_state",
+      "summary": "Probe errors are converted into a default toggle direction, producing wrong radio state actions",
+      "related_files": [
+        "system/wifi.go",
+        "handler/system.go"
+      ],
+      "evidence": [
+        "`system/wifi.go` `ifCheckForWiFi()` returns `false` on command failure after logging, with no error signal.",
+        "`system/wifi.go` `ToggleDevice` uses that boolean to choose between `nmcli radio wifi on/off`, so a probe failure silently drives an opposite toggle.",
+        "`handler/system.go` calls this through `wifi-toggle` without surfacing probe failures as actionable handler errors."
+      ],
+      "suggestion": "Change `ifCheckForWiFi`/`ToggleDevice` to return an error on probe failures (e.g., `ifCheckForWiFi() (bool, error)`), and update handler/system test seams so callers fail fast with explicit error context instead of taking an inferred branch.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shell_command_errors_ignored"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "err_dg_get_container_running_status_nil_client",
+      "summary": "Docker status helper can dereference a nil client on client construction failure.",
+      "related_files": [
+        "docker/docker.go",
+        "docker/minio.go",
+        "docker/netdata.go"
+      ],
+      "evidence": [
+        "`GetContainerRunningStatus` checks `if err != nil {}` and still calls `cli.Close()` and `cli.ContainerList(...)`, so `dockerclient.New()` failures are not handled.",
+        "This helper is used in container config builders and startup loops, so a transient client construction failure can crash dependent flows."
+      ],
+      "suggestion": "Return immediately with wrapped error when `dockerclient.New()` fails, and keep the function\u2019s error contract explicit for all callers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "design_accesspoint_router_ignores_shell_errors",
+      "summary": "Access point start/stop always report success while discarding shell command failures.",
+      "related_files": [
+        "accesspoint/router.go",
+        "accesspoint/accesspoint.go",
+        "accesspoint/parameters.go"
+      ],
+      "evidence": [
+        "`startRouter` and `stopRouter` call `executeRouterShellFn(...)` repeatedly with `res, err` but never branch on `err`.",
+        "`Start()` in `accesspoint/accesspoint.go` does not inspect those outcomes and returns nil regardless."
+      ],
+      "suggestion": "Track first command failure through `startRouter`/`stopRouter` and return the concrete error so caller can decide whether to abort, retry, or roll back.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "arch_cfg_init_fatal_continue",
+      "summary": "Config initialization silently tolerates bootstrap failures and allows process startup with partially initialized global state.",
+      "related_files": [
+        "config/config.go",
+        "main.go",
+        "broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`initializeConfig()` logs failures in `openOrCreateConfigFile` and returns without escalating an error.",
+        "`init()` calls `initializeConfig()` unconditionally, while startup in `main.go` proceeds even when config substrate is potentially invalid."
+      ],
+      "suggestion": "Split bootstrap into an explicit `Initialize() error` entry point, fail fast or enter a clearly defined degraded mode on unrecoverable failures, and avoid continuing anonymous side-effectful startup from `init()`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "err_support_submit_bugreport_bad_error_path",
+      "summary": "Bug report sender drops multipart/http operation errors and returns an unhelpful non-200 error value.",
+      "related_files": [
+        "handler/support.go",
+        "handler/system.go"
+      ],
+      "evidence": [
+        "`sendBugReport` ignores errors from `writer.WriteField`, `writer.CreateFormFile`, and `writer.Close()`, so malformed requests can pass to `client.Do` and fail later with poor diagnostics.",
+        "On non-200 responses, it returns `fmt.Errorf(\"%s: %s\", resp.Status, resp.Body)` which stringifies an `io.ReadCloser` rather than the server body."
+      ],
+      "suggestion": "Check and propagate multipart writer errors, close the writer before request execution, and read/trim response body before wrapping transport errors.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "structural_boundary_error_contracts",
+      "summary": "Boundary helpers mix typed errors, logging-only behavior, and false-success returns, weakening fault propagation across modules.",
+      "related_files": [
+        "config/config.go",
+        "docker/docker.go",
+        "accesspoint/router.go",
+        "handler/support.go"
+      ],
+      "evidence": [
+        "Some boundary functions return rich errors while adjacent helpers only log and continue or return hardcoded `true`.",
+        "This produces inconsistent recovery behavior for callers that coordinate startup and external side effects."
+      ],
+      "suggestion": "Define a consistent cross-module error contract for boundary operations (explicit status + wrapped cause), and align callsites to act on those outcomes before continuing.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "silent_error_boundary_contracts"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 6,
+    "dimension_coverage": 0.367,
+    "evidence_density": 1.6,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 38.592,
+    "dimensions_with_findings": 5
+  },
+  "review_scope": {
+    "reviewed_files_count": 116,
+    "successful_batch_count": 6,
+    "full_sweep_included": true,
+    "total_files": 232,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "startram/errors.go",
+    "system/wifi_c2c_service.go",
+    "system/wifi_transport_adapter.go",
+    "uploadsvc/adapters/upload_payload_test.go",
+    "uploadsvc/service.go",
+    "broadcast/collectors_and_mappers.go",
+    "broadcast/state_test.go",
+    "broadcast/broadcast.go",
+    "rectify/rectify.go",
+    "broadcast/loop_test.go",
+    "defaults/defaults.go",
+    "main.go",
+    "config/wireguard.go",
+    "docker/wireguard_test.go",
+    "rectify/rectify_test.go",
+    "docker/wireguard.go",
+    "leak/broadcast.go",
+    "leak/broadcast_test.go",
+    "routines/docker.go",
+    "system/wifi.go",
+    "leak/leak_test.go",
+    "routines/docker_test.go",
+    "structs/configs.go",
+    "defaults/version.go",
+    "routines/system_test.go",
+    "docker/docker.go",
+    "importer/importer.go",
+    "shipworkflow/urbit_operations.go",
+    "docker/runtime_seams.go",
+    "shipworkflow/startram.go",
+    "shipworkflow/operations_test.go",
+    "routines/runtime_seams.go",
+    "routines/version.go",
+    "setup/setup_test.go",
+    "handler/support.go",
+    "auth/auth.go",
+    "config/config.go",
+    "docker/llama_test.go",
+    "importer/extract.go",
+    "dockerclient/client.go",
+    "docker/minio.go",
+    "docker/urbit_test.go",
+    "handler/system_test.go",
+    "README.md",
+    "click/backup/service.go",
+    "click/filter.go",
+    "click/hoon.go",
+    "config/mc.go",
+    "docker/netdata.go",
+    "handler/authsvc/auth.go",
+    "handler/dev.go",
+    "handler/system.go",
+    "leak/handler.go",
+    "accesspoint/accesspoint_test.go",
+    "config/version.go",
+    "handler/handler.go",
+    "handler/urbit_test.go",
+    "importer/extract_test.go",
+    "importer/importer_test.go",
+    "leak/handler_test.go",
+    "logger/logger.go",
+    "startram/backup_runtime_test.go",
+    "structs/ws.go",
+    "system/disk.go",
+    "system/system.go",
+    "accesspoint/accesspoint.go",
+    "accesspoint/config.go",
+    "accesspoint/parameters.go",
+    "accesspoint/router.go",
+    "backups/backups.go",
+    "backupsvc/service.go",
+    "broadcast/loop.go",
+    "chopsvc/service.go",
+    "click/acme/service.go",
+    "click/click.go",
+    "click/command_exec.go",
+    "click/desk/desk.go",
+    "click/internal/runtime/runtime.go",
+    "click/lifecycle/lifecycle.go",
+    "click/luscode/luscode.go",
+    "click/notify/notify.go",
+    "click/pack/pack.go",
+    "click/restore/restore.go",
+    "click/storage/storage.go",
+    "config/minio.go",
+    "config/netdata.go",
+    "config/urbit.go",
+    "defaults/scripts.go",
+    "docker/events.go",
+    "docker/llama.go",
+    "docker/stats.go",
+    "docker/status.go",
+    "docker/urbit.go",
+    "docker/volume_writer.go",
+    "driveresolver/resolver.go",
+    "errpolicy/errors.go",
+    "exporter/exporter.go",
+    "handler/devsvc/dev.go",
+    "handler/leak.go",
+    "handler/newship.go",
+    "handler/penpai.go",
+    "handler/startram.go",
+    "handler/systemsvc/system.go",
+    "handler/urbit.go",
+    "handler/urbit_backup_service.go",
+    "handler/wireguard_recovery.go",
+    "handler/ws/upload.go",
+    "httpx/json.go",
+    "leak/ipc.go",
+    "leak/leak.go",
+    "leak/ports.go",
+    "leak/structs.go",
+    "leakchannel/leakchannel.go",
+    "lifecycle/runner.go",
+    "orchestration/runner.go",
+    "rectify/importer.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_162442",
+    "created_at": "2026-03-01T16:26:17+00:00",
+    "batch_count": 6,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/goseg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "da42cf6f1acdc22977594c42c1108283d06e14359230e65e30b59dd45dc461de"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture",
+      "error_consistency",
+      "abstraction_fitness",
+      "test_strategy",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

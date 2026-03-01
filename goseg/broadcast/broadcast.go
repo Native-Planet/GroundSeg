@@ -4,18 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
-	"groundseg/backupsvc"
-	"groundseg/click"
-	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/broadcast/collectors"
 	"groundseg/leak"
-	"groundseg/startram"
 	"groundseg/structs"
-	"groundseg/system"
+	"groundseg/transition"
 	"maps"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,22 +26,53 @@ var (
 	urbTransMu        sync.RWMutex
 	sysTransMu        sync.RWMutex
 	mu                sync.RWMutex // synchronize access to broadcastState
-	leakSink          = func(bState structs.AuthBroadcast) {
-		leak.LeakChan <- bState
-	}
-	BackupDir = backupsvc.ResolveBackupRoot(config.BasePath)
 )
 
-// SetLeakSinkForTests replaces the side effect used by BroadcastToClients.
-// Pass nil to restore the default leak-based sink.
-func SetLeakSinkForTests(sink func(structs.AuthBroadcast)) {
-	if sink == nil {
-		leakSink = func(bState structs.AuthBroadcast) {
-			leak.LeakChan <- bState
-		}
+var isConfigReady = func() bool { return true }
+
+func SetConfigReadyCheck(fn func() bool) {
+	if fn == nil {
+		isConfigReady = func() bool { return true }
 		return
 	}
-	leakSink = sink
+	isConfigReady = fn
+}
+
+type broadcastToClientsRuntime interface {
+	emitToLeak(structs.AuthBroadcast)
+	hasAuthSession() bool
+	broadcastAuth([]byte) error
+}
+
+type authBroadcastEnvelope struct {
+	Type      string                `json:"type"`
+	AuthLevel string                `json:"auth_level"`
+	Payload   structs.AuthBroadcast `json:"payload"`
+}
+
+type broadcastToClientsRuntimeDefault struct{}
+
+func (broadcastToClientsRuntimeDefault) emitToLeak(bState structs.AuthBroadcast) {
+	select {
+	case leak.LeakChan <- bState:
+	default:
+		go func() {
+			leak.LeakChan <- bState
+		}()
+	}
+}
+
+func (broadcastToClientsRuntimeDefault) hasAuthSession() bool {
+	cm := auth.GetClientManager()
+	if cm == nil {
+		return false
+	}
+	return cm.HasAuthSession()
+}
+
+func (broadcastToClientsRuntimeDefault) broadcastAuth(payload []byte) error {
+	auth.ClientManager.BroadcastAuth(payload)
+	return nil
 }
 
 func PublishSchedulePack(reason string) {
@@ -60,6 +84,9 @@ func SchedulePackEvents() <-chan string {
 }
 
 func Initialize() error {
+	if !isConfigReady() {
+		return fmt.Errorf("config subsystem is not initialized")
+	}
 	if err := bootstrapBroadcastState(); err != nil {
 		return fmt.Errorf("unable to initialize broadcast state: %v", err)
 	}
@@ -136,227 +163,41 @@ func bootstrapBroadcastState() error {
 }
 
 func GetStartramServices() error {
-	zap.L().Info("Retrieving StarTram services info")
-	if res, err := startram.Retrieve(); err != nil {
-		zap.L().Error(fmt.Sprintf("%v", err))
-		return err
-	} else {
-		zap.L().Info(fmt.Sprintf("%+v", res.Subdomains))
-		return nil
-	}
+	return collectors.GetStartramServices()
 }
 
 // put startram regions into broadcast struct
 func LoadStartramRegions() error {
 	zap.L().Info("Retrieving StarTram region info")
-	regions, err := startram.SyncRegions()
+	regions, err := collectors.LoadStartramRegions()
 	if err != nil {
 		return err
-	} else {
-		mu.Lock()
-		broadcastState.Profile.Startram.Info.Regions = regions
-		mu.Unlock()
 	}
+	mu.Lock()
+	broadcastState.Profile.Startram.Info.Regions = regions
+	mu.Unlock()
 	return nil
 }
 
 // this is for building the broadcast objects describing piers
 func ConstructPierInfo() (map[string]structs.Urbit, error) {
-	settings := config.StartramSettingsSnapshot()
-	piers := settings.Piers
-	updates := make(map[string]structs.Urbit)
-
-	backups := backupSnapshotForPiers(piers, config.GetStartramConfig().Backups)
-	runtimeSnapshot, err := runtimeSnapshotForPiers(piers)
-	if err != nil {
-		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
-		zap.L().Error(errmsg)
-		return updates, err
-	}
-	startramSnapshot := startramSnapshotForPiers(config.GetStartramConfig().Subdomains)
-
-	for pier, status := range runtimeSnapshot.pierStatus {
-		urbit, ok := assembleUrbitView(
-			pier,
-			status,
-			settings,
-			runtimeSnapshot,
-			backups,
-			startramSnapshot,
-		)
-		if ok {
-			updates[pier] = urbit
-		}
-	}
-	return updates, nil
+	state := GetState()
+	return collectors.ConstructPierInfo(state, GetScheduledPack)
 }
 
-type pierBackupSnapshot struct {
-	remote       structs.Backup
-	localDaily   structs.Backup
-	localWeekly  structs.Backup
-	localMonthly structs.Backup
-}
-
-type pierRuntimeSnapshot struct {
-	currentState structs.AuthBroadcast
-	shipNetworks map[string]string
-	pierStatus   map[string]string
-	hostName     string
-}
-
-type pierStartramSnapshot struct {
-	remoteReadyByURL map[string]bool
-}
-
-func backupSnapshotForPiers(piers []string, remoteBackups []structs.Backup) pierBackupSnapshot {
-	return pierBackupSnapshot{
-		remote:       flattenRemoteBackups(remoteBackups),
-		localDaily:   localBackupsForPeriod(piers, "daily"),
-		localWeekly:  localBackupsForPeriod(piers, "weekly"),
-		localMonthly: localBackupsForPeriod(piers, "monthly"),
-	}
-}
-
-func flattenRemoteBackups(remoteBackups []structs.Backup) structs.Backup {
-	remoteBackupMap := make(structs.Backup)
-	for _, backup := range remoteBackups {
-		for ship, backupInfo := range backup {
-			remoteBackupMap[ship] = backupInfo
-		}
-	}
-	return remoteBackupMap
-}
-
-func localBackupsForPeriod(piers []string, period string) structs.Backup {
-	localBackups := make(structs.Backup)
-	for _, ship := range piers {
-		shipBackups, err := filepath.Glob(filepath.Join(BackupDir, ship, period, "*"))
-		if err != nil {
-			continue
-		}
-		for _, backup := range shipBackups {
-			timestamp, err := strconv.Atoi(filepath.Base(backup))
-			if err != nil {
-				continue
-			}
-			localBackups[ship] = append(localBackups[ship], structs.BackupObject{Timestamp: timestamp, MD5: ""})
-		}
-	}
-	return localBackups
-}
-
-func runtimeSnapshotForPiers(piers []string) (pierRuntimeSnapshot, error) {
-	return runtimeSnapshotCollector{}.collect(piers)
-}
-
-func resolveBroadcastHostName() string {
-	hostName := system.LocalUrl
-	if hostName == "" {
-		zap.L().Debug("Defaulting to `nativeplanet.local`")
-		hostName = "nativeplanet.local"
-	}
-	return hostName
-}
-
-func startramSnapshotForPiers(subdomains []structs.Subdomain) pierStartramSnapshot {
-	readyByURL := make(map[string]bool, len(subdomains))
-	for _, subdomain := range subdomains {
-		readyByURL[subdomain.URL] = subdomain.Status == "ok"
-	}
-	return pierStartramSnapshot{
-		remoteReadyByURL: readyByURL,
-	}
-}
-
-func assembleUrbitView(
-	pier string,
-	status string,
-	settings config.StartramSettings,
-	runtimeSnapshot pierRuntimeSnapshot,
-	backups pierBackupSnapshot,
-	startramSnapshot pierStartramSnapshot,
-) (structs.Urbit, bool) {
-	return urbitViewMapper{}.assemble(
-		pier,
-		status,
-		settings,
-		runtimeSnapshot,
-		backups,
-		startramSnapshot,
-	)
-}
-
-func lusCodeIfRunning(pier string, status string) string {
-	if strings.Contains(status, "Up") {
-		lusCode, _ := click.GetLusCode(pier)
-		return lusCode
-	}
-	return ""
-}
-
-func deskInstalledIfRunning(pier string, status string, desk string) bool {
-	if !strings.Contains(status, "Up") {
-		return false
-	}
-	deskStatus, err := click.GetDesk(pier, desk, false)
-	if err != nil {
-		zap.L().Debug(fmt.Sprintf("Broadcast failed to get %s desk info for %v: %v", desk, pier, err))
-		return false
-	}
-	return deskStatus == "running"
-}
-
-func boolSettingWithDefaultTrue(setting any) bool {
-	if value, ok := setting.(bool); ok {
-		return value
-	}
-	return true
-}
-
-func normalizePackSchedule(meldDay string, meldDate int) (string, int) {
-	days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-	packDay := "Monday"
-	for _, day := range days {
-		if day == meldDay {
-			packDay = strings.Title(meldDay)
-			break
-		}
-	}
-	packDate := 1
-	if meldDate > 1 {
-		packDate = meldDate
-	}
-	return packDay, packDate
-}
-
+// Return a clone of apps info built from config state.
 func constructAppsInfo() structs.Apps {
-	return appInfoCollector{}.collect()
+	return collectors.ConstructAppsInfo()
 }
 
 func constructProfileInfo() structs.Profile {
-	return profileInfoCollector{}.collect()
+	state := GetState()
+	return collectors.ConstructProfileInfo(state.Profile.Startram.Info.Regions)
 }
 
 // put together the system[usage] subobject
 func constructSystemInfo() structs.System {
-	return systemInfoCollector{}.collect()
-}
-
-// return a map of ships and their networks
-func GetContainerNetworks(containers []string) map[string]string {
-	res := make(map[string]string)
-	for _, container := range containers {
-		network, err := docker.GetContainerNetwork(container)
-		if err != nil {
-			//errmsg := fmt.Sprintf("Error getting container network: %v", err)
-			//zap.L().Error(errmsg) // temp surpress
-			continue
-		} else {
-			res[container] = network
-		}
-	}
-	return res
+	return collectors.ConstructSystemInfo()
 }
 
 // stupid update method instead of psychotic recursion
@@ -364,6 +205,17 @@ func UpdateBroadcast(broadcast structs.AuthBroadcast) {
 	mu.Lock()
 	defer mu.Unlock()
 	broadcastState = broadcast
+}
+
+// ApplyBroadcastUpdate mutates the current broadcast snapshot and optionally notifies connected clients.
+func ApplyBroadcastUpdate(notify bool, mutate func(state *structs.AuthBroadcast)) error {
+	current := GetState()
+	mutate(&current)
+	UpdateBroadcast(current)
+	if !notify {
+		return nil
+	}
+	return BroadcastToClients()
 }
 
 // return broadcast state
@@ -410,11 +262,12 @@ func cloneBroadcastState(in structs.AuthBroadcast) structs.AuthBroadcast {
 
 // return json string of current broadcast state
 func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
-	//temp
-	bState.Type = "structure"
-	bState.AuthLevel = "authorized"
-	//end temp
-	broadcastJson, err := json.Marshal(bState)
+	envelope := authBroadcastEnvelope{
+		Type:      string(transition.BroadcastMessageTypeStructure),
+		AuthLevel: string(transition.BroadcastAuthLevelAuthorized),
+		Payload:   bState,
+	}
+	broadcastJson, err := json.Marshal(envelope)
 	if err != nil {
 		errmsg := fmt.Sprintf("Error marshalling response: %v", err)
 		zap.L().Error(errmsg)
@@ -425,19 +278,19 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 
 // broadcast the global state to auth'd clients
 func BroadcastToClients() error {
-	bState := GetState()
-	leakSink(bState) // vere 3.0
-	cm := auth.GetClientManager()
-	if cm.HasAuthSession() {
-		authJson, err := GetStateJson(bState)
-		auth.ClientManager.BroadcastAuth(authJson)
-		if err != nil {
-			return err
-		}
-		auth.ClientManager.BroadcastAuth(authJson)
+	return broadcastToClientsWithRuntime(broadcastToClientsRuntimeDefault{}, GetState())
+}
+
+func broadcastToClientsWithRuntime(rt broadcastToClientsRuntime, bState structs.AuthBroadcast) error {
+	rt.emitToLeak(bState) // vere 3.0
+	if !rt.hasAuthSession() {
 		return nil
 	}
-	return nil
+	authJson, err := GetStateJson(bState)
+	if err != nil {
+		return err
+	}
+	return rt.broadcastAuth(authJson)
 }
 
 // broadcast to unauth clients
@@ -445,6 +298,7 @@ func UnauthBroadcast(input []byte) error {
 	auth.ClientManager.BroadcastUnauth(input)
 	return nil
 }
+
 func ReloadUrbits() error {
 	zap.L().Info("Reloading ships in broadcast")
 	urbits, err := ConstructPierInfo()

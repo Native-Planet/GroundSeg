@@ -95,10 +95,8 @@ func LookForPorts() bool {
 			// check if sock exists
 			sockLocation := filepath.Join(dockerDir, patp, "_data", patp, ".urb", "dev", "groundseg")
 			shipConf := leakUrbitConf(patp)
-			if shipConf.CustomPierLocation != nil {
-				if str, ok := shipConf.CustomPierLocation.(string); ok {
-					sockLocation = filepath.Join(str, patp, ".urb", "dev", "groundseg")
-				}
+			if shipConf.CustomPierLocation != "" {
+				sockLocation = filepath.Join(shipConf.CustomPierLocation, patp, ".urb", "dev", "groundseg")
 			}
 			sock := filepath.Join(sockLocation, sockFile)
 			_, err := leakStat(sock)

@@ -1,0 +1,54 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 88.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Both `uploadsvc/service.go` and `system/wifi/service/c2c_service.go` define private, duplicated action-registry patterns (`actionBindings`/`c2cActionBindings`) with near-identical parse/lookup/execute wiring.",
+        "Each module exposes a different local contract-building flow (`ParseAction`/`SupportedActions` vs `ParseC2CAction`/`SupportedC2CActions`) without a shared module boundary for websocket command semantics.",
+        "`uploadsvc/adapters/upload_payload_test.go` depends on concrete action/request structure details via field-level assertions, increasing coupling to a specific producer/consumer contract implementation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The code paths are coherent and not broken, but duplicated command-translation registries create a maintenance coupling risk: adding or changing action semantics can drift across modules without compile-time enforcement. A shared command-contract boundary or generator-driven registry would improve module coupling."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_registry_fragmentation",
+      "summary": "Command action dispatch patterns are reimplemented per module, increasing the chance of cross-module contract drift as websocket actions evolve.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`uploadsvc/service.go` uses a private `actionBindings` slice with `parseAction`, `SupportedActions`, and `DescribeAction` to validate and execute actions.",
+        "`system/wifi/service/c2c_service.go` mirrors that shape with `c2cActionBindings`, `ParseC2CAction`, and `SupportedC2CActions`.",
+        "The adapter test asserts mapping details directly against `uploadsvc.OpenEndpointRequest`/`ActionOpenEndpoint`, tightly coupling test-level expectations to a specific internal action shape."
+      ],
+      "suggestion": "Extract a shared command-contract abstraction for websocket action registries (including canonical action metadata, parsing, supported-action enumeration, and operation description), then implement module-specific adapters against that boundary to prevent duplicated contract logic and detect drift when action sets change.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "action_contract_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Command-to-action translation is implemented independently in multiple modules instead of via a shared contract layer",
+      "Tests in adapter modules assert concrete payload-to-command mappings directly, which couples them to evolving internal command shapes"
+    ],
+    "likely_symptoms": [
+      "action_contract_fragmentation"
+    ],
+    "possible_false_positives": [
+      "If command domains are intentionally independent, shared abstraction could be over-generalized and reduce clarity"
+    ]
+  }
+}

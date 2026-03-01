@@ -1,0 +1,99 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 62.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Broadcasting boundary in `BroadcastToClients` duplicates state broadcast work and mixes notification policy with transport fanout directly, indicating thin abstraction with observable side-effect noise.",
+        "Core domain state types in `UrbitDocker` still encode multiple semantically stable booleans as `any`, forcing repeated runtime type coercion at call sites and weakening interface contracts.",
+        "`main.go` acts as a procedural composition root that directly sequences dozens of concrete package calls and goroutine loops, making startup orchestration and failure-policy logic non-composable."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 66.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "broadcast-auth-broadcast-double-send",
+      "summary": "Authorized state broadcast is emitted twice before returning, creating duplicated fanout work and misleading abstraction semantics.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/leak/broadcast.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `auth.ClientManager.BroadcastAuth(authJson)` twice in the happy-path branch when `HasAuthSession()` is true, while the first return value is already captured and checked after the first call.",
+        "There is no conditional branch or policy flag to justify the duplicate call, so callers of the broadcast abstraction cannot predict a single delivery contract."
+      ],
+      "suggestion": "Use a single authorized broadcast call path (one send + error handling), and if a two-phase strategy is intended, split into explicit calls with distinct payloads and comments or policy parameters.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "ship-config-schema-type-erasure",
+      "summary": "Ship config encodes runtime booleans as `any`, forcing ad-hoc conversions and weakening contract boundaries.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/broadcast/collectors_and_mappers.go",
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`UrbitDocker` defines `CustomPierLocation`, `StartramReminder`, `ChopOnUpgrade`, and `DisableShipRestarts` as `any` in the config model.",
+        "`collectors_and_mappers.go` and `collectors` logic call `boolSettingWithDefaultTrue` to recover these values at runtime with a default fallback, which masks malformed/mis-typed persisted data.",
+        "`urbit_operations.go` and `importer.go` repeatedly assert these fields with type checks (`.(string)` / `.(bool)`), showing callers are compensating for a weak domain contract."
+      ],
+      "suggestion": "Replace those `any` fields with explicit typed booleans/string fields in `UrbitDocker` and keep a migration layer in a single unmarshal path that normalizes legacy payloads, so callers consume stable typed config without scattered type assertions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "leaky_config_schema"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "bootstrap-composition-coupling",
+      "summary": "Application startup logic is tightly coupled to concrete subsystems inside `main`, reducing composability and testable abstraction boundaries.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`main.go` directly calls and wires initialization and loop startup across `auth`, `api`, `importer`, `system`, `routines`, `docker`, `rectify`, and broadcasting modules in one function.",
+        "Seam structs are already present (`runtime_seams.go` files) but startup still hardcodes concrete call order and side effects in `main`, so composition is only partial and weak.",
+        "Error and recovery behavior is embedded inline in startup sequence, making it harder to substitute policies or defer initialization stages for tests and deployment modes."
+      ],
+      "suggestion": "Introduce a small startup coordinator abstraction (phased startup graph) with explicit dependency ordering and lifecycle status reporting, then move package-specific initialization into registered startup components.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "composition_boundary_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Leaky and weakly typed config domain model forces runtime conversion work across consumers.",
+      "Runtime abstractions for startup and orchestration are incomplete or partial, leaving `main` as a tightly coupled composition hub."
+    ],
+    "likely_symptoms": [
+      "broadcast-auth-broadcast-double-send",
+      "ship-config-schema-type-erasure",
+      "bootstrap-composition-coupling"
+    ],
+    "possible_false_positives": [
+      "`broadcast.BroadcastToClients` duplicate send may be an intentional transitional pattern; verify there is no consumer-level expectation for duplicated frames."
+    ]
+  }
+}

@@ -9,27 +9,6 @@ import (
 	"groundseg/structs"
 )
 
-func resetLoopSeams() func() {
-	originalGetClientManager := getClientManagerForLoop
-	originalGetLickStatuses := getLickStatusesForLoop
-	originalConstructSystem := constructSystemInfoForLoop
-	originalConstructPier := constructPierInfoForLoop
-	originalConstructApps := constructAppsInfoForLoop
-	originalConstructProfile := constructProfileInfoForLoop
-	originalUpdateBroadcast := updateBroadcastForLoop
-	originalBroadcastClients := broadcastToClientsForLoop
-	return func() {
-		getClientManagerForLoop = originalGetClientManager
-		getLickStatusesForLoop = originalGetLickStatuses
-		constructSystemInfoForLoop = originalConstructSystem
-		constructPierInfoForLoop = originalConstructPier
-		constructAppsInfoForLoop = originalConstructApps
-		constructProfileInfoForLoop = originalConstructProfile
-		updateBroadcastForLoop = originalUpdateBroadcast
-		broadcastToClientsForLoop = originalBroadcastClients
-	}
-}
-
 func TestPreserveTransitionHelpers(t *testing.T) {
 	oldState := structs.AuthBroadcast{
 		System: structs.System{
@@ -67,31 +46,27 @@ func TestPreserveTransitionHelpers(t *testing.T) {
 }
 
 func TestRunBroadcastTickSkipsWhenNoSessionsOrLeaks(t *testing.T) {
-	restore := resetLoopSeams()
-	t.Cleanup(restore)
-
-	getClientManagerForLoop = func() *structs.ClientManager {
-		return auth.NewClientManager()
-	}
-	getLickStatusesForLoop = func() map[string]leak.LickStatus {
-		return map[string]leak.LickStatus{}
-	}
+	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
+		rt.getClientManager = func() *structs.ClientManager {
+			return auth.NewClientManager()
+		}
+		rt.getLickStatuses = func() map[string]leak.LickStatus {
+			return map[string]leak.LickStatus{}
+		}
+	})
 	constructed := false
-	constructSystemInfoForLoop = func() structs.System {
+	runtime.constructSystemInfo = func() structs.System {
 		constructed = true
 		return structs.System{}
 	}
 
-	runBroadcastTick()
+	runBroadcastTickWithRuntime(runtime)
 	if constructed {
 		t.Fatal("expected tick to skip expensive construction when no observers are connected")
 	}
 }
 
 func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
-	restore := resetLoopSeams()
-	t.Cleanup(restore)
-
 	oldState := structs.AuthBroadcast{
 		System: structs.System{
 			Transition: structs.SystemTransitionBroadcast{BugReport: "loading"},
@@ -109,42 +84,44 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 	}
 	UpdateBroadcast(oldState)
 
-	getClientManagerForLoop = func() *structs.ClientManager {
-		return auth.NewClientManager()
-	}
-	getLickStatusesForLoop = func() map[string]leak.LickStatus {
-		return map[string]leak.LickStatus{"zod": {}}
-	}
-	constructSystemInfoForLoop = func() structs.System {
-		system := structs.System{}
-		system.Info.Usage.CPU = 42
-		return system
-	}
-	constructPierInfoForLoop = func() (map[string]structs.Urbit, error) {
-		return map[string]structs.Urbit{"zod": {}}, nil
-	}
-	constructAppsInfoForLoop = func() structs.Apps {
-		apps := structs.Apps{}
-		apps.Penpai.Info.ActiveModel = "llama"
-		return apps
-	}
-	constructProfileInfoForLoop = func() structs.Profile {
-		profile := structs.Profile{}
-		profile.Startram.Info.Endpoint = "api.example.com"
-		return profile
-	}
+	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
+		rt.getClientManager = func() *structs.ClientManager {
+			return auth.NewClientManager()
+		}
+		rt.getLickStatuses = func() map[string]leak.LickStatus {
+			return map[string]leak.LickStatus{"zod": {}}
+		}
+		rt.constructSystemInfo = func() structs.System {
+			system := structs.System{}
+			system.Info.Usage.CPU = 42
+			return system
+		}
+		rt.constructPierInfo = func() (map[string]structs.Urbit, error) {
+			return map[string]structs.Urbit{"zod": {}}, nil
+		}
+		rt.constructAppsInfo = func() structs.Apps {
+			apps := structs.Apps{}
+			apps.Penpai.Info.ActiveModel = "llama"
+			return apps
+		}
+		rt.constructProfileInfo = func() structs.Profile {
+			profile := structs.Profile{}
+			profile.Startram.Info.Endpoint = "api.example.com"
+			return profile
+		}
+	})
 	var updated structs.AuthBroadcast
-	updateBroadcastForLoop = func(next structs.AuthBroadcast) {
+	runtime.updateBroadcast = func(next structs.AuthBroadcast) {
 		updated = next
 		UpdateBroadcast(next)
 	}
 	broadcastCalls := 0
-	broadcastToClientsForLoop = func() error {
+	runtime.broadcastToClients = func() error {
 		broadcastCalls++
 		return nil
 	}
 
-	runBroadcastTick()
+	runBroadcastTickWithRuntime(runtime)
 
 	if updated.System.Info.Usage.CPU != 42 {
 		t.Fatalf("expected reconstructed system info, got %+v", updated.System.Info.Usage)
@@ -170,30 +147,28 @@ func TestRunBroadcastTickBuildsStateAndPreservesTransitions(t *testing.T) {
 }
 
 func TestRunBroadcastTickHandlesPierInfoError(t *testing.T) {
-	restore := resetLoopSeams()
-	t.Cleanup(restore)
-
 	UpdateBroadcast(structs.AuthBroadcast{
 		Urbits: map[string]structs.Urbit{"zod": {}},
 	})
-	getClientManagerForLoop = func() *structs.ClientManager {
-		return auth.NewClientManager()
-	}
-	getLickStatusesForLoop = func() map[string]leak.LickStatus {
-		return map[string]leak.LickStatus{"zod": {}}
-	}
-	constructSystemInfoForLoop = func() structs.System { return structs.System{} }
-	constructPierInfoForLoop = func() (map[string]structs.Urbit, error) {
-		return nil, errors.New("failed")
-	}
-	constructAppsInfoForLoop = func() structs.Apps { return structs.Apps{} }
-	constructProfileInfoForLoop = func() structs.Profile { return structs.Profile{} }
-	updateBroadcastForLoop = func(next structs.AuthBroadcast) {
+	runtime := newTestBroadcastLoopRuntime(func(rt *broadcastLoopRuntime) {
+		rt.getClientManager = func() *structs.ClientManager {
+			return auth.NewClientManager()
+		}
+		rt.getLickStatuses = func() map[string]leak.LickStatus {
+			return map[string]leak.LickStatus{"zod": {}}
+		}
+		rt.constructSystemInfo = func() structs.System { return structs.System{} }
+		rt.constructPierInfo = func() (map[string]structs.Urbit, error) {
+			return nil, errors.New("failed")
+		}
+		rt.constructAppsInfo = func() structs.Apps { return structs.Apps{} }
+		rt.constructProfileInfo = func() structs.Profile { return structs.Profile{} }
+		rt.broadcastToClients = func() error { return nil }
+	})
+	runtime.updateBroadcast = func(next structs.AuthBroadcast) {
 		UpdateBroadcast(next)
 	}
-	broadcastToClientsForLoop = func() error { return nil }
 
 	// Should not panic even when pier info builder returns error and nil map.
-	runBroadcastTick()
+	runBroadcastTickWithRuntime(runtime)
 }
-

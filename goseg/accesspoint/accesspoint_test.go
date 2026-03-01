@@ -1,6 +1,7 @@
 package accesspoint
 
 import (
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -31,7 +32,7 @@ func TestResolveAPPasswordFallbackShape(t *testing.T) {
 }
 
 func TestMakeConfigContainsNetworkAndCredentials(t *testing.T) {
-	cfg, err := makeConfig("wlan0", "GroundSegTest", "strong-passphrase")
+	cfg, err := buildHostapdConfig("wlan0", "GroundSegTest", "strong-passphrase")
 	if err != nil {
 		t.Fatalf("makeConfig returned error: %v", err)
 	}
@@ -76,7 +77,7 @@ func TestMakeConfigRejectsInvalidInputs(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := makeConfig(tc.wlan, tc.ssid, tc.password); err == nil {
+			if _, err := buildHostapdConfig(tc.wlan, tc.ssid, tc.password); err == nil {
 				t.Fatal("expected makeConfig validation error")
 			}
 		})
@@ -100,7 +101,7 @@ func TestWriteHostapdConfigWritesConfigFile(t *testing.T) {
 	password = "valid-passphrase"
 	hostapdConfigPath = filepath.Join(t.TempDir(), "hostapd.config")
 
-	if err := writeHostapdConfig(); err != nil {
+	if err := writeHostapdConfig(hostapdConfigPath, wlan, ssid, password); err != nil {
 		t.Fatalf("writeHostapdConfig returned error: %v", err)
 	}
 	data, err := os.ReadFile(hostapdConfigPath)
@@ -264,8 +265,8 @@ func TestStartRouterBuildsExpectedCommandFlow(t *testing.T) {
 		return "", nil
 	}
 
-	if !startRouter() {
-		t.Fatal("startRouter should return true")
+	if err := startRouter(); err != nil {
+		t.Fatalf("startRouter should succeed: %v", err)
 	}
 	expected := []string{
 		"ip link set wlan0 up",
@@ -293,8 +294,8 @@ func TestStopRouterBuildsExpectedTeardownCommands(t *testing.T) {
 		return "", nil
 	}
 
-	if !stopRouter() {
-		t.Fatal("stopRouter should return true")
+	if err := stopRouter(); err != nil {
+		t.Fatalf("stopRouter should succeed: %v", err)
 	}
 	expected := []string{
 		"ip link set wlan0 down",
@@ -309,5 +310,26 @@ func TestStopRouterBuildsExpectedTeardownCommands(t *testing.T) {
 		if !hasCommand(commands, want) {
 			t.Fatalf("missing expected teardown command %q in %v", want, commands)
 		}
+	}
+}
+
+func TestStopRouterReturnsConcreteError(t *testing.T) {
+	restore := resetRouterGlobalsForTest()
+	t.Cleanup(restore)
+
+	wlan = "wlan0"
+	executeRouterShellFn = func(cmd string) (string, error) {
+		if cmd == "ip link set wlan0 down" {
+			return "", errors.New("down failed")
+		}
+		return "", nil
+	}
+
+	err := stopRouter()
+	if err == nil {
+		t.Fatal("expected stopRouter to fail on first command error")
+	}
+	if !strings.Contains(err.Error(), "stop wlan interface") {
+		t.Fatalf("expected contextual router error, got: %v", err)
 	}
 }

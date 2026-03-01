@@ -1,0 +1,48 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "system package wires a C2C execution path through package-level mutable vars (`c2cServiceFactory`, `connectToWifiForC2C`, `restartGroundSegForC2C`) in `system/wifi_c2c_service.go`, and the transport adapter defaults `executeC2CAction` to that package-level function in `system/wifi_transport_adapter.go`.",
+        "These globals are mutable by nature, so runtime behavior can be replaced implicitly by package-level state changes rather than explicit dependency construction."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Boundaries between transport and service execution are coupled through mutable package state instead of explicit constructor dependencies, so cross-module behavior is harder to reason about and test deterministically."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_global_c2c_dependency_seams",
+      "summary": "C2C execution flow depends on mutable package-level function indirection rather than explicit dependency wiring.",
+      "related_files": [
+        "system/wifi_c2c_service.go",
+        "system/wifi_transport_adapter.go"
+      ],
+      "evidence": [
+        "`system/wifi_c2c_service.go` defines mutable globals `c2cServiceFactory`, `connectToWifiForC2C`, and `restartGroundSegForC2C` that determine how `c2cService` is created and how actions execute.",
+        "`system/wifi_transport_adapter.go` stores `executeC2CAction` in the adapter struct and initializes it from that global entrypoint, so transport behavior is coupled to package-global state."
+      ],
+      "suggestion": "Replace mutable package globals with an explicit `c2cDeps` interface/struct passed through constructors (e.g., `newCaptiveTransportAdapter(deps c2cDeps)` and `NewC2CService(deps c2cServiceDeps)`), and use immutable concrete adapters in production.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "package_global_execution_seams"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Shared runtime behavior is configured through mutable package globals instead of immutable constructor-injected dependencies, increasing cross-module coupling and hidden initialization coupling."
+    ],
+    "likely_symptoms": [
+      "global-state-driven behavior switches in `system` that are hard to trace across imports"
+    ],
+    "possible_false_positives": []
+  }
+}

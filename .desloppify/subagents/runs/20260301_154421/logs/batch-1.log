@@ -116,15 +116,99 @@ Output schema:
 }
 
 
-STATUS: running
-STARTED AT: 2026-03-01T15:44:22+00:00
-ELAPSED: 20s
-OUTPUT FILE: /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_154421/results/batch-1.raw.txt (missing)
+STDOUT:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 77.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple packages exchange orchestration events with raw string literals instead of a shared transition contract (`handler/urbit_operations.go` publishes `"pack"`, `"chop"`, `"togglePower"` etc.; `rectify/rectify.go` decodes events with duplicate string switches).",
+        "Two parallel runtime-seam structs duplicate similar dependency-injection surfaces (`dockerRuntime` in `docker/runtime_seams.go` and `routineRuntime` in `routines/runtime_seams.go`) while callers still directly invoke package functions in places (`handler/urbit_operations.go` calls `docker.GetShipStatus`, `config.UpdateContainerState`, `chopsvc.ChopPier` directly).",
+        "Side-effect execution seams are inconsistent: `system/wifi.go` uses injectable `execCommandForWiFi` while `main.go` uses raw `exec.Command(\"reboot\")` in `killSwitch`, bypassing the same abstraction intent."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 54.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 46.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "stringly_typed_transition_contract",
+      "summary": "Event transition contracts are duplicated as ad-hoc strings across producer and consumer code.",
+      "related_files": ["goseg/handler/urbit_operations.go", "goseg/handler/startram.go", "goseg/rectify/rectify.go"],
+      "evidence": [
+        "`handler/urbit_operations.go` emits transitions with literal types like \"pack\", \"packMeld\", \"chopOnUpgrade\", etc.",
+        "`rectify/rectify.go` and other rectify handlers consume those states via large string switch statements with manual defaults for unrecognized values.",
+        "`chopsvc/service.go` and other callers also construct transition events with hand-typed string tags, but there is no shared enum/type-safe model for transition names."
+      ],
+      "suggestion": "Introduce a shared transition enum/types module (e.g., `type UrbitTransitionType string`) and replace literals with constants plus a central dispatcher/validator so producers and consumers cannot diverge silently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_event_protocol"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_runtime_seam_stacks",
+      "summary": "Multiple runtime-seam layers add indirection without a coherent seam boundary.",
+      "related_files": ["goseg/docker/runtime_seams.go", "goseg/routines/runtime_seams.go", "goseg/routines/docker.go", "goseg/handler/urbit_operations.go"],
+      "evidence": [
+        "`docker/runtime_seams.go` defines `dockerRuntime` with 20+ function fields that mostly map 1:1 to package globals.",
+        "`routines/runtime_seams.go` defines `routineRuntime` with a similarly broad, parallel field set.",
+      "`routines/docker.go` sometimes consumes `routineRuntime`, while handler-level code updates ship state directly through concrete package functions (`docker.GetShipStatus`, `config.UpdateContainerState`) instead of shared abstractions.",
+        "This creates separate dependency-injection philosophies in adjacent layers rather than a single abstraction boundary."
+      ],
+      "suggestion": "Collapse to one injected domain-facing interface for ship/config/docker operations and pass it through call chains; remove duplicated seam structs once callers are migrated to the shared interface.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_seam_abstractions"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "inconsistent_command_execution_abstraction",
+      "summary": "Shell-command side effects are executed via mixed abstractions, weakening testability and consistency.",
+      "related_files": ["goseg/system/wifi.go", "goseg/main.go"],
+      "evidence": [
+        "`system/wifi.go` defines injectable command seam variables (`execCommandForWiFi`, `runCommandForWiFi`) for shell calls.",
+        "Most wifi/system operations use those seams for testability/DI.",
+        "`main.go`'s `killSwitch` constructs/executes `exec.Command(\"reboot\")` directly, bypassing the existing seam pattern."
+      ],
+      "suggestion": "Introduce a shared command-execution abstraction (e.g., `systemcmd.Runner`) and route all reboot/service/network side effects through it; use function-variable/struct injection consistently in both `system` and startup paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parallel_seam_abstractions"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Stringly typed cross-module protocols where event names are manually synchronized.",
+      "Parallel DI/seam patterns (runtime structs plus direct package calls) with inconsistent adoption across layers."
+    ],
+    "likely_symptoms": [
+      "Brittle transitions when any producer/consumer misspells a transition type.",
+      "Increased cognitive load from duplicated indirection and uneven test seams.",
+      "Missed mocking points for command execution in startup/shutdown paths."
+    ],
+    "possible_false_positives": [
+      "Some low-cost string constants might be intentionally tolerated to avoid refactor churn."
+    ]
+  }
+}
 
-STDOUT (live):
 
-
-STDERR (live):
+STDERR:
 OpenAI Codex v0.106.0 (research preview)
 --------
 workdir: /Users/chuah/NP/GroundSeg
@@ -968,4 +1052,235 @@ func WithAuthorizedSession(tokenID string, session structs.SessionInfo) ConfUpda
 func WithUnauthorizedSession(tokenID string, session structs.SessionInfo) ConfUpdateOption {
 	return func(patch *ConfPatch) {
 		if patch.UnauthorizedSessions == nil {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '520,760p' goseg/config/config.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+		patch.LastKnownMDNS != nil ||
+		patch.DisableSlsa != nil ||
+		patch.GSVersion != nil ||
+		patch.BinHash != nil
+}
+
+// UpdateConfTyped applies typed mutations to SysConfig and persists them.
+func UpdateConfTyped(opts ...ConfUpdateOption) error {
+	if len(opts) == 0 {
+		return nil
+	}
+
+	patch := &ConfPatch{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(patch)
+		}
+	}
+	if !patch.hasUpdates() {
+		return nil
+codex
+I’ve extracted enough of config internals to establish two likely abstraction risks. I’ll now pull just the small remaining sections for any helper/utility abstraction patterns in importer/wireguard/lifecycle-related files and wrap up findings with evidence.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,220p' goseg/auth/auth.go && sed -n '1,220p' goseg/docker/runtime_seams.go && sed -n '1,220p' goseg/routines/runtime_seams.go && sed -n '1,220p' goseg/handler/urbit_operations.go && sed -n '1,260p' goseg/importer/http_upload? 2>/dev/null" in /Users/chuah/NP/GroundSeg exited 1 in 51ms:
+package auth
+
+// package for authenticating websockets
+// we use a homespun jwt knock-off because no tls on lan
+// tokens contain client metadata for authentication
+// authentication adds you to the AuthenticatedClients map
+// broadcasts get sent to members of this map
+
+// todo: purge old sessions from both maps
+
+// client send:
+// {
+// 	"type": "verify",
+// 	"id": "jsgeneratedid",
+// 	"token<optional>": {
+// 	  "id": "servergeneratedid",
+// 	  "token": "encryptedtext"
+// 	}
+// }
+
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "issue|issues|finding|identifier|skip|wontfix|next|cluster|rectify|abstra" .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+6:    "abstraction_fitness",
+11:    "abstraction_fitness": {
+18:        "Leaky abstractions: callers consistently bypass intended interfaces",
+22:      "skip": [
+23:        "Dependency-injection or framework abstractions required for wiring/testability",
+25:        "Cases where abstraction clearly reduces duplication across multiple callers",
+27:        "If the core issue is dependency direction or cycles, use cross_module_architecture"
+31:      "description": "Are structural design decisions sound \u2014 functions focused, abstractions earned, patterns consistent?",
+35:        "Files accumulating issues across many dimensions \u2014 likely mixing unrelated concerns",
+39:      "skip": [
+60:      "skip": [
+76:    "naming": "Use camelCase for unexported and PascalCase for exported identifiers."
+124:    "abstractions": {
+135:        "abstraction_leverage": 100,
+151:          "file": "goseg/rectify/rectify.go",
+186:          "file": "goseg/rectify/rectify_test.go",
+1743:        "goseg/rectify/": {
+1748:            "rectify.go",
+1749:            "rectify_test.go"
+2092:      "rectify/": {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '2130,2490p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+        "testing": 3
+      },
+      "system/": {
+        "fmt": 8,
+        "groundseg/structs": 8,
+        "os/exec": 8
+      },
+      "adapters/": {
+        "groundseg/structs": 2,
+        "groundseg/uploadsvc": 2,
+        "testing": 1
+      },
+      "importeradapter/": {
+        "groundseg/importer": 1,
+        "groundseg/structs": 1,
+        "groundseg/uploadsvc": 1
+      },
+      "uploadsvc/": {
+        "fmt": 1,
+        "errors": 1,
+codex
+I’ve cross-checked prior listed findings; no open abstraction-specific defects are carried in the packet for this batch that are clearly resolved. I’ll now mine for evidence-backed material issues in the assigned files and keep findings to proven structural defects only.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"type .*interface|type .* struct \\{|type .*Alias|interface \\{\" goseg/broadcast/collectors_and_mappers.go goseg/rectify/rectify.go goseg/broadcast/broadcast.go goseg/config/config.go goseg/config/wireguard.go goseg/config/urbit.go goseg/importer/importer.go goseg/importer/extract.go goseg/docker/runtime_seams.go goseg/routines/runtime_seams.go goseg/docker/docker.go goseg/chopsvc/service.go goseg/docker/wireguard.go goseg/system/wifi.go goseg/handler/urbit_operations.go goseg/handler/startram.go goseg/handler/support.go goseg/main.go goseg/routines/docker.go goseg/routines/version.go goseg/defaults/defaults.go goseg/defaults/version.go goseg/structs/configs.go goseg/docker/llama_test.go goseg/docker/wireguard_test.go goseg/leak/broadcast.go goseg/broadcast/loop_test.go goseg/rectify/rectify_test.go goseg/leak/broadcast_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/routines/runtime_seams.go:15:type routineRuntime struct {
+goseg/docker/runtime_seams.go:12:type dockerRuntime struct {
+goseg/structs/configs.go:9:type SysConfig struct {
+goseg/structs/configs.go:62:type DiskWarning struct {
+goseg/structs/configs.go:71:type Penpai struct {
+goseg/structs/configs.go:78:type SessionInfo struct {
+goseg/structs/configs.go:84:type UrbitDocker struct {
+goseg/structs/configs.go:259:type WgConfig struct {
+goseg/structs/configs.go:273:type McConfig struct {
+goseg/structs/configs.go:282:type NetdataConfig struct {
+goseg/broadcast/broadcast.go:194:type pierBackupSnapshot struct {
+goseg/broadcast/broadcast.go:201:type pierRuntimeSnapshot struct {
+goseg/broadcast/broadcast.go:208:type pierStartramSnapshot struct {
+goseg/handler/support.go:144:type partialBugReportError struct {
+goseg/handler/support.go:476:type LogFile struct {
+goseg/importer/importer.go:36:type uploadSession struct {
+goseg/importer/importer.go:46:type OpenUploadEndpointCmd struct {
+goseg/importer/importer.go:173:type validatedUploadRequest struct {
+goseg/docker/docker.go:256:type containerPlan struct {
+goseg/config/config.go:190:type StartramConfigSnapshot struct {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '220,520p' goseg/main.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+	if err := system.EnableResolved(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to enabled systemd-resolved: %v", err))
+	}
+	updateSettings := config.UpdateSettingsSnapshot()
+	startramSettings := config.StartramSettingsSnapshot()
+	internetAvailable := config.NetCheck("1.1.1.1:53")
+	zap.L().Info(fmt.Sprintf("Internet available: %t", internetAvailable))
+	if err := broadcast.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize broadcast subsystem: %v", err))
+	}
+	if err := docker.Initialize(); err != nil {
+		zap.L().Error(fmt.Sprintf("Unable to initialize docker subsystem: %v", err))
+	}
+	// ongoing connectivity check
+	go C2cCheck()
+	// async operation to retrieve version info if updates are on
+	versionUpdateChannel := make(chan bool)
+	remoteVersion := false
+	// debug mode
+	for _, arg := range os.Args[1:] {
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && rg -n \"UpdateConf\\(\" goseg | head -n 40" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/config/config.go:881:func UpdateConf(values map[string]interface{}) error {
+codex
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 77.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple packages exchange orchestration events with raw string literals instead of a shared transition contract (`handler/urbit_operations.go` publishes `"pack"`, `"chop"`, `"togglePower"` etc.; `rectify/rectify.go` decodes events with duplicate string switches).",
+        "Two parallel runtime-seam structs duplicate similar dependency-injection surfaces (`dockerRuntime` in `docker/runtime_seams.go` and `routineRuntime` in `routines/runtime_seams.go`) while callers still directly invoke package functions in places (`handler/urbit_operations.go` calls `docker.GetShipStatus`, `config.UpdateContainerState`, `chopsvc.ChopPier` directly).",
+        "Side-effect execution seams are inconsistent: `system/wifi.go` uses injectable `execCommandForWiFi` while `main.go` uses raw `exec.Command(\"reboot\")` in `killSwitch`, bypassing the same abstraction intent."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 54.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 46.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "stringly_typed_transition_contract",
+      "summary": "Event transition contracts are duplicated as ad-hoc strings across producer and consumer code.",
+      "related_files": ["goseg/handler/urbit_operations.go", "goseg/handler/startram.go", "goseg/rectify/rectify.go"],
+      "evidence": [
+        "`handler/urbit_operations.go` emits transitions with literal types like \"pack\", \"packMeld\", \"chopOnUpgrade\", etc.",
+        "`rectify/rectify.go` and other rectify handlers consume those states via large string switch statements with manual defaults for unrecognized values.",
+        "`chopsvc/service.go` and other callers also construct transition events with hand-typed string tags, but there is no shared enum/type-safe model for transition names."
+      ],
+      "suggestion": "Introduce a shared transition enum/types module (e.g., `type UrbitTransitionType string`) and replace literals with constants plus a central dispatcher/validator so producers and consumers cannot diverge silently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_event_protocol"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_runtime_seam_stacks",
+      "summary": "Multiple runtime-seam layers add indirection without a coherent seam boundary.",
+      "related_files": ["goseg/docker/runtime_seams.go", "goseg/routines/runtime_seams.go", "goseg/routines/docker.go", "goseg/handler/urbit_operations.go"],
+      "evidence": [
+        "`docker/runtime_seams.go` defines `dockerRuntime` with 20+ function fields that mostly map 1:1 to package globals.",
+        "`routines/runtime_seams.go` defines `routineRuntime` with a similarly broad, parallel field set.",
+      "`routines/docker.go` sometimes consumes `routineRuntime`, while handler-level code updates ship state directly through concrete package functions (`docker.GetShipStatus`, `config.UpdateContainerState`) instead of shared abstractions.",
+        "This creates separate dependency-injection philosophies in adjacent layers rather than a single abstraction boundary."
+      ],
+      "suggestion": "Collapse to one injected domain-facing interface for ship/config/docker operations and pass it through call chains; remove duplicated seam structs once callers are migrated to the shared interface.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_seam_abstractions"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "inconsistent_command_execution_abstraction",
+      "summary": "Shell-command side effects are executed via mixed abstractions, weakening testability and consistency.",
+      "related_files": ["goseg/system/wifi.go", "goseg/main.go"],
+      "evidence": [
+        "`system/wifi.go` defines injectable command seam variables (`execCommandForWiFi`, `runCommandForWiFi`) for shell calls.",
+        "Most wifi/system operations use those seams for testability/DI.",
+        "`main.go`'s `killSwitch` constructs/executes `exec.Command(\"reboot\")` directly, bypassing the existing seam pattern."
+      ],
+      "suggestion": "Introduce a shared command-execution abstraction (e.g., `systemcmd.Runner`) and route all reboot/service/network side effects through it; use function-variable/struct injection consistently in both `system` and startup paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "parallel_seam_abstractions"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Stringly typed cross-module protocols where event names are manually synchronized.",
+      "Parallel DI/seam patterns (runtime structs plus direct package calls) with inconsistent adoption across layers."
+    ],
+    "likely_symptoms": [
+      "Brittle transitions when any producer/consumer misspells a transition type.",
+      "Increased cognitive load from duplicated indirection and uneven test seams.",
+      "Missed mocking points for command execution in startup/shutdown paths."
+    ],
+    "possible_false_positives": [
+      "Some low-cost string constants might be intentionally tolerated to avoid refactor churn."
+    ]
+  }
+}
+tokens used
+111,481
 

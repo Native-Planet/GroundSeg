@@ -1,0 +1,55 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 94.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/startram/errors.go defines a small local wrapper around errpolicy (`wrapAPIConnectionError`) without importing transport or service-layer modules, so boundary direction remains explicit and one-way.",
+        "goseg/system/wifi/service/c2c_service.go and goseg/uploadsvc/service.go each encapsulate action parsing and dispatch internally via their own action-binding tables, with no cross-package import cycles in the reviewed files.",
+        "goseg/system/wifi/service/c2c_service.go and goseg/uploadsvc/adapters/upload_payload_test.go do not share mutable globals and remain construction-time configurable through injected call targets/interfaces.",
+        "goseg/uploadsvc/adapters/upload_payload_test.go is aligned to uploadsvc action contract values and does not appear to couple unrelated subsystems."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No blocking architecture coupling defects were found in scope, but the upload and wifi action-dispatch patterns are structurally similar and repeatedly implemented; this is a maintainability/standardization gap rather than a hard boundary violation in this batch."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "dup_action_dispatch_contracts",
+      "summary": "Two command-handling domains reimplement parallel action-binding dispatch logic without a shared contract surface, increasing future drift risk as action surfaces evolve.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/uploadsvc/service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "Both files define dedicated action types, unsupported-action errors, parsing helpers, binding registries, and executor behavior (`Upload` uses `Action`, `UnsupportedActionError`, `actionBindings`, `parseAction`; `C2C` uses `C2CAction`, `UnsupportedC2CActionError`, `c2cActionBindings`, `ParseC2CAction`).",
+        "Neither module exposes a shared cross-cutting abstraction for command schemas or dispatch policy, so adding a new command requires parallel evolution of each module’s registry and parsing/validation logic."
+      ],
+      "suggestion": "Extract a small generic command-registry contract (action enum, parser, dispatcher, unsupported-action sentinel) into a shared package boundary and have both modules consume it, keeping module-specific payload/operation behavior in module-local adapters; this reduces cross-module divergence while preserving each service’s domain types.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_binding_patterns"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Parallel implementation of command/router mechanics across modules without shared abstraction",
+      "Lack of explicit cross-module architectural convention for websocket/service action dispatch"
+    ],
+    "likely_symptoms": [
+      "Inconsistent action parsing/validation behavior across services",
+      "Higher onboarding cost when introducing new action types in multiple modules"
+    ],
+    "possible_false_positives": [
+      "If wifi and upload domains intentionally require different command semantics, the duplication may be an intentional boundary choice rather than a defect."
+    ]
+  }
+}

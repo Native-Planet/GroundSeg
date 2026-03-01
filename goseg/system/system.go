@@ -59,13 +59,21 @@ func GetDisk() (map[string][2]uint64, error) {
 	defer file.Close()
 	getDiskLabel := func(device string) (string, string) {
 		labelDir := "/dev/disk/by-label/"
-		files, _ := ioutil.ReadDir(labelDir)
+		files, err := ioutil.ReadDir(labelDir)
+		if err != nil {
+			return "", ""
+		}
 		for _, f := range files {
 			fullPath := filepath.Join(labelDir, f.Name())
-			resolvedPath, _ := os.Readlink(fullPath)
+			resolvedPath, err := os.Readlink(fullPath)
+			if err != nil {
+				zap.L().Warn(fmt.Sprintf("Unable to read disk label source for %s: %v", fullPath, err))
+				continue
+			}
 			if strings.HasSuffix(resolvedPath, device) {
 				label, err := url.QueryUnescape(f.Name())
 				if err != nil {
+					zap.L().Warn(fmt.Sprintf("Couldn't decode encoded disk label name %s: %v", f.Name(), err))
 					return device, ""
 				}
 				label, err = octalToAscii(label)
@@ -121,12 +129,11 @@ func octalToAscii(s string) (string, error) {
 }
 
 // get cpu temp (may not work on non-intel devices)
-func GetTemp() float64 {
+func GetTemp() (float64, error) {
 	basePath := "/sys/class/hwmon/"
 	hwmons, err := ioutil.ReadDir(basePath)
 	if err != nil {
-		fmt.Printf("Error reading the hwmon directory: %v\n", err)
-		return 0
+		return 0, fmt.Errorf("Error reading the hwmon directory: %w", err)
 	}
 	var totalTemp float64
 	var tempCount int
@@ -156,10 +163,9 @@ func GetTemp() float64 {
 		}
 	}
 	if tempCount > 0 {
-		return totalTemp / float64(tempCount) / 1000.0
-	} else {
-		return 0
+		return totalTemp / float64(tempCount) / 1000.0, nil
 	}
+	return 0, fmt.Errorf("no CPU temperature readings found")
 }
 
 func IsNPBox(basePath string) bool {

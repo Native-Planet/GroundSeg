@@ -1,0 +1,77 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 72.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`ProcessC2CMessage` unmarshals `WsC2cPayload` and immediately dispatches on `payload.Payload.Action` via `ParseC2CAction`, but never validates `payload` message envelope semantics before execution.",
+        "The same batch file (`README.md`) frames this area as contract-governed (runtime quality gates and boundary documentation), while the contract-facing wifi C2C path has no explicit envelope-contract enforcement in `c2c_service.go`.",
+        "Action token authority is centralized in `goseg/protocol/actions/actions.go`, but the current call path makes contract validity depend on caller discipline rather than runtime boundary checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/click/filter.go` is a dedicated boundary adapter (`filterResponse`) but has no direct unit tests in the listed files.",
+        "`goseg/protocol/actions/actions.go` defines protocol-level action contracts (upload + c2c) and has no tests here to lock expected action validation behavior.",
+        "`goseg/system/wifi/service/c2c_service_test.go` only validates one happy path and only one negative case (`action: \"invalid\"`) via the C2C flow, leaving core contract behavior under-specified."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "missing_c2c_envelope_guard",
+      "summary": "C2C message processing trusts action payload before validating transport envelope type",
+      "related_files": ["goseg/system/wifi/service/c2c_service.go", "goseg/click/filter.go", "README.md"],
+      "evidence": [
+        "`ProcessC2CMessage` unmarshal path uses `payload.Payload.Action` directly and does not check whether the message envelope is actually a C2C command before dispatching.",
+        "The function name and type (`ProcessC2CMessage`) imply transport-domain enforcement, but no explicit envelope guard exists in this boundary."
+      ],
+      "suggestion": "Add explicit pre-dispatch validation in `ProcessC2CMessage` (e.g., require expected message type/namespace before `ParseC2CAction`) and return a clear error for non-C2C envelopes; add tests in `c2c_service_test.go` for rejected non-C2C payloads.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_validation_gap"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "untested_contract_modules",
+      "summary": "Action and filter contract adapters lack focused tests despite cross-module blast radius",
+      "related_files": ["goseg/click/filter.go", "goseg/protocol/actions/actions.go", "goseg/system/wifi/service/c2c_service_test.go"],
+      "evidence": [
+        "`filterResponse` in `goseg/click/filter.go` is a protocol-facing adapter wrapper with no direct unit tests in this batch.",
+        "`goseg/protocol/actions/actions.go` encodes shared action tokens and parse/validation logic used by multiple transports but has no tests in the reviewed scope.",
+        "C2C tests cover only one successful dispatch path; they do not exercise parser invariants or complete boundary contracts for unsupported namespaces/actions."
+      ],
+      "suggestion": "Add focused unit tests for `ParseAction`/`ParseC2CAction`/`SupportedC2CActions` (unknown namespace/action, case handling, snapshot of supported set) and add contract tests for `filterResponse` success/failure mapping to ensure response parser behavior is locked before runtime consumers change.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_validation_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "contract_validation_gap",
+      "insufficient contract-level test coverage at boundary modules"
+    ],
+    "likely_symptoms": [
+      "cross_module_contract_drift",
+      "boundary_violations_masked_by_caller_assumptions",
+      "regression_risk_in_action_tokens_and_response_parsing"
+    ],
+    "possible_false_positives": [
+      "The caller may already enforce message type and action contract before invoking `ProcessC2CMessage`; if so, explicit envelope checking may be redundant but still safer at this boundary."
+    ]
+  }
+}

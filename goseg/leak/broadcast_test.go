@@ -145,6 +145,59 @@ func TestUpdateBroadcastSendsFullAndScopedPayloads(t *testing.T) {
 	}
 }
 
+func TestUpdateBroadcastReturnsOldStateOnFullMarshalFailure(t *testing.T) {
+	resetLeakStateForTest(t)
+	oldBroadcast := structs.AuthBroadcast{
+		AuthLevel: "authorized",
+	}
+	oldBroadcast.Profile.Startram.Info.Region = "ok"
+	newBroadcast := oldBroadcast
+	newBroadcast.Profile.Startram.Info.Region = func() {}
+
+	updated, err := updateBroadcast(oldBroadcast, newBroadcast)
+	if err == nil {
+		t.Fatal("expected full broadcast marshal failure")
+	}
+	if !reflect.DeepEqual(updated, oldBroadcast) {
+		t.Fatal("expected unchanged broadcast on marshal failure")
+	}
+}
+
+func TestUpdateBroadcastReturnsOldStateOnScopedMarshalFailure(t *testing.T) {
+	resetLeakStateForTest(t)
+	BytesChan["~bus"] = make(chan string, 1)
+	setLickStatusesForTest(map[string]LickStatus{
+		"~bus": {Auth: false},
+	})
+
+	oldBroadcast := structs.AuthBroadcast{
+		Profile: structs.Profile{},
+	}
+	oldBroadcast.Profile.Startram.Info.Registered = true
+	oldBroadcast.Profile.Startram.Info.Running = true
+	newBroadcast := structs.AuthBroadcast{
+		Profile: oldBroadcast.Profile,
+	}
+	badBus := structs.Urbit{}
+	badBus.Info.Vere = func() {}
+	newBroadcast.Urbits = map[string]structs.Urbit{
+		"~bus": badBus,
+	}
+
+	updated, err := updateBroadcast(oldBroadcast, newBroadcast)
+	if err == nil {
+		t.Fatal("expected scoped marshal failure")
+	}
+	if !reflect.DeepEqual(updated, oldBroadcast) {
+		t.Fatalf("expected unchanged broadcast on scoped marshal failure, got %+v", updated)
+	}
+	select {
+	case msg := <-BytesChan["~bus"]:
+		t.Fatalf("did not expect scoped payload to be sent when marshal fails, got %q", msg)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 type failingConn struct{}
 
 func (f *failingConn) Read(_ []byte) (int, error)         { return 0, io.EOF }

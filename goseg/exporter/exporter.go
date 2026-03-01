@@ -159,8 +159,8 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	filePath := filepath.Join(volumeDirectory, container, "_data")
 	shipConf := urbitConfForExporter(container)
 
-	if customLoc, ok := shipConf.CustomPierLocation.(string); ok {
-		filePath = customLoc
+	if shipConf.CustomPierLocation != "" {
+		filePath = shipConf.CustomPierLocation
 	}
 
 	// Create a temporary file for the zip

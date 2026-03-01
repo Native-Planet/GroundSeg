@@ -1,0 +1,78 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 84.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`shipworkflow/startram.go` repeatedly converts an in-process payload to JSON and back to the same struct type immediately before dispatch (`json.Marshal(payload)` then `json.Unmarshal` into `wiretramPayload`) inside `HandleStartramToggle`.",
+        "Core operational modules expose behavior through package-level mutable function vars (e.g., `dispatchUrbitPayloadFn` in `shipworkflow/startram.go`, `netCheckFn/connCheckFn/isNPBoxFn` in `main.go`, and `execCommandForWiFi/runCommandForWiFi` in `system/wifi.go`) that are swapped in tests via reset helpers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 78.0,
+        "interface_honesty": 66.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "shipstar_internal_payload_roundtrip",
+      "summary": "Avoid JSON round-trip for internal payload dispatch in startram orchestration to prevent unnecessary abstraction indirection.",
+      "related_files": [
+        "shipworkflow/startram.go",
+        "shipworkflow/operations_test.go"
+      ],
+      "evidence": [
+        "`shipworkflow/startram.go:HandleStartramToggle` constructs `payload := structs.WsUrbitPayload{...}` and immediately performs `json.Marshal(payload)` followed by `json.Unmarshal(jsonData, &wiretramPayload)` before calling `dispatchUrbitPayloadFn(wiretramPayload)`.",
+        "This converts internal typed data to wire format and back without crossing process/network boundary, creating avoidable transform/cost with no boundary guarantee benefit."
+      ],
+      "suggestion": "Pass `payload` directly to `dispatchUrbitPayloadFn` with a typed signature (or define a narrow internal interface), and remove the immediate marshal/unmarshal pair inside the same process.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "in_process_serialization_as_abstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "global_function_seams_as_default_DI",
+      "summary": "Replace widespread mutable global function seams with explicit dependency containers to avoid brittle abstraction boundaries.",
+      "related_files": [
+        "main.go",
+        "system/wifi.go",
+        "shipworkflow/startram.go",
+        "handler/system_test.go"
+      ],
+      "evidence": [
+        "`main.go` assigns runtime behavior through globals (`netCheckFn`, `connCheckFn`, `isNPBoxFn`, `c2cModeFn`, `setC2CModeFn`) rather than explicit injected dependencies.",
+        "`system/wifi.go` exposes command execution behavior via globals (`execCommandForWiFi`, `runCommandForWiFi`, `ifCheckForWiFi`) and replaces these from tests.",
+        "`shipworkflow/startram.go` uses package-level function vars such as `dispatchUrbitPayloadFn` and `recoverWireguardFleetFn`, with mutable override points.",
+        "`handler/system_test.go` contains seam reset helpers that replace many production callables globally for tests, indicating ad hoc DI is the pattern rather than explicit constructor-injected contracts."
+      ],
+      "suggestion": "Introduce small runtime dependency interfaces (e.g., network/command/dispatch/runtime interfaces), pass instances through constructor paths, and avoid mutable package globals so seams are explicit, scoped, and non-racy.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "mutable_global_seams"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Overusing in-process serialization as a pseudo-abstraction boundary instead of typed function contracts.",
+      "Reliance on mutable package-level function variables for dependency injection creates hidden coupling and difficult-to-reason call chains."
+    ],
+    "likely_symptoms": [
+      "Unnecessary CPU/alloc overhead and reduced compile-time safety in dispatch paths.",
+      "Testing-induced side effects from global seam mutation across test files sharing process state."
+    ],
+    "possible_false_positives": [
+      "Tests may not exercise some seam replacement paths in production, so risk profile may be lower than worst-case."
+    ]
+  }
+}

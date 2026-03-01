@@ -58,6 +58,8 @@ var (
 	uploadMu       sync.Mutex
 	uploadTTL      = 20 * time.Minute
 	uploadKeyRegex = regexp.MustCompile(`^[a-f0-9]{32}$`)
+
+	errChunkCombineTimeout = errors.New("import chunk combining timed out")
 )
 
 func Initialize() error {
@@ -174,6 +176,19 @@ type validatedUploadRequest struct {
 	SessionID string
 	Patp      string
 	Session   uploadSession
+}
+
+type uploadChunkPayload struct {
+	Filename string
+	Index    int
+	Total    int
+	File     io.ReadCloser
+}
+
+type uploadChunkProgress struct {
+	Filename  string
+	Total     int
+	AllChunks bool
 }
 
 func setUploadResponseHeaders(w http.ResponseWriter) {
@@ -306,7 +321,10 @@ func combineChunksWithTimeout(filename string, total int, timeout time.Duration)
 	case err := <-resultCh:
 		return err
 	case <-combineCtx.Done():
-		return fmt.Errorf("timed out while combining chunks")
+		if errors.Is(combineCtx.Err(), context.DeadlineExceeded) {
+			return errChunkCombineTimeout
+		}
+		return combineCtx.Err()
 	}
 }
 
@@ -346,61 +364,133 @@ func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
 		failUploadRequest(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	sesh := validated.Session
-	patp := validated.Patp
 
-	// Debug session info
-	zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", validated.SessionID, sesh))
-
-	// Drive handling
-	sesh, err = ensureUploadDriveReady(validated.SessionID, sesh)
-	if err != nil {
-		failUploadRequest(w, http.StatusBadRequest, "Failed to format and use custom drive")
-		return
-	}
-
-	// Update status
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
-	publishImportStatus("uploading")
-
-	// Handle file upload with streaming to disk
-	file, fileHeader, err := r.FormFile("file")
-	if err != nil {
-		failUploadRequest(w, http.StatusBadRequest, fmt.Sprintf("Unable to read uploaded file: %v", err))
-		return
-	}
-	defer file.Close()
-
-	filename := fileHeader.Filename
-	index, total, err := parseUploadChunkMetadata(r, filename)
+	chunk, err := readUploadChunk(r)
 	if err != nil {
 		failUploadRequest(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	defer chunk.File.Close()
 
-	if err := persistChunkToTemp(file, filename, index); err != nil {
-		failUploadRequest(w, http.StatusBadRequest, err.Error())
+	pipelineResult := runImportUploadPipeline(validated, chunk)
+	if pipelineResult.err != nil {
+		failUploadRequest(w, pipelineResult.statusCode, pipelineResult.err.Error())
 		return
 	}
-
-	// Check if all chunks have been received
-	if allChunksReceived(filename, total) {
-		if err := combineChunksWithTimeout(filename, total, 30*time.Minute); err != nil {
-			if strings.Contains(err.Error(), "timed out") {
-				failUploadRequest(w, http.StatusRequestTimeout, err.Error())
-			} else {
-				failUploadRequest(w, http.StatusBadRequest, fmt.Sprintf("Failed to combine chunks: %v", err))
-			}
-			return
-		}
+	if pipelineResult.completed {
 		sendUploadResponse(w, http.StatusOK, "success", "Upload successful")
 		ClearUploadSession(validated.SessionID)
-		go configureUploadedPier(filename, patp, sesh.Remote, sesh.Fix, sesh.CustomDrive)
 		return
 	}
 
 	// If we get here, just acknowledge the chunk reception
 	sendUploadResponse(w, http.StatusOK, "success", "Chunk received successfully")
+}
+
+type uploadPipelineResult struct {
+	completed  bool
+	statusCode int
+	err        error
+}
+
+func runImportUploadPipeline(validated validatedUploadRequest, chunk uploadChunkPayload) uploadPipelineResult {
+	session, err := prepareUploadSessionForChunk(validated.SessionID, validated.Session)
+	if err != nil {
+		return uploadPipelineResult{
+			completed:  false,
+			statusCode: http.StatusBadRequest,
+			err:        fmt.Errorf("Failed to format and use custom drive: %w", err),
+		}
+	}
+	validated.Session = session
+
+	zap.L().Debug(fmt.Sprintf("Upload session information for %v: %+v", validated.SessionID, session))
+	publishUploadStatus(validated.Patp)
+
+	if err := persistUploadedChunk(chunk.Filename, chunk.Index, chunk.File); err != nil {
+		return uploadPipelineResult{
+			completed:  false,
+			statusCode: http.StatusBadRequest,
+			err:        err,
+		}
+	}
+
+	chunkProgress := uploadChunkProgress{
+		Filename:  chunk.Filename,
+		Total:     chunk.Total,
+		AllChunks: allChunksReceived(chunk.Filename, chunk.Total),
+	}
+	outcome, err := finalizeUploadOnCompletion(chunkProgress, validated.Patp, validated.Session)
+	if err == nil {
+		return uploadPipelineResult{completed: outcome}
+	}
+	if errors.Is(err, errChunkCombineTimeout) {
+		return uploadPipelineResult{
+			completed:  true,
+			statusCode: http.StatusRequestTimeout,
+			err:        err,
+		}
+	}
+	if strings.HasPrefix(err.Error(), "Failed to configure imported pier") {
+		return uploadPipelineResult{
+			completed:  true,
+			statusCode: http.StatusInternalServerError,
+			err:        err,
+		}
+	}
+	return uploadPipelineResult{
+		completed:  true,
+		statusCode: http.StatusBadRequest,
+		err:        err,
+	}
+}
+
+func publishUploadStatus(patp string) {
+	docker.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
+	publishImportStatus("uploading")
+}
+
+func prepareUploadSessionForChunk(sessionID string, session uploadSession) (uploadSession, error) {
+	return ensureUploadDriveReady(sessionID, session)
+}
+
+func readUploadChunk(r *http.Request) (uploadChunkPayload, error) {
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		return uploadChunkPayload{}, fmt.Errorf("Unable to read uploaded file: %v", err)
+	}
+
+	index, total, err := parseUploadChunkMetadata(r, fileHeader.Filename)
+	if err != nil {
+		file.Close()
+		return uploadChunkPayload{}, err
+	}
+	return uploadChunkPayload{
+		Filename: fileHeader.Filename,
+		Index:    index,
+		Total:    total,
+		File:     file,
+	}, nil
+}
+
+func persistUploadedChunk(filename string, index int, data io.Reader) error {
+	return persistChunkToTemp(data, filename, index)
+}
+
+func finalizeUploadOnCompletion(progress uploadChunkProgress, patp string, session uploadSession) (bool, error) {
+	if !progress.AllChunks {
+		return false, nil
+	}
+	if err := combineChunksWithTimeout(progress.Filename, progress.Total, 30*time.Minute); err != nil {
+		if errors.Is(err, errChunkCombineTimeout) {
+			return true, errChunkCombineTimeout
+		}
+		return true, fmt.Errorf("Failed to combine chunks: %v", err)
+	}
+	if err := configureUploadedPier(progress.Filename, patp, session.Remote, session.Fix, session.CustomDrive); err != nil {
+		return true, fmt.Errorf("Failed to configure imported pier: %v", err)
+	}
+	return true, nil
 }
 
 func allChunksReceived(filename string, total int) bool {
@@ -450,136 +540,166 @@ func combineChunks(filename string, total int) error {
 	return nil
 }
 
-func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) {
+func configureUploadedPier(filename, patp string, remote, fix bool, dirPath string) error {
 	defer system.RemoveMultipartFiles("/tmp")
-	var customPath string
-	if dirPath != "" {
-		customPath = dirPath
+	ctx := newImportedPierContext(filename, patp, remote, fix, dirPath)
+	if err := runImportedPierWorkflow(ctx); err != nil {
+		return err
 	}
-	volPath := filepath.Join(config.DockerDir, patp, "_data")
-	if customPath != "" {
-		volPath = filepath.Join(customPath, patp)
-	}
+	go startImportedPierPostImportPipeline(ctx)
+	return nil
+}
 
-	err := runImportPhases(
-		filename,
-		patp,
-		customPath,
+type importedPierContext struct {
+	Filename    string
+	Patp        string
+	Remote      bool
+	Fix         bool
+	CustomDrive string
+	VolumePath  string
+}
+
+func newImportedPierContext(filename, patp string, remote, fix bool, customDrive string) importedPierContext {
+	volumePath := filepath.Join(config.DockerDir, patp, "_data")
+	if customDrive != "" {
+		volumePath = filepath.Join(customDrive, patp)
+	}
+	return importedPierContext{
+		Filename:    filename,
+		Patp:        patp,
+		Remote:      remote,
+		Fix:         fix,
+		CustomDrive: customDrive,
+		VolumePath:  volumePath,
+	}
+}
+
+func runImportedPierWorkflow(ctx importedPierContext) error {
+	return runImportPhases(
+		ctx.Filename,
+		ctx.Patp,
+		ctx.CustomDrive,
 		lifecycle.Step{
 			Phase: lifecycle.Phase("creating"),
 			Run: func() error {
-				if err := shipcreator.CreateUrbitConfig(patp, customPath); err != nil {
-					return fmt.Errorf("failed to create urbit config: %w", err)
-				}
-				if err := shipcreator.AppendSysConfigPier(patp); err != nil {
-					return fmt.Errorf("failed to update system.json: %w", err)
-				}
-				zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
-				if err := docker.DeleteContainer(patp); err != nil {
-					zap.L().Error(fmt.Sprintf("%v", err))
-				}
-				if err := docker.DeleteVolume(patp); err != nil {
-					zap.L().Info(fmt.Sprintf("%v (harmless)", err))
-				}
-				if customPath == "" {
-					if err := docker.CreateVolume(patp); err != nil {
-						return fmt.Errorf("failed to create volume: %w", err)
-					}
-					return nil
-				}
-				if err := os.MkdirAll(customPath, os.ModePerm); err != nil {
-					return fmt.Errorf("create custom pier directory error: %w", err)
-				}
-				return nil
+				return prepareImportedPierEnvironment(ctx)
 			},
 		},
 		lifecycle.Step{
 			Phase: lifecycle.Phase("extracting"),
 			Run: func() error {
-				extractionTimeout := time.NewTimer(4 * time.Hour)
-				extractionDone := make(chan struct{})
-				go func() {
-					select {
-					case <-extractionTimeout.C:
-						docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
-						publishImportStatus("checking")
-					case <-extractionDone:
-						extractionTimeout.Stop()
-					}
-				}()
-				defer close(extractionDone)
-
-				compressedPath := filepath.Join(uploadDir, filename)
-				switch checkExtension(filename) {
-				case ".zip":
-					if err := extractZip(compressedPath, volPath); err != nil {
-						return fmt.Errorf("failed to extract %v: %w", filename, err)
-					}
-				case ".tar.gz", ".tgz":
-					if err := extractTarGz(compressedPath, volPath); err != nil {
-						return fmt.Errorf("failed to extract %v: %w", filename, err)
-					}
-				case ".tar":
-					if err := extractTar(compressedPath, volPath); err != nil {
-						return fmt.Errorf("failed to extract %v: %w", filename, err)
-					}
-				default:
-					return fmt.Errorf("unsupported file type %v", filename)
-				}
-				zap.L().Debug(fmt.Sprintf("%v extracted to %v", filename, volPath))
-				if err := restructureDirectory(patp); err != nil {
-					return fmt.Errorf("failed to restructure directory: %w", err)
-				}
-				return nil
+				return extractUploadedPier(ctx)
 			},
 		},
 		lifecycle.Step{
 			Phase: lifecycle.Phase("booting"),
 			Run: func() error {
-				zap.L().Info(fmt.Sprintf("Starting extracted pier: %v", patp))
-				info, err := docker.StartContainer(patp, "vere")
-				if err != nil {
-					return fmt.Errorf("failed to start imported ship: %w", err)
-				}
-				config.UpdateContainerState(patp, info)
-				if err := os.Remove(filepath.Join(uploadDir, filename)); err != nil {
-					zap.L().Warn(fmt.Sprintf("Failed to remove uploaded archive %s: %v", filename, err))
-				}
-				return nil
+				return bootImportedPier(ctx)
 			},
 		},
 	)
-	if err != nil {
-		return
-	}
-
-	// if startram is registered
-	startramSettings := config.StartramSettingsSnapshot()
-	if startramSettings.WgRegistered {
-		// Register Services
-		go registerServices(patp)
-	}
-	// check for +code
-	go waitForShipReady(filename, patp, remote, fix, customPath)
 }
 
-func waitForShipReady(filename, patp string, remote, fix bool, customDrive string) {
-	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
-	shipworkflow.WaitForBootCode(patp, 1*time.Second)
-	if fix {
-		if err := acme.Fix(patp); err != nil {
+func startImportedPierPostImportPipeline(ctx importedPierContext) {
+	startImportedPierRegistration(ctx.Patp)
+	startImportedPierReadiness(ctx)
+}
+
+func startImportedPierRegistration(patp string) {
+	startramSettings := config.StartramSettingsSnapshot()
+	if startramSettings.WgRegistered {
+		go registerServices(patp)
+	}
+}
+
+func startImportedPierReadiness(ctx importedPierContext) {
+	go finalizeImportedPierReadiness(ctx)
+}
+
+func prepareImportedPierEnvironment(ctx importedPierContext) error {
+	if err := shipcreator.CreateUrbitConfig(ctx.Patp, ctx.CustomDrive); err != nil {
+		return fmt.Errorf("failed to create urbit config: %w", err)
+	}
+	if err := shipcreator.AppendSysConfigPier(ctx.Patp); err != nil {
+		return fmt.Errorf("failed to update system.json: %w", err)
+	}
+	zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", ctx.Patp))
+	if err := docker.DeleteContainer(ctx.Patp); err != nil {
+		zap.L().Error(fmt.Sprintf("%v", err))
+	}
+	if err := docker.DeleteVolume(ctx.Patp); err != nil {
+		zap.L().Info(fmt.Sprintf("%v (harmless)", err))
+	}
+	if ctx.CustomDrive == "" {
+		if err := docker.CreateVolume(ctx.Patp); err != nil {
+			return fmt.Errorf("failed to create volume: %w", err)
+		}
+		return nil
+	}
+	if err := os.MkdirAll(ctx.CustomDrive, os.ModePerm); err != nil {
+		return fmt.Errorf("create custom pier directory error: %w", err)
+	}
+	return nil
+}
+
+func extractUploadedPier(ctx importedPierContext) error {
+	extractionDone := make(chan struct{})
+	defer close(extractionDone)
+	go monitorExtractionProgress(extractionDone)
+
+	compressedPath := filepath.Join(uploadDir, ctx.Filename)
+	if err := extractUploadedArchive(compressedPath, ctx.VolumePath, ctx.Filename); err != nil {
+		return fmt.Errorf("failed to extract %v: %w", ctx.Filename, err)
+	}
+
+	zap.L().Debug(fmt.Sprintf("%v extracted to %v", ctx.Filename, ctx.VolumePath))
+	if err := restructureDirectory(ctx.Patp); err != nil {
+		return fmt.Errorf("failed to restructure directory: %w", err)
+	}
+	return nil
+}
+
+func monitorExtractionProgress(done <-chan struct{}) {
+	extractionTimeout := time.NewTimer(4 * time.Hour)
+	select {
+	case <-extractionTimeout.C:
+		docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
+		publishImportStatus("checking")
+	case <-done:
+		extractionTimeout.Stop()
+	}
+}
+
+func bootImportedPier(ctx importedPierContext) error {
+	zap.L().Info(fmt.Sprintf("Starting extracted pier: %v", ctx.Patp))
+	info, err := docker.StartContainer(ctx.Patp, "vere")
+	if err != nil {
+		return fmt.Errorf("failed to start imported ship: %w", err)
+	}
+	config.UpdateContainerState(ctx.Patp, info)
+	if err := os.Remove(filepath.Join(uploadDir, ctx.Filename)); err != nil {
+		zap.L().Warn(fmt.Sprintf("Failed to remove uploaded archive %s: %v", ctx.Filename, err))
+	}
+	return nil
+}
+
+func finalizeImportedPierReadiness(ctx importedPierContext) {
+	zap.L().Info(fmt.Sprintf("Booting ship: %v", ctx.Patp))
+	shipworkflow.WaitForBootCode(ctx.Patp, 1*time.Second)
+	if ctx.Fix {
+		if err := acme.Fix(ctx.Patp); err != nil {
 			errmsg := fmt.Sprintf("Failed to update urbit config for imported ship: %v", err)
 			zap.L().Error(errmsg)
 		}
 	}
 	startramSettings := config.StartramSettingsSnapshot()
-	if startramSettings.WgRegistered && startramSettings.WgOn && remote {
+	if startramSettings.WgRegistered && startramSettings.WgOn && ctx.Remote {
 		publishImportStatus("remote")
-		shipworkflow.WaitForRemoteReady(patp, 1*time.Second)
-		if err := shipworkflow.SwitchShipToWireguard(patp, true); err != nil {
+		shipworkflow.WaitForRemoteReady(ctx.Patp, 1*time.Second)
+		if err := shipworkflow.SwitchShipToWireguard(ctx.Patp, true); err != nil {
 			errmsg := fmt.Sprintf("%v", err)
 			zap.L().Error(errmsg)
-			errorCleanup(filename, patp, customDrive, errmsg)
+			errorCleanup(ctx.Filename, ctx.Patp, ctx.CustomDrive, errmsg)
 			return
 		}
 	}
@@ -622,10 +742,9 @@ func restructureDirectory(patp string) error {
 	}
 	// if no customDir is set, check volume
 	shipConf := config.UrbitConf(patp)
-	customDir, ok := shipConf.CustomPierLocation.(string)
-	if ok {
+	if shipConf.CustomPierLocation != "" {
 		zap.L().Info("Custom pier location found!")
-		volDir = customDir
+		volDir = shipConf.CustomPierLocation
 	} else {
 		for _, vol := range volumes.Volumes {
 			if vol.Name == patp {
@@ -640,7 +759,7 @@ func restructureDirectory(patp string) error {
 	zap.L().Info(fmt.Sprintf("%v pier path: %v", patp, volDir))
 	// find .urb
 	var urbLoc []string
-	_ = filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -648,7 +767,9 @@ func restructureDirectory(patp string) error {
 			urbLoc = append(urbLoc, filepath.Dir(path))
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
 	// there can only be one
 	if len(urbLoc) > 1 {
 		return fmt.Errorf("%v ships detected in pier directory", len(urbLoc))
@@ -666,18 +787,30 @@ func restructureDirectory(patp string) error {
 		zap.L().Debug(fmt.Sprintf(".urb found in %v", urbLoc[0]))
 		zap.L().Debug(fmt.Sprintf("Moving to %v", tempDir))
 		if volDir == urbLoc[0] { // .urb in root
-			_ = os.MkdirAll(tempDir, 0755)
-			items, _ := ioutil.ReadDir(urbLoc[0])
+			if err := os.MkdirAll(tempDir, 0755); err != nil {
+				return fmt.Errorf("create temp import directory %s: %w", tempDir, err)
+			}
+			items, err := ioutil.ReadDir(urbLoc[0])
+			if err != nil {
+				return fmt.Errorf("read pier directory %s: %w", urbLoc[0], err)
+			}
 			for _, item := range items {
 				if item.Name() != patp {
-					os.Rename(filepath.Join(urbLoc[0], item.Name()), filepath.Join(tempDir, item.Name()))
+					if err := os.Rename(filepath.Join(urbLoc[0], item.Name()), filepath.Join(tempDir, item.Name())); err != nil {
+						return fmt.Errorf("move %s to temp directory: %w", item.Name(), err)
+					}
 				}
 			}
 		} else {
-			os.Rename(urbLoc[0], tempDir)
+			if err := os.Rename(urbLoc[0], tempDir); err != nil {
+				return fmt.Errorf("move %s to temp directory: %w", urbLoc[0], err)
+			}
 		}
 		unused := []string{}
-		dirs, _ := ioutil.ReadDir(volDir)
+		dirs, err := ioutil.ReadDir(volDir)
+		if err != nil {
+			return fmt.Errorf("read import directory %s: %w", volDir, err)
+		}
 		for _, dir := range dirs {
 			dirName := dir.Name()
 			if dirName != "temp_dir" && dirName != "unused" {
@@ -685,12 +818,18 @@ func restructureDirectory(patp string) error {
 			}
 		}
 		if len(unused) > 0 {
-			_ = os.MkdirAll(unusedDir, 0755)
+			if err := os.MkdirAll(unusedDir, 0755); err != nil {
+				return fmt.Errorf("create unused directory %s: %w", unusedDir, err)
+			}
 			for _, u := range unused {
-				os.Rename(filepath.Join(volDir, u), filepath.Join(unusedDir, u))
+				if err := os.Rename(filepath.Join(volDir, u), filepath.Join(unusedDir, u)); err != nil {
+					return fmt.Errorf("archive directory %s: %w", u, err)
+				}
 			}
 		}
-		os.Rename(tempDir, pierDir)
+		if err := os.Rename(tempDir, pierDir); err != nil {
+			return fmt.Errorf("finalize pier directory %s: %w", pierDir, err)
+		}
 		zap.L().Info(fmt.Sprintf("%v restructuring done", patp))
 	} else {
 		zap.L().Debug("No restructuring needed")

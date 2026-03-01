@@ -1,0 +1,97 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 82.0,
+    "initialization_coupling": 75.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "`goseg/docker/container_config.go` drops `DeleteContainer(containerName)` errors in the `minio` branch and then proceeds to container config resolution without surfacing that failure.",
+        "That means an infrastructure cleanup failure can be silently lost while later logic continues, creating non-deterministic startup/container-init behavior at runtime."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "`goseg/docker/docker.go` mutates lifecycle/network/registry behavior from an `init()` function (`configureSubpackages`), so import/load order controls side effects and dependency wiring.",
+        "`goseg/handler/dev.go` binds `isDev` and `BackupDir` at package init (`checkDevMode()` and `ResolveBackupRoot(config.BasePath)`) using process args/config globals at import time.",
+        "These globals are mutable at runtime in tests and may drift from canonical configuration when callers update `config.BasePath` or startup flags after package init."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "init_side_effects_in_initfunc",
+      "summary": "Docker package wires subpackages during import via init(), coupling startup order and hidden global side effects.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/docker/container_config.go"
+      ],
+      "evidence": [
+        "`goseg/docker/docker.go` defines `init()` that calls `configureSubpackages()` and mutates package-level singletons (`lifecycle.SetClientFactory`, `SetContainerConfigResolver`, `SetImageInfoLookup`, `SetImagePuller`, plus network/registry factories).",
+        "This happens as soon as package is imported, before consumers can configure or replace collaborators."
+      ],
+      "suggestion": "Replace package `init()` wiring with an explicit `Initialize()`/`New` bootstrap path that accepts injectable factories, so docker subpackages are configured intentionally from application entrypoint code rather than import time.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "init_time_global_wiring"
+    },
+    {
+      "dimension": "initialization_coupling",
+      "identifier": "dev_globals_captured_preflight",
+      "summary": "Dev handler caches process args and derived backup root at package init, creating stale state when config changes later.",
+      "related_files": [
+        "goseg/handler/dev.go",
+        "goseg/handler/dev_test.go"
+      ],
+      "evidence": [
+        "`isDev` is initialized from `checkDevMode()` at declaration time using `os.Args`.",
+        "`BackupDir` is initialized from `backupsvc.ResolveBackupRoot(config.BasePath)` once at import time.",
+        "Tests compensate by directly mutating globals (`isDev`, `BackupDir`, and dependency seams), indicating production behavior also depends on mutable package state."
+      ],
+      "suggestion": "Move these values behind provider functions (e.g., `isDevFn`, `backupDirFn`) and resolve them during `DevHandler` invocation or explicit app initialization so runtime config and flags are interpreted at call time.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "init_time_global_wiring"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "swallow_minio_cleanup_error",
+      "summary": "MinIO container setup ignores cleanup errors, so configuration can continue after failed container teardown.",
+      "related_files": [
+        "goseg/docker/container_config.go",
+        "goseg/docker/docker.go"
+      ],
+      "evidence": [
+        "In `containerConfigForType` (`containerType == \"minio\"`), `DeleteContainer(containerName)` is called and its error return is discarded.",
+        "Downstream returns from `minioContainerConf` are still used even if delete already failed, so callers cannot distinguish setup failure from success."
+      ],
+      "suggestion": "Capture and return `DeleteContainer` errors before continuing (`if err := DeleteContainer(...); err != nil { return ..., err }`) and document expected MinIO restart semantics.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "init_time_global_wiring",
+      "missing_error_gate_at_boundary"
+    ],
+    "likely_symptoms": [
+      "init_side_effects_in_initfunc",
+      "dev_globals_captured_preflight",
+      "swallow_minio_cleanup_error"
+    ],
+    "possible_false_positives": []
+  }
+}

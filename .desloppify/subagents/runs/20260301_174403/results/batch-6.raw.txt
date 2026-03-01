@@ -1,0 +1,192 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 76.0,
+    "error_consistency": 74.0,
+    "abstraction_fitness": 70.0,
+    "test_strategy": 89.0,
+    "design_coherence": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/broadcast/broadcast.go imports and coordinates auth, backupsvc, click, config, docker, leak, startram, and system in one package, creating a broad cross-domain hub (goseg/broadcast/broadcast.go:6-15).",
+        "Broadcast state is assembled from unrelated runtime/domain collaborators while also handling global channel wiring and state mutation (goseg/broadcast/broadcast.go:27-40).",
+        "Leak action handling dispatches into URbit/system/startram paths while broadcast still owns much orchestration state refresh logic (goseg/handler/router/leak.go:25-58, goseg/broadcast/broadcast.go:63-70)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Separate broadcast into at least two submodules (data collectors + transport/publishing) with explicit interfaces so state assembly and WS output delivery can evolve independently."
+    },
+    "error_consistency": {
+      "evidence": [
+        "Click response parsing slices `line[:endIndex]` before validating `endIndex` in both parser implementations, which can panic on malformed responses.",
+        "Failure branches in click cleanup paths drop filesystem errors (stat/remove), so call sites cannot distinguish success from silent failure.",
+        "Bug report upload returns an HTTP error using `%v` on an unread body reader object instead of captured body content."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`click/filter.go` and `click/internal/runtime/runtime.go` each contain duplicated parser logic for `%avow` response parsing, including the same bound-check ordering bug.",
+        "The parser duplication is coupled with two call chains that perform similar validation/handling patterns, so behavior divergence is likely and not centrally controlled."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "abstraction_leverage": 74.0,
+      "indirection_cost": 69.0,
+      "interface_honesty": 70.0
+    },
+    "test_strategy": {
+      "evidence": [
+        "Critical error-paths in `goseg/click/hoon.go` and parser logic in `goseg/click/filter.go` have no direct tests in their own packages, and malformed input behavior is asserted only indirectly."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add direct unit tests for malformed click CLI responses (e.g., `%avow` without `]`) and negative/error paths in `deleteHoon`-style file cleanup helpers to prevent panic/regression and silent failures."
+    },
+    "design_coherence": {
+      "evidence": [
+        "Broadcast path sends authenticated WS payload then performs another send immediately after; error check is in the wrong sequence.",
+        "Error handling for parser inputs is duplicated and inconsistent across two click runtime layers rather than centralized."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_double_send",
+      "summary": "Broadcasts authorized state twice and checks marshal error too late",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `auth.ClientManager.BroadcastAuth(authJson)` before `err` is checked, then checks error and calls `BroadcastAuth` again at `goseg/broadcast/broadcast.go:432-437`.",
+        "`runBroadcastTick` invokes `BroadcastToClients` every tick when auth/clients are present, so duplicates are repeatedly emitted (`goseg/broadcast/loop.go:9-13`, `goseg/broadcast/loop.go:24-29`)."
+      ],
+      "suggestion": "Marshal to JSON first, return on error, and call `BroadcastAuth` exactly once with the serialized payload. Add a regression test in `goseg/broadcast` for single-send behavior on each tick.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "broadcast_cross_domain_orchestrator",
+      "summary": "Broadcast package acts as a cross-domain orchestrator instead of a focused boundary",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/router/leak.go",
+        "goseg/handler/ship/urbit.go"
+      ],
+      "evidence": [
+        "`broadcast.go` imports `auth`, `backupsvc`, `click`, `config`, `docker`, `leak`, `startram`, and `system` together (`goseg/broadcast/broadcast.go:6-15`).",
+        "The package both owns domain state assembly and publishes transport events (`BroadcastToClients`, leak sink wiring, global maps/channels).",
+        "Routers/handlers consume handlers from multiple domains while broadcast remains a central fan-out coordinator (`goseg/handler/router/leak.go:14-22`, `goseg/handler/ship/urbit.go:1-3`)."
+      ],
+      "suggestion": "Split broadcast into explicit layers: a collector layer that only builds immutable snapshots and a publishing layer that handles transport; inject collaborators via narrow interfaces so the package no longer depends on unrelated domain modules.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "broadcast_coupled_facades"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "click_response_parser_panic",
+      "summary": "Malformed click CLI responses can panic due to unchecked string slicing",
+      "related_files": [
+        "goseg/click/filter.go",
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/click/notify/notify.go"
+      ],
+      "evidence": [
+        "Both `filterResponse` variants do `line[:endIndex]` before verifying `endIndex` (`goseg/click/filter.go:28-33`, `goseg/click/internal/runtime/runtime.go:79-84`).",
+        "The parser is used in high-throughput command execution paths that should fail safely on bad output (`goseg/click/notify/notify.go:65-82`, `goseg/click/internal/runtime/runtime.go:108-120`)."
+      ],
+      "suggestion": "Create a shared parser that validates `]` existence before slicing and returns explicit parse errors, then route both parser callsites through it.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "click_response_parser_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "click_response_parser_duplication",
+      "summary": "Duplicate response parser implementations create fragile, inconsistent click behavior",
+      "related_files": [
+        "goseg/click/filter.go",
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/click/notify/notify.go"
+      ],
+      "evidence": [
+        "Nearly identical parse branches for `success`, `code`, and `desk` live in both parser functions (`goseg/click/filter.go:17-61`, `goseg/click/internal/runtime/runtime.go:66-106`).",
+        "Both modules expose separate surfaces while producing same outcomes, increasing maintenance cost and the chance of divergence."
+      ],
+      "suggestion": "Collapse parser behavior into one internal package-level helper used by both files, then add table-driven tests for malformed and edge-case lines.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "click_response_parser_duplication"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "click_cleanup_error_suppression",
+      "summary": "Filesystem cleanup in Hoon file helpers swallows failure states",
+      "related_files": [
+        "goseg/click/hoon.go",
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/click/notify/notify.go"
+      ],
+      "evidence": [
+        "`deleteHoon` ignores `os.Stat` errors other than `os.IsNotExist` and ignores `os.Remove` errors completely (`goseg/click/hoon.go:40-42`).",
+        "The same pattern exists in `runtime.DeleteHoon` (`goseg/click/internal/runtime/runtime.go:34-40`), so multiple call chains inherit silent failure behavior."
+      ],
+      "suggestion": "Return errors from `DeleteHoon` and `create/execute` paths, then propagate or log at callers where cleanup failures should affect command/error semantics; at minimum handle and report unexpected `Stat`/`Remove` failures.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "click_fs_cleanup_suppression"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "support_http_error_body_dropout",
+      "summary": "Bug report upload drops server error payload when status is non-200",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/handler/system/support_test.go"
+      ],
+      "evidence": [
+        "On non-200 responses, `sendBugReport` formats error with `%s` and `resp.Body` instead of reading body bytes (`goseg/handler/system/support.go:419-420`).",
+        "This discards actionable response details and can make upload failures harder to debug."
+      ],
+      "suggestion": "Read and close the response body into a bounded buffer on non-success, wrap with status code, and add request timeout/response-body assertions in tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "broadcast package remains a high-coupling domain hub with weak boundary separation",
+      "duplicated click response parsing logic implemented twice without shared parser contracts",
+      "cleanup helpers suppress low-level I/O error signals"
+    ],
+    "likely_symptoms": [
+      "broadcast duplicate WS sends on auth clients",
+      "runtime panics on malformed `%avow` response lines",
+      "silent failure to remove temporary Hoon command files"
+    ],
+    "possible_false_positives": [
+      "A few router/actions may intentionally rely on best-effort cleanup semantics for temporary files; verify expected user-facing behavior before changing to hard failures."
+    ]
+  }
+}

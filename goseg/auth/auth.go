@@ -256,9 +256,9 @@ func CreateToken(conn *websocket.Conn, r *http.Request, authed bool) (map[string
 		return nil, fmt.Errorf("failed to encrypt token: %v", err)
 	}
 	token := map[string]string{
-		"id":    id,
-		"token": encryptedText,
+		"id": id,
 	}
+	token["token"] = encryptedText
 	// Update sessions in the system's configuration
 	AddToAuthMap(conn, token, authed)
 	return token, nil

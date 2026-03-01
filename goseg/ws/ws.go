@@ -6,7 +6,8 @@ import (
 	"groundseg/auth"
 	"groundseg/broadcast"
 	"groundseg/config"
-	"groundseg/handler"
+	"groundseg/handler/api"
+	"groundseg/handler/devsvc"
 	handlerws "groundseg/handler/ws"
 	"groundseg/setup"
 	"groundseg/startram"
@@ -177,7 +178,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			*/
-			resp, err := handler.C2CHandler(msg)
+			resp, err := api.C2CHandler(msg)
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
 				continue
@@ -188,17 +189,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		if authed || conf.Setup != "complete" {
 			switch msgType.Payload.Type {
 			case "dev":
-				if err = handler.DevHandler(msg); err != nil {
+				if err = devsvc.DevHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "penpai":
-				if err = handler.PenpaiHandler(msg); err != nil {
+				if err = api.PenpaiHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "new_ship":
-				if err = handler.NewShipHandler(msg); err != nil {
+				if err = api.NewShipHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -208,33 +209,33 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "password":
-				if err = handler.PwHandler(msg, false); err != nil {
+				if err = api.PwHandler(msg, false); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				} else {
-					resp, err := handler.UnauthHandler()
+					resp, err := api.UnauthHandler()
 					if err != nil {
 						zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 					}
 					MuCon.Write(resp)
 				}
 			case "system":
-				if err = handler.SystemHandler(msg); err != nil {
+				if err = api.SystemHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "startram":
-				if err = handler.StartramHandler(msg); err != nil {
+				if err = api.StartramHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "urbit":
-				if err = handler.UrbitHandler(msg); err != nil {
+				if err = api.UrbitHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "support":
-				if err := handler.SupportHandler(msg); err != nil {
+				if err := api.SupportHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
 					ack = "nack"
 				}
@@ -254,11 +255,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "logout":
-				if err := handler.LogoutHandler(msg); err != nil {
+				if err := api.LogoutHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("Error logging out client: %v", err))
 					ack = "nack"
 				}
-				resp, err := handler.UnauthHandler()
+				resp, err := api.UnauthHandler()
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
@@ -275,7 +276,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				if !authed && conf.Setup == "complete" {
 					zap.L().Debug("Not authed in auth flow")
-					resp, err := handler.UnauthHandler()
+					resp, err := api.UnauthHandler()
 					if err != nil {
 						zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 					}
@@ -331,7 +332,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			responseErr := "null"
 			switch msgType.Payload.Type {
 			case "login":
-				newToken, err := handler.LoginHandler(MuCon, msg)
+				newToken, err := api.LoginHandler(MuCon, msg)
 				if err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
@@ -356,7 +357,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				zap.L().Debug(fmt.Sprintf("Verify %v check result: %v", payload.Token.ID, authed))
 			default:
-				resp, err := handler.UnauthHandler()
+				resp, err := api.UnauthHandler()
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}

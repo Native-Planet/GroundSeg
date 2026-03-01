@@ -31,7 +31,10 @@ func GetWgConf() (structs.WgConfig, error) {
 	defer configFile.Close()
 
 	// Read file contents into byte slice
-	byteValue, _ := ioutil.ReadAll(configFile)
+	byteValue, err := ioutil.ReadAll(configFile)
+	if err != nil {
+		return wgConf, err
+	}
 
 	if err := json.Unmarshal(byteValue, &wgConf); err != nil {
 		return wgConf, err

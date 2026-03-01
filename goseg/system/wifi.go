@@ -31,7 +31,7 @@ var (
 	c2cEnabled                                       = false
 	defaultWiFiRadio            wifiRadioService     = nmcliWiFiRadioService{}
 	defaultAccessPointLifecycle accessPointLifecycle = systemAccessPointLifecycle{}
-	captiveAdapter                                   = newCaptiveTransportAdapter()
+	captiveAdapter                                   = newCaptiveTransportAdapter(defaultC2CServiceDeps())
 
 	execCommandForWiFi   = exec.Command
 	runCommandForWiFi    = runCommand
@@ -115,10 +115,14 @@ func C2CMode() error {
 		return fmt.Errorf("failed to discover wifi device for C2C mode: %w", err)
 	}
 	// store ssids
-	C2CStoredSSIDs = defaultWiFiRadio.ListSSIDs(device)
+	ssids, err := defaultWiFiRadio.ListSSIDs(device)
+	if err != nil {
+		return fmt.Errorf("couldn't list ssids for %s: %w", device, err)
+	}
+	C2CStoredSSIDs = ssids
 	zap.L().Info(fmt.Sprintf("C2C retrieved available SSIDs: %v", C2CStoredSSIDs))
 	// stop systemd-resolved
-	_, err = runCommand("systemctl", "stop", "systemd-resolved")
+	_, err = runCommandForWiFi("systemctl", "stop", "systemd-resolved")
 	if err != nil {
 		return fmt.Errorf("Failed to stop resolved: %w", err)
 	}
@@ -238,11 +242,10 @@ func primaryWifiDevice() (string, error) {
 	return wifiDevices[0], nil
 }
 
-func ListWifiSSIDs(dev string) []string {
+func ListWifiSSIDs(dev string) ([]string, error) {
 	out, err := runCommandForWiFi("nmcli", "-t", "dev", "wifi", "list", "ifname", dev)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't gather wifi networks: %v", err))
-		return []string{}
+		return nil, fmt.Errorf("couldn't gather wifi networks: %w", err)
 	}
 	lines := strings.Split(out, "\n")
 	var ssids []string
@@ -252,7 +255,7 @@ func ListWifiSSIDs(dev string) []string {
 			ssids = append(ssids, parts[7])
 		}
 	}
-	return ssids
+	return ssids, nil
 }
 
 func getConnectedSSID(c *wifi.Client, dev string) string {

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"groundseg/dockerclient"
 	"groundseg/structs"
+	"groundseg/transition"
 	"net/http"
-	"strings"
 	"time"
 
 	eventtypes "github.com/docker/docker/api/types/events"
@@ -19,19 +19,20 @@ var (
 	DisableShipRestart = false
 )
 
-type dockerRoutineRuntime = routineRuntime
-
-func newDockerRoutineRuntime() dockerRoutineRuntime {
-	return newRoutineRuntime()
-}
-
 func StartDockerHealthLoops() {
 	go Check502Loop()
 }
 
 // subscribe to docker events and feed them into eventbus
 func DockerListener() {
-	ctx := context.Background()
+	DockerListenerWithContext(context.Background())
+}
+
+// DockerListenerWithContext runs until ctx is canceled.
+func DockerListenerWithContext(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cli, err := dockerclient.New()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Error initializing Docker client: %v", err))
@@ -40,12 +41,29 @@ func DockerListener() {
 	messages, errs := cli.Events(ctx, eventtypes.ListOptions{})
 	for {
 		select {
+		case <-ctx.Done():
+			zap.L().Info("Stopping Docker event listener")
+			return
 		case event := <-messages:
+			if ctx.Err() != nil {
+				return
+			}
 			// Convert the Docker event to our custom event and send it to the EventBus
-			eventBus <- structs.Event{Type: string(event.Action), Data: event}
+			select {
+			case eventBus <- structs.Event{Type: string(event.Action), Data: event}:
+			case <-ctx.Done():
+				return
+			}
 		case err := <-errs:
-			if err != nil {
-				zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
+			if err == nil {
+				if ctx.Err() != nil {
+					return
+				}
+				continue
+			}
+			zap.L().Error(fmt.Sprintf("Docker event error: %v", err))
+			if ctx.Err() != nil {
+				return
 			}
 		}
 	}
@@ -54,75 +72,83 @@ func DockerListener() {
 // receives events via docker.EventBus
 // compares actual state to desired state
 func DockerSubscriptionHandler() {
-	dockerSubscriptionHandler(newDockerRoutineRuntime())
+	DockerSubscriptionHandlerWithContext(context.Background())
 }
 
-func dockerSubscriptionHandler(rt dockerRoutineRuntime) {
+func DockerSubscriptionHandlerWithContext(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	dockerSubscriptionHandlerWithRuntime(ctx, newDockerRoutineRuntime())
+}
+
+func dockerSubscriptionHandlerWithRuntime(ctx context.Context, rt dockerRoutineRuntime) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	for {
-		event := <-eventBus
-		dockerEvent, ok := event.Data.(eventtypes.Message)
-		if !ok {
-			zap.L().Error("Failed to assert Docker event data type")
-			continue
-		}
-		contName := dockerEvent.Actor.Attributes["name"]
-		switch dockerEvent.Action {
-
-		case "stop":
-			zap.L().Info(fmt.Sprintf("Docker: %s stopped", contName))
-
-			if containerState, exists := rt.getContainerState()[contName]; exists {
-				containerState.ActualStatus = "stopped"
-				rt.updateContainerState(contName, containerState)
-				// start it again if this isn't what the user wants
-				if containerState.DesiredStatus != "stopped" {
-					rt.startContainer(contName, containerState.Type)
-				}
-				makeBroadcastWithRuntime(rt, contName, string(dockerEvent.Action))
+		select {
+		case <-ctx.Done():
+			zap.L().Info("Stopping Docker subscription handler")
+			return
+		case event := <-eventBus:
+			dockerEvent, ok := event.Data.(eventtypes.Message)
+			if !ok {
+				zap.L().Error("Failed to assert Docker event data type")
+				continue
 			}
+			contName := dockerEvent.Actor.Attributes["name"]
+			action := transition.DockerAction(dockerEvent.Action)
+			switch action {
 
-		case "start":
-			zap.L().Info(fmt.Sprintf("Docker: %s started", contName))
+			case transition.DockerActionStop:
+				zap.L().Info(fmt.Sprintf("Docker: %s stopped", contName))
 
-			containerState, exists := rt.getContainerState()[contName]
-			if exists {
-				containerState.ActualStatus = "running"
-				rt.updateContainerState(contName, containerState)
-				switch contName {
-				case "wireguard":
-					// set wgOn to false
-					err := rt.updateWgOn(true)
-					if err != nil {
-						zap.L().Error(fmt.Sprintf("%v", err))
+				updateContainerTransition(rt, contName, action, func(state *structs.ContainerState) error {
+					state.ActualStatus = string(transition.ContainerStatusStopped)
+					if state.DesiredStatus != string(transition.ContainerStatusStopped) {
+						if _, err := rt.startContainer(contName, state.Type); err != nil {
+							return err
+						}
 					}
-					current := rt.getState()
-					current.Profile.Startram.Info.Running = true
-					rt.updateBroadcast(current)
-				}
-				makeBroadcastWithRuntime(rt, contName, string(dockerEvent.Action))
-			}
+					return nil
+				})
 
-		case "die":
-			zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
-			if containerState, exists := rt.getContainerState()[contName]; exists {
-				containerState.ActualStatus = "died"
-				rt.updateContainerState(contName, containerState)
-				if containerState.Type == "vere" {
+			case transition.DockerActionStart:
+				zap.L().Info(fmt.Sprintf("Docker: %s started", contName))
+
+				updateContainerTransition(rt, contName, action, func(state *structs.ContainerState) error {
+					state.ActualStatus = string(transition.ContainerStatusRunning)
+					if contName == string(transition.ContainerTypeWireguard) {
+						if err := rt.updateWgOn(true); err != nil {
+							return err
+						}
+						current := rt.getState()
+						current.Profile.Startram.Info.Running = true
+						rt.updateBroadcast(current)
+					}
+					return nil
+				})
+
+			case transition.DockerActionDie:
+				zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
+				updateContainerTransition(rt, contName, action, func(state *structs.ContainerState) error {
+					state.ActualStatus = string(transition.ContainerStatusDied)
+					if state.Type != string(transition.ContainerTypeVere) {
+						return nil
+					}
 					if err := rt.loadUrbitConfig(contName); err != nil {
-						zap.L().Error(fmt.Sprintf("Failed to load config for %s: %v", contName, err))
+						return fmt.Errorf("Failed to load config for %s: %w", contName, err)
 					}
 					conf := rt.urbitConf(contName)
-					if disableRestart, ok := conf.DisableShipRestarts.(bool); ok && disableRestart {
+					if conf.DisableShipRestarts {
 						zap.L().Info(fmt.Sprintf("Leaving %s container alone after death due to DisableShipRestarts=true", contName))
-						containerState.DesiredStatus = "stopped"
-						rt.updateContainerState(contName, containerState)
+						state.DesiredStatus = string(transition.ContainerStatusStopped)
 						rt.clearLusCode(contName)
-						makeBroadcastWithRuntime(rt, contName, string(dockerEvent.Action))
-						return
-					} else {
-						rt.clearLusCode(contName)
+						return nil
 					}
-					if containerState.DesiredStatus != "died" && containerState.DesiredStatus != "stopped" {
+					rt.clearLusCode(contName)
+					if state.DesiredStatus != string(transition.ContainerStatusDied) && state.DesiredStatus != string(transition.ContainerStatusStopped) {
 						zap.L().Info(fmt.Sprintf("Attempting to restart ship %s after death", contName))
 						go func(name, containerType string) {
 							rt.sleep(2 * time.Second)
@@ -132,17 +158,31 @@ func dockerSubscriptionHandler(rt dockerRoutineRuntime) {
 							} else {
 								zap.L().Info(fmt.Sprintf("Successfully restarted %s after death", name))
 							}
-						}(contName, containerState.Type)
+						}(contName, state.Type)
 					} else {
-						zap.L().Info(fmt.Sprintf("Ship desired status: %s", containerState.DesiredStatus))
+						zap.L().Info(fmt.Sprintf("Ship desired status: %s", state.DesiredStatus))
 					}
-				}
-				makeBroadcastWithRuntime(rt, contName, string(dockerEvent.Action))
+					return nil
+				})
+			default:
+				zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 			}
-		default:
-			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
 		}
 	}
+}
+
+func updateContainerTransition(rt dockerRoutineRuntime, contName string, action transition.DockerAction, mutate func(*structs.ContainerState) error) {
+	containerState, exists := rt.getContainerState()[contName]
+	if !exists {
+		return
+	}
+
+	if err := mutate(&containerState); err != nil {
+		zap.L().Warn(fmt.Sprintf("Docker transition failed for %s: %v", contName, err))
+		return
+	}
+	rt.updateContainerState(contName, containerState)
+	makeBroadcastWithRuntime(rt, contName, string(action))
 }
 
 func makeBroadcast(contName string, status string) {
@@ -154,11 +194,11 @@ func makeBroadcastWithRuntime(rt dockerRoutineRuntime, contName string, status s
 	case "wireguard":
 		var wgOn bool
 		// set wgOn to false
-		if status == "die" {
+		if status == string(transition.DockerActionDie) {
 			wgOn = false
 		}
 		// set wgOn to true
-		if status == "start" {
+		if status == string(transition.DockerActionStart) {
 			wgOn = true
 		}
 		if err := rt.updateWgOn(wgOn); err != nil {
@@ -202,7 +242,7 @@ func check502Loop(rt dockerRoutineRuntime) {
 				continue
 			}
 			turnedOn := false
-			if strings.Contains(pierStatus[pier], "Up") {
+			if transition.IsContainerUpStatus(pierStatus[pier]) {
 				turnedOn = true
 			}
 			if turnedOn && pierNetwork != "default" && settings.WgOn {
@@ -267,7 +307,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 	}
 	var stepErrors []error
 	for patp, status := range pierStatus {
-		if status == "Up" || strings.HasPrefix(status, "Up ") {
+		if transition.IsContainerUpStatus(status) {
 			if err := rt.barExit(patp); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to stop %s with |exit for daemon restart: %v", patp, err))
 				stepErrors = append(stepErrors, fmt.Errorf("failed to stop %s with |exit for daemon restart: %w", patp, err))
@@ -280,7 +320,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 					break
 				}
 				zap.L().Debug(fmt.Sprintf("%s", status))
-				if !strings.Contains(status, "Up") {
+				if !transition.IsContainerUpStatus(status) {
 					break
 				}
 				rt.sleep(1 * time.Second)

@@ -38,7 +38,7 @@ var (
 		MeldLast:            "0",
 		MeldNext:            "0",
 		BootStatus:          "boot",
-		CustomPierLocation:  nil,
+		CustomPierLocation:  "",
 		CustomUrbitWeb:      "",
 		CustomS3Web:         "",
 		ShowUrbitWeb:        "",

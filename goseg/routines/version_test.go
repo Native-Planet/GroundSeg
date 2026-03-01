@@ -17,9 +17,9 @@ func testVersionRuntime() versionRuntime {
 	rt.updateDocker = func(string, structs.Channel, structs.Channel) {}
 	rt.updateBinary = func(versionRuntime, string, structs.Channel) {}
 	rt.getSha256 = func(string) (string, error) { return "", nil }
-	rt.architecture = func() string { return "amd64" }
-	rt.basePath = func() string { return "" }
-	rt.debugMode = func() bool { return false }
+	rt.Architecture = func() string { return "amd64" }
+	rt.BasePath = func() string { return "" }
+	rt.DebugMode = func() bool { return false }
 	rt.getConf = func() structs.SysConfig { return structs.SysConfig{} }
 	rt.getShipStatus = func([]string) (map[string]string, error) { return map[string]string{}, nil }
 	rt.startContainer = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
@@ -27,7 +27,7 @@ func testVersionRuntime() versionRuntime {
 	rt.loadUrbitConfig = func(string) error { return nil }
 	rt.urbitConf = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
 	rt.waitComplete = func(string) error { return nil }
-	rt.chopPier = func(string, structs.UrbitDocker) error { return nil }
+	rt.chopPier = func(string) error { return nil }
 	rt.updateUrbit = func(string, func(*structs.UrbitDocker) error) error { return nil }
 	return rt
 }
@@ -95,7 +95,7 @@ func TestCallUpdaterSkipsWhenSyncFails(t *testing.T) {
 
 func TestCallUpdaterTriggersDockerAndChannelUpdate(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g2", "n2", "w1", "m1", "s1", "v1")
@@ -142,7 +142,7 @@ func TestCallUpdaterTriggersDockerAndChannelUpdate(t *testing.T) {
 
 func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g2", "n1", "w1", "m1", "s1", "v1")
@@ -175,7 +175,7 @@ func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 
 func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	rt.getConf = func() structs.SysConfig {
 		return structs.SysConfig{}
@@ -208,7 +208,7 @@ func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 
 func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	rt.getConf = func() structs.SysConfig {
 		return structs.SysConfig{Piers: []string{"zod", "nec"}}
@@ -236,7 +236,7 @@ func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 
 func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	rt.getConf = func() structs.SysConfig {
 		return structs.SysConfig{Piers: []string{"zod"}}
@@ -283,7 +283,7 @@ func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 
 func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.architecture = func() string { return "amd64" }
+	rt.Architecture = func() string { return "amd64" }
 
 	rt.getConf = func() structs.SysConfig {
 		return structs.SysConfig{Piers: []string{"zod"}}
@@ -322,7 +322,7 @@ func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 	}
 	rt.waitComplete = func(string) error { return nil }
 	chopCalled := make(chan struct{}, 1)
-	rt.chopPier = func(string, structs.UrbitDocker) error {
+	rt.chopPier = func(string) error {
 		chopCalled <- struct{}{}
 		return nil
 	}

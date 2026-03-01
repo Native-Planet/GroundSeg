@@ -1,0 +1,69 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 4,
+  "assessments": {
+    "api_surface_coherence": 82.0
+  },
+  "dimension_notes": {
+    "api_surface_coherence": {
+      "evidence": [
+        "Public APIs in the same domain mix error-returning and error-silent signatures (`goseg/system/wifi.go` has `ListWifiSSIDs` returning only `[]string` while neighboring wifi helpers return `error`), creating ambiguous caller behavior.",
+        "Error-returning contract is broken in `goseg/docker/docker.go` where `GetContainerRunningStatus` proceeds after a failed `dockerclient.New()` path and can dereference a nil client before any explicit error return."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "PANIC_ON_DOCKER_CLIENT_INIT_FAIL",
+      "summary": "`GetContainerRunningStatus` can panic on Docker client init failure instead of returning an error through its exported API.",
+      "related_files": [
+        "goseg/docker/docker.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`goseg/docker/docker.go` defines `GetContainerRunningStatus(containerName string) (string, error)` and calls `cli, err := dockerclient.New()` with an empty `if err != nil {}` block.",
+        "The function then does `defer cli.Close()` and continues using `cli` regardless of `err`, so a failed client construction can dereference a nil pointer before returning an error.",
+        "`goseg/routines/docker.go` invokes `GetContainerRunningStatus` expecting `(status, err)` semantics; a panic breaks that contract and removes caller-level recovery."
+      ],
+      "suggestion": "In `GetContainerRunningStatus`, return immediately when `dockerclient.New()` fails (e.g., `return \"\", fmt.Errorf(...)`) and add a regression test that verifies a nil/failed client path returns an error instead of panicking.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_inconsistency"
+    },
+    {
+      "dimension": "api_surface_coherence",
+      "identifier": "WIFI_SSID_SWALLOWS_SCAN_FAILURES",
+      "summary": "Wi‑Fi SSID listing collapses operational errors into empty results, obscuring failures as successful empty scans.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/wifi_transport_adapter.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi.go` exposes `func ListWifiSSIDs(dev string) []string` and on `runCommandForWiFi` error returns `[]string{}` after silently ignoring the error.",
+        "The same file’s neighboring API functions (`getWifiDevice`, `C2CConnect`, etc.) return errors, so error-signaling semantics are inconsistent within the same subsystem.",
+        "`goseg/system/wifi_transport_adapter.go` binds `listWirelessSSIDs: ListWifiSSIDs`, which forces callers through a no-error callback shape and prevents distinguishing \"no results\" from \"scan failure\"."
+      ],
+      "suggestion": "Change `ListWifiSSIDs` to return `([]string, error)` and update call sites/adapters in `wifi_transport_adapter.go` and related subsystem code to propagate scan failures explicitly; update tests to assert failure observability.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Cross-module APIs lack a coherent error contract, especially where command/external-service failures are collapsed into empty values.",
+      "Adapter/callback-facing function signatures sometimes force information-loss patterns, encouraging swallowing of failures for legacy convenience."
+    ],
+    "likely_symptoms": [
+      "PANIC_ON_DOCKER_CLIENT_INIT_FAIL",
+      "WIFI_SSID_SWALLOWS_SCAN_FAILURES"
+    ],
+    "possible_false_positives": []
+  }
+}

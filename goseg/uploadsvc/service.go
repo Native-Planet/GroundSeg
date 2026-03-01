@@ -2,8 +2,13 @@ package uploadsvc
 
 import (
 	"fmt"
+
+	"groundseg/protocol/actions"
 )
 
+// Action represents the transport contract for upload websocket commands.
+// The canonical action set is `actionBindings`; keep it as the source of truth for
+// supported actions and dispatch behavior.
 type OpenEndpointRequest struct {
 	Endpoint      string
 	TokenID       string
@@ -13,11 +18,11 @@ type OpenEndpointRequest struct {
 	SelectedDrive string
 }
 
-type Action string
+type Action = actions.Action
 
 const (
-	ActionOpenEndpoint Action = "open-endpoint"
-	ActionReset        Action = "reset"
+	ActionOpenEndpoint Action = actions.ActionUploadOpenEndpoint
+	ActionReset        Action = actions.ActionUploadReset
 )
 
 type Service interface {
@@ -30,56 +35,61 @@ type Command struct {
 	OpenEndpointRequest OpenEndpointRequest
 }
 
-type UnsupportedActionError struct {
-	Action Action
-}
-
-func (e UnsupportedActionError) Error() string {
-	return fmt.Sprintf("unsupported upload action: %s", e.Action)
-}
+type UnsupportedActionError = actions.UnsupportedActionError
 
 type Executor struct {
-	dispatch map[Action]func(Command) error
+	dispatcher actions.ActionDispatcher[Action, Service, Command]
+	service    Service
 }
 
-var supportedActions = []Action{
-	ActionOpenEndpoint,
-	ActionReset,
+var actionBindings = actions.NewActionDispatcher(actions.NamespaceUpload, []actions.ActionBinding[Action, Service, Command]{
+	{
+		Action: ActionOpenEndpoint,
+		Execute: func(service Service, cmd Command) error {
+			return service.OpenEndpoint(cmd.OpenEndpointRequest)
+		},
+		Operation: func(cmd Command) string {
+			return fmt.Sprintf("open upload endpoint %s", cmd.OpenEndpointRequest.Endpoint)
+		},
+	},
+	{
+		Action: ActionReset,
+		Execute: func(service Service, cmd Command) error {
+			return service.Reset()
+		},
+		Operation: func(Command) string {
+			return "reset upload session"
+		},
+	},
+})
+
+// ParseAction validates the action before commands are built.
+func ParseAction(raw string) (Action, error) {
+	return actions.ParseUploadAction(raw)
 }
 
 func SupportedActions() []Action {
-	return append([]Action(nil), supportedActions...)
+	return actions.SupportedUploadActions()
 }
 
 func NewExecutor(service Service) (Executor, error) {
 	if service == nil {
 		return Executor{}, fmt.Errorf("upload service is required")
 	}
-	dispatch := map[Action]func(Command) error{
-		ActionOpenEndpoint: func(cmd Command) error {
-			return service.OpenEndpoint(cmd.OpenEndpointRequest)
-		},
-		ActionReset: func(cmd Command) error {
-			return service.Reset()
-		},
-	}
-	return Executor{dispatch: dispatch}, nil
+	return Executor{
+		dispatcher: actionBindings,
+		service:    service,
+	}, nil
 }
 
 func (e Executor) Execute(cmd Command) error {
-	handler, exists := e.dispatch[cmd.Action]
-	if !exists {
-		return UnsupportedActionError{Action: cmd.Action}
-	}
-	return handler(cmd)
+	return e.dispatcher.Execute(cmd.Action, e.service, cmd)
 }
 
 func (e Executor) SupportedActions() []Action {
-	actions := make([]Action, 0, len(supportedActions))
-	for _, action := range supportedActions {
-		if _, ok := e.dispatch[action]; ok {
-			actions = append(actions, action)
-		}
-	}
-	return actions
+	return e.dispatcher.Supported()
+}
+
+func DescribeAction(cmd Command) (string, bool) {
+	return actionBindings.Describe(cmd.Action, cmd)
 }

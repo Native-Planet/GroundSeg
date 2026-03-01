@@ -2,17 +2,20 @@ package runtime
 
 import (
 	"fmt"
+	"groundseg/click/internal/response"
 	"groundseg/config"
 	"groundseg/docker"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
 var (
-	execDockerCommandFn = docker.ExecDockerCommand
+	execDockerCommandFn = func(container string, cmd []string) (string, error) {
+		response, _, err := docker.ExecDockerCommand(container, cmd)
+		return response, err
+	}
 )
 
 func JoinGap(hoon []string) string {
@@ -22,10 +25,8 @@ func JoinGap(hoon []string) string {
 func CreateHoon(patp, file, hoon string) error {
 	shipConf := config.UrbitConf(patp)
 	location := filepath.Join(config.DockerDir, patp, "_data")
-	if shipConf.CustomPierLocation != nil {
-		if str, ok := shipConf.CustomPierLocation.(string); ok {
-			location = str
-		}
+	if shipConf.CustomPierLocation != "" {
+		location = shipConf.CustomPierLocation
 	}
 	hoonFile := filepath.Join(location, fmt.Sprintf("%s.hoon", file))
 	return ioutil.WriteFile(hoonFile, []byte(hoon), 0644)
@@ -34,10 +35,8 @@ func CreateHoon(patp, file, hoon string) error {
 func DeleteHoon(patp, file string) {
 	shipConf := config.UrbitConf(patp)
 	location := filepath.Join(config.DockerDir, patp, "_data")
-	if shipConf.CustomPierLocation != nil {
-		if str, ok := shipConf.CustomPierLocation.(string); ok {
-			location = str
-		}
+	if shipConf.CustomPierLocation != "" {
+		location = shipConf.CustomPierLocation
 	}
 	hoonFile := filepath.Join(location, fmt.Sprintf("%s.hoon", file))
 	if _, err := os.Stat(hoonFile); !os.IsNotExist(err) {
@@ -63,46 +62,8 @@ func ClickExec(patp, file, dependency string) (string, error) {
 	return res, nil
 }
 
-func FilterResponse(resType string, response string) (string, bool, error) {
-	responseSlice := strings.Split(response, "\n")
-	switch resType {
-	case "success":
-		for _, line := range responseSlice {
-			if strings.Contains(line, "[0 %avow 0 %noun %success]") {
-				return "", true, nil
-			}
-		}
-		return "", false, nil
-	case "code":
-		for _, line := range responseSlice {
-			if strings.Contains(line, "%avow") {
-				endIndex := strings.Index(line, "]")
-				lastPercentIndex := strings.LastIndex(line[:endIndex], "%")
-				if lastPercentIndex != -1 && endIndex != -1 && lastPercentIndex < endIndex {
-					code := line[lastPercentIndex+1 : endIndex]
-					return code, false, nil
-				}
-			}
-		}
-	case "desk":
-		for _, line := range responseSlice {
-			if strings.Contains(line, "%avow") {
-				if strings.Contains(line, "does not yet exist") {
-					return "not-found", false, nil
-				}
-				regex := regexp.MustCompile(`app status:\s+([^\s]+)`)
-				match := regex.FindStringSubmatch(line)
-				if len(match) >= 2 {
-					appStatus := strings.TrimSuffix(match[1], "]")
-					return appStatus, false, nil
-				}
-				return "not-found", false, nil
-			}
-		}
-	case "default":
-		return "", false, fmt.Errorf("Unknown poke response")
-	}
-	return "", false, fmt.Errorf("+code not in poke response")
+func FilterResponse(resType string, pokeResponse string) (string, bool, error) {
+	return response.ParsePokeResponse(resType, pokeResponse)
 }
 
 func ExecuteCommand(patp, file, hoon, sourcePath, successToken, operation string) (string, error) {

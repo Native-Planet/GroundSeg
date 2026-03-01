@@ -1,0 +1,140 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 79.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/broadcast/broadcast.go performs duplicate `auth.ClientManager.BroadcastAuth(authJson)` calls in `BroadcastToClients` after a single state fetch, creating two outbound sends for the same message.",
+        "State mutation and read paths in `goseg/broadcast/broadcast.go` are split into many narrow lock/unlock sections (`bootstrapBroadcastState`) and then later consumed unsafely across methods, which increases consistency risk for broadcast payloads.",
+        "`goseg/config/config.go` centralizes file I/O, defaults, validation, persistence, and global accessors on shared package-level mutable state, coupling unrelated concerns behind one singleton surface.",
+        "Orchestration helpers in `goseg/docker/orchestration/minio.go` and `goseg/docker/orchestration/netdata.go` use unbounded polling loops for container readiness, increasing failure coupling and making startup error handling inconsistent.",
+        "`goseg/importer/importer.go` combines session orchestration, storage mutation, validation, parsing, progress tracking, and service state transitions in one large file with shared globals."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 61.2,
+        "indirection_cost": 68.3,
+        "interface_honesty": 64.7
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast-duplicate-send",
+      "summary": "Broadcast authentication payload is sent twice for each state change, causing duplicate client notifications.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` calls `auth.ClientManager.GetStateJson()` once, then calls `auth.ClientManager.BroadcastAuth(authJson)` twice in succession without intermediate state change.",
+        "`structs.BroadcastAuth` is intended as a single outbound event type, so duplicate dispatch appears accidental and semantically redundant."
+      ],
+      "suggestion": "Remove one of the duplicate `BroadcastAuth` invocations and add a targeted unit test in `goseg/broadcast/broadcast.go` that asserts one outbound call per state transition.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "broadcast_dispatch_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast-state-consistency",
+      "summary": "Broadcast state updates and reads are fragmented, increasing chances of transiently inconsistent snapshots delivered to clients.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/system/support.go",
+        "goseg/leak/handler.go"
+      ],
+      "evidence": [
+        "`bootstrapBroadcastState` acquires and releases the mutex for each field assignment rather than applying state updates in one cohesive update path.",
+        "`BroadcastToClients` reads state (`GetState`) and then publishes to listeners without a single atomic/snapshot handoff contract between mutators and broadcasters.",
+        "State is subsequently consumed by multiple handlers, so partial interleaving can produce mixed-state updates under concurrent load."
+      ],
+      "suggestion": "Introduce an explicit snapshot type and a single mutex-protected mutator method in broadcast state that returns a complete immutable copy; `BroadcastToClients` should consume only that snapshot and emit exactly once.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "broadcast_state_race"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config-singleton-fat-module",
+      "summary": "The config package concentrates unrelated lifecycle concerns in one mutable singleton, increasing coupling and hidden side effects.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go",
+        "goseg/config/mc.go"
+      ],
+      "evidence": [
+        "Global configuration state and locking (`configData`, `configDataLock`) are shared for default initialization, file read/write, migration/version behavior, and domain getters.",
+        "Multiple unrelated concerns (runtime environment assumptions, transport defaults, persistence, and validation) are co-located without explicit boundaries or interfaces.",
+        "Tests and other packages depend on mutable package-level state patterns rather than injecting a typed config provider."
+      ],
+      "suggestion": "Refactor config into smaller services: a `ConfigStore` for IO/versioning and a typed immutable `RuntimeConfig` passed through constructors; replace package globals with explicit dependencies in callsites.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "god_config_module"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "importer-god-state",
+      "summary": "Importer orchestration mixes validation, lifecycle control, persistence, and transport/state handling in one file-level module, obscuring responsibility boundaries.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/routines/docker.go",
+        "goseg/shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "`importer.go` defines broad operational flow (session management, checks, orchestration calls, and state transitions) with shared mutable state, creating wide impact from local edits.",
+        "Caller modules (`routines/docker.go`, `shipworkflow/urbit_operations.go`) must coordinate with this monolith rather than depend on narrow interfaces.",
+        "Test files (`importer_test.go`, `extract_test.go`) exercise many branches, implying behavioral coupling rather than clearly isolated units."
+      ],
+      "suggestion": "Split importer into distinct components: parsing/validation, persistence, orchestration adapter, and state-machine coordinator, with explicit interfaces and shared immutable request/response DTOs.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "god_importer_module"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "orchestration-indefinite-poll",
+      "summary": "Container readiness checks can block indefinitely because polling loops have no bounded termination conditions.",
+      "related_files": [
+        "goseg/docker/orchestration/minio.go",
+        "goseg/docker/orchestration/netdata.go"
+      ],
+      "evidence": [
+        "Runtime config functions repeatedly loop on container status and only break on matching condition, with no max attempts or context deadline guard.",
+        "A misconfigured service or hung container can therefore stall startup/handoff paths indefinitely rather than failing fast.",
+        "The same unbounded-poll style appears in multiple orchestration helpers, indicating a shared design pattern."
+      ],
+      "suggestion": "Use context-bound wait with timeout and capped retry/backoff policy in a shared orchestration utility, and surface explicit timeout errors to callers for retry/fallback handling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_timeout_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Monolithic mutable modules (broadcast, config, importer) conflate orchestration, state, and transport concerns.",
+      "Implicit state-sharing under coarse locks causes coherence hazards and accidental duplicate operations.",
+      "Lack of bounded operational contracts (timeouts) in orchestration primitives creates indefinite wait behavior."
+    ],
+    "likely_symptoms": [
+      "broadcast-duplicate-send",
+      "broadcast-state-consistency",
+      "orchestration-indefinite-poll"
+    ],
+    "possible_false_positives": [
+      "Some repeated lock acquisitions in broadcast may be intentional to reduce lock scope; however, combined evidence still points to inconsistent snapshot semantics."
+    ]
+  }
+}
