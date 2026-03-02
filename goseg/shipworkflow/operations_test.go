@@ -12,16 +12,16 @@ import (
 
 func setupUrbitOperationsConfig(t *testing.T, patp string, conf structs.UrbitDocker) {
 	t.Helper()
-	oldBasePath := config.BasePath
+	oldBasePath := config.BasePath()
 	oldUrbits := config.UrbitsConfig
 
-	config.BasePath = t.TempDir()
+	config.SetBasePath(t.TempDir())
 	config.UrbitsConfig = map[string]structs.UrbitDocker{
 		patp: conf,
 	}
 
 	t.Cleanup(func() {
-		config.BasePath = oldBasePath
+		config.SetBasePath(oldBasePath)
 		config.UrbitsConfig = oldUrbits
 	})
 }

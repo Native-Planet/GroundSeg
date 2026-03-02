@@ -17,7 +17,7 @@ func preserveVersionGlobals(t *testing.T) {
 	originalRetryDelay := versionFetchRetryDelay
 	originalSleep := versionFetchSleep
 	originalConfig := globalConfig
-	originalBasePath := BasePath
+	originalBasePath := BasePath()
 	t.Cleanup(func() {
 		versionStore = originalStore
 		versionHTTPClient = originalClient
@@ -25,7 +25,7 @@ func preserveVersionGlobals(t *testing.T) {
 		versionFetchRetryDelay = originalRetryDelay
 		versionFetchSleep = originalSleep
 		globalConfig = originalConfig
-		BasePath = originalBasePath
+		SetBasePath(originalBasePath)
 	})
 }
 
@@ -69,8 +69,8 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 		t.Fatalf("unexpected channel: %+v", channel)
 	}
 
-	BasePath = t.TempDir()
-	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+	SetBasePath(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
 	versionStore = newInMemoryVersionStore()
@@ -83,7 +83,7 @@ func TestResolveLatestChannelAndPublishVersionMetadata(t *testing.T) {
 	if GetVersionChannel().Groundseg.Repo != "repo-beta" {
 		t.Fatalf("unexpected published channel: %+v", GetVersionChannel())
 	}
-	if _, err := os.Stat(filepath.Join(BasePath, "settings", "version_info.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(BasePath(), "settings", "version_info.json")); err != nil {
 		t.Fatalf("expected persisted version_info.json: %v", err)
 	}
 }
@@ -118,8 +118,8 @@ func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
 func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	preserveVersionGlobals(t)
 
-	BasePath = t.TempDir()
-	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+	SetBasePath(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
 	versionStore = newInMemoryVersionStore()
@@ -164,8 +164,8 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 func TestCreateDefaultVersionAndLocalVersionFallback(t *testing.T) {
 	preserveVersionGlobals(t)
 
-	BasePath = t.TempDir()
-	if err := os.MkdirAll(filepath.Join(BasePath, "settings"), 0o755); err != nil {
+	SetBasePath(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
 		t.Fatalf("mkdir settings failed: %v", err)
 	}
 
@@ -177,7 +177,7 @@ func TestCreateDefaultVersionAndLocalVersionFallback(t *testing.T) {
 		t.Fatalf("expected non-empty default local version metadata")
 	}
 
-	if err := os.WriteFile(filepath.Join(BasePath, "settings", "version_info.json"), []byte("{invalid"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(BasePath(), "settings", "version_info.json"), []byte("{invalid"), 0o644); err != nil {
 		t.Fatalf("write invalid version file failed: %v", err)
 	}
 	fallback := LocalVersion()

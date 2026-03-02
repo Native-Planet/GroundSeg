@@ -4,17 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"groundseg/protocol/actions"
 	"groundseg/structs"
 	wifiService "groundseg/system/wifi/service"
 )
 
-type c2cAction = wifiService.C2CAction
+const c2cActionConnect actions.Action = actions.ActionC2CConnect
 
-const c2cActionConnect = wifiService.ConnectAction
-
-var supportedC2CActions = wifiService.SupportedC2CActions
-
-type unsupportedC2CActionError = wifiService.UnsupportedC2CActionError
+var supportedC2CActions = actions.SupportedC2CActions
 
 type c2cServiceDeps struct {
 	connectToWiFi    func(string, string) error
@@ -34,7 +31,7 @@ func processC2CMessageForAdapterWithDeps(msg []byte, deps c2cServiceDeps) error 
 	if payload.Type != "c2c" {
 		return fmt.Errorf("unsupported c2c payload type: %q", payload.Type)
 	}
-	action, err := parseC2CAction(payload.Payload.Action)
+	action, err := actions.ParseC2CAction(payload.Payload.Action)
 	if err != nil {
 		return err
 	}
@@ -53,32 +50,35 @@ func defaultC2CServiceDeps() c2cServiceDeps {
 	}
 }
 
-func c2cActionExecutorForAdapter(action c2cAction, ssid, password string) error {
-	service := newC2CServiceForAdapterWithDeps(defaultC2CServiceDeps())
+func c2cActionExecutorForAdapter(action actions.Action, ssid, password string) error {
+	service, err := newC2CServiceForAdapterWithDeps(defaultC2CServiceDeps())
+	if err != nil {
+		return err
+	}
 	return service.Execute(action, ssid, password)
 }
 
-func parseC2CAction(raw string) (c2cAction, error) {
-	return wifiService.ParseC2CAction(raw)
-}
-
-func newC2CServiceForAdapter() wifiService.C2CService {
+func newC2CServiceForAdapter() (wifiService.C2CService, error) {
 	return newC2CServiceForAdapterWithDeps(defaultC2CServiceDeps())
 }
 
-func newC2CServiceForAdapterWithDeps(deps c2cServiceDeps) wifiService.C2CService {
+func newC2CServiceForAdapterWithDeps(deps c2cServiceDeps) (wifiService.C2CService, error) {
 	if deps.connectToWiFi == nil {
-		panic("newC2CServiceForAdapterWithDeps called without connectToWiFi")
+		return nil, fmt.Errorf("newC2CServiceForAdapterWithDeps called without connectToWiFi")
 	}
 	if deps.restartGroundSeg == nil {
-		panic("newC2CServiceForAdapterWithDeps called without restartGroundSeg")
+		return nil, fmt.Errorf("newC2CServiceForAdapterWithDeps called without restartGroundSeg")
 	}
 	return wifiService.NewC2CServiceForAdapter(deps.connectToWiFi, deps.restartGroundSeg)
 }
 
 func newC2CServiceFactory(deps c2cServiceDeps) func() wifiService.C2CService {
 	return func() wifiService.C2CService {
-		return newC2CServiceForAdapterWithDeps(deps)
+		service, err := newC2CServiceForAdapterWithDeps(deps)
+		if err != nil {
+			return nil
+		}
+		return service
 	}
 }
 

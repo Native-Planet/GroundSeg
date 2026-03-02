@@ -3,7 +3,8 @@ package system
 import (
 	"encoding/json"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/handler/systemsvc"
 	"groundseg/system"
 	"os/exec"
@@ -12,10 +13,10 @@ import (
 
 var (
 	confForSystemHandler             = config.Conf
-	stopContainerForSystemHandler    = docker.StopContainerByName
+	stopContainerForSystemHandler    = orchestration.StopContainerByName
 	updateConfTypedForSystemHandler  = config.UpdateConfTyped
 	withPenpaiAllowForSystemHandler  = config.WithPenpaiAllow
-	loadLlamaForSystemHandler        = docker.LoadLlama
+	loadLlamaForSystemHandler        = orchestration.LoadLlama
 	withGracefulExitForSystemHandler = config.WithGracefulExit
 	execCommandForSystemHandler      = func(name string, args ...string) systemsvc.CommandRunner {
 		return exec.Command(name, args...)
@@ -25,7 +26,7 @@ var (
 	runUpgradeForSystemHandler              = system.RunUpgrade
 	toggleDeviceForSystemHandler            = system.ToggleDevice
 	connectToWifiForSystemHandler           = system.ConnectToWifi
-	publishSystemTransitionForSystemHandler = docker.PublishSystemTransition
+	publishSystemTransitionForSystemHandler = events.PublishSystemTransition
 	sleepForSystemHandler                   = time.Sleep
 )
 
@@ -47,6 +48,6 @@ func SystemHandler(msg []byte) error {
 		ConnectToWifi:           connectToWifiForSystemHandler,
 		PublishSystemTransition: publishSystemTransitionForSystemHandler,
 		Sleep:                   sleepForSystemHandler,
-		IsDebugMode:             config.DebugMode,
+		IsDebugMode:             config.DebugMode(),
 	})
 }

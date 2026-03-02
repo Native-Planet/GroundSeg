@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/authsession"
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/leakchannel"
@@ -17,9 +18,8 @@ import (
 )
 
 var (
-	failedLogins int
-	remainder    int
-	loginMu      sync.Mutex
+	lockoutStateMu sync.RWMutex
+	lockoutState   = &lockoutStats{}
 )
 
 const (
@@ -27,11 +27,57 @@ const (
 	LockoutDuration = 2 * time.Minute
 )
 
+type lockoutStats struct {
+	failedLogins int
+	remainder    int
+}
+
+type lockoutStateSnapshot struct {
+	FailedLogins int
+	Remainder    int
+}
+
+func getLockoutStateSnapshot() lockoutStateSnapshot {
+	lockoutStateMu.RLock()
+	defer lockoutStateMu.RUnlock()
+	return lockoutStateSnapshot{
+		FailedLogins: lockoutState.failedLogins,
+		Remainder:    lockoutState.remainder,
+	}
+}
+
+func resetFailedLoginState() {
+	lockoutStateMu.Lock()
+	defer lockoutStateMu.Unlock()
+	lockoutState.failedLogins = 0
+	lockoutState.remainder = 0
+}
+
+func registerFailedLogin() bool {
+	lockoutStateMu.Lock()
+	defer lockoutStateMu.Unlock()
+	lockoutState.failedLogins++
+	return lockoutState.failedLogins >= MaxFailedLogins && lockoutState.remainder == 0
+}
+
+func setLockoutRemainder(value int) {
+	lockoutStateMu.Lock()
+	defer lockoutStateMu.Unlock()
+	lockoutState.remainder = value
+}
+
+func decrementAndGetRemainder() int {
+	lockoutStateMu.Lock()
+	defer lockoutStateMu.Unlock()
+	if lockoutState.remainder > 0 {
+		lockoutState.remainder--
+	}
+	return lockoutState.remainder
+}
+
 var ErrInvalidLoginCredentials = errors.New("invalid login credentials")
 
 func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
-	loginMu.Lock()
-	defer loginMu.Unlock()
 	var loginPayload structs.WsLoginPayload
 	err := json.Unmarshal(msg, &loginPayload)
 	if err != nil {
@@ -39,7 +85,7 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 	}
 	isAuthenticated := auth.AuthenticateLogin(loginPayload.Payload.Password)
 	if isAuthenticated {
-		failedLogins = 0
+		resetFailedLoginState()
 		newToken, err := auth.AuthToken(loginPayload.Token.Token)
 		if err != nil {
 			return make(map[string]string), err
@@ -48,16 +94,16 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 			"id":    loginPayload.Token.ID,
 			"token": newToken,
 		}
-		if err := auth.AddToAuthMap(conn.Conn, token, true); err != nil {
+		if err := authsession.AddToAuthMap(conn.Conn, token, true); err != nil {
 			return make(map[string]string), fmt.Errorf("Unable to process login: %w", err)
 		}
 		zap.L().Info(fmt.Sprintf("Session %s logged in", loginPayload.Token.ID))
 		return token, nil
 	}
 
-	failedLogins++
+	shouldStartLockout := registerFailedLogin()
 	zap.L().Warn(fmt.Sprintf("Failed auth"))
-	if failedLogins >= MaxFailedLogins && remainder == 0 {
+	if shouldStartLockout {
 		go enforceLockout()
 	}
 	loginError, _ := json.Marshal(map[string]string{
@@ -69,13 +115,14 @@ func LoginHandler(conn *structs.MuConn, msg []byte) (map[string]string, error) {
 }
 
 func UnauthHandler() ([]byte, error) {
+	state := getLockoutStateSnapshot()
 	blob := structs.UnauthBroadcast{
 		Type:      "structure",
 		AuthLevel: "unauthorized",
 		Login: struct {
 			Remainder int `json:"remainder"`
 		}{
-			Remainder: remainder,
+			Remainder: state.Remainder,
 		},
 	}
 	resp, err := json.Marshal(blob)
@@ -87,22 +134,19 @@ func UnauthHandler() ([]byte, error) {
 
 func enforceLockout() {
 	// todo: extend remainder
-	remainder = 120
+	setLockoutRemainder(120)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	for remainder > 0 {
+	for getLockoutStateSnapshot().Remainder > 0 {
 		unauth, err := UnauthHandler()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't broadcast lockout: %v", err))
 		}
 		broadcast.UnauthBroadcast(unauth)
 		<-ticker.C
-		remainder -= 1
+		decrementAndGetRemainder()
 	}
-	loginMu.Lock()
-	defer loginMu.Unlock()
-	failedLogins = 0
-	remainder = 0
+	resetFailedLoginState()
 
 	unauth, err := UnauthHandler()
 	if err != nil {
@@ -117,7 +161,7 @@ func LogoutHandler(msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("Couldn't unmarshal login payload: %w", err)
 	}
-	auth.RemoveFromAuthMap(logoutPayload.Token.ID, true)
+	authsession.RemoveFromAuthMap(logoutPayload.Token.ID, true)
 	return nil
 }
 
@@ -176,7 +220,7 @@ func PwHandler(msg []byte, urbitMode bool) error {
 			if pwPayload.Token.ID == "" {
 				return fmt.Errorf("Missing token id for logout after password update")
 			}
-			auth.RemoveFromAuthMap(pwPayload.Token.ID, true)
+			authsession.RemoveFromAuthMap(pwPayload.Token.ID, true)
 			return nil
 		}
 		return fmt.Errorf("Current password is incorrect")

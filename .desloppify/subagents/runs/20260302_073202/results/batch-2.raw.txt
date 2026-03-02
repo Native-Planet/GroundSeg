@@ -1,0 +1,121 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 58.0,
+    "mid_level_elegance": 73.0,
+    "low_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules expose callback/adapter seams built from one-method interfaces and function adapters even when there is a single concrete implementation path (for example `startupRuntime` adapters in `goseg/startup_orchestrator.go`, `broadcastRuntimeContract` adapters in `goseg/broadcast/broadcast.go`, and `importerRuntime` adapters in `goseg/importer/importer.go`).",
+        "Runtime graphs are composed through repetitive `withDefaults`/constructor chains instead of cohesive domain-specific dependency containers, increasing call depth and hiding actual coupling.",
+        "The same pattern appears in `goseg/docker/orchestration/wireguard.go` (`wireguardRuntime` + `wireguardRuntimeFromDocker`) where seam plumbing dominates logic and lowers signal-to-policy ratio."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 48.0,
+        "indirection_cost": 64.0,
+        "interface_honesty": 70.0
+      }
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "`startBackgroundServicesWithRuntime` runs `runtime.syncRetrieveFn()` inline before service supervision and logs only a warning if it fails.",
+        "The same startup path then starts supervised services (`startStartramRenewalReminder`, `startDocker*`, loop services) as a background group in `startBackgroundServicesWithRuntime`, so retrieval failures can be masked while downstream routines continue.",
+        "`Bootstrap` delegates to `startBackgroundServices` from `goseg/main.go`, and the runtime callback contract allows this warning-only behavior even in `startramWgRegistered` mode."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`StartVersionSubsystemWithContext`/`CheckVersionLoopWithContext` pass context to loops (`goseg/routines/version.go`), but update execution uses `http.Get(url)` without request context in `callUpdater`.",
+        "`verifySlsaProvenance` also uses `http.Get(provenanceURL)` directly, so verifier/download paths are not cancelable and can ignore shutdown-driven cancellation.",
+        "The module already defines context-aware entrypoints, but network IO bypasses them in the critical update path."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_over_abstraction",
+      "summary": "Seam patterns add indirection without policy, especially in startup and transport/runtime wiring.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/importer/importer.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`startupRuntime` defines multiple one-method interfaces plus function-adapter types, merged field-by-field.",
+        "`broadcastRuntimeContract`/`broadcastRuntimeFns` is a context-free callback wrapper layer with repeated re-wiring in option helpers.",
+        "`importerRuntime` and `wireguardRuntime` repeat the same contract-to-fn adapter pattern with minimal logic added."
+      ],
+      "suggestion": "Consolidate seam design into a small set of domain-specific dependency structs per startup/runtime layer (e.g., bootstrap subsystem, background orchestration, and wireguard import/load), and keep interface abstractions only where multiple implementations are truly expected; remove adapter duplication that simply forwards function calls.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_over_abstraction"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "startram_sync_bypasses_supervision",
+      "summary": "Synchronous Startram sync is run outside the supervised startup service graph and treated as non-fatal.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`startBackgroundServicesWithRuntime` executes `runtime.syncRetrieveFn()` before adding background services.",
+        "When `syncRetrieveFn` returns error, code only logs and continues startup with `logger.Warn`.",
+        "The same startup flow also starts `startStartramRenewalReminder` and transition handlers in the background service set."
+      ],
+      "suggestion": "Run sync retrieval as a supervised/first-class startup phase (`superviseBackgroundService`-style) and return startup failure on first hard-sync error in `startramWgRegistered` mode, or add an explicit readiness gate with bounded retry + hard-fail fallback so downstream state is not silently started with potentially stale discovery data.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_over_abstraction"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "contextless_update_http_calls",
+      "summary": "Version update downloads ignore shutdown context, weakening lifecycle and cancellation behavior.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`callUpdater` performs `http.Get(url)` for binary download with no context or timeout.",
+        "`verifySlsaProvenance` also uses `http.Get(provenanceURL)` and fixed temporary files.",
+        "The call stack originates from context-aware startup paths (`StartVersionSubsystemWithContext`), but network calls do not propagate cancellation."
+      ],
+      "suggestion": "Inject a version-update runtime HTTP client with `http.Client{Timeout: ...}` and use `http.NewRequestWithContext` in both `callUpdater` and `verifySlsaProvenance` so shutdown/cancel signals stop in-flight fetches and avoid blocking shutdown paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "runtime_seam_over_abstraction",
+      "insufficient supervision semantics for startup side effects",
+      "context plumbing not consistently threaded into low-level IO paths"
+    ],
+    "likely_symptoms": [
+      "runtime_seam_over_abstraction",
+      "startram_sync_bypasses_supervision",
+      "contextless_update_http_calls"
+    ],
+    "possible_false_positives": [
+      "Some function adapters may be intentionally retained for legacy testability, so expected-to-be-thin seams in narrower integration contexts can look like defects without direct behavioral impact."
+    ]
+  }
+}

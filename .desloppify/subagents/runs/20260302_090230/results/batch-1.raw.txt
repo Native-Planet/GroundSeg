@@ -1,0 +1,51 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 88.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/actions/actions.go implements module-specific contract-version policy helpers (`IsUploadActionContractActive`, `IsUploadActionContractDeprecated`, `IsC2CActionContractActive`, `IsC2CActionContractDeprecated`) instead of relying on a shared contract-governance boundary.",
+        "goseg/startram/errors.go independently defines `APIConnectionErrorContractDescriptor` and its own `APIConnectionErrorContractForVersion`, `IsAPIConnectionErrorContractActive`, and `IsAPIConnectionErrorContractDeprecated` lifecycle checks.",
+        "The same conceptual concern (contract metadata + version compatibility checks) is split across two packages, so each file must be changed consistently when behavior/contract rules evolve."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "A shared, single contract-governance path is missing, so contract lifecycle semantics are duplicated and can drift between protocol/actions and startram."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-governance-duplication",
+      "summary": "Contract governance logic is duplicated across protocol/actions and startram, creating cross-module drift risk.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "actions.go defines per-contract wrappers (`IsUploadActionContractActive`, `IsUploadActionContractDeprecated`, `IsC2CActionContractActive`, `IsC2CActionContractDeprecated`) for contract lifecycle checks.",
+        "startram/errors.go defines separate descriptor and lifecycle helpers (`APIConnectionErrorContractForVersion`, `IsAPIConnectionErrorContractActive`, `IsAPIConnectionErrorContractDeprecated`) for the same compatibility concern.",
+        "The duplicate patterns indicate contract-version policy is split instead of being owned by a single boundary."
+      ],
+      "suggestion": "Introduce a shared contracts governance API (in `groundseg/protocol/contracts`) that exposes contract registration and uniform active/deprecated checks, then have both packages consume that API instead of maintaining independent version-policy helpers and local metadata copies.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract-governance-fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "contract-governance-fragmentation",
+      "policy_surface duplication without a single source of truth"
+    ],
+    "likely_symptoms": [
+      "contract-governance-duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

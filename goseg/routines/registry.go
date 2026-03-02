@@ -1,6 +1,10 @@
 package routines
 
-import routinesystem "groundseg/routines/system"
+import (
+	"context"
+
+	routinesystem "groundseg/routines/system"
+)
 
 func StartBackupRoutines() {
 	routinesystem.StartBackupRoutines()
@@ -18,7 +22,14 @@ func StartChopRoutines() {
 	routinesystem.StartChopRoutines()
 }
 
+func StartChopRoutinesWithContext(ctx context.Context) error {
+	return routinesystem.StartChopRoutinesWithContext(ctx)
+}
+
 func ChopAtLimit() {
 	routinesystem.ChopAtLimit()
 }
 
+func StartBackupRoutinesWithContext(ctx context.Context) error {
+	return routinesystem.StartBackupRoutinesWithContext(ctx)
+}

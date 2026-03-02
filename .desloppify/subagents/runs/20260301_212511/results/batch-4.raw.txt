@@ -1,0 +1,88 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 76.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Identical wireguard-recovery orchestration is implemented independently in `goseg/handler/system/recovery.go` and `goseg/shipworkflow/startram.go`, increasing drift risk between restart paths.",
+        "`SupportHandlerWithRuntime` in `goseg/system/support.go` mixes request parsing, workflow orchestration, filesystem staging, artifact capture, packaging, and transport send in one linear flow.",
+        "The config subsystem (`goseg/config/config.go` and `goseg/config/version.go`) mixes singleton process state, persistence, and remote-version orchestration in the same package surface, which makes boundaries and test seams harder to reason about."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "wireguard_recovery_orchestration_duplication",
+      "summary": "Duplicate wireguard fleet recovery logic is duplicated across handler and workflow modules",
+      "related_files": [
+        "goseg/handler/system/recovery.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`recoverWireguardFleet` in `goseg/shipworkflow/startram.go` and `RecoverWireguardFleet` in `goseg/handler/system/recovery.go` perform the same restart sequence: collect ship status, restart `wireguard`, optionally issue `click.BarExit`/`WaitForShipExit`, delete ship/minio containers, then reload urbits/mc/minios.",
+        "Message text differs slightly (for example, `restart Wireguard` vs `restart wireguard` and minor condition formatting), indicating copy drift risk without single shared ownership."
+      ],
+      "suggestion": "Extract one `WireguardRecoveryOrchestrator` in a single package (`orchestration` or new `recovery` package) with a small options struct, and have both call sites delegate to it so sequencing and error aggregation are centralized.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_recovery_logic_copy_paste"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "support_handler_multiple_responsibilities",
+      "summary": "Bug report handler blends protocol decode, I/O orchestration, and transport submission in one flow",
+      "related_files": [
+        "goseg/system/support.go",
+        "goseg/handler/system/recovery.go"
+      ],
+      "evidence": [
+        "`SupportHandlerWithRuntime` in `goseg/system/support.go` performs payload decoding, temp-workspace preparation, artifact collection, optional CPU profile capture, zip packaging, and HTTP submission before restoring outcome state.",
+        "`goseg/handler/system/recovery.go` already contains long orchestration-style control flow for fleet recovery, suggesting mixed handler/orchestration boundaries are recurring in the same module family."
+      ],
+      "suggestion": "Split support reporting into explicit steps with boundaries: `decodeSupportRequest`, `collectArtifacts`, `archiveReport`, and `submitReport`, then compose them in a small coordinator; this makes each step independently testable and easier to evolve.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "handler_orchestration_mix"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_singleton_state_and_transport_conflation",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`goseg/config/config.go` owns broad process-wide mutable state (`globalConfig`, container-state maps, secrets cache) plus initialization and side effects.",
+        "`goseg/config/version.go` also maintains mutable global HTTP/retry state and persistence logic for version metadata, while exposing state via package globals/functions.",
+        "Both files are tightly coupled by mutable package-level behavior and make lifecycle-driven state changes spread across the same package surface, making behavior and reset semantics harder to reason about."
+      ],
+      "suggestion": "Refactor config/version into explicit collaborators (e.g., `ConfigStore`, `VersionResolver`, `VersionCache`) with dependency-injected state handles and immutable snapshots passed between layers, avoiding mutable global singletons where possible.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_state_mixture"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Cross-module copy/paste for orchestration workflows instead of shared abstractions.",
+      "Handler/orchestration and command flow are not clearly separated in subsystem entrypoints.",
+      "Config package combines mutable process-wide state and protocol/network concerns in one namespace."
+    ],
+    "likely_symptoms": [
+      "drift between equivalent workflow implementations over time",
+      "harder-to-test end-to-end behavior and brittle edits",
+      "surprising side effects from mutable globals during refactors"
+    ],
+    "possible_false_positives": []
+  }
+}

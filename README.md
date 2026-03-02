@@ -88,13 +88,17 @@ Runtime boundary expectations for backend changes:
    - `goseg/uploadsvc/GOVERNANCE.md`
    - `goseg/system/wifi/README.md`
 5. For StarTram external API masking semantics, follow `goseg/startram/GOVERNANCE.md`.
-6. Use shared boundary helpers for edge contracts:
+6. For protocol and error contract surfaces, define compatibility descriptors in:
+   - `goseg/protocol/contracts/contracts.go` (`ContractDescriptor`, shared registry, active/deprecated helpers)
+   - `goseg/protocol/actions/actions.go` (upload/C2C action contract registration by descriptor ID)
+   - `goseg/startram/errors.go` (API connection contract lookup and masking semantics through shared contracts)
+7. Use shared boundary helpers for edge contracts:
    dependency-injected handlers (no package-global service mutation) and shared masked-error wrappers (`goseg/errpolicy`) for outward error semantics.
 
 CI policy checks:
 
 1. `Runtime Contract Gate` (`.github/workflows/upload-contract-gate.yml`) runs a path-aware check that fails if contract surfaces change without paired tests:
-   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`.
+   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`, `goseg/protocol/actions/actions.go`.
 2. The same gate runs targeted contract tests via `.github/scripts/check-upload-contract.sh` for upload branch matrix, upload dispatch parity, and startram masked-error semantics.
 
 ## Removing GroundSeg (Uninstall)

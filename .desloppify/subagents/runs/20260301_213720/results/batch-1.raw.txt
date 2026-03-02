@@ -1,0 +1,86 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 78.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Routines and orchestration create parallel runtime seam structs that mostly wrap direct package calls without enforcing behavior (goseg/routines/runtime_seams.go:18-55,123-205; goseg/docker/orchestration/runtime_seams.go:13-53,142-238).",
+        "Public entrypoints delegate to `WithRuntime` variants even when orchestration logic is identical in the default path (goseg/routines/docker.go:61-64, 123-126; goseg/routines/version.go:17-35; goseg/docker/orchestration/wireguard.go:17-20; goseg/docker/orchestration/minio.go:16-19).",
+        "Domain-specific runtime type aliases are all identical to `dockerRuntime`, so alias names do not provide real capability boundaries (goseg/docker/orchestration/runtime_seams.go:137-140)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": [
+        "Several indirection layers are structural and not policy-driven; consolidating seam layers would reduce cognitive and test harness overhead.",
+        "Type aliases for domain-specific runtimes are mostly nominal and should be replaced or given distinct behavior contracts."
+      ],
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 44.0,
+        "interface_honesty": 46.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_wrappers_without_behavior",
+      "summary": "Runtime seam abstractions mostly wrap direct calls and add indirection without adding policy",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/routines/docker.go",
+        "goseg/routines/version.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "Global function vars alias concrete dependencies and are immediately re-bound into seam structs (goseg/routines/runtime_seams.go:18-55).",
+        "Runtime constructors mostly just wrap the same dependency graph with `seams.RequireSeam*` and no translation/guard logic (goseg/routines/runtime_seams.go:119-205).",
+        "Public call paths route through thin `WithRuntime` wrappers even for normal execution paths (goseg/routines/docker.go:61-64, 123-126; goseg/routines/version.go:20-36)."
+      ],
+      "suggestion": "Consolidate seams around explicit behavior seams only: keep `RequireSeam` wiring at package boundaries for test-specific overrides, remove no-op pass-through layers, and introduce one minimal runtime interface per subsystem with grouped capabilities that are actually consumed.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_indirection_debt"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_aliases_are_nominal",
+      "summary": "Nominal runtime aliases hide a single implementation and mislead interface boundaries",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/minio.go",
+        "goseg/docker/orchestration/urbit.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "Domain runtime aliases are type-equivalent to `dockerRuntime`, so there is no implementation or contract distinction (goseg/docker/orchestration/runtime_seams.go:137-140).",
+        "`newWireguardRuntime`, `newMinIORuntime`, `newUrbitRuntime` all return the same concrete runtime (goseg/docker/orchestration/runtime_seams.go:224-238).",
+        "`load...WithRuntime` functions accept those aliases but immediately operate with generic container orchestration capabilities (goseg/docker/orchestration/wireguard.go:21-22; goseg/docker/orchestration/minio.go:16-18; goseg/docker/orchestration/urbit.go:22-25)."
+      ],
+      "suggestion": "Replace the nominal aliases with explicit dedicated runtime interfaces for each subsystem (e.g., `WireguardOps`, `MinioOps`, `UrbitOps`) and provide domain-specific constructors; only expose methods each domain truly needs, or pass a common interface plus explicit per-operation injectors.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_indirection_debt"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Over-reliance on testability-oriented seams without domain-policy payoff",
+      "False abstraction boundaries through nominal aliases that do not constrain implementations"
+    ],
+    "likely_symptoms": [
+      "Hard-to-follow call chains across multiple runtime constructor layers",
+      "Frequent wrapper churn with minimal value for future maintenance",
+      "Cross-module refactors requiring edits in several seam files for tiny behavior changes"
+    ],
+    "possible_false_positives": []
+  }
+}

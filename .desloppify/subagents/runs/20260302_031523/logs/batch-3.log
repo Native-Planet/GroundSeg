@@ -1,0 +1,628 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_031523/results/batch-3.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/system/wifi/service/c2c_service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.5,
+    "test_strategy": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "c2c_service.go exposes a `C2CService` interface with a generic `Execute(action actions.Action, ssid, password string) error` method while action parsing/dispatch is also defined in the same package via a local `c2cActionDispatcher`.",
+        "`ProcessC2CMessage` accepts any `C2CService` from `serviceFactory` and directly calls `service.Execute`, so consumers can bypass the shared action contract path (`ParseC2CAction` / `NewActionDispatcher`) by providing an alternate implementation.",
+        "The protocol contract is centralized in actions.go (`ParseAction`, `actionMetasForNamespace`, `SupportedC2CActions`), but `system/wifi/service` still requires each caller to trust injected implementations to honor that contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`C2CServiceExecutor` stores `connectToWiFi` and `restartGroundSeg` as function fields and calls them directly with no nil guards.",
+        "`ProcessC2CMessage` validates only the factory and service object, but does not validate function-level invariants before dispatch, so miswired adapters can panic at runtime instead of returning deterministic errors.",
+        "The README-level governance for this batch emphasizes contract-boundary quality gates, but this file-level critical path has no local precondition tests for constructor/dispatcher wiring failures."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c-exposed-execute-bypass",
+      "summary": "Wi‑Fi C2C command contract is not sealed: injected services can execute raw actions without the shared protocol dispatcher contract.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`c2c_service.go` defines `C2CService` with `Execute(action actions.Action, ssid, password string) error` and `ProcessC2CMessage` invokes that method on any provided service.",
+        "The same file also defines `c2cActionDispatcher` and action-binding logic, so contract enforcement exists but is not guaranteed by interface shape.",
+        "This creates two execution paths for C2C actions depending on implementation choice, weakening boundary integrity between protocol contracts and runtime service behavior."
+      ],
+      "suggestion": "Refactor the interface so `Execute` is not publicly substitutable: keep `C2CService` focused on domain operations (`ConnectToWiFi`, `RestartGroundSeg`) and move action dispatch into a package-private function that always goes through the action contract parser/dispatcher. Add an explicit adapter-level test that proves every supported action routes through `actions.NewActionDispatcher`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c-contract-boundary"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c-service-nil-dependency-paths",
+      "summary": "Critical Wi‑Fi adapter service constructor path has unguarded runtime panic potential that is not covered by local contract tests.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`NewC2CServiceForAdapter` accepts `connectToWiFi` and `restartGroundSeg` function arguments without validation.",
+        "`ConnectToWiFi` and `RestartGroundSeg` dereference those function fields directly (`s.connectToWiFi(...)`, `s.restartGroundSeg(...)`) with no nil guard.",
+        "Governance docs in `README.md` call out explicit runtime boundary and quality expectations for contract-bearing paths, but this code path has no local guardrails and would fail via panic rather than deterministic error.",
+        "Existing expectations imply adapter boundary behavior should be robustly tested for contract miswiring, especially in command execution entry points."
+      ],
+      "suggestion": "Add precondition checks in `NewC2CServiceForAdapter` (or the methods) that return a clear error when dependencies are nil, and add tests for miswired adapter dependencies to lock behavior (error propagation instead of panic).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "c2c-contract-boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Unsealed service interface allows command execution to bypass shared protocol dispatch contract.",
+      "Constructor-time dependency validation is deferred until invocation, making runtime safety dependent on correct wiring discipline."
+    ],
+    "likely_symptoms": [
+      "c2c-exposed-execute-bypass",
+      "c2c-service-nil-dependency-paths"
+    ],
+    "possible_false_positives": [
+      "If adapter factories are constrained by build-time patterns not visible in this file set, the bypass risk may be lower than modeled."
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cac8b-1f3e-7453-a26a-149adf27ec48
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 3
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/system/wifi/service/c2c_service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll read the blind review packet and the four assigned files, then assess only `cross_module_architecture` and `test_strategy` per your constraints, and return the required JSON with evidence-backed findings only for that scope.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/actions/actions.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' README.md" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+ succeeded in 51ms:
+package actions
+
+import "fmt"
+
+// Namespace groups action enums by transport domain.
+type Namespace string
+
+const (
+	NamespaceUpload Namespace = "upload"
+	NamespaceC2C    Namespace = "c2c"
+)
+
+// Action is a transport action contract token.
+type Action string
+
+const (
+	ActionUploadOpenEndpoint Action = "open-endpoint"
+	ActionUploadReset        Action = "reset"
+	ActionC2CConnect         Action = "connect"
+)
+ succeeded in 51ms:
+Total output lines: 4500
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "error_consistency",
+    "abstraction_fitness",
+    "test_strategy",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/startram/errors.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/wifi/service/c2c_service.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package service
+
+import "groundseg/protocol/actions"
+import "fmt"
+
+const (
+	ConnectAction actions.Action = actions.ActionC2CConnect
+)
+
+// C2CService is responsible for performing captured C2C actions.
+type C2CService interface {
+	ConnectToWiFi(ssid, password string) error
+	RestartGroundSeg() error
+	Execute(action actions.Action, ssid, password string) error
+}
+
+// C2CCommand is a typed, transport-agnostic command payload.
+type C2CCommand struct {
+	Action   actions.Action
+	SSID     string
+ succeeded in 53ms:
+package startram
+
+import "groundseg/errpolicy"
+
+// APIConnectionErrorMessage is the stable public contract for API transport failures.
+// The wrapped error keeps the original cause for observability while masking
+// transport details from callers.
+const APIConnectionErrorMessage = "Unable to connect to API server"
+
+func wrapAPIConnectionError(err error) error {
+	return errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+}
+codex
+I’ve confirmed the assigned files; next I’ll do targeted symbol checks to validate whether these contracts and service paths are currently covered by tests and whether their cross-module usage matches the docs/contract expectations.
+exec
+/opt/homebrew/bin/zsh -lc 'rg --line-number "ProcessC2CMessage|C2CServiceExecutor|c2cActionDispatcher|ParseC2CAction|UploadActionContractForAction|ActionUploadOpenEndpoint|ActionC2CConnect" goseg/system/wifi/service goseg/protocol/actions goseg/startram' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --line-number "UploadActionContract|UploadPayload|ParseUploadAction|ActionMetas|SupportedUploadActions" goseg/protocol/actions' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "rg --line-number \"package actions\\b|package service\\b|package startram\\b\" goseg/*/*/*_test.go goseg/*/*/*/*_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/protocol/actions/actions_test.go:50:func TestParseUploadActionReportsDeterministicErrorType(t *testing.T) {
+goseg/protocol/actions/actions_test.go:51:	_, err := ParseUploadAction("definitely-not-upload")
+goseg/protocol/actions/actions_test.go:67:func TestActionMetasReturnsContractsByNamespace(t *testing.T) {
+goseg/protocol/actions/actions_test.go:68:	upload := ActionMetas(NamespaceUpload)
+goseg/protocol/actions/actions_test.go:77:	c2c := ActionMetas(NamespaceC2C)
+goseg/protocol/actions/actions_test.go:86:func TestActionMetasForInvalidNamespaceReturnsNil(t *testing.T) {
+goseg/protocol/actions/actions_test.go:87:	if got := ActionMetas("invalid"); got != nil {
+goseg/protocol/actions/actions_test.go:92:func TestActionMetasReturnsCopyByValue(t *testing.T) {
+goseg/protocol/actions/actions_test.go:93:	first := ActionMetas(NamespaceUpload)
+goseg/protocol/actions/actions_test.go:103:	second := ActionMetas(NamespaceUpload)
+goseg/protocol/actions/actions_test.go:105:		t.Fatalf("expected ActionMetas return value to be copied by value, got mutated action %q", second[0].Action)
+goseg/protocol/actions/actions_test.go:108:		t.Fatalf("expected ActionMetas return value to be insulated from external mutation")
+goseg/protocol/actions/actions_test.go:112:func TestParseUploadActionRejectsUnknown(t *testing.T) {
+goseg/protocol/actions/actions_test.go:113:	_, err := ParseUploadAction("bogus")
+goseg/protocol/actions/actions_test.go:126:func TestSupportedUploadActionsMatchesContract(t *testing.T) {
+goseg/protocol/actions/actions_test.go:127:	got := SupportedUploadActions()
+goseg/protocol/actions/actions_test.go:136:		if _, err := ParseUploadAction(string(action)); err != nil {
+goseg/protocol/actions/actions_test.go:142:func TestUploadActionContractsIncludesExpectedActions(t *testing.T) {
+goseg/protocol/actions/actions_test.go:143:	got := UploadActionContracts()
+goseg/protocol/actions/actions_test.go:149:	gotCopy := UploadActionContracts()
+ succeeded in 53ms:
+goseg/system/wifi/service/c2c_service.go:7:	ConnectAction actions.Action = actions.ActionC2CConnect
+goseg/system/wifi/service/c2c_service.go:29:type C2CServiceExecutor struct {
+goseg/system/wifi/service/c2c_service.go:34:func NewC2CServiceForAdapter(connectToWiFi func(string, string) error, restartGroundSeg func() error) C2CServiceExecutor {
+goseg/system/wifi/service/c2c_service.go:35:	return C2CServiceExecutor{
+goseg/system/wifi/service/c2c_service.go:41:var c2cActionDispatcher = actions.NewActionDispatcher(actions.NamespaceC2C, []actions.ActionBinding[actions.Action, C2CService, c2cCommand]{
+goseg/system/wifi/service/c2c_service.go:56:func (s C2CServiceExecutor) ConnectToWiFi(ssid, password string) error {
+goseg/system/wifi/service/c2c_service.go:60:func (s C2CServiceExecutor) RestartGroundSeg() error {
+goseg/system/wifi/service/c2c_service.go:64:func (s C2CServiceExecutor) Execute(action actions.Action, ssid, password string) error {
+goseg/system/wifi/service/c2c_service.go:65:	return c2cActionDispatcher.Execute(action, s, c2cCommand{ssid: ssid, password: password})
+goseg/system/wifi/service/c2c_service.go:68:func ProcessC2CMessage(cmd C2CCommand, serviceFactory func() C2CService) error {
+goseg/system/wifi/service/c2c_service_test.go:43:func TestProcessC2CMessageDispatchesConnect(t *testing.T) {
+goseg/system/wifi/service/c2c_service_test.go:51:	gotErr := ProcessC2CMessage(cmd, func() C2CService { return service })
+goseg/system/wifi/service/c2c_service_test.go:53:		t.Fatalf("ProcessC2CMessage returned unexpected error: %v", gotErr)
+goseg/system/wifi/service/c2c_service_test.go:66:func TestProcessC2CMessageRejectsUnsupportedAction(t *testing.T) {
+goseg/system/wifi/service/c2c_service_test.go:72:	err := ProcessC2CMessage(cmd, func() C2CService { return service })
+goseg/system/wifi/service/c2c_service_test.go:79:func TestProcessC2CMessageRejectsNilServiceFactory(t *testing.T) {
+goseg/system/wifi/service/c2c_service_test.go:83:	if err := ProcessC2CMessage(cmd, nil); err == nil {
+goseg/system/wifi/service/c2c_service_test.go:88:func TestProcessC2CMessageRejectsNilService(t *testing.T) {
+goseg/system/wifi/service/c2c_service_test.go:92:	err := ProcessC2CMessage(cmd, func() C2CService { return nil })
+goseg/protocol/actions/actions_test.go:34:	_, err := ParseAction(NamespaceUpload, string(ActionC2CConnect))
+ succeeded in 51ms:
+goseg/system/wifi/service/c2c_service_test.go:1:package service
+goseg/protocol/actions/actions_test.go:1:package actions
+codex
+I found tests exist for the actions and Wi‑Fi service modules, so I’m verifying whether `startram/errors.go` has equivalent coverage and whether the contract/error-wrapping behavior is consistently tested from calling sites.
+exec
+/opt/homebrew/bin/zsh -lc "rg --line-number \"APIConnectionErrorMessage|wrapAPIConnectionError|errpolicy.WrapMasked|Startram\" goseg/startram goseg -g '*test.go'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+goseg/startram/client_test.go:19:	stub := stubStartramAPIClient{
+goseg/startram/client_test.go:25:			return newStartramHTTPResponse(http.StatusAccepted, `{"ok":true}`), nil
+goseg/startram/client_test.go:39:			return newStartramHTTPResponse(http.StatusCreated, `{"ok":true}`), nil
+goseg/backupsvc/service_test.go:99:func TestUploadLatestBackupCallsStartramUpload(t *testing.T) {
+goseg/startram/boundaries_test.go:15:func (s *boundariesSyncer) ApplyRetrieveState(structs.StartramRetrieve) error {
+goseg/startram/boundaries_test.go:37:func drainStartramEvents() {
+goseg/startram/boundaries_test.go:57:	if err := ApplyRetrieveState(structs.StartramRetrieve{}); err != nil {
+goseg/startram/boundaries_test.go:87:	drainStartramEvents()
+goseg/startram/backup_runtime_test.go:63:	settings config.StartramSettings
+goseg/startram/backup_runtime_test.go:67:func (s stubConfigService) StartramSettingsSnapshot() config.StartramSettings {
+goseg/startram/backup_runtime_test.go:79:func (s stubConfigService) SetStartramConfig(structs.StartramRetrieve) {}
+goseg/startram/backup_runtime_test.go:253:		settings: config.StartramSettings{
+goseg/rectify/rectify_test.go:91:func TestRectifyUrbitAppliesStartramEvents(t *testing.T) {
+goseg/rectify/rectify_test.go:105:		return state.Profile.Startram.Transition.Restart == restartValue &&
+goseg/rectify/rectify_test.go:106:			state.Profile.Startram.Transition.Toggle == "loading" &&
+goseg/rectify/rectify_test.go:107:			state.Profile.Startram.Transition.Endpoint == ""
+goseg/startram/state_sync_test.go:18:func (syncer failingRetrieveStateSyncer) ApplyRetrieveState(structs.StartramRetrieve) error {
+goseg/startram/state_sync_test.go:22:type spyStartramConfigService struct {
+goseg/startram/state_sync_test.go:23:	settings             config.StartramSettings
+goseg/startram/state_sync_test.go:25:	setConfigs           []structs.StartramRetrieve
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/system/wifi/service/c2c_service_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package service
+
+import (
+	"errors"
+	"testing"
+
+	"groundseg/protocol/actions"
+)
+
+type stubC2CService struct {
+	connectCalls int
+	restartCalls int
+	connectErr   error
+	restartErr   error
+	lastSSID     string
+	lastPassword string
+}
+
+func (s *stubC2CService) ConnectToWiFi(ssid, password string) error {
+	s.connectCalls++
+codex
+I found one meaningful test-coverage gap while checking this area; I’ll do one quick read of the Wi‑Fi command governance docs to validate whether current error/contract behavior aligns with its stated boundary rules.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/wifi/README.md" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+# Wi-Fi System Gateway Package
+
+This package owns package-local governance for Wi-Fi contract boundaries. High-level
+rollout and architecture notes remain in root docs; this file is authoritative for
+local compatibility invariants.
+
+## Sub-boundaries
+- `goseg/system/wifi/transport`: websocket adapter and broadcast mechanics.
+- `goseg/system/wifi/service`: C2C action contract and execution semantics.
+- `goseg/system/wifi_transport_adapter.go` in `goseg/system` provides adapter wiring.
+
+## C2C action contract
+- Package `system/wifi/service` consumes shared action enums from
+  `groundseg/protocol/actions` and keeps parser/executor binding aligned:
+  - `ParseC2CAction(raw)` accepts only supported values from
+    `protocol/actions`.
+  - `c2cActionBindings` and `C2CService.Execute` must remain aligned.
+  - Unsupported action values return shared `UnsupportedActionError`.
+- Adapter glue in `goseg/system/wifi_c2c_service.go` should remain a simple dependency
+  injection boundary and delegate to service contracts.
+exec
+/opt/homebrew/bin/zsh -lc 'rg --line-number "TestC2CActionBindingsCoverKnownActions|TestParseC2CAction|TestProcessMessageRejectsUnsupportedAction|processC2CMessageForAdapter|c2cActionBindings" goseg/system/wifi_test.go goseg/system/wifi_c2c_service.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/system/wifi_test.go:181:func TestParseC2CAction(t *testing.T) {
+goseg/system/wifi_test.go:192:func TestParseC2CActionRejectsUnsupportedAction(t *testing.T) {
+goseg/system/wifi_test.go:220:func TestProcessMessageRejectsUnsupportedAction(t *testing.T) {
+goseg/system/wifi_test.go:263:	if err := processC2CMessageForAdapterWithDeps([]byte(msg), deps); err != nil {
+goseg/system/wifi_test.go:264:		t.Fatalf("processC2CMessageForAdapter failed: %v", err)
+goseg/system/wifi_test.go:298:func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
+goseg/system/wifi_c2c_service.go:21:func processC2CMessageForAdapter(msg []byte) error {
+goseg/system/wifi_c2c_service.go:23:	return processC2CMessageForAdapterWithDeps(msg, deps)
+goseg/system/wifi_c2c_service.go:26:func processC2CMessageForAdapterWithDeps(msg []byte, deps c2cServiceDeps) error {
+codex
+I found the Wi‑Fi governance README and matching adapter tests; I’ll quickly sample the integration test names/logic to verify whether contract alignment is actually enforced end-to-end.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '240,340p' goseg/system/wifi_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+	if processErr == nil {
+		t.Fatal("expected wrong envelope type error")
+	}
+}
+
+func TestProcessC2CMessageForAdapter(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	connectCalled := false
+	restartCalled := false
+	deps := c2cServiceDeps{
+		connectToWiFi: func(ssid, password string) error {
+			connectCalled = true
+			if ssid != "HomeWiFi" || password != "secret" {
+				t.Fatalf("unexpected credentials: %s / %s", ssid, password)
+			}
+			return nil
+		},
+		restartGroundSeg: func() error {
+			restartCalled = true
+			return nil
+codex
+The adapter tests show contract coverage exists, so I’m checking whether naming and exported wiring now mismatch test symbols (potential governance drift between files in the same module).
+exec
+/opt/homebrew/bin/zsh -lc "rg --line-number \"c2cActionConnect|ConnectAction|newC2CServiceForAdapter|newC2CServiceForAdapterWithDeps|supportedC2CActions|c2cServiceDeps\" goseg/system/wifi/service goseg/system/wifi -g '*.go'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/system/wifi/service/c2c_service.go:7:	ConnectAction actions.Action = actions.ActionC2CConnect
+goseg/system/wifi/service/c2c_service.go:43:		Action: ConnectAction,
+goseg/system/wifi/service/c2c_service.go:7:	ConnectAction actions.Action = actions.ActionC2CConnect
+goseg/system/wifi/service/c2c_service.go:43:		Action: ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:33:	case ConnectAction:
+goseg/system/wifi/service/c2c_service_test.go:46:		Action:   ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:81:		Action: ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:90:		Action: ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:33:	case ConnectAction:
+goseg/system/wifi/service/c2c_service_test.go:46:		Action:   ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:81:		Action: ConnectAction,
+goseg/system/wifi/service/c2c_service_test.go:90:		Action: ConnectAction,
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.5,
+    "test_strategy": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "c2c_service.go exposes a `C2CService` interface with a generic `Execute(action actions.Action, ssid, password string) error` method while action parsing/dispatch is also defined in the same package via a local `c2cActionDispatcher`.",
+        "`ProcessC2CMessage` accepts any `C2CService` from `serviceFactory` and directly calls `service.Execute`, so consumers can bypass the shared action contract path (`ParseC2CAction` / `NewActionDispatcher`) by providing an alternate implementation.",
+        "The protocol contract is centralized in actions.go (`ParseAction`, `actionMetasForNamespace`, `SupportedC2CActions`), but `system/wifi/service` still requires each caller to trust injected implementations to honor that contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`C2CServiceExecutor` stores `connectToWiFi` and `restartGroundSeg` as function fields and calls them directly with no nil guards.",
+        "`ProcessC2CMessage` validates only the factory and service object, but does not validate function-level invariants before dispatch, so miswired adapters can panic at runtime instead of returning deterministic errors.",
+        "The README-level governance for this batch emphasizes contract-boundary quality gates, but this file-level critical path has no local precondition tests for constructor/dispatcher wiring failures."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c-exposed-execute-bypass",
+      "summary": "Wi‑Fi C2C command contract is not sealed: injected services can execute raw actions without the shared protocol dispatcher contract.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`c2c_service.go` defines `C2CService` with `Execute(action actions.Action, ssid, password string) error` and `ProcessC2CMessage` invokes that method on any provided service.",
+        "The same file also defines `c2cActionDispatcher` and action-binding logic, so contract enforcement exists but is not guaranteed by interface shape.",
+        "This creates two execution paths for C2C actions depending on implementation choice, weakening boundary integrity between protocol contracts and runtime service behavior."
+      ],
+      "suggestion": "Refactor the interface so `Execute` is not publicly substitutable: keep `C2CService` focused on domain operations (`ConnectToWiFi`, `RestartGroundSeg`) and move action dispatch into a package-private function that always goes through the action contract parser/dispatcher. Add an explicit adapter-level test that proves every supported action routes through `actions.NewActionDispatcher`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c-contract-boundary"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c-service-nil-dependency-paths",
+      "summary": "Critical Wi‑Fi adapter service constructor path has unguarded runtime panic potential that is not covered by local contract tests.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`NewC2CServiceForAdapter` accepts `connectToWiFi` and `restartGroundSeg` function arguments without validation.",
+        "`ConnectToWiFi` and `RestartGroundSeg` dereference those function fields directly (`s.connectToWiFi(...)`, `s.restartGroundSeg(...)`) with no nil guard.",
+        "Governance docs in `README.md` call out explicit runtime boundary and quality expectations for contract-bearing paths, but this code path has no local guardrails and would fail via panic rather than deterministic error.",
+        "Existing expectations imply adapter boundary behavior should be robustly tested for contract miswiring, especially in command execution entry points."
+      ],
+      "suggestion": "Add precondition checks in `NewC2CServiceForAdapter` (or the methods) that return a clear error when dependencies are nil, and add tests for miswired adapter dependencies to lock behavior (error propagation instead of panic).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "c2c-contract-boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Unsealed service interface allows command execution to bypass shared protocol dispatch contract.",
+      "Constructor-time dependency validation is deferred until invocation, making runtime safety dependent on correct wiring discipline."
+    ],
+    "likely_symptoms": [
+      "c2c-exposed-execute-bypass",
+      "c2c-service-nil-dependency-paths"
+    ],
+    "possible_false_positives": [
+      "If adapter factories are constrained by build-time patterns not visible in this file set, the bypass risk may be lower than modeled."
+    ]
+  }
+}
+tokens used
+51,900
+

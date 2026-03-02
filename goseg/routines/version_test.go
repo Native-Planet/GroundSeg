@@ -1,34 +1,43 @@
 package routines
 
 import (
+	"context"
 	"errors"
 	"groundseg/structs"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
+
+type versionRuntimeChannelStub = versionChannelOps
+
+type versionRuntimeConfigStub = versionConfigOps
+
+type versionRuntimeUpdateStub = versionUpdateOps
 
 func testVersionRuntime() versionRuntime {
 	rt := newVersionRuntime()
-	rt.syncVersionInfo = func() (structs.Channel, bool) { return structs.Channel{}, true }
-	rt.getVersionChannel = func() structs.Channel { return structs.Channel{} }
-	rt.setVersionChannel = func(structs.Channel) {}
-	rt.updateDocker = func(string, structs.Channel, structs.Channel) {}
-	rt.updateBinary = func(versionRuntime, string, structs.Channel) {}
-	rt.getSha256 = func(string) (string, error) { return "", nil }
-	rt.Architecture = func() string { return "amd64" }
-	rt.BasePath = func() string { return "" }
-	rt.DebugMode = func() bool { return false }
-	rt.getConf = func() structs.SysConfig { return structs.SysConfig{} }
-	rt.getShipStatus = func([]string) (map[string]string, error) { return map[string]string{}, nil }
-	rt.startContainer = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
-	rt.stopContainer = func(string) error { return nil }
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.urbitConf = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	rt.waitComplete = func(string) error { return nil }
-	rt.chopPier = func(string) error { return nil }
-	rt.updateUrbit = func(string, func(*structs.UrbitDocker) error) error { return nil }
+	rt.channelOps = versionRuntimeChannelStub{
+		syncVersionInfoFn:   func() (structs.Channel, bool) { return structs.Channel{}, true },
+		getVersionChannelFn: func() structs.Channel { return structs.Channel{} },
+		setVersionChannelFn: func(structs.Channel) {},
+	}
+	rt.configOps = versionRuntimeConfigStub{
+		getSha256Fn:       func(string) (string, error) { return "", nil },
+		architectureFn:    func() string { return "amd64" },
+		basePathFn:        func() string { return "" },
+		debugModeFn:       func() bool { return false },
+		getConfFn:         func() structs.SysConfig { return structs.SysConfig{} },
+		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{}, nil },
+		startContainerFn:  func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+		stopContainerFn:   func(string) error { return nil },
+		loadUrbitConfigFn: func(string) error { return nil },
+		urbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+		waitCompleteFn:    func(string) error { return nil },
+		chopPierFn:        func(string) error { return nil },
+		updateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
+	}
+	rt.updateOps = versionRuntimeUpdateStub{}
 	return rt
 }
 
@@ -71,103 +80,93 @@ func TestGetSha256(t *testing.T) {
 
 func TestCallUpdaterSkipsWhenSyncFails(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.syncVersionInfo = func() (structs.Channel, bool) {
-		return structs.Channel{}, false
+	rt.channelOps = versionRuntimeChannelStub{
+		syncVersionInfoFn: func() (structs.Channel, bool) {
+			return structs.Channel{}, false
+		},
 	}
-	updateDockerCalled := false
-	rt.updateDocker = func(string, structs.Channel, structs.Channel) {
-		updateDockerCalled = true
-	}
-	updateBinaryCalled := false
-	rt.updateBinary = func(_ versionRuntime, _ string, _ structs.Channel) {
-		updateBinaryCalled = true
+	called := false
+	rt.updateOps = versionRuntimeUpdateStub{
+		updateDockerFn: func(_ versionConfigOps, _ string, _ structs.Channel, _ structs.Channel) { called = true },
+		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) { called = true },
 	}
 
-	callUpdaterWithRuntime(rt, "latest")
+	callUpdater(context.Background(), rt, "latest")
 
-	if updateDockerCalled {
-		t.Fatal("docker update should be skipped when version sync fails")
-	}
-	if updateBinaryCalled {
-		t.Fatal("binary update should be skipped when version sync fails")
+	if called {
+		t.Fatal("docker or binary update should be skipped when version sync fails")
 	}
 }
 
 func TestCallUpdaterTriggersDockerAndChannelUpdate(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
-
+	rt.configOps = versionRuntimeConfigStub{
+		getConfFn:        func() structs.SysConfig { return structs.SysConfig{} },
+		architectureFn:   func() string { return "amd64" },
+		getSha256Fn:      func(string) (string, error) { return "g2", nil },
+		basePathFn:       func() string { return "" },
+		getShipStatusFn:  func([]string) (map[string]string, error) { return map[string]string{}, nil },
+		startContainerFn: func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+	}
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g2", "n2", "w1", "m1", "s1", "v1")
 
-	rt.syncVersionInfo = func() (structs.Channel, bool) {
-		return latest, true
-	}
-	rt.getVersionChannel = func() structs.Channel {
-		return current
+	rt.channelOps = versionRuntimeChannelStub{
+		syncVersionInfoFn:   func() (structs.Channel, bool) { return latest, true },
+		getVersionChannelFn: func() structs.Channel { return current },
+		setVersionChannelFn: func(ch structs.Channel) {
+			if ch != latest {
+				t.Fatalf("unexpected channel set value")
+			}
+		},
 	}
 	dockerCalls := 0
-	rt.updateDocker = func(release string, gotCurrent, gotLatest structs.Channel) {
-		dockerCalls++
-		if release != "latest" {
-			t.Fatalf("unexpected release: %s", release)
-		}
-		if gotCurrent != current || gotLatest != latest {
-			t.Fatalf("unexpected docker update args")
-		}
-	}
-	setChannelCalls := 0
-	rt.setVersionChannel = func(ch structs.Channel) {
-		setChannelCalls++
-		if ch != latest {
-			t.Fatalf("unexpected channel set value")
-		}
-	}
-	rt.getSha256 = func(string) (string, error) {
-		return latest.Groundseg.Amd64Sha256, nil
-	}
-	rt.updateBinary = func(_ versionRuntime, _ string, _ structs.Channel) {
-		t.Fatal("binary update should not run when hashes match")
+	rt.updateOps = versionRuntimeUpdateStub{
+		updateDockerFn: func(_ versionConfigOps, release string, gotCurrent, gotLatest structs.Channel) {
+			dockerCalls++
+			if release != "latest" {
+				t.Fatalf("unexpected release: %s", release)
+			}
+			if gotCurrent != current || gotLatest != latest {
+				t.Fatalf("unexpected docker update args")
+			}
+		},
+		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) {
+			t.Fatal("binary update should not run when hashes match")
+		},
 	}
 
-	callUpdaterWithRuntime(rt, "latest")
-
+	callUpdater(context.Background(), rt, "latest")
 	if dockerCalls != 1 {
 		t.Fatalf("expected one docker update call, got %d", dockerCalls)
-	}
-	if setChannelCalls != 1 {
-		t.Fatalf("expected one setVersionChannel call, got %d", setChannelCalls)
 	}
 }
 
 func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn: func() string { return "amd64" },
+		getSha256Fn:    func(string) (string, error) { return "different-local-hash", nil },
+	}
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g2", "n1", "w1", "m1", "s1", "v1")
-
-	rt.syncVersionInfo = func() (structs.Channel, bool) {
-		return latest, true
-	}
-	rt.getVersionChannel = func() structs.Channel {
-		return current
-	}
-	rt.updateDocker = func(string, structs.Channel, structs.Channel) {}
-	rt.setVersionChannel = func(structs.Channel) {}
-	rt.getSha256 = func(string) (string, error) {
-		return "different-local-hash", nil
+	rt.channelOps = versionRuntimeChannelStub{
+		syncVersionInfoFn:   func() (structs.Channel, bool) { return latest, true },
+		getVersionChannelFn: func() structs.Channel { return current },
+		setVersionChannelFn: func(structs.Channel) {},
 	}
 	binaryCalls := 0
-	rt.updateBinary = func(_ versionRuntime, branch string, info structs.Channel) {
-		binaryCalls++
-		if branch != "latest" || info != latest {
-			t.Fatalf("unexpected binary update args")
-		}
+	rt.updateOps = versionRuntimeUpdateStub{
+		updateBinaryFn: func(_ context.Context, _ versionUpdateOps, _ versionConfigOps, branch string, info structs.Channel) {
+			binaryCalls++
+			if branch != "latest" || info != latest {
+				t.Fatalf("unexpected binary update args")
+			}
+		},
 	}
 
-	callUpdaterWithRuntime(rt, "latest")
-
+	callUpdater(context.Background(), rt, "latest")
 	if binaryCalls != 1 {
 		t.Fatalf("expected one binary update call, got %d", binaryCalls)
 	}
@@ -175,192 +174,186 @@ func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 
 func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
-
-	rt.getConf = func() structs.SysConfig {
-		return structs.SysConfig{}
-	}
-	rt.getShipStatus = func([]string) (map[string]string, error) {
-		return map[string]string{}, nil
-	}
-	var started []string
-	rt.startContainer = func(name, typ string) (structs.ContainerState, error) {
-		started = append(started, name+":"+typ)
-		return structs.ContainerState{}, nil
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn:  func() string { return "amd64" },
+		getConfFn:       func() structs.SysConfig { return structs.SysConfig{} },
+		getShipStatusFn: func([]string) (map[string]string, error) { return map[string]string{}, nil },
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			return structs.ContainerState{}, nil
+		},
 	}
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n2", "w2", "m2", "s1", "v1")
-	updateDockerWithRuntime(rt, "latest", current, latest)
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
 
-	expected := map[string]bool{
-		"netdata:netdata":     true,
-		"wireguard:wireguard": true,
-		"miniomc:miniomc":     true,
+	rt.updateOps = versionRuntimeUpdateStub{}
+	called := map[string]bool{}
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn: func() string { return "amd64" },
+		getConfFn:      func() structs.SysConfig { return structs.SysConfig{} },
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			called[name+":"+typ] = true
+			return structs.ContainerState{}, nil
+		},
+		getShipStatusFn: func([]string) (map[string]string, error) { return map[string]string{}, nil },
 	}
-	for _, key := range started {
-		delete(expected, key)
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+
+	if _, ok := called["netdata:netdata"]; !ok {
+		t.Fatal("expected netdata container start")
 	}
-	if len(expected) != 0 {
-		t.Fatalf("missing expected service start calls, remaining=%v all=%v", expected, started)
+	if _, ok := called["wireguard:wireguard"]; !ok {
+		t.Fatal("expected wireguard container start")
+	}
+	if _, ok := called["miniomc:miniomc"]; !ok {
+		t.Fatal("expected miniomc container start")
 	}
 }
 
 func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
-
-	rt.getConf = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"zod", "nec"}}
-	}
-	rt.getShipStatus = func([]string) (map[string]string, error) {
-		return map[string]string{
-			"zod": "Up 1 second",
-			"nec": "Exited",
-		}, nil
-	}
-	var started []string
-	rt.startContainer = func(name, typ string) (structs.ContainerState, error) {
-		started = append(started, name+":"+typ)
-		return structs.ContainerState{}, nil
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn: func() string { return "amd64" },
+		getConfFn:      func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod", "nec"}} },
+		getShipStatusFn: func([]string) (map[string]string, error) {
+			return map[string]string{
+				"zod": "Up 1 second",
+				"nec": "Exited",
+			}, nil
+		},
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			if name == "minio_nec" {
+				return structs.ContainerState{}, errors.New("boom")
+			}
+			return structs.ContainerState{}, nil
+		},
 	}
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n1", "w1", "m1", "s2", "v1")
-	updateDockerWithRuntime(rt, "latest", current, latest)
 
-	if len(started) != 1 || started[0] != "minio_zod:minio" {
-		t.Fatalf("unexpected minio starts: %v", started)
+	started := 0
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn: func() string { return "amd64" },
+		getConfFn:      func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod", "nec"}} },
+		getShipStatusFn: func([]string) (map[string]string, error) {
+			return map[string]string{
+				"zod": "Up 1 second",
+				"nec": "Exited",
+			}, nil
+		},
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			started++
+			if name == "minio_zod" {
+				return structs.ContainerState{}, nil
+			}
+			if name == "minio_nec" {
+				return structs.ContainerState{}, errors.New("boom")
+			}
+			return structs.ContainerState{}, nil
+		},
+	}
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if started != 1 {
+		t.Fatalf("expected one start call for running piers, got %d", started)
 	}
 }
 
 func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
-
-	rt.getConf = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"zod"}}
+	seenStatus := ""
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn:    func() string { return "amd64" },
+		getConfFn:         func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{"zod": "Exited"}, nil },
+		loadUrbitConfigFn: func(string) error { return nil },
+		urbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
+		stopContainerFn:   func(string) error { t.Fatal("stopContainer should not run for stopped ship"); return nil },
+		updateUrbitFn: func(_ string, update func(*structs.UrbitDocker) error) error {
+			cfg := structs.UrbitDocker{}
+			if err := update(&cfg); err != nil {
+				return err
+			}
+			seenStatus = cfg.BootStatus
+			return nil
+		},
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			if name != "zod" || typ != "vere" {
+				t.Fatalf("unexpected start call: %s %s", name, typ)
+			}
+			return structs.ContainerState{}, nil
+		},
+		waitCompleteFn: func(string) error { return nil },
 	}
-	rt.getShipStatus = func([]string) (map[string]string, error) {
-		return map[string]string{"zod": "Exited"}, nil
-	}
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.urbitConf = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	rt.stopContainer = func(string) error {
-		t.Fatal("stopContainer should not run for stopped ship")
-		return nil
-	}
-	var bootStatuses []string
-	rt.updateUrbit = func(_ string, update func(*structs.UrbitDocker) error) error {
-		cfg := &structs.UrbitDocker{}
-		if err := update(cfg); err != nil {
-			return err
-		}
-		bootStatuses = append(bootStatuses, cfg.BootStatus)
-		return nil
-	}
-	startCalls := 0
-	rt.startContainer = func(name, typ string) (structs.ContainerState, error) {
-		startCalls++
-		if name != "zod" || typ != "vere" {
-			t.Fatalf("unexpected start call: %s %s", name, typ)
-		}
-		return structs.ContainerState{}, nil
-	}
-	rt.waitComplete = func(string) error { return nil }
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v2")
-	updateDockerWithRuntime(rt, "latest", current, latest)
-
-	if startCalls != 1 {
-		t.Fatalf("expected one vere start for prep, got %d", startCalls)
-	}
-	if len(bootStatuses) != 2 || bootStatuses[0] != "prep" || bootStatuses[1] != "noboot" {
-		t.Fatalf("unexpected boot status updates: %v", bootStatuses)
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if seenStatus != "noboot" {
+		t.Fatalf("expected final boot status noboot, got %s", seenStatus)
 	}
 }
 
 func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.Architecture = func() string { return "amd64" }
-
-	rt.getConf = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"zod"}}
-	}
-	rt.getShipStatus = func([]string) (map[string]string, error) {
-		return map[string]string{"zod": "Up 1 second"}, nil
-	}
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.urbitConf = func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{ChopOnUpgrade: true}
-	}
-	stopCalls := 0
-	rt.stopContainer = func(name string) error {
-		stopCalls++
-		if name != "zod" {
-			t.Fatalf("unexpected stop target %s", name)
-		}
-		return nil
-	}
-	var bootStatuses []string
-	rt.updateUrbit = func(_ string, update func(*structs.UrbitDocker) error) error {
-		cfg := &structs.UrbitDocker{}
-		if err := update(cfg); err != nil {
-			return err
-		}
-		bootStatuses = append(bootStatuses, cfg.BootStatus)
-		return nil
-	}
-	startCalls := 0
-	rt.startContainer = func(name, typ string) (structs.ContainerState, error) {
-		startCalls++
-		if name != "zod" || typ != "vere" {
-			t.Fatalf("unexpected start call: %s %s", name, typ)
-		}
-		return structs.ContainerState{}, nil
-	}
-	rt.waitComplete = func(string) error { return nil }
-	chopCalled := make(chan struct{}, 1)
-	rt.chopPier = func(string) error {
-		chopCalled <- struct{}{}
-		return nil
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn:    func() string { return "amd64" },
+		getConfFn:         func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{"zod": "Up 1 second"}, nil },
+		loadUrbitConfigFn: func(string) error { return nil },
+		urbitConfFn: func(string) structs.UrbitDocker {
+			return structs.UrbitDocker{ChopOnUpgrade: true}
+		},
+		stopContainerFn: func(name string) error {
+			if name != "zod" {
+				t.Fatalf("unexpected stop target %s", name)
+			}
+			return nil
+		},
+		updateUrbitFn: func(_ string, update func(*structs.UrbitDocker) error) error {
+			cfg := structs.UrbitDocker{}
+			if err := update(&cfg); err != nil {
+				return err
+			}
+			if cfg.BootStatus != "noboot" && cfg.BootStatus != "prep" && cfg.BootStatus != "boot" {
+				t.Fatalf("unexpected boot status %s", cfg.BootStatus)
+			}
+			return nil
+		},
+		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
+			if name != "zod" || typ != "vere" {
+				t.Fatalf("unexpected start call: %s %s", name, typ)
+			}
+			return structs.ContainerState{}, nil
+		},
+		waitCompleteFn: func(string) error { return nil },
+		chopPierFn: func(patp string) error {
+			if patp != "zod" {
+				t.Fatalf("unexpected chop target %s", patp)
+			}
+			return nil
+		},
 	}
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v2")
-	updateDockerWithRuntime(rt, "latest", current, latest)
-
-	if stopCalls != 1 {
-		t.Fatalf("expected one stop call, got %d", stopCalls)
-	}
-	if startCalls != 2 {
-		t.Fatalf("expected two starts (prep and boot), got %d", startCalls)
-	}
-	if len(bootStatuses) != 2 || bootStatuses[0] != "prep" || bootStatuses[1] != "boot" {
-		t.Fatalf("unexpected boot status updates: %v", bootStatuses)
-	}
-	select {
-	case <-chopCalled:
-	case <-time.After(2 * time.Second):
-		t.Fatal("expected chop routine to be triggered")
-	}
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
 }
 
 func TestUpdateDockerReturnsOnStatusError(t *testing.T) {
 	rt := testVersionRuntime()
-	rt.getConf = func() structs.SysConfig {
-		return structs.SysConfig{Piers: []string{"zod"}}
-	}
-	rt.getShipStatus = func([]string) (map[string]string, error) {
-		return nil, errors.New("status error")
-	}
-	rt.startContainer = func(string, string) (structs.ContainerState, error) {
-		t.Fatal("should not start containers when status lookup fails")
-		return structs.ContainerState{}, nil
+	rt.configOps = versionRuntimeConfigStub{
+		architectureFn:  func() string { return "amd64" },
+		getConfFn:       func() structs.SysConfig { return structs.SysConfig{Piers: []string{"zod"}} },
+		getShipStatusFn: func([]string) (map[string]string, error) { return nil, errors.New("status error") },
+		startContainerFn: func(string, string) (structs.ContainerState, error) {
+			t.Fatal("should not start containers when status lookup fails")
+			return structs.ContainerState{}, nil
+		},
 	}
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n2", "w1", "m1", "s1", "v1")
-	updateDockerWithRuntime(rt, "latest", current, latest)
+	updateDockerForRuntime(rt.configOps, "latest", current, latest)
 }

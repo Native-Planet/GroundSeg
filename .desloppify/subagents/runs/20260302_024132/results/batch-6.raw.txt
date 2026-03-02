@@ -1,0 +1,167 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 79.0,
+    "error_consistency": 84.0,
+    "abstraction_fitness": 78.0,
+    "test_strategy": 94.0,
+    "design_coherence": 83.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/accesspoint/accesspoint.go declares mutable process-wide AP state in package globals (wlan, inet, ip, ssid, password, rootDir) and Start/Stop mutate those fields directly.",
+        "goseg/accesspoint/router.go and accesspoint.go read those globals during command construction and process orchestration without synchronization, creating hidden coupling across callers.",
+        "These globals act as a cross-module shared control surface for runtime behavior, not a per-invocation runtime contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "goseg/docker/network/network.go executes multiple daemon operations with context.Background() for ContainerList/ContainerInspect/Volume operations and ContainerStop.",
+        "When docker API hangs, operations can block indefinitely and caller error paths can lose timing information because no timeout is attached at these call sites.",
+        "goseg/dockerclient/client.go has a bounded ping timeout for API negotiation, but orchestration runtime callers do not inherit bounded contexts, causing inconsistent error-timeout behavior across adjacent layers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "No explicit per-operation timeout policy is enforced in all orchestration/network call sites, so timeouts and error-causality are inconsistent across closely related modules."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/click/backup/service.go, goseg/click/restore/restore.go, goseg/click/storage/storage.go, goseg/click/notify/notify.go, goseg/click/desk/desk.go, and goseg/click/lifecycle/lifecycle.go all replicate the same click command execution pattern (create hoon, execute, parse response, clear cache) with tiny local wrappers.",
+        "goseg/click/click.go mostly delegates through package-level var-injected function indirections, so this duplication is spread across several modules rather than concentrated in one explicit runtime abstraction.",
+        "goseg/click/internal/runtime/runtime.go already provides shared execution primitives, but callers still re-wrap heavily and diverge in wrapper naming and local cache semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "A shared click-operation contract (command execution, response policy, cache invalidation, and error wrapping) is partially implemented but not consistently centralized.",
+      "sub_axes": {
+        "abstraction_leverage": 61.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 84.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "Most listed files have either direct unit tests or focused tests in sibling test files, but the critical event-loop/error-paths remain integration-light in the listed production surface.",
+        "The leak event consumer path includes unguarded runtime dispatch loops (goseg/handler/router/leak.go), yet no listed integration-style test in this batch verifies fault containment when one handler panics or misbehaves."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add a cross-module integration test for leak-router event flow that validates continued processing after handler-level failures and malformed action payloads."
+    },
+    "design_coherence": {
+      "evidence": [
+        "goseg/handler/router/leak.go dispatches every action directly in a tight infinite loop without panic protection, so a single bad handler can terminate the loop and silently stall event handling.",
+        "goseg/accesspoint/accesspoint.go exposes mutable package state as function-level behavior control, increasing implicit coupling and reducing function-level predictability under concurrent calls."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "ap-global-state-race",
+      "summary": "Access point runtime state is stored in mutable package globals, making Start/Stop calls non-isolated and implicitly coupled.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/accesspoint/router.go"
+      ],
+      "evidence": [
+        "accesspoint.go defines package globals (wlan, inet, ip, ssid, password, rootDir) and Start/Stop mutate wlan/others directly.",
+        "router.go and accesspoint.go read and write those globals during parameter validation, command composition, and startup/shutdown paths without synchronization."
+      ],
+      "suggestion": "Introduce an explicit AccessPointRuntime struct carrying interface, network, credentials, and path fields; avoid package-level mutable fields and pass runtime by value/reference through Start/Stop so operations are per-call and concurrency-safe.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "shared-state-runtime"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "docker-net-op-timeout-gap",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/dockerclient/client.go"
+      ],
+      "summary": "Docker orchestration network operations use unlimited background contexts, allowing hangs and hiding timeout-related fault boundaries.",
+      "evidence": [
+        "network.go calls ContainerList, ContainerInspect, ContainerStop, VolumeCreate/Inspect/List with context.Background() across all mutating/read operations.",
+        "dockerclient.New() uses ping timeout for version negotiation, so timeout policy is inconsistent across adjacent layers that perform similar external I/O."
+      ],
+      "suggestion": "Add per-operation context timeouts/deadlines in network.go wrappers and wrap errors with operation names and target identifiers; preserve cancellation and make all docker-client boundary calls timeout-consistent.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary-timeout-policy-inconsistency"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "click-wrapper-duplication",
+      "related_files": [
+        "goseg/click/click.go",
+        "goseg/click/backup/service.go",
+        "goseg/click/restore/restore.go",
+        "goseg/click/storage/storage.go",
+        "goseg/click/notify/notify.go",
+        "goseg/click/desk/desk.go"
+      ],
+      "summary": "Click command execution logic is duplicated across multiple subpackages instead of a single well-defined command execution abstraction.",
+      "evidence": [
+        "Several files define local wrapper vars/functions around runtime.ExecuteCommand / CreateHoon / FilterResponse and repeat the same create-run-parse-cleanup flow.",
+        "The same caching and error-handling shape appears in multiple modules with different names and minor variations, increasing drift risk."
+      ],
+      "suggestion": "Create a single click command executor in click/internal (or click/runtime) with explicit execution policy (hoon naming, cache clear hook, parse strategy, success predicate) and migrate all click/* modules to it.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "click-command-plumbing-fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "leak-loop-failure-absorption",
+      "related_files": [
+        "goseg/handler/router/leak.go",
+        "goseg/handler/ship/urbit.go"
+      ],
+      "summary": "Leak event dispatcher lacks panic isolation, so one misbehaving handler can terminate the consumer loop.",
+      "evidence": [
+        "HandleLeakAction runs `for { action := <-leakchannel.LeakAction; ... }` and directly invokes handlers without recover protection.",
+        "gallsegAuthedHandler and gallsegUnauthHandler do not guard against panics from downstream handlers, so one bad action can stop future event processing."
+      ],
+      "suggestion": "Wrap each dispatched handler call in recover/guard logic and emit transition/error telemetry before continuing; optionally route panics through a dead-letter channel.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "event-loop-fragility"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Global mutable state used as control plane for AP and handler/runtime glue.",
+      "Inconsistent API boundary policy for timeout/error envelopes across docker client callers.",
+      "Over-fragmented command-execution wrappers across click subpackages.",
+      "Event-loop dispatch does not defend against downstream panics."
+    ],
+    "likely_symptoms": [
+      "Flaky AP behavior under concurrent Start/Stop calls",
+      "Potential blocked docker management paths during daemon stalls",
+      "Divergent error semantics and duplicated maintenance burden in click actions",
+      "Lost leak events after a single handler panic"
+    ],
+    "possible_false_positives": [
+      "If Start/Stop are guaranteed single-threaded by process design, global accesspoint state may not race in practice.",
+      "If all call sites are guaranteed to run under externally supervised timeouts, indefinite block risk from background contexts may be partially mitigated."
+    ]
+  }
+}

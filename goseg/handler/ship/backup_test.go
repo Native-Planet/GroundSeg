@@ -8,17 +8,17 @@ import (
 
 	"groundseg/backupsvc"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/shipworkflow"
 	"groundseg/startram"
 	"groundseg/structs"
 )
 
 func resetBackupServiceSeams() {
-	backupDirForBackupService = func() string { return backupsvc.ResolveBackupRoot(config.BasePath) }
+	backupDirForBackupService = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 	runTransitionedOperationForBackupService = shipworkflow.RunTransitionedOperation
 	persistShipConfForBackupService = shipworkflow.PersistUrbitConfigValue
-	publishUrbitTransitionForBackupService = docker.PublishUrbitTransition
+	publishUrbitTransitionForBackupService = events.PublishUrbitTransition
 	sleepForBackupService = time.Sleep
 	createLocalBackupForBackupService = backupsvc.CreateLocalBackup
 	restoreBackupWithRequestForBackupService = startram.RestoreBackupWithRequest

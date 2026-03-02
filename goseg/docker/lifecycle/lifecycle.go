@@ -17,18 +17,89 @@ import (
 	"groundseg/structs"
 )
 
-var (
-	dockerClientNew         = dockerclient.New
-	containerConfigResolver = func(containerName string, containerType string) (container.Config, container.HostConfig, error) {
-		return container.Config{}, container.HostConfig{}, fmt.Errorf("container config resolver is not configured")
+type Runtime struct {
+	dockerClientNew             func(...client.Opt) (*client.Client, error)
+	containerConfigResolver     containerConfigResolverFn
+	getLatestContainerInfoFn    imageInfoLookupFn
+	pullImageIfNotExistFn       imagePullerFn
+	dockerPollInterval          time.Duration
+	getContainerRunningStatusFn func(string) (string, error)
+	startContainerFn            func(string, string) (structs.ContainerState, error)
+	dockerPollerTickFn          func() error
+}
+
+type RuntimeOption func(*Runtime)
+
+func WithDockerClientFactory(factory func(...client.Opt) (*client.Client, error)) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.dockerClientNew = factory
 	}
-	getLatestContainerInfoFn    = registry.GetLatestContainerInfo
-	pullImageIfNotExistFn       = registry.PullImageIfNotExist
-	dockerPollInterval          = 10 * time.Second
-	getContainerRunningStatusFn = GetContainerRunningStatus
-	startContainerFn            = StartContainer
-	dockerPollerTickFn          = runDockerPollerTick
-)
+}
+
+func WithContainerConfigResolver(resolver containerConfigResolverFn) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.containerConfigResolver = resolver
+	}
+}
+
+func WithImageInfoLookup(fn imageInfoLookupFn) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.getLatestContainerInfoFn = fn
+	}
+}
+
+func WithImagePuller(fn imagePullerFn) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.pullImageIfNotExistFn = fn
+	}
+}
+
+func WithGetContainerRunningStatus(fn func(string) (string, error)) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.getContainerRunningStatusFn = fn
+	}
+}
+
+func WithStartContainerFn(fn func(string, string) (structs.ContainerState, error)) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.startContainerFn = fn
+	}
+}
+
+func WithDockerPollerTickFn(fn func() error) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.dockerPollerTickFn = fn
+	}
+}
+
+func WithDockerPollInterval(interval time.Duration) RuntimeOption {
+	return func(rt *Runtime) {
+		rt.dockerPollInterval = interval
+	}
+}
+
+func NewRuntime(opts ...RuntimeOption) *Runtime {
+	rt := &Runtime{
+		dockerClientNew: dockerclient.New,
+		containerConfigResolver: func(containerName string, containerType string) (container.Config, container.HostConfig, error) {
+			return container.Config{}, container.HostConfig{}, fmt.Errorf("container config resolver is not configured")
+		},
+		getLatestContainerInfoFn: registry.GetLatestContainerInfo,
+		pullImageIfNotExistFn:    registry.PullImageIfNotExist,
+		dockerPollInterval:       10 * time.Second,
+	}
+	rt.getContainerRunningStatusFn = rt.GetContainerRunningStatus
+	rt.startContainerFn = rt.StartContainer
+	rt.dockerPollerTickFn = rt.runDockerPollerTick
+	for _, opt := range opts {
+		if opt != nil {
+			opt(rt)
+		}
+	}
+	return rt
+}
+
+var DefaultRuntime = NewRuntime()
 
 type containerConfigResolverFn func(string, string) (container.Config, container.HostConfig, error)
 
@@ -36,36 +107,10 @@ type imageInfoLookupFn func(string) (map[string]string, error)
 
 type imagePullerFn func(string, map[string]string) (bool, error)
 
-func SetClientFactory(factory func(...client.Opt) (*client.Client, error)) {
-	if factory == nil {
-		dockerClientNew = dockerclient.New
-		return
-	}
-	dockerClientNew = factory
-}
-
-func SetContainerConfigResolver(resolver containerConfigResolverFn) {
-	if resolver != nil {
-		containerConfigResolver = resolver
-	}
-}
-
-func SetImageInfoLookup(fn imageInfoLookupFn) {
-	if fn != nil {
-		getLatestContainerInfoFn = fn
-	}
-}
-
-func SetImagePuller(fn imagePullerFn) {
-	if fn != nil {
-		pullImageIfNotExistFn = fn
-	}
-}
-
-func Initialize() error {
-	_, err := FindContainer("groundseg-webui")
+func (runtime *Runtime) Initialize() error {
+	_, err := runtime.FindContainer("groundseg-webui")
 	if err == nil {
-		if err = StopContainerByName("groundseg-webui"); err != nil {
+		if err = runtime.StopContainerByName("groundseg-webui"); err != nil {
 			zap.L().Warn(fmt.Sprintf("Couldn't stop old webui container: %v", err))
 		}
 	}
@@ -73,76 +118,57 @@ func Initialize() error {
 		zap.L().Warn(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
 
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return fmt.Errorf("error creating docker client: %v", err)
+		return fmt.Errorf("error creating docker client: %w", err)
 	}
 	defer cli.Close()
 	version, err := cli.ServerVersion(context.TODO())
 	if err != nil {
-		return fmt.Errorf("error getting docker version: %v", err)
+		return fmt.Errorf("error getting docker version: %w", err)
 	}
 	zap.L().Info(fmt.Sprintf("Docker version: %s", version.Version))
 	return nil
 }
 
-func GetShipStatus(patps []string) (map[string]string, error) {
+func (runtime *Runtime) GetShipStatus(patps []string) (map[string]string, error) {
 	statuses := make(map[string]string)
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		errmsg := fmt.Sprintf("Error getting Docker info: %v", err)
-		zap.L().Error(errmsg)
-		return statuses, err
+		errmsg := fmt.Errorf("unable to create docker client: %w", err)
+		zap.L().Error(errmsg.Error())
+		return statuses, errmsg
 	}
 	defer cli.Close()
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
-		errmsg := fmt.Sprintf("Error getting containers: %v", err)
-		zap.L().Error(errmsg)
-		return statuses, err
+		errmsg := fmt.Errorf("failed to list containers: %w", err)
+		zap.L().Error(errmsg.Error())
+		return statuses, errmsg
 	}
 
-	for _, pier := range patps {
-		found := false
-		for _, cont := range containers {
-			for _, name := range cont.Names {
-				fasPier := "/" + pier
-				if name == fasPier {
-					statuses[pier] = cont.Status
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			statuses[pier] = "not found"
-		}
-	}
-	return statuses, nil
+	statusIndex := NewContainerStatusIndex(containers)
+	return ResolveStatuses(statusIndex, patps), nil
 }
 
 // GetContainerImageTag returns the image tag for a container name if the container exists.
-func GetContainerImageTag(containerName string) (string, error) {
+func (runtime *Runtime) GetContainerImageTag(containerName string) (string, error) {
 	ctx := context.Background()
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return "", fmt.Errorf("unable to create docker client: %v", err)
+		return "", fmt.Errorf("unable to create docker client: %w", err)
 	}
 	defer cli.Close()
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
-		return "", fmt.Errorf("failed to list containers: %v", err)
+		return "", fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, cont := range containers {
 		for _, name := range cont.Names {
 			if strings.TrimPrefix(name, "/") == containerName {
-				imageParts := strings.Split(cont.Image, ":")
-				if len(imageParts) > 1 {
-					return strings.Split(imageParts[1], "@")[0], nil
+				if tag := imageTagFromReference(cont.Image); tag != "" {
+					return tag, nil
 				}
 				return "latest", nil
 			}
@@ -151,17 +177,30 @@ func GetContainerImageTag(containerName string) (string, error) {
 	return "", fmt.Errorf("no exact match found for container %s", containerName)
 }
 
+func imageTagFromReference(image string) string {
+	imageWithoutDigest := strings.SplitN(image, "@", 2)[0]
+	lastColon := strings.LastIndex(imageWithoutDigest, ":")
+	if lastColon == -1 {
+		return ""
+	}
+	lastSlash := strings.LastIndex(imageWithoutDigest, "/")
+	if lastSlash > lastColon {
+		return ""
+	}
+	return imageWithoutDigest[lastColon+1:]
+}
+
 // GetContainerRunningStatus returns status for a container by exact name.
-func GetContainerRunningStatus(containerName string) (string, error) {
+func (runtime *Runtime) GetContainerRunningStatus(containerName string) (string, error) {
 	var status string
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return status, fmt.Errorf("unable to create docker client: %v", err)
+		return status, fmt.Errorf("unable to create docker client: %w", err)
 	}
 	defer cli.Close()
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
 	if err != nil {
-		return status, err
+		return status, fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, cont := range containers {
 		for _, name := range cont.Names {
@@ -170,7 +209,7 @@ func GetContainerRunningStatus(containerName string) (string, error) {
 			}
 		}
 	}
-	return status, fmt.Errorf("Unable to get container running status: %v", containerName)
+	return status, fmt.Errorf("unable to get container running status for %s", containerName)
 }
 
 type containerPlan struct {
@@ -182,33 +221,33 @@ type containerPlan struct {
 	DesiredImage string
 }
 
-func containerPlanFor(containerName string, containerType string) (containerPlan, error) {
+func (runtime *Runtime) containerPlanFor(containerName string, containerType string) (containerPlan, error) {
 	plan := containerPlan{Name: containerName, Type: containerType}
-	containerConfig, hostConfig, err := containerConfigResolver(containerName, containerType)
+	containerConfig, hostConfig, err := runtime.containerConfigResolver(containerName, containerType)
 	if err != nil {
-		return plan, err
+		return plan, fmt.Errorf("resolve container config for %s/%s: %w", containerName, containerType, err)
 	}
 	plan.Config = containerConfig
 	plan.HostConfig = hostConfig
 
-	imageInfo, err := getLatestContainerInfoFn(containerType)
+	imageInfo, err := runtime.getLatestContainerInfoFn(containerType)
 	if err != nil {
-		return plan, err
+		return plan, fmt.Errorf("lookup latest image for container type %s: %w", containerType, err)
 	}
 	plan.ImageInfo = imageInfo
 	plan.DesiredImage = fmt.Sprintf("%s:%s@sha256:%s", imageInfo["repo"], imageInfo["tag"], imageInfo["hash"])
-	if _, err := pullImageIfNotExistFn(plan.DesiredImage, imageInfo); err != nil {
-		return plan, err
+	if _, err := runtime.pullImageIfNotExistFn(plan.DesiredImage, imageInfo); err != nil {
+		return plan, fmt.Errorf("ensure image exists %s: %w", plan.DesiredImage, err)
 	}
 	return plan, nil
 }
 
 func createAndStartContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
 	if _, err := cli.ContainerCreate(ctx, &plan.Config, &plan.HostConfig, nil, nil, plan.Name); err != nil {
-		return err
+		return fmt.Errorf("create container %s: %w", plan.Name, err)
 	}
 	if err := cli.ContainerStart(ctx, plan.Name, container.StartOptions{}); err != nil {
-		return err
+		return fmt.Errorf("start container %s: %w", plan.Name, err)
 	}
 	return nil
 }
@@ -231,45 +270,45 @@ func recreateContainerIfImageChanged(ctx context.Context, cli *client.Client, pl
 		}
 	}
 	if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
-		zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet)", plan.Name))
+		zap.L().Warn(fmt.Sprintf("Couldn't remove container %v (may not exist yet): %v", plan.Name, err))
 	}
 	if err := createAndStartContainer(ctx, cli, plan); err != nil {
-		return err
+		return fmt.Errorf("recreate container %s: %w", plan.Name, err)
 	}
 	zap.L().Info(fmt.Sprintf("Restarted %s with image %s", plan.Name, plan.DesiredImage))
 	return nil
 }
 
-func ensureRunningContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
-	existingContainer, err := FindContainer(plan.Name)
+func ensureRunningContainer(runtime *Runtime, ctx context.Context, cli *client.Client, plan containerPlan) error {
+	existingContainer, err := runtime.FindContainer(plan.Name)
 	if err != nil {
 		if !isContainerLookupNotFound(err) {
-			return err
+			return fmt.Errorf("lookup container %s: %w", plan.Name, err)
 		}
 		existingContainer = nil
 	}
 	switch {
 	case existingContainer == nil:
 		if err := createAndStartContainer(ctx, cli, plan); err != nil {
-			return err
+			return fmt.Errorf("start container %s: %w", plan.Name, err)
 		}
 		zap.L().Info(fmt.Sprintf("%s started with image %s", plan.Name, plan.DesiredImage))
 	case existingContainer.State == "exited":
 		if err := cli.ContainerRemove(ctx, plan.Name, container.RemoveOptions{Force: true}); err != nil {
-			return err
+			return fmt.Errorf("remove exited container %s: %w", plan.Name, err)
 		}
 		if err := createAndStartContainer(ctx, cli, plan); err != nil {
-			return err
+			return fmt.Errorf("restart exited container %s: %w", plan.Name, err)
 		}
 		zap.L().Info(fmt.Sprintf("Started stopped container %s", plan.Name))
 	case existingContainer.State == "created":
 		if err := cli.ContainerStart(ctx, plan.Name, container.StartOptions{}); err != nil {
-			return err
+			return fmt.Errorf("start created container %s: %w", plan.Name, err)
 		}
 		zap.L().Info(fmt.Sprintf("Started created container %s", plan.Name))
 	default:
 		if err := recreateContainerIfImageChanged(ctx, cli, plan, existingContainer.Image); err != nil {
-			return err
+			return fmt.Errorf("reconcile existing container %s: %w", plan.Name, err)
 		}
 	}
 	return nil
@@ -277,7 +316,10 @@ func ensureRunningContainer(ctx context.Context, cli *client.Client, plan contai
 
 func ensureCreatedContainer(ctx context.Context, cli *client.Client, plan containerPlan) error {
 	_, err := cli.ContainerCreate(ctx, &plan.Config, &plan.HostConfig, nil, nil, plan.Name)
-	return err
+	if err != nil {
+		return fmt.Errorf("create container %s: %w", plan.Name, err)
+	}
+	return nil
 }
 
 func containerStateFromInspect(plan containerPlan, desiredStatus string, containerDetails container.InspectResponse) structs.ContainerState {
@@ -294,77 +336,76 @@ func containerStateFromInspect(plan containerPlan, desiredStatus string, contain
 	}
 }
 
-func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
+func (runtime *Runtime) StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
 	zap.L().Debug(fmt.Sprintf("StartContainer issued for %v", containerName))
 	var containerState structs.ContainerState
-	if err := cleanupMinIOContainerForStart(containerName, containerType); err != nil {
-		return containerState, err
+	if err := runtime.cleanupMinIOContainerForStart(containerName, containerType); err != nil {
+		return containerState, fmt.Errorf("cleanup container %s before start: %w", containerName, err)
 	}
-	plan, err := containerPlanFor(containerName, containerType)
+	plan, err := runtime.containerPlanFor(containerName, containerType)
 	if err != nil {
-		return containerState, err
+		return containerState, fmt.Errorf("build container plan for %s/%s: %w", containerName, containerType, err)
 	}
 	ctx := context.Background()
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return containerState, err
+		return containerState, fmt.Errorf("create docker client for %s: %w", containerName, err)
 	}
 	defer cli.Close()
-	if err := ensureRunningContainer(ctx, cli, plan); err != nil {
-		return containerState, err
+	if err := ensureRunningContainer(runtime, ctx, cli, plan); err != nil {
+		return containerState, fmt.Errorf("start container %s: %w", containerName, err)
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
-		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
+		return containerState, fmt.Errorf("failed to inspect container %s: %w", containerName, err)
 	}
 	containerState = containerStateFromInspect(plan, "running", containerDetails)
 	return containerState, err
 }
 
-func CreateContainer(containerName string, containerType string) (structs.ContainerState, error) {
+func (runtime *Runtime) CreateContainer(containerName string, containerType string) (structs.ContainerState, error) {
 	var containerState structs.ContainerState
-	if err := cleanupMinIOContainerForStart(containerName, containerType); err != nil {
-		return containerState, err
+	if err := runtime.cleanupMinIOContainerForStart(containerName, containerType); err != nil {
+		return containerState, fmt.Errorf("cleanup container %s before create: %w", containerName, err)
 	}
-	plan, err := containerPlanFor(containerName, containerType)
+	plan, err := runtime.containerPlanFor(containerName, containerType)
 	if err != nil {
-		return containerState, err
+		return containerState, fmt.Errorf("build container plan for %s/%s: %w", containerName, containerType, err)
 	}
 	ctx := context.Background()
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return containerState, err
+		return containerState, fmt.Errorf("create docker client for %s: %w", containerName, err)
 	}
 	defer cli.Close()
 	if err := ensureCreatedContainer(ctx, cli, plan); err != nil {
-		return containerState, err
+		return containerState, fmt.Errorf("create container %s: %w", containerName, err)
 	}
 	containerDetails, err := cli.ContainerInspect(ctx, containerName)
 	if err != nil {
-		return containerState, fmt.Errorf("failed to inspect container %s: %v", containerName, err)
+		return containerState, fmt.Errorf("failed to inspect container %s: %w", containerName, err)
 	}
 	containerState = containerStateFromInspect(plan, "stopped", containerDetails)
 	return containerState, err
 }
 
-// StopContainerByName stops a container by name.
-func StopContainerByName(containerName string) error {
+func (runtime *Runtime) StopContainerByName(containerName string) error {
 	ctx := context.Background()
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to create docker client: %w", err)
 	}
 	defer cli.Close()
 	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, cont := range containers {
 		for _, name := range cont.Names {
 			if name == "/"+containerName {
 				options := container.StopOptions{}
 				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
-					return fmt.Errorf("failed to stop container %s: %v", containerName, err)
+					return fmt.Errorf("failed to stop container %s: %w", containerName, err)
 				}
 				zap.L().Info(fmt.Sprintf("Successfully stopped container %s\n", containerName))
 				return nil
@@ -374,36 +415,35 @@ func StopContainerByName(containerName string) error {
 	return fmt.Errorf("container with name %s not found", containerName)
 }
 
-// DeleteContainer deletes a container by its name.
-func DeleteContainer(name string) error {
-	cli, err := dockerClientNew()
+func (runtime *Runtime) DeleteContainer(name string) error {
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		errmsg := fmt.Errorf("Failed to create docker client: %v : %v", name, err)
+		errmsg := fmt.Errorf("Failed to create docker client %s: %w", name, err)
 		return errmsg
 	}
 	defer cli.Close()
 	if err := cli.ContainerRemove(context.Background(), name, container.RemoveOptions{Force: true}); err != nil {
-		return fmt.Errorf("Failed to delete docker container: %v : %v", name, err)
+		return fmt.Errorf("Failed to delete docker container %s: %w", name, err)
 	}
 	zap.L().Info(fmt.Sprintf("Deleted Container: %s", name))
 	return nil
 }
 
-func cleanupMinIOContainerForStart(containerName string, containerType string) error {
+func (runtime *Runtime) cleanupMinIOContainerForStart(containerName string, containerType string) error {
 	if containerType != "minio" {
 		return nil
 	}
-	existingContainer, err := FindContainer(containerName)
+	existingContainer, err := runtime.FindContainer(containerName)
 	if err != nil {
 		if isContainerLookupNotFound(err) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("find minio container %s for cleanup: %w", containerName, err)
 	}
 	if existingContainer == nil {
 		return nil
 	}
-	return DeleteContainer(containerName)
+	return runtime.DeleteContainer(containerName)
 }
 
 func isContainerLookupNotFound(err error) bool {
@@ -414,10 +454,10 @@ func isContainerLookupNotFound(err error) bool {
 }
 
 // ExecDockerCommand executes a command inside a container and returns stdout/stderr plus the exit code.
-func ExecDockerCommand(containerName string, cmd []string) (string, int, error) {
-	cli, err := dockerClientNew()
+func (runtime *Runtime) ExecDockerCommand(containerName string, cmd []string) (string, int, error) {
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return "", -1, err
+		return "", -1, fmt.Errorf("unable to create docker client: %w", err)
 	}
 	defer cli.Close()
 
@@ -426,29 +466,29 @@ func ExecDockerCommand(containerName string, cmd []string) (string, int, error) 
 
 	containerID, err := GetContainerIDByName(ctx, cli, containerName)
 	if err != nil {
-		return "", -1, err
+		return "", -1, fmt.Errorf("lookup container %s: %w", containerName, err)
 	}
 
 	resp, err := cli.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
-		return "", -1, err
+		return "", -1, fmt.Errorf("failed to create exec for container %s: %w", containerName, err)
 	}
 	hijackedResp, err := cli.ContainerExecAttach(ctx, resp.ID, container.ExecAttachOptions{})
 	if err != nil {
-		return "", -1, err
+		return "", -1, fmt.Errorf("failed to attach to exec for container %s: %w", containerName, err)
 	}
 	defer hijackedResp.Close()
 
 	output, err := ioutil.ReadAll(hijackedResp.Reader)
 	if err != nil {
-		return "", -1, err
+		return "", -1, fmt.Errorf("read exec output from %s: %w", containerName, err)
 	}
 	execID := resp.ID
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		execState, inspectErr := cli.ContainerExecInspect(ctx, execID)
 		if inspectErr != nil {
-			return string(output), -1, fmt.Errorf("failed to inspect exec command %s in %s: %v", execID, containerName, inspectErr)
+			return string(output), -1, fmt.Errorf("failed to inspect exec command %s in %s: %w", execID, containerName, inspectErr)
 		}
 		if !execState.Running && execState.ExitCode != 0 {
 			return string(output), execState.ExitCode, fmt.Errorf("command failed with exit code %d: %s", execState.ExitCode, strings.TrimSpace(string(output)))
@@ -466,7 +506,7 @@ func ExecDockerCommand(containerName string, cmd []string) (string, int, error) 
 func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) (string, error) {
 	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, cont := range containers {
 		for _, n := range cont.Names {
@@ -478,36 +518,35 @@ func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 	return "", fmt.Errorf("Container not found")
 }
 
-// RestartContainer restarts a running container.
-func RestartContainer(name string) error {
+func (runtime *Runtime) RestartContainer(name string) error {
 	ctx := context.Background()
-	cli, err := dockerClientNew()
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return fmt.Errorf("Couldn't create client: %v", err)
+		return fmt.Errorf("Couldn't create client: %w", err)
 	}
 	defer cli.Close()
 
 	containerID, err := GetContainerIDByName(ctx, cli, name)
 	if err != nil {
-		return fmt.Errorf("Couldn't get ID: %v", err)
+		return fmt.Errorf("Couldn't get ID for %s: %w", name, err)
 	}
 	timeout := 30
 	stopOptions := container.StopOptions{Timeout: &timeout}
 	if err := cli.ContainerRestart(ctx, containerID, stopOptions); err != nil {
-		return fmt.Errorf("Couldn't restart container: %v", err)
+		return fmt.Errorf("Couldn't restart container %s: %w", name, err)
 	}
 	return nil
 }
 
-func FindContainer(containerName string) (*container.Summary, error) {
-	cli, err := dockerClientNew()
+func (runtime *Runtime) FindContainer(containerName string) (*container.Summary, error) {
+	cli, err := runtime.dockerClientNew()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer cli.Close()
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 	for _, container := range containers {
 		for _, name := range container.Names {
@@ -516,36 +555,36 @@ func FindContainer(containerName string) (*container.Summary, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("Container %v not found", containerName)
+	return nil, fmt.Errorf("container %s not found", containerName)
 }
 
-func DockerPoller() {
-	ticker := time.NewTicker(dockerPollInterval)
+func (runtime *Runtime) DockerPoller() {
+	ticker := time.NewTicker(runtime.dockerPollInterval)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
 		zap.L().Info("polling docker")
-		if err := dockerPollerTickFn(); err != nil {
+		if err := runtime.dockerPollerTickFn(); err != nil {
 			zap.L().Error(fmt.Sprintf("Docker poller tick failed: %v", err))
 		}
 	}
 }
 
-func runDockerPollerTick() error {
-	if err := ensureMonitoredContainerHealthy("netdata", "netdata"); err != nil {
+func (runtime *Runtime) runDockerPollerTick() error {
+	if err := runtime.ensureMonitoredContainerHealthy("netdata", "netdata"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func ensureMonitoredContainerHealthy(containerName, containerType string) error {
-	status, err := getContainerRunningStatusFn(containerName)
+func (runtime *Runtime) ensureMonitoredContainerHealthy(containerName, containerType string) error {
+	status, err := runtime.getContainerRunningStatusFn(containerName)
 	if err == nil {
 		if strings.HasPrefix(status, "Up") {
 			return nil
 		}
 		zap.L().Warn(fmt.Sprintf("Container %s is not running (%q); attempting restart", containerName, status))
-		if _, err := startContainerFn(containerName, containerType); err != nil {
+		if _, err := runtime.startContainerFn(containerName, containerType); err != nil {
 			return fmt.Errorf("failed to restart container %s: %w", containerName, err)
 		}
 		return nil
@@ -554,7 +593,7 @@ func ensureMonitoredContainerHealthy(containerName, containerType string) error 
 		return fmt.Errorf("container status check failed for %s: %w", containerName, err)
 	}
 	zap.L().Info(fmt.Sprintf("Container %s is not found; attempting start", containerName))
-	if _, err := startContainerFn(containerName, containerType); err != nil {
+	if _, err := runtime.startContainerFn(containerName, containerType); err != nil {
 		return fmt.Errorf("failed to start container %s: %w", containerName, err)
 	}
 	return nil
@@ -569,6 +608,6 @@ func Contains(slice []string, str string) bool {
 	return false
 }
 
-func PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
-	return pullImageIfNotExistFn(desiredImage, imageInfo)
+func (runtime *Runtime) PullImageIfNotExist(desiredImage string, imageInfo map[string]string) (bool, error) {
+	return runtime.pullImageIfNotExistFn(desiredImage, imageInfo)
 }

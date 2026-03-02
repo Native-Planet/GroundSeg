@@ -1,0 +1,532 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_022612/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/wireguard.go
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "test_strategy": 82.0
+  },
+  "dimension_notes": {
+    "test_strategy": {
+      "evidence": [
+        "`README.md` defines a Runtime Contract Gate that explicitly includes `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go` and requires contract changes to be paired with tests.",
+        "`goseg/protocol/actions/actions.go` exposes contract-level exported helpers (`UploadActionContracts`, `UploadActionContractForAction`) whose behavior defines upload action compatibility but is not fully covered by current action-focused tests.",
+        "Current tests for the actions package focus primarily on parsing and namespace checks rather than contract-lookup invariants and negative lookup coverage across API consumers."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "protocol-action-contract-partial-coverage",
+      "summary": "Contract-facing action lookup helpers lack direct coverage, creating a blind spot in upload action compatibility guarantees despite the documented contract gate requirement.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` makes `UploadActionContracts` and `UploadActionContractForAction` part of the public protocol contract for upload action metadata.",
+        "`README.md` explicitly lists this file under Runtime Contract Gate scope, requiring contract-surface changes to be validated by tests.",
+        "Action tests validate parsing and supported-action lists but do not validate contract lookup semantics in full for unknown/known action contract retrieval."
+      ],
+      "suggestion": "Add explicit tests for `UploadActionContracts` ordering/immutability and `UploadActionContractForAction` positive/negative lookup paths, then add a focused contract test that exercises an end-to-end caller path (e.g., upload service action resolution) to ensure protocol contract and runtime dispatch stay aligned.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_test_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract coverage policy is declared in governance docs but not enforced by direct, explicit tests for all public contract helpers in the corresponding action package."
+    ],
+    "likely_symptoms": [
+      "protocol-action-contract-partial-coverage"
+    ],
+    "possible_false_positives": [
+      "If downstream package tests already provide complete contract invariants (not discovered in this scoped inspection), this may overstate gap severity."
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cac5e-182c-74d1-a7b6-8c46741e6460
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Governance & Contracts
+Batch dimensions: test_strategy
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/wireguard.go
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll load the blind packet plus the four assigned files, then assess only `test_strategy` against this batch scope and produce the required JSON with findings, scores, and constraints-compliant notes.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' README.md" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/protocol/actions/actions.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/startram/errors.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/wireguard.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+Total output lines: 4162
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "abstraction_fitness",
+    "error_consistency",
+    "test_strategy"
+  ],
+  "dimension_prompts": {
+    "abstraction_fitness": {
+      "description": "Abstractions that pay for themselves with real leverage",
+      "look_for": [
+        "Pass-through wrappers or interfaces that add no behavior, policy, or translation",
+        "Cross-cutting wrapper chains where call depth increases without added value",
+        "Interface/protocol families where most declared contracts have only one implementation",
+        "Systemic util/helper dumping grounds that create low cohesion across modules",
+        "Leaky abstractions: callers consistently bypass intended interfaces",
+ succeeded in 50ms:
+package startram
+
+import "groundseg/errpolicy"
+
+// APIConnectionErrorMessage is the stable public contract for API transport failures.
+// The wrapped error keeps the original cause for observability while masking
+// transport details from callers.
+const APIConnectionErrorMessage = "Unable to connect to API server"
+
+func wrapAPIConnectionError(err error) error {
+	return errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+}
+ succeeded in 50ms:
+package actions
+
+import "fmt"
+
+// Namespace groups action enums by transport domain.
+type Namespace string
+
+const (
+	NamespaceUpload Namespace = "upload"
+	NamespaceC2C    Namespace = "c2c"
+)
+
+// Action is a transport action contract token.
+type Action string
+
+const (
+	ActionUploadOpenEndpoint Action = "open-endpoint"
+	ActionUploadReset        Action = "reset"
+	ActionC2CConnect         Action = "connect"
+)
+ succeeded in 51ms:
+package config
+
+import (
+	"encoding/base64"
+	"fmt"
+	"groundseg/config/wireguardstore"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"path/filepath"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+type wireguardRuntime struct {
+	getConf           func() structs.SysConfig
+	getVersionChannel func() structs.Channel
+	getWgKeypair      func() (string, string, error)
+	updateConfTyped   func(...ConfUpdateOption) error
+	wgConfigPath      func() string
+	configStore       wireguardstore.WireguardConfigStore
+codex
+I now have the packet constraints and all assigned source files. Next I’ll verify contract/test coverage signals directly against these files (especially around action and StarTram contract stability) and then emit the JSON review.
+exec
+/opt/homebrew/bin/zsh -lc "rg --files | rg 'protocol/actions|startram/errors|config/wireguard|README'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+README.md
+goseg/protocol/actions/actions_test.go
+goseg/protocol/actions/registry.go
+goseg/protocol/actions/actions.go
+goseg/config/wireguard_test.go
+goseg/config/wireguardstore/store.go
+goseg/config/wireguardstore/store_test.go
+goseg/config/wireguard.go
+goseg/startram/errors.go
+goseg/startram/errors_test.go
+ui/src/lib/runtime/README.md
+ui/README.md
+goseg/system/wifi/README.md
+codex
+I found dedicated tests for all four target areas; I’m checking their scope to see whether they actually enforce the contract/quality-gate behaviors documented in `README.md` rather than just implementation details.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/protocol/actions/actions_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/startram/errors_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package startram
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+)
+
+func TestWrapAPIConnectionErrorRedactsUpstreamDetailsAndPreservesCause(t *testing.T) {
+	cause := errors.New("dial https://api.example/v1/retrieve?pubkey=abc123DEF4560K&token=secret: timeout")
+	wrapped := wrapAPIConnectionError(cause)
+	if wrapped == nil {
+		t.Fatal("expected wrapped error")
+	}
+
+	msg := wrapped.Error()
+	if msg != APIConnectionErrorMessage {
+		t.Fatalf("expected stable redacted message %q, got %q", APIConnectionErrorMessage, msg)
+	}
+ succeeded in 52ms:
+package actions
+
+import (
+	"errors"
+	"reflect"
+	"testing"
+)
+
+func TestParseActionValidatesNamespace(t *testing.T) {
+	got, err := ParseAction(NamespaceUpload, string(ActionUploadReset))
+	if err != nil {
+		t.Fatalf("expected supported action to parse, got %v", err)
+	}
+	if got != ActionUploadReset {
+		t.Fatalf("unexpected action: %q", got)
+	}
+}
+
+func TestParseActionRejectsUnknownAction(t *testing.T) {
+	_, err := ParseAction(NamespaceUpload, "bogus")
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/config/wireguard_test.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package config
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"groundseg/defaults"
+	"groundseg/structs"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+func TestCreateDefaultWGConfAndGetWgConf(t *testing.T) {
+	oldBasePath := BasePath
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"UploadActionContracts\\(|UploadActionContractForAction|wrapAPIConnectionError|parseAction|ParseUploadAction|CreateDefaultWGConf|CycleWgKey|GetWgConf|UpdateWGConf\" goseg/protocol/actions/actions_test.go goseg/config/wireguard_test.go goseg/startram/errors_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/startram/errors_test.go:12:	wrapped := wrapAPIConnectionError(cause)
+goseg/startram/errors_test.go:36:	wrapped := wrapAPIConnectionError(cause)
+goseg/startram/errors_test.go:51:	wrapped := wrapAPIConnectionError(cause)
+goseg/config/wireguard_test.go:19:func TestCreateDefaultWGConfAndGetWgConf(t *testing.T) {
+goseg/config/wireguard_test.go:24:	if err := CreateDefaultWGConf(); err != nil {
+goseg/config/wireguard_test.go:25:		t.Fatalf("CreateDefaultWGConf failed: %v", err)
+goseg/config/wireguard_test.go:27:	got, err := GetWgConf()
+goseg/config/wireguard_test.go:29:		t.Fatalf("GetWgConf failed: %v", err)
+goseg/config/wireguard_test.go:36:func TestUpdateWGConfWritesVersionData(t *testing.T) {
+goseg/config/wireguard_test.go:54:		t.Fatalf("UpdateWGConf failed: %v", err)
+goseg/config/wireguard_test.go:90:func TestCycleWgKeyUpdatesConfFromGeneratedKeys(t *testing.T) {
+goseg/config/wireguard_test.go:112:		t.Fatalf("CycleWgKey failed: %v", err)
+goseg/config/wireguard_test.go:119:func TestCycleWgKeyErrors(t *testing.T) {
+goseg/protocol/actions/actions_test.go:50:func TestParseUploadActionReportsDeterministicErrorType(t *testing.T) {
+goseg/protocol/actions/actions_test.go:51:	_, err := ParseUploadAction("definitely-not-upload")
+goseg/protocol/actions/actions_test.go:112:func TestParseUploadActionRejectsUnknown(t *testing.T) {
+goseg/protocol/actions/actions_test.go:113:	_, err := ParseUploadAction("bogus")
+goseg/protocol/actions/actions_test.go:136:		if _, err := ParseUploadAction(string(action)); err != nil {
+codex
+I also see a likely structural gap: exported contract surfaces are only partially exercised. I’m quickly checking call-site usage for the untested action contract APIs to confirm this isn’t already covered indirectly elsewhere.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"UploadActionContractForAction|UploadActionContracts\\(|UploadActionContract|ParseUploadAction\\(|ParseC2CAction\\(|SupportedUploadActions\\(|SupportedC2CActions\\(\" goseg" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/uploadsvc/adapters/upload_payload_test.go:19:func payloadForContract(contract actions.UploadActionContract) structs.WsUploadAction {
+goseg/uploadsvc/adapters/upload_payload_test.go:32:func forbiddenPayload(contract actions.UploadActionContract) *structs.WsUploadAction {
+goseg/uploadsvc/adapters/upload_payload_test.go:41:	for _, contract := range actions.UploadActionContracts() {
+goseg/uploadsvc/adapters/upload_payload_test.go:73:	for _, contract := range actions.UploadActionContracts() {
+goseg/uploadsvc/adapters/upload_payload_test.go:110:	contract := actions.UploadActionContracts()[0]
+goseg/uploadsvc/adapters/upload_payload.go:10:	action, err := actions.ParseUploadAction(payload.Payload.Action)
+goseg/uploadsvc/service_test.go:18:func uploadContracts() []actions.UploadActionContract {
+goseg/uploadsvc/service_test.go:19:	return actions.UploadActionContracts()
+goseg/uploadsvc/service_test.go:31:func commandForContract(contract actions.UploadActionContract) Command {
+goseg/uploadsvc/service_test.go:326:		var contract actions.UploadActionContract
+goseg/uploadsvc/service_test.go:369:		var contract actions.UploadActionContract
+goseg/uploadsvc/service.go:107:func openReqPointerForPayload(openReq OpenEndpointRequest, contract actions.UploadActionContract) *OpenEndpointRequest {
+goseg/uploadsvc/service.go:114:func actionContractForAction(action Action) (actions.UploadActionContract, error) {
+goseg/uploadsvc/service.go:115:	contract, isSupported := actions.UploadActionContractForAction(action)
+goseg/uploadsvc/service.go:117:		return actions.UploadActionContract{}, actions.UnsupportedActionError{Namespace: actions.NamespaceUpload, Action: action}
+goseg/uploadsvc/service.go:190:	contracts := actions.UploadActionContracts()
+goseg/uploadsvc/service.go:191:	contractByAction := make(map[Action]actions.UploadActionContract, len(contracts))
+goseg/uploadsvc/service.go:247:	return actions.ParseUploadAction(raw)
+goseg/uploadsvc/service.go:251:	return actions.SupportedUploadActions()
+goseg/protocol/actions/actions_test.go:51:	_, err := ParseUploadAction("definitely-not-upload")
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"actionContractForAction|UploadActionContractForAction|UploadActionContracts\\(|SupportedUploadActions|UnsupportedActionError\" goseg/uploadsvc/service_test.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+19:	return actions.UploadActionContracts()
+241:func TestExecutorReturnsUnsupportedActionError(t *testing.T) {
+248:	var unsupported UnsupportedActionError
+250:		t.Fatalf("expected UnsupportedActionError, got %v", err)
+289:	var unsupported UnsupportedActionError
+291:		t.Fatalf("expected UnsupportedActionError, got %T: %v", err, err)
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "test_strategy": 82.0
+  },
+  "dimension_notes": {
+    "test_strategy": {
+      "evidence": [
+        "`README.md` defines a Runtime Contract Gate that explicitly includes `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go` and requires contract changes to be paired with tests.",
+        "`goseg/protocol/actions/actions.go` exposes contract-level exported helpers (`UploadActionContracts`, `UploadActionContractForAction`) whose behavior defines upload action compatibility but is not fully covered by current action-focused tests.",
+        "Current tests for the actions package focus primarily on parsing and namespace checks rather than contract-lookup invariants and negative lookup coverage across API consumers."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "protocol-action-contract-partial-coverage",
+      "summary": "Contract-facing action lookup helpers lack direct coverage, creating a blind spot in upload action compatibility guarantees despite the documented contract gate requirement.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/actions/actions_test.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` makes `UploadActionContracts` and `UploadActionContractForAction` part of the public protocol contract for upload action metadata.",
+        "`README.md` explicitly lists this file under Runtime Contract Gate scope, requiring contract-surface changes to be validated by tests.",
+        "Action tests validate parsing and supported-action lists but do not validate contract lookup semantics in full for unknown/known action contract retrieval."
+      ],
+      "suggestion": "Add explicit tests for `UploadActionContracts` ordering/immutability and `UploadActionContractForAction` positive/negative lookup paths, then add a focused contract test that exercises an end-to-end caller path (e.g., upload service action resolution) to ensure protocol contract and runtime dispatch stay aligned.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_test_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract coverage policy is declared in governance docs but not enforced by direct, explicit tests for all public contract helpers in the corresponding action package."
+    ],
+    "likely_symptoms": [
+      "protocol-action-contract-partial-coverage"
+    ],
+    "possible_false_positives": [
+      "If downstream package tests already provide complete contract invariants (not discovered in this scoped inspection), this may overstate gap severity."
+    ]
+  }
+}
+tokens used
+40,033
+

@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	BackupDir                           = backupsvc.ResolveBackupRoot(config.BasePath)
+	BackupDir                           = backupsvc.ResolveBackupRoot(config.BasePath())
 	CreateLocalBackupForRoutine         = backupsvc.CreateLocalBackup
 	UploadLatestBackupForRoutine        = backupsvc.UploadLatestBackup
 	LatestDailyBackupForRoutine         = backupsvc.MostRecentDailyBackupTime

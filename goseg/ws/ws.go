@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/authsession"
 	"groundseg/broadcast"
 	"groundseg/config"
-	"groundseg/handler/api"
+	"groundseg/handler/authsvc"
 	"groundseg/handler/devsvc"
+	"groundseg/handler/ship"
+	handlerSystem "groundseg/handler/system"
 	handlerws "groundseg/handler/ws"
 	"groundseg/setup"
+	"groundseg/shipworkflow"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
@@ -68,7 +72,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenId := payload.Token.ID
 	zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
-	MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
+	MuCon := auth.GetMuConn(conn, tokenId)
 	token := map[string]string{
 		"id":    payload.Token.ID,
 		"token": payload.Token.Token,
@@ -108,10 +112,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		MuCon.Write(respJSON)
 	} else if !authed {
 		var ack string
-		token, err = auth.CreateToken(conn, r, false)
+		shouldTrackSession := true
+		token, err = auth.CreateToken(r, false)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to create token: %v", err))
 			ack = "nack"
+			shouldTrackSession = false
 		}
 		result := map[string]interface{}{
 			"type":     "activity",
@@ -126,13 +132,17 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			zap.L().Error(errmsg)
 		}
 		MuCon.Write(respJson)
-	}
-	if err := auth.AddToAuthMap(conn, token, authed); err != nil {
+		if shouldTrackSession {
+			if err := authsession.AddToAuthMap(conn, token, false); err != nil {
+				zap.L().Error(fmt.Sprintf("Unable to track auth session: %v", err))
+			}
+		}
+	} else if err := authsession.AddToAuthMap(conn, token, true); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to track auth session: %v", err))
 	}
 	for {
 		// mutexed read operations
-		_, msg, err := MuCon.Read(auth.ClientManager)
+		_, msg, err := auth.ReadMuConn(MuCon)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) || strings.Contains(err.Error(), "broken pipe") {
 				zap.L().Debug("WS closed")
@@ -148,7 +158,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		tokenId := payload.Token.ID
 		zap.L().Debug(fmt.Sprintf("New WS session for %v", tokenId))
-		MuCon := auth.ClientManager.GetMuConn(conn, tokenId)
+		MuCon := auth.GetMuConn(conn, tokenId)
 		token := map[string]string{
 			"id":    payload.Token.ID,
 			"token": payload.Token.Token,
@@ -178,7 +188,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 			*/
-			resp, err := api.C2CHandler(msg)
+			resp, err := authsvc.C2CHandler(msg)
 			if err != nil {
 				zap.L().Warn(fmt.Sprintf("Unable to generate c2c payload: %v", err))
 				continue
@@ -194,12 +204,12 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "penpai":
-				if err = api.PenpaiHandler(msg); err != nil {
+				if err = handlerSystem.PenpaiHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "new_ship":
-				if err = api.NewShipHandler(msg); err != nil {
+				if err = shipworkflow.HandleNewShip(msg, shipworkflow.HandleNewShipBoot, shipworkflow.CancelNewShip, shipworkflow.ResetNewShip); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
@@ -209,33 +219,33 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "password":
-				if err = api.PwHandler(msg, false); err != nil {
+				if err = authsvc.PwHandler(msg, false); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				} else {
-					resp, err := api.UnauthHandler()
+					resp, err := authsvc.UnauthHandler()
 					if err != nil {
 						zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 					}
 					MuCon.Write(resp)
 				}
 			case "system":
-				if err = api.SystemHandler(msg); err != nil {
+				if err = handlerSystem.SystemHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "startram":
-				if err = api.StartramHandler(msg); err != nil {
+				if err = handlerSystem.StartramHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "urbit":
-				if err = api.UrbitHandler(msg); err != nil {
+				if err = ship.UrbitHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
 				}
 			case "support":
-				if err := api.SupportHandler(msg); err != nil {
+				if err := handlerSystem.SupportHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
 					ack = "nack"
 				}
@@ -246,7 +256,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			case "login":
 				// already authed so lets get you on the map
-				if err := auth.AddToAuthMap(conn, token, true); err != nil {
+				if err := authsession.AddToAuthMap(conn, token, true); err != nil {
 					zap.L().Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
@@ -255,11 +265,11 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 					ack = "nack"
 				}
 			case "logout":
-				if err := api.LogoutHandler(msg); err != nil {
+				if err := authsvc.LogoutHandler(msg); err != nil {
 					zap.L().Error(fmt.Sprintf("Error logging out client: %v", err))
 					ack = "nack"
 				}
-				resp, err := api.UnauthHandler()
+				resp, err := authsvc.UnauthHandler()
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}
@@ -270,13 +280,13 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				if conf.Setup != "complete" {
 					authed = false
 				}
-				if err := auth.AddToAuthMap(conn, token, authed); err != nil {
+				if err := authsession.AddToAuthMap(conn, token, authed); err != nil {
 					zap.L().Error(fmt.Sprintf("Unable to reauth: %v", err))
 					ack = "nack"
 				}
 				if !authed && conf.Setup == "complete" {
 					zap.L().Debug("Not authed in auth flow")
-					resp, err := api.UnauthHandler()
+					resp, err := authsvc.UnauthHandler()
 					if err != nil {
 						zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 					}
@@ -332,7 +342,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 			responseErr := "null"
 			switch msgType.Payload.Type {
 			case "login":
-				newToken, err := api.LoginHandler(MuCon, msg)
+				newToken, err := authsvc.LoginHandler(MuCon, msg)
 				if err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					ack = "nack"
@@ -357,7 +367,7 @@ func WsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				zap.L().Debug(fmt.Sprintf("Verify %v check result: %v", payload.Token.ID, authed))
 			default:
-				resp, err := api.UnauthHandler()
+				resp, err := authsvc.UnauthHandler()
 				if err != nil {
 					zap.L().Warn(fmt.Sprintf("Unable to generate deauth payload: %v", err))
 				}

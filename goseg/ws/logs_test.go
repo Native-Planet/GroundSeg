@@ -21,18 +21,18 @@ func resetLogsHandlerSeamsForTest(t *testing.T) {
 	origLogCheck := logTokenCheckForLogs
 	origRetrieve := retrieveSysLogHistoryForLogs
 	origFind := findContainerForLogs
-	origSysSessions := logger.SysLogSessions
-	origDockerSessions := logger.DockerLogSessions
+	origSysSessions := logger.SysLogSessions()
+	origDockerSessions := logger.DockerLogSessions()
 	t.Cleanup(func() {
 		logTokenCheckForLogs = origLogCheck
 		retrieveSysLogHistoryForLogs = origRetrieve
 		findContainerForLogs = origFind
-		logger.SysLogSessions = origSysSessions
-		logger.DockerLogSessions = origDockerSessions
+		logger.SetSysLogSessions(origSysSessions)
+		logger.SetDockerLogSessions(origDockerSessions)
 	})
 
-	logger.SysLogSessions = []*websocket.Conn{}
-	logger.DockerLogSessions = map[string]map[*websocket.Conn]bool{}
+	logger.SetSysLogSessions([]*websocket.Conn{})
+	logger.SetDockerLogSessions(map[string]map[*websocket.Conn]bool{})
 }
 
 func wsURLFromHTTP(httpURL string) string {
@@ -72,7 +72,7 @@ func TestLogsHandlerSystemRequestReturnsHistoryAndRegistersSession(t *testing.T)
 	}
 
 	testutil.WaitForCondition(t, func() bool {
-		return len(logger.SysLogSessions) == 1
+		return len(logger.SysLogSessions()) == 1
 	}, "expected websocket session to be registered for system logs")
 }
 
@@ -104,7 +104,7 @@ func TestLogsHandlerContainerRequestTracksDockerSession(t *testing.T) {
 	}
 
 	testutil.WaitForCondition(t, func() bool {
-		sessions, exists := logger.DockerLogSessions["vere"]
+		sessions, exists := logger.DockerLogSessions()["vere"]
 		return exists && len(sessions) == 1
 	}, "expected docker log session to be tracked for container request")
 }

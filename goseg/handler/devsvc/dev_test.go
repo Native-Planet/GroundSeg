@@ -83,12 +83,12 @@ func TestDevHandlerRemoteBackupAndRestore(t *testing.T) {
 	t.Cleanup(resetDevSeams)
 	isDevFn = func() bool { return true }
 
-	oldBasePath := config.BasePath
-	config.BasePath = t.TempDir()
-	t.Cleanup(func() { config.BasePath = oldBasePath })
+	oldBasePath := config.BasePath()
+	config.SetBasePath(t.TempDir())
+	t.Cleanup(func() { config.SetBasePath(oldBasePath) })
 
 	patp := "~zod"
-	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath) }
+	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 
 	confForDev = func() structs.SysConfig {
 		return structs.SysConfig{Piers: []string{patp}, RemoteBackupPassword: "pw"}

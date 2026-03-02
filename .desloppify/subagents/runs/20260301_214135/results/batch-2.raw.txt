@@ -1,0 +1,76 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 2,
+  "assessments": {
+    "cross_module_architecture": 78.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action contracts are duplicated between `protocol/actions` (`uploadSupported`) and `uploadsvc` (`actionBindings`) rather than modeled from one shared contract source.",
+        "`uploadsvc` still carries a transport-specific `Command` envelope (`OpenEndpointRequest`) for all upload actions, including `reset`, which implies cross-action schema coupling."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 56.0,
+        "interface_honesty": 68.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action-contract-dual-source",
+      "summary": "Upload action governance has two independent canonical lists, creating unavoidable drift risk across protocol parsing and dispatch execution.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`protocol/actions/actions.go` defines `uploadSupported = []Action{ActionUploadOpenEndpoint, ActionUploadReset}` for parser validation.",
+        "`goseg/uploadsvc/service.go` separately encodes supported/handled actions in `actionBindings` with handlers for the same action names.",
+        "Tests in `goseg/uploadsvc/adapters/upload_payload_test.go` directly reference action constants from `actions` while also validating upload payload dispatch behavior, coupling behavior expectations to two independent sources."
+      ],
+      "suggestion": "Introduce a single upload action contract definition in `goseg/protocol/actions` (including handler metadata where needed) and generate or derive both parser validation and service dispatch bindings from it, so adding/removing actions is impossible to do in one layer without failing compile/runtime gates in the other.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "upload-action-governance-fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "reset-action-overloads-openendpoint-request",
+      "summary": "Reset command contracts are over-coupled to an endpoint-centric request shape, weakening transport contract boundaries and allowing unrelated payload fields to flow into reset paths.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`Command` uses a single `OpenEndpointRequest` payload for all upload actions, including `ActionUploadReset`.",
+        "The reset binding in `actionBindings` ignores request content and still executes `service.Reset()`, yet tests expect request fields to be parsed and present for reset (`reset-with-extra-fields` case).",
+        "Action parsing in `protocol/actions` validates only the action token, with no per-action payload contract enforcement here, so reset and open-endpoint payloads share a structurally broad envelope."
+      ],
+      "suggestion": "Refactor upload command modeling to be action-specific (e.g., `type Command struct { Action Action; OpenEndpointRequest *OpenEndpointRequest; ResetRequest *ResetRequest }` or a typed union) and validate/purge payload fields per action at adapter boundary so each namespace action owns a strict contract.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload-action-governance-fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "upload action governance is fragmented across modules instead of centralized in one contract artifact",
+      "upload command payload model is unified across non-equivalent actions, masking action-specific schema boundaries"
+    ],
+    "likely_symptoms": [
+      "action-contract-dual-source",
+      "reset-action-overloads-openendpoint-request"
+    ],
+    "possible_false_positives": []
+  }
+}

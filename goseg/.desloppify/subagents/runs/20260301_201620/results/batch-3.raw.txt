@@ -1,0 +1,73 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`README.md` states the websocket action registry in `protocol/actions` is the single source of truth for client-originating command tokens.",
+        "`uploadsvc/adapters/upload_payload_test.go` validates upload parsing using `uploadsvc.ActionOpenEndpoint` / `uploadsvc.ActionReset` and `uploadsvc.UnsupportedActionError`, with no references to `groundseg/protocol/actions` contract APIs.",
+        "`protocol/actions/actions.go` also defines `ProtocolVersion` and domain-specific parse helpers (`ParseUploadAction`, `ParseC2CAction`) whose contract is not exercised in this batch’s parser/adapter checks.",
+        "The test coverage in this batch covers upload adapter behavior only, while the documented contract includes both upload and c2c domains."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_contract_not_used_as_source_of_truth",
+      "summary": "Upload adapter contract tests bypass the documented protocol contract and can pass while action sources diverge.",
+      "related_files": [
+        "README.md",
+        "protocol/actions/actions.go",
+        "uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`README.md` explicitly states `protocol/actions` is the single source of truth for websocket action tokens.",
+        "The adapter test imports `uploadsvc` constants (`uploadsvc.ActionOpenEndpoint`, `uploadsvc.ActionReset`) instead of `protocol/actions` action constants.",
+        "Unsupported-action behavior in the test is asserted via `uploadsvc.UnsupportedActionError` only, not protocol-level unsupported-action semantics."
+      ],
+      "suggestion": "Refactor the upload payload tests (and adapter command parser contracts) to depend on `protocol/actions` for all action literals and parser checks, then assert adapter-facing command results are a stable projection of protocol actions. Add a compile-time or test-time guard that fails when protocol action constants change without corresponding adapter updates.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_source_of_truth_violation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "docs_scope_contract_coverage_gap",
+      "summary": "Quality-gate coverage does not match documented contract scope across protocol namespaces and versioning.",
+      "related_files": [
+        "README.md",
+        "protocol/actions/actions.go",
+        "uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`README.md` documents versioned Websocket Action Contract (v1.0) and both upload/c2c action domains.",
+        "`protocol/actions/actions.go` includes `ProtocolVersion` plus `ActionC2CConnect` and related parser helpers.",
+        "The tested path in this batch only validates upload adapter parsing behavior and does not exercise c2c parser/dispatch or protocol-version governance behavior."
+      ],
+      "suggestion": "Add contract-focused tests for the full documented action surface: assert every namespace/action in `protocol/actions` has parser/executor parity, and gate protocol-version drift. Specifically include c2c `connect` through the same contract test suite so README promises are enforced at runtime.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_source_of_truth_violation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Action contract governance is documented centrally but not consistently enforced at module boundaries.",
+      "Test strategy omits key contract dimensions (especially cross-domain and version-level checks) referenced in project docs."
+    ],
+    "likely_symptoms": [
+      "action_contract_not_used_as_source_of_truth",
+      "docs_scope_contract_coverage_gap"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"groundseg/broadcast"
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/testutil"
@@ -42,7 +42,7 @@ func TestUrbitTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	broadcast.UpdateBroadcast(current)
 
 	eventValue := "pack-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	docker.PublishUrbitTransition(structs.UrbitTransition{
+	events.PublishUrbitTransition(structs.UrbitTransition{
 		Patp:  "zod",
 		Type:  "pack",
 		Event: eventValue,
@@ -63,8 +63,8 @@ func TestNewShipTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	bootStage := "booting-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	patp := "~zod-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: bootStage})
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "patp", Event: patp})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: bootStage})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "patp", Event: patp})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -80,7 +80,7 @@ func TestSystemTransitionHandlerUpdatesBroadcastState(t *testing.T) {
 
 	broadcast.UpdateBroadcast(structs.AuthBroadcast{})
 	event := "bug-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	docker.PublishSystemTransition(structs.SystemTransition{Type: "bugReportError", Event: event})
+	events.PublishSystemTransition(structs.SystemTransition{Type: "bugReportError", Event: event})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()

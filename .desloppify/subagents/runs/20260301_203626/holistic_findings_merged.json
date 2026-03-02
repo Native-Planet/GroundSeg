@@ -1,0 +1,362 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 58.3,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 58.0,
+        "Indirection Cost": 68.0,
+        "Interface Honesty": 52.0
+      }
+    },
+    "cross_module_architecture": 73.2,
+    "design_coherence": 54.9
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines a centralized action vocabulary (`Action`, `Namespace`) and parsing/validation entry points (`ParseAction`, `ParseUploadAction`, `ParseC2CAction`) instead of scattering ad-hoc action parsing logic.",
+        "`goseg/uploadsvc/adapters/upload_payload_test.go` validates mapping behavior through `uploadsvc` command parsing/types, showing the adapter boundary is exercised through package contracts.",
+        "`goseg/config/wireguard.go` does direct file I/O through a small `wireguardRuntime` seam (`getConf`, `getVersionChannel`, `getWgKeypair`, `updateConfTyped`, `wgConfigPath`) that localizes coupling points for configuration/runtime behavior.",
+        "`goseg/startram/errors.go` wraps transport failures through a single package-level adapter (`wrapAPIConnectionError`) rather than leaking raw transport errors to callers."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seam files expose multiple domain-specific runtime constructors/types (`wireguardRuntime`, `netdataRuntime`, `minioRuntime`, `urbitRuntime`) that mostly delegate directly to the shared docker runtime without adding behavior or distinct contracts.",
+        "Runtime constructors take context-like snapshots but still invoke package/global-level behavior deep in implementations, reducing the effective boundary of the abstraction.",
+        "Importer cleanup logic in `configureUploadedPier` hardcodes `RemoveMultipartFiles(\"/tmp\")` instead of using injected/configured runtime or filesystem context, showing a seam bypass."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 52.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "There is a near-complete duplicate support-reporting implementation in both `handler/system/support.go` and `system/system.go` (including `supportRuntime`, `SupportHandlerWithRuntime`, and the same end-to-end flow).",
+        "`routines/docker.go` and `docker/orchestration/runtime_seams.go` each define parallel seam-graph layers with the same structural pattern (function field structs with nil-safe wrapper methods), which is duplicated in both orchestration and routine boundaries.",
+        "The support handler in `system/system.go` is responsible for request parsing, filesystem orchestration, container-log collection, zipping, and transport submission in one function body."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime-seam-no-value",
+      "summary": "Domain runtime wrappers in orchestration add type-level indirection without new behavior, creating weak abstractions and unnecessary coupling.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/minio.go"
+      ],
+      "evidence": [
+        "Domain seam constructors in `runtime_seams.go` return structs that are thin aliases/wrappers around `dockerRuntime` and do not define domain-specific methods.",
+        "In domain orchestration files, implementations primarily call the embedded base runtime methods instead of a domain-specific interface/strategy, so the wrapper types do not encode meaningful policy.",
+        "The same construction pattern appears to be repeated across several domain runtimes, indicating an abstraction hotspot rather than isolated naming convenience."
+      ],
+      "suggestion": "Replace the fake per-domain seams with a single shared runtime abstraction plus explicit capability interfaces (for operations that truly differ by domain), or consolidate into one runtime interface with small strategy objects. Keep domain wrappers only when they encapsulate behavior, not as pure pass-through aliases.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime-seam-erosion"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime-context-leakage",
+      "summary": "Constructor context is partially injected, but implementations still read global/module-level dependency points, weakening interface boundaries.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "Runtime seam constructors accept snapshot-like inputs yet the runtime path continues to rely on broad package-level config/state access, so callers cannot fully control behavior through the constructor boundary.",
+        "This pattern appears in both routines and orchestration seam layers, so the same abstraction boundary is duplicated with the same leakage.",
+        "The seam is therefore only nominal: it suggests testability and separation but does not fully honor it."
+      ],
+      "suggestion": "Thread all required dependencies through the runtime struct (or constructor interface) and remove hidden package-global reads from downstream methods; define narrower interfaces (e.g., ConfigPort, FsPort, NetworkPort) and inject implementations.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime-seam-erosion"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "hardcoded-tmp-cleanup",
+      "summary": "Importer cleanup bypasses configurable filesystem abstraction by hardcoding `/tmp` instead of using initialized temp/storage context.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/config/config.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "In the importer flow, `configureUploadedPier()` unconditionally defers `RemoveMultipartFiles(\"/tmp\")`, while runtime initialization in the same module manages configurable upload/temp locations.",
+        "This makes path policy non-uniform across modules and breaks the intention of context-driven configuration used elsewhere in the import path.",
+        "The cleanup behavior therefore becomes an implicit, environment-specific contract instead of explicit dependency injection."
+      ],
+      "suggestion": "Inject the temp/upload base path from initialized context and route cleanup through a filesystem seam or helper interface so tests and alternate runtimes can control where temporary files are created and removed.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "filesystem-path-association"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_surface_excluded_from_runtime_gate",
+      "summary": "Action-contract registry is outside documented runtime contract gate coverage despite being a shared boundary.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`README.md` documents runtime contract gate inputs and excludes `goseg/protocol/actions/actions.go`.",
+        "`goseg/protocol/actions/actions.go` defines canonical action tokens and validation for upload/c2c namespaces used by other modules, so governance coverage has a boundary blind spot."
+      ],
+      "suggestion": "Add `goseg/protocol/actions/actions.go` (and its test target) to the Runtime Contract Gate inputs and update the contract-gate script/checklist to treat action set changes as contract changes requiring paired tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_surface_coverage_gap"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_action_contract_lacks_boundary_tests",
+      "summary": "Shared action parser/registry has no direct boundary tests, weakening cross-module contract enforcement.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "The listed module provides `ParseAction`, namespace lists, and `UnsupportedActionError` mapping logic used across transports, yet there is no direct `_test` in that package in the reviewed surface.",
+        "`goseg/uploadsvc/adapters/upload_payload_test.go` validates adapter mapping for known cases but does not independently assert parser invariants (namespace validation/error semantics order/casing/unsupported behavior) of the shared actions contract."
+      ],
+      "suggestion": "Create protocol-level tests for `ParseAction`, `SupportedActions`, and namespace-specific invalid/duplicate/unknown behavior, then lock these to the adapter/service expected contract through a shared parity test pattern.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_surface_coverage_gap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dup_support_handler_implementation",
+      "summary": "Duplicate support-reporting implementations in two packages increase drift risk and weaken module cohesion.",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "Both files define `supportRuntime` and `SupportHandlerWithRuntime` with the same orchestration shape and same bug-report workflow (message parse \u2192 state transitions \u2192 dump/zip/send).",
+        "Both files contain the same constants and transitions for `bugReport`/`bugReportError` and invoke the same publish/send pipeline, creating parallel ownership."
+      ],
+      "suggestion": "Extract the support orchestration into a single package-owned module (for example `systemsupport`), keep only thin wrappers in handler/system, and have both call the shared orchestrator plus shared seam structs.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "support-handler_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "support_handler_multiresponsibility",
+      "summary": "Support request handling combines transport parsing, artifact collection, archiving, and reporting in one long function, making policy changes brittle.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/handler/system/support.go"
+      ],
+      "evidence": [
+        "`SupportHandlerWithRuntime` parses payload, validates/unmarshals JSON, creates filesystem roots, writes report data, invokes optional CPU profiling, creates zip, deletes temp directories, submits network payload, and emits transitions.",
+        "The same cohesive set of side effects exists as duplicated logic in the handler package variant, reinforcing that this concern has grown beyond one responsibility."
+      ],
+      "suggestion": "Split the workflow into explicit steps (`decodeInput`, `prepareWorkspace`, `collectArtifacts`, `packageArtifact`, `publishResult`) and inject side-effect adapters so each step is testable and policy can evolve independently.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "support-handler_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "parallel_seam_boilerplate_duplication",
+      "summary": "Runtime seam scaffolding is duplicated across subsystems, adding avoidable maintenance coupling and abstraction noise.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "Both files define multiple operation structs with function fields and tiny wrappers (e.g., state/container/config/image/network/timer-style seams) that perform nil-check + forwarding behavior.",
+        "The pattern is repeated in production seams and mirrored via tests/stubs, suggesting a shared seam-construction convention is missing and likely to drift over time."
+      ],
+      "suggestion": "Introduce a shared seam helper layer or generic seam factory pattern (or small generated wrappers) that standardizes seam struct creation and default-noop behavior, then compose package-specific ops through composition not duplication.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam-boilerplate-duplication"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.333,
+    "evidence_density": 1.875,
+    "high_score_missing_issue_note": 1,
+    "finding_pressure": 18.774,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 60,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 252,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/config/wireguard.go",
+    "goseg/protocol/actions/actions.go",
+    "goseg/startram/errors.go",
+    "goseg/uploadsvc/adapters/upload_payload_test.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/routines/docker.go",
+    "goseg/rectify/rectify.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/routines/docker_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/leak/broadcast.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/importer/importer.go",
+    "goseg/routines/system_test.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/main.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/config/config.go",
+    "goseg/setup/setup_test.go",
+    "goseg/routines/version.go",
+    "goseg/auth/auth.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/minio.go",
+    "README.md",
+    "goseg/click/backup/service.go",
+    "goseg/click/hoon.go",
+    "goseg/config/mc.go",
+    "goseg/docker/orchestration/netdata.go",
+    "goseg/docker/orchestration/volume_writer.go",
+    "goseg/leak/handler.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/version.go",
+    "goseg/docker/orchestration/runtime_seams_test.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/structs/ws.go",
+    "goseg/system/disk.go",
+    "goseg/system/system.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_203626",
+    "created_at": "2026-03-01T20:37:11+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "6e756f09345837cb37bf15b9c0604fe3e4ffc63113d12971f6048caf493cdbec"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "design_coherence",
+      "cross_module_architecture",
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

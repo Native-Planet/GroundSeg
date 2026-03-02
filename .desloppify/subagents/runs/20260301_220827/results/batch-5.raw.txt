@@ -1,0 +1,70 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 80.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/importer/importer.go mixes wrapped and unwrapped error propagation in upload error paths (e.g., `fmt.Errorf(\"Unable to read uploaded file: %v\", err)` and `fmt.Errorf(\"%s\", errmsg)`) while sibling paths still use `%w` chaining, causing downstream callers to lose `errors.Is`-based categorization.",
+        "goseg/leak/handler.go ignores `sendBroadcast` failures at call site (`if err != nil { return }`) without surfacing the transport failure to any higher-level retry/alert path.",
+        "The error contracts in these call sites diverge between ‘silent/opaque return’ and chain-preserving return, so similar operational failures can be observed as unrelated generic errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "importer_error_chain_dropped",
+      "summary": "Preserve original error causes when importing uploaded artifacts",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "goseg/importer/importer.go: `readUploadChunk` wraps `err` with `%v` in `fmt.Errorf(\"Unable to read uploaded file: %v\", err)`, which discards the wrapped error chain.",
+        "goseg/importer/importer.go: `finalizeImportedPierReadiness` captures `err` as text (`errmsg := fmt.Sprintf(\"%v\", err)`) and returns `fmt.Errorf(\"%s\", errmsg)`, dropping the underlying cause.",
+        "goseg/importer/importer.go: error callers in the same package already rely on typed/sentinel checks (`errors.Is`) in upload pipeline error handling, so erased causes reduce classification fidelity."
+      ],
+      "suggestion": "Adopt a package-wide wrapping policy for importer failures: return wrapped errors with `%w` wherever a concrete underlying error exists (for example, `fmt.Errorf(\"Unable to read uploaded file: %w\", err)` and `return fmt.Errorf(\"switching imported ship to Wireguard: %w\", err)`), and avoid converting `err` to strings before rethrowing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_wrapping_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "leak_broadcast_error_suppressed",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/leak/handler_test.go"
+      ],
+      "evidence": [
+        "goseg/leak/handler.go: in `listener`, `sendBroadcast` errors are converted to an early `return` (`if err != nil { return }`) with no caller-visible failure signal; the loop terminates without propagating a recoverable signal or transition status.",
+        "The function already has side channels for error visibility (`zap` logging inside `sendBroadcast`), but `listener` does not differentiate transient send failures from normal shutdown and does not emit a structured operational event.",
+        "This pattern makes leak broadcast delivery failures appear identical to routine disconnects and blocks consistent handling policies across call sites."
+      ],
+      "suggestion": "Keep the local cleanup, but propagate a distinct leak-broadcast error outcome (for example via an explicit control channel or explicit transition/state update) so callers can apply consistent retry/recovery policy instead of silently ending the listener loop.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent error wrapping policy across shared workflow/error paths, especially around upload import and broadcast-delivery boundaries.",
+      "Selective swallowing of operational transport failures in the leak event loop without a structured escalation path."
+    ],
+    "likely_symptoms": [
+      "Hard-to-debug import failures that appear as broad generic upload errors instead of actionable root causes.",
+      "Silent loss of leak broadcast failures with limited observability and no consistent recovery signal."
+    ],
+    "possible_false_positives": [
+      "The importer `error` branches that convert to formatted strings may be considered intentional minimal user-facing messages in some flows, so verify whether callers rely on chain inspection before enforcing stricter wrapping everywhere."
+    ]
+  }
+}

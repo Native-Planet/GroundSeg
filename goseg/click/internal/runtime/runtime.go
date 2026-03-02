@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"groundseg/click/internal/response"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/lifecycle"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,8 +13,14 @@ import (
 
 var (
 	execDockerCommandFn = func(container string, cmd []string) (string, error) {
-		response, _, err := docker.ExecDockerCommand(container, cmd)
-		return response, err
+		response, exitCode, err := lifecycle.DefaultRuntime.ExecDockerCommand(container, cmd)
+		if err != nil {
+			return "", err
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("click command exited with code %d", exitCode)
+		}
+		return response, nil
 	}
 )
 
@@ -24,7 +30,7 @@ func JoinGap(hoon []string) string {
 
 func CreateHoon(patp, file, hoon string) error {
 	shipConf := config.UrbitConf(patp)
-	location := filepath.Join(config.DockerDir, patp, "_data")
+	location := filepath.Join(config.DockerDir(), patp, "_data")
 	if shipConf.CustomPierLocation != "" {
 		location = shipConf.CustomPierLocation
 	}
@@ -34,7 +40,7 @@ func CreateHoon(patp, file, hoon string) error {
 
 func DeleteHoon(patp, file string) {
 	shipConf := config.UrbitConf(patp)
-	location := filepath.Join(config.DockerDir, patp, "_data")
+	location := filepath.Join(config.DockerDir(), patp, "_data")
 	if shipConf.CustomPierLocation != "" {
 		location = shipConf.CustomPierLocation
 	}
@@ -67,23 +73,77 @@ func FilterResponse(resType string, pokeResponse string) (string, bool, error) {
 }
 
 func ExecuteCommand(patp, file, hoon, sourcePath, successToken, operation string) (string, error) {
+	response, _, success, err := ExecuteCommandWithResponse(patp, file, hoon, sourcePath, successToken, operation, nil)
+	if err != nil {
+		return "", err
+	}
+	if successToken != "" && !success {
+		return "", fmt.Errorf("%s failed poke", operation)
+	}
+	return response, nil
+}
+
+func ExecuteCommandWithResponse(
+	patp, file, hoon, sourcePath, responseToken, operation string,
+	clearLusCode func(string),
+) (string, string, bool, error) {
+	response, err := executeClickCommand(patp, file, hoon, sourcePath, operation, clearLusCode)
+	if err != nil {
+		return "", "", false, err
+	}
+	if responseToken == "" {
+		return response, "", true, nil
+	}
+	parsed, success, err := FilterResponse(responseToken, response)
+	if err != nil {
+		return response, "", false, fmt.Errorf("%s failed to parse response: %v", operation, err)
+	}
+	return response, parsed, success, nil
+}
+
+func ExecuteCommandWithLusInvalidation(
+	patp, file, hoon, sourcePath, successToken, operation string,
+	clearLusCode func(string),
+) (string, error) {
+	response, _, success, err := ExecuteCommandWithResponse(patp, file, hoon, sourcePath, successToken, operation, clearLusCode)
+	if err != nil {
+		return "", err
+	}
+	if !success {
+		return "", fmt.Errorf("%s failed poke", operation)
+	}
+	return response, nil
+}
+
+func ExecuteCommandWithSuccess(
+	patp, file, hoon, sourcePath, successToken, operation string,
+	clearLusCode func(string),
+) (string, error) {
+	response, _, success, err := ExecuteCommandWithResponse(patp, file, hoon, sourcePath, successToken, operation, clearLusCode)
+	if err != nil {
+		return "", err
+	}
+	if successToken != "" && !success {
+		return "", fmt.Errorf("%s failed poke", operation)
+	}
+	return response, nil
+}
+
+func executeClickCommand(
+	patp, file, hoon, sourcePath, operation string,
+	clearLusCode func(string),
+) (string, error) {
 	if err := CreateHoon(patp, file, hoon); err != nil {
 		return "", fmt.Errorf("%s failed to create hoon: %v", operation, err)
+	}
+	if clearLusCode != nil {
+		clearLusCode(patp)
 	}
 	defer DeleteHoon(patp, file)
 
 	response, err := ClickExec(patp, file, sourcePath)
 	if err != nil {
 		return "", fmt.Errorf("%s failed to execute hoon: %v", operation, err)
-	}
-	if successToken != "" {
-		_, success, err := FilterResponse(successToken, response)
-		if err != nil {
-			return "", fmt.Errorf("%s failed to parse response: %v", operation, err)
-		}
-		if !success {
-			return "", fmt.Errorf("%s failed poke", operation)
-		}
 	}
 	return response, nil
 }

@@ -1,0 +1,118 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 73.8
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Bug-report collection and upload logic is duplicated between `system/system.go` and `handler/system/support.go`, including repeated endpoint helpers, sanitization helpers, zip creation, and handler wiring.",
+        "`shipworkflow/urbit_operations.go` contains a broad mix of unrelated operations (installation/removal, service lifecycle, backup/pier actions, networking, process restarts, and image/container controls) in one file, creating a large orchestration god-file.",
+        "Global config access (`config` package accessors and mutating globals) is read throughout orchestration and runtime seams, including tests and collectors, which increases implicit coupling and reduces interface clarity."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 52.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 58.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "support_handler_duplication",
+      "summary": "Bug-report support handling is duplicated across two packages instead of sharing a single coherent abstraction.",
+      "related_files": [
+        "system/system.go",
+        "handler/system/support.go"
+      ],
+      "evidence": [
+        "Both files define/consume overlapping support flow components: handler entrypoints (`SupportHandler`/`SupportHandlerWithRuntime`), JSON sanitization (`sanitizeJSON`), zip creation (`zipDir`), and report transport (`sendBugReportWithEndpoint`, `dumpBugReport`, `lastTwoLogs`).",
+        "The same constants and transport behavior (`s3`, telemetry-style bug report endpoint interaction pattern) appear mirrored rather than delegated to one canonical implementation."
+      ],
+      "suggestion": "Extract a shared support/bug-report package or service interface with a single implementation and inject it from both packages; keep package-specific handlers thin wrappers. This should consolidate validation, sanitization, archive creation, and endpoint calls, and make future format changes one-location-only.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "support_duplication_cluster"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "shipworkflow_orchestration_monolith",
+      "summary": "Operational responsibilities in ship orchestration are concentrated in one file, creating a low-cohesion orchestration nucleus.",
+      "related_files": [
+        "shipworkflow/urbit_operations.go",
+        "shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`shipworkflow/urbit_operations.go` mixes container/service installation, rebuild/install/uninstall flows, backups, lifecycle transitions, network/power toggles, and pier/container transition orchestration in a single large file.",
+        "Adjacent workflow file `shipworkflow/startram.go` adds related orchestration entrypoints, indicating coordination logic is spread across files by feature edges rather than by stable bounded responsibilities."
+      ],
+      "suggestion": "Split the file into explicit use-case services (e.g., install/uninstall, lifecycle, networking/power, pier registration) behind narrow interfaces and compose them through a small orchestration coordinator; move helper logic into reusable modules with focused tests per concern.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_responsibility_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_runtime_config_coupling",
+      "summary": "Runtime code relies on package-level mutable config access, increasing indirection cost and weakening explicit boundaries.",
+      "related_files": [
+        "config/config.go",
+        "routines/runtime_seams.go",
+        "broadcast/collectors/collectors.go",
+        "docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "`config/config.go` centralizes mutable runtime state and exposes package-global getters/setters used directly by orchestration/routine code.",
+        "`routines/runtime_seams.go` and `broadcast/collectors/collectors.go` consume these global values instead of receiving explicit runtime context, so call sites infer behavior indirectly.",
+        "The broadcast/runtime seam tests and collectors depend on shared global state in favor of explicit dependencies, creating brittle setup and hidden coupling."
+      ],
+      "suggestion": "Define an explicit runtime context interface (container paths, architecture, runtime flags, and state snapshots) and thread it through seam constructors; replace most global config reads/writes with injected immutable snapshots plus explicit state update commands.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_config_bypass_injection"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "importer_http_pipeline_mix",
+      "summary": "The importer module conflates HTTP transport handling with complex provisioning and lifecycle orchestration.",
+      "related_files": [
+        "importer/importer.go",
+        "importer/extract_test.go",
+        "importer/importer_test.go"
+      ],
+      "evidence": [
+        "The same file contains HTTP handler concerns and deep post-upload orchestration (archive extraction, filesystem writes, session validation, provisioning triggers, pier registration, and lifecycle transitions).",
+        "Tests target both HTTP-facing behavior and internal orchestration in one area, suggesting the implementation exposes multi-domain behavior without a clear adapter/service split."
+      ],
+      "suggestion": "Split importer into an HTTP adapter layer and a domain/import service layer: adapter handles request auth/parsing/streaming only, while service handles extraction + configuration pipeline + registration, with explicit interfaces for lifecycle hooks.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_responsibility_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Consolidated abstraction gaps (shared support/report workflow duplicated rather than extracted).",
+      "Large modules holding unrelated operational concerns without stable boundaries.",
+      "Global mutable config/state used as de-facto dependency injection mechanism."
+    ],
+    "likely_symptoms": [
+      "support_handler_duplication",
+      "shipworkflow_orchestration_monolith",
+      "global_runtime_config_coupling",
+      "importer_http_pipeline_mix"
+    ],
+    "possible_false_positives": [
+      "Some overlap may be intentional to preserve behavior consistency between legacy handler and legacy system paths, but evidence suggests maintainability debt and coupling are now material."
+    ]
+  }
+}

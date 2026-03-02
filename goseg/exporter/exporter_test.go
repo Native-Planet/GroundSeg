@@ -4,19 +4,51 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/structs"
 
 	"github.com/gorilla/mux"
 )
+
+type closeTrackingFile struct {
+	*os.File
+	closeCount *int
+}
+
+func (f *closeTrackingFile) Close() error {
+	*f.closeCount++
+	return f.File.Close()
+}
+
+type failingReadCloser struct {
+	closeCount *int
+	readCount  int
+}
+
+func (f *failingReadCloser) Read(_ []byte) (int, error) {
+	if f.readCount == 0 {
+		f.readCount++
+		return 1, nil
+	}
+	return 0, errors.New("synthetic read failure")
+}
+
+func (f *failingReadCloser) Close() error {
+	*f.closeCount++
+	return nil
+}
 
 func resetExporterState() {
 	exportMu.Lock()
@@ -25,18 +57,22 @@ func resetExporterState() {
 	mkdirAllForExporter = os.MkdirAll
 	getStoragePathForExporter = config.GetStoragePath
 	createTempForExporter = os.CreateTemp
+	openForExporter = func(path string) (io.ReadCloser, error) {
+		return os.Open(path)
+	}
+	copyForExporter = io.Copy
 	removeForExporter = os.Remove
 	walkForExporter = filepath.Walk
 	dockerDataForExporter = defaults.DockerData
 	urbitConfForExporter = config.UrbitConf
-	publishUrbitTransitionForExporter = docker.PublishUrbitTransition
-	getShipStatusForExporter = docker.GetShipStatus
+	publishUrbitTransitionForExporter = events.PublishUrbitTransition
+	getShipStatusForExporter = orchestration.GetShipStatus
 }
 
 func TestInitializeAndWhitelist(t *testing.T) {
 	t.Cleanup(resetExporterState)
 	targetDir := filepath.Join(t.TempDir(), "exports")
-	getStoragePathForExporter = func(string) string { return targetDir }
+	getStoragePathForExporter = func(string) (string, error) { return targetDir, nil }
 
 	if err := Initialize(); err != nil {
 		t.Fatalf("Initialize failed: %v", err)
@@ -162,5 +198,175 @@ func TestExportHandlerMinioSuccessStreamsZip(t *testing.T) {
 	exportMu.Unlock()
 	if exists {
 		t.Fatalf("expected whitelist cleanup after success")
+	}
+}
+
+func TestExportHandlerPropagatesOpenErrorDuringArchiveAndCleansUp(t *testing.T) {
+	t.Cleanup(resetExporterState)
+	exportDir = t.TempDir()
+	volumesDir := t.TempDir()
+	dockerDataForExporter = func(string) string { return volumesDir }
+	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
+
+	transitionCalls := 0
+	publishUrbitTransitionForExporter = func(transition structs.UrbitTransition) {
+		transitionCalls++
+	}
+
+	container := "minio_~zod"
+	dataDir := filepath.Join(volumesDir, container, "_data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "ok.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf("write ok file failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "bad.txt"), []byte("bad"), 0o644); err != nil {
+		t.Fatalf("write bad file failed: %v", err)
+	}
+	walkForExporter = func(_ string, fn filepath.WalkFunc) error {
+		for _, name := range []string{"ok.txt", "bad.txt"} {
+			path := filepath.Join(dataDir, name)
+			info, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			if err := fn(path, info, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	openCount := 0
+	closeCount := 0
+	openForExporter = func(path string) (io.ReadCloser, error) {
+		openCount++
+		if strings.HasSuffix(path, "bad.txt") {
+			return nil, errors.New("synthetic open failure")
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		return &closeTrackingFile{
+			File:       f,
+			closeCount: &closeCount,
+		}, nil
+	}
+
+	token := structs.WsTokenStruct{ID: "1", Token: "t"}
+	if err := WhitelistContainer(container, token); err != nil {
+		t.Fatalf("whitelist failed: %v", err)
+	}
+	body, _ := json.Marshal(token)
+	req := httptest.NewRequest(http.MethodPost, "/export/"+container, bytes.NewReader(body))
+	req = mux.SetURLVars(req, map[string]string{"container": container})
+	rr := httptest.NewRecorder()
+	ExportHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request on open failure, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if transitionCalls < 2 {
+		t.Fatalf("expected cleanup transitions, got %d", transitionCalls)
+	}
+	if openCount != 2 {
+		t.Fatalf("expected open attempts for two files, got %d", openCount)
+	}
+	if closeCount != 1 {
+		t.Fatalf("expected one successful file handle to be closed, got %d", closeCount)
+	}
+
+	exportMu.Lock()
+	_, exists := whitelist[container]
+	exportMu.Unlock()
+	if exists {
+		t.Fatalf("expected whitelist cleanup on open failure")
+	}
+}
+
+func TestExportHandlerPropagatesReadErrorDuringArchiveAndCleansUp(t *testing.T) {
+	t.Cleanup(resetExporterState)
+	exportDir = t.TempDir()
+	volumesDir := t.TempDir()
+	dockerDataForExporter = func(string) string { return volumesDir }
+	urbitConfForExporter = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
+
+	transitionCalls := 0
+	publishUrbitTransitionForExporter = func(transition structs.UrbitTransition) {
+		transitionCalls++
+	}
+
+	container := "minio_~zod"
+	dataDir := filepath.Join(volumesDir, container, "_data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "ok.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf("write ok file failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "bad.txt"), []byte("bad"), 0o644); err != nil {
+		t.Fatalf("write bad file failed: %v", err)
+	}
+	walkForExporter = func(_ string, fn filepath.WalkFunc) error {
+		for _, name := range []string{"ok.txt", "bad.txt"} {
+			path := filepath.Join(dataDir, name)
+			info, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			if err := fn(path, info, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	openCount := 0
+	closeCount := 0
+	openForExporter = func(path string) (io.ReadCloser, error) {
+		openCount++
+		if strings.HasSuffix(path, "bad.txt") {
+			return &failingReadCloser{closeCount: &closeCount}, nil
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		return &closeTrackingFile{
+			File:       f,
+			closeCount: &closeCount,
+		}, nil
+	}
+
+	token := structs.WsTokenStruct{ID: "1", Token: "t"}
+	if err := WhitelistContainer(container, token); err != nil {
+		t.Fatalf("whitelist failed: %v", err)
+	}
+	body, _ := json.Marshal(token)
+	req := httptest.NewRequest(http.MethodPost, "/export/"+container, bytes.NewReader(body))
+	req = mux.SetURLVars(req, map[string]string{"container": container})
+	rr := httptest.NewRecorder()
+	ExportHandler(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request on read failure, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if transitionCalls < 2 {
+		t.Fatalf("expected cleanup transitions, got %d", transitionCalls)
+	}
+	if openCount != 2 {
+		t.Fatalf("expected open attempts for two files, got %d", openCount)
+	}
+	if closeCount != 2 {
+		t.Fatalf("expected all opened handles/readers to be closed, got %d", closeCount)
+	}
+
+	exportMu.Lock()
+	_, exists := whitelist[container]
+	exportMu.Unlock()
+	if exists {
+		t.Fatalf("expected whitelist cleanup on read failure")
 	}
 }

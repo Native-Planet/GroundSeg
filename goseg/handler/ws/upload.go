@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/errpolicy"
+	"groundseg/protocol/actions"
 	"groundseg/structs"
 	"groundseg/uploadsvc"
 	"groundseg/uploadsvc/adapters"
@@ -17,9 +18,9 @@ type UploadMessageHandler struct {
 }
 
 func UploadSupportedActions() []string {
-	actions := uploadsvc.SupportedActions()
-	result := make([]string, 0, len(actions))
-	for _, action := range actions {
+	supportedActions := actions.SupportedUploadActions()
+	result := make([]string, 0, len(supportedActions))
+	for _, action := range supportedActions {
 		result = append(result, string(action))
 	}
 	return result
@@ -45,7 +46,7 @@ func (handler UploadMessageHandler) Handle(msg []byte) error {
 	}
 	command, err := adapters.CommandFromWsPayload(uploadPayload)
 	if err != nil {
-		var unsupported uploadsvc.UnsupportedActionError
+		var unsupported actions.UnsupportedActionError
 		if errors.As(err, &unsupported) {
 			// Preserve external contract for unknown upload actions.
 			return fmt.Errorf("Unrecognized upload action: %v", uploadPayload.Payload.Action)
@@ -53,7 +54,7 @@ func (handler UploadMessageHandler) Handle(msg []byte) error {
 		return errpolicy.WrapOperation("Unsupported upload action", err)
 	}
 	if err := handler.executor.Execute(command); err != nil {
-		var unsupported uploadsvc.UnsupportedActionError
+		var unsupported actions.UnsupportedActionError
 		if errors.As(err, &unsupported) {
 			// Preserve external contract for unknown upload actions.
 			return fmt.Errorf("Unrecognized upload action: %v", uploadPayload.Payload.Action)

@@ -39,12 +39,12 @@ func TestUrbitConfAccessorsAndCopy(t *testing.T) {
 func TestLoadAndRemoveUrbitConfig(t *testing.T) {
 	t.Cleanup(resetUrbitTestState)
 
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	pier := "~bus"
-	path := filepath.Join(BasePath, "settings", "pier")
+	path := filepath.Join(BasePath(), "settings", "pier")
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatalf("mkdir failed: %v", err)
 	}
@@ -88,9 +88,9 @@ func TestLoadAndRemoveUrbitConfig(t *testing.T) {
 func TestUpdateUrbitPersistsMutations(t *testing.T) {
 	t.Cleanup(resetUrbitTestState)
 
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	pier := "~nec"
 	urbitMutex.Lock()
@@ -110,7 +110,7 @@ func TestUpdateUrbitPersistsMutations(t *testing.T) {
 		t.Fatalf("unexpected updated config: %+v", updated)
 	}
 
-	file := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	file := filepath.Join(BasePath(), "settings", "pier", pier+".json")
 	raw, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatalf("read persisted file failed: %v", err)
@@ -131,9 +131,9 @@ func TestUpdateUrbitValidationAndLoadFailure(t *testing.T) {
 		t.Fatalf("expected nil mutate function error")
 	}
 
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 	err := UpdateUrbit("~missing", func(*structs.UrbitDocker) error { return nil })
 	if err == nil {
 		t.Fatalf("expected load error for missing on-disk config")

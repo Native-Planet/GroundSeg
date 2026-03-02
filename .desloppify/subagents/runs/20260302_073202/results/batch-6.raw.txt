@@ -1,0 +1,93 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 76.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "The same module set mixes lifecycle orchestration, runtime configuration, transport dispatch, and protocol payload/state model responsibilities in a single file, increasing coupling across unrelated behavior.",
+        "Docker-related orchestration/runtime packages repeat multiple independent runtime-composition abstractions instead of reusing a shared seam.",
+        "Several files define duplicated configuration/adapter wrappers for similar container/write-to-volume workflows with only package-local naming differences."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_package_mixes_lifecyle_and_authentication_domains",
+      "summary": "Auth package bundles lifecycle orchestration with token crypto and websocket auth flows in one file, obscuring ownership.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`goseg/auth/auth.go` owns startup lifecycle (`Initialize`, `Start`, `Stop`, `runAuthCleanupLoop`) and also token serialization/cipher handling (`KeyfileEncrypt`, `KeyfileDecrypt`, `AuthorizeUploadToken`, `CreateToken`).",
+        "`goseg/structs/ws.go` also exposes websocket session primitives (`ClientManager`, `MuConn`) used by auth while carrying protocol payload contracts, widening the same domain into low-level transport + policy concerns."
+      ],
+      "suggestion": "Split auth into separate modules (for example `auth/lifecycle`, `auth/token_validation`, and `auth/session`), and keep websocket session primitives in a dedicated structs or session package with explicit interfaces for the auth boundary.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "undifferentiated_domain_bundles"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "broadcast_file_fuses_state_store_and_transport_boundaries",
+      "summary": "Broadcast file conflates stateful domain model management with transport emission concerns.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/system/support.go",
+        "goseg/structs/ws.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/broadcast.go` defines global mutable state (`broadcastState`, schedule maps, mutexes), transition application helpers, and websocket/leak fan-out entrypoints in the same package surface.",
+        "It also handles state cloning and serialization in the same file as transport dispatch (`BroadcastToClients`, `UnauthBroadcast`), creating an intertwined handoff path."
+      ],
+      "suggestion": "Split `broadcast.go` into `state` (durable state machine, cloning, mutation invariants), `transitions` (intent encoding), and `delivery` (broadcast transport + retry/drop policy) to keep handoff seams explicit.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "undifferentiated_domain_bundles"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "docker_runtime_abstractions_are_reimplemented_in_multiple_packages",
+      "summary": "Runtime seam patterns are reimplemented across docker packages instead of converging on one shared abstraction.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/container/helpers.go",
+        "goseg/docker/orchestration/volume_writer.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_seams.go` and `goseg/docker/lifecycle/lifecycle.go` both define separate `Runtime` types with option adapters and default adapter injection.",
+        "`goseg/docker/orchestration/container/helpers.go` and `goseg/docker/orchestration/volume_writer.go` duplicate `writeConfigArtifact`/volume bootstrap wrapper patterns rather than reusing a single internal seam.",
+        "`goseg/docker/orchestration/container/netdata.go` composes its own artifact-writing options against these near-equivalent patterns, increasing drift risk."
+      ],
+      "suggestion": "Extract a shared internal runtime/composition primitive for adapter wiring and artifact-plan execution, then migrate both lifecycle and orchestration call paths to it before adding more container-specific runtimes.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "cross_package_seam_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Domain boundaries are not being held: lifecycle/stateful responsibilities are mixed with protocol and transport concerns.",
+      "Runtime/seam patterns are duplicated across docker subsystems instead of being consolidated in a canonical internal abstraction."
+    ],
+    "likely_symptoms": [
+      "Future changes in one package require unrelated callers to be retested due to implicit coupling.",
+      "Inconsistent runtime behavior and wrapper semantics can silently diverge as seams are copied by hand."
+    ],
+    "possible_false_positives": [
+      "If the mixed-responsibility files were intentionally kept together for rollout coordination, refactor benefit may be partly architectural preference-driven."
+    ]
+  }
+}

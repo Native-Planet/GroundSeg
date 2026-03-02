@@ -1,0 +1,92 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 78.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Transition/event lifecycle handling is hand-coded across multiple workflow modules (`goseg/shipworkflow/urbit_operations.go`, `goseg/shipworkflow/startram.go`, `goseg/rectify/rectify.go`) with repeated loading/success/error/clear patterns instead of a shared state-machine abstraction.",
+        "Log-file selection logic is duplicated between support and logstream modules (`type LogFile`, `-part-` filename parsing, date/part sorting) in `goseg/handler/system/support.go` and `goseg/routines/logstream/logs.go`.",
+        "Wi-Fi and access-point orchestration spans shell command execution, service lifecycle, polling loops, and HTTP/captive behavior in overlapping modules (`goseg/system/wifi.go`, `goseg/accesspoint/accesspoint.go`), indicating weak boundary separation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "scattered_transition_state_machine",
+      "summary": "Transition lifecycle behavior is duplicated across ship and startram workflows instead of centralized in one orchestration model.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/startram.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`urbit_operations.go` repeatedly emits transition states inline (for example `pack`, `packMeld`, `deleteShip`, `togglePower`, `rollChop`) with per-function start/error/success/clear handling.",
+        "`startram.go` separately re-implements transition sequencing via direct `startram.PublishEvent(...)` calls and `PublishTransitionWithPolicy(...)` wrappers for restart/toggle/register/endpoint flows.",
+        "`rectify.go` contains another distinct transition-application path (`applyTransitionUpdate`, `set*Transition` functions) that updates broadcast state independently from workflow emitters."
+      ],
+      "suggestion": "Introduce a shared transition orchestration component (typed state progression + terminal policy + clear timing) used by both shipworkflow and rectify paths; migrate existing operations to declarative transition plans instead of inline event strings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transition_orchestration_scatter"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "duplicated_log_file_selection_logic",
+      "summary": "Support and logstream modules duplicate the same log filename parsing/sorting structure.",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "Both files define a `LogFile` struct and parse `*.log` names by splitting on `-part-` (`support.go` and `logs.go`).",
+        "Both implementations sort by date and part number with nearly identical `sort.Slice` comparators.",
+        "This logic diverges only in retention count/consumer behavior, not parsing strategy, which indicates reusable shared logic was not extracted."
+      ],
+      "suggestion": "Extract log filename parsing and recency ordering into a shared package (for example `logger/logfiles`) and have support/reporting and cleanup routines call the same API with different retention policies.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_log_primitives"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_accesspoint_boundary_blur",
+      "summary": "Wi-Fi/C2C flow mixes infrastructure control, policy sequencing, and API surface across overlapping modules.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/accesspoint/accesspoint.go"
+      ],
+      "evidence": [
+        "`wifi.go` combines loop/state management (`wifiInfoLoop`), system service control (`systemctl` enable/start/stop), network connect/reboot flows (`C2CConnect`), and API endpoints (`CaptiveAPI`, `CaptivePortal`) in one module.",
+        "`accesspoint.go` combines runtime normalization, dependency checks, process probing/matcher internals, and shell execution in the same package.",
+        "Cross-calls (`wifi.go` driving AP lifecycle while also owning C2C policy) indicate orchestration and adapter boundaries are not cleanly separated."
+      ],
+      "suggestion": "Split into explicit layers: Wi-Fi policy service (C2C state machine), AP adapter (hostapd/dnsmasq lifecycle), and HTTP/captive adapter; keep shell/process concerns behind interfaces and move sequencing rules into one coordinator.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "network_control_responsibility_mixing"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Workflow state management is implemented ad hoc per feature instead of through a shared transition engine.",
+      "Domain utilities (log file indexing, network lifecycle primitives) were reimplemented in feature modules rather than extracted as shared services.",
+      "Adapters, orchestration, and API endpoints are colocated in large files, causing boundary drift."
+    ],
+    "likely_symptoms": [
+      "scattered_transition_state_machine",
+      "duplicated_log_file_selection_logic",
+      "wifi_accesspoint_boundary_blur"
+    ],
+    "possible_false_positives": []
+  }
+}

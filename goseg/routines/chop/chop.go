@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"groundseg/chopsvc"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/structs"
 	"time"
 
@@ -16,7 +16,7 @@ const BytesPerGiB = 1 << 30
 var (
 	ConfForChop           = config.Conf
 	UrbitConfForChop      = config.UrbitConf
-	ContainerStatsForChop = docker.GetContainerStats
+	ContainerStatsForChop = orchestration.GetContainerStats
 	ChopPierForChop       = chopsvc.ChopPier
 	sleepForChop          = time.Sleep
 )

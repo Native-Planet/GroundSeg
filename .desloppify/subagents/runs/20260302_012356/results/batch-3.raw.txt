@@ -1,0 +1,53 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "low_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "low_level_elegance": {
+      "evidence": [
+        "goseg/uploadsvc/doc.go encodes operational expectations in prose (`Governance for this boundary is encoded directly in code`, `must remain aligned`, `must be deterministic`) without attaching that contract to executable checks in this file.",
+        "goseg/startram/doc.go uses similarly contractual prose (`Error-visibility policy ... via wrapAPIConnectionError`) while this file contains no implementation, so enforcement is not self-evident at this point of definition.",
+        "Both package docs have extremely high comment density (`comment_ratio` 0.91) relative to code in the file, which increases the risk that intent documentation drifts from enforcement paths."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The package docs embed behavioral constraints and migration/governance intent as narrative only. Move these invariants to colocated tests/compile-time checks or explicit exported helpers so the guarantees are enforceable and do not drift."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "doc_contracts_lack_enforcement",
+      "summary": "Package docs define executable behavior rules without local enforcement, creating contract drift risk.",
+      "related_files": [
+        "goseg/uploadsvc/doc.go",
+        "goseg/startram/doc.go"
+      ],
+      "evidence": [
+        "uploadsvc/doc.go states `Governance for this boundary is encoded directly in code` and list-level requirements such as alignment and determinism, but this file only contains package comments.",
+        "startram/doc.go states `Error-visibility policy ... via `wrapAPIConnectionError``, yet the doc file itself does not enforce or validate this boundary contract.",
+        "Blind packet AI-debt signal shows both files at `comment_ratio`: `0.91`, far above codebase average, indicating intent is largely out-of-band from execution."
+      ],
+      "suggestion": "Keep package docs concise and shift executable invariants into code-level checks: add tests that assert `SupportedActions` and dispatch binding alignment, add deterministic `DescribeAction` tests (including unsupported actions), and colocate the error-chain visibility policy with a unit test around `wrapAPIConnectionError` usage or an exported constructor API. Reduce comment prose to high-level intent.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "doc_vs_enforcement_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Reliance on narrative package docs as the primary mechanism for boundary and migration governance",
+      "Contract obligations are documented in prose but not validated through tests or focused helpers"
+    ],
+    "likely_symptoms": [
+      "doc_contracts_lack_enforcement"
+    ],
+    "possible_false_positives": [
+      "If this repository intentionally prefers long-form package docs and relies on separate governance review docs, this may be stylistic rather than a quality defect"
+    ]
+  }
+}

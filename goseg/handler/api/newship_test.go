@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/structs"
 )
 
 func drainNewShipTransitions() {
 	for {
 		select {
-		case <-docker.NewShipTransitions():
+		case <-events.NewShipTransitions():
 		default:
 			return
 		}
@@ -22,16 +22,16 @@ func drainNewShipTransitions() {
 
 func readNewShipTransitions(t *testing.T, count int) []structs.NewShipTransition {
 	t.Helper()
-	events := make([]structs.NewShipTransition, 0, count)
+	capturedEvents := make([]structs.NewShipTransition, 0, count)
 	for i := 0; i < count; i++ {
 		select {
-		case evt := <-docker.NewShipTransitions():
-			events = append(events, evt)
+		case evt := <-events.NewShipTransitions():
+			capturedEvents = append(capturedEvents, evt)
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timed out waiting for new-ship transition %d", i+1)
 		}
 	}
-	return events
+	return capturedEvents
 }
 
 func buildNewShipMessage(t *testing.T, action, patp string) []byte {

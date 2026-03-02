@@ -1,0 +1,136 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 72.4
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Multiple runtime/state-bearing registries are package-level and cross-cutting (`goseg/auth`, `goseg/structs/ws.go`, `goseg/logger`) rather than isolated behind clear interfaces, which makes ownership of connection/session lifecycle ambiguous.",
+        "Operational behavior and I/O side effects are colocated in orchestration and workflow functions in multiple files, forcing callers to execute broad procedures instead of composable primitives.",
+        "There is no shared abstraction for mount-file/volume bootstrap and system state persistence concerns, so equivalent behaviors are reimplemented in sibling modules with local variations."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc1_stateful_singletons",
+      "summary": "Session and transport state are spread across auth/ws/logger packages without a single ownership boundary.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/structs/ws.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "Auth package and websocket package each expose distinct connection/session maps and mutation operations, while logger tracks syslog/docker session maps as additional mutable global state.",
+        "Several handlers invoke runtime-auth and websocket helpers while logger functions also manage lifecycle state, producing duplicated and competing authority over connection/session behavior.",
+        "Global registries and direct map/slice mutation are used instead of a small dedicated coordinator contract."
+      ],
+      "suggestion": "Introduce a single session-orchestration service interface (e.g., `SessionCoordinator`) owned by one package, with narrow adapters for auth, websocket, and logger producers/consumers to consume, so session lifecycle transitions and concurrency policy are centralized.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "session_boundary_fuzziness"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc2_repeated_recovery_workflow_logic",
+      "summary": "Recovery workflows duplicate orchestration logic instead of sharing a unified recovery runner.",
+      "related_files": [
+        "goseg/shipworkflow/recovery.go",
+        "goseg/shipworkflow/startram.go",
+        "goseg/shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "Multiple workflow entry points contain similar stepwise loops with localized error accumulation, conditional continuation, and status-transition side effects.",
+        "Each function both decides policy (`retry`, `continue`, transition selection) and performs concrete operational work, mixing workflow strategy with execution details.",
+        "No common abstraction is used to express the shared shape of a recovery action and its transition/event outcomes."
+      ],
+      "suggestion": "Extract a shared recovery runner that accepts a declarative step description and policy hooks; keep status transition emission and error policy in a single coordinator, and keep operation handlers side-effect focused.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_side_effect_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc3_volume_bootstrap_pattern_split",
+      "summary": "Container-volume initialization is duplicated between orchestration subsystems, creating divergence risk.",
+      "related_files": [
+        "goseg/docker/orchestration/netdata.go",
+        "goseg/docker/orchestration/volume_writer.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "Netdata orchestration and volume writer both implement mount/path preparation logic, including directory creation, mount target handling, and copy/chown fallback branches with overlapping behavior.",
+        "Lifecycle logic also performs service-specific orchestration around these operations instead of delegating to a shared primitive.",
+        "Behavioral differences are encoded inline per service, which makes it easy for future service paths to drift from the intended common contract."
+      ],
+      "suggestion": "Create a shared volume bootstrap abstraction (e.g., `VolumeInitializationPlan`) used by all orchestrated services, with explicit semantics for mount preparation, content seeding, and permission handling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "workflow_side_effect_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc4_system_state_persistence_mutability",
+      "summary": "Mount-state persistence logic is coupled to direct mutable system writes and lacks an idempotent/update model.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/disk.go"
+      ],
+      "evidence": [
+        "Filesystem/setup paths rewrite system files directly (for mount persistence) and include append-like updates without a clearly shared parser/comparer path.",
+        "Retryable operations can re-enter these writes, and state updates are performed as imperative text composition with no explicit no-op/deduplication strategy.",
+        "Related disk/system modules expose multiple helpers that mutate host configuration directly rather than describing desired state and reconciling."
+      ],
+      "suggestion": "Split persistence writes into a typed reconciler model: read current state, compute diff, then apply idempotent updates through one function, and isolate this behind a narrow system-state interface.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc5_status_query_conflation",
+      "summary": "Ship status resolution mixes data lookup and orchestration concerns, limiting reuse across callers.",
+      "related_files": [
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/subsystem/docker.go"
+      ],
+      "evidence": [
+        "Status methods repeatedly traverse container lists and perform nested matching to resolve a ship result in-line with orchestration logic.",
+        "Callers receive raw structural loops rather than a reusable index-based lookup/query service.",
+        "The same classification/lookup concerns reappear in subsystem-level call paths, indicating no clear boundary between orchestration and status domain logic."
+      ],
+      "suggestion": "Introduce a dedicated status query service that indexes container metadata once per call and provides consistent query semantics for all lifecycle/subsystem users.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "workflow_side_effect_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No explicit boundary between orchestration flow, state persistence, and transport/session lifecycle in multiple subsystems.",
+      "Repeated ad-hoc service-specific implementations instead of shared abstractions for reusable operational patterns.",
+      "Global mutable state used as cross-cutting state bus without clearly owned coordinator."
+    ],
+    "likely_symptoms": [
+      "dc1_stateful_singletons",
+      "dc2_repeated_recovery_workflow_logic",
+      "dc3_volume_bootstrap_pattern_split",
+      "dc4_system_state_persistence_mutability",
+      "dc5_status_query_conflation"
+    ],
+    "possible_false_positives": [
+      "Some apparent duplication may be intentional service-specific behavior (especially in orchestration/bootstrap paths).",
+      "Status lookup approach may be sufficient at current small scale; performance concerns may be less material than readability concerns."
+    ]
+  }
+}

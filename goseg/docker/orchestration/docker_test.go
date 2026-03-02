@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/docker/docker/client"
+
+	"groundseg/docker/lifecycle"
 )
 
 func TestContains(t *testing.T) {
@@ -18,13 +20,15 @@ func TestContains(t *testing.T) {
 }
 
 func TestGetContainerRunningStatusReturnsInitError(t *testing.T) {
-	original := dockerClientNew
-	t.Cleanup(func() { dockerClientNew = original })
-
-	dockerClientNew = func(_ ...client.Opt) (*client.Client, error) {
-		return nil, errors.New("cannot init docker client")
+	rt := &orchestrationRuntime{
+		lifecycleRuntime: lifecycle.NewRuntime(
+			lifecycle.WithDockerClientFactory(func(_ ...client.Opt) (*client.Client, error) {
+				return nil, errors.New("cannot init docker client")
+			}),
+		),
 	}
-	if _, err := GetContainerRunningStatus("test-container"); err == nil {
+
+	if _, err := rt.GetContainerRunningStatus("test-container"); err == nil {
 		t.Fatalf("expected init failure to surface as an error")
 	}
 }

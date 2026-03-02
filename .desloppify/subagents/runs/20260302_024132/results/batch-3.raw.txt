@@ -1,0 +1,42 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 95.0,
+    "test_strategy": 95.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "README.md codifies explicit Runtime Contract Gate policy by naming `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go` as contract-gated surfaces.",
+        "`goseg/protocol/actions/actions.go` centralizes transport action contracts via a narrow API (`ParseAction`, `SupportedActions`, `UploadActionContracts`, `UploadActionContractForAction`) with copy-on-return semantics to avoid caller-side mutation.",
+        "`goseg/startram/errors.go` exposes a stable masked error message constant and funnels outward transport failures through `wrapAPIConnectionError` + `errpolicy.WrapMasked`, reinforcing a shared outward-error convention."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Cross-module governance is clear but not fully formalized beyond runtime docs plus ad-hoc gate references; adding explicit cross-module contract metadata (e.g., contract versioning/compatibility assertions embedded with the contract definitions) would reduce risk of accidental boundary drift."
+    },
+    "test_strategy": {
+      "evidence": [
+        "README.md states strict backend release gates (`go test ./...` plus integration targets) and runtime contract checks before shipping backend/runtime changes.",
+        "README.md explicitly links contract-gate coverage to `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go`, and those surfaces are covered by package tests in the codebase (`actions_test.go`, `errors_test.go`).",
+        "The same governance text requires deterministic unit tests for upload/version/registration-related flows, matching the intent for high-risk cross-module contracts represented by this batch."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The contract gate strategy is mostly documented and partially enforced, but test-strategy quality could be strengthened by adding one explicit integration-level contract verification that exercises end-to-end failure shaping and contract parity across the two listed contract modules."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Governance contract checks are described in documentation and CI references, but enforcement artifacts are not encoded as first-class contract types adjacent to the modules themselves."
+    ],
+    "likely_symptoms": [
+      "Potential for future contract drift before gate scripts are adjusted."
+    ],
+    "possible_false_positives": []
+  }
+}

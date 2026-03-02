@@ -1,0 +1,49 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "high_level_elegance": 76.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "Two independent contract-tracking models are implemented in `goseg/protocol/actions/actions.go` and `goseg/startram/errors.go`: both define their own `ContractCompatibility` enum, date-based compatibility checks, and active/deprecated helper logic.",
+        "`actions.go` and `errors.go` each encode contract lifecycle policy separately (`CurrentContractVersion` and `APIConnectionErrorContract`), with duplicated parsing helpers (`isVersionAtLeast` vs `isContractVersionAtLeast`), so contract evolution rules are not owned by a single boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "contract_model_fragmentation",
+      "summary": "Contract compatibility concerns are split across packages with duplicated enums and version logic, causing fragmented ownership and versioning drift risk.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines `ContractCompatibility` and a `currentContractVersion`/`isVersionAtLeast*` helper set for action contracts.",
+        "`goseg/startram/errors.go` defines a second `ContractCompatibility` plus parallel helper `isContractVersionAtLeast` and contract descriptor checks for API errors.",
+        "Both files maintain lifecycle policy (`IntroducedIn/DeprecatedIn/RemovedIn` concepts and compatibility values) in separate, uncoupled models."
+      ],
+      "suggestion": "Introduce a shared contract-governance abstraction (e.g., a common `contracts` package in `goseg/protocol` or a dedicated internal module) with one `ContractCompatibility` type and canonical version-evaluation helpers, then replace both modules’ local implementations with that API.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_versioning_boundary_split"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract/version compatibility policy is modeled as duplicated local abstractions rather than a shared domain boundary.",
+      "Lack of a single ownership point for protocol/error contract metadata leads to parallel evolution paths."
+    ],
+    "likely_symptoms": [
+      "contract_model_fragmentation"
+    ],
+    "possible_false_positives": []
+  }
+}

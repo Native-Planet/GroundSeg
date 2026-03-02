@@ -12,10 +12,7 @@ func resetCodeState() {
 	codeMutex.Lock()
 	lusCodes = make(map[string]structs.ClickLusCode)
 	codeMutex.Unlock()
-	createHoonForCode = createLusCode
-	deleteHoonForCode = runtimeDeleteLusCode
-	clickExecForCode = runtimeClickExec
-	filterResponseForCode = runtimeFilterResponse
+	executeClickCommandForCode = executeLusCode
 }
 
 func TestAllowLusCodeRequestFlowControl(t *testing.T) {
@@ -81,35 +78,34 @@ func TestGetLusCodeReturnsCachedValue(t *testing.T) {
 
 func TestGetLusCodeCreateFailure(t *testing.T) {
 	t.Cleanup(resetCodeState)
-	createHoonForCode = func(_, _, _ string) error {
-		return errors.New("write failed")
+	executeClickCommandForCode = func(
+		_, _, _, _, _, _ string,
+		_ func(string),
+	) (string, string, bool, error) {
+		return "", "", false, errors.New("write failed")
 	}
 
 	_, err := GetLusCode("~bus")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "failed to create hoon") {
+	if !strings.Contains(err.Error(), "failed to get exec") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestGetLusCodeExecFailureStoresErrorAndDeletesFile(t *testing.T) {
+func TestGetLusCodeExecFailureStoresError(t *testing.T) {
 	t.Cleanup(resetCodeState)
-
-	deleted := false
-	createHoonForCode = func(_, _, _ string) error { return nil }
-	deleteHoonForCode = func(_, _ string) { deleted = true }
-	clickExecForCode = func(_, _, _ string) (string, error) {
-		return "", errors.New("exec failed")
+	executeClickCommandForCode = func(
+		_, _, _, _, _, _ string,
+		_ func(string),
+	) (string, string, bool, error) {
+		return "", "", false, errors.New("exec failed")
 	}
 
 	_, err := GetLusCode("~mar")
 	if err == nil {
 		t.Fatalf("expected error")
-	}
-	if !deleted {
-		t.Fatalf("expected deferred delete to run")
 	}
 
 	codeMutex.Lock()
@@ -122,14 +118,12 @@ func TestGetLusCodeExecFailureStoresErrorAndDeletesFile(t *testing.T) {
 
 func TestGetLusCodeSuccessStoresFetchedCode(t *testing.T) {
 	t.Cleanup(resetCodeState)
-
-	createHoonForCode = func(_, _, _ string) error { return nil }
-	deleteHoonForCode = func(_, _ string) {}
-	clickExecForCode = func(_, _, _ string) (string, error) {
-		return "raw response", nil
-	}
-	filterResponseForCode = func(_, _ string) (string, bool, error) {
-		return strings.Repeat("z", 27), false, nil
+	expected := strings.Repeat("z", 27)
+	executeClickCommandForCode = func(
+		_, _, _, _, _, _ string,
+		_ func(string),
+	) (string, string, bool, error) {
+		return "", expected, true, nil
 	}
 
 	got, err := GetLusCode("~pal")
@@ -148,8 +142,9 @@ func TestGetLusCodeSuccessStoresFetchedCode(t *testing.T) {
 	}
 }
 
-func runtimeDeleteLusCode(_, _ string)                        {}
-func runtimeClickExec(_, _, _ string) (string, error)         { return "", nil }
-func runtimeFilterResponse(_, _ string) (string, bool, error) { return "", false, nil }
-
-func createLusCode(_, _, _ string) error { return nil }
+func executeLusCode(
+	_, _, _, _, _, _ string,
+	_ func(string),
+) (string, string, bool, error) {
+	return "", "", false, nil
+}

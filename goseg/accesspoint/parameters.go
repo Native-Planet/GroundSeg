@@ -23,6 +23,10 @@ func hasInterface(interfaceNames []string, target string) bool {
 }
 
 func checkParameters() error {
+	return checkParametersWithContext(accessPointRuntime())
+}
+
+func checkParametersWithContext(rt AccessPointRuntime) error {
 	// get interfaces
 	interfaces, err := netInterfacesFn()
 	if err != nil {
@@ -35,27 +39,27 @@ func checkParameters() error {
 	}
 
 	// Check wlan interface
-	if wlan != "" && !hasInterface(interfaceNames, wlan) {
-		return fmt.Errorf("Wlan %s interface was not found", wlan)
+	if rt.Wlan != "" && !hasInterface(interfaceNames, rt.Wlan) {
+		return fmt.Errorf("Wlan %s interface was not found", rt.Wlan)
 	}
 
 	// Check inet interface
-	if inet != "" && !hasInterface(interfaceNames, inet) {
-		return fmt.Errorf("Inet %s interface was not found", inet)
+	if rt.Inet != "" && !hasInterface(interfaceNames, rt.Inet) {
+		return fmt.Errorf("Inet %s interface was not found", rt.Inet)
 	}
 
 	// Validate IP
-	if !validateIP(ip) {
-		return fmt.Errorf("Wrong ip %s", ip)
+	if !validateIP(rt.IP) {
+		return fmt.Errorf("Wrong ip %s", rt.IP)
 	}
 
 	// Check SSID
-	if ssid == "" {
+	if rt.SSID == "" {
 		return fmt.Errorf("SSID must not be empty")
 	}
 
 	// Check password
-	if password == "" {
+	if rt.Password == "" {
 		return fmt.Errorf("Password must not be empty")
 	}
 	return nil

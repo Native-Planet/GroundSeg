@@ -7,9 +7,8 @@ import (
 )
 
 var (
-	executeClickCommandForBackup = runtime.ExecuteCommand
-	filterResponseForBackup      = runtime.FilterResponse
-	joinGapForBackup             = runtime.JoinGap
+	executeClickCommandForBackup = runtime.ExecuteCommandWithSuccess
+	joinGapForBackup            = runtime.JoinGap
 	backupAgentFn                = backupAgent
 )
 
@@ -32,16 +31,9 @@ func backupAgent(patp, agent string) error {
 		";<", "~", "bind:m", fmt.Sprintf("(poke [our %%hood] %%drum-put !>([/%s/jam %s]))", file, stateJam),
 		"(pure:m !>('success'))",
 	})
-	response, err := executeClickCommandForBackup(patp, file, hoon, "", "", fmt.Sprintf("Click %s", file))
+	_, err := executeClickCommandForBackup(patp, file, hoon, "", "success", fmt.Sprintf("Click %s", file), nil)
 	if err != nil {
-		return err
-	}
-	_, succeeded, err := filterResponseForBackup("success", response)
-	if err != nil {
-		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
-	}
-	if !succeeded {
-		return fmt.Errorf("Click %s failed poke for %s", file, patp)
+		return fmt.Errorf("click command failed for %s on %s: %w", file, patp, err)
 	}
 	return nil
 }

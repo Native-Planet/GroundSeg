@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"groundseg/protocol/actions"
 	"groundseg/structs"
 	"groundseg/uploadsvc"
 )
@@ -68,8 +69,8 @@ func uploadBranchMatrixCases(token structs.WsTokenStruct) []uploadBranchMatrixCa
 		},
 		{
 			name:       "open-endpoint-success",
-			action:     string(uploadsvc.ActionOpenEndpoint),
-			msg:        buildUploadMessage(string(uploadsvc.ActionOpenEndpoint), "session-matrix", true, true, "/dev/sda", token),
+			action:     string(actions.ActionUploadOpenEndpoint),
+			msg:        buildUploadMessage(string(actions.ActionUploadOpenEndpoint), "session-matrix", true, true, "/dev/sda", token),
 			service:    &stubUploadService{},
 			wantOpen:   1,
 			wantReset:  0,
@@ -77,8 +78,8 @@ func uploadBranchMatrixCases(token structs.WsTokenStruct) []uploadBranchMatrixCa
 		},
 		{
 			name:      "open-endpoint-service-failure",
-			action:    string(uploadsvc.ActionOpenEndpoint),
-			msg:       buildUploadMessage(string(uploadsvc.ActionOpenEndpoint), "session-matrix", false, false, "", token),
+			action:    string(actions.ActionUploadOpenEndpoint),
+			msg:       buildUploadMessage(string(actions.ActionUploadOpenEndpoint), "session-matrix", false, false, "", token),
 			service:   &stubUploadService{openErr: errors.New("open failed")},
 			wantErr:   "open upload endpoint session-matrix",
 			wantOpen:  1,
@@ -86,16 +87,25 @@ func uploadBranchMatrixCases(token structs.WsTokenStruct) []uploadBranchMatrixCa
 		},
 		{
 			name:      "reset-success",
-			action:    string(uploadsvc.ActionReset),
-			msg:       buildUploadMessage(string(uploadsvc.ActionReset), "", false, false, "", structs.WsTokenStruct{}),
+			action:    string(actions.ActionUploadReset),
+			msg:       buildUploadMessage(string(actions.ActionUploadReset), "", false, false, "", structs.WsTokenStruct{}),
 			service:   &stubUploadService{},
 			wantOpen:  0,
 			wantReset: 1,
 		},
 		{
+			name:      "reset-with-extra-fields",
+			action:    string(actions.ActionUploadReset),
+			msg:       buildUploadMessage(string(actions.ActionUploadReset), "session-reset", true, true, "/dev/sda", structs.WsTokenStruct{}),
+			service:   &stubUploadService{},
+			wantErr:   "Unsupported upload action: reset command must not include open-endpoint payload",
+			wantOpen:  0,
+			wantReset: 0,
+		},
+		{
 			name:      "reset-service-failure",
-			action:    string(uploadsvc.ActionReset),
-			msg:       buildUploadMessage(string(uploadsvc.ActionReset), "", false, false, "", structs.WsTokenStruct{}),
+			action:    string(actions.ActionUploadReset),
+			msg:       buildUploadMessage(string(actions.ActionUploadReset), "", false, false, "", structs.WsTokenStruct{}),
 			service:   &stubUploadService{resetErr: errors.New("reset failed")},
 			wantErr:   "reset upload session",
 			wantOpen:  0,
@@ -121,7 +131,7 @@ func TestUploadHandlerDispatchesActions(t *testing.T) {
 	}
 
 	token := structs.WsTokenStruct{ID: "u1", Token: "tok"}
-	if err := handler.Handle(buildUploadMessage(string(uploadsvc.ActionOpenEndpoint), "session-1", true, true, "/dev/sda", token)); err != nil {
+	if err := handler.Handle(buildUploadMessage(string(actions.ActionUploadOpenEndpoint), "session-1", true, true, "/dev/sda", token)); err != nil {
 		t.Fatalf("open-endpoint returned error: %v", err)
 	}
 	if service.openCalls != 1 || service.resetCalls != 0 {
@@ -131,7 +141,7 @@ func TestUploadHandlerDispatchesActions(t *testing.T) {
 		t.Fatalf("unexpected open-endpoint request: %+v", service.lastReq)
 	}
 
-	if err := handler.Handle(buildUploadMessage(string(uploadsvc.ActionReset), "", false, false, "", structs.WsTokenStruct{})); err != nil {
+	if err := handler.Handle(buildUploadMessage(string(actions.ActionUploadReset), "", false, false, "", structs.WsTokenStruct{})); err != nil {
 		t.Fatalf("reset returned error: %v", err)
 	}
 	if service.openCalls != 1 || service.resetCalls != 1 {
@@ -145,7 +155,7 @@ func TestUploadHandlerPropagatesServiceErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewUploadMessageHandler returned error: %v", err)
 	}
-	if err := handler.Handle(buildUploadMessage(string(uploadsvc.ActionOpenEndpoint), "session-2", false, false, "", structs.WsTokenStruct{})); err == nil {
+	if err := handler.Handle(buildUploadMessage(string(actions.ActionUploadOpenEndpoint), "session-2", false, false, "", structs.WsTokenStruct{})); err == nil {
 		t.Fatal("expected error when OpenEndpoint fails")
 	}
 
@@ -154,7 +164,7 @@ func TestUploadHandlerPropagatesServiceErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewUploadMessageHandler returned error: %v", err)
 	}
-	if err := handler.Handle(buildUploadMessage(string(uploadsvc.ActionReset), "", false, false, "", structs.WsTokenStruct{})); err == nil {
+	if err := handler.Handle(buildUploadMessage(string(actions.ActionUploadReset), "", false, false, "", structs.WsTokenStruct{})); err == nil {
 		t.Fatal("expected error when Reset fails")
 	}
 }

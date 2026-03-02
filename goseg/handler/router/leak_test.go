@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"groundseg/handler/api"
+	"groundseg/handler/authsvc"
 	"groundseg/handler/ship"
 	"groundseg/handler/system"
 	"groundseg/leakchannel"
@@ -14,11 +14,11 @@ import (
 func resetLeakSeams() {
 	urbitHandlerForLeak = ship.UrbitHandler
 	penpaiHandlerForLeak = system.PenpaiHandler
-	newShipHandlerForLeak = api.NewShipHandler
+	newShipHandlerForLeak = handleNewShipForLeak
 	systemHandlerForLeak = system.SystemHandler
 	startramHandlerForLeak = system.StartramHandler
 	supportHandlerForLeak = system.SupportHandler
-	pwHandlerForLeak = api.PwHandler
+	pwHandlerForLeak = authsvc.PwHandler
 }
 
 func TestGallsegUnauthHandlerRoutesOnlyMatchingUrbitPayload(t *testing.T) {
@@ -80,6 +80,44 @@ func TestGallsegAuthedHandlerDispatchesByActionType(t *testing.T) {
 		if counts[actionType] != 1 {
 			t.Fatalf("expected %s handler call once, got %d", actionType, counts[actionType])
 		}
+	}
+}
+
+func TestGallsegAuthedHandlerRecoversFromPanicInUrbitHandler(t *testing.T) {
+	t.Cleanup(resetLeakSeams)
+	calls := 0
+	urbitHandlerForLeak = func([]byte) error {
+		calls++
+		panic("boom")
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("panic escaped gallsegAuthedHandler: %v", recovered)
+		}
+	}()
+	gallsegAuthedHandler(leakchannel.ActionChannel{Auth: true, Type: "urbit", Content: []byte("{}")})
+	if calls != 1 {
+		t.Fatalf("expected panicing urbit handler to be invoked once, got %d", calls)
+	}
+}
+
+func TestSafelyHandleLeakActionKeepsLoopAliveOnPanic(t *testing.T) {
+	t.Cleanup(resetLeakSeams)
+	calls := 0
+	urbitHandlerForLeak = func([]byte) error {
+		calls++
+		panic("boom")
+	}
+	penpaiHandlerForLeak = func([]byte) error {
+		calls++
+		return nil
+	}
+
+	safelyHandleLeakAction(leakchannel.ActionChannel{Auth: true, Type: "urbit", Content: []byte("{}")})
+	safelyHandleLeakAction(leakchannel.ActionChannel{Auth: true, Type: "penpai", Content: []byte("{}")})
+
+	if calls != 2 {
+		t.Fatalf("expected both leak actions to be handled, got %d calls", calls)
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"groundseg/chopsvc"
 	"groundseg/click"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/shipworkflow"
 	"groundseg/structs"
 	"time"
@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	urbitGetShipStatus     = docker.GetShipStatus
-	urbitDeleteContainer   = docker.DeleteContainer
+	urbitGetShipStatus     = orchestration.GetShipStatus
+	urbitDeleteContainer   = orchestration.DeleteContainer
 	urbitBarExit           = click.BarExit
 	urbitSleep             = time.Sleep
 	waitCompletePoller     = shipworkflow.PollWithTimeout
@@ -83,7 +83,7 @@ var urbitCommands = map[string]urbitCommand{
 	"toggle-backup":              urbitWithShip(handleLocalToggleBackup),
 	"toggle-startram-backup":     urbitWithShip(handleStartramToggleBackup),
 	"local-backup":               urbitWithPatp(handleLocalBackup),
-	"schedule-local-backup":       urbitWithPayloadAndShip(handleScheduleLocalBackup),
+	"schedule-local-backup":      urbitWithPayloadAndShip(handleScheduleLocalBackup),
 	"restore-tlon-backup":        urbitWithPayloadAndShip(handleRestoreTlonBackup),
 }
 
@@ -100,7 +100,18 @@ func UrbitHandler(msg []byte) error {
 	if !exists {
 		return fmt.Errorf("unrecognized urbit action: %v", urbitPayload.Payload.Action)
 	}
-	return handler(patp, urbitPayload)
+	return runUrbitCommandWithRecovery(urbitPayload.Payload.Action, func() error {
+		return handler(patp, urbitPayload)
+	})
+}
+
+func runUrbitCommandWithRecovery(action string, fn func() error) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("panic handling urbit action %s: %v", action, recovered)
+		}
+	}()
+	return fn()
 }
 
 // remove a string from a slice of strings

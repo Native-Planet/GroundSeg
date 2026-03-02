@@ -1,0 +1,95 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 3,
+  "assessments": {
+    "design_coherence": 74.3
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Container runtime loaders duplicate the same lifecycle across multiple backends (validate runtime, ensure config exists/regen, materialize runtime config, start container, update state), increasing coupling and drift risk.",
+        "Access-point start path checks `running` state but continues through reconfiguration and start steps even when already running, making start semantics effectively idempotent-unsafe and harder to reason about during mode transitions.",
+        "Configuration persistence in `config` mixes atomic temp-file+rename flow in one module (`UpdateMcConf`) with direct write-file persistence in another (`CreateDefaultVersion`), creating inconsistent durability behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "container_orchestration_runtime_duplication",
+      "summary": "Container runtime loaders duplicate startup/config patterns across Netdata, Wireguard, and MinIO with no shared orchestration abstraction.",
+      "related_files": [
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/docker/orchestration/container/minio.go",
+        "goseg/docker/orchestration/volume_writer.go"
+      ],
+      "evidence": [
+        "`LoadNetdataWithRuntime`, `LoadWireguardWithRuntime`, and `LoadMCWithRuntime` all implement the same orchestration shape (runtime validation → ensure config file/defaults → write/update container config → start container → publish state).",
+        "`writeNDConfigArtifactWithRuntime` and `writeWGConfigArtifact` are separate copies of the same artifact-write pattern, differing mainly by constants.",
+        "Shared infra exists (`writeConfigArtifact`, `copyFileToVolumeWithTempContainer`, volume initialization ops), but each backend still recreates orchestration boilerplate independently."
+      ],
+      "suggestion": "Introduce a generic container-loader builder in `goseg/docker/orchestration/container` (e.g., `ContainerRuntimePlan` + `RunContainerWithRuntime`) to centralize the lifecycle sequence and reduce per-backend scaffolding; keep backend-specific behavior in small strategy hooks and unit-test them separately.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_runtime_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_start_idempotency",
+      "summary": "Access-point start flow is not truly idempotent when already running, so repeated transitions can reconfigure/restart unnecessarily.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`startWithRuntime` logs `\"Accesspoint already started\"` but does not return early when `running == true`, then still proceeds to write hostapd config and call `StartRouterFn`.",
+        "C2C mode transitions (`C2CMode`/`C2CConnect`) depend on deterministic start/stop behavior in access-point lifecycle, so repeated calls can produce churn.",
+        "The function lacks a `forceRestart`/`dry-run` distinction, so control flow cannot safely express \"already healthy\" as a no-op."
+      ],
+      "suggestion": "Make `startWithRuntime` explicitly handle `running == true` as a success no-op unless a `forceRestart` option is requested; extract a small helper that splits identity-check, config-generation, and startup execution so idempotent transitions are explicit.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_persistence_consistency",
+      "summary": "Configuration persistence strategies differ across config modules, making atomicity and corruption-recovery behavior inconsistent.",
+      "related_files": [
+        "goseg/config/mc.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`UpdateMcConf` writes via temp file, validates size, then renames into place (`os.CreateTemp` + `os.Rename`), which is crash-safe.",
+        "`CreateDefaultVersion` writes directly with `ioutil.WriteFile` to `version_info.json`, without staged write/rename and before verification, creating a different failure mode.",
+        "`LocalVersion` currently handles missing/invalid version file by falling back to defaults, which can silently mask partial-write events caused by non-atomic writes."
+      ],
+      "suggestion": "Introduce one config persistence helper in `config` that enforces atomic temp-file + fsync + rename semantics for all config writes, then route `UpdateMcConf` and `CreateDefaultVersion` through the same helper.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_persistence_model_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Repeated orchestration lifecycle patterns are inlined in multiple container runtimes instead of being shared through a common contract.",
+      "Control-flow semantics for idempotent transitions are not centralized across subsystem modules.",
+      "Config write durability strategy is inconsistent inside the same package, leading to uneven reliability characteristics."
+    ],
+    "likely_symptoms": [
+      "orchestration_runtime_duplication",
+      "accesspoint_start_idempotency",
+      "config_persistence_consistency"
+    ],
+    "possible_false_positives": [
+      "accesspoint_start_idempotency is contingent on downstream `StartRouter` semantics; if underlying start is guaranteed idempotent this finding is less severe.",
+      "The container duplication finding may reflect explicit backward-compatible intent, but the current shared helpers indicate the abstraction was only partially extracted."
+    ]
+  }
+}

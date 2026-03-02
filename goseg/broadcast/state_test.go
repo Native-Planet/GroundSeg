@@ -149,3 +149,25 @@ func TestGetStateJSONInjectsStructureMetadata(t *testing.T) {
 		t.Fatalf("expected auth_level=authorized, got %v", decoded["auth_level"])
 	}
 }
+
+func TestSetStartramRunningUsesTransitionPath(t *testing.T) {
+	previousState := GetState()
+	t.Cleanup(func() {
+		UpdateBroadcast(previousState)
+	})
+
+	initial := structs.AuthBroadcast{}
+	initial.Profile.Startram.Info.Running = false
+	initial.Profile.Startram.Transition.Restart = "running"
+	UpdateBroadcast(initial)
+	if err := SetStartramRunning(true); err != nil {
+		t.Fatalf("SetStartramRunning returned error: %v", err)
+	}
+	got := GetState()
+	if !got.Profile.Startram.Info.Running {
+		t.Fatal("expected startram running state to be true after transition")
+	}
+	if got.Profile.Startram.Transition.Restart != "running" {
+		t.Fatalf("expected existing startram transition state to remain, got %q", got.Profile.Startram.Transition.Restart)
+	}
+}

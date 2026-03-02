@@ -8,13 +8,12 @@ import (
 
 func resetRestoreSeams() {
 	executeClickCommandForRestore = executeRestoreCommand
-	filterResponseForRestore = filterResponse
 	restoreAgentFn = restoreAgent
 }
 
 func TestRestoreAgentExecFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string) (string, error) {
+	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", errors.New("exec failed")
 	}
 
@@ -29,29 +28,23 @@ func TestRestoreAgentExecFailure(t *testing.T) {
 
 func TestRestoreAgentFilterFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string) (string, error) {
-		return "response", nil
-	}
-	filterResponseForRestore = func(_, _ string) (string, bool, error) {
-		return "", false, errors.New("parse failed")
+	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("parse failed")
 	}
 
 	err := RestoreAgent("~zod", "groups")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "failed to get exec") {
+	if !strings.Contains(err.Error(), "parse failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestRestoreAgentPokeFailure(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
-	executeClickCommandForRestore = func(_, _, _, _, _, _ string) (string, error) {
-		return "response", nil
-	}
-	filterResponseForRestore = func(_, _ string) (string, bool, error) {
-		return "", false, nil
+	executeClickCommandForRestore = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("failed poke")
 	}
 
 	err := RestoreAgent("~zod", "groups")
@@ -67,15 +60,15 @@ func TestRestoreAgentBuildsExpectedCommand(t *testing.T) {
 	t.Cleanup(resetRestoreSeams)
 
 	var gotPatp, gotFile, gotHoon, gotOperation string
-	executeClickCommandForRestore = func(patp, file, hoon, _, _, operation string) (string, error) {
+	executeClickCommandForRestore = func(
+		patp, file, hoon, sourcePath, successToken, operation string,
+		_clearLus func(string),
+	) (string, error) {
 		gotPatp = patp
 		gotFile = file
 		gotHoon = hoon
 		gotOperation = operation
 		return "ok", nil
-	}
-	filterResponseForRestore = func(_, _ string) (string, bool, error) {
-		return "", true, nil
 	}
 
 	if err := RestoreAgent("~nec", "profile"); err != nil {
@@ -117,10 +110,6 @@ func TestRestoreTlonAggregatesErrors(t *testing.T) {
 	}
 }
 
-func executeRestoreCommand(_, _, _, _, _, _ string) (string, error) {
+func executeRestoreCommand(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 	return "ok", nil
-}
-
-func filterResponse(_, _ string) (string, bool, error) {
-	return "", true, nil
 }

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const pingTimeout = 5 * time.Second
+var pingTimeout = 5 * time.Second
 
 var (
 	versionMu           sync.RWMutex
@@ -24,6 +24,13 @@ var (
 	detectAPIVersionForClient  = detectAPIVersion
 	newClientWithOptsForClient = client.NewClientWithOpts
 )
+
+func SetPingTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	pingTimeout = timeout
+}
 
 // New returns a Docker client that pings the daemon once to discover the API
 // version the server expects. Subsequent calls reuse the cached version so we

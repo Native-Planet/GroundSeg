@@ -10,32 +10,9 @@ import (
 )
 
 var (
-	executeClickCommandForRestore = executeClickCommandForRestoreImpl
-	filterResponseForRestore      = runtime.FilterResponse
+	executeClickCommandForRestore = runtime.ExecuteCommandWithSuccess
 	restoreAgentFn                = restoreAgent
 )
-
-func executeClickCommandForRestoreImpl(patp, file, hoon, sourcePath, successToken, operation string) (string, error) {
-	if err := runtime.CreateHoon(patp, file, hoon); err != nil {
-		return "", fmt.Errorf("%s failed to create hoon: %v", operation, err)
-	}
-	defer runtime.DeleteHoon(patp, file)
-
-	response, err := runtime.ClickExec(patp, file, sourcePath)
-	if err != nil {
-		return "", fmt.Errorf("%s failed to execute hoon: %v", operation, err)
-	}
-	if successToken != "" {
-		_, success, err := runtime.FilterResponse(successToken, response)
-		if err != nil {
-			return "", fmt.Errorf("%s failed to parse response: %v", operation, err)
-		}
-		if !success {
-			return "", fmt.Errorf("%s failed poke", operation)
-		}
-	}
-	return response, nil
-}
 
 func restoreAgent(patp, agent string) error {
 	file := fmt.Sprintf("restore-%s", agent)
@@ -51,16 +28,9 @@ func restoreAgent(patp, agent string) error {
 		";<", "~", "bind:m", "(take-poke-ack /pokeas)",
 		"(pure:m !>('success'))",
 	}, " ")
-	response, err := executeClickCommandForRestore(patp, file, hoon, "", "", fmt.Sprintf("Click %s", file))
+	_, err := executeClickCommandForRestore(patp, file, hoon, "", "success", fmt.Sprintf("Click %s", file), nil)
 	if err != nil {
 		return err
-	}
-	_, succeeded, err := filterResponseForRestore("success", response)
-	if err != nil {
-		return fmt.Errorf("Click %s failed to get exec: %v", file, err)
-	}
-	if !succeeded {
-		return fmt.Errorf("Click %s failed poke: %s", file, patp)
 	}
 	zap.L().Info(fmt.Sprintf("Click %s restored agent %s on %s", file, agent, patp))
 	return nil

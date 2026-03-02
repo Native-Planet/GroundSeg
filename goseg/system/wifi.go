@@ -1,6 +1,8 @@
 package system
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"groundseg/structs"
 	"net/http"
@@ -32,6 +34,9 @@ var (
 	defaultWiFiRadio            wifiRadioService     = nmcliWiFiRadioService{}
 	defaultAccessPointLifecycle accessPointLifecycle = systemAccessPointLifecycle{}
 	captiveAdapter                                   = newCaptiveTransportAdapter(defaultC2CServiceDeps())
+	wifiInfoTickerFactory                            = func() *time.Ticker { return time.NewTicker(10 * time.Second) }
+	wifiInfoLoopStopMu          sync.Mutex
+	wifiInfoLoopStop            context.CancelFunc
 
 	execCommandForWiFi   = exec.Command
 	runCommandForWiFi    = runCommand
@@ -39,19 +44,32 @@ var (
 	wifiNewClientForWiFi = wifi.New
 )
 
+func HasWifiDevice() bool {
+	wifiStateMu.RLock()
+	defer wifiStateMu.RUnlock()
+	return Device != ""
+}
+
 func InitializeWiFi() error {
 	var initErr error
 	wifiInit.Do(func() {
-		device, err := defaultWiFiRadio.PrimaryDevice()
-		if err != nil {
-			initErr = fmt.Errorf("couldn't find a wifi device: %w", err)
-			return
-		}
-		Device = device
-		defaultWiFiRadio.RefreshInfo(device)
-		go wifiInfoLoop(device)
+		initErr = startWiFiInfoLoop(context.Background())
 	})
 	return initErr
+}
+
+func StartWiFiInfoLoop(ctx context.Context) error {
+	return startWiFiInfoLoop(ctx)
+}
+
+func StopWiFiInfoLoop() {
+	wifiInfoLoopStopMu.Lock()
+	stop := wifiInfoLoopStop
+	wifiInfoLoopStop = nil
+	wifiInfoLoopStopMu.Unlock()
+	if stop != nil {
+		stop()
+	}
 }
 
 func IsC2CMode() bool {
@@ -79,11 +97,41 @@ func WifiInfoSnapshot() structs.SystemWifi {
 	return WifiInfo
 }
 
-func wifiInfoLoop(dev string) {
-	tick := time.Tick(10 * time.Second)
+func startWiFiInfoLoop(ctx context.Context) error {
+	device, err := defaultWiFiRadio.PrimaryDevice()
+	if err != nil {
+		return fmt.Errorf("couldn't find a wifi device: %w", err)
+	}
+	{
+		wifiStateMu.Lock()
+		Device = device
+		wifiStateMu.Unlock()
+	}
+	defaultWiFiRadio.RefreshInfo(device)
+
+	wifiInfoLoopStopMu.Lock()
+	if wifiInfoLoopStop != nil {
+		wifiInfoLoopStopMu.Unlock()
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	wifiInfoLoopStop = cancel
+	wifiInfoLoopStopMu.Unlock()
+	go wifiInfoLoop(ctx, device)
+	return nil
+}
+
+func wifiInfoLoop(ctx context.Context, dev string) {
+	ticker := wifiInfoTickerFactory()
+	defer ticker.Stop()
 	for {
 		select {
-		case <-tick:
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 			defaultWiFiRadio.RefreshInfo(dev)
 		}
 	}
@@ -96,7 +144,7 @@ func constructWifiInfo(dev string) {
 func ifCheck() bool {
 	out, err := runCommandForWiFi("nmcli", "radio", "wifi")
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't check interface: %v", err))
+		zap.L().Error(fmt.Sprintf("couldn't check interface: %v", err))
 		return false
 	}
 	return strings.Contains(string(out), "enabled")
@@ -124,13 +172,13 @@ func C2CMode() error {
 	// stop systemd-resolved
 	_, err = runCommandForWiFi("systemctl", "stop", "systemd-resolved")
 	if err != nil {
-		return fmt.Errorf("Failed to stop resolved: %w", err)
+		return fmt.Errorf("failed to stop systemd-resolved: %w", err)
 	}
 	// stop AP
 	//accesspoint.Stop(device)
 	// start AP
 	if err := defaultAccessPointLifecycle.Start(device); err != nil {
-		return fmt.Errorf("Failed to start accesspoint: %w", err)
+		return fmt.Errorf("failed to start access point: %w", err)
 	}
 	return nil
 }
@@ -149,14 +197,14 @@ func C2CConnect(ssid, password string) error {
 	}
 	time.Sleep(5 * time.Second)
 	if err := defaultWiFiRadio.SetLinkUp(device); err != nil {
-		return err
+		return fmt.Errorf("set wifi interface %s up: %w", device, err)
 	}
 	// attempt to connect
 	err = defaultWiFiRadio.Connect(ssid, password)
 	if err != nil {
 		connectErr := fmt.Errorf("connect to wifi %s: %w", ssid, err)
 		if c2cErr := C2CMode(); c2cErr != nil {
-			return fmt.Errorf("%w; restore C2C mode after failed connect: %v", connectErr, c2cErr)
+			return fmt.Errorf("restore C2C mode after failed connect: %w", errors.Join(connectErr, c2cErr))
 		}
 		return connectErr
 	} else {
@@ -189,12 +237,12 @@ func EnableResolved() error {
 	cmd := execCommandForWiFi("systemctl", "enable", "systemd-resolved")
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to enable systemd-resolved: %v", err)
+		return fmt.Errorf("failed to enable systemd-resolved: %w", err)
 	}
 	cmd = execCommandForWiFi("systemctl", "start", "systemd-resolved")
 	_, err = cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to start systemd-resolved: %v", err)
+		return fmt.Errorf("failed to start systemd-resolved: %w", err)
 	}
 	return nil
 }
@@ -234,7 +282,7 @@ func getWifiDevice() ([]string, error) {
 func primaryWifiDevice() (string, error) {
 	wifiDevices, err := getWifiDevice()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to retrieve wifi devices: %w", err)
 	}
 	if len(wifiDevices) == 0 {
 		return "", fmt.Errorf("no WiFi device found")
@@ -261,7 +309,7 @@ func ListWifiSSIDs(dev string) ([]string, error) {
 func getConnectedSSID(c *wifi.Client, dev string) string {
 	interfaces, err := c.Interfaces()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't get devices: %v", err))
+		zap.L().Error(fmt.Sprintf("couldn't get devices: %v", err))
 		return ""
 	}
 	for _, iface := range interfaces {
@@ -281,7 +329,7 @@ func ConnectToWifi(ssid, password string) error {
 	cmd := execCommandForWiFi("nmcli", "dev", "wifi", "connect", ssid, "password", password)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to connect to wifi: %v", err)
+		return fmt.Errorf("failed to connect to wifi: %w", err)
 	}
 	return nil
 }
@@ -289,11 +337,14 @@ func ConnectToWifi(ssid, password string) error {
 func DisconnectWifi(ifaceName string) error {
 	c, err := wifiNewClientForWiFi()
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't create wifi client: %w", err)
 	}
 	defer c.Close()
 	iface := &wifi.Interface{Name: ifaceName}
-	return c.Disconnect(iface)
+	if err := c.Disconnect(iface); err != nil {
+		return fmt.Errorf("failed to disconnect wifi interface %s: %w", ifaceName, err)
+	}
+	return nil
 }
 
 func ToggleDevice(dev string) error {
@@ -305,7 +356,7 @@ func ToggleDevice(dev string) error {
 	}
 	_, err := runCommandForWiFi("nmcli", "radio", "wifi", cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set wifi radio %s: %w", cmd, err)
 	}
 	return nil
 }
@@ -318,7 +369,7 @@ func applyCaptiveRules(dev string) error {
 	}
 	for key, value := range sysctlSettings {
 		if _, err := runCommandForWiFi("sysctl", "-w", fmt.Sprintf("%s=%s", key, value)); err != nil {
-			return fmt.Errorf("failed to set %s: %v", key, err)
+			return fmt.Errorf("failed to set %s: %w", key, err)
 		}
 	}
 	return nil

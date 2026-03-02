@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"groundseg/auth"
+	"groundseg/authsession"
 	"groundseg/config"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -24,7 +25,7 @@ var (
 	hasherForSetup           = auth.Hasher
 	cycleWgKeyForSetup       = config.CycleWgKey
 	startramRegisterForSetup = startram.Register
-	addToAuthMapForSetup     = auth.AddToAuthMap
+	addToAuthMapForSetup     = authsession.AddToAuthMap
 )
 
 /*

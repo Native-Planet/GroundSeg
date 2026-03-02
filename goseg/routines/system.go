@@ -30,12 +30,22 @@ func StartMDNSServer() {
 }
 
 func AptUpdateLoop() {
+	_ = AptUpdateLoopWithContext(context.Background())
+}
+
+func AptUpdateLoopWithContext(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	updateCheckForAptLoop()
 	conf := configForSystemRoutine()
 	checkInterval := aptUpdateCheckInterval(conf)
 	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
 	for {
 		select {
+		case <-ctx.Done():
+			return nil
 		case <-ticker.C:
 			updateCheckForAptLoop()
 		}

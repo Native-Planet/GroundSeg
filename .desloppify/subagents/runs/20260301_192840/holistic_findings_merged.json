@@ -1,0 +1,220 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 50.4,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 44.0,
+        "Indirection Cost": 34.0,
+        "Interface Honesty": 58.0
+      }
+    }
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Many tiny config snapshot types/functions exist as independent pass-through wrappers rather than a consolidated domain API (`goseg/config/config.go:279-377`).",
+        "Callers in multiple subsystems repeatedly compose runtime behavior through nested function-seam structs (`goseg/routines/runtime_seams.go`, `goseg/broadcast/loop.go`, `goseg/docker/orchestration/runtime_seams.go`, `goseg/docker/lifecycle/lifecycle.go`).",
+        "Several runtime paths create new runtime objects repeatedly only to forward through additional wrapper layers without semantic transformation (`goseg/routines/docker.go:88-103`, `goseg/routines/docker.go:180-219`, `goseg/broadcast/loop.go:86-151`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 44.0,
+        "indirection_cost": 34.0,
+        "interface_honesty": 58.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "snapshot_bag_fragmentation",
+      "summary": "Config is exposed through many narrow snapshot structs that duplicate a copy-on-read pattern, creating low-leverage abstraction debt across package boundaries.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Each feature area defines independent snapshot views over `Conf()` (`goseg/config/config.go:279-377`).",
+        "Collector and routine layers create helper shims that exist solely to wrap those snapshots without domain logic (`goseg/broadcast/collectors/collectors.go:32-38`, `goseg/routines/runtime_seams.go:44-48`, `89-93`).",
+        "Higher-level orchestration code directly depends on many snapshot functions (`goseg/importer/importer.go:69-78`, `goseg/main.go:92-104`) instead of a bounded config contract."
+      ],
+      "suggestion": "Replace the ad-hoc snapshot family with bounded read interfaces (for example `ShipConfigView`, `RuntimeConfigView`, `AuthConfigView`) and inject explicit dependencies at subsystem boundaries, so each caller can request only the small set of fields it truly needs with clear ownership and stronger API semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_chain_overextension",
+      "summary": "Runtime-seam layers and helper wrappers are stacked broadly for testability but add little domain behavior and increase trace complexity.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "Broadcast exposes a custom runtime struct with many function fields plus defaulting logic, yet execution remains a thin pass-through sequence (`goseg/broadcast/loop.go:13-40`, `49-83`).",
+        "Docker routines mirror the same style with multiple nested seam structs and direct forwarding (`goseg/routines/runtime_seams.go:24-65`, `84-103`).",
+        "Update/event-handling paths instantiate runtime wrappers and forward through wrapper methods rather than domain transitions (`goseg/routines/docker.go:88-103`, `180-219`, `227-260`)."
+      ],
+      "suggestion": "Constrain seams to true boundaries only (one seam per subsystem boundary), and replace pass-through function buckets with direct interfaces that carry one clear behavioral contract; avoid per-event/per-call wrapper reconstruction for hot paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "noop_seam_defaults_hide_contract",
+      "summary": "Default no-op seam implementations in orchestration/runtime construction obscure whether required dependencies are actually configured.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "The base docker runtime sets wireguard/minio/netdata operations to inert defaults that return success-like placeholders (`goseg/docker/orchestration/runtime_seams.go:146-157`).",
+        "Load paths branch on optional writer hooks without explicit invariant enforcement, making feature readiness implicit (`goseg/docker/orchestration/wireguard.go:34-38`, `213-229`).",
+        "Lifecycle uses mutable package-level function variables and setters for dependency overrides without a contract enforcing completeness (`goseg/docker/lifecycle/lifecycle.go:20-31`, `47-63`)."
+      ],
+      "suggestion": "Introduce explicit `runtime.RuntimeDependencies` interfaces for orchestration and lifecycle, fail-fast on missing implementations in constructors, and remove silent no-op defaults unless semantically optional.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 6.838,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 37,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 252,
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/routines/docker.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/config/wireguard.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/routines/docker_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/docker/orchestration/urbit.go",
+    "goseg/routines/system_test.go",
+    "goseg/importer/importer.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/main.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/setup/setup_test.go",
+    "goseg/routines/version.go",
+    "goseg/config/config.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/auth/auth.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/minio.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_192840",
+    "created_at": "2026-03-01T19:29:21+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "a5a9b08b5adab8ca3647ce2635d0dda6cff870849b7ba49cf187fa6301d0b9fb"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

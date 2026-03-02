@@ -1,0 +1,80 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 74.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "evidence": [
+        "Runtime seam layers in `goseg/routines/runtime_seams.go` and `goseg/docker/orchestration/runtime_seams.go` mirror the same delegation pattern: small structs of function pointers plus methods that almost always forward one call through `seams.DefaultIfNil*` wrappers.",
+        "`HandleStartramRestart`/`HandleStartramToggle` in `goseg/shipworkflow/startram.go` rely on `defaultStartramRuntime()` and thus execute placeholder runtime callbacks in production paths.",
+        "Several constructor-time defaults are set to no-op/error placeholders in seam structs (for example, recover/dispath callbacks), so call chains can execute with silently degraded behavior rather than failing fast."
+      ],
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "no_op_runtime_defaults",
+      "summary": "Default runtime seams hide behavior with silent no-op fallbacks, creating low-leverage indirection chains.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`newDockerRoutineRuntimeWithContext()` and `newDockerRuntimeWithContext()` populate many function fields through `seams.DefaultIfNil*`, and the seam methods (`GetState`, `StartContainer`, `UpdateContainerState`, etc.) are purely pass-through wrappers.",
+        "The fallback behavior in seam helpers allows missing collaborators to behave as no-op/zero-value instead of surfacing an immediate wiring error.",
+        "The same indirection pattern is repeated across multiple packages, adding several layers before reaching concrete operations."
+      ],
+      "suggestion": "Collapse seam abstractions to only the boundaries that need test seams: replace broad no-op-tolerant structs with explicit dependency interfaces for the few call sites requiring mockable edges, and make constructor requirements explicit (`panic`/error on missing dependency) so misconfiguration fails fast.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "placeholder_seam_defaults"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "startram_default_runtime_bypasses_workflow",
+      "summary": "Startram default runtime injects placeholder callbacks that bypass real workflow steps in production handlers.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/routines/docker.go",
+        "goseg/routines/runtime_seams.go"
+      ],
+      "evidence": [
+        "`HandleStartramRestart()` and `HandleStartramToggle()` call methods on `defaultStartramRuntime()` (`runtime.recoverWireguardFleetFn(...)`, `runtime.dispatchUrbitPayloadFn(...)`) so placeholder defaults are directly part of exported behavior.",
+        "`defaultStartramRuntime()` sets `recoverWireguardFleetFn` to a no-op `func(...) error { return nil }`, which prevents recovery actions from running in the normal execution path.",
+        "`defaultDispatchUrbitPayload` returns `fmt.Errorf(\"no urbit dispatcher configured\")`, so toggle flows invoke an abstraction that is intentionally unimplemented unless swapped out before use."
+      ],
+      "suggestion": "Replace placeholder callback defaults with concrete, production-safe callbacks and isolate test-only overrides via explicit constructor injection (or option args), so default runtime has complete behavior and seam behavior cannot silently drop critical operations.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "placeholder_seam_defaults"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Placeholder/default runtime seams were introduced as testability points but leaked into production behavior without enforcement of complete collaborators.",
+      "Seam factories prefer maximal delegation over meaningful policy translation, increasing call depth without proportional leverage."
+    ],
+    "likely_symptoms": [
+      "Critical orchestration steps silently skipped during startram restart/toggle flows",
+      "Harder debugging when callbacks are miswired because failures are hidden behind defaults"
+    ],
+    "possible_false_positives": [
+      "Some no-op fallbacks may be intentionally tolerated in internal test-only construction paths; confirm those paths are not reachable from user-facing handlers."
+    ]
+  }
+}

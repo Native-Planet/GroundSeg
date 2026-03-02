@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"testing"
+
+	"groundseg/protocol/actions"
 )
 
 type stubC2CService struct {
@@ -26,22 +28,22 @@ func (s *stubC2CService) RestartGroundSeg() error {
 	return s.restartErr
 }
 
-func (s *stubC2CService) Execute(action C2CAction, ssid, password string) error {
+func (s *stubC2CService) Execute(action actions.Action, ssid, password string) error {
 	switch action {
-	case ConnectAction:
+	case actions.ActionC2CConnect:
 		if err := s.ConnectToWiFi(ssid, password); err != nil {
 			return err
 		}
 		return s.RestartGroundSeg()
 	default:
-		return UnsupportedC2CActionError{Namespace: "c2c", Action: action}
+		return actions.UnsupportedActionError{Namespace: "c2c", Action: action}
 	}
 }
 
 func TestProcessC2CMessageDispatchesConnect(t *testing.T) {
 	service := &stubC2CService{}
 	cmd := C2CCommand{
-		Action:   ConnectAction,
+		Action:   actions.ActionC2CConnect,
 		SSID:     "mynetwork",
 		Password: "s3cret",
 	}
@@ -64,11 +66,11 @@ func TestProcessC2CMessageDispatchesConnect(t *testing.T) {
 func TestProcessC2CMessageRejectsUnsupportedAction(t *testing.T) {
 	service := &stubC2CService{}
 	cmd := C2CCommand{
-		Action: C2CAction("invalid"),
+		Action: actions.Action("invalid"),
 	}
 
 	err := ProcessC2CMessage(cmd, func() C2CService { return service })
-	var unsupported UnsupportedC2CActionError
+	var unsupported actions.UnsupportedActionError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected unsupported action error, got %v", err)
 	}
@@ -76,7 +78,7 @@ func TestProcessC2CMessageRejectsUnsupportedAction(t *testing.T) {
 
 func TestProcessC2CMessageRejectsNilServiceFactory(t *testing.T) {
 	cmd := C2CCommand{
-		Action: ConnectAction,
+		Action: actions.ActionC2CConnect,
 	}
 	if err := ProcessC2CMessage(cmd, nil); err == nil {
 		t.Fatal("expected nil service factory to fail")
@@ -85,10 +87,40 @@ func TestProcessC2CMessageRejectsNilServiceFactory(t *testing.T) {
 
 func TestProcessC2CMessageRejectsNilService(t *testing.T) {
 	cmd := C2CCommand{
-		Action: ConnectAction,
+		Action: actions.ActionC2CConnect,
 	}
 	err := ProcessC2CMessage(cmd, func() C2CService { return nil })
 	if err == nil {
 		t.Fatal("expected nil service to fail")
+	}
+}
+
+func TestNewC2CServiceForAdapterRejectsNilConnectCallback(t *testing.T) {
+	got, err := NewC2CServiceForAdapter(nil, func() error { return nil })
+	if got != nil {
+		t.Fatalf("expected no service when connect callback is nil, got %T", got)
+	}
+	if err == nil {
+		t.Fatal("expected constructor to fail with nil connect callback")
+	}
+}
+
+func TestNewC2CServiceForAdapterRejectsNilRestartCallback(t *testing.T) {
+	got, err := NewC2CServiceForAdapter(func(_, _ string) error { return nil }, nil)
+	if got != nil {
+		t.Fatalf("expected no service when restart callback is nil, got %T", got)
+	}
+	if err == nil {
+		t.Fatal("expected constructor to fail with nil restart callback")
+	}
+}
+
+func TestC2CServiceExecutorGuardsNilCallbacksAtCallSite(t *testing.T) {
+	service := C2CServiceExecutor{}
+	if err := service.ConnectToWiFi("HomeWiFi", "secret"); err == nil {
+		t.Fatal("expected ConnectToWiFi to fail when callback is not configured")
+	}
+	if err := service.RestartGroundSeg(); err == nil {
+		t.Fatal("expected RestartGroundSeg to fail when callback is not configured")
 	}
 }

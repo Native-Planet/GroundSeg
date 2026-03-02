@@ -1,0 +1,596 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_031523/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/system/wifi/service/c2c_service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines canonical action identifiers (`ActionC2CConnect`) and c2c metadata in the protocol contract layer, while `goseg/system/wifi/service/c2c_service.go` redefines `ConnectAction` as a second alias to the same transport token.",
+        "`goseg/system/wifi/service/c2c_service.go` builds a package-scope `c2cActionDispatcher` using protocol bindings at import time, coupling action wiring into global package state and making boundary composition harder."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_action_alias_duplication",
+      "summary": "Protocol action contracts are duplicated across layers instead of owned by a single boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`ActionC2CConnect` is defined in `goseg/protocol/actions/actions.go` as the canonical protocol token.",
+        "`goseg/system/wifi/service/c2c_service.go` introduces `ConnectAction` as a second alias assigned to the same token.",
+        "Both identifiers represent the same semantic command, so any rename or semantic change must be mirrored manually in multiple modules."
+      ],
+      "suggestion": "Delete the local `ConnectAction` alias and use the protocol contract symbol directly at all call sites, or introduce a single exported canonical symbol in `actions` and remove per-layer command aliases so contract changes are made once.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_dispatcher_global_init_coupling",
+      "summary": "C2C action dispatch is bound at package scope, increasing coupling and reducing composability across module boundaries.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` defines `c2cActionDispatcher` as a global variable initialized with `actions.NewActionDispatcher(...)`.",
+        "All command execution paths read from this singleton dispatcher, which ties this package’s runtime behavior to import-time construction of bindings and fixed semantics."
+      ],
+      "suggestion": "Refactor to construct the dispatcher explicitly (for example in `NewC2CServiceForAdapter`/`ProcessC2CMessage`) and pass it in as a dependency so action wiring is explicit, testable, and replaceable by callers without editing global package state.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action contract duplication and scattered ownership across protocol and transport modules.",
+      "Package-scope initialization of dispatch wiring creating implicit module-level coupling."
+    ],
+    "likely_symptoms": [
+      "c2c_action_alias_duplication",
+      "c2c_dispatcher_global_init_coupling"
+    ],
+    "possible_false_positives": [
+      "If the duplicated action alias is intentionally kept for temporary backward compatibility, the first finding may be a planned transition pattern."
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cac8b-1f3e-7551-83f4-8f61bcd06638
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Architecture & Coupling
+Batch dimensions: cross_module_architecture
+Batch rationale: god modules, import-time side effects
+
+Files assigned:
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/system/wifi/service/c2c_service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll review only the three assigned files against the blind packet and the `cross_module_architecture` dimension, then return a strict JSON batch result with assessed scores and evidence-backed findings. I’ll first load the packet and all three target files in one pass, then produce findings only for valid defects in current code.
+exec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/protocol/actions/actions.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/startram/errors.go' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/system/wifi/service/c2c_service.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package actions
+
+import "fmt"
+
+// Namespace groups action enums by transport domain.
+type Namespace string
+
+const (
+	NamespaceUpload Namespace = "upload"
+	NamespaceC2C    Namespace = "c2c"
+)
+
+// Action is a transport action contract token.
+type Action string
+
+const (
+	ActionUploadOpenEndpoint Action = "open-endpoint"
+	ActionUploadReset        Action = "reset"
+	ActionC2CConnect         Action = "connect"
+)
+ succeeded in 52ms:
+Total output lines: 4500
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "error_consistency",
+    "abstraction_fitness",
+    "test_strategy",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+ succeeded in 52ms:
+package startram
+
+import "groundseg/errpolicy"
+
+// APIConnectionErrorMessage is the stable public contract for API transport failures.
+// The wrapped error keeps the original cause for observability while masking
+// transport details from callers.
+const APIConnectionErrorMessage = "Unable to connect to API server"
+
+func wrapAPIConnectionError(err error) error {
+	return errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+}
+ succeeded in 52ms:
+package service
+
+import "groundseg/protocol/actions"
+import "fmt"
+
+const (
+	ConnectAction actions.Action = actions.ActionC2CConnect
+)
+
+// C2CService is responsible for performing captured C2C actions.
+type C2CService interface {
+	ConnectToWiFi(ssid, password string) error
+	RestartGroundSeg() error
+	Execute(action actions.Action, ssid, password string) error
+}
+
+// C2CCommand is a typed, transport-agnostic command payload.
+type C2CCommand struct {
+	Action   actions.Action
+	SSID     string
+codex
+I’ve loaded the target files and now I’m checking the blind packet for prior findings tied to this batch so I can avoid re-reporting closed or `wontfix` items and focus on deeper architectural causes.
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "protocol/actions/actions.go|startram/errors.go|c2c_service.go|findings|status|wontfix|identifier|root_cause_cluster|cross_module_architecture|import-time|import time|side effects|god" /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+6:    "cross_module_architecture",
+13:    "cross_module_architecture": {
+19:        "Cross-module coordination through shared mutable state or import-time side effects",
+60:        "If the core issue is dependency direction or cycles, use cross_module_architecture"
+109:    "naming": "Use camelCase for unexported and PascalCase for exported identifiers."
+116:          "file": "goseg/protocol/actions/actions.go",
+121:          "file": "goseg/protocol/actions/actions.go",
+126:          "file": "goseg/protocol/actions/actions.go",
+131:          "file": "goseg/protocol/actions/actions.go",
+136:          "file": "goseg/startram/errors.go",
+141:          "file": "goseg/system/wifi/service/c2c_service.go",
+146:          "file": "goseg/system/wifi/service/c2c_service.go",
+2241:            "status_query.go",
+2242:            "status_query_test.go"
+2287:            "status.go",
+2288:            "status_test.go",
+2844:            "wifi_c2c_service.go",
+2860:            "c2c_service.go",
+3282:    "existing_findings": {
+3597:      "goseg/system/wifi_c2c_service.go": [
+codex
+I found explicit batch context and system constraints embedded in the packet; next I’ll quickly inspect the existing finding block for these same three files so I only surface genuine outstanding issues.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '3240,3710p' /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+      },
+      "startram/": {
+        "groundseg/structs": 8,
+        "net/http": 7,
+        "fmt": 6
+      },
+      "structs/": {
+        "encoding/json": 5,
+        "time": 4,
+        "testing": 3
+      },
+      "service/": {
+        "groundseg/protocol/actions": 2,
+        "fmt": 1,
+        "errors": 1
+      },
+      "transport/": {
+        "encoding/json": 1,
+        "fmt": 1,
+        "net/http": 1
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"type ActionDispatcher|func NewActionDispatcher|func \\(.*\\) Execute\\(\" goseg/protocol/actions -g '*.go'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/protocol/actions/registry.go:11:type ActionDispatcher[A ~string, S any, C any] struct {
+goseg/protocol/actions/registry.go:17:func NewActionDispatcher[A ~string, S any, C any](namespace Namespace, bindings []ActionBinding[A, S, C]) ActionDispatcher[A, S, C] {
+goseg/protocol/actions/registry.go:37:func (d ActionDispatcher[A, S, C]) Execute(action A, svc S, payload C) error {
+codex
+I’m checking `protocol/actions` dispatch internals now; if dispatch construction is performed as import-time global registration, that would directly affect cross-module architecture and could justify findings for this batch.
+exec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/protocol/actions/registry.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package actions
+
+import "fmt"
+
+type ActionBinding[A ~string, S any, C any] struct {
+	Action    A
+	Execute   func(S, C) error
+	Operation func(C) string
+}
+
+type ActionDispatcher[A ~string, S any, C any] struct {
+	namespace Namespace
+	order     []A
+	bindings  map[A]ActionBinding[A, S, C]
+}
+
+func NewActionDispatcher[A ~string, S any, C any](namespace Namespace, bindings []ActionBinding[A, S, C]) ActionDispatcher[A, S, C] {
+	bindingMap := make(map[A]ActionBinding[A, S, C], len(bindings))
+	order := make([]A, 0, len(bindings))
+	for _, binding := range bindings {
+codex
+I have enough to identify one likely boundary issue, but I’ll quickly sample cross-references for `C2CService` and protocol actions to confirm whether the same abstractions are duplicated in multiple transport layers.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"ProcessC2CMessage|C2CService|ActionC2CConnect|SupportedC2CActions|ConnectAction|UploadActionContracts|ParseC2CAction\" goseg -g '*.go'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+goseg/protocol/actions/actions_test.go:34:	_, err := ParseAction(NamespaceUpload, string(ActionC2CConnect))
+goseg/protocol/actions/actions_test.go:45:	if unsupported.Action != ActionC2CConnect {
+goseg/protocol/actions/actions_test.go:46:		t.Fatalf("expected unsupported action value %q, got %q", ActionC2CConnect, unsupported.Action)
+goseg/protocol/actions/actions_test.go:79:		{Action: ActionC2CConnect, Description: "connect c2c client"},
+goseg/protocol/actions/actions_test.go:142:func TestUploadActionContractsIncludesExpectedActions(t *testing.T) {
+goseg/protocol/actions/actions_test.go:143:	got := UploadActionContracts()
+goseg/protocol/actions/actions_test.go:149:	gotCopy := UploadActionContracts()
+goseg/protocol/actions/actions_test.go:155:func TestUploadActionContractsAreOrdered(t *testing.T) {
+goseg/protocol/actions/actions_test.go:156:	got := UploadActionContracts()
+goseg/protocol/actions/actions_test.go:199:	got := UploadActionContracts()
+goseg/protocol/actions/actions_test.go:215:func TestSupportedC2CActionsMatchesContract(t *testing.T) {
+goseg/protocol/actions/actions_test.go:216:	got := SupportedC2CActions()
+goseg/protocol/actions/actions_test.go:217:	expected := []Action{ActionC2CConnect}
+goseg/protocol/actions/actions.go:19:	ActionC2CConnect         Action = "connect"
+goseg/protocol/actions/actions.go:46:		{Action: ActionC2CConnect, Description: "connect c2c client"},
+goseg/protocol/actions/actions.go:118:func UploadActionContracts() []UploadActionContract {
+goseg/protocol/actions/actions.go:158:// ParseC2CAction validates actions for the c2c transport namespace.
+goseg/protocol/actions/actions.go:159:func ParseC2CAction(raw string) (Action, error) {
+goseg/protocol/actions/actions.go:168:// SupportedC2CActions returns c2c-supported actions.
+goseg/protocol/actions/actions.go:169:func SupportedC2CActions() []Action {
+codex
+I found a related adapter file that appears to replicate C2C action symbols and wiring, which can indicate a cross-module contract split and duplication. I’ll inspect that file for concrete boundary evidence.
+exec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/system/wifi_c2c_service.go' in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package system
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"groundseg/protocol/actions"
+	"groundseg/structs"
+	wifiService "groundseg/system/wifi/service"
+)
+
+const c2cActionConnect actions.Action = actions.ActionC2CConnect
+
+var supportedC2CActions = actions.SupportedC2CActions
+
+type c2cServiceDeps struct {
+	connectToWiFi    func(string, string) error
+	restartGroundSeg func() error
+}
+
+codex
+I found evidence of duplicated `c2c` action symbols across layers. I’ll validate whether those duplicates are used consistently or only as aliases, then derive structural impact.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"APIConnectionErrorMessage|wrapAPIConnectionError|Unable to connect to API server\" goseg/startram goseg -g '*.go'" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/startram/errors.go:5:// APIConnectionErrorMessage is the stable public contract for API transport failures.
+goseg/startram/errors.go:8:const APIConnectionErrorMessage = "Unable to connect to API server"
+goseg/startram/errors.go:10:func wrapAPIConnectionError(err error) error {
+goseg/startram/errors.go:11:	return errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+goseg/startram/startram.go:28:		wrappedErr := wrapAPIConnectionError(err)
+goseg/startram/startram.go:62:		wrappedErr := wrapAPIConnectionError(err)
+goseg/startram/startram.go:105:		return wrapAPIConnectionError(err)
+goseg/startram/startram.go:145:		return wrapAPIConnectionError(err)
+goseg/startram/startram.go:178:		return wrapAPIConnectionError(err)
+goseg/startram/startram.go:210:		return wrapAPIConnectionError(err)
+goseg/startram/startram.go:248:		return wrapAPIConnectionError(err)
+goseg/startram/startram.go:349:		return wrapAPIConnectionError(err)
+goseg/startram/state_sync_test.go:169:	if err.Error() != APIConnectionErrorMessage {
+goseg/startram/state_sync_test.go:170:		t.Fatalf("expected masked API connection message %q, got %q", APIConnectionErrorMessage, err)
+goseg/startram/errors_test.go:12:	wrapped := wrapAPIConnectionError(cause)
+goseg/startram/errors_test.go:18:	if msg != APIConnectionErrorMessage {
+goseg/startram/errors_test.go:19:		t.Fatalf("expected stable redacted message %q, got %q", APIConnectionErrorMessage, msg)
+goseg/startram/errors_test.go:36:	wrapped := wrapAPIConnectionError(cause)
+goseg/startram/errors_test.go:40:	if wrapped.Error() != APIConnectionErrorMessage {
+goseg/startram/errors_test.go:41:		t.Fatalf("expected stable user-facing message %q, got %q", APIConnectionErrorMessage, wrapped.Error())
+exec
+/opt/homebrew/bin/zsh -lc 'cat /Users/chuah/NP/GroundSeg/goseg/system/wifi/service/c2c_service_test.go' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package service
+
+import (
+	"errors"
+	"testing"
+
+	"groundseg/protocol/actions"
+)
+
+type stubC2CService struct {
+	connectCalls int
+	restartCalls int
+	connectErr   error
+	restartErr   error
+	lastSSID     string
+	lastPassword string
+}
+
+func (s *stubC2CService) ConnectToWiFi(ssid, password string) error {
+	s.connectCalls++
+codex
+I still need evidence for `startram` file impact; I’ll check whether other `startram` files bypass the shared wrapper, which would indicate a coupling/consistency fault in error contracts at the package boundary.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"WrapMasked\\(|APIConnectionErrorMessage|mask\" /Users/chuah/NP/GroundSeg/goseg/startram/*.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+/Users/chuah/NP/GroundSeg/goseg/startram/state_sync_test.go:169:	if err.Error() != APIConnectionErrorMessage {
+/Users/chuah/NP/GroundSeg/goseg/startram/state_sync_test.go:170:		t.Fatalf("expected masked API connection message %q, got %q", APIConnectionErrorMessage, err)
+/Users/chuah/NP/GroundSeg/goseg/startram/startram_test.go:17:	output := maskPubkey(input)
+/Users/chuah/NP/GroundSeg/goseg/startram/startram_test.go:19:		t.Fatalf("expected pubkey body to be masked, got %q", output)
+/Users/chuah/NP/GroundSeg/goseg/startram/startram.go:67:	if err := httpx.ReadJSON(resp, maskPubkey(regionUrl), &retrieve); err != nil {
+/Users/chuah/NP/GroundSeg/goseg/startram/startram.go:360:func maskPubkey(input string) string {
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:18:	if msg != APIConnectionErrorMessage {
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:19:		t.Fatalf("expected stable redacted message %q, got %q", APIConnectionErrorMessage, msg)
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:40:	if wrapped.Error() != APIConnectionErrorMessage {
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:41:		t.Fatalf("expected stable user-facing message %q, got %q", APIConnectionErrorMessage, wrapped.Error())
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:55:	if wrapped.Error() != APIConnectionErrorMessage {
+/Users/chuah/NP/GroundSeg/goseg/startram/errors_test.go:56:		t.Fatalf("expected stable message %q, got %q", APIConnectionErrorMessage, wrapped.Error())
+/Users/chuah/NP/GroundSeg/goseg/startram/errors.go:5:// APIConnectionErrorMessage is the stable public contract for API transport failures.
+/Users/chuah/NP/GroundSeg/goseg/startram/errors.go:6:// The wrapped error keeps the original cause for observability while masking
+/Users/chuah/NP/GroundSeg/goseg/startram/errors.go:8:const APIConnectionErrorMessage = "Unable to connect to API server"
+/Users/chuah/NP/GroundSeg/goseg/startram/errors.go:11:	return errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+codex
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines canonical action identifiers (`ActionC2CConnect`) and c2c metadata in the protocol contract layer, while `goseg/system/wifi/service/c2c_service.go` redefines `ConnectAction` as a second alias to the same transport token.",
+        "`goseg/system/wifi/service/c2c_service.go` builds a package-scope `c2cActionDispatcher` using protocol bindings at import time, coupling action wiring into global package state and making boundary composition harder."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_action_alias_duplication",
+      "summary": "Protocol action contracts are duplicated across layers instead of owned by a single boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`ActionC2CConnect` is defined in `goseg/protocol/actions/actions.go` as the canonical protocol token.",
+        "`goseg/system/wifi/service/c2c_service.go` introduces `ConnectAction` as a second alias assigned to the same token.",
+        "Both identifiers represent the same semantic command, so any rename or semantic change must be mirrored manually in multiple modules."
+      ],
+      "suggestion": "Delete the local `ConnectAction` alias and use the protocol contract symbol directly at all call sites, or introduce a single exported canonical symbol in `actions` and remove per-layer command aliases so contract changes are made once.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_dispatcher_global_init_coupling",
+      "summary": "C2C action dispatch is bound at package scope, increasing coupling and reducing composability across module boundaries.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` defines `c2cActionDispatcher` as a global variable initialized with `actions.NewActionDispatcher(...)`.",
+        "All command execution paths read from this singleton dispatcher, which ties this package’s runtime behavior to import-time construction of bindings and fixed semantics."
+      ],
+      "suggestion": "Refactor to construct the dispatcher explicitly (for example in `NewC2CServiceForAdapter`/`ProcessC2CMessage`) and pass it in as a dependency so action wiring is explicit, testable, and replaceable by callers without editing global package state.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol action contract duplication and scattered ownership across protocol and transport modules.",
+      "Package-scope initialization of dispatch wiring creating implicit module-level coupling."
+    ],
+    "likely_symptoms": [
+      "c2c_action_alias_duplication",
+      "c2c_dispatcher_global_init_coupling"
+    ],
+    "possible_false_positives": [
+      "If the duplicated action alias is intentionally kept for temporary backward compatibility, the first finding may be a planned transition pattern."
+    ]
+  }
+}
+tokens used
+50,128
+

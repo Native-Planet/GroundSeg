@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"groundseg/config"
+	"groundseg/startram/backup"
 	"groundseg/structs"
 	"net/http"
 )
@@ -31,7 +32,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 		t.Fatalf("failed to write plaintext file: %v", err)
 	}
 
-	ciphertext, err := encryptFile(path, "test-password")
+	ciphertext, err := backup.EncryptFile(path, "test-password")
 	if err != nil {
 		t.Fatalf("encryptFile returned error: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 		t.Fatal("expected non-empty ciphertext")
 	}
 
-	decrypted, err := decryptFile(ciphertext, "test-password")
+	decrypted, err := backup.DecryptFile(ciphertext, "test-password")
 	if err != nil {
 		t.Fatalf("decryptFile returned error: %v", err)
 	}
@@ -82,8 +83,8 @@ func (service *stubStartramConfigService) SetWgRegistered(registered bool) error
 
 func (service *stubStartramConfigService) SetStartramConfig(_ structs.StartramRetrieve) {}
 
-func (service *stubStartramConfigService) BasePath() string {
-	return ""
+func (service *stubStartramConfigService) RuntimeContext() config.RuntimeContext {
+	return config.RuntimeContext{}
 }
 
 type stubRetrieveStateSyncer struct {

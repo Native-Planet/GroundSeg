@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mdlayher/wifi"
+	"groundseg/protocol/actions"
 )
 
 func resetWifiSeamsForTest(t *testing.T) {
@@ -179,7 +180,7 @@ func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 
 func TestParseC2CAction(t *testing.T) {
 	resetWifiSeamsForTest(t)
-	action, err := parseC2CAction(string(c2cActionConnect))
+	action, err := actions.ParseC2CAction(string(c2cActionConnect))
 	if err != nil {
 		t.Fatalf("expected connect action to parse: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestParseC2CAction(t *testing.T) {
 
 func TestParseC2CActionRejectsUnsupportedAction(t *testing.T) {
 	resetWifiSeamsForTest(t)
-	if _, err := parseC2CAction("unsupported"); err == nil {
+	if _, err := actions.ParseC2CAction("unsupported"); err == nil {
 		t.Fatal("expected parse failure for unsupported action")
 	}
 }
@@ -225,7 +226,7 @@ func TestProcessMessageRejectsUnsupportedAction(t *testing.T) {
 	if processErr == nil {
 		t.Fatal("expected unsupported action error")
 	}
-	if _, ok := processErr.(unsupportedC2CActionError); !ok {
+	if _, ok := processErr.(actions.UnsupportedActionError); !ok {
 		t.Fatalf("expected unsupported action error, got %T: %v", processErr, processErr)
 	}
 }
@@ -284,7 +285,10 @@ func TestC2CServiceExecutesConnectAndRestart(t *testing.T) {
 			return nil
 		},
 	}
-	service := newC2CServiceForAdapterWithDeps(deps)
+	service, err := newC2CServiceForAdapterWithDeps(deps)
+	if err != nil {
+		t.Fatalf("newC2CServiceForAdapterWithDeps failed: %v", err)
+	}
 
 	if err := service.Execute(c2cActionConnect, "HomeWiFi", "secret"); err != nil {
 		t.Fatalf("execute failed: %v", err)
@@ -294,11 +298,46 @@ func TestC2CServiceExecutesConnectAndRestart(t *testing.T) {
 	}
 }
 
+func TestNewC2CServiceForAdapterWithDepsRejectsNilDependencies(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	_, err := newC2CServiceForAdapterWithDeps(c2cServiceDeps{
+		restartGroundSeg: func() error { return nil },
+	})
+	if err == nil {
+		t.Fatal("expected constructor to fail when connect callback is nil")
+	}
+
+	_, err = newC2CServiceForAdapterWithDeps(c2cServiceDeps{
+		connectToWiFi: func(_, _ string) error { return nil },
+	})
+	if err == nil {
+		t.Fatal("expected constructor to fail when restart callback is nil")
+	}
+}
+
+func TestProcessC2CMessageForAdapterReportsMissingServiceOnConstructorFailure(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	msg := `{"type":"c2c","payload":{"action":"connect","ssid":"HomeWiFi","password":"secret"}}`
+	deps := c2cServiceDeps{
+		connectToWiFi: nil,
+	}
+
+	err := processC2CMessageForAdapterWithDeps([]byte(msg), deps)
+	if err == nil {
+		t.Fatal("expected processC2CMessageForAdapter to fail when dependencies are nil")
+	}
+	if !strings.Contains(err.Error(), "c2c service is required") {
+		t.Fatalf("expected service requirement error, got %v", err)
+	}
+}
+
 func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
 	resetWifiSeamsForTest(t)
 	foundConnect := false
 	for _, action := range supportedC2CActions() {
-		if _, err := parseC2CAction(string(action)); err != nil {
+		if _, err := actions.ParseC2CAction(string(action)); err != nil {
 			t.Fatalf("action %v should be supported by parser", action)
 		}
 		if action == c2cActionConnect {
@@ -307,5 +346,79 @@ func TestC2CActionBindingsCoverKnownActions(t *testing.T) {
 	}
 	if !foundConnect {
 		t.Fatalf("expected connect action binding")
+	}
+}
+
+type wifiRadioConnectErrorService struct {
+	connectedDevice string
+	connectErr      error
+}
+
+func (s wifiRadioConnectErrorService) PrimaryDevice() (string, error) {
+	return s.connectedDevice, nil
+}
+
+func (s wifiRadioConnectErrorService) RefreshInfo(_ string) {}
+
+func (s wifiRadioConnectErrorService) Enable() error {
+	return nil
+}
+
+func (s wifiRadioConnectErrorService) SetLinkUp(_ string) error {
+	return nil
+}
+
+func (s wifiRadioConnectErrorService) Connect(_, _ string) error {
+	return s.connectErr
+}
+
+func (s wifiRadioConnectErrorService) ListSSIDs(_ string) ([]string, error) {
+	return nil, nil
+}
+
+type accessPointLifecycleNoop struct{}
+
+func (accessPointLifecycleNoop) Start(_ string) error { return nil }
+func (accessPointLifecycleNoop) Stop(_ string) error  { return nil }
+
+func TestC2CConnectWrapsConnectAndRestoreErrors(t *testing.T) {
+	resetWifiSeamsForTest(t)
+	originalRadio := defaultWiFiRadio
+	originalAPLifecycle := defaultAccessPointLifecycle
+	originalRunCommand := runCommandForWiFi
+	originalExecCommand := execCommandForWiFi
+	connectErr := errors.New("connect failure")
+	c2cRestoreErr := errors.New("restore failure")
+	defer func() {
+		defaultWiFiRadio = originalRadio
+		defaultAccessPointLifecycle = originalAPLifecycle
+		runCommandForWiFi = originalRunCommand
+		execCommandForWiFi = originalExecCommand
+	}()
+
+	defaultWiFiRadio = wifiRadioConnectErrorService{
+		connectedDevice: "wlan0",
+		connectErr:      connectErr,
+	}
+	defaultAccessPointLifecycle = accessPointLifecycleNoop{}
+	runCommandForWiFi = func(command string, args ...string) (string, error) {
+		if command == "systemctl" && len(args) > 0 && args[0] == "stop" {
+			return "", c2cRestoreErr
+		}
+		return "", nil
+	}
+	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
+		return exec.Command("true")
+	}
+
+	err := C2CConnect("HomeWiFi", "secret")
+	if err == nil {
+		t.Fatal("expected C2CConnect to return combined error")
+	}
+	if !errors.Is(err, connectErr) {
+		t.Fatalf("expected connect error in chain, got %v", err)
+	}
+	if !errors.Is(err, c2cRestoreErr) {
+		t.Fatalf("expected C2C mode restore error in chain, got %v", err)
 	}
 }

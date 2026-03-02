@@ -18,8 +18,8 @@ var (
 
 // retrieve struct corresponding with urbit json file
 func UrbitConf(pier string) structs.UrbitDocker {
-	urbitMutex.Lock()
-	defer urbitMutex.Unlock()
+	urbitMutex.RLock()
+	defer urbitMutex.RUnlock()
 	return UrbitsConfig[pier]
 }
 
@@ -59,7 +59,7 @@ func RemoveUrbitConfig(pier string) error {
 	defer urbitMutex.Unlock()
 	delete(UrbitsConfig, pier)
 	// remove from disk
-	err := os.Remove(filepath.Join(BasePath, "settings", "pier", pier+".json"))
+	err := os.Remove(filepath.Join(BasePath(), "settings", "pier", pier+".json"))
 	return err
 }
 
@@ -98,7 +98,7 @@ func UpdateUrbit(pier string, mutateFn func(*structs.UrbitDocker) error) error {
 }
 
 func loadUrbitConfigFromDisk(pier string) (structs.UrbitDocker, error) {
-	confPath := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	confPath := filepath.Join(BasePath(), "settings", "pier", pier+".json")
 	file, err := os.ReadFile(confPath)
 	if err != nil {
 		return structs.UrbitDocker{}, fmt.Errorf("unable to load %s config: %v", pier, err)
@@ -119,7 +119,7 @@ func normalizeUrbitConfig(conf *structs.UrbitDocker) {
 
 func persistUrbitConfigLocked(pier string, conf structs.UrbitDocker) error {
 	normalizeUrbitConfig(&conf)
-	path := filepath.Join(BasePath, "settings", "pier", pier+".json")
+	path := filepath.Join(BasePath(), "settings", "pier", pier+".json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return fmt.Errorf("error creating urbit config dir for %s: %v", pier, err)
 	}

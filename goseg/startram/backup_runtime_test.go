@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"groundseg/config"
+	"groundseg/startram/backup"
 	"groundseg/structs"
 )
 
@@ -78,8 +79,8 @@ func (s stubConfigService) SetWgRegistered(bool) error {
 
 func (s stubConfigService) SetStartramConfig(structs.StartramRetrieve) {}
 
-func (s stubConfigService) BasePath() string {
-	return s.basePath
+func (s stubConfigService) RuntimeContext() config.RuntimeContext {
+	return config.RuntimeContext{BasePath: s.basePath}
 }
 
 func httpResponse(status int, body []byte) *http.Response {
@@ -185,7 +186,7 @@ func TestEncryptDecryptFileRoundTripAndWrongKey(t *testing.T) {
 		t.Fatalf("failed to create plaintext file: %v", err)
 	}
 
-	encrypted, err := encryptFile(path, "secret-key")
+	encrypted, err := backup.EncryptFile(path, "secret-key")
 	if err != nil {
 		t.Fatalf("encryptFile returned error: %v", err)
 	}
@@ -193,7 +194,7 @@ func TestEncryptDecryptFileRoundTripAndWrongKey(t *testing.T) {
 		t.Fatal("expected encrypted payload to differ from plaintext")
 	}
 
-	decrypted, err := decryptFile(encrypted, "secret-key")
+	decrypted, err := backup.DecryptFile(encrypted, "secret-key")
 	if err != nil {
 		t.Fatalf("decryptFile returned error: %v", err)
 	}
@@ -201,10 +202,10 @@ func TestEncryptDecryptFileRoundTripAndWrongKey(t *testing.T) {
 		t.Fatalf("unexpected decrypted payload: got %q want %q", string(decrypted), string(plaintext))
 	}
 
-	if _, err := decryptFile(encrypted, "wrong-key"); err == nil || !strings.Contains(err.Error(), "failed to decrypt") {
+	if _, err := backup.DecryptFile(encrypted, "wrong-key"); err == nil || !strings.Contains(err.Error(), "failed to decrypt") {
 		t.Fatalf("expected decrypt failure with wrong key, got %v", err)
 	}
-	if _, err := decryptFile([]byte("short"), "secret-key"); err == nil || !strings.Contains(err.Error(), "ciphertext too short") {
+	if _, err := backup.DecryptFile([]byte("short"), "secret-key"); err == nil || !strings.Contains(err.Error(), "ciphertext too short") {
 		t.Fatalf("expected short ciphertext error, got %v", err)
 	}
 }
@@ -242,11 +243,9 @@ func TestDownloadAndVerifyChecksMD5(t *testing.T) {
 }
 
 func TestRetrieveRemoteBackupEmptyLinkAndSuccess(t *testing.T) {
-	origService := defaultBackupInfrastructureService
 	origClient := defaultAPIClient
 	origConfig := defaultConfigService
 	t.Cleanup(func() {
-		defaultBackupInfrastructureService = origService
 		defaultAPIClient = origClient
 		defaultConfigService = origConfig
 	})
@@ -260,9 +259,12 @@ func TestRetrieveRemoteBackupEmptyLinkAndSuccess(t *testing.T) {
 		basePath: t.TempDir(),
 	}
 
-	defaultBackupInfrastructureService = stubBackupInfrastructureService{
-		getBackupFn: func(string, string, string, string, string) (string, error) {
-			return "", nil
+	defaultAPIClient = stubAPIClient{
+		postFn: func(url, _ string, _ io.Reader) (*http.Response, error) {
+			if url != "https://api.startram.test/v1/backup/get" {
+				t.Fatalf("unexpected post URL: %s", url)
+			}
+			return httpResponse(http.StatusOK, []byte(`{"result":""}`)), nil
 		},
 	}
 	if _, err := retrieveRemoteBackup("~zod", 100, "ignored-md5"); err == nil || !strings.Contains(err.Error(), "backup link is empty") {
@@ -274,19 +276,23 @@ func TestRetrieveRemoteBackupEmptyLinkAndSuccess(t *testing.T) {
 	if err := os.WriteFile(plainFile, plain, 0o644); err != nil {
 		t.Fatalf("failed to write temp plaintext: %v", err)
 	}
-	encrypted, err := encryptFile(plainFile, "restore-secret")
+	encrypted, err := backup.EncryptFile(plainFile, "restore-secret")
 	if err != nil {
 		t.Fatalf("failed to encrypt test payload: %v", err)
 	}
 	encryptedMD5 := fmt.Sprintf("%x", md5.Sum(encrypted))
 
-	defaultBackupInfrastructureService = stubBackupInfrastructureService{
-		getBackupFn: func(string, string, string, string, string) (string, error) {
-			return "https://download.startram.test/blob", nil
-		},
-	}
 	defaultAPIClient = stubAPIClient{
-		getFn: func(string) (*http.Response, error) {
+		postFn: func(url, _ string, _ io.Reader) (*http.Response, error) {
+			if url != "https://api.startram.test/v1/backup/get" {
+				t.Fatalf("unexpected post URL: %s", url)
+			}
+			return httpResponse(http.StatusOK, []byte(`{"result":"https://download.startram.test/blob"}`)), nil
+		},
+		getFn: func(url string) (*http.Response, error) {
+			if url != "https://download.startram.test/blob" {
+				t.Fatalf("unexpected get URL: %s", url)
+			}
 			return httpResponse(http.StatusOK, encrypted), nil
 		},
 	}

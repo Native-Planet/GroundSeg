@@ -1,6 +1,7 @@
 package routines
 
 import (
+	"context"
 	"fmt"
 	"groundseg/broadcast"
 	"groundseg/config"
@@ -20,6 +21,31 @@ func PackScheduleLoop() {
 	//ticker := time.NewTicker(15 * time.Second)
 	for {
 		select {
+		case <-broadcast.SchedulePackEvents():
+			if err := queuePack(); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))
+			}
+		case <-ticker.C:
+			if err := queuePack(); err != nil {
+				zap.L().Error(fmt.Sprintf("Failed to make pack queue with ticker: %v", err))
+			}
+		}
+	}
+}
+
+func PackScheduleLoopWithContext(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := queuePack(); err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to make initial pack queue: %v", err))
+	}
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
 		case <-broadcast.SchedulePackEvents():
 			if err := queuePack(); err != nil {
 				zap.L().Error(fmt.Sprintf("Failed to make pack queue with channel: %v", err))

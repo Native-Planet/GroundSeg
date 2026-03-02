@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/shipworkflow"
 	"groundseg/structs"
 	"strings"
@@ -14,13 +15,13 @@ import (
 )
 
 var (
-	publishUrbitTransitionFn    = docker.PublishUrbitTransition
-	getShipStatusFn             = docker.GetShipStatus
+	publishUrbitTransitionFn    = events.PublishUrbitTransition
+	getShipStatusFn             = orchestration.GetShipStatus
 	barExitFn                   = click.BarExit
-	stopContainerByNameFn       = docker.StopContainerByName
+	stopContainerByNameFn       = orchestration.StopContainerByName
 	updateUrbitFn               = config.UpdateUrbit
-	startContainerFn            = docker.StartContainer
-	forceUpdateContainerStatsFn = docker.ForceUpdateContainerStats
+	startContainerFn            = orchestration.StartContainer
+	forceUpdateContainerStatsFn = orchestration.ForceUpdateContainerStats
 	waitCompleteFn              = func(patp string) error {
 		return WaitComplete(patp)
 	}

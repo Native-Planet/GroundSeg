@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"groundseg/broadcast"
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/structs"
 	"groundseg/testutil"
 )
@@ -31,10 +31,10 @@ func TestImportShipTransitionHandlerAppliesUploadTransitions(t *testing.T) {
 	errMsg := "error-" + suffix
 	extracted := 77
 
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "status", Event: status})
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "error", Event: errMsg})
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: extracted})
+	events.PublishImportShipTransition(structs.UploadTransition{Type: "status", Event: status})
+	events.PublishImportShipTransition(structs.UploadTransition{Type: "patp", Event: patp})
+	events.PublishImportShipTransition(structs.UploadTransition{Type: "error", Event: errMsg})
+	events.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: extracted})
 
 	testutil.WaitForCondition(t, func() bool {
 		state := broadcast.GetState()
@@ -56,7 +56,7 @@ func TestImportShipTransitionHandlerIgnoresUnknownTransitionTypes(t *testing.T) 
 	initial.Upload.Extracted = 42
 	broadcast.UpdateBroadcast(initial)
 
-	docker.PublishImportShipTransition(structs.UploadTransition{Type: "unknown", Event: "ignored"})
+	events.PublishImportShipTransition(structs.UploadTransition{Type: "unknown", Event: "ignored"})
 	time.Sleep(100 * time.Millisecond)
 
 	state := broadcast.GetState()

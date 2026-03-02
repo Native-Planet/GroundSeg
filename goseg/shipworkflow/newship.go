@@ -9,7 +9,8 @@ import (
 	"go.uber.org/zap"
 
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/shipcleanup"
 	"groundseg/shipcreator"
 	"groundseg/startram"
@@ -31,21 +32,21 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 	}
 
 	zap.L().Info(fmt.Sprintf("Preparing environment for pier: %v", patp))
-	if err = docker.DeleteContainer(patp); err != nil {
+	if err = orchestration.DeleteContainer(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("delete container error: %v", err))
 	}
-	if err = docker.DeleteVolume(patp); err != nil {
+	if err = orchestration.DeleteVolume(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("delete volume error: %v", err))
 	}
 
 	if customDrive == "" {
-		if err = docker.CreateVolume(patp); err != nil {
+		if err = orchestration.CreateVolume(patp); err != nil {
 			errmsg := fmt.Sprintf("create volume error: %v", err)
 			zap.L().Error(errmsg)
 			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
 		}
 		key := shipPayload.Payload.Key
-		if err = docker.WriteFileToVolume(patp, patp+".key", key); err != nil {
+		if err = orchestration.WriteFileToVolume(patp, patp+".key", key); err != nil {
 			errmsg := fmt.Sprintf("write file to volume error: %v", err)
 			zap.L().Error(errmsg)
 			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
@@ -68,8 +69,8 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 	}
 
 	zap.L().Info(fmt.Sprintf("Creating Pier: %v", patp))
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "creating"})
-	info, err := docker.StartContainer(patp, "vere")
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "creating"})
+	info, err := orchestration.StartContainer(patp, "vere")
 	if err != nil {
 		errmsg := fmt.Sprintf("start container error: %v", err)
 		zap.L().Error(errmsg)
@@ -82,10 +83,10 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 		go RegisterNewShipServices(patp)
 	}
 	if conf.PenpaiAllow {
-		if err := docker.StopContainerByName("llama"); err != nil {
+		if err := orchestration.StopContainerByName("llama"); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't stop Llama: %v", err))
 		}
-		_, err := docker.StartContainer("llama", "llama")
+		_, err := orchestration.StartContainer("llama", "llama")
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't restart Llama: %v", err))
 		}
@@ -99,13 +100,13 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 	patp := shipPayload.Payload.Patp
 	remote := shipPayload.Payload.Remote
 
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "booting"})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "booting"})
 	zap.L().Info(fmt.Sprintf("Booting ship: %v", patp))
 	WaitForBootCode(patp, 1*time.Second)
 
 	conf := config.Conf()
 	if conf.WgRegistered && conf.WgOn && remote {
-		docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "remote"})
+		events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "remote"})
 		WaitForRemoteReady(patp, 1*time.Second)
 		if err := SwitchShipToWireguard(patp, false); err != nil {
 			errmsg := fmt.Sprintf("%v", err)
@@ -116,9 +117,9 @@ func waitForNewShipReady(shipPayload structs.WsNewShipPayload, customDrive strin
 	}
 
 	startram.SyncRetrieve()
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "completed"})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "completed"})
 	if conf.PenpaiAllow {
-		docker.StartContainer("llama-gpt-api", "llama-api")
+		orchestration.StartContainer("llama-gpt-api", "llama-api")
 	}
 }
 
@@ -129,8 +130,8 @@ func RegisterNewShipServices(patp string) {
 }
 
 func handleNewShipErrorCleanup(patp, errmsg, customDrive string) error {
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "aborted"})
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: "aborted"})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "error", Event: fmt.Sprintf("%v", errmsg)})
 	zap.L().Info(fmt.Sprintf("New ship creation failed: %s: %s", patp, errmsg))
 	zap.L().Info(fmt.Sprintf("Running cleanup routine"))
 	customPierPath := ""

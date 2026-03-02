@@ -1,0 +1,84 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.5,
+    "test_strategy": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "c2c_service.go exposes a `C2CService` interface with a generic `Execute(action actions.Action, ssid, password string) error` method while action parsing/dispatch is also defined in the same package via a local `c2cActionDispatcher`.",
+        "`ProcessC2CMessage` accepts any `C2CService` from `serviceFactory` and directly calls `service.Execute`, so consumers can bypass the shared action contract path (`ParseC2CAction` / `NewActionDispatcher`) by providing an alternate implementation.",
+        "The protocol contract is centralized in actions.go (`ParseAction`, `actionMetasForNamespace`, `SupportedC2CActions`), but `system/wifi/service` still requires each caller to trust injected implementations to honor that contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "`C2CServiceExecutor` stores `connectToWiFi` and `restartGroundSeg` as function fields and calls them directly with no nil guards.",
+        "`ProcessC2CMessage` validates only the factory and service object, but does not validate function-level invariants before dispatch, so miswired adapters can panic at runtime instead of returning deterministic errors.",
+        "The README-level governance for this batch emphasizes contract-boundary quality gates, but this file-level critical path has no local precondition tests for constructor/dispatcher wiring failures."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c-exposed-execute-bypass",
+      "summary": "Wi‑Fi C2C command contract is not sealed: injected services can execute raw actions without the shared protocol dispatcher contract.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`c2c_service.go` defines `C2CService` with `Execute(action actions.Action, ssid, password string) error` and `ProcessC2CMessage` invokes that method on any provided service.",
+        "The same file also defines `c2cActionDispatcher` and action-binding logic, so contract enforcement exists but is not guaranteed by interface shape.",
+        "This creates two execution paths for C2C actions depending on implementation choice, weakening boundary integrity between protocol contracts and runtime service behavior."
+      ],
+      "suggestion": "Refactor the interface so `Execute` is not publicly substitutable: keep `C2CService` focused on domain operations (`ConnectToWiFi`, `RestartGroundSeg`) and move action dispatch into a package-private function that always goes through the action contract parser/dispatcher. Add an explicit adapter-level test that proves every supported action routes through `actions.NewActionDispatcher`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c-contract-boundary"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c-service-nil-dependency-paths",
+      "summary": "Critical Wi‑Fi adapter service constructor path has unguarded runtime panic potential that is not covered by local contract tests.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`NewC2CServiceForAdapter` accepts `connectToWiFi` and `restartGroundSeg` function arguments without validation.",
+        "`ConnectToWiFi` and `RestartGroundSeg` dereference those function fields directly (`s.connectToWiFi(...)`, `s.restartGroundSeg(...)`) with no nil guard.",
+        "Governance docs in `README.md` call out explicit runtime boundary and quality expectations for contract-bearing paths, but this code path has no local guardrails and would fail via panic rather than deterministic error.",
+        "Existing expectations imply adapter boundary behavior should be robustly tested for contract miswiring, especially in command execution entry points."
+      ],
+      "suggestion": "Add precondition checks in `NewC2CServiceForAdapter` (or the methods) that return a clear error when dependencies are nil, and add tests for miswired adapter dependencies to lock behavior (error propagation instead of panic).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "c2c-contract-boundary"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Unsealed service interface allows command execution to bypass shared protocol dispatch contract.",
+      "Constructor-time dependency validation is deferred until invocation, making runtime safety dependent on correct wiring discipline."
+    ],
+    "likely_symptoms": [
+      "c2c-exposed-execute-bypass",
+      "c2c-service-nil-dependency-paths"
+    ],
+    "possible_false_positives": [
+      "If adapter factories are constrained by build-time patterns not visible in this file set, the bypass risk may be lower than modeled."
+    ]
+  }
+}

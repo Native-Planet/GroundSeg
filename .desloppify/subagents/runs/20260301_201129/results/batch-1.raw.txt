@@ -1,0 +1,72 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 86.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines `ProtocolVersion = \"1.0\"`, but this version constant is not consulted by action parsing or dispatch in `goseg/uploadsvc/adapters/upload_payload.go` and `goseg/uploadsvc/service.go`.",
+        "`goseg/click/filter.go` introduces a thin `filterResponse` shim that only forwards to `response.ParsePokeResponse`, while production call chains in `goseg/click/internal/runtime/runtime.go` and package users in `goseg/click/restore/restore.go` use `runtime.FilterResponse` directly."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Version contract is defined but never enforced at module boundaries; response parsing shims exist in parallel with active paths, creating avoidable ambiguity in where the canonical boundary logic lives."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "UNUSED-PROTOCOL-VERSION",
+      "summary": "Protocol version constant is a dead artifact and does not enforce cross-module compatibility at the action boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/adapters/upload_payload.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`ProtocolVersion` is declared in `goseg/protocol/actions/actions.go` with no references outside that file.",
+        "Upload action intake in `goseg/uploadsvc/adapters/upload_payload.go` validates only action token strings, and `goseg/uploadsvc/service.go` routes via `actions.ParseUploadAction` without any explicit protocol version check.",
+        "There is no version gate before dispatch and no compatibility fail-fast path at this boundary."
+      ],
+      "suggestion": "Either remove `ProtocolVersion` or enforce it in the websocket action intake path (e.g., include version in incoming payload/header, validate in `ParseAction`/adapter layer, and reject mismatched clients before dispatch) to keep protocol contract checks centralized.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_orphaning"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "ORPHANED-RESPONSE-SHIM",
+      "summary": "An extra click-level response shim exists separately from the active runtime parser path, creating duplicated boundaries and a stale module entry point.",
+      "related_files": [
+        "goseg/click/filter.go",
+        "goseg/click/internal/runtime/runtime.go",
+        "goseg/click/restore/restore.go"
+      ],
+      "evidence": [
+        "`goseg/click/filter.go` defines `filterResponse` as a one-line pass-through to `response.ParsePokeResponse` and retains commented legacy logic.",
+        "Production call paths in `goseg/click/restore/restore.go` depend on `runtime.FilterResponse`, not `filterResponse` in `goseg/click/filter.go`.",
+        "A live parser boundary already exists in `goseg/click/internal/runtime/runtime.go`, making `filterResponse` an additional unconsumed indirection layer."
+      ],
+      "suggestion": "Delete or retire `goseg/click/filter.go` and standardize on a single parser boundary (`runtime.FilterResponse` or another explicit shared abstraction), then remove the duplicate shim and commented legacy block.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_shims"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "contract_orphaning",
+      "duplicated_shims"
+    ],
+    "likely_symptoms": [
+      "UNUSED-PROTOCOL-VERSION",
+      "ORPHANED-RESPONSE-SHIM"
+    ],
+    "possible_false_positives": []
+  }
+}

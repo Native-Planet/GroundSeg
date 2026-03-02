@@ -3,10 +3,11 @@ package router
 import (
 	"encoding/json"
 	"fmt"
-	"groundseg/handler/api"
+	"groundseg/handler/authsvc"
 	"groundseg/handler/ship"
 	"groundseg/handler/system"
 	"groundseg/leakchannel"
+	"groundseg/shipworkflow"
 	"groundseg/structs"
 
 	"go.uber.org/zap"
@@ -15,12 +16,16 @@ import (
 var (
 	urbitHandlerForLeak    = ship.UrbitHandler
 	penpaiHandlerForLeak   = system.PenpaiHandler
-	newShipHandlerForLeak  = api.NewShipHandler
+	newShipHandlerForLeak  = handleNewShipForLeak
 	systemHandlerForLeak   = system.SystemHandler
 	startramHandlerForLeak = system.StartramHandler
 	supportHandlerForLeak  = system.SupportHandler
-	pwHandlerForLeak       = api.PwHandler
+	pwHandlerForLeak       = authsvc.PwHandler
 )
+
+func handleNewShipForLeak(payload []byte) error {
+	return shipworkflow.HandleNewShip(payload, shipworkflow.HandleNewShipBoot, shipworkflow.CancelNewShip, shipworkflow.ResetNewShip)
+}
 
 func HandleLeakAction() {
 	// no:
@@ -29,12 +34,29 @@ func HandleLeakAction() {
 	// logs
 	for {
 		action := <-leakchannel.LeakAction
-		if action.Auth {
-			gallsegAuthedHandler(action)
-			continue
-		}
-		gallsegUnauthHandler(action)
+		safelyHandleLeakAction(action)
 	}
+}
+
+func safelyHandleLeakAction(action leakchannel.ActionChannel) {
+	if action.Auth {
+		safely(func() {
+			gallsegAuthedHandler(action)
+		}, "gallsegAuthedHandler", action)
+		return
+	}
+	safely(func() {
+		gallsegUnauthHandler(action)
+	}, "gallsegUnauthHandler", action)
+}
+
+func safely(fn func(), handlerName string, action leakchannel.ActionChannel) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			zap.L().Error(fmt.Sprintf("Recovered panic in %s for action=%s patp=%s: %v", handlerName, action.Type, action.Patp, recovered))
+		}
+	}()
+	fn()
 }
 
 func Initialize() {
@@ -54,42 +76,57 @@ func gallsegUnauthHandler(action leakchannel.ActionChannel) {
 	if urbitPayload.Payload.Patp != action.Patp {
 		return
 	}
-	if err := urbitHandlerForLeak(action.Content); err != nil {
-		zap.L().Error(fmt.Sprintf("%+v", err))
-		return
-	}
+	safely(func() {
+		if err := urbitHandlerForLeak(action.Content); err != nil {
+			zap.L().Error(fmt.Sprintf("%+v", err))
+		}
+	}, "urbitHandlerForLeak", action)
 }
 
 func gallsegAuthedHandler(action leakchannel.ActionChannel) {
 	switch action.Type {
 	case "urbit":
-		if err := urbitHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%+v", err))
-		}
+		safely(func() {
+			if err := urbitHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("%+v", err))
+			}
+		}, "urbitHandlerForLeak", action)
 	case "penpai":
-		if err := penpaiHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
+		safely(func() {
+			if err := penpaiHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("%v", err))
+			}
+		}, "penpaiHandlerForLeak", action)
 	case "new_ship":
-		if err := newShipHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
+		safely(func() {
+			if err := newShipHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("%v", err))
+			}
+		}, "newShipHandlerForLeak", action)
 	case "system":
-		if err := systemHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
+		safely(func() {
+			if err := systemHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("%v", err))
+			}
+		}, "systemHandlerForLeak", action)
 	case "startram":
-		if err := startramHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
+		safely(func() {
+			if err := startramHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("%v", err))
+			}
+		}, "startramHandlerForLeak", action)
 	case "support":
-		if err := supportHandlerForLeak(action.Content); err != nil {
-			zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
-		}
+		safely(func() {
+			if err := supportHandlerForLeak(action.Content); err != nil {
+				zap.L().Error(fmt.Sprintf("Error creating bug report: %v", err))
+			}
+		}, "supportHandlerForLeak", action)
 	case "password":
-		if err := pwHandlerForLeak(action.Content, true); err != nil {
-			zap.L().Error(fmt.Sprintf("%v", err))
-		}
+		safely(func() {
+			if err := pwHandlerForLeak(action.Content, true); err != nil {
+				zap.L().Error(fmt.Sprintf("%v", err))
+			}
+		}, "pwHandlerForLeak", action)
 	default:
 		zap.L().Error(fmt.Sprintf("Invalid gallseg action: %v", action.Type))
 	}

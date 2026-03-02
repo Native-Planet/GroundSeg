@@ -1,0 +1,88 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 79.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "goseg/importer/importer.go logs ACME/configure errors without returning in finalize flow (finalizeImportedPierReadiness:960-963), while sibling steps in the same workflow return wrapped errors.",
+        "prepareImportedPierEnvironment treats DeleteContainer/DeleteVolume failures as informational only (987-992), so caller cannot distinguish setup failures from non-fatal cleanup events.",
+        "startServerWithRuntime returns nil on the first ErrServerClosed event from one listener without confirming the other listener has not already returned a hard failure (main.go:359-366)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "importer_acme_fix_error_swallowed",
+      "summary": "Imported pier post-processing ignores ACME fix failures and continues as success.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "In finalizeImportedPierReadiness, when ctx.Fix is true, acme.Fix errors are only logged and not propagated (lines 960-963), so callers still get nil and mark readiness as successful.",
+        "The same function later returns wrapped errors on wireguard switch failures, indicating this omission is inconsistent within one function's error contract."
+      ],
+      "suggestion": "Propagate acme.Fix failure as a wrapped error (or classify it as a typed soft-fail), and explicitly choose whether import should abort or continue; add a test that asserts the function fails when acme.Fix returns an error in finalized import path.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "importer_cleanup_error_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "importer_cleanup_delete_errors_ignored",
+      "summary": "Import environment cleanup errors are logged but not surfaced, masking real setup failures.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "prepareImportedPierEnvironment swallows DeleteContainer/DeleteVolume errors and continues to CreateVolume/MkdirAll (987-997), so stale container/volume state can persist or be silently bypassed.",
+        "This block is in an error-returning setup function where adjacent calls (CreateUrbitConfig, AppendSysConfigPier, CreateVolume, os.MkdirAll) use explicit `return fmt.Errorf(...)` semantics."
+      ],
+      "suggestion": "Replace blind log-and-continue with explicit handling: propagate unexpected failures, explicitly allow and wrap expected no-op cases (e.g., already absent), and add regression tests for deletion failures with different sentinel errors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "importer_cleanup_error_contract"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "server_listener_unexpected_error_masking",
+      "summary": "HTTP/websocket startup can hide a failed listener behind a graceful shutdown from the other listener.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "startServerWithRuntime returns nil on listener.ErrServerClosed, but only after the first listener event is received (359-366), without verifying no prior/future unexpected listener error occurred.",
+        "The tests assert listener failure is surfaced, but do not cover the reverse-order race where one listener exits ErrServerClosed while the other exits with non-nil error."
+      ],
+      "suggestion": "Track listener outcomes and only return nil when both listeners have exited with graceful shutdown (or context cancellation), otherwise return the first non-nil unexpected error; add a test that simulates one listener returning ErrServerClosed and the other returning a real error.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Import workflow lacks explicit cleanup error contract: operations intended as cleanup are mixed with critical setup steps but use inconsistent return behavior.",
+      "Listener lifecycle coordination uses first-response semantics rather than aggregate error handling across concurrent server goroutines."
+    ],
+    "likely_symptoms": [
+      "importer_acme_fix_error_swallowed",
+      "importer_cleanup_delete_errors_ignored",
+      "server_listener_unexpected_error_masking"
+    ],
+    "possible_false_positives": [
+      "Not all `fmt.Errorf(\"%v\", err)` usage in listed files indicates a bug; some paths may intentionally emit human-facing messages without classification-based handling."
+    ]
+  }
+}

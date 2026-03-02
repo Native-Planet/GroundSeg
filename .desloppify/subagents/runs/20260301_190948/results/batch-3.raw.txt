@@ -1,0 +1,72 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 84.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error handling across core I/O and startup boundaries is split between wrapped/contextual returns (`fmt.Errorf(\"...: %w\", err)`) and raw `return err`, which produces uneven failure observability and inconsistent caller behavior.",
+        "Startup code mixes abort-on-error behavior with silent continuation in the same top-level flow, while still containing hard terminators (`panic`, `os.Exit`) in other paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_boundary_error_wrapping",
+      "summary": "Boundary functions mix raw error returns with wrapped/contextual errors, creating inconsistent failure contracts.",
+      "related_files": [
+        "goseg/config/wireguard.go",
+        "goseg/click/backup/service.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "In `goseg/config/wireguard.go`, `GetWgConf` and `CreateDefaultWGConf` return raw underlying errors (`return wgConf, err`, `return err`) for I/O/encode failures without operation context.",
+        "In `goseg/click/backup/service.go`, `backupAgent` returns `err` directly from `executeClickCommandForBackup`, while nearby failures are wrapped with command/component context before returning.",
+        "In `goseg/docker/lifecycle/lifecycle.go`, several container runtime helpers (`createAndStartContainer`, parts of `GetShipStatus`, and other wrappers) return raw `err` despite the surrounding flow being heavily contextualized."
+      ],
+      "suggestion": "Establish a shared boundary error pattern (for example, wrap all external I/O/command failures with `%w` and a consistent operation prefix) and apply it across these modules. This improves logs, `errors.Is`/`errors.As` usability, and failure triage consistency.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_wrapping_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_fatal_error_strategy_in_bootstrap",
+      "summary": "Critical startup paths use hard process termination instead of a consistent error propagation contract.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "In `goseg/main.go`, `init()` executes `panic(err)` when embedded content setup fails (`fs.Sub` error), skipping normal error reporting and shutdown paths.",
+        "In `goseg/main.go`, `killSwitch()` calls `os.Exit(0)` on debug mode, terminating the process directly from a loop routine instead of returning an error through caller control.",
+        "The same startup layer otherwise uses normal `return`/logging-based error handling for other subsystem failures, so fatal handling strategy is inconsistent across adjacent startup code paths."
+      ],
+      "suggestion": "Refactor bootstrap to keep one failure contract: return structured errors from initialization entry points, route them through a single central error handler/logger, and avoid direct `panic`/`os.Exit` in favor of cancellation/cleanup-aware shutdown.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fatal_error_strategy_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No shared error-boundary policy across subsystem interfaces, causing inconsistent wrapping and surfacing behavior.",
+      "Mixed process-level termination semantics in startup/runtime orchestration rather than a centralized error contract."
+    ],
+    "likely_symptoms": [
+      "Error diagnostics lose root-cause chainability (`errors.Is`/`errors.As` less useful) across modules.",
+      "Debug startup behavior is harder to reason about because fatal and recoverable failures are handled inconsistently."
+    ],
+    "possible_false_positives": [
+      "Some raw error returns in lower-level routines may be intentional to preserve original errors for upstream classification, but this is not applied consistently."
+    ]
+  }
+}

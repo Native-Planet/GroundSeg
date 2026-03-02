@@ -4,25 +4,12 @@ import (
 	"fmt"
 
 	"groundseg/click/internal/runtime"
-	"groundseg/click/luscode"
 	"groundseg/structs"
 )
 
 var (
-	createHoonForHark     = runtime.CreateHoon
-	deleteHoonForHark     = runtime.DeleteHoon
-	clickExecForHark      = runtime.ClickExec
-	filterResponseForHark = runtime.FilterResponse
-	clearLusCode          = luscode.ClearLusCode
+	executeClickCommandForHark = runtime.ExecuteCommandWithSuccess
 )
-
-func createHoonForNotification(patp, file, hoon string) error {
-	if err := createHoonForHark(patp, file, hoon); err != nil {
-		return err
-	}
-	clearLusCode(patp)
-	return nil
-}
 
 type harkNotification struct {
 	file       string
@@ -64,21 +51,17 @@ func buildHarkAddYarnHoon(notification harkNotification) string {
 
 func sendHarkNotification(patp string, notification harkNotification) error {
 	hoon := buildHarkAddYarnHoon(notification)
-	if err := createHoonForNotification(patp, notification.file, hoon); err != nil {
-		return fmt.Errorf("%s failed to create hoon: %w", notification.errorLabel, err)
-	}
-	defer deleteHoonForHark(patp, notification.file)
-
-	response, err := clickExecForHark(patp, notification.file, "")
+	_, err := executeClickCommandForHark(
+		patp,
+		notification.file,
+		hoon,
+		"",
+		"success",
+		notification.errorLabel,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("%s failed to execute hoon: %w", notification.errorLabel, err)
-	}
-	_, succeeded, err := filterResponseForHark("success", response)
-	if err != nil {
-		return fmt.Errorf("%s failed to parse response: %w", notification.errorLabel, err)
-	}
-	if !succeeded {
-		return fmt.Errorf("%s failed poke for %s", notification.errorLabel, patp)
 	}
 	return nil
 }

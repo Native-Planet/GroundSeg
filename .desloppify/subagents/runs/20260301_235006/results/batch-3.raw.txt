@@ -1,0 +1,32 @@
+{
+  "batch": "AI Debt & Migrations",
+  "batch_index": 3,
+  "assessments": {
+    "low_level_elegance": 93.0
+  },
+  "dimension_notes": {
+    "low_level_elegance": {
+      "evidence": [
+        "Both `goseg/startram/doc.go` and `goseg/uploadsvc/doc.go` contain long normative package-level prose that defines behavioral contracts, while these files have almost no executable content of their own.",
+        "The blind packet flags both files as AI-debt signal outliers (`comment_ratio`: 0.83 for `goseg/startram/doc.go`, 0.91 for `goseg/uploadsvc/doc.go`) versus codebase average 0.027, indicating unusually high comment density and higher maintenance burden if contracts change.",
+        "The `goseg/uploadsvc/doc.go` text encodes dispatch/contract alignment expectations (`SupportedActions`, `DescribeAction`, `ParseAction`) that must be manually kept in sync with runtime paths."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Reduce the contract-like assertions in package docs into a single canonical governance artifact (e.g., package-level ADR or GOVERNANCE.md + focused tests), and keep package docs concise so they describe purpose rather than duplicating operational invariants."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "Contract text is embedded in package docs as normative documentation instead of a dedicated, testable boundary contract location, creating drift risk over time."
+    ],
+    "likely_symptoms": [
+      "Stale boundary assumptions when action sets or error-handling policies evolve."
+    ],
+    "possible_false_positives": [
+      "High comment ratio is partly an artifact of short file size; these are package docs, so some verbosity is expected."
+    ]
+  }
+}

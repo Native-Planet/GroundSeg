@@ -2,6 +2,7 @@ package logger
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,18 +12,20 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func resetLoggerGlobalsForTest(t *testing.T) {
 	t.Helper()
 	originalLogPath := LogPath
-	originalSysSessions := SysLogSessions
-	originalToRemove := SysSessionsToRemove
+	originalSysSessions := SysLogSessions()
+	originalToRemove := SysSessionsToRemove()
 
 	t.Cleanup(func() {
 		LogPath = originalLogPath
-		SysLogSessions = originalSysSessions
-		SysSessionsToRemove = originalToRemove
+		SetSysLogSessions(originalSysSessions)
+		SetSysSessionsToRemove(originalToRemove)
 	})
 }
 
@@ -127,15 +130,89 @@ func TestPrevSysLogfileUsesPreviousMonth(t *testing.T) {
 
 func TestMakeLogPathHandlesRelativeAndAbsoluteBasePath(t *testing.T) {
 	t.Setenv("GS_BASE_PATH", "relative/path")
-	relativePath := makeLogPath()
-	if relativePath != "/opt/nativeplanet/groundseg/logs/" && relativePath != "/media/data/logs/" {
+	relativePath, err := makeLogPath()
+	if err != nil {
+		t.Fatalf("makeLogPath failed: %v", err)
+	}
+	if relativePath != "/opt/nativeplanet/groundseg/logs/" && relativePath != "/media/data/logs/" && relativePath != "/opt/nativeplanet/groundseg/logs" {
 		t.Fatalf("unexpected relative-path fallback result: %q", relativePath)
 	}
 
 	t.Setenv("GS_BASE_PATH", "/tmp/groundseg-logger-test")
-	absolutePath := makeLogPath()
-	if absolutePath != "/tmp/groundseg-logger-test/logs/" && absolutePath != "/media/data/logs/" {
+	absolutePath, err := makeLogPath()
+	if err != nil {
+		t.Fatalf("makeLogPath failed: %v", err)
+	}
+	if absolutePath != "/tmp/groundseg-logger-test/logs/" && absolutePath != "/media/data/logs/" && absolutePath != "/tmp/groundseg-logger-test/logs" {
 		t.Fatalf("unexpected absolute-path result: %q", absolutePath)
+	}
+}
+
+func resetLoggerInitForTest(t *testing.T) {
+	t.Helper()
+	originalErr := loggerInitErr
+	originalState := loggerInitState
+	originalMkdir := mkdirAllFn
+	t.Cleanup(func() {
+		loggerInitErr = originalErr
+		loggerInitState = originalState
+		mkdirAllFn = originalMkdir
+	})
+	loggerInitState = loggerInitNotInitialized
+	loggerInitErr = nil
+}
+
+func TestInitializeReturnsErrorWhenLogDirectoryFails(t *testing.T) {
+	resetLoggerInitForTest(t)
+	mkdirAllFn = func(_ string, _ os.FileMode) error {
+		return errors.New("permission denied")
+	}
+
+	err := Initialize()
+	if err == nil {
+		t.Fatalf("expected Initialize to return an error when log directory creation fails")
+	}
+	if !strings.Contains(err.Error(), "log path fallback failed") && !strings.Contains(err.Error(), "configured log path unavailable") {
+		t.Fatalf("expected fallback-init error, got: %v", err)
+	}
+	if LogPath != loggerFallbackLogPath {
+		t.Fatalf("expected fallback log path to be used, got %q", LogPath)
+	}
+}
+
+func TestInitializeSucceedsWithConfiguredPath(t *testing.T) {
+	resetLoggerInitForTest(t)
+	tmpDir := filepath.Join(t.TempDir(), "groundseg-logs")
+	t.Setenv("GS_BASE_PATH", tmpDir)
+	mkdirAllFn = func(path string, _ os.FileMode) error {
+		return nil
+	}
+
+	err := Initialize()
+	if err != nil {
+		t.Fatalf("expected Initialize to succeed with writable configured path, got: %v", err)
+	}
+}
+
+func TestLoggerLevelFromArgs(t *testing.T) {
+	if got, want := loggerLevelFromArgs([]string{}), zap.InfoLevel; got != want {
+		t.Fatalf("expected default level %v, got %v", want, got)
+	}
+	if got, want := loggerLevelFromArgs([]string{"server", "dev"}), zap.DebugLevel; got != want {
+		t.Fatalf("expected dev level %v, got %v", want, got)
+	}
+}
+
+func TestBuildLoggerRespectsLevel(t *testing.T) {
+	logger := buildLogger(zapcore.ErrorLevel)
+	if logger == nil {
+		t.Fatal("expected logger to be created")
+	}
+	if entry := logger.Check(zapcore.ErrorLevel, "err"); entry == nil {
+		t.Fatal("expected error level logs to be enabled")
+	}
+	if entry := logger.Check(zapcore.DebugLevel, "dbg"); entry != nil {
+		t.Fatalf("unexpected debug logs to be enabled with error-level logger")
 	}
 }
 
@@ -145,16 +222,16 @@ func TestRemoveSysSessionsDropsQueuedConnections(t *testing.T) {
 	a := &websocket.Conn{}
 	b := &websocket.Conn{}
 	c := &websocket.Conn{}
-	SysLogSessions = []*websocket.Conn{a, b, c}
-	SysSessionsToRemove = []*websocket.Conn{b}
+	SetSysLogSessions([]*websocket.Conn{a, b, c})
+	SetSysSessionsToRemove([]*websocket.Conn{b})
 
 	RemoveSysSessions()
 
-	if !reflect.DeepEqual(SysLogSessions, []*websocket.Conn{a, c}) {
-		t.Fatalf("unexpected remaining sessions: %+v", SysLogSessions)
+	if !reflect.DeepEqual(SysLogSessions(), []*websocket.Conn{a, c}) {
+		t.Fatalf("unexpected remaining sessions: %+v", SysLogSessions())
 	}
-	if len(SysSessionsToRemove) != 0 {
-		t.Fatalf("expected SysSessionsToRemove to be cleared, got %+v", SysSessionsToRemove)
+	if len(SysSessionsToRemove()) != 0 {
+		t.Fatalf("expected SysSessionsToRemove to be cleared, got %+v", SysSessionsToRemove())
 	}
 }
 

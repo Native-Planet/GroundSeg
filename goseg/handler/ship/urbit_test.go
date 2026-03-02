@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"groundseg/shipworkflow"
-	"net"
 	"strings"
 	"testing"
 	"time"
@@ -99,6 +98,26 @@ func TestUrbitHandlerRejectsMalformedPayload(t *testing.T) {
 	}
 }
 
+func TestUrbitHandlerRecoversFromPanicInAction(t *testing.T) {
+	originalCommands := urbitCommands
+	t.Cleanup(func() {
+		urbitCommands = originalCommands
+	})
+
+	urbitCommands = map[string]urbitCommand{
+		"panic-action": func(string, structs.WsUrbitPayload) error {
+			panic("boom")
+		},
+	}
+	err := UrbitHandler(buildUrbitPayload(t, "panic-action", "~zod"))
+	if err == nil {
+		t.Fatal("expected panic to be recovered and returned as error")
+	}
+	if !strings.Contains(err.Error(), "panic handling urbit action panic-action") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func resetUrbitTestSeams() func() {
 	originalStatus := urbitGetShipStatus
 	originalCleanDelete := urbitCleanDeleteFn
@@ -111,7 +130,6 @@ func resetUrbitTestSeams() func() {
 		waitCompleteFn = originalWaitCompleteFn
 		urbitCleanDeleteFn = originalCleanDelete
 		areSubdomainsAliasesFn = originalAliasFn
-		shipworkflow.SetAliasCNAMELookup(net.LookupCNAME)
 	}
 }
 
@@ -137,10 +155,12 @@ func TestAreSubdomainsAliasesUsesAltCnameBypass(t *testing.T) {
 	})
 
 	config.SetStartramConfig(structs.StartramRetrieve{Cname: "alt.example"})
-	shipworkflow.SetAliasCNAMELookup(func(string) (string, error) {
-		t.Fatal("lookupCNAME should not be called when cname bypass matches")
-		return "", nil
-	})
+	areSubdomainsAliasesFn = func(domain1, domain2 string) (bool, error) {
+		return shipworkflow.AreSubdomainsAliasesWithLookup(func(string) (string, error) {
+			t.Fatal("lookupCNAME should not be called when cname bypass matches")
+			return "", nil
+		}, domain1, domain2)
+	}
 
 	isAlias, err := AreSubdomainsAliases("ship.alt.example", "ignored.example")
 	if err != nil {
@@ -165,13 +185,15 @@ func TestAreSubdomainsAliasesComparesResolvedCnames(t *testing.T) {
 		"b.example": "shared.target.",
 		"c.example": "other.target.",
 	}
-	shipworkflow.SetAliasCNAMELookup(func(domain string) (string, error) {
-		resolved, ok := lookupResults[domain]
-		if !ok {
-			return "", errors.New("missing lookup")
-		}
-		return resolved, nil
-	})
+	areSubdomainsAliasesFn = func(domain1, domain2 string) (bool, error) {
+		return shipworkflow.AreSubdomainsAliasesWithLookup(func(domain string) (string, error) {
+			resolved, ok := lookupResults[domain]
+			if !ok {
+				return "", errors.New("missing lookup")
+			}
+			return resolved, nil
+		}, domain1, domain2)
+	}
 
 	matched, err := AreSubdomainsAliases("a.example", "b.example")
 	if err != nil {

@@ -1,0 +1,131 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 75.4
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "System support flow and ship lifecycle flows interleave request handling, orchestration, and execution side effects in the same packages/functions.",
+        "The importer and broadcast packages each retain mutable shared state (session registries, collectors/transport registries, goroutine synchronization) while also owning protocol/routing logic.",
+        "Several handlers mutate long-lived runtime state directly rather than delegating through a narrow abstraction, creating coupled cross-cutting behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "dcf-support-orchestrator-conflation",
+      "summary": "Support upload path mixes request parsing, environment prep, archive creation, profiling, submission, and transition emission in one service path.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/handler/system/support.go"
+      ],
+      "evidence": [
+        "Handler creates a high-level support request context, then the service layer performs fs setup, archive creation, optional CPU profiling setup/sleep, artifact upload, and emits transition/notification events in one routine.",
+        "There is no clear decomposition boundary between orchestration logic and side-effecting transport/build steps."
+      ],
+      "suggestion": "Extract a dedicated support-orchestration coordinator interface and split responsibilities into: request adaptation, artifact preparation/compression, transport submission, and event emission. Each helper should return a status/result without performing unrelated lifecycle operations.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overloaded_orchestrators"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dcf-importer-session-state-fanout",
+      "summary": "Upload/import workflow depends on a shared in-memory session map and mutable session objects spread across multiple handlers.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/importer/importer_test.go"
+      ],
+      "evidence": [
+        "Importer logic maintains upload session state in package-level storage and accesses/mutates it across multiple request-level paths.",
+        "State transitions (create/update/finalize) are coupled to parse/auth/IO code in the same file, creating implicit ordering and lifecycle coupling that is hard to reason about and test.",
+        "Tests exercise session-driven behavior directly against this shared mechanism, indicating cross-cutting coupling rather than service-level abstraction."
+      ],
+      "suggestion": "Introduce a narrow `SessionStore` interface with explicit lifecycle methods and immutable request descriptors; implement session state as a separate component injected into handlers so import, auth, and persistence concerns are separated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "stateful_service_core_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dcf-broadcast-global-runtime-cohesion",
+      "summary": "Broadcast module combines registry lifecycle, transport orchestration, and collector execution responsibilities in a single global coordinator.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "The broadcast package owns global registries and synchronization while also driving start/stop lifecycle and forwarding behavior.",
+        "Collector code is tightly coupled to broadcaster execution paths instead of being isolated behind an interface, causing repeated orchestration branches and broad state mutation in one layer."
+      ],
+      "suggestion": "Define a collector interface contract and move collector lifecycle/state behind a registry service; keep `broadcast.go` focused on transport orchestration and remove shared mutable global state from core execution paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_abstraction_gap"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dcf-wifi-command-mix",
+      "summary": "WiFi subsystem fuses OS-command execution, AP/device lifecycle, and policy decisions in one service module, limiting portability and composability.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/system.go"
+      ],
+      "evidence": [
+        "WiFi logic performs platform command invocations while also deciding behavior, timing, and state transitions at the same layer.",
+        "Support/request-driven and runtime orchestration concerns are coupled to direct command execution, making behavior harder to substitute or test without shell-level side effects.",
+        "Related support and lifecycle pathways consume these WiFi outcomes directly, reinforcing a tightly coupled control graph."
+      ],
+      "suggestion": "Split WiFi into a thin orchestration layer plus injected execution adapters (shell/OS abstraction) and policy/decision functions; keep command invocation and transition logic in separate, swappable components.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "platform_tech_debt_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dcf-orchestration-pattern-duplication",
+      "summary": "Ship/docker lifecycle code repeats a common pattern of config mutation + restart/reconcile + transition publish across multiple handlers without shared abstraction.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "Multiple ship operation handlers perform similar sequences: mutate state/config, trigger lifecycle actions, and emit transition updates inline.",
+        "Common behavior is re-expressed per operation rather than delegated to a reusable orchestration primitive.",
+        "This increases drift risk (inconsistent sequencing/error handling) and makes each new operation harder to add safely."
+      ],
+      "suggestion": "Introduce a shared operation executor (validate -> mutate config -> perform lifecycle action -> publish transition) with explicit hooks, and migrate handlers to compose that flow.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orchestration_abstraction_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Cross-cutting orchestration concerns remain concentrated in implementation files instead of thin coordinators and explicit abstractions.",
+      "Global mutable runtime/session state is used as coordination mechanism across handlers.",
+      "Responsibility leakage across transport, lifecycle, and domain decision-making in hot paths."
+    ],
+    "likely_symptoms": [
+      "dcf-support-orchestrator-conflation",
+      "dcf-importer-session-state-fanout",
+      "dcf-broadcast-global-runtime-cohesion",
+      "dcf-wifi-command-mix",
+      "dcf-orchestration-pattern-duplication"
+    ],
+    "possible_false_positives": [
+      "Some coupling may be intentional for bootstrap-time startup paths where reduced indirection is a deliberate tradeoff; however the current patterns are broad and recurring enough to require explicit abstraction.
+    ]
+  }
+}

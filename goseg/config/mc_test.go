@@ -17,15 +17,15 @@ func resetMcSeams() {
 
 func TestCreateDefaultMcConfWritesDefaults(t *testing.T) {
 	t.Cleanup(resetMcSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	if err := CreateDefaultMcConf(); err != nil {
 		t.Fatalf("CreateDefaultMcConf failed: %v", err)
 	}
 
-	path := filepath.Join(BasePath, "settings", "mc.json")
+	path := filepath.Join(BasePath(), "settings", "mc.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read mc.json failed: %v", err)
@@ -41,9 +41,9 @@ func TestCreateDefaultMcConfWritesDefaults(t *testing.T) {
 
 func TestUpdateMcConfWritesVersionChannelData(t *testing.T) {
 	t.Cleanup(resetMcSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	confForMc = func() structs.SysConfig {
 		return structs.SysConfig{UpdateBranch: "edge"}
@@ -62,7 +62,7 @@ func TestUpdateMcConfWritesVersionChannelData(t *testing.T) {
 		t.Fatalf("UpdateMcConf failed: %v", err)
 	}
 
-	path := filepath.Join(BasePath, "settings", "mc.json")
+	path := filepath.Join(BasePath(), "settings", "mc.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read mc.json failed: %v", err)

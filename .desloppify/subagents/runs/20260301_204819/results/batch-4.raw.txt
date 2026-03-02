@@ -1,0 +1,91 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 68.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "`goseg/importer/importer.go` starts post-import execution in a detached goroutine (`startImportedPierPostImportWorkflow`) and returns from the upload path before that workflow is completed or its terminal state is represented.",
+        "`goseg/handler/system/support.go` intermixes request handling with outcome-side effects through deferred publishing logic and in-path success publishing, producing non-localized control-flow and ambiguous event ordering.",
+        "`goseg/routines/runtime_seams.go`, `goseg/docker/orchestration/runtime_seams.go`, and `goseg/internal/seams/runtime.go` repeat the same seam-wrapper/`DefaultIfNil` adapter shape independently, creating a duplicated indirection pattern instead of a single contract.",
+        "The above patterns indicate weak boundary consistency between orchestration modules, making future behavior changes error-prone and diffused."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc_async_import_state_semantics",
+      "summary": "Importer returns success before post-import workflow outcome is representable, weakening API semantics.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`configureUploadedPier` invokes `runImportedPierWorkflow` directly and then starts `startImportedPierPostImportWorkflow` in a goroutine.",
+        "The goroutine only logs `log.Error` on failure and does not update a durable session or response contract that callers can observe.",
+        "There is no explicit completion signal to tie the API result to downstream workflow termination or failure."
+      ],
+      "suggestion": "Refactor import orchestration into a two-phase contract: persist session state transitions (requested -> workflow-running -> completed/failed), return a job id from the handler, and require the caller to observe completion through a status endpoint/event stream.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_boundary_leak"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc_support_event_semantics_mix",
+      "summary": "Support handler couples control-flow and telemetry/event publishing via broad defer-based side effects.",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "The handler uses a deferred closure to publish error/success outcomes from shared local error state in addition to explicit publish calls.",
+        "Outcome publication is embedded in handler control-flow rather than a dedicated outcome translator, so event ordering and branch semantics become implicit.",
+        "This pattern makes handler behavior difficult to reason about when adding new branches."
+      ],
+      "suggestion": "Extract an explicit `SupportResult` state model and move publication into a dedicated post-handler coordinator that emits one terminal event per request path.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "state_boundary_leak"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "dc_seams_indirection_duplication",
+      "summary": "Runtime seam packages duplicate the same adapter/constructor patterns instead of sharing a single seam abstraction.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/internal/seams/runtime.go"
+      ],
+      "evidence": [
+        "Each listed seam file re-implements wrapper structs and defaulting helpers with very similar `DefaultIfNil`/constructor behavior.",
+        "Naming and wiring conventions are similar but not centralized, so behavior changes require synchronized edits across packages.",
+        "The repetition increases cognitive load and raises the risk of divergence in nil-safe boundaries."
+      ],
+      "suggestion": "Introduce a shared seam helper/factory module and a consistent dependency-injection contract so module-specific seams embed/compose common behavior instead of re-declaring equivalent defaults.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "State/observability boundary ambiguity between synchronous request handlers and async orchestration workflows.",
+      "Copy-pasted seam abstraction patterns that are treated as local package concerns rather than a shared contract."
+    ],
+    "likely_symptoms": [
+      "dc_async_import_state_semantics",
+      "dc_seams_indirection_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

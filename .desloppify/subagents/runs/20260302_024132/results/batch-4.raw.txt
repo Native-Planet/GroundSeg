@@ -1,0 +1,119 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 74.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/main.go and goseg/docker/orchestration/runtime_seams.go are both heavily built around mutable runtime seams and bootstrap globals rather than a single explicit composition root.",
+        "Listed files already flagged by prior analysis show broad cohesion drift (for example, goseg/config/config.go complexity/mixed clusters and goseg/broadcast/broadcast.go and goseg/system/system.go responsibility-cluster signals), which is consistent with repeatedly mixing unrelated concerns in the same module.",
+        "goseg/accesspoint/accesspoint_test.go and goseg/startup_orchestrator_test.go rely on replacing package-level behavior in ways that indicate production/test coupling to global orchestration state."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "bootstrap_seams_global_contract",
+      "summary": "Global seam indirection centralizes bootstrap control but erodes subsystem ownership and test isolation",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "main startup logic appears coupled to mutable package-level runtime hooks (e.g., bootstrap/server function hooks) rather than a single immutable composition object.",
+        "runtime seam helpers layer function-valued defaults and no-op fallbacks in goseg/docker/orchestration/runtime_seams.go, and tests override these hooks at package scope instead of injecting explicit interfaces.",
+        "Startup tests must coordinate with global state to control behavior, indicating fragile dependency direction and poor boundary control."
+      ],
+      "suggestion": "Replace mutable global hooks with a dedicated bootstrap context object that owns explicit runtime dependencies (Docker, network, broadcast, auth, handlers). Construct it once in main and pass interfaces to startup modules, then remove package-level seam mutation from tests by passing test doubles through constructors.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_runtime_seam_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "startup_and_service_mix",
+      "summary": "main.go mixes application bootstrap, orchestration, and transport/server lifecycle in one flow",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "goseg/main.go performs startup sequencing, runtime initialization, HTTP/websocket server setup, and shutdown behavior in one command surface without a narrow orchestration contract.",
+        "Tests mirror this by exercising and overriding internal startup state instead of validating a narrow orchestrator boundary.",
+        "The same batch's prior cohesion/complexity signals already show these files as high-complexity hotspots."
+      ],
+      "suggestion": "Extract a `StartupOrchestrator` with explicit phase methods (`initRuntime`, `startServices`, `startTransports`, `waitForShutdown`) and keep main as a thin composer; this keeps behavior observable and enables focused unit tests on each phase.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_runtime_seam_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_token_boundary_blur",
+      "summary": "auth package bundles token policy, persistence, and handler-side auth mutation in one flow",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/handler/system/support.go",
+        "goseg/goseg/handler/system/support.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "goseg/auth/auth.go is responsible for token creation/authorization and token lifecycle behaviors while other layers appear to reach directly into shared auth state and behavior.",
+        "handler/system support paths import and use auth constructs without a narrow authorization abstraction, creating repeated cross-layer coupling.",
+        "Prior mechanical findings already reported mixed-responsibility clusters in auth-related files."
+      ],
+      "suggestion": "Split auth into clear subcomponents (token store, policy evaluator, auth middleware/guard) with explicit interfaces; move all state mutation into an injected service and keep handlers purely to map transport inputs to policies.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundary_spillover_auth"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_cross_cutting_bundle",
+      "summary": "Config module mixes defaults, schema evolution, runtime settings, and persistence in one large surface",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go",
+        "goseg/config/mc.go"
+      ],
+      "evidence": [
+        "goseg/config/config.go and goseg/config/version.go are both reported as high-complexity with large LOC and disconnected function clusters, indicating weakly delimited responsibilities inside config.",
+        "The presence of wide config-bag references in these files aligns with domain leakage (construction/loading/validation/migration handled together).",
+        "Existing prior flags include duplicated boilerplate blocks in goseg/config/mc.go, suggesting local duplication as a symptom of missing shared abstraction."
+      ],
+      "suggestion": "Split config concerns into composable modules (loaders/parsers, defaults, migration/versioning, persistence), then expose a small, coherent `ConfigView` API to callers instead of passing mutable/config-bag-heavy arguments.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "domain_boundary_blend"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Global mutable seam/orchestration wiring remains the dominant coherence hazard across startup and runtime-boundary modules.",
+      "Cross-module ownership is blurred by large files that absorb multiple lifecycle responsibilities (bootstrap, persistence, policy, transport wiring).",
+      "Config and auth modules are doing broader domain work than their names imply, creating boundary ambiguity and brittle tests."
+    ],
+    "likely_symptoms": [
+      "bootstrap_seams_global_contract",
+      "startup_and_service_mix",
+      "auth_token_boundary_blur",
+      "config_cross_cutting_bundle"
+    ],
+    "possible_false_positives": [
+      "Some seam/indirection patterns may be intentionally used for testability, though current global override pattern reduces that benefit."
+    ]
+  }
+}

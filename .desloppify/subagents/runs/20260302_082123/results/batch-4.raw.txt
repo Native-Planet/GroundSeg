@@ -1,0 +1,93 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 82.1
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Repository-wide, infrastructure boundary modules repeatedly use adapter structs composed almost entirely of one-line pass-through methods (`runtimeContainerAdapter`, `runtimeUrbitAdapter`, `runtimeSnapshotAdapter`, and `startramRuntimeDefault*Ops`) before adding business logic, which increases indirection without adding new behavior.",
+        "Startup and connectivity flow is centralized in `main.go` across CLI parsing, startup composition, dual-server lifecycle, connectivity polling, kill-switch scheduling, and signal handling in one file and one run path, making it difficult to test or replace individual concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime-seam-pass-through-duplication",
+      "summary": "Runtime seam layers add abstraction depth but no business behavior, increasing cognitive and refactor cost.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi.go",
+        "goseg/docker/orchestration/subsystem/docker.go"
+      ],
+      "evidence": [
+        "`runtime_seams.go` defines multiple wrapper interfaces and adapter types whose methods mostly forward directly to package functions (`StartContainer`, `StopContainerByName`, `UrbitConf`, `LoadWireguard`, etc.) without enrichment.",
+        "`startramRuntimeDefaultContainerOps` and `startramRuntimeServiceOverrides` mirror the same forwarding pattern and are re-wrapped rather than consolidated.",
+        "`accesspoint.go` and `wifi.go` similarly expose extensive function-pointer-based injection for each dependency edge, again with minimal policy translation.",
+        "This creates a systemic seam pattern where dependency boundaries are verbose but not semantically meaningful."
+      ],
+      "suggestion": "Create a narrower, intentional runtime contract per subsystem that contains only behavior-meaningful calls (e.g., `ContainerControl`, `SnapshotOps`) and inject concrete collaborators directly; remove no-op adapter layers and replace one-line wrappers with focused facades where behavior actually changes. This should reduce call depth and make seam tests assert intent, not plumbing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "pass-through-seam-overengineering"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "main-bootstraps-mixed-responsibility",
+      "summary": "Main bootstrap mixes startup orchestration, transport lifecycle, connectivity policy, and host-mode side effects in one flow.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`main.go` combines CLI parsing (`parseStartupOptions`), bootstrap wiring (`bootstrapSubsystems`), HTTP/WS server lifecycle (`startServerWithRuntime`), network recovery policy (`C2cCheckWith`), and kill-switch reboot timing (`killSwitch`) in a single execution path.",
+        "`startServerWithRuntime` simultaneously starts both listeners, owns shutdown orchestration, and does cross-server error handling, so changes to one transport concern affect unrelated startup and kill-switch paths.",
+        "Tests in `main_test.go` only exercise that callbacks are wired, not that these lifecycle responsibilities are separated into independently testable units."
+      ],
+      "suggestion": "Split startup into explicit collaborators (e.g., `StartupCoordinator`, `ServerLifecycleManager`, `ConnectivitySupervisor`) with dedicated interfaces and data structs; keep `main.go` as composition-only. Move kill-switch logic into a small policy service driven by connectivity snapshots, and keep transport boot logic transport-specific.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "pass-through-seam-overengineering"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session-client-state-transition-inconsistency",
+      "summary": "Client connection state transitions keep inactive placeholders and skip normalization, producing mixed semantics in auth-state transitions.",
+      "related_files": [
+        "goseg/session/ws.go"
+      ],
+      "evidence": [
+        "`transitionClientStateLocked` has a fast-path for `targetAuth && !client.Active` that appends a client and returns without setting active state, creating a branch with different semantics from the normal transition path.",
+        "`enqueueFakeConnIfNilOrUnconnected` explicitly inserts placeholder `MuConn` values, and cleanup/transition logic then has to special-case inactive/nil connections, increasing state-machine ambiguity.",
+        "The result is a brittle mix of transport lifecycle, placeholder management, and auth-state transitions in the same function, which is hard to reason about and extend safely."
+      ],
+      "suggestion": "Refactor `ClientManager` state updates around a single explicit transition function that always normalizes `(connection, active, bucket)` as an invariant and remove placeholder insertion from auth-state transitions. Represent temporary pending sessions separately from active session buckets to keep transition logic coherent.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "System-wide preference for test seams/indirection without clear behavioral payoff.",
+      "Cross-cutting responsibilities kept in transport/bootstrap and state-management modules instead of being decomposed into intent-driven units."
+    ],
+    "likely_symptoms": [
+      "Hard-to-change dependency graph across subsystem seams",
+      "Reduced test signal from callback-heavy code paths",
+      "Session bucket invariants that require extra defensive handling"
+    ],
+    "possible_false_positives": [
+      "Some wrappers may be intentionally retained for mocking in non-production runtimes",
+      "Placeholder connections may be required for legacy auth session behavior and should be validated against runtime protocol assumptions before removal"
+    ]
+  }
+}

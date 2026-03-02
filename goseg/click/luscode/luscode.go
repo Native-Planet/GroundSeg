@@ -15,19 +15,8 @@ var (
 	lusCodes  = make(map[string]structs.ClickLusCode)
 	codeMutex sync.Mutex
 
-	createHoonForCode     = runtime.CreateHoon
-	deleteHoonForCode     = runtime.DeleteHoon
-	clickExecForCode      = runtime.ClickExec
-	filterResponseForCode = runtime.FilterResponse
+	executeClickCommandForCode = runtime.ExecuteCommandWithResponse
 )
-
-func createHoonForLusCode(patp, file, hoon string) error {
-	if err := createHoonForCode(patp, file, hoon); err != nil {
-		return err
-	}
-	ClearLusCode(patp)
-	return nil
-}
 
 // ClearLusCode clears cached +code values for a ship.
 func ClearLusCode(patp string) {
@@ -50,22 +39,22 @@ func GetLusCode(patp string) (string, error) {
 	}
 	file := "code"
 	hoon := "=/  m  (strand ,vase)  ;<  our=@p  bind:m  get-our  ;<  code=@p  bind:m  (scry @p /j/code/(scot %p our))  (pure:m !>((crip (slag 1 (scow %p code)))))"
-	if err := createHoonForLusCode(patp, file, hoon); err != nil {
-		return "", fmt.Errorf("Click +code failed to create hoon: %v", err)
-	}
-	// defer hoon file deletion
-	defer deleteHoonForCode(patp, file)
-
-	response, err := clickExecForCode(patp, file, "")
+	_, code, success, err := executeClickCommandForCode(
+		patp,
+		file,
+		hoon,
+		"",
+		"code",
+		"Click +code",
+		ClearLusCode,
+	)
 	if err != nil {
 		storeLusCodeError(patp)
 		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
 	}
-
-	code, _, err := filterResponseForCode("code", response)
-	if err != nil {
+	if !success {
 		storeLusCodeError(patp)
-		return "", fmt.Errorf("Click +code failed to get exec: %v", err)
+		return "", fmt.Errorf("Click +code failed poke")
 	}
 	storeLusCode(patp, code)
 	return code, nil

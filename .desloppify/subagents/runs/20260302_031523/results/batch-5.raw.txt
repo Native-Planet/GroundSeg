@@ -1,0 +1,95 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 84.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` executes injected runtime callbacks (`connectToWiFi`, `restartGroundSeg`) without nil checks, so a partially constructed `C2CServiceExecutor` can panic at call time instead of returning a typed error.",
+        "`goseg/system/wifi/service/c2c_service.go` and `goseg/internal/seams/runtime.go` show two different seam strategies: one suite returns explicit fallback errors for missing hooks, while another allows nil callback dereference.",
+        "`goseg/shipworkflow/urbit_operations.go` frequently wraps upstream errors with `%v` (for example around lines with `Failed to get ship status...` and many MinIO/alias/rollback paths), which drops unwrapability for callers that depend on typed causes.",
+        "`goseg/system/disk.go` similarly formats many upstream failures with `%v` (for example `Failed to lsblk`, `Failed to create ext4 filesystem`, `failed to write to fstab`) instead of `%w`, resulting in inconsistent observability and retry/classification behavior versus other call paths that do preserve error causes."
+      ],
+      "issues_preventing_higher_score": "Error wrapping strategy is inconsistent at module boundaries: some high-value paths preserve underlying causes (`%w`/joined errors) while adjacent paths in the same subsystem erase them with `%v` formatting, which weakens callers’ ability to classify and aggregate failures."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "c2c_executor_missing_callback_guards",
+      "summary": "C2C executor can panic on nil callbacks instead of returning a deterministic error.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/internal/seams/runtime.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` constructors accept arbitrary functions for `connectToWiFi` and `restartGroundSeg` but do not validate them.",
+        "`ConnectToWiFi` and `RestartGroundSeg` unconditionally invoke function fields, so nil fields cause a nil-function panic rather than an error return.",
+        "Other seam constructors in this codebase commonly substitute fallback behavior or return explicit configuration errors when callbacks are missing (`goseg/internal/seams/runtime.go`), so this is a strategy mismatch at a boundary."
+      ],
+      "suggestion": "Add constructor-time validation (or runtime nil checks in each method) that returns a concrete error when `connectToWiFi` or `restartGroundSeg` are unset, and expose that failure through `ProcessC2CMessage` rather than panicking.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "seam_error_contract_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "shipworkflow_error_chaining_regression",
+      "summary": "Critical ship workflow wrappers drop underlying errors with `%v`, breaking consistent error-chain semantics.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "In `goseg/shipworkflow/urbit_operations.go`, many return sites use `fmt.Errorf(\"...: %v\", err)` in long-running operation paths (for example around pack/meld/chop/alias/container operations).",
+        "Nearby return sites in the same package do use `%w`, so behavior is mixed within one boundary depending on operation path.",
+        "Inconsistent wrapping prevents callers and tests from relying on `errors.Is`/`errors.As` at orchestration boundaries even where they expect wrapped causality."
+      ],
+      "suggestion": "Normalize `shipworkflow` return conventions by wrapping all forwarded errors with `%w`, and keep `%v` only for message-only formatting when no underlying error should be propagated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wrapped_error_policy_divergence"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "system_disk_observability_chain_gap",
+      "summary": "Disk setup and fs-operations lose error causality, reducing diagnosability consistency.",
+      "related_files": [
+        "goseg/system/disk.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/system/disk.go` returns upstream command/system errors with `%v` in multiple IO and filesystem paths (`ListHardDisks`, `CreateGroundSegFilesystem`, `SetupTmpDir` helpers), so the original error type is not preserved.",
+        "`goseg/system/wifi.go` commonly uses wrapped returns (`%w`) for command and state transitions, so sibling system package boundaries behave differently under failure.",
+        "The mixed approach makes downstream consumers harder to reason about because some failures can be typed/inspected while adjacent failures become opaque strings."
+      ],
+      "suggestion": "Adopt a package-wide wrapping rule in `system/*` (e.g., wrap lower-level errors with `%w` for all propagation paths, and only mask when intentionally redacting), then add tests asserting `errors.Is` works for representative disk-wiring failures.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wrapped_error_policy_divergence"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent error contract at module seams: constructors/methods differ between explicit-fail and nil-deref behavior.",
+      "Non-uniform error wrapping discipline (`%w` vs `%v`) across system orchestration packages creates mixed semantics for the same error handling intent.",
+      "Lack of a documented policy for which layer should preserve machine-readable error causes versus human-readable masking."
+    ],
+    "likely_symptoms": [
+      "unexpected panic on startup/runtime injection paths",
+      "errors.Is/As checks missing expected signal under operation failures",
+      "harder triage in logs because operational failures are downgraded to opaque formatted strings"
+    ],
+    "possible_false_positives": [
+      "Some `%v`-formatted errors may be intentional user-facing message formatting where callers are not expected to inspect causes."
+    ]
+  }
+}

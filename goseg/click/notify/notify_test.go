@@ -13,10 +13,7 @@ func resetNotifySeams() {
 	sendStartramReminderFn = sendStartramReminder
 	sendDiskSpaceWarningFn = sendDiskSpaceWarning
 	sendSmartWarningFn = sendSmartWarning
-	createHoonForHark = createHoon
-	deleteHoonForHark = deleteHoon
-	clickExecForHark = clickExec
-	filterResponseForHark = filterResponse
+	executeClickCommandForHark = executeClickCommandForHarkDefault
 }
 
 func TestSendNotificationDispatch(t *testing.T) {
@@ -77,17 +74,10 @@ func TestSendNotificationInvalidType(t *testing.T) {
 func TestSendStartramReminderBuildsPayload(t *testing.T) {
 	t.Cleanup(resetNotifySeams)
 	var gotFile, gotHoon string
-	createHoonForHark = func(_, file, body string) error {
+	executeClickCommandForHark = func(_patp, file, body, _sourcePath, _successToken, _operation string, _clear func(string)) (string, error) {
 		gotFile = file
 		gotHoon = body
-		return nil
-	}
-	deleteHoonForHark = func(_, _ string) {}
-	clickExecForHark = func(_, _, _ string) (string, error) {
 		return "ok", nil
-	}
-	filterResponseForHark = func(_, _ string) (string, bool, error) {
-		return "", true, nil
 	}
 
 	if err := sendStartramReminder("~zod", 4); err != nil {
@@ -104,14 +94,11 @@ func TestSendStartramReminderBuildsPayload(t *testing.T) {
 func TestSendDiskSpaceWarningBuildsPayload(t *testing.T) {
 	t.Cleanup(resetNotifySeams)
 	var gotFile, gotHoon string
-	createHoonForHark = func(_, file, body string) error {
+	executeClickCommandForHark = func(_patp, file, body, _sourcePath, _successToken, _operation string, _clear func(string)) (string, error) {
 		gotFile = file
 		gotHoon = body
-		return nil
+		return "ok", nil
 	}
-	deleteHoonForHark = func(_, _ string) {}
-	clickExecForHark = func(_, _, _ string) (string, error) { return "ok", nil }
-	filterResponseForHark = func(_, _ string) (string, bool, error) { return "", true, nil }
 
 	if err := sendDiskSpaceWarning("~bus", "nvme0n1", 92.5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -126,9 +113,9 @@ func TestSendDiskSpaceWarningBuildsPayload(t *testing.T) {
 
 func TestSendSmartWarningExecFailure(t *testing.T) {
 	t.Cleanup(resetNotifySeams)
-	createHoonForHark = func(_, _, _ string) error { return nil }
-	deleteHoonForHark = func(_, _ string) {}
-	clickExecForHark = func(_, _, _ string) (string, error) { return "", errors.New("exec failed") }
+	executeClickCommandForHark = func(_, _, _, _, _, _ string, _clear func(string)) (string, error) {
+		return "", errors.New("exec failed")
+	}
 
 	err := sendSmartWarning("~nec", "sda")
 	if err == nil {
@@ -141,10 +128,9 @@ func TestSendSmartWarningExecFailure(t *testing.T) {
 
 func TestSendStartramReminderPokeFailure(t *testing.T) {
 	t.Cleanup(resetNotifySeams)
-	createHoonForHark = func(_, _, _ string) error { return nil }
-	deleteHoonForHark = func(_, _ string) {}
-	clickExecForHark = func(_, _, _ string) (string, error) { return "resp", nil }
-	filterResponseForHark = func(_, _ string) (string, bool, error) { return "", false, nil }
+	executeClickCommandForHark = func(_, _, _, _, _, _ string, _clear func(string)) (string, error) {
+		return "", errors.New("failed poke")
+	}
 	lifecycle.BarExit("~zod") // keep package import alive for compile in test package
 	err := sendStartramReminder("~pal", 2)
 	if err == nil {
@@ -155,11 +141,6 @@ func TestSendStartramReminderPokeFailure(t *testing.T) {
 	}
 }
 
-func createHoon(_, _, _ string) error { return nil }
-func deleteHoon(_, _ string)          {}
-func clickExec(_, _, _ string) (string, error) {
+func executeClickCommandForHarkDefault(_patp, _file, _body, _sourcePath, _successToken, _operation string, _clear func(string)) (string, error) {
 	return "ok", nil
-}
-func filterResponse(_, _ string) (string, bool, error) {
-	return "", true, nil
 }

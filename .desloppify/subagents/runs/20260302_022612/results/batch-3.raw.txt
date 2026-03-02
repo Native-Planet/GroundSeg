@@ -1,0 +1,95 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 3,
+  "assessments": {
+    "error_consistency": 74.2
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "System and orchestration boundary functions mix wrapped returns (`%w`) with plain string interpolation (`%v`) and plain `return err` patterns for similar failure classes across neighboring files.",
+        "Several startup/load flows log operational failures and continue instead of returning structured errors, while related code paths fail fast, producing inconsistent recovery/failure semantics.",
+        "Some error-producing I/O steps are checked and propagated, while other nearby request/serialization steps intentionally ignore returned errors."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "inconsistent_error_wrapping_across_boundaries",
+      "summary": "Error wrapping is inconsistent across service boundaries, causing lost root-cause chains for upstream handling.",
+      "related_files": [
+        "goseg/handler/system/support.go",
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/handler/system/support.go:128-130` returns `fmt.Errorf(\"Couldn't unmarshal support payload: %v\", err)` and several other paths return `%v`-based messages without wrapping the original error.",
+        "`goseg/handler/system/support.go:310-312` and `320` also create non-wrapping formatted errors for failure chains that should preserve caller-visible causes.",
+        "`goseg/docker/orchestration/container/wireguard.go:118` and `130-136` build new strings from raw decode/file-read errors instead of wrapping with `%w`, while nearby code in other packages wraps upstream errors with `%w`.",
+        "`goseg/system/wifi.go:110-112` wraps, but later `154-158` etc. also mix `%w` and `%v` depending on call site, creating an inconsistent contract."
+      ],
+      "suggestion": "Adopt a repository-wide rule for boundary-returned errors: wrap underlying failures with `%w` for functional failures and keep user-facing phrasing separate so callers can still `errors.Is`/`errors.As`. Standardize helper return style in support, orchestration, and wireless control codepaths, then add tests that assert chained errors remain inspectable.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_wrapping_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "silent_partial_failures_in_bootstrap_loops",
+      "summary": "Critical bootstrap loops swallow subsystem errors and continue, producing non-deterministic startup state under partial failures.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/docker/orchestration/urbit.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`goseg/startup_orchestrator.go:393-406` logs failures for exporter/importer/WiFi/systemd-resolved setup but does not fail required startup, returning success with degraded capabilities.",
+        "`goseg/docker/orchestration/urbit.go:30-33`, `38-48` logs per-pier config/start errors and continues, yet `loadUrbits` always returns nil even when all pier startups fail.",
+        "`goseg/broadcast/broadcast.go:64-70` uses hard-fail behavior in initialization for missing bootstrap/loader functions, contrasting with silent-continuation paths in adjacent startup code."
+      ],
+      "suggestion": "Make failure policy explicit: decide per subsystem whether errors are fatal, warning-with-status, or best-effort and return structured outcome objects (e.g., success count + aggregated errors). For `startup` and `loadUrbits`, escalate to a non-nil error when a required minimum is not met, and include aggregated diagnostics for partial failures so callers can surface consistent health/failure state.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "partial_failure_semantics"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "multipart_request_errors_not_checked",
+      "summary": "Multipart bug-report request construction ignores write/close failures, which can send malformed payloads without surfacing errors.",
+      "related_files": [
+        "goseg/handler/system/support.go"
+      ],
+      "evidence": [
+        "`goseg/handler/system/support.go:598-599` calls `writer.WriteField(...)` twice without checking returned errors.",
+        "`goseg/handler/system/support.go:608` ignores the error from `writer.Close()`, and `sendBugReportWithEndpoint` may proceed to submit even when multipart assembly failed.",
+        "`goseg/handler/system/support.go:620` proceeds to `client.Do(req)` without validating multipart construction integrity first."
+      ],
+      "suggestion": "Capture and propagate errors from `writer.WriteField` and `writer.Close()`, and fail fast with wrapped context before issuing `client.Do`. Return a dedicated transport-level error so callers can retry or signal the bug-report submission failure consistently.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Inconsistent error policy (wrapped vs stringified vs ignored) across adjacent runtime/handler boundaries.",
+      "No shared contract for whether startup/component failures are fatal or best-effort.",
+      "I/O-boundary operations not uniformly checked before continuing control flow."
+    ],
+    "likely_symptoms": [
+      "Support report upload failures without useful upstream diagnostics.",
+      "Partial startup success that appears healthy but misses subsystems/components.",
+      "Hard-to-debug failures because underlying error causes are erased by `%v` formatting."
+    ],
+    "possible_false_positives": [
+      "Some continuations are intentionally best-effort to keep partial functionality available in degraded mode.",
+      "A subset of errors may be non-critical by explicit product design despite returning in error-capable signatures."
+    ]
+  }
+}

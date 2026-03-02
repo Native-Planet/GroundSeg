@@ -1,115 +1,93 @@
 package routines
 
 import (
-	"groundseg/broadcast"
+	"context"
 	"groundseg/chopsvc"
-	"groundseg/click"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/handler/ship"
-	"groundseg/handler/system"
-	"groundseg/internal/seams"
 	"groundseg/structs"
 	"net/http"
 	"time"
 )
 
-type runtimeBase struct {
-	seams.RuntimeBase
-}
-
-func newRuntimeBase() runtimeBase { return runtimeBase{RuntimeBase: seams.NewRuntimeBase()} }
-
-type dockerRoutineRuntime struct {
-	runtimeBase
-
-	getContainerState    func() map[string]structs.ContainerState
-	updateContainerState func(string, structs.ContainerState)
-	getState             func() structs.AuthBroadcast
-	updateBroadcast      func(structs.AuthBroadcast)
-	broadcastClients     func() error
-	updateWgOn           func(bool) error
-	getShipStatus        func([]string) (map[string]string, error)
-	getShipSettings      func() config.ShipSettings
-	getCheck502Settings  func() config.Check502Settings
-	startContainer       func(string, string) (structs.ContainerState, error)
-	loadUrbitConfig      func(string) error
-	urbitConf            func(string) structs.UrbitDocker
-	clearLusCode         func(string)
-	getContainerNetwork  func(string) (string, error)
-	getLusCode           func(string) (string, error)
-	httpGet              func(string) (*http.Response, error)
-	recoverWireguard     func([]string, bool) error
-	barExit              func(string) error
-	sleep                func(time.Duration)
-}
-
-func newDockerRoutineRuntime() dockerRoutineRuntime {
-	base := newRuntimeBase()
-	return dockerRoutineRuntime{
-		runtimeBase:          base,
-		getContainerState:    config.GetContainerState,
-		updateContainerState: config.UpdateContainerState,
-		getState:             broadcast.GetState,
-		updateBroadcast:      broadcast.UpdateBroadcast,
-		broadcastClients:     broadcast.BroadcastToClients,
-		updateWgOn: func(wgOn bool) error {
-			return config.UpdateConfTyped(config.WithWgOn(wgOn))
+func newVersionRuntime() versionRuntime {
+	return versionRuntime{
+		channelOps: versionChannelOps{
+			syncVersionInfoFn:   config.SyncVersionInfo,
+			getVersionChannelFn: config.GetVersionChannel,
+			setVersionChannelFn: config.SetVersionChannel,
 		},
-		getShipStatus:       docker.GetShipStatus,
-		getShipSettings:     config.ShipSettingsSnapshot,
-		getCheck502Settings: config.Check502SettingsSnapshot,
-		startContainer:      docker.StartContainer,
-		loadUrbitConfig:     config.LoadUrbitConfig,
-		urbitConf:           config.UrbitConf,
-		clearLusCode:        click.ClearLusCode,
-		getContainerNetwork: docker.GetContainerNetwork,
-		getLusCode:          click.GetLusCode,
-		httpGet:             http.Get,
-		recoverWireguard:    system.RecoverWireguardFleet,
-		barExit:             click.BarExit,
-		sleep:               time.Sleep,
+		configOps: versionConfigOps{
+			getConfFn:   config.Conf,
+			getSha256Fn: getSha256,
+			architectureFn: func() string {
+				return config.RuntimeContextSnapshot().Architecture
+			},
+			basePathFn: func() string {
+				return config.RuntimeContextSnapshot().BasePath
+			},
+			debugModeFn: func() bool {
+				return config.RuntimeContextSnapshot().DebugMode
+			},
+			getShipStatusFn:   orchestration.GetShipStatus,
+			startContainerFn:  orchestration.StartContainer,
+			stopContainerFn:   orchestration.StopContainerByName,
+			loadUrbitConfigFn: config.LoadUrbitConfig,
+			urbitConfFn:       config.UrbitConf,
+			waitCompleteFn:    ship.WaitComplete,
+			chopPierFn:        chopsvc.ChopPier,
+			updateUrbitFn:     config.UpdateUrbit,
+		},
+		updateOps: versionUpdateOps{
+			updateDockerFn: updateDockerForRuntime,
+			updateBinaryFn: updateBinary,
+			downloadFn: func(ctx context.Context, url string) (*http.Response, error) {
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				if err != nil {
+					return nil, err
+				}
+				return versionUpdateHTTPClient.Do(req)
+			},
+		},
 	}
+}
+
+// version runtime abstractions for periodic updates.
+type versionChannelOps struct {
+	syncVersionInfoFn   func() (structs.Channel, bool)
+	getVersionChannelFn func() structs.Channel
+	setVersionChannelFn func(structs.Channel)
+}
+
+type versionConfigOps struct {
+	getConfFn         func() structs.SysConfig
+	getSha256Fn       func(string) (string, error)
+	architectureFn    func() string
+	basePathFn        func() string
+	debugModeFn       func() bool
+	getShipStatusFn   func([]string) (map[string]string, error)
+	startContainerFn  func(string, string) (structs.ContainerState, error)
+	stopContainerFn   func(string) error
+	loadUrbitConfigFn func(string) error
+	urbitConfFn       func(string) structs.UrbitDocker
+	waitCompleteFn    func(string) error
+	chopPierFn        func(string) error
+	updateUrbitFn     func(string, func(*structs.UrbitDocker) error) error
+}
+
+type versionUpdateOps struct {
+	updateDockerFn func(versionConfigOps, string, structs.Channel, structs.Channel)
+	updateBinaryFn func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel)
+	downloadFn     func(context.Context, string) (*http.Response, error)
+}
+
+var versionUpdateHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
 }
 
 type versionRuntime struct {
-	runtimeBase
-
-	syncVersionInfo   func() (structs.Channel, bool)
-	getVersionChannel func() structs.Channel
-	setVersionChannel func(structs.Channel)
-	updateDocker      func(string, structs.Channel, structs.Channel)
-	updateBinary      func(versionRuntime, string, structs.Channel)
-	getSha256         func(string) (string, error)
-	getConf           func() structs.SysConfig
-	getShipStatus     func([]string) (map[string]string, error)
-	startContainer    func(string, string) (structs.ContainerState, error)
-	stopContainer     func(string) error
-	loadUrbitConfig   func(string) error
-	urbitConf         func(string) structs.UrbitDocker
-	waitComplete      func(string) error
-	chopPier          func(string) error
-	updateUrbit       func(string, func(*structs.UrbitDocker) error) error
-}
-
-func newVersionRuntime() versionRuntime {
-	base := newRuntimeBase()
-	return versionRuntime{
-		runtimeBase:       base,
-		syncVersionInfo:   config.SyncVersionInfo,
-		getVersionChannel: config.GetVersionChannel,
-		setVersionChannel: config.SetVersionChannel,
-		updateDocker:      updateDocker,
-		updateBinary:      updateBinary,
-		getSha256:         getSha256,
-		getConf:           config.Conf,
-		getShipStatus:     docker.GetShipStatus,
-		startContainer:    docker.StartContainer,
-		stopContainer:     docker.StopContainerByName,
-		loadUrbitConfig:   config.LoadUrbitConfig,
-		urbitConf:         config.UrbitConf,
-		waitComplete:      ship.WaitComplete,
-		chopPier:          chopsvc.ChopPier,
-		updateUrbit:       config.UpdateUrbit,
-	}
+	channelOps versionChannelOps
+	configOps  versionConfigOps
+	updateOps  versionUpdateOps
 }

@@ -1,0 +1,111 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "mid_level_elegance": 76.0,
+    "low_level_elegance": 74.0
+  },
+  "dimension_notes": {
+    "mid_level_elegance": {
+      "evidence": [
+        "Global mutable state from the leak subsystem is exposed through `GetLickStatuses` and written through `BytesChan`/`lickStatuses` without an ownership boundary, so orchestration consumers and listeners read/write maps and channels by value across package seams (`goseg/leak/leak.go`, `goseg/leak/broadcast.go`, `goseg/broadcast/loop.go`).",
+        "Two independent broadcaster paths are launched during startup (`BroadcastLoop` in the broadcast bootstrap and `startBroadcastPusher` in startup background services), which creates duplicated cross-package update behavior for the same websocket fanout path."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 74.0,
+        "indirection_cost": 70.0,
+        "interface_honesty": 78.0
+      }
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`GetLickStatuses` returns `lickStatuses` directly after releasing the mutex, but callers then iterate or index that map in separate goroutines (`goseg/leak/broadcast.go`, `goseg/leak/handler.go`), while writers mutate the same map under lock (`goseg/leak/handler.go`), creating race-prone, hard-to-observe behavior.",
+        "`BroadcastToClients` drops to a goroutine per blocked send (`go func(){ leak.LeakChan <- bState }`) and background startup repeatedly calls it from `startBroadcastPusher` every 2s, so backpressure can accumulate goroutines under sustained channel saturation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 72.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 74.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "leak_shared_map_exposed_without_copy",
+      "summary": "Leak state maps are shared across packages without ownership-safe snapshots, risking data races.",
+      "related_files": [
+        "goseg/leak/leak.go",
+        "goseg/leak/broadcast.go",
+        "goseg/leak/handler.go"
+      ],
+      "evidence": [
+        "`GetLickStatuses` returns `lickStatuses` directly while only holding a read lock during return, so callers get the live map and no longer hold synchronization.",
+        "`broadcast.updateBroadcast` reads `BytesChan`/`lickStatuses`-backed state via `GetLickStatuses` and direct map/index operations without caller-side locking.",
+        "Writers mutate `lickStatuses` under `lickMu` in `urbitLogin`/`urbitLogout`, and writers/readers in other goroutines can interleave unsafely."
+      ],
+      "suggestion": "Return a cloned `map[string]LickStatus` from `GetLickStatuses` (and clone channel state where needed), or provide read-only accessor methods that perform map iteration under lock and return copies, then update all read sites (`updateBroadcast`, `processAction`, loop callers) to use the safe API.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_leak_state_without_ownership"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "leak_channel_backpressure_goroutine_spike",
+      "summary": "Broadcast propagation can spawn unbounded goroutines when leak channel backpressure occurs.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`BroadcastToClients` uses a `default` branch that starts a new goroutine for each blocked send to `LeakChan` instead of bounded retry/backoff.",
+        "Startup also starts `startBroadcastPusher` as a perpetual 2-second loop, multiplying opportunities to hit this fallback under subscriber slowdown."
+      ],
+      "suggestion": "Replace the fallback goroutine path with bounded non-blocking semantics (drop/try again later), or add backpressure-aware buffering on `LeakChan` plus instrumentation/alerts, so a stalled consumer cannot create unbounded goroutine churn.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "shared_leak_state_without_ownership"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "duplicate_broadcast_update_paths",
+      "summary": "Multiple startup-originated broadcast loops create duplicated update responsibilities across modules.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`broadcast.Initialize` bootstraps the broadcast lifecycle and starts `BroadcastLoop` (`go BroadcastLoop()`), which already pushes updated states.",
+        "Startup background runtime also launches `startBroadcastPusher`, which independently polls `BroadcastToClients()` every 2 seconds.",
+        "These separate paths cross initialization and runtime packages without an explicit cadence/ownership contract, increasing redundant emissions and operational coupling."
+      ],
+      "suggestion": "Consolidate to a single broadcast-emission path (either keep the loop and remove `startBroadcastPusher`, or let startup schedule updates through the existing loop's callback), and make the active strategy explicit via a single startup seam.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_broadcast_orchestration_paths"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Shared mutable package-level state (maps/channels) crossing seams without copy-safe accessors.",
+      "Background service orchestration starts overlapping runtime loops that target the same integration boundary.",
+      "Lack of explicit ownership/contract for broadcast emission scheduling across startup and broadcast packages."
+    ],
+    "likely_symptoms": [
+      "Data race reports in concurrent builds/tests involving leak/broadcast interactions.",
+      "Transient goroutine growth under leak-channel saturation.",
+      "Redundant websocket/client broadcast traffic and harder-to-reason orchestration flow."
+    ],
+    "possible_false_positives": []
+  }
+}

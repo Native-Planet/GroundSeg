@@ -6,7 +6,6 @@ import (
 	"groundseg/auth"
 	"groundseg/leakchannel"
 	"groundseg/structs"
-	"reflect"
 	"time"
 
 	"math/big"
@@ -15,26 +14,72 @@ import (
 	"go.uber.org/zap"
 )
 
+type leakPayloadType string
+
+const (
+	leakPayloadLogin    leakPayloadType = "login"
+	leakPayloadLogout   leakPayloadType = "logout"
+	leakPayloadPassword leakPayloadType = "password"
+	leakPayloadError    leakPayloadType = "protocol_error"
+)
+
 func handleAction(patp string, result []byte) {
+	statuses := GetLickStatuses()
+	isAuth := false
+	if status, ok := statuses[patp]; ok {
+		isAuth = status.Auth
+	}
+
 	if len(result) < 5 {
 		zap.L().Warn("Received malformed leak packet: payload too short")
+		reportLeakProtocolError(patp, isAuth, "payload too short")
 		return
 	}
 	stripped := result[5:]
 	reversed := reverseLittleEndian(stripped)
 	jam := new(big.Int).SetBytes(reversed)
 	res := noun.Cue(jam)
-	if reflect.TypeOf(res) == reflect.TypeOf(noun.Cell{}) {
-		bytes, err := decodeAtom(noun.Slag(res, 1).String())
-		if err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to decode payload: %v", err))
-			return
-		}
-		if err := processAction(patp, bytes); err != nil {
-			zap.L().Error(fmt.Sprintf("Failed to process action: %v", err))
-			return
-		}
+	cell, ok := res.(noun.Cell)
+	if !ok {
+		zap.L().Warn(fmt.Sprintf("Received non-cell leak payload from %s: %T", patp, res))
+		reportLeakProtocolError(patp, isAuth, fmt.Sprintf("expected packet noun cell, got %T", res))
+		return
+	}
+	bytes, err := decodeAtom(noun.Slag(cell, 1).String())
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to decode payload: %v", err))
+		reportLeakProtocolError(patp, isAuth, fmt.Sprintf("failed to decode leak payload: %v", err))
+		return
+	}
+	if err := processAction(patp, bytes); err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to process action: %v", err))
+	}
+}
 
+type leakProtocolErrorPayload struct {
+	Error  string `json:"error"`
+	Reason string `json:"reason"`
+}
+
+func reportLeakProtocolError(patp string, isAuth bool, reason string) {
+	payload, err := json.Marshal(leakProtocolErrorPayload{
+		Error:  "protocol_error",
+		Reason: reason,
+	})
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to marshal protocol error payload: %v", err))
+		return
+	}
+	sendToLeakChannel(patp, isAuth, leakPayloadError, payload)
+}
+
+func parseLeakPayloadType(raw string) (leakPayloadType, bool) {
+	kind := leakPayloadType(raw)
+	switch kind {
+	case leakPayloadLogin, leakPayloadLogout, leakPayloadPassword:
+		return kind, true
+	default:
+		return kind, false
 	}
 }
 
@@ -73,16 +118,20 @@ func processAction(patp string, byteArray []byte) error {
 		return nil
 	}
 	isAuth := info.Auth
-	switch payload.Payload.Type {
-	case "login":
+	payloadType, knownPayloadType := parseLeakPayloadType(payload.Payload.Type)
+	if !knownPayloadType {
+		payloadType = leakPayloadType(payload.Payload.Type)
+	}
+	switch payloadType {
+	case leakPayloadLogin:
 		if !isAuth {
 			urbitLogin(isAuth, patp, byteArray)
 		}
-	case "logout":
+	case leakPayloadLogout:
 		if isAuth {
 			urbitLogout(patp)
 		}
-	case "password":
+	case leakPayloadPassword:
 		go func() {
 			select {
 			case <-leakchannel.Logout:
@@ -91,9 +140,9 @@ func processAction(patp string, byteArray []byte) error {
 				zap.L().Error("Password change auto-logout timeout")
 			}
 		}()
-		sendToLeakChannel(patp, isAuth, payload.Payload.Type, byteArray)
+		sendToLeakChannel(patp, isAuth, payloadType, byteArray)
 	default:
-		sendToLeakChannel(patp, isAuth, payload.Payload.Type, byteArray)
+		sendToLeakChannel(patp, isAuth, payloadType, byteArray)
 	}
 	return nil
 }
@@ -116,16 +165,17 @@ func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
 		return
 	}
 	authed := auth.AuthenticateLogin(payload.Payload.Password)
+
 	lickMu.Lock()
-	defer lickMu.Unlock()
 	status, exists := lickStatuses[patp]
 	if !exists {
 		zap.L().Error(fmt.Sprintf("Login failed, %s not in map", patp))
+		lickMu.Unlock()
 		return
 	}
 	response := AuthEvent{
 		Type:        "urbit-activity",
-		PayloadType: "login",
+		PayloadType: string(leakPayloadLogin),
 	}
 	if authed {
 		status.Auth = authed
@@ -134,19 +184,26 @@ func urbitLogin(isAuth bool, patp string, loginPayload []byte) {
 		zap.L().Error(fmt.Sprintf("Password incorrect for admin login for  %s", patp))
 		response.Error = "Incorrect Password"
 	}
+	lickMu.Unlock()
+
 	responseBytes, err := json.Marshal(response)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to marshal login response for %s: %v", patp, err))
 		return
 	}
-	BytesChan[patp] <- string(responseBytes)
+	channels := GetLickChannels()
+	channel, exists := channels[patp]
+	if !exists {
+		return
+	}
+	channel <- string(responseBytes)
 }
 
-func sendToLeakChannel(patp string, isAuth bool, payloadType string, content []byte) {
+func sendToLeakChannel(patp string, isAuth bool, payloadType leakPayloadType, content []byte) {
 	leakchannel.LeakAction <- leakchannel.ActionChannel{
 		Patp:    patp,
 		Auth:    isAuth,
-		Type:    payloadType,
+		Type:    string(payloadType),
 		Content: content,
 	}
 }

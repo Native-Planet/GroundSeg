@@ -9,7 +9,7 @@ import (
 
 	"github.com/Native-Planet/perigee/libprg"
 
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/driveresolver"
 	"groundseg/structs"
 )
@@ -56,9 +56,9 @@ func HandleNewShip(msg []byte, bootFn func(structs.WsNewShipPayload) error, canc
 
 func HandleNewShipBoot(shipPayload structs.WsNewShipPayload) error {
 	handleError := func(err error) error {
-		docker.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: err.Error()})
+		events.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: err.Error()})
 		time.Sleep(5 * time.Second)
-		docker.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: ""})
+		events.PublishNewShipTransition(structs.NewShipTransition{Type: "freeError", Event: ""})
 		return err
 	}
 
@@ -97,9 +97,9 @@ func HandleNewShipBoot(shipPayload structs.WsNewShipPayload) error {
 }
 
 func ResetNewShip() error {
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: ""})
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "patp", Event: ""})
-	docker.PublishNewShipTransition(structs.NewShipTransition{Type: "error", Event: ""})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "bootStage", Event: ""})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "patp", Event: ""})
+	events.PublishNewShipTransition(structs.NewShipTransition{Type: "error", Event: ""})
 	return nil
 }
 

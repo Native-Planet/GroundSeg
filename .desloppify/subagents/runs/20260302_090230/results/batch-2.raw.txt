@@ -1,0 +1,79 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 74.2
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple runtime dependency surfaces are modeled as large function-bag structs with no behavior beyond forwarding to package-level functions (for example `goseg/importer/importer.go`, `goseg/broadcast/collectors/collectors.go`, `goseg/shipworkflow/operations_runtime.go`, and `goseg/docker/orchestration/runtime_seams.go`), creating long wrapper chains before reaching concrete logic.",
+        "`goseg/config/config_view.go:ConfigViewSnapshot` exposes `RuntimeSettings()` and `CurrentRuntimeContext()` by reading `RuntimeContextSnapshot()` directly, so methods on a snapshot depend on current global state instead of the snapshot value.",
+        "Runtime adapters in Docker orchestration compose multiple projections (`newDockerRuntime` -> projection functions) and then re-check every function for nil at the call boundary, adding layering without clear policy translation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 62.1,
+        "indirection_cost": 55.0,
+        "interface_honesty": 66.7
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "configview_snapshot_leaks_global_runtime",
+      "summary": "ConfigView snapshot methods read live global runtime context, breaking snapshot isolation semantics.",
+      "related_files": [
+        "goseg/config/config_view.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`ConfigViewSnapshot` stores only `conf structs.SysConfig` but `RuntimeSettings()` and `CurrentRuntimeContext()` call `RuntimeContextSnapshot()` directly.",
+        "Methods intended to represent a snapshot (`NewConfigViewSnapshotFromConfig`) can return runtime fields that drift if global context changes after snapshot construction."
+      ],
+      "suggestion": "Store runtime context in the snapshot struct at construction time (for both `NewConfigViewSnapshot` and `NewConfigViewSnapshotFromConfig`) and have `RuntimeSettings()`/`CurrentRuntimeContext()` return those stored fields, so callers can rely on true snapshot immutability.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_bag_indirection_layers",
+      "summary": "Several seam layers are thin function-bag wrappers that add wiring depth without policy or translation.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`importerRuntime` and `collectorRuntime` define many function fields and `default*Runtime()` merely assign concrete package functions.",
+        "`workflowRuntime` in `operations_runtime.go` and `WireguardRuntime`/`UrbitRuntime` projections in `runtime_seams.go` create another layer of pass-through indirection before actual call sites.",
+        "Callers mostly need a tiny subset of behaviors but must traverse shared projection structs and nil-check helpers (e.g., `dispatchUploadImportWithRuntime`, `copyWGFileToVolumeWithRuntime`) before behavior executes.",
+        "The packet reports high chain depths in this area, consistent with multi-layer indirection."
+      ],
+      "suggestion": "Replace the broad function-bag seam approach with narrower interfaces per subsystem (e.g., importer, collectors, ship workflow, docker orchestration) and provide concrete adapters only where call-time policy is needed; remove redundant projection functions in favor of direct dependency construction in package boundaries.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_over_abstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Repeated abstraction pattern of broad, weakly-scoped runtime seam structs that are primarily test seams, not behavior encoders.",
+      "Snapshot-type API accidentally coupled back to mutable global state at method call time, reducing trust in snapshot boundaries."
+    ],
+    "likely_symptoms": [
+      "increased call depth and repeated runtime projection boilerplate across modules",
+      "tests and production paths touching same abstraction stack while each still depends on global mutable context"
+    ],
+    "possible_false_positives": [
+      "The blind packet's older mention of signature drift in `SetStartramConfig` did not hold up in current source; call sites consistently use the `structs.StartramRetrieve` form."
+    ]
+  }
+}

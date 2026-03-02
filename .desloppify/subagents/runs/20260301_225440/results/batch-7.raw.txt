@@ -1,0 +1,178 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "naming_quality": 90.0,
+    "logic_clarity": 86.0,
+    "type_safety": 88.0,
+    "contract_coherence": 74.0,
+    "error_consistency": 87.0,
+    "initialization_coupling": 89.0,
+    "convention_outlier": 92.0,
+    "api_surface_coherence": 89.0,
+    "authorization_consistency": 72.0
+  },
+  "dimension_notes": {
+    "naming_quality": {
+      "evidence": [
+        "Function and type names across `goseg/config/config.go`, `goseg/broadcast/broadcast.go`, and `goseg/importer/importer.go` are generally intent-revealing (`InitializeConfig`, `BroadcastToClients`, `SetUploadSession`).",
+        "Cross-file contracts use mostly consistent domain terms (`session`, `auth`, `broadcast`, `runtime`)."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Some naming still overloads 'token' semantics (ID vs full token value) across auth/importer paths, which affects clarity and discoverability of authorization contracts."
+    },
+    "logic_clarity": {
+      "evidence": [
+        "`goseg/leak/handler.go` has conditional noun handling that silently exits when decoded payload shape is unexpected, leaving behavior implicit instead of being explicitly rejected.",
+        "`goseg/importer/importer.go` performs staged validation across methods (`OpenUploadEndpoint` and later request validators) with mixed criteria, requiring readers to infer intended control flow."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Mixed authorization and validation branches are spread across import/auth handling and leak message handling without shared explicit guard helpers, which lowers readability and traceability."
+    },
+    "type_safety": {
+      "evidence": [
+        "Type-based branching in `goseg/leak/handler.go` relies on runtime assumptions about noun structure; malformed shapes are not surfaced as typed failures.",
+        "Serialization/dispatch entrypoints generally avoid unchecked panics, but explicit typed error returns are inconsistent in malformed-path handling."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Type guards in hot paths are not normalized through shared validators; adding explicit typed error objects for invalid request/message shapes would improve safety and diagnosability."
+    },
+    "contract_coherence": {
+      "evidence": [
+        "In `goseg/importer/importer.go`, `OpenUploadEndpoint` authorizes continuation using `IsTokenIdAuthed(token.ID)` (token-id only).",
+        "The same flow later validates session identity with `existingSession.Token != token` (full token comparison), creating a semantic split between auth acceptance and session matching."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The token contract is effectively duplicated with different equality rules; there is no single canonical session-token validation API."
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/broadcast/broadcast.go` defers to an async send path on channel saturation (`go func(){...}` fallback), which changes failure behavior between synchronous and asynchronous paths.",
+        "Malformed/unsupported leak payloads in `goseg/leak/handler.go` are not returned as explicit protocol errors, so callers receive no uniform failure signal."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Error policy is inconsistent across modules (sync validation failures, async drops/retry semantics, silent drops), requiring a shared response/error contract."
+    },
+    "initialization_coupling": {
+      "evidence": [
+        "Global/runtime setup in `goseg/startup_orchestrator.go` and `goseg/main.go` wires many subsystems in one path, including channels, background services, and upload/auth configuration.",
+        "Subsequent code in workflow/adapter modules assumes these globals are already initialized, raising implicit startup ordering dependence."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "A clearer dependency graph (explicit runtime/input requirements per module) would reduce implicit coupling during startup and in tests."
+    },
+    "convention_outlier": {
+      "evidence": [
+        "Across `goseg/main.go`, `goseg/startup_orchestrator.go`, and lifecycle/config modules, startup/validation responsibilities are separated using a mostly consistent pattern.",
+        "No major style or naming outliers are pervasive in the reviewed files."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Outliers remain in token/session naming and validation semantics, which are cross-cutting rather than localized convention issues."
+    },
+    "api_surface_coherence": {
+      "evidence": [
+        "Auth/token lifecycle for upload flows spans `goseg/importer/importer.go` and `goseg/auth/auth.go` with separate guard functions and assumptions.",
+        "API surface behavior (what is required to be valid for session continuity) is not consistently documented in one place or enforced by one gate."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No single request-auth contract object exists for upload/session operations; callers rely on inferred behavior across files."
+    },
+    "authorization_consistency": {
+      "evidence": [
+        "`goseg/importer/importer.go` first accepts session continuation by token ID (`IsTokenIdAuthed(token.ID)`), then later performs stricter full-token comparison (`existingSession.Token != token`), creating two inconsistent authorization interpretations in one flow.",
+        "This same endpoint also invokes `auth.ValidateAndAuthorizeRequestToken` in follow-on validation, duplicating auth checks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Authorization semantics should be unified behind one validator returning a clear decision mode/state; current split allows drift in edge cases."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "contract_coherence",
+      "identifier": "token-contract-split",
+      "summary": "Upload session authorization uses different token semantics in the same request lifecycle, so acceptance can differ between steps.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`OpenUploadEndpoint` checks `auth.IsTokenIdAuthed(token.ID)` (ID-only) before session setup.",
+        "Downstream path compares persisted `existingSession.Token` against the full `token` value.",
+        "The importer layer also calls `auth.ValidateAndAuthorizeRequestToken` in follow-on validation."
+      ],
+      "suggestion": "Introduce a single canonical upload-session auth contract (e.g., a `ValidateUploadSessionToken(session, requestToken)` helper) that defines one equivalence rule and one error outcome, then replace split checks in importer and related handlers with that helper.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "upload_token_semantics"
+    },
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "authorization-duplication-drift",
+      "summary": "Token authorization is checked in multiple places with non-equivalent conditions, creating inconsistent pass/fail outcomes.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "ID-based pass in `IsTokenIdAuthed(token.ID)` and full-token equality check for session reuse use different acceptance criteria.",
+        "`validateUploadRequest` adds yet another revalidation call, duplicating auth work without shared policy."
+      ],
+      "suggestion": "Consolidate authorization policy into a dedicated strategy in `auth` and consume it from importer entrypoints; return a typed authorization result that indicates exactly why a token is invalid or rotated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "upload_token_semantics"
+    },
+    {
+      "dimension": "logic_clarity",
+      "identifier": "leak-noun-silent-noop",
+      "summary": "Malformed leak payload shapes can be dropped without explicit error signaling, reducing debuggability and protocol clarity.",
+      "related_files": [
+        "goseg/leak/handler.go",
+        "goseg/leak/broadcast.go"
+      ],
+      "evidence": [
+        "In handler decode/dispatch flow, payload type branching assumes cell-shaped noun and does not emit a protocol error when shape assertions fail.",
+        "Control returns without structured feedback to caller path for invalid message shapes."
+      ],
+      "suggestion": "Add explicit validation/error branch for non-cell payloads that returns a structured protocol error event, and add table-driven tests in leak tests to cover malformed noun inputs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "invalid-message-handling"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Upload auth/token contract is fragmented across importer and auth modules, resulting in drift between ID-based and value-based authorization checks.",
+      "Message validation and dispatch error semantics are not normalized, leading to silent no-ops in malformed request paths."
+    ],
+    "likely_symptoms": [
+      "token-contract-split",
+      "authorization-duplication-drift",
+      "leak-noun-silent-noop"
+    ],
+    "possible_false_positives": [
+      "broadcast async backpressure behavior appears intentional in some designs; verify shutdown lifecycle before treating goroutine fallback as a confirmed leak in `BroadcastToClients`."
+    ]
+  }
+}

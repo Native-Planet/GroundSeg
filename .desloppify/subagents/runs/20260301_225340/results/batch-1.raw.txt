@@ -1,0 +1,99 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 54.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple files define separate large `*Runtime` seam structs (e.g. `goseg/docker/orchestration/runtime_seams.go`, `goseg/routines/runtime_seams.go`, `goseg/shipworkflow/operations_runtime.go`) with many function fields and separate `WithRuntime` wrappers, while the underlying behavior remains coupled to package-level state.",
+        "Several constructors follow a “default + with-runtime” pattern that mostly delegates through wrappers rather than introducing true abstraction boundaries.",
+        "`goseg/importer/importer.go` and `goseg/docker/orchestration/wireguard.go` accept runtime/config-like inputs, but key operations still reference ambient package values and helper globals, so seam injection is only partial."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 35.0,
+        "indirection_cost": 42.0,
+        "interface_honesty": 46.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_leaks_break_seam_contract",
+      "summary": "Runtime/context seams are not honored consistently, so tests can override behavior without preventing runtime dependence on global state.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/config/config.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "Runtime initialization in `importer` exposes overridable paths/ops, but the implementation still relies on package-level config state in the default path/IO path construction path, so overrides cannot fully isolate behavior.",
+        "`RuntimeContextSnapshot` is introduced, yet callers in multiple modules still pull from package globals (for example base/path/runtime flags) instead of consistently threading the injected snapshot through seams."
+      ],
+      "suggestion": "Define and propagate one canonical context object per orchestration path (no fallback reads from package globals). Replace direct `config`/global reads with context-sourced accessors inside runtime seam ops, and enforce via compilation checks/tests that runtime entrypoints only consume fields from the injected runtime struct.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_abstraction_sprawl"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "dup_wrapper_chains_without_behavior",
+      "summary": "Operation functions are wrapped in repetitive `WithRuntime` pass-through chains that add indirection without adding abstraction value.",
+      "related_files": [
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/netdata.go",
+        "goseg/docker/orchestration/urbit.go"
+      ],
+      "evidence": [
+        "Each file exposes base implementations plus `WithRuntime` variants that forward calls with minimal or no added logic.",
+        "The same delegation pattern appears across these orchestration modules, creating deeper call stacks and repeated seams for logically equivalent behavior."
+      ],
+      "suggestion": "Collapse duplicated `WithRuntime` wrappers into a single seam entrypoint per bounded operation and move the injectability boundary to the package edge; keep test seams at one layer instead of stacked forwarders.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_abstraction_sprawl"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wide_function_bag_structs",
+      "summary": "Runtime seam structs aggregate too many unrelated dependencies, reducing interface honesty and making call sites harder to reason about.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "Each seam type combines numerous helper operations (process/env/os/config/logging/IO helpers) into one broad struct, making dependencies coarse-grained and hiding true component boundaries.",
+        "Consumers frequently receive only a subset of these services but are forced to accept the entire bag, indicating low abstraction precision."
+      ],
+      "suggestion": "Split seam definitions into narrower operation-specific interfaces (for example split lifecycle, network, filesystem, and config concerns) and inject only the minimal seam set needed per module.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_abstraction_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime seam pattern is applied inconsistently: heavy wrapper scaffolding is used while global state remains the effective dependency mechanism.",
+      "Cross-package replication of large seam structs indicates missing shared abstraction layer and low abstraction leverage."
+    ],
+    "likely_symptoms": [
+      "runtime_leaks_break_seam_contract",
+      "dup_wrapper_chains_without_behavior",
+      "wide_function_bag_structs"
+    ],
+    "possible_false_positives": [
+      "Some global reads may be intentional legacy fallback points and could be transitional, not all of them necessarily indicate a defect in isolation."
+    ]
+  }
+}

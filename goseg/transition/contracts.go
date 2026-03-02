@@ -36,6 +36,10 @@ const (
 const (
 	ContainerTypeWireguard ContainerType = "wireguard"
 	ContainerTypeVere      ContainerType = "vere"
+	ContainerTypeNetdata   ContainerType = "netdata"
+	ContainerTypeMinio     ContainerType = "minio"
+	ContainerTypeMinioMC   ContainerType = "miniomc"
+	ContainerTypeLlamaAPI  ContainerType = "llama-api"
 )
 
 const (

@@ -1,0 +1,30 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 88.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "protocol/actions/actions.go exposes a strict namespace/action contract and uploadsvc consumers re-export those action constants via a type alias in uploadsvc/service.go, reducing duplicated protocol token definitions across modules.",
+        "config/wireguard.go keeps filesystem-backed configuration responsibilities within the config package and does not perform package-level initialization that mutates global state at import time.",
+        "uploadsvc/adapters/upload_payload_test.go validates parser/dispatch behavior through uploadsvc’s public action constants, which indicates the test layer is wired through the same cross-module contract instead of recreating transport action rules."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "No critical coupling defect was found in this slice, but the governance dimension for this batch would be stronger with explicit cross-module contract tests asserting that protocol action versioning and upload action surfaces remain synchronized over time."
+    }
+  },
+  "findings": [],
+  "retrospective": {
+    "root_causes": [
+      "No clear high-impact cross-module coupling defect was identified in the selected files after validation against prior packet context."
+    ],
+    "likely_symptoms": [],
+    "possible_false_positives": [
+      "Perceived risk around protocol/action drift is plausible but not currently a code defect in these files alone; it is mostly a process/contract-hardening concern."
+    ]
+  }
+}

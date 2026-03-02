@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/startram"
 	"groundseg/structs"
 	"strings"
@@ -63,7 +63,7 @@ func SwitchShipToWireguard(patp string, gracefulStop bool) error {
 	}
 
 	if gracefulStop {
-		statuses, err := docker.GetShipStatus([]string{patp})
+		statuses, err := orchestration.GetShipStatus([]string{patp})
 		if err != nil {
 			return fmt.Errorf("failed to get statuses for %s when rebuilding container: %w", patp, err)
 		}
@@ -78,15 +78,15 @@ func SwitchShipToWireguard(patp string, gracefulStop bool) error {
 		}
 	}
 
-	if err := docker.DeleteContainer(patp); err != nil {
+	if err := orchestration.DeleteContainer(patp); err != nil {
 		// keep going; this can fail when container has already exited/been removed.
 	}
 
-	if _, err := docker.StartContainer("minio_"+patp, "minio"); err != nil {
+	if _, err := orchestration.StartContainer("minio_"+patp, "minio"); err != nil {
 		// keep going; minio startup is best effort here and can be retried by health loops.
 	}
 
-	info, err := docker.StartContainer(patp, "vere")
+	info, err := orchestration.StartContainer(patp, "vere")
 	if err != nil {
 		return fmt.Errorf("failed to start container %s: %w", patp, err)
 	}

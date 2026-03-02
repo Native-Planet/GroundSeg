@@ -5,122 +5,161 @@ import (
 	"groundseg/auth"
 	"groundseg/leak"
 	"groundseg/structs"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
 
+var broadcastInterval = 1 * time.Second
+
 type broadcastLoopRuntime struct {
-	getClientManager     func() *structs.ClientManager
-	getLickStatuses      func() map[string]leak.LickStatus
-	constructSystemInfo  func() structs.System
-	constructPierInfo    func() (map[string]structs.Urbit, error)
-	constructAppsInfo    func() structs.Apps
-	constructProfileInfo func() structs.Profile
-	preserveSystem       func(structs.AuthBroadcast, structs.System) structs.System
-	preserveUrbits       func(structs.AuthBroadcast, map[string]structs.Urbit) map[string]structs.Urbit
-	preserveProfile      func(structs.AuthBroadcast, structs.Profile) structs.Profile
-	updateBroadcast      func(structs.AuthBroadcast)
-	broadcastToClients   func() error
+	getClientManagerFn     func() *structs.ClientManager
+	getLickStatusesFn      func() map[string]leak.LickStatus
+	constructSystemInfoFn  func() structs.System
+	constructPierInfoFn    func() (map[string]structs.Urbit, error)
+	constructAppsInfoFn    func() structs.Apps
+	constructProfileInfoFn func() structs.Profile
+	preserveSystemFn       func(structs.AuthBroadcast, structs.System) structs.System
+	preserveUrbitsFn       func(structs.AuthBroadcast, map[string]structs.Urbit) map[string]structs.Urbit
+	preserveProfileFn      func(structs.AuthBroadcast, structs.Profile) structs.Profile
+	updateBroadcastFn      func(structs.AuthBroadcast)
+	broadcastToClientsFn   func() error
+	tickErrorFn            func(error)
+	tickInterval           time.Duration
 }
 
-func newBroadcastLoopRuntime() broadcastLoopRuntime {
-	return broadcastLoopRuntime{
-		getClientManager:     auth.GetClientManager,
-		getLickStatuses:      leak.GetLickStatuses,
-		constructSystemInfo:  constructSystemInfo,
-		constructPierInfo:    ConstructPierInfo,
-		constructAppsInfo:    constructAppsInfo,
-		constructProfileInfo: constructProfileInfo,
-		preserveSystem:       PreserveSystemTransitions,
-		preserveUrbits:       PreserveUrbitsTransitions,
-		preserveProfile:      PreserveProfileTransitions,
-		updateBroadcast:      UpdateBroadcast,
-		broadcastToClients:   BroadcastToClients,
+var (
+	loopControlMu   sync.Mutex
+	loopRunning     bool
+	loopStopChannel chan struct{}
+)
+
+func newBroadcastLoopRuntime() *broadcastLoopRuntime {
+	return &broadcastLoopRuntime{
+		getClientManagerFn:     auth.GetClientManager,
+		getLickStatusesFn:      leak.GetLickStatuses,
+		constructSystemInfoFn:  constructSystemInfo,
+		constructPierInfoFn:    ConstructPierInfo,
+		constructAppsInfoFn:    constructAppsInfo,
+		constructProfileInfoFn: constructProfileInfo,
+		preserveSystemFn:       PreserveSystemTransitions,
+		preserveUrbitsFn:       PreserveUrbitsTransitions,
+		preserveProfileFn:      PreserveProfileTransitions,
+		updateBroadcastFn:      UpdateBroadcast,
+		broadcastToClientsFn:   BroadcastToClients,
+		tickErrorFn:            func(err error) { zap.L().Error(fmt.Sprintf("broadcast tick failed: %v", err)) },
+		tickInterval:           broadcastInterval,
 	}
 }
 
-func newTestBroadcastLoopRuntime(overrides func(runtime *broadcastLoopRuntime)) broadcastLoopRuntime {
+func newTestBroadcastLoopRuntime(overrides func(runtime *broadcastLoopRuntime)) *broadcastLoopRuntime {
 	rt := newBroadcastLoopRuntime()
-	overrides(&rt)
+	overrides(rt)
 	return rt
 }
 
 func BroadcastLoop() {
-	BroadcastLoopWithRuntime(newBroadcastLoopRuntime())
+	StartBroadcastLoop()
 }
 
-func BroadcastLoopWithRuntime(runtime broadcastLoopRuntime) {
-	ticker := time.NewTicker(broadcastInterval)
-	if runtime.broadcastToClients == nil {
-		runtime.broadcastToClients = BroadcastToClients
+func BroadcastLoopWithRuntime(runtime *broadcastLoopRuntime) {
+	StartBroadcastLoopWithRuntime(runtime)
+}
+
+func StartBroadcastLoop() bool {
+	return StartBroadcastLoopWithRuntime(newBroadcastLoopRuntime())
+}
+
+func StartBroadcastLoopWithRuntime(runtime *broadcastLoopRuntime) bool {
+	if runtime == nil {
+		runtime = newBroadcastLoopRuntime()
 	}
-	if runtime.getClientManager == nil {
-		runtime.getClientManager = auth.GetClientManager
+
+	stop := make(chan struct{})
+
+	loopControlMu.Lock()
+	if loopRunning {
+		loopControlMu.Unlock()
+		return false
 	}
-	if runtime.getLickStatuses == nil {
-		runtime.getLickStatuses = leak.GetLickStatuses
+	loopRunning = true
+	loopStopChannel = stop
+	loopControlMu.Unlock()
+
+	go runBroadcastLoop(runtime, stop)
+	return true
+}
+
+func StopBroadcastLoop() {
+	loopControlMu.Lock()
+	defer loopControlMu.Unlock()
+
+	if !loopRunning {
+		return
 	}
-	if runtime.constructSystemInfo == nil {
-		runtime.constructSystemInfo = constructSystemInfo
+	if loopStopChannel != nil {
+		close(loopStopChannel)
 	}
-	if runtime.constructPierInfo == nil {
-		runtime.constructPierInfo = ConstructPierInfo
+	loopRunning = false
+	loopStopChannel = nil
+}
+
+func runBroadcastLoop(runtime *broadcastLoopRuntime, stop <-chan struct{}) {
+	tickerDuration := broadcastInterval
+	if runtime != nil && runtime.tickInterval > 0 {
+		tickerDuration = runtime.tickInterval
 	}
-	if runtime.constructAppsInfo == nil {
-		runtime.constructAppsInfo = constructAppsInfo
-	}
-	if runtime.constructProfileInfo == nil {
-		runtime.constructProfileInfo = constructProfileInfo
-	}
-	if runtime.preserveSystem == nil {
-		runtime.preserveSystem = PreserveSystemTransitions
-	}
-	if runtime.preserveUrbits == nil {
-		runtime.preserveUrbits = PreserveUrbitsTransitions
-	}
-	if runtime.preserveProfile == nil {
-		runtime.preserveProfile = PreserveProfileTransitions
-	}
-	if runtime.updateBroadcast == nil {
-		runtime.updateBroadcast = UpdateBroadcast
-	}
+	ticker := time.NewTicker(tickerDuration)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			runBroadcastTickWithRuntime(runtime)
+			if err := runBroadcastTickWithRuntime(runtime); err != nil {
+				if runtime.tickErrorFn != nil {
+					runtime.tickErrorFn(err)
+				}
+			}
+		case <-stop:
+			return
 		}
 	}
 }
 
 func runBroadcastTick() {
-	runBroadcastTickWithRuntime(newBroadcastLoopRuntime())
+	_ = runBroadcastTickWithRuntime(newBroadcastLoopRuntime())
 }
 
-func runBroadcastTickWithRuntime(rt broadcastLoopRuntime) {
-	cm := rt.getClientManager()
-	if cm == nil {
-		return
+func runBroadcastTickWithRuntime(rt *broadcastLoopRuntime) error {
+	if rt == nil {
+		rt = newBroadcastLoopRuntime()
 	}
-	if cm.HasAuthSession() || len(rt.getLickStatuses()) > 0 {
+	cm := rt.getClientManagerFn()
+	if cm == nil {
+		return nil
+	}
+	if cm.HasAuthSession() || len(rt.getLickStatusesFn()) > 0 {
 		// refresh loop for host info
-		systemInfo := rt.constructSystemInfo()
+		systemInfo := rt.constructSystemInfoFn()
 
 		// pier info
-		pierInfo, err := rt.constructPierInfo()
+		pierInfo, err := rt.constructPierInfoFn()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Unable to build pier info: %v", err))
+			mu.RLock()
+			pierInfo = broadcastState.Urbits
+			mu.RUnlock()
 		}
 		if pierInfo == nil {
 			pierInfo = make(map[string]structs.Urbit)
 		}
 
 		// apps info
-		appsInfo := rt.constructAppsInfo()
+		appsInfo := rt.constructAppsInfoFn()
 
 		// profile info
-		profileInfo := rt.constructProfileInfo()
+		profileInfo := rt.constructProfileInfoFn()
 
 		// Retrieve broadcastState
 		mu.RLock()
@@ -128,9 +167,9 @@ func runBroadcastTickWithRuntime(rt broadcastLoopRuntime) {
 		mu.RUnlock()
 
 		// Preserve transitions
-		systemInfo = rt.preserveSystem(newState, systemInfo)
-		pierInfo = rt.preserveUrbits(newState, pierInfo)
-		profileInfo = rt.preserveProfile(newState, profileInfo)
+		systemInfo = rt.preserveSystemFn(newState, systemInfo)
+		pierInfo = rt.preserveUrbitsFn(newState, pierInfo)
+		profileInfo = rt.preserveProfileFn(newState, profileInfo)
 
 		// Update broadcast state
 		newState.System = systemInfo
@@ -138,11 +177,15 @@ func runBroadcastTickWithRuntime(rt broadcastLoopRuntime) {
 		newState.Apps = appsInfo
 		newState.Profile = profileInfo
 
-		rt.updateBroadcast(newState)
+		rt.updateBroadcastFn(newState)
 
 		// broadcast
-		rt.broadcastToClients()
+		if err := rt.broadcastToClientsFn(); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func PreserveProfileTransitions(oldState structs.AuthBroadcast, newProfile structs.Profile) structs.Profile {

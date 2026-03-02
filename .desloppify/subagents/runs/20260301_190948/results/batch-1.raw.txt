@@ -1,0 +1,59 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 87.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "A pattern of pass-through runtime seams is repeated across multiple listed modules, with interfaces/default structs plus helper wrappers that mostly forward directly to existing package behavior.",
+        "Blind-packet abstraction metrics already flag high indirection hotspot density in these same files (e.g., broadcast, routines/docker, wireguard orchestration), consistent with accumulated wrapper-chain call depth.",
+        "Call paths in production are longer than necessary in seam-heavy modules where concrete behavior is effectively fixed to one runtime branch."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Abstractions would score higher if seam layers are consolidated so wrappers only exist where multiple implementations or policy translation is actually required.",
+      "sub_axes": {
+        "abstraction_leverage": 80.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 82.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "thin_default_runtime_seams",
+      "summary": "Runtime seam interfaces in production are largely thin forwarding wrappers, adding indirection without policy or behavioral branching.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`broadcast/broadcast.go` defines an interface and default implementation for client-runtime methods, then funnels calls through a tiny forwarding layer.",
+        "`routines/runtime_seams.go` and `docker/orchestration/runtime_seams.go` each declare explicit seam interfaces and default implementations instead of using direct call sites.",
+        "`routines/docker.go` relies on these seam calls, so normal execution pays extra abstraction depth for behavior that is not currently polymorphic.",
+        "Packet abstraction analysis reports repeated indirection hotspots in these files with max chain depth 4, matching the observed seam-stack shape."
+      ],
+      "suggestion": "Replace pass-through wrappers with direct package-level collaborators or function variables only in test-critical places, and keep interfaces only where multiple real implementations exist; fold duplicated seam definitions into a small shared seam strategy to reduce wrapper depth and coupling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_overabstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam-by-seam pattern applied uniformly for testability even where production has a single concrete path.",
+      "Abstracted call chains were introduced before behavior variation existed, so the layers were not earned by actual policy or translation needs."
+    ],
+    "likely_symptoms": [
+      "thin_default_runtime_seams"
+    ],
+    "possible_false_positives": []
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 67.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Many tiny config snapshot types/functions exist as independent pass-through wrappers rather than a consolidated domain API (`goseg/config/config.go:279-377`).",
+        "Callers in multiple subsystems repeatedly compose runtime behavior through nested function-seam structs (`goseg/routines/runtime_seams.go`, `goseg/broadcast/loop.go`, `goseg/docker/orchestration/runtime_seams.go`, `goseg/docker/lifecycle/lifecycle.go`).",
+        "Several runtime paths create new runtime objects repeatedly only to forward through additional wrapper layers without semantic transformation (`goseg/routines/docker.go:88-103`, `goseg/routines/docker.go:180-219`, `goseg/broadcast/loop.go:86-151`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 44.0,
+        "indirection_cost": 34.0,
+        "interface_honesty": 58.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "snapshot_bag_fragmentation",
+      "summary": "Config is exposed through many narrow snapshot structs that duplicate a copy-on-read pattern, creating low-leverage abstraction debt across package boundaries.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/importer/importer.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Each feature area defines independent snapshot views over `Conf()` (`goseg/config/config.go:279-377`).",
+        "Collector and routine layers create helper shims that exist solely to wrap those snapshots without domain logic (`goseg/broadcast/collectors/collectors.go:32-38`, `goseg/routines/runtime_seams.go:44-48`, `89-93`).",
+        "Higher-level orchestration code directly depends on many snapshot functions (`goseg/importer/importer.go:69-78`, `goseg/main.go:92-104`) instead of a bounded config contract."
+      ],
+      "suggestion": "Replace the ad-hoc snapshot family with bounded read interfaces (for example `ShipConfigView`, `RuntimeConfigView`, `AuthConfigView`) and inject explicit dependencies at subsystem boundaries, so each caller can request only the small set of fields it truly needs with clear ownership and stronger API semantics.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_chain_overextension",
+      "summary": "Runtime-seam layers and helper wrappers are stacked broadly for testability but add little domain behavior and increase trace complexity.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "Broadcast exposes a custom runtime struct with many function fields plus defaulting logic, yet execution remains a thin pass-through sequence (`goseg/broadcast/loop.go:13-40`, `49-83`).",
+        "Docker routines mirror the same style with multiple nested seam structs and direct forwarding (`goseg/routines/runtime_seams.go:24-65`, `84-103`).",
+        "Update/event-handling paths instantiate runtime wrappers and forward through wrapper methods rather than domain transitions (`goseg/routines/docker.go:88-103`, `180-219`, `227-260`)."
+      ],
+      "suggestion": "Constrain seams to true boundaries only (one seam per subsystem boundary), and replace pass-through function buckets with direct interfaces that carry one clear behavioral contract; avoid per-event/per-call wrapper reconstruction for hot paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "noop_seam_defaults_hide_contract",
+      "summary": "Default no-op seam implementations in orchestration/runtime construction obscure whether required dependencies are actually configured.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "The base docker runtime sets wireguard/minio/netdata operations to inert defaults that return success-like placeholders (`goseg/docker/orchestration/runtime_seams.go:146-157`).",
+        "Load paths branch on optional writer hooks without explicit invariant enforcement, making feature readiness implicit (`goseg/docker/orchestration/wireguard.go:34-38`, `213-229`).",
+        "Lifecycle uses mutable package-level function variables and setters for dependency overrides without a contract enforcing completeness (`goseg/docker/lifecycle/lifecycle.go:20-31`, `47-63`)."
+      ],
+      "suggestion": "Introduce explicit `runtime.RuntimeDependencies` interfaces for orchestration and lifecycle, fail-fast on missing implementations in constructors, and remove silent no-op defaults unless semantically optional.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "snapshot_bag_overabstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Config is modeled as copy-on-read micro-projections rather than explicit capability interfaces.",
+      "Cross-package seam injection is overused, creating indirection chains that often forward calls unchanged.",
+      "Fallback/no-op defaults in seams reduce interface honesty by allowing invalid composition states without visible failure."
+    ],
+    "likely_symptoms": [
+      "Hard-to-follow control flow through runtime layers in broadcast and docker loops",
+      "Inconsistent abstraction semantics as same config/domain appears as multiple tiny projections",
+      "Brittle tests and brittle production wiring when seam defaults change behavior silently"
+    ],
+    "possible_false_positives": [
+      "Some seams are intentionally test-focused; those used for explicit dependency override in a few narrow cases may be acceptable despite low leverage in current form"
+    ]
+  }
+}

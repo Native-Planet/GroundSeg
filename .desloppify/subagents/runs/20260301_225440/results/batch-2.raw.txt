@@ -1,0 +1,139 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "dependency_health": 79.4,
+    "mid_level_elegance": 70.8,
+    "low_level_elegance": 75.6
+  },
+  "dimension_notes": {
+    "dependency_health": {
+      "evidence": [
+        "Multiple listed files still carry stale/unused imports (e.g., `goseg/importer/importer.go` has unused `types/volume`, `gorilla/mux`, `zap`; `goseg/main.go` has unused `zap` and `gorilla/mux`; `goseg/routines/docker.go` has unused `events` and `zap`).",
+        "Bootstrap and runtime wiring files import broad dependency sets while exposing only a narrow surface, increasing compile-time coupling and making package drift harder to detect.",
+        "The seam layer (`goseg/routines/runtime_seams.go`) and orchestration wiring create additional dependency bridges instead of simplifying ownership boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "Runtime-seam abstraction style is repeated across packages: `goseg/docker/orchestration/runtime_seams.go`, `goseg/routines/runtime_seams.go`, and `goseg/shipworkflow/operations_runtime.go` all bundle many collaborators in wide runtime objects.",
+        "`goseg/startup_orchestrator.go` and startup wiring in `goseg/main.go` coordinate a large number of background services through that shared graph in a single flow, making initialization ordering and failure semantics opaque.",
+        "This indicates duplicated seam patterns instead of a stable, low-friction boundary contract between modules."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`goseg/broadcast/collectors/collectors.go` is large and mechanically flagged as low-leverage decomposition (multiple disconnected function clusters), yet is used directly by the broadcast coordinator in `goseg/broadcast/broadcast.go`, suggesting blurred module boundaries.",
+        "In listed modules, several files are coupling setup, orchestration, and service actions in the same execution path instead of isolating cohesive operations into smaller, single-purpose functions."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "dependency_health",
+      "identifier": "runtime_dead_dependencies",
+      "summary": "Dead imports across execution-path files indicate accumulated dependency drift and unnecessary package coupling.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/main.go",
+        "goseg/routines/docker.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`goseg/importer/importer.go` retains imports (`types/volume`, `gorilla/mux`, `zap`) reported as unused.",
+        "`goseg/main.go` reports unused imports for `zap` and `gorilla/mux` while serving orchestration/bootstrap responsibilities.",
+        "`goseg/routines/docker.go` still has unused imports in a file that already sits near orchestration seams, amplifying graph noise.",
+        "These stale dependencies are across core runtime and orchestration paths, not isolated test-only files."
+      ],
+      "suggestion": "Remove stale imports and split seam-specific packages so each file depends only on the abstractions it actually calls; if deferred usage is planned, gate imports by build tags or defer code behind explicit optional compile paths.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "dependency_bag_seams",
+      "summary": "Repeated wide dependency-bag seams force modules to absorb each other’s implementation surface.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "The same broad pattern appears across multiple files: runtime structs composed as large function/interface bundles passed through layers.",
+        "Callers import these broad runtime containers and access many capabilities that are unrelated to their local behavior.",
+        "This produces repetitive constructor signatures and brittle handoff code rather than explicit, narrow contracts."
+      ],
+      "suggestion": "Replace the shared, cross-module runtime bags with narrow interfaces for each use-case (e.g., container ops, wireguard ops, workflow ops), and inject only those interfaces at each boundary.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_bag_dependency"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "startup_graph_monolith",
+      "summary": "Startup logic is centralized in orchestrator modules with high coupling and implicit ordering assumptions.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/main.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "Startup/bootstrap flow spans `main.go` and `startup_orchestrator.go` and drives many background routines through one orchestration path.",
+        "The startup sequence embeds service creation and launch policy in one place, making dependency ordering and recoverability difficult to reason about.",
+        "Runtime seam objects are treated as a single handoff payload instead of explicit subsystem interfaces."
+      ],
+      "suggestion": "Introduce a declarative startup plan with explicit service dependency metadata and health/error policy, so subsystem startup is registered and ordered by contract rather than manually coupled in one function.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_bag_dependency"
+    },
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "collector_cohesion_breakdown",
+      "summary": "Collector and broadcast responsibilities are bundled together, making behavior harder to isolate and test incrementally.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/leak/broadcast.go",
+        "goseg/broadcast/loop_test.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/collectors/collectors.go` is large and marked with disconnected function clusters, indicating mixed concerns under one module.",
+        "The broadcast coordinator directly depends on that broad collector module while additional broadcast/leak adapters also consume it, increasing coupling among unrelated paths.",
+        "Tests can only mock whole collector/orchestration interactions rather than narrow collector contracts."
+      ],
+      "suggestion": "Split collectors into focused modules (eg. source/event/filtering/state collectors) with narrow interfaces, and inject only required collector contracts into broadcast/leak entrypoints.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_bag_dependency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime-bag abstraction pattern (large bundled seam structs) has been applied repeatedly across orchestration, routines, and workflow layers, creating coupling debt.",
+      "Startup wiring is treated as an orchestration implementation detail rather than a declarative boundary, increasing fragility and lowering abstraction leverage."
+    ],
+    "likely_symptoms": [
+      "dependency_bag_seams",
+      "startup_graph_monolith",
+      "collector_cohesion_breakdown"
+    ],
+    "possible_false_positives": [
+      "Unused import findings may sometimes be intentionally temporary; verify compile scope before bulk removal if files are build-tagged."
+    ]
+  }
+}

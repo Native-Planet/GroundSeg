@@ -1,0 +1,73 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 80.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "In `goseg/importer/importer.go`, HTTP upload responses are written without checking write failures, so transport-layer failures are lost and handlers still report successful command flow.",
+        "In `goseg/importer/importer.go` and `goseg/system/disk.go`, existence checks only treat `os.IsNotExist` as actionable and effectively ignore other `os.Stat` failures, turning unexpected I/O/permission errors into silent success/continuation."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 0,
+        "indirection_cost": 0,
+        "interface_honesty": 0
+      },
+      "issues_preventing_higher_score": [
+        "Propagate HTTP write failures from upload handlers instead of dropping them.",
+        "Normalize filesystem existence checks to treat non-`NotExist` errors as fatal for control decisions."
+      ]
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "upload_response_write_errors_ignored",
+      "summary": "Upload handler drops `ResponseWriter` write errors, losing transport failure context",
+      "related_files": [
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`sendUploadResponse` calls `w.WriteHeader` and `w.Write` but does not return or inspect write errors, and callers do not branch on failures after response write attempts."
+      ],
+      "suggestion": "Change `sendUploadResponse` to return an error and have `failUploadRequest`/`HTTPUploadHandler` handle it by logging and failing the request with a secondary server error fallback so callers can react consistently.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "fs_exists_check_ignores_non_notexist_errors",
+      "summary": "Filesystem existence checks ignore non-`NotExist` errors and can misclassify error conditions as success",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/system/disk.go"
+      ],
+      "evidence": [
+        "`allChunksReceived` only treats `os.IsNotExist(err)` as an incomplete chunk signal and treats all other `os.Stat` errors as though the chunk exists.",
+        "`CreateGroundSegFilesystem` loops until `os.Stat` is `os.IsNotExist`, which can silently continue on permission/I/O errors instead of failing fast."
+      ],
+      "suggestion": "Introduce a shared helper for path probes that returns an explicit error for any non-`NotExist` failure, and use it in import completion checks and disk path selection to stop workflows on filesystem anomalies.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "non_discriminating_fs_error_paths"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Transport response and filesystem existence checks rely on partial success assumptions that discard important error classes.",
+      "Error strategy drift: some call sites treat only one error condition as actionable and silently continue for the rest."
+    ],
+    "likely_symptoms": [
+      "Upload API appears to succeed while clients receive truncated/undelivered responses",
+      "Import completion may be triggered when chunk availability checks are unreliable due to unexpected FS errors"
+    ],
+    "possible_false_positives": []
+  }
+}

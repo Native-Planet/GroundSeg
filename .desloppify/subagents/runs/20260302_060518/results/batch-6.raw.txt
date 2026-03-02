@@ -1,0 +1,117 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 6,
+  "assessments": {
+    "design_coherence": 84.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime-specific constructor and adaptation logic is manually assembled in multiple places (`goseg/docker/orchestration/container_bridge.go:22-46`, `goseg/docker/orchestration/container_bridge.go:55-88`, `goseg/docker/orchestration/netdata.go:38-89`, `goseg/docker/orchestration/netdata.go:139-163`, `goseg/docker/orchestration/runtime_seams.go:32-63`, `goseg/docker/orchestration/volume_writer.go:32-38`), creating repeated patterns for equivalent responsibilities.",
+        "Session lifecycle transitions in auth session maps are implemented with duplicated add/move/remove logic and inconsistent precondition handling (`goseg/structs/ws.go:182-247`), which couples behavior tightly to two nearly parallel code paths.",
+        "Patch application is implemented as a large monolithic registry with repeated parse/apply closures per field, increasing coupling and making key additions a broad edit (`goseg/config/config_update.go:53-61`, `goseg/config/config_update.go:64-71`, `goseg/config/config_update.go:72-77`, etc.)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "These repetitive construction/migration patterns are contained and testable, but they prevent the code from reaching high coherence because adding/removing runtime or config behaviors still requires coordinated edits across multiple manual blocks."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_builder_boilerplate",
+      "summary": "Runtime bridge builders duplicate adapter composition and wrapper logic across container types.",
+      "related_files": [
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/netdata.go",
+        "goseg/docker/orchestration/volume_writer.go"
+      ],
+      "evidence": [
+        "`container_bridge.go` defines near-duplicated mapping for llama/netdata/minio runtime structs (`:5-53`, `:55-88`) while each includes near-identical copy helper and config/function wiring patterns.",
+        "`runtime_seams.go` contains many constructor paths that expose and pass through the same interfaces repeatedly while each runtime path assembles similar adapter slices manually (`:14-20`, `:31-76`, `:136-176`).",
+        "`volume_writer.go` reintroduces helper plumbing (`requiredCopyFileToVolumeFn`, `writeConfigArtifact`, `copyFileToVolumeWithTempContainer`) that mirrors the same adaptation pattern used in each runtime-specific path."
+      ],
+      "suggestion": "Introduce a shared runtime-builder abstraction for container runtimes (type-specific descriptor + adapter composition function), so container-specific constructors only specify the fields and capabilities they need; centralize copy-to-volume wrapper generation and common volume/bootstrap setup in one place.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime-builder-boilerplate-drift"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "auth_session_map_transition_guard",
+      "summary": "ClientManager session transition functions contain duplicated map-mutation flows and unsafe nil/state assumptions.",
+      "related_files": [
+        "goseg/structs/ws.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`ClientManager.AddAuthClient` dereferences `client.Active` before checking nil (`:185`), so a nil `*MuConn` causes a panic on caller misuse instead of returning a controlled path.",
+        "`AddAuthClient` and `AddUnauthClient` both implement remove-from-other-map, exists-check, and append logic independently (`:182-247`), increasing risk of drift in auth/unauth state migration semantics.",
+        "Callers in `auth` rely on these state transitions (`auth/auth.go:85`, `auth/auth.go:125`) but there is no single abstraction that validates and applies session transitions consistently."
+      ],
+      "suggestion": "Refactor `ClientManager` into a single session transition routine (normalize + validate input + move/mutate maps), and apply strict nil/type checks at the beginning of both auth/unauth paths to prevent panic; update callers to pass explicit state transition operations via that helper.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "session-map-state-machine"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_descriptor_repetition",
+      "summary": "Config patch registration is manually repetitive, making schema evolution and correctness-prone edits likely.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "Each config key is registered with a triplet of tiny closures (`hasUpdates`, `parse`, `apply`) repeated across many entries (`goseg/config/config_update.go:60-61`, `:64-77`, `:78-110`, `:112-160`, etc.).",
+        "`hasUpdates()` iterates this large registry every update path (`:44-51`) and correctness depends on each repeated closure staying in sync.",
+        "Cross-file cohesion is further weakened because update version compatibility is maintained separately in `config/version.go` and must remain aligned with patch registry behavior."
+      ],
+      "suggestion": "Convert the registry to declarative descriptors with reusable typed parse/apply templates (or generated descriptors) that keep key, validation type, and field target in one schema, then generate the triplet behavior from that single source.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "declarative-config-over-manual-closures"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_process_probe_ambiguity",
+      "summary": "Process detection couples AP liveness checks to a brittle, regex-style shell convention inside direct exec usage.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/accesspoint/accesspoint_test.go"
+      ],
+      "evidence": [
+        "`isRunningWithRuntime` ignores its runtime input (`:279`) and hardcodes `pgrep` pattern probing (`:281`), while passing a single-quoted regex-like pattern through `exec.Command` (`'hostapd|dnsmasq'`) rather than a direct argument contract.",
+        "Runtime call sites can override probing via `runProcessProbeFn`, but there is no structured process match interface for hostname/command exactness (`:44-52`, `:50-53`).",
+        "Tests verify success/failure only via mocked exit codes and do not assert behavior for multi-process matching semantics (`goseg/accesspoint/accesspoint_test.go:256-291`)."
+      ],
+      "suggestion": "Extract process probing into a dedicated helper that accepts a normalized matcher contract (exact names or regex semantics) and avoid quoting assumptions; use a single matcher implementation for hostapd/dnsmasq checks and make pattern semantics explicit in tests.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "runtime-contract-boundary-misalignment"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual adapter/constructor composition repeated across runtime seams instead of being data-driven",
+      "Duplicated mutable state transition logic for session maps",
+      "Schema evolution logic encoded as repetitive closures instead of declarative descriptors",
+      "Process probing command contracts mixed with external invocation detail"
+    ],
+    "likely_symptoms": [
+      "runtime_builder_boilerplate",
+      "auth_session_map_transition_guard",
+      "config_patch_descriptor_repetition"
+    ],
+    "possible_false_positives": [
+      "config patch repetition may be accepted as explicitness for policy-heavy parsing",
+      "process probing command style may be intentionally conservative for compatibility with legacy platform tooling"
+    ]
+  }
+}

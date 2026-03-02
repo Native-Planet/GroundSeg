@@ -1,0 +1,101 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 74.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`routines/runtime_seams.go` and `docker/orchestration/runtime_seams.go` both define large `runtime` structs composed only of function fields and constructors that mostly rebind one function per op with `seams.RequireSeam*` wrappers.",
+        "`lifecycle` and `network` each declare their own `dockerClientNew` plus `SetClientFactory` seam, duplicating the same dependency override abstraction for the same boundary.",
+        "`broadcast/collectors/collectors.go` composes configuration, orchestration, click, and system concerns in one function chain (`ConstructPierInfo` -> `runtimeSnapshotForPiers` -> `collectUrbitViewInputs`) with no abstraction boundary for data providers.",
+        "This indicates repeated cross-cutting indirection layers and a single layer doing orchestration duties across modules instead of clean composition."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 64.0,
+        "indirection_cost": 57.0,
+        "interface_honesty": 72.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_boilerplate",
+      "summary": "Runtime seam layers are duplicated across packages with mostly pass-through behavior, increasing indirection and cognitive load.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`routines/runtime_seams.go` defines `dockerRoutineRuntime` and `dockerRoutineStateOps`/`dockerRoutineContainerOps` wrappers where most fields are direct passthroughs to module-level functions.",
+        "`docker/orchestration/runtime_seams.go` defines a parallel seam graph (`dockerRuntime`, `dockerRuntimeContextOps`, `dockerRuntimeContainerOps`, etc.) with equivalent pass-through initialization.",
+        "Both files create largely parallel abstractions for similar boundaries without evidence of policy separation beyond seam injection/testing indirection."
+      ],
+      "suggestion": "Introduce a shared seam-building utility or unified runtime abstraction layer so orchestration and routine call-sites share a small set of explicit constructor arguments instead of duplicated per-package op-struct scaffolding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_docker_factory_seams",
+      "summary": "Docker client factory seams are repeated in multiple layers with inconsistent surface area, causing duplicate test/DI setup and fragmented ownership.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/dockerclient/client.go"
+      ],
+      "evidence": [
+        "`goseg/docker/network/network.go` exports `dockerClientNew` and `SetClientFactory` as a mutable seam to override `dockerclient.New`.",
+        "`goseg/docker/lifecycle/lifecycle.go` repeats the same pattern (`dockerClientNew` + `SetClientFactory`) instead of reusing a single shared client-seam contract.",
+        "`goseg/dockerclient/client.go` already owns the version-aware client construction and ping-caching behavior, so the upper layers are re-wrapping a behavior that is already centralized."
+      ],
+      "suggestion": "Move client creation seams behind one package-level abstraction (or explicit runtime parameter) and remove duplicated mutable factory globals from both callers so all docker client injection is configured consistently.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "collector_orchestration_conflation",
+      "summary": "Collector logic aggregates state acquisition, policy, and view assembly, making it hard to test and reuse as a true abstraction.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/docker/orchestration/urbit.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` in `collectors` not only transforms state but also calls into `config` (`StartramSettingsSnapshot`, `GetStartramConfig`, `LoadUrbitConfig`) and orchestration (`runtimeSnapshotCollector` via `GetShipStatus`) directly.",
+        "`collectUrbitViewInputs` loads config (`UrbitConf`), pulls container status info, resolves network/minIO state, and performs derived view mapping in a single function.",
+        "This conflates provider boundaries: callers cannot inject isolated data providers without rebuilding broad global seams, so abstraction does not provide clear replacement points."
+      ],
+      "suggestion": "Split collectors into explicit provider interfaces (state providers, network/status providers, and view-mapping composer) and inject these at runtime so each stage has single responsibility and test seams are focused.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "collector_dependency_aggregation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Repeated seam boilerplate for similar boundaries without shared abstraction policy.",
+      "Aggregation of orchestration/config interactions inside collector functions.",
+      "Testability seams implemented at multiple package layers with duplicated mutable globals."
+    ],
+    "likely_symptoms": [
+      "runtime_seam_fragmentation",
+      "collector_dependency_aggregation"
+    ],
+    "possible_false_positives": [
+      "Some seam-heavy patterns may be intentionally preserved to keep unit tests decoupled from live docker/system dependencies; if test harness stability is a strict requirement, selective boilerplate may be intentional."
+    ]
+  }
+}

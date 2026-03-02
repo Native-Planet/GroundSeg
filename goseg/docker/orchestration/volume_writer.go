@@ -1,20 +1,16 @@
 package orchestration
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
 	"fmt"
+	"groundseg/docker/orchestration/internal/artifactwriter"
 	"groundseg/dockerclient"
-	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/docker/docker/api/types/container"
 	"go.uber.org/zap"
 )
 
-type volumeWriterImageSelector func() (string, error)
+type volumeWriterImageSelector = func() (string, error)
 
 func copyFileToVolumeWithTempContainer(
 	filePath string,
@@ -56,7 +52,7 @@ func copyFileToVolumeWithTempContainer(
 		return err
 	}
 
-	tarReader, err := tarArchiveForSingleFile(filePath)
+	tarReader, err := artifactwriter.TarArchiveForSingleFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -72,37 +68,4 @@ func latestContainerImage(containerType string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"]), nil
-}
-
-func tarArchiveForSingleFile(filePath string) (io.Reader, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	info, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	var buffer bytes.Buffer
-	tw := tar.NewWriter(&buffer)
-	header := &tar.Header{
-		Name: filepath.Base(filePath),
-		Mode: int64(info.Mode().Perm()),
-		Size: info.Size(),
-	}
-	if err := tw.WriteHeader(header); err != nil {
-		_ = tw.Close()
-		return nil, err
-	}
-	if _, err := io.Copy(tw, file); err != nil {
-		_ = tw.Close()
-		return nil, err
-	}
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	return &buffer, nil
 }

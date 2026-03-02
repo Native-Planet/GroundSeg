@@ -1,0 +1,88 @@
+{
+  "batch": "Package Organization",
+  "batch_index": 4,
+  "assessments": {
+    "high_level_elegance": 77.0
+  },
+  "dimension_notes": {
+    "high_level_elegance": {
+      "evidence": [
+        "`goseg/routines/docker.go` is a pure forwarding layer: it exposes Docker lifecycle entry points but contains no domain logic.",
+        "`goseg/docker/orchestration/subsystem/docker.go` already implements the same Docker subsystem entry workflow (health loop startup, subsystem startup, transition handling), so callers must infer which layer is the canonical API owner.",
+        "`goseg/startram/backup_runtime.go` co-locates transport (HTTP + API payload handling), crypto operations (`encryptFile`/`decryptFile`), Docker volume manipulation (`writeBackupToVolume` via `docker inspect`), and restore orchestration sequencing in a single module.",
+        "`goseg/startram/backup_service.go` provides a thin delegating service interface, but the bulk implementation remains in `backup_runtime.go`, increasing coupling between transport, orchestration, and infra concerns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 61.0,
+        "indirection_cost": 58.0,
+        "interface_honesty": 64.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "facade_api_dualism",
+      "summary": "Docker orchestration entry points are split between `routines` and `docker/orchestration/subsystem` without a single ownership contract.",
+      "related_files": ["goseg/routines/docker.go", "goseg/routines/docker_test.go", "goseg/docker/orchestration/subsystem/docker.go"],
+      "evidence": [
+        "`routines/docker.go` defines `StartDockerHealthLoops`, `StartDockerHealthLoopsWithContext`, and `StartDockerSubsystem` as direct one-line delegates to `subsystem`",
+        "The same capability area is fully implemented in `goseg/docker/orchestration/subsystem/docker.go` (loop startup, transition workflows, event handling), so imports and tests become ambiguous over the canonical caller API"
+      ],
+      "suggestion": "Choose one package as the API owner for Docker subsystem startup (either keep it in `docker/orchestration/subsystem` and remove the delegating `routines/docker.go`, or convert `routines` into the only façade with a clearer seam), and update call sites/tests to use that single surface.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "docker_entrypoint_ambiguity"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "backup_runtime_mixed_responsibility",
+      "summary": "Startram backup runtime mixes unrelated concerns in one module, blurring package boundaries.",
+      "related_files": ["goseg/startram/backup_runtime.go", "goseg/startram/backup_service.go", "goseg/startram/backup_runtime_test.go"],
+      "evidence": [
+        "`backup_runtime.go` contains HTTP/API helpers, crypto functions, tar/zstd extraction, filesystem path + tempdir orchestration, and restore control flow in one place",
+        "`backup_service.go` exposes a dedicated interface (`BackupInfrastructureService`) while `backup_runtime.go` still embeds both infrastructure transport and runtime restoration logic",
+        "Tests in `backup_runtime_test.go` simulate both transport and runtime behaviors through this same module, reinforcing the package’s mixed cohesion"
+      ],
+      "suggestion": "Split `backup_runtime.go` into explicit submodules (for example `backup_transport.go`, `backup_crypto.go`, `backup_restore_runtime.go`) and keep `backup_service.go` as the orchestration boundary so each module has one clear domain responsibility.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_layering_in_backup_runtime"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "orphaned_container_config",
+      "summary": "`container_config.go` appears to be a stale package fragment with unclear ownership and no active integration.",
+      "related_files": ["goseg/docker/orchestration/container_config.go", "goseg/docker/orchestration/llama.go"],
+      "evidence": [
+        "Batch metadata indicates `container_config.go` is a small, unimported module (`0 importers` and untested in previous packet), suggesting this file is not part of an active package boundary",
+        "LLama/container concerns are exercised in `llama.go`, so this configuration code likely belongs with existing orchestration builders or should be removed"
+      ],
+      "suggestion": "Either fold any live container-config helpers into `llama.go`-adjacent orchestration constructors or remove the module entirely after migrating callers; add a package integration test that exercises the chosen location.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "orphaned_domain_artifacts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Duplicated or mirrored package entry points without a defined ownership rule (`routines` vs `docker/orchestration`).",
+      "Monolithic runtime modules that combine protocol, crypto, and orchestration responsibilities instead of explicit domain seams.",
+      "Stale or orphaned domain fragments retained as separate files instead of being consolidated or removed."
+    ],
+    "likely_symptoms": [
+      "facade_api_dualism",
+      "backup_runtime_mixed_responsibility",
+      "orphaned_container_config"
+    ],
+    "possible_false_positives": [
+      "If build tags or platform-specific files exclude `container_config.go` in active builds, the import/usage assessment may overstate orphaning."
+    ]
+  }
+}

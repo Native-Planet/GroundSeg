@@ -45,6 +45,10 @@ func makeLickPacket(payload []byte) []byte {
 	return toBytes(noun.Jam(noun.MakeNoun(cell)))
 }
 
+func makeAtomPacket(value int64) []byte {
+	return toBytes(noun.Jam(noun.MakeNoun(big.NewInt(value))))
+}
+
 func TestReverseLittleEndian(t *testing.T) {
 	input := []byte{1, 2, 3, 4}
 	got := reverseLittleEndian(input)
@@ -225,15 +229,49 @@ func TestHandleActionDecodesAndDispatchesPayload(t *testing.T) {
 	}
 }
 
-func TestHandleActionDoesNotPanicOnShortPacket(t *testing.T) {
-	defer func() {
-		if recover() != nil {
-			t.Fatal("handleAction panicked on short packet")
-		}
-	}()
+func TestHandleActionReportsMalformedPayloads(t *testing.T) {
+	resetLeakStateForTest(t)
+	tests := []struct {
+		name   string
+		packet []byte
+	}{
+		{
+			name:   "short packet",
+			packet: []byte{0, 1, 2, 3},
+		},
+		{
+			name:   "atom payload",
+			packet: makeAtomPacket(123),
+		},
+	}
 
-	shortPackets := [][]byte{{}, {0}, {0, 1, 2, 3}}
-	for _, packet := range shortPackets {
-		handleAction("~zod", packet)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			done := make(chan struct{})
+			go func() {
+				handleAction("~zod", tc.packet)
+				close(done)
+			}()
+
+			action := mustReceiveLeakAction(t, tc.name)
+			if action.Patp != "~zod" {
+				t.Fatalf("expected action for ~zod, got %q", action.Patp)
+			}
+			if action.Type != string(leakPayloadError) {
+				t.Fatalf("expected %q action type, got %q", leakPayloadError, action.Type)
+			}
+			var payload leakProtocolErrorPayload
+			if err := json.Unmarshal(action.Content, &payload); err != nil {
+				t.Fatalf("expected JSON error payload, got %v", err)
+			}
+			if payload.Error == "" || payload.Reason == "" {
+				t.Fatalf("expected protocol error payload fields, got %+v", payload)
+			}
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("timed out waiting for handleAction to return")
+			}
+		})
 	}
 }

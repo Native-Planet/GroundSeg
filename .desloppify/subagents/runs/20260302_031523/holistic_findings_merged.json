@@ -1,0 +1,640 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 69.1,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 70.7,
+        "Indirection Cost": 76.7,
+        "Interface Honesty": 68.3
+      }
+    },
+    "cross_module_architecture": 53.8,
+    "design_coherence": 60.7,
+    "error_consistency": 57.2,
+    "test_strategy": 71.2
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "c2c_service.go exposes a `C2CService` interface with a generic `Execute(action actions.Action, ssid, password string) error` method while action parsing/dispatch is also defined in the same package via a local `c2cActionDispatcher`.",
+        "`ProcessC2CMessage` accepts any `C2CService` from `serviceFactory` and directly calls `service.Execute`, so consumers can bypass the shared action contract path (`ParseC2CAction` / `NewActionDispatcher`) by providing an alternate implementation.",
+        "The protocol contract is centralized in actions.go (`ParseAction`, `actionMetasForNamespace`, `SupportedC2CActions`), but `system/wifi/service` still requires each caller to trust injected implementations to honor that contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple files define large runtime seam structs with many pass-through function fields (for example `RuntimeFns` in `goseg/docker/orchestration/runtime_seams.go` and `WireguardRuntime` in `goseg/docker/orchestration/container/wireguard.go`).",
+        "`Startup`/background orchestration paths compose several nested op interfaces whose default implementations mostly delegate to package-level functions (`goseg/startup_orchestrator.go`, `goseg/shipworkflow/operations_runtime.go`, `goseg/importer/importer.go`).",
+        "Artifact/config write paths contain an additional wrapper layer where `writeWGConfigArtifact` builds an options struct and immediately delegates to `writeConfigArtifact`, which itself mostly forwards into `artifactwriter.Write` (`goseg/docker/orchestration/container/wireguard.go`, `goseg/docker/orchestration/container/helpers.go`, `goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 63.0,
+        "indirection_cost": 79.0,
+        "interface_honesty": 58.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "`C2CServiceExecutor` stores `connectToWiFi` and `restartGroundSeg` as function fields and calls them directly with no nil guards.",
+        "`ProcessC2CMessage` validates only the factory and service object, but does not validate function-level invariants before dispatch, so miswired adapters can panic at runtime instead of returning deterministic errors.",
+        "The README-level governance for this batch emphasizes contract-boundary quality gates, but this file-level critical path has no local precondition tests for constructor/dispatcher wiring failures."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "medium",
+      "issues_preventing_higher_score": ""
+    },
+    "design_coherence": {
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_seams.go` defines `NewRuntime(fns ...RuntimeFns)` but only applies `fns[0]`, silently discarding all additional seam function-set arguments.",
+        "`goseg/docker/lifecycle/lifecycle.go` uses the same variadic pattern but correctly iterates every option, establishing inconsistent constructor semantics across adjacent seam/lifecycle abstractions.",
+        "`goseg/config/config_update.go` models map mutations as additive-only builders (`WithAuthorizedSession`, `WithUnauthorizedSession`, `WithDiskWarning`) and applies them only when patch map length is > 0, creating an unclear path for explicit map clearing/removal semantics."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` executes injected runtime callbacks (`connectToWiFi`, `restartGroundSeg`) without nil checks, so a partially constructed `C2CServiceExecutor` can panic at call time instead of returning a typed error.",
+        "`goseg/system/wifi/service/c2c_service.go` and `goseg/internal/seams/runtime.go` show two different seam strategies: one suite returns explicit fallback errors for missing hooks, while another allows nil callback dereference.",
+        "`goseg/shipworkflow/urbit_operations.go` frequently wraps upstream errors with `%v` (for example around lines with `Failed to get ship status...` and many MinIO/alias/rollback paths), which drops unwrapability for callers that depend on typed causes.",
+        "`goseg/system/disk.go` similarly formats many upstream failures with `%v` (for example `Failed to lsblk`, `Failed to create ext4 filesystem`, `failed to write to fstab`) instead of `%w`, resulting in inconsistent observability and retry/classification behavior versus other call paths that do preserve error causes."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Error wrapping strategy is inconsistent at module boundaries: some high-value paths preserve underlying causes (`%w`/joined errors) while adjacent paths in the same subsystem erase them with `%v` formatting, which weakens callers\u2019 ability to classify and aggregate failures."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_action_alias_duplication",
+      "summary": "Protocol action contracts are duplicated across layers instead of owned by a single boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`ActionC2CConnect` is defined in `goseg/protocol/actions/actions.go` as the canonical protocol token.",
+        "`goseg/system/wifi/service/c2c_service.go` introduces `ConnectAction` as a second alias assigned to the same token.",
+        "Both identifiers represent the same semantic command, so any rename or semantic change must be mirrored manually in multiple modules."
+      ],
+      "suggestion": "Delete the local `ConnectAction` alias and use the protocol contract symbol directly at all call sites, or introduce a single exported canonical symbol in `actions` and remove per-layer command aliases so contract changes are made once.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_dispatcher_global_init_coupling",
+      "summary": "C2C action dispatch is bound at package scope, increasing coupling and reducing composability across module boundaries.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` defines `c2cActionDispatcher` as a global variable initialized with `actions.NewActionDispatcher(...)`.",
+        "All command execution paths read from this singleton dispatcher, which ties this package\u2019s runtime behavior to import-time construction of bindings and fixed semantics."
+      ],
+      "suggestion": "Refactor to construct the dispatcher explicitly (for example in `NewC2CServiceForAdapter`/`ProcessC2CMessage`) and pass it in as a dependency so action wiring is explicit, testable, and replaceable by callers without editing global package state.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c_action_contract_scatter"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_bloat",
+      "summary": "Runtime seam abstractions are over-bagged and mostly delegate straight through to concrete functions.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`RuntimeFns` in `goseg/docker/orchestration/runtime_seams.go` exposes many one-function fields and constructor logic only re-binds them to defaults with minimal policy.",
+        "`startup_orchestrator.go` splits startup work into several callback interfaces (`startBackgroundServicesOps`, `startBackgroundStartramOps`, `startBackgroundOptionalOps`) with defaults that immediately call package functions.",
+        "`operations_runtime.go` defines `uploadImportOps`, `aliasLookupOps`, `cleanDeleteOps` as mostly injectable function containers with wrapper defaults and no additional translation.",
+        "`importer.go` defines `importerRuntime` with several function fields where default runtime delegates directly to concrete functions, creating another thin seam layer."
+      ],
+      "suggestion": "Refactor these into narrower domain-specific interfaces/adapters (e.g., `ContainerRuntime`, `WorkflowRuntime`, `ConfigRuntime`) and pass concrete adapters directly instead of broad per-function bags. Remove duplicate interface layers when a single underlying function set already exists, and keep seam interfaces at true test seams, not for every leaf operation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_bloat"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "artifact_wrapper_stack",
+      "summary": "Wireguard config artifact path stacks multiple options structs and copy-through wrappers with no meaningful behavior.",
+      "related_files": [
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/docker/orchestration/container/helpers.go",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go"
+      ],
+      "evidence": [
+        "`writeWGConfigArtifact` in `goseg/docker/orchestration/container/wireguard.go` builds a `writeConfigArtifactOptions` struct and forwards directly to `writeConfigArtifact` without adding domain logic.",
+        "`writeConfigArtifact` in `goseg/docker/orchestration/container/helpers.go` only normalizes one field and forwards into `artifactwriter.Write`.",
+        "`artifactwriter.Write` then performs default fallbacks and orchestration of copy vs write; the container-level helper adds another near-identical struct and call boundary before reaching same behavior."
+      ],
+      "suggestion": "Consolidate these into a single `ArtifactWriter` abstraction with one concrete configuration object per domain (e.g., `WriteWireguardConfigSpec`) and remove the redundant container helper/options layer; make `writeWGConfigArtifact` either perform a domain-specific policy decision or delete it and call the writer directly.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_bloat"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c-exposed-execute-bypass",
+      "summary": "Wi\u2011Fi C2C command contract is not sealed: injected services can execute raw actions without the shared protocol dispatcher contract.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`c2c_service.go` defines `C2CService` with `Execute(action actions.Action, ssid, password string) error` and `ProcessC2CMessage` invokes that method on any provided service.",
+        "The same file also defines `c2cActionDispatcher` and action-binding logic, so contract enforcement exists but is not guaranteed by interface shape.",
+        "This creates two execution paths for C2C actions depending on implementation choice, weakening boundary integrity between protocol contracts and runtime service behavior."
+      ],
+      "suggestion": "Refactor the interface so `Execute` is not publicly substitutable: keep `C2CService` focused on domain operations (`ConnectToWiFi`, `RestartGroundSeg`) and move action dispatch into a package-private function that always goes through the action contract parser/dispatcher. Add an explicit adapter-level test that proves every supported action routes through `actions.NewActionDispatcher`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "c2c-contract-boundary"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "c2c-service-nil-dependency-paths",
+      "summary": "Critical Wi\u2011Fi adapter service constructor path has unguarded runtime panic potential that is not covered by local contract tests.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`NewC2CServiceForAdapter` accepts `connectToWiFi` and `restartGroundSeg` function arguments without validation.",
+        "`ConnectToWiFi` and `RestartGroundSeg` dereference those function fields directly (`s.connectToWiFi(...)`, `s.restartGroundSeg(...)`) with no nil guard.",
+        "Governance docs in `README.md` call out explicit runtime boundary and quality expectations for contract-bearing paths, but this code path has no local guardrails and would fail via panic rather than deterministic error.",
+        "Existing expectations imply adapter boundary behavior should be robustly tested for contract miswiring, especially in command execution entry points."
+      ],
+      "suggestion": "Add precondition checks in `NewC2CServiceForAdapter` (or the methods) that return a clear error when dependencies are nil, and add tests for miswired adapter dependencies to lock behavior (error propagation instead of panic).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "c2c-contract-boundary"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_fns_constructor_discards_variadic_input",
+      "summary": "Runtime seam constructor silently ignores all but the first variadic seam config, making `NewRuntime` behavior lossy and surprising.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/runtime_seams_test.go"
+      ],
+      "evidence": [
+        "`NewRuntime(fns ...RuntimeFns)` initializes `cfg := RuntimeFns{}` and then only assigns `cfg = fns[0]` when `len(fns) > 0`; no loop merges later values.",
+        "The corresponding option-style constructor in `goseg/docker/lifecycle/lifecycle.go` iterates through variadic options, so callers cannot infer consistent API intent across packages.",
+        "Current tests do not cover passing multiple `RuntimeFns` values, so this silent drop is unguarded."
+      ],
+      "suggestion": "Change `NewRuntime` to merge all provided `RuntimeFns` values deterministically (e.g., start with zero-value struct and apply each via explicit merge/overlay), or change signature to accept a single config struct if only one is intended; add a test asserting that passing multiple values applies all provided overrides.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "runtime_constructor_contract_inconsistency"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_map_semantics_ambiguous",
+      "summary": "Configuration patch model conflates additive updates with replacement/clear semantics for map fields.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/mc.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`hasUpdates` returns true for map sections only when their lengths are greater than zero, so an empty map cannot represent an explicit clear operation.",
+        "`applyConfPatch` applies map writes under the same non-empty gate, meaning callers cannot express intent to clear `AuthorizedSessions`, `UnauthorizedSessions`, or `DiskWarnings` via patch.",
+        "Patch builder helpers only support `With*Session` and `WithDiskWarning` addition-style methods, with no explicit clear/remove API for map entries."
+      ],
+      "suggestion": "Introduce explicit patch operations for map fields (e.g., `ClearAuthorizedSessions`, `RemoveUnauthorizedSession`, `SetAuthorizedSessions(map[string].., mode=replace)`), or encode maps as pointer/tri-state values so empty vs nil is distinguishable and clear semantics are represented explicitly.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_constructor_contract_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "c2c_executor_missing_callback_guards",
+      "summary": "C2C executor can panic on nil callbacks instead of returning a deterministic error.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/internal/seams/runtime.go"
+      ],
+      "evidence": [
+        "`goseg/system/wifi/service/c2c_service.go` constructors accept arbitrary functions for `connectToWiFi` and `restartGroundSeg` but do not validate them.",
+        "`ConnectToWiFi` and `RestartGroundSeg` unconditionally invoke function fields, so nil fields cause a nil-function panic rather than an error return.",
+        "Other seam constructors in this codebase commonly substitute fallback behavior or return explicit configuration errors when callbacks are missing (`goseg/internal/seams/runtime.go`), so this is a strategy mismatch at a boundary."
+      ],
+      "suggestion": "Add constructor-time validation (or runtime nil checks in each method) that returns a concrete error when `connectToWiFi` or `restartGroundSeg` are unset, and expose that failure through `ProcessC2CMessage` rather than panicking.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "seam_error_contract_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "shipworkflow_error_chaining_regression",
+      "summary": "Critical ship workflow wrappers drop underlying errors with `%v`, breaking consistent error-chain semantics.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "In `goseg/shipworkflow/urbit_operations.go`, many return sites use `fmt.Errorf(\"...: %v\", err)` in long-running operation paths (for example around pack/meld/chop/alias/container operations).",
+        "Nearby return sites in the same package do use `%w`, so behavior is mixed within one boundary depending on operation path.",
+        "Inconsistent wrapping prevents callers and tests from relying on `errors.Is`/`errors.As` at orchestration boundaries even where they expect wrapped causality."
+      ],
+      "suggestion": "Normalize `shipworkflow` return conventions by wrapping all forwarded errors with `%w`, and keep `%v` only for message-only formatting when no underlying error should be propagated.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wrapped_error_policy_divergence"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "system_disk_observability_chain_gap",
+      "summary": "Disk setup and fs-operations lose error causality, reducing diagnosability consistency.",
+      "related_files": [
+        "goseg/system/disk.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`goseg/system/disk.go` returns upstream command/system errors with `%v` in multiple IO and filesystem paths (`ListHardDisks`, `CreateGroundSegFilesystem`, `SetupTmpDir` helpers), so the original error type is not preserved.",
+        "`goseg/system/wifi.go` commonly uses wrapped returns (`%w`) for command and state transitions, so sibling system package boundaries behave differently under failure.",
+        "The mixed approach makes downstream consumers harder to reason about because some failures can be typed/inspected while adjacent failures become opaque strings."
+      ],
+      "suggestion": "Adopt a package-wide wrapping rule in `system/*` (e.g., wrap lower-level errors with `%w` for all propagation paths, and only mask when intentionally redacting), then add tests asserting `errors.Is` works for representative disk-wiring failures.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wrapped_error_policy_divergence"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "config-read-locks-serialize-state-access",
+      "summary": "Config read methods use write locks, forcing global serialization across read-heavy handlers.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/urbit.go",
+        "goseg/config/bootstrap.go",
+        "goseg/handler/authsvc/auth.go"
+      ],
+      "evidence": [
+        "`Conf()` takes `confMutex.Lock()` and `defer confMutex.Unlock()` even for immutable read access.",
+        "`UrbitConf()` in `goseg/config/urbit.go` also takes `urbitMutex.Lock()` for read-only lookup.",
+        "Handler paths call these accessors frequently (`handler/authsvc`, `handler/devsvc`) while holding other orchestration/runtime locks in normal operation."
+      ],
+      "suggestion": "Switch these read-mostly paths to `sync.RWMutex` and use `RLock/RUnlock` for reads, then reserve write locks for mutation paths. Consider adding a `ConfigSnapshot()` API that returns immutable snapshots for read-heavy flows.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_runtime_state_locking"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "config-patch-json-type-assumptions",
+      "summary": "Config map patch parsing rejects valid JSON values due to strict `int`/typed-map assertions.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`buildConfigPatch` asserts `swapVal`, `penpaiCores`, `c2cInterval` as `int` and returns type errors for `float64` values.",
+        "`authorizedSessions` and `diskWarning` are asserted as concrete maps instead of decoding from decoded JSON shape.",
+        "The same module also accepts `piers` only as `[]interface{}` or `[]string`, indicating mixed contract handling."
+      ],
+      "suggestion": "Accept JSON payloads using a typed DTO with `json.Decoder.UseNumber()` and normalize numeric fields explicitly (`int(num)`) and nested map shapes through helper decoders instead of direct assertions.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast-loop-ignores-client-broadcast-errors",
+      "summary": "Broadcast loop discards websocket broadcast failures, masking operational regressions.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`runBroadcastTickWithRuntime` calls `rt.broadcastToClientsFn()` and does not inspect the returned error.",
+        "No recovery/backoff/health signal is emitted when broadcast fanout fails.",
+        "Tests in `broadcast/loop_test.go` verify only successful broadcast callbacks."
+      ],
+      "suggestion": "Capture and act on the error from `broadcastToClientsFn`: log with context, increment a metrics counter, and optionally trigger a retry/backoff policy or degraded-mode transition.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "bootstrap-keyfile-path-shadowing",
+      "summary": "Session key path initialization uses a local shadow variable, leaving global path state stale.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`initializeConfig` defines `keyPath := filepath.Join(BasePath, \"settings\", \"session.key\")` inside the empty-key path branch.",
+        "`UpdateConfTyped(WithKeyfile(keyPath))` updates config but does not update package-level `keyPath` used elsewhere as canonical path state.",
+        "Subsequent code depends on `config`-level state for auth/session key behavior, so dual-path state can diverge."
+      ],
+      "suggestion": "Use package-level `keyPath` consistently in bootstrap/update flow (assign to shared var, then persist), or remove global `keyPath` in favor of deriving from config snapshot everywhere.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "exporter-defers-file-close-in-walk-loop",
+      "summary": "Exporter walk callback defers `Close` inside a tight loop, deferring all file descriptors until handler exit.",
+      "related_files": [
+        "goseg/exporter/exporter.go",
+        "goseg/exporter/exporter_test.go"
+      ],
+      "evidence": [
+        "In `ExportHandler`, each `walkForExporter` callback does `fileReader, err := os.Open(path)` followed by `defer fileReader.Close()`.",
+        "This defer executes when `ExportHandler` returns, not per file iteration, so descriptor count grows with every exported file.",
+        "Current tests only cover a small one-file success path and token checks, not many-file stress behavior."
+      ],
+      "suggestion": "Refactor to `if _, err := ...; err != nil { ... }` then `if _, err := io.Copy(...); err != nil { ... }` with explicit `fileReader.Close()`/`file.Close()` before callback returns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "resource-lifecycle-consistency"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "broadcast-and-export-failure-paths-not-covered",
+      "summary": "Failure-mode tests are missing for high-impact runtime loops and export traversal behavior.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/loop_test.go",
+        "goseg/exporter/exporter.go",
+        "goseg/exporter/exporter_test.go"
+      ],
+      "evidence": [
+        "Broadcast loop tests validate happy-path tick and nil-error callback behavior; no test covers `broadcastToClientsFn` returning an error.",
+        "Exporter tests do not include multi-file exports, induced file-open errors during walk, or descriptor-limit stress cases tied to per-iteration `defer` behavior.",
+        "This leaves two production error paths behaviorally unverified in automated tests."
+      ],
+      "suggestion": "Add focused tests for `broadcastToClientsFn` error propagation and a synthetic multi-file export that forces per-file open/read errors, asserting cleanup, error response code, and absence of resource leaks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 6,
+    "dimension_coverage": 0.367,
+    "evidence_density": 1.75,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 35.856,
+    "dimensions_with_findings": 5
+  },
+  "review_scope": {
+    "reviewed_files_count": 128,
+    "successful_batch_count": 6,
+    "full_sweep_included": true,
+    "total_files": 297,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/actions/actions.go",
+    "goseg/startram/errors.go",
+    "goseg/system/wifi/service/c2c_service.go",
+    "goseg/docker/orchestration/container/helpers.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/rectify/rectify.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/config/wireguardbuilder/builder.go",
+    "goseg/docker/orchestration/container/wireguard.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/importer/importer.go",
+    "goseg/startup_orchestrator.go",
+    "goseg/config/config_view.go",
+    "goseg/main.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/docker/orchestration/subsystem/docker.go",
+    "goseg/main_test.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/runtime_seams_test.go",
+    "goseg/click/internal/runtime/runtime_test.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "goseg/docker/orchestration/urbit_test.go",
+    "goseg/setup/setup_test.go",
+    "goseg/startup_orchestrator_test.go",
+    "goseg/routines/version.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/importer/importer_test.go",
+    "README.md",
+    "goseg/click/backup/service.go",
+    "goseg/config/mc.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/docker/orchestration/container_bridge.go",
+    "goseg/docker/orchestration/volume_writer.go",
+    "goseg/leak/handler.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/auth/auth.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/config_update.go",
+    "goseg/config/version.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/internal/seams/runtime.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/structs/ws.go",
+    "goseg/system/disk.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/system.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go",
+    "goseg/accesspoint/config.go",
+    "goseg/accesspoint/parameters.go",
+    "goseg/accesspoint/router.go",
+    "goseg/authsession/session.go",
+    "goseg/backups/backups.go",
+    "goseg/backupsvc/service.go",
+    "goseg/broadcast/loop.go",
+    "goseg/chopsvc/service.go",
+    "goseg/click/acme/service.go",
+    "goseg/click/click.go",
+    "goseg/click/desk/desk.go",
+    "goseg/click/internal/response/response.go",
+    "goseg/click/internal/runtime/runtime.go",
+    "goseg/click/lifecycle/lifecycle.go",
+    "goseg/click/luscode/luscode.go",
+    "goseg/click/notify/notify.go",
+    "goseg/click/pack/pack.go",
+    "goseg/click/restore/restore.go",
+    "goseg/click/storage/storage.go",
+    "goseg/config/bootstrap.go",
+    "goseg/config/config.go",
+    "goseg/config/config_events.go",
+    "goseg/config/config_merge.go",
+    "goseg/config/config_state.go",
+    "goseg/config/minio.go",
+    "goseg/config/netdata.go",
+    "goseg/config/persistence.go",
+    "goseg/config/storage.go",
+    "goseg/config/urbit.go",
+    "goseg/config/wireguard.go",
+    "goseg/config/wireguardkeys/keys.go",
+    "goseg/config/wireguardstore/store.go",
+    "goseg/defaults/scripts.go",
+    "goseg/docker/events/events.go",
+    "goseg/docker/lifecycle/status_query.go",
+    "goseg/docker/orchestration/container/llama.go",
+    "goseg/docker/orchestration/container/minio.go",
+    "goseg/docker/orchestration/container_config.go",
+    "goseg/docker/orchestration/llama.go",
+    "goseg/docker/orchestration/minio.go",
+    "goseg/docker/orchestration/netdata.go",
+    "goseg/docker/orchestration/orchestration.go",
+    "goseg/docker/orchestration/stats.go",
+    "goseg/docker/orchestration/status.go",
+    "goseg/docker/orchestration/subsystem/runtime_seams.go",
+    "goseg/docker/orchestration/urbit.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/docker/registry/registry.go",
+    "goseg/dockerclient/client.go",
+    "goseg/driveresolver/resolver.go",
+    "goseg/errpolicy/errors.go",
+    "goseg/exporter/exporter.go",
+    "goseg/handler/api/handler.go",
+    "goseg/handler/api/newship.go",
+    "goseg/handler/authsvc/auth.go",
+    "goseg/handler/devsvc/dev.go",
+    "goseg/handler/router/leak.go",
+    "goseg/handler/ship/backup.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260302_031523",
+    "created_at": "2026-03-02T03:18:17+00:00",
+    "batch_count": 6,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "254de47eccd6a1e0324b5be8e0984ad2097b75c9f4fbd9c1a9339a6d341945e9"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture",
+      "error_consistency",
+      "abstraction_fitness",
+      "test_strategy",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency",
+      "test_strategy"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

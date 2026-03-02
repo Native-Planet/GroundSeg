@@ -1,0 +1,20 @@
+2026-03-01T21:41:36+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=40m selected=[1, 2, 3, 4]
+2026-03-01T21:41:36+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_214135
+2026-03-01T21:41:36+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260301_214135.json
+2026-03-01T21:41:36+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-01T21:41:36+00:00 batch-queued batch=1 position=1/4
+2026-03-01T21:41:36+00:00 batch-start batch=1 position=1/4
+2026-03-01T21:41:36+00:00 batch-queued batch=2 position=2/4
+2026-03-01T21:41:36+00:00 batch-start batch=2 position=2/4
+2026-03-01T21:41:36+00:00 batch-queued batch=3 position=3/4
+2026-03-01T21:41:36+00:00 batch-start batch=3 position=3/4
+2026-03-01T21:41:36+00:00 batch-queued batch=4 position=4/4
+2026-03-01T21:41:48+00:00 batch-start batch=4 position=4/4
+2026-03-01T21:41:48+00:00 batch-done batch=2 position=2/4 code=0 elapsed=12
+2026-03-01T21:41:49+00:00 batch-done batch=1 position=1/4 code=0 elapsed=13
+2026-03-01T21:42:04+00:00 heartbeat active=[3, 4] queued=[] elapsed={3:28, 4:16}
+2026-03-01T21:42:19+00:00 heartbeat active=[3, 4] queued=[] elapsed={3:43, 4:31}
+2026-03-01T21:42:23+00:00 batch-done batch=3 position=3/4 code=0 elapsed=47
+2026-03-01T21:42:32+00:00 batch-done batch=4 position=4/4 code=0 elapsed=44
+2026-03-01T21:42:32+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_214135/run_summary.json
+2026-03-01T21:42:32+00:00 run-finished successful=[1, 2, 3, 4] failed=[] imported=/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_214135/holistic_findings_merged.json

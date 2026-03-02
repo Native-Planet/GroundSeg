@@ -18,15 +18,15 @@ func resetNetdataSeams() {
 
 func TestCreateDefaultNetdataConfWritesDefaults(t *testing.T) {
 	t.Cleanup(resetNetdataSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	if err := CreateDefaultNetdataConf(); err != nil {
 		t.Fatalf("CreateDefaultNetdataConf failed: %v", err)
 	}
 
-	path := filepath.Join(BasePath, "settings", "netdata.json")
+	path := filepath.Join(BasePath(), "settings", "netdata.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read netdata.json failed: %v", err)
@@ -42,9 +42,9 @@ func TestCreateDefaultNetdataConfWritesDefaults(t *testing.T) {
 
 func TestUpdateNetdataConfWritesChannelData(t *testing.T) {
 	t.Cleanup(resetNetdataSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	confForNetdata = func() structs.SysConfig {
 		return structs.SysConfig{UpdateBranch: "beta"}
@@ -63,7 +63,7 @@ func TestUpdateNetdataConfWritesChannelData(t *testing.T) {
 		t.Fatalf("UpdateNetdataConf failed: %v", err)
 	}
 
-	path := filepath.Join(BasePath, "settings", "netdata.json")
+	path := filepath.Join(BasePath(), "settings", "netdata.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read netdata.json failed: %v", err)

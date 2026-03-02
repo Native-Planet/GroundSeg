@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/dockerclient"
+	"groundseg/session"
 	"os"
 	"strings"
 	"sync"
@@ -19,13 +20,115 @@ import (
 )
 
 var (
-	LogPath             string
-	SysLogChannel       = make(chan []byte, 100)
-	SysLogSessions      []*websocket.Conn
-	DockerLogSessions   = make(map[string]map[*websocket.Conn]bool)
-	SysSessionsToRemove []*websocket.Conn
-	loggerInitOnce      sync.Once
+	LogPath        string
+	SysLogChannel  = make(chan []byte, 100)
+	loggerInitMu   sync.Mutex
+	loggerInitErr  error
+	mkdirAllFn     = os.MkdirAll
+	pathResolverFn = makeLogPath
 )
+
+type loggerInitLifecycle uint8
+
+const (
+	loggerInitNotInitialized loggerInitLifecycle = iota
+	loggerInitInitializing
+	loggerInitInitialized
+)
+
+var loggerInitState = loggerInitNotInitialized
+
+const loggerFallbackLogPath = "/tmp/groundseg-logs/"
+
+func printStartupBanner() {
+	fmt.Println("                                       !G#:\n                                   " +
+		" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
+		"@&Y^  \n    ?&@@@@@@@@@&J             !G@@@@B?. .^ \n   Y@@@@@@@@@@@@@J         :?B@@@@G!  :" +
+		"Y&&:\n   @@@@@@@@@@@@@@B       ^Y&@@@&5^  ~P&@@@:\n   Y@@@@@@@@@@@@@J     !P&@@@#J.  7B@@@@G" +
+		"! \n    ?#@@@@@@@@@&?   .7B@@@@G7  :J#@@@&5~   \n     .!YGBBBGY7.  :J#@@@&P~  ^5&@@@#J:  !?." +
+		"\n                ^5&@@@#J:  !G@@@@G7. .?B@@:\n             .7G@@@@G7. :J#@@@&P~  ^Y#@@@&:\n" +
+		"            .P&&&&G!   ~B&&&#5^   ~#&&&&&P. \n\nＮａｔｉｖｅ Ｐｌａｎｅｔ")
+	fmt.Println(" ▄▄ • ▄▄▄        ▄• ▄▌ ▐ ▄ ·▄▄▄▄  .▄▄ · ▄▄▄ . ▄▄ • 𝐯𝟐!\n▐█ ▀ ▪▀▄ █·▪     █▪██▌•" +
+		"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
+		"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
+		" ·▀▀▀▀ (~)")
+}
+
+func loggerLevelFromArgs(args []string) zapcore.Level {
+	for _, arg := range args {
+		if arg == "dev" {
+			return zap.DebugLevel
+		}
+	}
+	return zap.InfoLevel
+}
+
+func resolveLoggerPath() (string, error) {
+	return pathResolverFn()
+}
+
+func makeLoggerCore(level zapcore.Level) zapcore.Core {
+	// write logs to file
+	fw := FileWriter{}
+	fileWriteSyncer := zapcore.AddSync(fw)
+
+	// stdout
+	consoleWriteSyncer := zapcore.AddSync(os.Stdout)
+
+	// channel
+	cw := ChanWriter{}
+	wsWriteSyncer := zapcore.AddSync(cw)
+
+	// encoder config
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+
+	// encoder
+	encoder := zapcore.NewJSONEncoder(encoderConfig)
+
+	// zap core
+	return zapcore.NewTee(
+		zapcore.NewCore(encoder, fileWriteSyncer, level),
+		zapcore.NewCore(encoder, consoleWriteSyncer, level),
+		zapcore.NewCore(encoder, wsWriteSyncer, level),
+	)
+}
+
+func buildLogger(level zapcore.Level) *zap.Logger {
+	core := makeLoggerCore(level)
+	return zap.Must(zap.New(core, zap.AddCaller()), nil)
+}
+
+func Debug(v string) {
+	zap.L().Debug(v)
+}
+
+func Debugf(format string, args ...any) {
+	zap.L().Debug(fmt.Sprintf(format, args...))
+}
+
+func Info(v string) {
+	zap.L().Info(v)
+}
+
+func Infof(format string, args ...any) {
+	zap.L().Info(fmt.Sprintf(format, args...))
+}
+
+func Warn(v string) {
+	zap.L().Warn(v)
+}
+
+func Warnf(format string, args ...any) {
+	zap.L().Warn(fmt.Sprintf(format, args...))
+}
+
+func Error(v string) {
+	zap.L().Error(v)
+}
+
+func Errorf(format string, args ...any) {
+	zap.L().Error(fmt.Sprintf(format, args...))
+}
 
 // File Writer
 type FileWriter struct{}
@@ -61,72 +164,52 @@ func (cw ChanWriter) Sync() error {
 	return nil
 }
 
-func Initialize() {
-	loggerInitOnce.Do(func() {
-		// write logs to file
-		fw := FileWriter{}
-		fileWriteSyncer := zapcore.AddSync(fw)
+func Initialize() error {
+	loggerInitMu.Lock()
+	defer loggerInitMu.Unlock()
+	switch loggerInitState {
+	case loggerInitInitializing:
+		return loggerInitErr
+	case loggerInitInitialized:
+		return nil
+	}
 
-		// stdout
-		consoleWriteSyncer := zapcore.AddSync(os.Stdout)
-
-		// channel
-		cw := ChanWriter{}
-		wsWriteSyncer := zapcore.AddSync(cw)
-
-		// encoder config
-		encoderConfig := zap.NewDevelopmentEncoderConfig()
-
-		// encoder
-		encoder := zapcore.NewJSONEncoder(encoderConfig)
-
-		// trigger dev mode with `./groundseg dev`
-		logLevel := zap.InfoLevel
-		for _, arg := range os.Args[1:] {
-			if arg == "dev" {
-				logLevel = zap.DebugLevel
-			}
+	loggerInitState = loggerInitInitializing
+	loggerInitErr = nil
+	storagePath, err := resolveLoggerPath()
+	if err != nil {
+		loggerInitErr = err
+	} else {
+		LogPath = storagePath
+	}
+	if LogPath == "" {
+		LogPath = loggerFallbackLogPath
+	}
+	err = mkdirAllFn(LogPath, 0755)
+	zap.ReplaceGlobals(buildLogger(loggerLevelFromArgs(os.Args[1:])))
+	printStartupBanner()
+	if err != nil {
+		fmt.Printf("Failed to create log directory: %v\n", err)
+		fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
+		fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
+			"\n   (  >< )\n Love, Native Planet\n")
+		fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
+		LogPath = loggerFallbackLogPath
+		if mkErr := mkdirAllFn(LogPath, 0755); mkErr != nil {
+			fmt.Printf("Failed to create fallback log directory: %v\n", mkErr)
+			loggerInitErr = fmt.Errorf("log path fallback failed: %w", mkErr)
+		} else {
+			loggerInitErr = fmt.Errorf("configured log path unavailable, using fallback: %w", err)
 		}
-
-		// zap core
-		core := zapcore.NewTee(
-			zapcore.NewCore(encoder, fileWriteSyncer, logLevel),
-			zapcore.NewCore(encoder, consoleWriteSyncer, logLevel),
-			zapcore.NewCore(encoder, wsWriteSyncer, logLevel),
-		)
-
-		// instantiate global logger
-		zap.ReplaceGlobals(zap.Must(zap.New(core, zap.AddCaller()), nil))
-
-		fmt.Println("                                       !G#:\n                                   " +
-			" .7G@@@^\n          .                       :J#@@@@P.\n     .75GB#BG57.                ~5&@@" +
-			"@&Y^  \n    ?&@@@@@@@@@&J             !G@@@@B?. .^ \n   Y@@@@@@@@@@@@@J         :?B@@@@G!  :" +
-			"Y&&:\n   @@@@@@@@@@@@@@B       ^Y&@@@&5^  ~P&@@@:\n   Y@@@@@@@@@@@@@J     !P&@@@#J.  7B@@@@G" +
-			"! \n    ?#@@@@@@@@@&?   .7B@@@@G7  :J#@@@&5~   \n     .!YGBBBGY7.  :J#@@@&P~  ^5&@@@#J:  !?." +
-			"\n                ^5&@@@#J:  !G@@@@G7. .?B@@:\n             .7G@@@@G7. :J#@@@&P~  ^Y#@@@&:\n" +
-			"            .P&&&&G!   ~B&&&#5^   ~#&&&&&P. \n\nＮａｔｉｖｅ Ｐｌａｎｅｔ")
-		fmt.Println(" ▄▄ • ▄▄▄        ▄• ▄▌ ▐ ▄ ·▄▄▄▄  .▄▄ · ▄▄▄ . ▄▄ • 𝐯𝟐!\n▐█ ▀ ▪▀▄ █·▪     █▪██▌•" +
-			"█▌▐███▪ ██ ▐█ ▀. ▀▄.▀·▐█ ▀ ▪\n▄█ ▀█▄▐▀▀▄  ▄█▀▄ █▌▐█▌▐█▐▐▌▐█· ▐█▌▄▀▀▀█▄▐▀▀▪▄▄█ ▀█▄ 🪐\n▐█▄▪▐█▐" +
-			"█•█▌▐█▌.▐▌▐█▄█▌██▐█▌██. ██ ▐█▄▪▐█▐█▄▄▌▐█▄▪▐█\n·▀▀▀▀ .▀  ▀ ▀█▄▀▪ ▀▀▀ ▀▀ █▪▀▀▀▀▀•  ▀▀▀▀  ▀▀▀" +
-			" ·▀▀▀▀ (~)")
-
-		LogPath = makeLogPath()
-		err := os.MkdirAll(LogPath, 0755)
-		if err != nil {
-			fmt.Printf("Failed to create log directory: %v\n", err)
-			fmt.Print("\n\n.・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n")
-			fmt.Print("Please run GroundSeg as root!  \n    /) /)\n   ( . . )" +
-				"\n   (  >< )\n Love, Native Planet\n")
-			fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
-			LogPath = "/tmp/groundseg-logs/"
-			if mkErr := os.MkdirAll(LogPath, 0755); mkErr != nil {
-				fmt.Printf("Failed to create fallback log directory: %v\n", mkErr)
-				return
-			}
-		}
-		zap.L().Info("Starting GroundSeg")
-		zap.L().Info("Urbit is love <3")
-	})
+	}
+	zap.L().Info("Starting GroundSeg")
+	zap.L().Info("Urbit is love <3")
+	if loggerInitErr == nil {
+		loggerInitState = loggerInitInitialized
+	} else {
+		loggerInitState = loggerInitNotInitialized
+	}
+	return loggerInitErr
 }
 
 func SysLogfile() string {
@@ -164,28 +247,56 @@ func PrevSysLogfile() string {
 	return fmt.Sprintf("%s%d-%02d.log", LogPath, year, month)
 }
 
-func makeLogPath() string {
+func makeLogPath() (string, error) {
 	return config.GetStoragePath("logs")
 }
 
+func SysLogSessions() []*websocket.Conn {
+	return session.SysLogSessions()
+}
+
+func SetSysLogSessions(sessions []*websocket.Conn) {
+	session.SetSysLogSessions(sessions)
+}
+
+func SysSessionsToRemove() []*websocket.Conn {
+	return session.SysSessionsToRemove()
+}
+
+func SetSysSessionsToRemove(sessions []*websocket.Conn) {
+	session.SetSysSessionsToRemove(sessions)
+}
+
+func AddSysLogSession(conn *websocket.Conn) {
+	session.AddSysLogSession(conn)
+}
+
+func AddSysSessionToRemove(conn *websocket.Conn) {
+	session.AddSysSessionToRemove(conn)
+}
+
+func DockerLogSessions() map[string]map[*websocket.Conn]bool {
+	return session.DockerLogSessions()
+}
+
+func SetDockerLogSessions(sessions map[string]map[*websocket.Conn]bool) {
+	session.SetDockerLogSessions(sessions)
+}
+
+func SetDockerLogSession(container string, conn *websocket.Conn, live bool) {
+	session.SetDockerLogSession(container, conn, live)
+}
+
+func SetDockerLogSessionLive(container string, conn *websocket.Conn, live bool) {
+	session.SetDockerLogSessionLive(container, conn, live)
+}
+
+func RemoveDockerLogSession(container string, conn *websocket.Conn) {
+	session.RemoveDockerLogSession(container, conn)
+}
+
 func RemoveSysSessions() {
-	result := []*websocket.Conn{}
-	itemsToRemove := make(map[*websocket.Conn]struct{})
-
-	// Create a set of items to remove for quick lookup
-	for _, item := range SysSessionsToRemove {
-		itemsToRemove[item] = struct{}{}
-	}
-
-	// Iterate over slice1 and add to result if not in itemsToRemove
-	for _, item := range SysLogSessions {
-		if _, found := itemsToRemove[item]; !found {
-			result = append(result, item)
-		}
-	}
-	SysLogSessions = result
-	// always clear remove list after running function
-	SysSessionsToRemove = []*websocket.Conn{}
+	session.RemoveSysLogSessions()
 }
 
 func getDockerLogs(name string) ([]byte, error) {

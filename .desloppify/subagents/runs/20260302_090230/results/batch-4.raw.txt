@@ -1,0 +1,72 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 79.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Startram orchestration assembles workflow steps in a loop while binding shared state into closures; this pattern appears in `HandleStartramToggle` and relies on mutable, reused loop-local values instead of per-step immutable values, which is fragile and hard to reason about.",
+        "Multiple runtime-seam packages (`accesspoint`, `container/netdata`, `orchestration/runtime_seams`) implement the same constructor + option + wrapper + nil-default scaffolding without shared abstraction, causing duplicated intent and cross-package incoherence in where behavior boundaries are enforced."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "loop_payload_capture_in_toggle_steps",
+      "summary": "Workflow steps in startram toggle use a shared payload variable inside loop-constructed closures, so multiple steps can dispatch the same (last) payload.",
+      "related_files": [
+        "goseg/shipworkflow/startram.go",
+        "goseg/shipworkflow/urbit_operations.go"
+      ],
+      "evidence": [
+        "`HandleStartramToggle` builds `workflow.Step` entries inside `for _, patp := range settings.Piers`.",
+        "It sets `payload := structs.WsUrbitPayload{...}` and captures `payload` directly in `Run: func() error { return startramDispatchUrbitPayloadFn(payload) }` without creating a per-iteration copy.",
+        "No intermediate function boundary enforces immutability of the per-pier action arguments before the closure executes."
+      ],
+      "suggestion": "Construct the payload inside each closure from a per-iteration copied ship id (for example, `patpCopy := patp`) or pass a closure that takes `patpCopy` explicitly, ensuring each step captures its own input value.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "workflow_loop_capture"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "pass_through_seam_abstraction_bloat",
+      "summary": "Runtime seam layers repeatedly use pass-through wrappers and thin duplicate types, creating low-leverage abstractions that obscure orchestration intent across modules.",
+      "related_files": [
+        "goseg/docker/orchestration/volume_writer.go",
+        "goseg/docker/orchestration/container/helpers.go",
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/volume_writer.go` introduces `buildCopyFileToVolumeFn` that only delegates to `requiredCopyFileToVolumeFn` without policy or translation.",
+        "`volume_writer.go` aliases `writeConfigArtifactOptions = artifactwriter.WriteConfig` and wraps only to forward the call.",
+        "`container/helpers.go` defines a parallel `writeConfigArtifactOptions` type and forwarding wrapper performing only shallow field mapping.",
+        "`runtime_seams.go` repeatedly defines multiple function fields and option structs with repetitive nil-guard assignment logic for every operation group, while other seam packages mirror this same pattern."
+      ],
+      "suggestion": "Consolidate these seam layers into a small shared constructor/runtime helper with explicit policy hooks (e.g., one typed seam record and one normalization strategy), replacing repeated identity wrappers and copy-based option copying with a single coherent abstraction.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "workflow_loop_capture",
+      "runtime_seam_duplication"
+    ],
+    "likely_symptoms": [
+      "toggle dispatch inconsistency across ship-specific steps",
+      "duplicated orchestration glue that increases maintenance surface"
+    ],
+    "possible_false_positives": []
+  }
+}

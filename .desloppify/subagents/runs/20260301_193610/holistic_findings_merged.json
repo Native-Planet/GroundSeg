@@ -1,0 +1,222 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 52.2,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 34.0,
+        "Indirection Cost": 38.0,
+        "Interface Honesty": 42.0
+      }
+    }
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "orchestration and routine layers are built around broad function-field seam structs (`dockerRuntime`, `dockerRoutineRuntime`, `versionRuntime`) instead of narrow behavioral contracts.",
+        "These seams are initialized as package-level runtime tables and mostly point at package-global symbols (e.g. `config.BasePath`, `config.Architecture`, `config.LoadUrbitConfig`, `docker.StartContainer`, `docker.StopContainerByName`) via tiny lambdas or direct function fields.",
+        "Global mutable config and env-like variables (`config.BasePath`, `config.Architecture`, `config.DebugMode`, `system.Device`, etc.) are consumed across many modules, creating implicit dependencies instead of explicit context passing.",
+        "Seams and helper closures in broadcast and collectors are frequently pass-through (e.g. `resolveBackupRoot`, `currentBasePath`, `startramSettingsSnapshot`, and similar wrappers) without adding policy/translation."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 34.0,
+        "indirection_cost": 38.0,
+        "interface_honesty": 42.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam-001",
+      "summary": "Runtime seam structs add multiple indirection layers but currently expose no real behavioral abstraction, reducing readability and creating maintenance overhead.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`dockerRuntime` and `dockerRoutineRuntime` are large function-field aggregates (`BasePath`, `Architecture`, `fileOps`, `containerOps`, `imageOps`, `configOps`, etc.) and most production code still flows through these wrappers.",
+        "Production constructors (`newWireguardRuntime`, `newUrbitRuntime`, `newMinIORuntime`) build mostly identical seam objects and immediately pass them into call chains that eventually call nearly same underlying package functions.",
+        "Call paths in loaders (`loadWireguard`, `loadUrbits`) and Docker routines are driven by these runtime wrappers rather than direct service-level contracts."
+      ],
+      "suggestion": "Refactor to narrow seam interfaces to only behavior that is truly variable (e.g., shell/docker/test doubles), and keep fixed dependencies directly at call sites. Consolidate seam creation with a shared constructor or inject a single `RuntimeDependencies` interface with a small number of cohesive methods, rather than wide function tables.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "cfgbag-001",
+      "summary": "Global configuration values are used as an implicit, mutable bag across modules, weakening abstraction boundaries and making call contexts hard to reason about.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/wireguard.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`config/config.go` exposes process-level mutable state such as `BasePath`, `Architecture`, `DebugMode`, `DockerDir`, `Ready`, etc. as package variables.",
+        "`runtime_seams` and callers capture these globals via closures (`BasePath: func() string { return config.BasePath }`, `Architecture: func() string { return config.Architecture }`) rather than receiving an explicit execution context.",
+        "Higher-level flows in `shipworkflow` and routines directly read `config` snapshots and then mutate config through `UpdateConfTyped` without an explicit boundary object."
+      ],
+      "suggestion": "Introduce an explicit immutable runtime context object (or interface) passed into orchestrators/workflows, containing only fields actually needed per operation (paths, architecture, mode), and keep mutation operations behind small repository-style interfaces to reduce ambient global dependency.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "proxy-001",
+      "summary": "Multiple files layer pass-through proxy functions over underlying dependencies without policy, creating low-leverage indirection chains.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/system/wifi.go",
+        "goseg/routines/version.go",
+        "goseg/docker/network/network.go"
+      ],
+      "evidence": [
+        "Collectors define many wrapper functions like `resolveBackupRoot`, `currentBasePath`, `startramSettingsSnapshot`, `startramConfigSnapshot`, `getShipStatus`, and `getContainerNetwork` that immediately delegate to single concrete calls.",
+        "`system/wifi.go` defines `execCommandForWiFi`, `runCommandForWiFi`, `ifCheckForWiFi` as proxy delegates around package calls, with `getWifiDevice`/`primaryWifiDevice` still building shell pipelines directly.",
+        "`version` and orchestration-related seam files similarly wrap existing calls instead of exposing fewer, policy-bearing interfaces, increasing chain depth with limited abstraction leverage."
+      ],
+      "suggestion": "Collapse trivial pass-through wrappers into direct calls unless they encode test-time behavior or translation. For truly replaceable boundaries (e.g., command execution), replace proxy variables with a concise interface and inject a single mock/fake implementation.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.333,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 8.266,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 37,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 252,
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/defaults/defaults.go",
+    "goseg/rectify/rectify.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/config/wireguard.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/routines/docker.go",
+    "goseg/routines/docker_test.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/docker/orchestration/urbit.go",
+    "goseg/routines/system_test.go",
+    "goseg/importer/importer.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/main.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/setup/setup_test.go",
+    "goseg/routines/version.go",
+    "goseg/config/config.go",
+    "goseg/auth/auth.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/minio.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_193610",
+    "created_at": "2026-03-01T19:36:50+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "eb638f359dc4f157c87b209f6d6c590b33e0371ba6d0a986237041494167b8f2"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

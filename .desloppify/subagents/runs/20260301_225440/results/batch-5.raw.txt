@@ -1,0 +1,85 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 93.0,
+    "high_level_elegance": 95.0,
+    "test_strategy": 84.0,
+    "package_organization": 92.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` centralizes protocol action enums and parse helpers for namespace-specific action validation.",
+        "`goseg/uploadsvc/service_test.go` and `goseg/uploadsvc/adapters/upload_payload_test.go` exercise protocol action contracts through adapter and service-facing surfaces, showing intended decoupled layering.",
+        "`README.md` references contract-gate expectations for upload/starmtram boundaries rather than runtime-enforced package APIs."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "A lightweight architecture regression artifact (for action-schema evolution across protocol/service/adapter) would reduce uncertainty about boundary drift between contract packages."
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Action protocol, transport adapter mapping, and service contract tests are split across clearly scoped packages (`protocol`, `uploadsvc`, `startram`, `config`) in the assigned scope.",
+        "Files align with bounded responsibilities (`actions.go` for protocol contract metadata/parsing, `errors.go` for startram transport masking semantics, tests scoped by adapter/service surfaces, and `wireguard.go` for config persistence behavior)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Top-level ownership is clear, but the batch would score higher if cross-cutting compatibility policy were codified in a versioned contract document for each package-to-package seam rather than only in scattered test assertions."
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/uploadsvc/service_test.go` repeatedly asserts fixed action-order expectations (`len(actions)==2`, `actions[0]==ActionUploadOpenEndpoint`, `actions[1]==ActionUploadReset`) instead of asserting set semantics for supported-action contracts.",
+        "No companion assertion in this batch shows that action ordering is part of the API contract; ordering appears to be an implementation detail, so tests are coupled to an un-declared detail.",
+        "`goseg/uploadsvc/service_test.go` also checks operation text through `DescribeAction`, but there is no order-agnostic normalization test for supported actions in the adapter-side contract tests."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Introduce order-agnostic supported-action assertions and add a contract test matrix that checks membership semantics across protocol/service/adapter, keeping order checks only when explicitly documented."
+    },
+    "package_organization": {
+      "evidence": [
+        "The blind packet’s structure profile shows many small, domain-focused directories with narrow file counts in the touched areas (`config`, `protocol`, `startram`, `uploadsvc`, `README` at root).",
+        "Objective coupling signals available in the packet are incomplete for this slice (e.g., directory import averages resolve to zeros in the provided `holistic_context.structure` output), so structural risk can only be inferred weakly."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Re-run/refresh the structure scan to include non-zero `root_files` and `coupling_matrix` signals; then validate whether any contract-facing files should be moved into a dedicated protocol/contracts folder for tighter governance."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "test_strategy",
+      "identifier": "test-order-coupling-on-supported-actions",
+      "summary": "Supported-action tests assert slice indexes, coupling test expectations to non-contractual ordering.",
+      "related_files": [
+        "goseg/uploadsvc/service_test.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service_test.go` asserts `actions[0] == ActionUploadOpenEndpoint` and `actions[1] == ActionUploadReset` in multiple places.",
+        "`goseg/protocol/actions/actions.go` builds action lists from internal slice literals without declaring order as API contract, so test ordering assertions are stronger than contract guarantees.",
+        "No test in this batch explicitly documents action ordering as contract-critical."
+      ],
+      "suggestion": "Convert order-sensitive assertions to order-agnostic set checks in `goseg/uploadsvc/service_test.go` (e.g., map/set or sort+compare), and keep index assertions only if order is explicitly part of API shape. Add a focused contract test documenting whether order is stable and why.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "action_contract_test_friction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Tests overfit implementation details (slice order) where contract semantics are not formally stated."
+    ],
+    "likely_symptoms": [
+      "order-based regressions in action test failures during non-functional action-list refactors",
+      "unnecessary test brittleness across upload action contract edits"
+    ],
+    "possible_false_positives": []
+  }
+}

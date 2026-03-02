@@ -1,6 +1,9 @@
 package importer
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,8 +14,10 @@ import (
 	"time"
 
 	"groundseg/auth"
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/lifecycle"
+	"groundseg/orchestration"
+	"groundseg/shipworkflow"
 	"groundseg/structs"
 
 	"github.com/gorilla/mux"
@@ -21,7 +26,7 @@ import (
 func drainImportTransitions() {
 	for {
 		select {
-		case <-docker.ImportShipTransitions():
+		case <-events.ImportShipTransitions():
 		default:
 			return
 		}
@@ -30,16 +35,16 @@ func drainImportTransitions() {
 
 func readImportTransitions(t *testing.T, count int) []structs.UploadTransition {
 	t.Helper()
-	events := make([]structs.UploadTransition, 0, count)
+	capturedEvents := make([]structs.UploadTransition, 0, count)
 	for i := 0; i < count; i++ {
 		select {
-		case evt := <-docker.ImportShipTransitions():
-			events = append(events, evt)
+		case evt := <-events.ImportShipTransitions():
+			capturedEvents = append(capturedEvents, evt)
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timed out waiting for import transition %d", i+1)
 		}
 	}
-	return events
+	return capturedEvents
 }
 
 func copyUploadSessionMap(src map[string]uploadSession) map[string]uploadSession {
@@ -65,14 +70,37 @@ func resetUploadSessionsForTest(t *testing.T) {
 
 func authorizeTokenIDsForTest(t *testing.T, tokenIDs ...string) {
 	t.Helper()
-	originalClientManager := auth.ClientManager
-	clientManager := auth.NewClientManager()
+	originalValidateUploadSessionTokenFn := validateUploadSessionTokenFn
+	authorizedTokens := make(map[string]struct{}, len(tokenIDs))
 	for _, tokenID := range tokenIDs {
-		clientManager.AddAuthClient(tokenID, &structs.MuConn{Active: false})
+		authorizedTokens[tokenID] = struct{}{}
 	}
-	auth.ClientManager = clientManager
+	validateUploadSessionTokenFn = func(sessionToken structs.WsTokenStruct, providedToken structs.WsTokenStruct, _ *http.Request, _ auth.UploadTokenAuthorizationPolicy) auth.UploadTokenAuthorizationResult {
+		if sessionToken != (structs.WsTokenStruct{}) {
+			if sessionToken.ID != providedToken.ID || sessionToken.Token != providedToken.Token {
+				return auth.UploadTokenAuthorizationResult{
+					Status:           auth.UploadValidationStatusTokenContract,
+					AuthorizedToken:  providedToken.Token,
+					AuthorizationErr: fmt.Errorf("upload token does not match upload session"),
+				}
+			}
+		}
+
+		if _, ok := authorizedTokens[providedToken.ID]; !ok {
+			return auth.UploadTokenAuthorizationResult{
+				Status:           auth.UploadValidationStatusNotAuthorized,
+				AuthorizedToken:  providedToken.Token,
+				AuthorizationErr: fmt.Errorf("token id %s is not authorized", providedToken.ID),
+			}
+		}
+
+		return auth.UploadTokenAuthorizationResult{
+			Status:          auth.UploadValidationStatusAuthorized,
+			AuthorizedToken: providedToken.Token,
+		}
+	}
 	t.Cleanup(func() {
-		auth.ClientManager = originalClientManager
+		validateUploadSessionTokenFn = originalValidateUploadSessionTokenFn
 	})
 }
 
@@ -113,7 +141,9 @@ func TestFailUploadRequestPublishesFailureTransitions(t *testing.T) {
 	drainImportTransitions()
 
 	recorder := httptest.NewRecorder()
-	failUploadRequest(recorder, http.StatusUnauthorized, "bad token")
+	if err := failUploadRequest(recorder, http.StatusUnauthorized, "bad token"); err != nil {
+		t.Fatalf("failUploadRequest returned error: %v", err)
+	}
 
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("unexpected status: got %d", recorder.Code)
@@ -135,6 +165,45 @@ func TestFailUploadRequestPublishesFailureTransitions(t *testing.T) {
 	}
 }
 
+type responseWriterWithWriteFailure struct {
+	statusCode int
+	writeErr   error
+	headers    http.Header
+}
+
+func (w *responseWriterWithWriteFailure) Header() http.Header {
+	if w.headers == nil {
+		w.headers = make(http.Header)
+	}
+	return w.headers
+}
+
+func (w *responseWriterWithWriteFailure) WriteHeader(code int) {
+	w.statusCode = code
+}
+
+func (w *responseWriterWithWriteFailure) Write(body []byte) (int, error) {
+	return 0, w.writeErr
+}
+
+func TestSendUploadResponsePropagatesWriteError(t *testing.T) {
+	writeErr := errors.New("write failed")
+	writer := &responseWriterWithWriteFailure{writeErr: writeErr}
+
+	if err := sendUploadResponse(writer, http.StatusOK, "success", "ok"); err == nil || !errors.Is(err, writeErr) {
+		t.Fatalf("expected write error to propagate, got %v", err)
+	}
+}
+
+func TestFailUploadRequestPropagatesWriteError(t *testing.T) {
+	writeErr := errors.New("write failed")
+	writer := &responseWriterWithWriteFailure{writeErr: writeErr}
+
+	if err := failUploadRequest(writer, http.StatusBadRequest, "oops"); err == nil || !errors.Is(err, writeErr) {
+		t.Fatalf("expected write error to propagate, got %v", err)
+	}
+}
+
 func TestRunImportPhasesEmitsLifecycleStatuses(t *testing.T) {
 	drainImportTransitions()
 
@@ -142,16 +211,20 @@ func TestRunImportPhasesEmitsLifecycleStatuses(t *testing.T) {
 		"archive.tgz",
 		"~zod",
 		"",
-		lifecycle.Step{
-			Phase: lifecycle.Phase("creating"),
-			Run: func() error {
-				return nil
-			},
-		},
-		lifecycle.Step{
-			Phase: lifecycle.Phase("booting"),
-			Run: func() error {
-				return nil
+		orchestration.WorkflowPhases{
+			Execute: []lifecycle.Step{
+				{
+					Phase: lifecycle.Phase("creating"),
+					Run: func() error {
+						return nil
+					},
+				},
+				{
+					Phase: lifecycle.Phase("booting"),
+					Run: func() error {
+						return nil
+					},
+				},
 			},
 		},
 	)
@@ -193,7 +266,7 @@ func TestValidateUploadRequestRejectsMissingHeaders(t *testing.T) {
 		"patp":          "~zod",
 	})
 
-	_, err := validateUploadRequest(req)
+	_, err := validateUploadRequest(req, "abcdabcdabcdabcdabcdabcdabcdabcd", "~zod")
 	if err == nil {
 		t.Fatal("expected validateUploadRequest to fail without auth headers")
 	}
@@ -229,12 +302,44 @@ func TestValidateUploadRequestRejectsTokenMismatch(t *testing.T) {
 	req.Header.Set("X-Upload-Token-Id", "token-id")
 	req.Header.Set("X-Upload-Token", "different")
 
-	_, err := validateUploadRequest(req)
+	_, err := validateUploadRequest(req, "abcdabcdabcdabcdabcdabcdabcdabcd", "~zod")
 	if err == nil {
 		t.Fatal("expected validateUploadRequest to fail on token mismatch")
 	}
 	if !strings.Contains(err.Error(), "upload token does not match upload session") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestInitializeReturnsErrorForStoragePathFailures(t *testing.T) {
+	runtime := defaultImporterRuntime()
+	runtime.storagePathForFn = func(_ string) (string, error) {
+		return "", errors.New("storage unavailable")
+	}
+
+	if err := initializeWithRuntime(runtime); err == nil {
+		t.Fatal("expected Initialize to fail when storage path cannot be resolved")
+	}
+}
+
+func TestInitializeSetsUploadAndTempDirectories(t *testing.T) {
+	runtime := defaultImporterRuntime()
+	base := t.TempDir()
+	runtime.storagePathForFn = func(pathType string) (string, error) {
+		if pathType == "uploads" {
+			return filepath.Join(base, "uploads"), nil
+		}
+		return filepath.Join(base, "temp"), nil
+	}
+
+	if err := initializeWithRuntime(runtime); err != nil {
+		t.Fatalf("Initialize returned error: %v", err)
+	}
+	if uploadDir != filepath.Join(base, "uploads") {
+		t.Fatalf("unexpected uploadDir %q", uploadDir)
+	}
+	if tempDir != filepath.Join(base, "temp") {
+		t.Fatalf("unexpected tempDir %q", tempDir)
 	}
 }
 
@@ -392,7 +497,11 @@ func TestPersistChunkAndCombineChunks(t *testing.T) {
 			t.Fatalf("persistChunkToTemp(%d) returned error: %v", index, err)
 		}
 	}
-	if !allChunksReceived(filename, len(parts)) {
+	allChunks, err := allChunksReceived(filename, len(parts))
+	if err != nil {
+		t.Fatalf("allChunksReceived returned error: %v", err)
+	}
+	if !allChunks {
 		t.Fatal("expected allChunksReceived to be true after writing all parts")
 	}
 
@@ -415,6 +524,44 @@ func TestPersistChunkAndCombineChunks(t *testing.T) {
 	}
 }
 
+func TestPersistChunkToTempPropagatesCloseError(t *testing.T) {
+	setUploadDirsForTest(t)
+
+	closeErr := errors.New("close failed")
+	originalClose := closeTempFileFn
+	closeTempFileFn = func(*os.File) error {
+		return closeErr
+	}
+	t.Cleanup(func() {
+		closeTempFileFn = originalClose
+	})
+
+	err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0)
+	if err == nil || !errors.Is(err, closeErr) {
+		t.Fatalf("expected close error wrapped, got: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(tempDir, "ship.tgz-part-0")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected temp chunk file to be removed when close fails, got %v", statErr)
+	}
+}
+
+func TestAllChunksReceivedPropagatesFilesystemError(t *testing.T) {
+	setUploadDirsForTest(t)
+
+	originalStat := statFn
+	statErr := errors.New("stat access denied")
+	statFn = func(string) (os.FileInfo, error) {
+		return nil, statErr
+	}
+	t.Cleanup(func() {
+		statFn = originalStat
+	})
+
+	if _, err := allChunksReceived("ship.tgz", 1); err == nil || !errors.Is(err, statErr) {
+		t.Fatalf("expected stat error to propagate, got %v", err)
+	}
+}
+
 func TestCombineChunksReturnsErrorWhenChunkMissing(t *testing.T) {
 	setUploadDirsForTest(t)
 
@@ -429,5 +576,316 @@ func TestCombineChunksReturnsErrorWhenChunkMissing(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to open chunk file 1") {
 		t.Fatalf("unexpected combine error: %v", err)
+	}
+}
+
+func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testing.T) {
+	setUploadDirsForTest(t)
+	runtime := defaultImporterRuntime()
+	uploadPath := uploadDir
+	tempPath := tempDir
+	runtime.storagePathForFn = func(pathType string) (string, error) {
+		switch pathType {
+		case "uploads":
+			return uploadPath, nil
+		case "temp":
+			return tempPath, nil
+		default:
+			return "", fmt.Errorf("unexpected path type: %s", pathType)
+		}
+	}
+
+	configureErr := errors.New("configure failed")
+	postErr := errors.New("post-process failed")
+
+	workflowCalled := false
+	postCalled := false
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+		workflowCalled = true
+		t.Logf("configure workflow called")
+		return nil
+	}
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+		postCalled = true
+		t.Logf("post-import workflow called")
+		return nil
+	}
+	runtime.cleanupMultipartFn = func(string) error { return nil }
+
+	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
+		Filename:    "ship.tgz",
+		Patp:        "~zod",
+	}, runtime); err != nil {
+		t.Fatalf("configureUploadedPier returned unexpected error: %v", err)
+	}
+	if !workflowCalled || !postCalled {
+		t.Fatalf("expected both imported-pier workflows to be called, got workflow=%v post=%v", workflowCalled, postCalled)
+	}
+
+	workflowCalled = false
+	postCalled = false
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+		workflowCalled = true
+		return configureErr
+	}
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+		postCalled = false
+		return nil
+	}
+	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
+		Filename:    "ship.tgz",
+		Patp:        "~zod",
+	}, runtime); err == nil || !errors.Is(err, configureErr) {
+		t.Fatalf("expected configure phase failure to be returned, got: %v", err)
+	}
+	if !workflowCalled || postCalled {
+		t.Fatalf("expected only configure workflow to run on configure failure, got workflow=%v post=%v", workflowCalled, postCalled)
+	}
+
+	workflowCalled = false
+	postCalled = false
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+		workflowCalled = true
+		return nil
+	}
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+		postCalled = true
+		return postErr
+	}
+	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
+		Filename:    "ship.tgz",
+		Patp:        "~zod",
+	}, runtime); err == nil || !errors.Is(err, postErr) {
+		t.Fatalf("expected post-import workflow failure to be returned, got: %v", err)
+	}
+	if !workflowCalled || !postCalled {
+		t.Fatalf("expected both workflows to run, got workflow=%v post=%v", workflowCalled, postCalled)
+	}
+}
+
+func TestFinalizeUploadOnCompletionDispatchesUploadImportCommand(t *testing.T) {
+	setUploadDirsForTest(t)
+
+	runtime := defaultImporterRuntime()
+
+	requestCtx := context.WithValue(context.Background(), "test-key", "test-value")
+	var observedCmd shipworkflow.UploadImportCommand
+	runtime.uploadCoordinator = shipworkflow.UploadImportCoordinatorFunc(func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
+		if ctx != requestCtx {
+			t.Fatalf("unexpected dispatch context: %v", ctx)
+		}
+		observedCmd = cmd
+		return nil
+	})
+
+	if err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0); err != nil {
+		t.Fatalf("persistChunkToTemp returned error: %v", err)
+	}
+
+	completed, err := finalizeUploadOnCompletionWithRuntime(
+		uploadChunkProgress{
+			Filename:  "ship.tgz",
+			Total:     1,
+			AllChunks: true,
+		},
+		validatedUploadRequest{
+			Context: requestCtx,
+			Patp:    "~zod",
+			Session: uploadSession{
+				Remote:      true,
+				Fix:         true,
+				CustomDrive: "/custom/drive",
+			},
+		},
+		runtime,
+	)
+	if err != nil {
+		t.Fatalf("finalizeUploadOnCompletion returned unexpected error: %v", err)
+	}
+	if !completed {
+		t.Fatalf("expected completion to be true after final chunk")
+	}
+	if observedCmd.ArchivePath != filepath.Join(uploadDir, "ship.tgz") {
+		t.Fatalf("unexpected archive path: %q", observedCmd.ArchivePath)
+	}
+	if observedCmd.Patp != "~zod" {
+		t.Fatalf("unexpected patp: %q", observedCmd.Patp)
+	}
+	if !observedCmd.Remote || !observedCmd.Fix {
+		t.Fatalf("expected flags to be propagated, got remote=%v fix=%v", observedCmd.Remote, observedCmd.Fix)
+	}
+	if observedCmd.CustomDrive != "/custom/drive" {
+		t.Fatalf("unexpected custom drive: %q", observedCmd.CustomDrive)
+	}
+}
+
+func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing.T) {
+	setUploadDirsForTest(t)
+
+	dispatchErr := errors.New("dispatch failed")
+	runtime := defaultImporterRuntime()
+	runtime.uploadCoordinator = shipworkflow.UploadImportCoordinatorFunc(func(context.Context, shipworkflow.UploadImportCommand) error {
+		return dispatchErr
+	})
+
+	if err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0); err != nil {
+		t.Fatalf("persistChunkToTemp returned error: %v", err)
+	}
+	completed, err := finalizeUploadOnCompletionWithRuntime(
+		uploadChunkProgress{
+			Filename:  "ship.tgz",
+			Total:     1,
+			AllChunks: true,
+		},
+		validatedUploadRequest{
+			Patp: "~zod",
+		},
+		runtime,
+	)
+	if err == nil {
+		t.Fatal("expected finalizeUploadOnCompletion to return an error")
+	}
+	if !completed {
+		t.Fatalf("expected completion to be true after final chunk")
+	}
+	if !errors.Is(err, errImportPierConfig) {
+		t.Fatalf("expected import config sentinel in error chain, got %v", err)
+	}
+	if !errors.Is(err, dispatchErr) {
+		t.Fatalf("expected dispatch error in error chain, got %v", err)
+	}
+}
+
+func TestFinalizeImportedPierReadinessReturnsAcmeFixErrorWhenFixIsEnabled(t *testing.T) {
+	origAcmeFix := acmeFixFn
+	origWaitBoot := shipworkflowWaitForBootCodeFn
+	origWaitRemote := shipworkflowWaitForRemoteReadyFn
+	origSwitchWireguard := shipworkflowSwitchToWireguardFn
+	defer func() {
+		acmeFixFn = origAcmeFix
+		shipworkflowWaitForBootCodeFn = origWaitBoot
+		shipworkflowWaitForRemoteReadyFn = origWaitRemote
+		shipworkflowSwitchToWireguardFn = origSwitchWireguard
+	}()
+
+	shipworkflowWaitForBootCodeFn = func(string, time.Duration) {}
+	shipworkflowWaitForRemoteReadyFn = func(string, time.Duration) {}
+	shipworkflowSwitchToWireguardFn = func(string, bool) error {
+		return nil
+	}
+
+	expectedErr := errors.New("acme fix failed")
+	acmeFixFn = func(string) error {
+		return expectedErr
+	}
+
+	err := finalizeImportedPierReadiness(importedPierContext{
+		Patp: "~zod",
+		Fix:  true,
+	})
+	if err == nil {
+		t.Fatal("expected finalizeImportedPierReadiness to return acme fix error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error chain to include acme failure, got %v", err)
+	}
+}
+
+func TestPrepareImportedPierEnvironmentPropagatesRealCleanupErrors(t *testing.T) {
+	origCreateUrbitConfig := shipcreatorCreateUrbitConfigFn
+	origAppendSysConfigPier := shipcreatorAppendSysConfigPierFn
+	origDeleteContainer := dockerDeleteContainerFn
+	origDeleteVolume := dockerDeleteVolumeFn
+	origCreateVolume := dockerCreateVolumeFn
+	origMkdirAll := mkdirAllFn
+	defer func() {
+		shipcreatorCreateUrbitConfigFn = origCreateUrbitConfig
+		shipcreatorAppendSysConfigPierFn = origAppendSysConfigPier
+		dockerDeleteContainerFn = origDeleteContainer
+		dockerDeleteVolumeFn = origDeleteVolume
+		dockerCreateVolumeFn = origCreateVolume
+		mkdirAllFn = origMkdirAll
+	}()
+	shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+	shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+	dockerDeleteContainerFn = func(string) error {
+		return errors.New("failed to delete container: permission denied")
+	}
+	dockerDeleteVolumeFn = func(string) error {
+		return errors.New("volume cleanup should be ignored when container cleanup fails")
+	}
+	dockerCreateVolumeFn = func(string) error { return nil }
+	mkdirAllFn = func(string, os.FileMode) error { return nil }
+
+	err := prepareImportedPierEnvironment(importedPierContext{
+		Patp:        "~zod",
+		CustomDrive: "",
+	})
+	if err == nil {
+		t.Fatal("expected prepareImportedPierEnvironment to fail for non-ignorable container delete error")
+	}
+}
+
+func TestPrepareImportedPierEnvironmentIgnoresNotFoundCleanupErrors(t *testing.T) {
+	origCreateUrbitConfig := shipcreatorCreateUrbitConfigFn
+	origAppendSysConfigPier := shipcreatorAppendSysConfigPierFn
+	origDeleteContainer := dockerDeleteContainerFn
+	origDeleteVolume := dockerDeleteVolumeFn
+	origCreateVolume := dockerCreateVolumeFn
+	origMkdirAll := mkdirAllFn
+	defer func() {
+		shipcreatorCreateUrbitConfigFn = origCreateUrbitConfig
+		shipcreatorAppendSysConfigPierFn = origAppendSysConfigPier
+		dockerDeleteContainerFn = origDeleteContainer
+		dockerDeleteVolumeFn = origDeleteVolume
+		dockerCreateVolumeFn = origCreateVolume
+		mkdirAllFn = origMkdirAll
+	}()
+
+	shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
+	shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
+	dockerDeleteContainerFn = func(string) error {
+		return errors.New("No such container")
+	}
+	dockerDeleteVolumeFn = func(string) error {
+		return errors.New("no such volume")
+	}
+	dockerCreateVolumeFn = func(string) error { return nil }
+	mkdirAllFn = func(string, os.FileMode) error { return nil }
+
+	if err := prepareImportedPierEnvironment(importedPierContext{
+		Patp:        "~zod",
+		CustomDrive: "",
+	}); err != nil {
+		t.Fatalf("expected prepareImportedPierEnvironment to ignore cleanup not found errors: %v", err)
+	}
+}
+
+func TestIgnorableCleanupDeleteError(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "not found",
+			err:  errors.New("No such container"),
+			want: true,
+		},
+		{
+			name: "permission denied",
+			err:  errors.New("permission denied"),
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isIgnorableCleanupDeleteError(tc.err); got != tc.want {
+				t.Fatalf("isIgnorableCleanupDeleteError(%q) = %v, want %v", tc.err.Error(), got, tc.want)
+			}
+		})
 	}
 }

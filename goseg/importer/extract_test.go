@@ -9,26 +9,26 @@ import (
 	"testing"
 	"time"
 
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/structs"
 )
 
 func collectImportTransitions(timeout time.Duration) []structs.UploadTransition {
-	events := []structs.UploadTransition{}
+	capturedEvents := []structs.UploadTransition{}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	for {
 		select {
-		case evt := <-docker.ImportShipTransitions():
-			events = append(events, evt)
+		case evt := <-events.ImportShipTransitions():
+			capturedEvents = append(capturedEvents, evt)
 		case <-timer.C:
-			return events
+			return capturedEvents
 		}
 	}
 }
 
-func hasExtracted100(events []structs.UploadTransition) bool {
-	for _, evt := range events {
+func hasExtracted100(capturedEvents []structs.UploadTransition) bool {
+	for _, evt := range capturedEvents {
 		if evt.Type == "extracted" && evt.Value == 100 {
 			return true
 		}

@@ -1,0 +1,106 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "orchestration and routine layers are built around broad function-field seam structs (`dockerRuntime`, `dockerRoutineRuntime`, `versionRuntime`) instead of narrow behavioral contracts.",
+        "These seams are initialized as package-level runtime tables and mostly point at package-global symbols (e.g. `config.BasePath`, `config.Architecture`, `config.LoadUrbitConfig`, `docker.StartContainer`, `docker.StopContainerByName`) via tiny lambdas or direct function fields.",
+        "Global mutable config and env-like variables (`config.BasePath`, `config.Architecture`, `config.DebugMode`, `system.Device`, etc.) are consumed across many modules, creating implicit dependencies instead of explicit context passing.",
+        "Seams and helper closures in broadcast and collectors are frequently pass-through (e.g. `resolveBackupRoot`, `currentBasePath`, `startramSettingsSnapshot`, and similar wrappers) without adding policy/translation."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 34.0,
+        "indirection_cost": 38.0,
+        "interface_honesty": 42.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam-001",
+      "summary": "Runtime seam structs add multiple indirection layers but currently expose no real behavioral abstraction, reducing readability and creating maintenance overhead.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/routines/docker.go"
+      ],
+      "evidence": [
+        "`dockerRuntime` and `dockerRoutineRuntime` are large function-field aggregates (`BasePath`, `Architecture`, `fileOps`, `containerOps`, `imageOps`, `configOps`, etc.) and most production code still flows through these wrappers.",
+        "Production constructors (`newWireguardRuntime`, `newUrbitRuntime`, `newMinIORuntime`) build mostly identical seam objects and immediately pass them into call chains that eventually call nearly same underlying package functions.",
+        "Call paths in loaders (`loadWireguard`, `loadUrbits`) and Docker routines are driven by these runtime wrappers rather than direct service-level contracts."
+      ],
+      "suggestion": "Refactor to narrow seam interfaces to only behavior that is truly variable (e.g., shell/docker/test doubles), and keep fixed dependencies directly at call sites. Consolidate seam creation with a shared constructor or inject a single `RuntimeDependencies` interface with a small number of cohesive methods, rather than wide function tables.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "cfgbag-001",
+      "summary": "Global configuration values are used as an implicit, mutable bag across modules, weakening abstraction boundaries and making call contexts hard to reason about.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/wireguard.go",
+        "goseg/routines/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`config/config.go` exposes process-level mutable state such as `BasePath`, `Architecture`, `DebugMode`, `DockerDir`, `Ready`, etc. as package variables.",
+        "`runtime_seams` and callers capture these globals via closures (`BasePath: func() string { return config.BasePath }`, `Architecture: func() string { return config.Architecture }`) rather than receiving an explicit execution context.",
+        "Higher-level flows in `shipworkflow` and routines directly read `config` snapshots and then mutate config through `UpdateConfTyped` without an explicit boundary object."
+      ],
+      "suggestion": "Introduce an explicit immutable runtime context object (or interface) passed into orchestrators/workflows, containing only fields actually needed per operation (paths, architecture, mode), and keep mutation operations behind small repository-style interfaces to reduce ambient global dependency.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "proxy-001",
+      "summary": "Multiple files layer pass-through proxy functions over underlying dependencies without policy, creating low-leverage indirection chains.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/system/wifi.go",
+        "goseg/routines/version.go",
+        "goseg/docker/network/network.go"
+      ],
+      "evidence": [
+        "Collectors define many wrapper functions like `resolveBackupRoot`, `currentBasePath`, `startramSettingsSnapshot`, `startramConfigSnapshot`, `getShipStatus`, and `getContainerNetwork` that immediately delegate to single concrete calls.",
+        "`system/wifi.go` defines `execCommandForWiFi`, `runCommandForWiFi`, `ifCheckForWiFi` as proxy delegates around package calls, with `getWifiDevice`/`primaryWifiDevice` still building shell pipelines directly.",
+        "`version` and orchestration-related seam files similarly wrap existing calls instead of exposing fewer, policy-bearing interfaces, increasing chain depth with limited abstraction leverage."
+      ],
+      "suggestion": "Collapse trivial pass-through wrappers into direct calls unless they encode test-time behavior or translation. For truly replaceable boundaries (e.g., command execution), replace proxy variables with a concise interface and inject a single mock/fake implementation.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "wide_seam_overabstraction"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam layers were introduced primarily for testability but expanded into broad mutable wrappers that now carry most orchestration behavior.",
+      "Global config/state as mutable package variables substitutes for explicit environment/context abstraction, increasing accidental coupling."
+    ],
+    "likely_symptoms": [
+      "high indirection path lengths without policy concentration",
+      "wide function closures and one-implementation interfaces",
+      "cross-module coupling to ambient config globals"
+    ],
+    "possible_false_positives": [
+      "The seam tables may be intentionally kept for future injection use; if a planned refactor is pending, some pass-through wrappers may be transitional by design.",
+      "Some wrappers may be preserved for deterministic testing in selected packages and not currently targeted for immediate removal."
+    ]
+  }
+}

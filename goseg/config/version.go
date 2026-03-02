@@ -6,7 +6,6 @@ import (
 	"groundseg/defaults"
 	"groundseg/httpx"
 	"groundseg/structs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -158,16 +157,12 @@ func fetchVersionFromServer(conf structs.SysConfig) (structs.Version, error) {
 }
 
 func persistVersionInfo(version structs.Version) error {
-	confPath := filepath.Join(BasePath, "settings", "version_info.json")
-	file, err := os.Create(confPath)
+	confPath := filepath.Join(BasePath(), "settings", "version_info.json")
+	rawVersionInfo, err := json.MarshalIndent(version, "", "    ")
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	return encoder.Encode(&version)
+	return persistConfigJSON(confPath, rawVersionInfo)
 }
 
 func resolveVersionForConfiguredChannel(version structs.Version, releaseChannel string) (structs.Channel, error) {
@@ -242,12 +237,12 @@ func CreateDefaultVersion() error {
 	if err != nil {
 		return err
 	}
-	prettyJSON, err := json.MarshalIndent(versionInfo, "", "    ")
+	rawVersionInfo, err := json.MarshalIndent(versionInfo, "", "    ")
 	if err != nil {
 		return err
 	}
-	filePath := filepath.Join(BasePath, "settings", "version_info.json")
-	err = ioutil.WriteFile(filePath, prettyJSON, 0644)
+	filePath := filepath.Join(BasePath(), "settings", "version_info.json")
+	err = persistConfigJSON(filePath, rawVersionInfo)
 	if err != nil {
 		return err
 	}
@@ -263,7 +258,7 @@ func LocalVersion() structs.Version {
 		}
 		return fallback
 	}
-	confPath := filepath.Join(BasePath, "settings", "version_info.json")
+	confPath := filepath.Join(BasePath(), "settings", "version_info.json")
 	_, err := os.Open(confPath)
 	if err != nil {
 		// create a default if it doesn't exist
@@ -273,7 +268,7 @@ func LocalVersion() structs.Version {
 			return defaultVersion()
 		}
 	}
-	file, err := ioutil.ReadFile(confPath)
+	file, err := os.ReadFile(confPath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to load version info: %v", err))
 		return defaultVersion()

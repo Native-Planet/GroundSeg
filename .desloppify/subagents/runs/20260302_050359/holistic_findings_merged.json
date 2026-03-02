@@ -1,0 +1,342 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 61.9,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 58.0,
+        "Indirection Cost": 42.0,
+        "Interface Honesty": 64.0
+      }
+    },
+    "cross_module_architecture": 94.8,
+    "design_coherence": 57.7
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/actions/actions.go only defines transport action metadata and parsing utilities and performs no init-time mutation.",
+        "goseg/startram/errors.go exposes one stable connection error message and wraps an injected error through errpolicy without creating package-level state.",
+        "No shared mutable state or import-time side effects are evident in the assigned files."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Architectural coupling is low in scope, but action/action-meta registration is manual; adding a new namespace/action today can silently drift from protocol usage unless additional compile-time or golden tests enforce registry parity across packages."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "The wireguard loading/config path is composed of multiple near-pass-through layers: `goseg/docker/orchestration/wireguard.go` only forwards each public entrypoint to `container.*WithRuntime(...)`, and `goseg/docker/orchestration/container_bridge.go` builds a runtime struct by mechanically copying fields without domain-specific adaptation.",
+        "`goseg/docker/orchestration/runtime_seams.go` defines adapter interfaces (`runtimeContainer`, `runtimeUrbit`, `runtimeConfig`, etc.) and default adapters whose methods are mostly one-to-one wrappers over concrete package functions.",
+        "Runtime configuration for WireGuard is spread across `goseg/defaults/defaults.go` and `goseg/config/wireguardbuilder/builder.go`, increasing duplicate ownership of default behavior and constants."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 42.0,
+        "interface_honesty": 64.0
+      }
+    },
+    "design_coherence": {
+      "evidence": [
+        "goseg/internal/seams/runtime.go contains duplicated seam helpers for many arities/signatures (e.g. `noopFallback1x2`, `noopFallback2x2`, `noopFallback2x3`, `DefaultIfNil1x2`, `DefaultIfNil2x3`, `RequireSeam1x2`, etc.), creating a parallel API surface that scales by copy-paste.",
+        "goseg/docker/orchestration/runtime_seams.go and goseg/docker/orchestration/container_bridge.go add additional adapter wrappers (`adaptCopyFileToVolumeFn`, per-service runtime builders) to satisfy the seam indirection, increasing seam churn with each new service constructor.",
+        "goseg/config/config_update.go repeatedly re-implements identical field-by-field checks and mutations across `hasUpdates()` and `applyConfPatch()`, so adding one config field requires touching multiple large switch-like/if chains in lockstep."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_chain_wireguard_bloat",
+      "summary": "Wireguard runtime abstractions form an extra indirection chain with little behavioral value, increasing call depth without adding policy.",
+      "related_files": [
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/orchestration/container_bridge.go",
+        "goseg/docker/orchestration/container/wireguard.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/wireguard.go` has a series of entrypoints (`loadWireguard`, `wgContainerConf`, `buildWgConf`, `writeWgConf`, `WriteWgConfToFile`, `copyWGFileToVolume`) that only delegate to container-layer functions with the same arguments after `wireguardRuntimeFromDocker` conversion.",
+        "`goseg/docker/orchestration/container_bridge.go` constructs `container.WireguardRuntime` by direct field assignment from `dockerRuntime` with no transformation or invariant enforcement.",
+        "`goseg/docker/orchestration/runtime_seams.go` default adapters (`runtimeContainerAdapter`, `runtimeUrbitAdapter`, `runtimeConfigAdapter`, etc.) mainly forward to concrete funcs (`StartContainer`, `GetLatestContainerInfo`, etc.) rather than adding abstraction behavior."
+      ],
+      "suggestion": "Collapse the wireguard orchestration seam into one seam boundary: either keep orchestration->runtime conversion in a single package boundary and expose only operation-level methods with real policy, or remove redundant forwarding layers where they only wrap/call-through. This reduces chain depth and makes dependency direction clearer for debugging and testing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_chain_bloat"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wg_default_config_split_brain",
+      "summary": "Wireguard defaults are defined in multiple independent modules, creating duplicate source-of-truth for default runtime/container behavior.",
+      "related_files": [
+        "goseg/defaults/defaults.go",
+        "goseg/config/wireguardbuilder/builder.go",
+        "goseg/docker/orchestration/container/wireguard.go"
+      ],
+      "evidence": [
+        "`goseg/defaults/defaults.go` defines a full `WgConfig` struct with concrete defaults (`WireguardVersion`, `Repo`, hashes, `CapAdd`, `Sysctls`, `Volumes`).",
+        "`goseg/config/wireguardbuilder/builder.go` reconstructs a `structs.WgConfig` manually and re-embeds similar default fields (`WireguardName`, `CapAdd`, `Volumes`, `Sysctls`) with only a few version-driven fields changed.",
+        "Because these are manually repeated, updates to one default definition do not automatically flow to the builder, making behavior divergence possible across codepaths."
+      ],
+      "suggestion": "Introduce a single canonical Wireguard default source and have `BuildConfig` derive all static defaults from it (then override only the version-dependent fields). Add a narrow builder that cannot drift from `defaults.WgConfig` unless explicitly changed.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_chain_bloat"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "interface_runtime_unchanged_passthrough",
+      "summary": "Some runtime interfaces are introduced for test seams but expose almost no behavior boundary, limiting interface honesty.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/handler/system/support.go"
+      ],
+      "evidence": [
+        "Multiple runtime structs (`importerRuntime`, `workflowRuntime`, `supportRuntime`) use function fields for DI and call sites frequently use direct concrete functions through defaults, indicating interface-style seams are primarily mechanical.",
+        "`runtime_seams.go` and `wireguardRuntimeFromDocker`/`newDockerRuntime` assemble runtime bundles as pass-through function sets; many callers invoke wrappers that only enforce nil-checks before delegation.",
+        "In practical terms, this raises cognitive cost for tracing execution because concrete behavior is often reachable only after several adapter layers."
+      ],
+      "suggestion": "Consolidate seam strategy: keep coarse seams for major external boundaries, but avoid creating module-level interfaces/functions that only provide delegation. For each package, expose a single explicit runtime interface with cohesive methods where fallback behavior/translation is enforced.",
+      "confidence": "low",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_chain_bloat"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "seam_wrapper_bloat",
+      "summary": "Over-dense seam-helper boilerplate lowers abstraction leverage and increases maintenance cost.",
+      "related_files": [
+        "goseg/internal/seams/runtime.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/docker/orchestration/container_bridge.go"
+      ],
+      "evidence": [
+        "`runtime.go` introduces many narrowly specialized helpers per arity (`noopFallback1`, `noopFallback2`, `DefaultIfNil1x2`, `RequireSeam2x2`, etc.) plus multiple typed variants that largely duplicate behavior.",
+        "`container_bridge.go` then adds adapter glue functions (`adaptCopyFileToVolumeFn`) to bridge slight signature differences rather than a single coherent seam contract.",
+        "The same pattern appears in tests and mocks, which amplifies the maintenance burden with each new seam shape."
+      ],
+      "suggestion": "Replace the arity-specific helper explosion with a small, explicit seam container object and shared no-op/default constructors (or a generator-like helper package) so adding a new seam only requires one adapter registration, not multiple boilerplate wrappers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_abstraction_overengineering"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_maintenance_drag",
+      "summary": "Config patch handling is split across duplicated manual field maps, making schema drift easy and refactors hard.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`ConfPatch` in `config_update.go` is a large flat field list where new configuration knobs require manually adding pointers plus duplicate handling.",
+        "`hasUpdates()` independently enumerates every patch field in a long disjunction while `applyConfPatch()` repeats a similar exhaustive field-by-field assignment pass.",
+        "This mirrors behavior in `version.go` where retry and request/state handling is centralized but patch-like validation logic is not shared across config paths."
+      ],
+      "suggestion": "Introduce a declarative patch registry (or explicit patch command types with per-field handlers) so new config fields are represented once and validation/update logic is co-located, preventing divergence between `hasUpdates` and `applyConfPatch`.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_surface_growth"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "implicit_singleton_lifecycles",
+      "summary": "Module init paths spawn perpetual background work without explicit lifecycle handles.",
+      "related_files": [
+        "goseg/auth/auth.go",
+        "goseg/system/wifi.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`auth.Initialize` starts a goroutine that runs indefinitely (`CleanupStaleSessions`) without a stop/cancel path.",
+        "`system.InitializeWiFi` launches `wifiInfoLoop(device)` via `go` and never exposes a stop mechanism tied to shutdown context.",
+        "`logger.Initialize` performs global side-effectful initialization (`loggerInitOnce`, global `zap` replacement, stdout/ASCII output), making it hard to control lifecycle and test in embedded contexts."
+      ],
+      "suggestion": "Introduce explicit lifecycle APIs (`Start`/`Stop`, injected context, and testable runner interfaces) for auth and wifi polling so background tasks can be deterministically started/stopped and logger init is separated from runtime configuration.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_singleton_runtime_state"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.333,
+    "evidence_density": 2.0,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 14.194,
+    "dimensions_with_findings": 2
+  },
+  "review_scope": {
+    "reviewed_files_count": 70,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 299,
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/actions/actions.go",
+    "goseg/startram/errors.go",
+    "goseg/docker/orchestration/container/helpers.go",
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/rectify/rectify.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/docker/orchestration/subsystem/docker_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/config/wireguardbuilder/builder.go",
+    "goseg/docker/orchestration/container/wireguard.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/importer/importer.go",
+    "goseg/config/config_view.go",
+    "goseg/docker/orchestration/urbit.go",
+    "goseg/startup_orchestrator.go",
+    "goseg/main.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/docker/orchestration/subsystem/docker.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/main_test.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/docker/orchestration/runtime_seams_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/shipworkflow/operations_runtime.go",
+    "goseg/click/internal/runtime/runtime_test.go",
+    "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+    "goseg/docker/orchestration/urbit_test.go",
+    "goseg/setup/setup_test.go",
+    "goseg/routines/version.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/importer/importer_test.go",
+    "README.md",
+    "goseg/click/backup/service.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/docker/orchestration/container_bridge.go",
+    "goseg/docker/orchestration/volume_writer.go",
+    "goseg/exporter/exporter_test.go",
+    "goseg/leak/handler.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/auth/auth.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/config/config_update.go",
+    "goseg/config/version.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/internal/seams/runtime.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/shipworkflow/recovery_test.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/structs/ws.go",
+    "goseg/system/disk.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/system.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260302_050359",
+    "created_at": "2026-03-02T05:04:45+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "7ee34f3c3392dba120be4547cb2ac4aa077b933c61e450385a7eb508d71a31ad"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness",
+      "design_coherence",
+      "cross_module_architecture"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness",
+      "cross_module_architecture",
+      "design_coherence"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

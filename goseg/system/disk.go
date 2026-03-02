@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/anatol/smart.go"
 	"github.com/google/uuid"
@@ -19,7 +20,8 @@ import (
 )
 
 var (
-	SmartResults      = make(map[string]bool)
+	smartResultsMu    sync.RWMutex
+	smartResults      = make(map[string]bool)
 	runDiskCommandFn  = runCommand
 	listPartitionsFn  = disk.Partitions
 	checkSataDriveFn  = checkSataDrive
@@ -35,7 +37,141 @@ var (
 	openFileFn        = os.OpenFile
 	mountAllCommandFn = func() error { return exec.Command("mount", "-a").Run() }
 	mkfsExt4CommandFn = func(uuid, devPath string) error { return exec.Command("mkfs.ext4", "-U", uuid, "-F", devPath).Run() }
+	statFn            = os.Stat
 )
+
+type fstabRecord struct {
+	Device     string
+	MountPoint string
+	FSType     string
+	Options    string
+	Dump       string
+	Pass       string
+}
+
+func (record fstabRecord) line() string {
+	return fmt.Sprintf("%s %s %s %s %s %s", record.Device, record.MountPoint, record.FSType, record.Options, record.Dump, record.Pass)
+}
+
+func parseFstabLine(raw string) (fstabRecord, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return fstabRecord{}, false
+	}
+	parts := strings.Fields(trimmed)
+	if len(parts) < 6 {
+		return fstabRecord{}, false
+	}
+	return fstabRecord{
+		Device:     parts[0],
+		MountPoint: parts[1],
+		FSType:     parts[2],
+		Options:    parts[3],
+		Dump:       parts[4],
+		Pass:       parts[5],
+	}, true
+}
+
+func reconcileFstabLines(lines []string, desired fstabRecord) ([]string, bool) {
+	if desired.Device == "" || desired.MountPoint == "" {
+		return lines, false
+	}
+
+	desiredKey := desired.Device + "|" + desired.MountPoint
+	updated := make([]string, 0, len(lines)+1)
+	seen := false
+	changed := false
+
+	for _, line := range lines {
+		record, ok := parseFstabLine(line)
+		if !ok {
+			updated = append(updated, line)
+			continue
+		}
+		if record.Device+"|"+record.MountPoint != desiredKey {
+			updated = append(updated, line)
+			continue
+		}
+
+		if seen {
+			changed = true
+			continue
+		}
+
+		recordLine := desired.line()
+		if record.line() != recordLine {
+			recordLine = recordLine
+			changed = true
+		} else {
+			recordLine = line
+		}
+		updated = append(updated, recordLine)
+		seen = true
+	}
+
+	if !seen {
+		updated = append(updated, desired.line())
+		changed = true
+	}
+
+	return updated, changed
+}
+
+func readFstabLines(path string) ([]string, error) {
+	file, err := openFn(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return lines, nil
+}
+
+func writeFstabLines(path string, lines []string) error {
+	file, err := openFileFn(path, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	for _, line := range lines {
+		if _, err := writer.WriteString(line + "\n"); err != nil {
+			return err
+		}
+	}
+	return writer.Flush()
+}
+
+func SmartResultsSnapshot() map[string]bool {
+	smartResultsMu.RLock()
+	defer smartResultsMu.RUnlock()
+
+	clone := make(map[string]bool, len(smartResults))
+	for device, healthy := range smartResults {
+		clone[device] = healthy
+	}
+	return clone
+}
+
+func SetSmartResults(results map[string]bool) {
+	smartResultsMu.Lock()
+	defer smartResultsMu.Unlock()
+	for device := range smartResults {
+		delete(smartResults, device)
+	}
+	for device, healthy := range results {
+		smartResults[device] = healthy
+	}
+}
 
 func ListHardDisks() (structs.LSBLKDevice, error) {
 	var dev structs.LSBLKDevice
@@ -66,7 +202,11 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 	for i := 1; ; i++ {
 		dirName = fmt.Sprintf("groundseg-%d", i)
 		dirPath = "/" + dirName
-		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		exists, err := filePathExists(dirPath)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
 			break
 		}
 	}
@@ -92,44 +232,23 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 	}
 	for _, dev := range blockDevices.BlockDevices {
 		if dev.Name == sel {
-			fstabEntry := fmt.Sprintf("UUID=%s %s %s %s %s %s\n", uuid, dirPath, "ext4", "defaults,nofail", "0", "2")
-			// Read the existing fstab file
-			readFile, err := openFn("/etc/fstab")
+			rawLines, err := readFstabLines("/etc/fstab")
 			if err != nil {
 				return "", fmt.Errorf("Error opening fstab: %v", err)
 			}
-			var lines []string
-			scanner := bufio.NewScanner(readFile)
-			for scanner.Scan() {
-				lines = append(lines, scanner.Text())
-			}
-			if err := scanner.Err(); err != nil {
-				return "", fmt.Errorf("Error reading fstab: %v", err)
-			}
-			if err := readFile.Close(); err != nil {
-				return "", fmt.Errorf("Error closing fstab read file: %v", err)
-			}
 
-			// Append the new entry
-			lines = append(lines, fstabEntry)
-
-			// Write the updated content back to /etc/fstab
-			writeFile, err := openFileFn("/etc/fstab", os.O_WRONLY|os.O_TRUNC, 0644)
-			if err != nil {
-				return "", fmt.Errorf("Error opening fstab for writing: %v", err)
-			}
-			writer := bufio.NewWriter(writeFile)
-			for _, line := range lines {
-				_, err := writer.WriteString(line + "\n")
-				if err != nil {
+			reconciledLines, changed := reconcileFstabLines(rawLines, fstabRecord{
+				Device:     "UUID=" + uuid,
+				MountPoint: dirPath,
+				FSType:     "ext4",
+				Options:    "defaults,nofail",
+				Dump:       "0",
+				Pass:       "2",
+			})
+			if changed {
+				if err := writeFstabLines("/etc/fstab", reconciledLines); err != nil {
 					return "", fmt.Errorf("Error writing to fstab: %v", err)
 				}
-			}
-			if err := writer.Flush(); err != nil {
-				return "", fmt.Errorf("Error flushing fstab write: %v", err)
-			}
-			if err := writeFile.Close(); err != nil {
-				return "", fmt.Errorf("Error closing fstab: %v", err)
 			}
 
 			// Mount the newly created ext4 filesystem at /groundseg-<n>
@@ -140,6 +259,16 @@ func CreateGroundSegFilesystem(sel string) (string, error) {
 		}
 	}
 	return dirPath, nil
+}
+
+func filePathExists(path string) (bool, error) {
+	if _, err := statFn(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat path %s: %w", path, err)
+	}
+	return true, nil
 }
 
 func RemoveMultipartFiles(path string) error {

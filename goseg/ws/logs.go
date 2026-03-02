@@ -3,14 +3,12 @@ package ws
 import (
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"groundseg/auth"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/logger"
 	"groundseg/structs"
 	"net/http"
-
-	"github.com/gorilla/websocket"
-	"go.uber.org/zap"
 )
 
 type LogPayload struct {
@@ -21,7 +19,7 @@ type LogPayload struct {
 var (
 	logTokenCheckForLogs         = auth.LogTokenCheck
 	retrieveSysLogHistoryForLogs = logger.RetrieveSysLogHistory
-	findContainerForLogs         = docker.FindContainer
+	findContainerForLogs         = orchestration.FindContainer
 )
 
 func LogsHandler(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +73,7 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			zap.L().Info("log request authenticated")
-			logger.SysLogSessions = append(logger.SysLogSessions, conn)
+			logger.AddSysLogSession(conn)
 		} else {
 			_, err := findContainerForLogs(payload.Type)
 			if err != nil {
@@ -83,10 +81,7 @@ func LogsHandler(w http.ResponseWriter, r *http.Request) {
 				conn.Close()
 				break
 			}
-			if _, exists := logger.DockerLogSessions[payload.Type]; !exists {
-				logger.DockerLogSessions[payload.Type] = make(map[*websocket.Conn]bool)
-			}
-			logger.DockerLogSessions[payload.Type][conn] = false
+			logger.SetDockerLogSession(payload.Type, conn, false)
 		}
 	}
 }

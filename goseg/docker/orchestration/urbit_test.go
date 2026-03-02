@@ -14,58 +14,73 @@ import (
 	"github.com/docker/docker/api/types/mount"
 )
 
-func testUrbitRuntime() urbitRuntime {
-	rt := newUrbitRuntime()
-	rt.shipSettings = func() config.ShipSettings { return config.ShipSettings{} }
-	rt.runtimeSettings = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} }
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.urbitConf = func(string) structs.UrbitDocker { return structs.UrbitDocker{} }
-	rt.startContainer = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
-	rt.createContainer = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
-	rt.updateContainerState = func(string, structs.ContainerState) {}
-	rt.getLatestContainerInfo = func(kind string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/" + kind, "tag": "tag", "hash": "hash"}, nil
+func testUrbitRuntime() UrbitRuntime {
+	return UrbitRuntime{
+		ShipSettingsSnapshotFn: func() config.ShipSettings {
+			return config.ShipSettings{}
+		},
+		RuntimeSettingsSnapshotFn: func() config.ShipRuntimeSettings {
+			return config.ShipRuntimeSettings{}
+		},
+		LoadUrbitConfigFn: func(string) error {
+			return nil
+		},
+		UrbitConfFn: func(string) structs.UrbitDocker {
+			return structs.UrbitDocker{}
+		},
+		UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
+			return nil
+		},
+		StartContainerFn: func(string, string) (structs.ContainerState, error) {
+			return structs.ContainerState{}, nil
+		},
+		CreateContainerFn: func(string, string) (structs.ContainerState, error) {
+			return structs.ContainerState{}, nil
+		},
+		UpdateContainerStateFn: func(string, structs.ContainerState) {},
+		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
+			return map[string]string{"repo": "repo", "tag": "tag", "hash": "hash"}, nil
+		},
+		ArchitectureFn: func() string { return "amd64" },
+		DockerDirFn:    func() string { return "/tmp/docker" },
+		WriteFileFn:    func(string, []byte, os.FileMode) error { return nil },
 	}
-	rt.updateUrbit = func(string, func(*structs.UrbitDocker) error) error { return nil }
-	rt.writeFile = func(string, []byte, os.FileMode) error { return nil }
-	rt.Architecture = func() string { return "amd64" }
-	rt.DockerDir = func() string { return "/tmp/docker" }
-	return rt
 }
 
 func TestLoadUrbitsDispatchesStartOrCreate(t *testing.T) {
 	rt := testUrbitRuntime()
-	rt.shipSettings = func() config.ShipSettings {
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
 		return config.ShipSettings{Piers: []string{"~zod", "~bus", "~mar"}}
 	}
-	rt.loadUrbitConfig = func(pier string) error {
+	rt.LoadUrbitConfigFn = func(pier string) error {
 		if pier == "~bus" {
 			return errors.New("bad config")
 		}
 		return nil
 	}
-	rt.urbitConf = func(pier string) structs.UrbitDocker {
+	rt.UrbitConfFn = func(pier string) structs.UrbitDocker {
 		if pier == "~mar" {
 			return structs.UrbitDocker{BootStatus: "noboot"}
 		}
 		return structs.UrbitDocker{BootStatus: "boot"}
 	}
-	var started, created []string
-	rt.startContainer = func(name, ctype string) (structs.ContainerState, error) {
+	var started, created, updated []string
+	rt.StartContainerFn = func(name, ctype string) (structs.ContainerState, error) {
 		started = append(started, name+":"+ctype)
 		return structs.ContainerState{ActualStatus: "running"}, nil
 	}
-	rt.createContainer = func(name, ctype string) (structs.ContainerState, error) {
+	rt.CreateContainerFn = func(name, ctype string) (structs.ContainerState, error) {
 		created = append(created, name+":"+ctype)
 		return structs.ContainerState{ActualStatus: "created"}, nil
 	}
-	var updated []string
-	rt.updateContainerState = func(name string, _ structs.ContainerState) {
+	rt.UpdateContainerStateFn = func(name string, _ structs.ContainerState) {
 		updated = append(updated, name)
 	}
 
-	if err := loadUrbits(rt); err != nil {
-		t.Fatalf("LoadUrbits failed: %v", err)
+	if err := loadUrbits(rt); err == nil {
+		t.Fatalf("expected LoadUrbits failure due to partial bootstrap errors")
+	} else if !strings.Contains(err.Error(), "bad config") {
+		t.Fatalf("unexpected LoadUrbits error: %v", err)
 	}
 	if strings.Join(started, ",") != "~zod:vere" {
 		t.Fatalf("unexpected started ships: %v", started)
@@ -78,9 +93,23 @@ func TestLoadUrbitsDispatchesStartOrCreate(t *testing.T) {
 	}
 }
 
-func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
+func TestLoadUrbitsReturnsErrorWhenAllShipsFail(t *testing.T) {
 	rt := testUrbitRuntime()
-	rt.runtimeSettings = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{SnapTime: 90} }
+	rt.ShipSettingsSnapshotFn = func() config.ShipSettings {
+		return config.ShipSettings{Piers: []string{"~zod", "~bus"}}
+	}
+	rt.LoadUrbitConfigFn = func(string) error { return errors.New("config missing") }
+
+	loadErr := loadUrbits(rt)
+	if loadErr == nil {
+		t.Fatal("expected LoadUrbits to fail when all configured piers fail")
+	}
+	if !strings.Contains(loadErr.Error(), "load urbits failed for one or more ships") {
+		t.Fatalf("expected aggregated urbit failure summary, got: %v", loadErr)
+	}
+}
+
+func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
 	shipState := map[string]structs.UrbitDocker{
 		"~zod": {
 			PierName:         "~zod",
@@ -93,9 +122,19 @@ func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
 			MinioAmd64Sha256: "old-minio",
 		},
 	}
-	rt.urbitConf = func(name string) structs.UrbitDocker { return shipState[name] }
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.getLatestContainerInfo = func(kind string) (map[string]string, error) {
+	rt := testUrbitRuntime()
+	rt.RuntimeSettingsSnapshotFn = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{SnapTime: 90} }
+	rt.LoadUrbitConfigFn = func(string) error { return nil }
+	rt.UpdateUrbitFn = func(name string, mutate func(*structs.UrbitDocker) error) error {
+		c := shipState[name]
+		if err := mutate(&c); err != nil {
+			return err
+		}
+		shipState[name] = c
+		return nil
+	}
+	rt.UrbitConfFn = func(name string) structs.UrbitDocker { return shipState[name] }
+	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
 		switch kind {
 		case "vere":
 			return map[string]string{"repo": "repo/vere", "tag": "v4.0", "hash": "new-urbit"}, nil
@@ -105,23 +144,12 @@ func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
 			return nil, errors.New("unknown kind")
 		}
 	}
-	rt.Architecture = func() string { return "amd64" }
-	rt.updateUrbit = func(name string, mutate func(*structs.UrbitDocker) error) error {
-		c := shipState[name]
-		if err := mutate(&c); err != nil {
-			return err
-		}
-		shipState[name] = c
-		return nil
-	}
-	rt.DockerDir = func() string { return "/tmp/docker" }
 	var scriptPath, scriptContent string
-	rt.writeFile = func(path string, data []byte, _ os.FileMode) error {
+	rt.WriteFileFn = func(path string, data []byte, _ os.FileMode) error {
 		scriptPath = path
 		scriptContent = string(data)
 		return nil
 	}
-
 	containerCfg, hostCfg, err := urbitContainerConfWithRuntime(rt, "~zod")
 	if err != nil {
 		t.Fatalf("urbitContainerConf failed: %v", err)
@@ -146,9 +174,58 @@ func TestUrbitContainerConfDefaultNetworkAndPackReset(t *testing.T) {
 	}
 }
 
-func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
+func TestUrbitContainerConfReloadsConfigAfterMutation(t *testing.T) {
+	shipState := map[string]structs.UrbitDocker{
+		"~zod": {
+			PierName:         "~zod",
+			BootStatus:       "boot",
+			Network:          "bridge",
+			HTTPPort:         8080,
+			AmesPort:         34344,
+			LoomSize:         31,
+			UrbitAmd64Sha256: "old-urbit",
+			MinioAmd64Sha256: "old-minio",
+		},
+	}
+
 	rt := testUrbitRuntime()
-	rt.runtimeSettings = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{SnapTime: 60} }
+	rt.RuntimeSettingsSnapshotFn = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} }
+	rt.LoadUrbitConfigFn = func(string) error { return nil }
+	rt.UpdateUrbitFn = func(name string, mutate func(*structs.UrbitDocker) error) error {
+		c := shipState[name]
+		if err := mutate(&c); err != nil {
+			return err
+		}
+		c.BootStatus = "pack"
+		shipState[name] = c
+		return nil
+	}
+	rt.UrbitConfFn = func(name string) structs.UrbitDocker {
+		return shipState[name]
+	}
+	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
+		if kind == "minio" {
+			return map[string]string{"repo": "repo/minio", "tag": "tag", "hash": "new-minio"}, nil
+		}
+		return map[string]string{"repo": "repo/vere", "tag": "tag", "hash": "new-urbit"}, nil
+	}
+
+	var scriptContent string
+	rt.WriteFileFn = func(_ string, data []byte, _ os.FileMode) error {
+		scriptContent = string(data)
+		return nil
+	}
+
+	_, _, err := urbitContainerConfWithRuntime(rt, "~zod")
+	if err != nil {
+		t.Fatalf("urbitContainerConf failed: %v", err)
+	}
+	if scriptContent != defaults.PackScript {
+		t.Fatalf("expected pack script content after persisted config update, got %q", scriptContent)
+	}
+}
+
+func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
 	shipState := map[string]structs.UrbitDocker{
 		"~nec": {
 			PierName:           "~nec",
@@ -162,13 +239,10 @@ func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
 			CustomPierLocation: "/custom/pier",
 		},
 	}
-	rt.urbitConf = func(name string) structs.UrbitDocker { return shipState[name] }
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.getLatestContainerInfo = func(kind string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/" + kind, "tag": "tag", "hash": "hash"}, nil
-	}
-	rt.Architecture = func() string { return "arm64" }
-	rt.updateUrbit = func(name string, mutate func(*structs.UrbitDocker) error) error {
+	rt := testUrbitRuntime()
+	rt.RuntimeSettingsSnapshotFn = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{SnapTime: 60} }
+	rt.LoadUrbitConfigFn = func(pier string) error { return nil }
+	rt.UpdateUrbitFn = func(name string, mutate func(*structs.UrbitDocker) error) error {
 		c := shipState[name]
 		if err := mutate(&c); err != nil {
 			return err
@@ -176,8 +250,14 @@ func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
 		shipState[name] = c
 		return nil
 	}
+	rt.UrbitConfFn = func(name string) structs.UrbitDocker { return shipState[name] }
+	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
+		return map[string]string{"repo": "repo/" + kind, "tag": "tag", "hash": "hash"}, nil
+	}
+	rt.ArchitectureFn = func() string { return "arm64" }
+	rt.DockerDirFn = func() string { return "/custom/pier" }
 	var scriptPath string
-	rt.writeFile = func(path string, _ []byte, _ os.FileMode) error {
+	rt.WriteFileFn = func(path string, _ []byte, _ os.FileMode) error {
 		scriptPath = path
 		return nil
 	}
@@ -203,12 +283,13 @@ func TestUrbitContainerConfWireguardAndCustomPier(t *testing.T) {
 
 func TestUrbitContainerConfErrors(t *testing.T) {
 	rt := testUrbitRuntime()
-	rt.runtimeSettings = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} }
-	rt.urbitConf = func(string) structs.UrbitDocker {
+	rt.LoadUrbitConfigFn = func(string) error { return nil }
+	rt.UrbitConfFn = func(string) structs.UrbitDocker {
 		return structs.UrbitDocker{PierName: "~zod", BootStatus: "unknown"}
 	}
-	rt.loadUrbitConfig = func(string) error { return nil }
-	rt.getLatestContainerInfo = func(kind string) (map[string]string, error) {
+	rt.UpdateUrbitFn = func(string, func(*structs.UrbitDocker) error) error { return nil }
+	rt.RuntimeSettingsSnapshotFn = func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} }
+	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
 		if kind == "minio" {
 			return nil, errors.New("minio lookup failed")
 		}
@@ -219,7 +300,7 @@ func TestUrbitContainerConfErrors(t *testing.T) {
 		t.Fatalf("expected minio lookup error, got %v", err)
 	}
 
-	rt.getLatestContainerInfo = func(string) (map[string]string, error) {
+	rt.GetLatestContainerInfoFn = func(kind string) (map[string]string, error) {
 		return map[string]string{"repo": "repo/x", "tag": "tag", "hash": "hash"}, nil
 	}
 	if _, _, err := urbitContainerConfWithRuntime(rt, "~zod"); err == nil || !strings.Contains(err.Error(), "Unknown action") {

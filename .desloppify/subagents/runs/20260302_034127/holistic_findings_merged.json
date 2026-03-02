@@ -1,0 +1,349 @@
+{
+  "assessments": {
+    "cross_module_architecture": 60.8,
+    "design_coherence": 58.2,
+    "error_consistency": 73.3
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` is the protocol boundary owner for C2C action tokens (`ActionC2CConnect`) and namespace metadata.",
+        "`goseg/system/wifi/service/c2c_service.go` reconstructs execution wiring with a separate hardcoded binding table (`c2cActionDispatcher`) instead of deriving from protocol contract definitions.",
+        "`goseg/system/wifi/service/c2c_service.go` also mirrors the C2C action value via `ConnectAction`, duplicating protocol boundary knowledge in the service module."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Small boundary-friction remains because protocol action declarations and execution dispatch are not connected by a shared contract mechanism; new actions/removals require manual coordination across modules."
+    },
+    "design_coherence": {
+      "evidence": [
+        "Container runtime loaders duplicate the same lifecycle across multiple backends (validate runtime, ensure config exists/regen, materialize runtime config, start container, update state), increasing coupling and drift risk.",
+        "Access-point start path checks `running` state but continues through reconfiguration and start steps even when already running, making start semantics effectively idempotent-unsafe and harder to reason about during mode transitions.",
+        "Configuration persistence in `config` mixes atomic temp-file+rename flow in one module (`UpdateMcConf`) with direct write-file persistence in another (`CreateDefaultVersion`), creating inconsistent durability behavior."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    },
+    "error_consistency": {
+      "evidence": [
+        "Within `goseg/shipworkflow/urbit_operations.go`, the same lifecycle workflows switch between `%w` and `%v` error formatting in adjacent failure paths, so some failures preserve the underlying cause while others replace it.",
+        "In `setUrbitDomain` and `setMinIODomain` (in `goseg/shipworkflow/urbit_operations.go`), calls that delegate to `startram.AliasCreate` return `err` directly while nearby persistence and validation failures are wrapped with contextual `%w` messages."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": ""
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_action_dispatch_contract_drift",
+      "summary": "C2C action contract and execution binding are duplicated across modules, creating drift risk.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/system/wifi/service/c2c_service.go"
+      ],
+      "evidence": [
+        "`ActionC2CConnect` is defined in the protocol package, while `goseg/system/wifi/service/c2c_service.go` separately defines `ConnectAction` and an isolated `c2cActionDispatcher` slice entry.",
+        "There is no in-module wiring in these files that ties the protocol's C2C action metadata to service dispatch registration, so boundary drift is only caught at runtime when an unsupported action is executed."
+      ],
+      "suggestion": "Introduce a shared, explicit C2C action contract descriptor in `protocol/actions` and construct the service dispatcher from it (or add a protocol-to-service parity test at this boundary) so adding/removing actions cannot silently diverge; remove redundant local action aliases once contract-driven wiring exists.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "protocol-action-contract-parity"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_unvalidated_action_entry",
+      "summary": "C2C command entrypoint accepts unvalidated actions, weakening protocol contracts across module seams.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`ProcessC2CMessage` receives `C2CCommand` and forwards `cmd.Action` directly to `service.Execute` without calling `actions.ParseC2CAction`.",
+        "`ParseAction` and namespace-specific validators exist in `goseg/protocol/actions/actions.go`, but this boundary is bypassed at the wifi service seam."
+      ],
+      "suggestion": "Validate `cmd.Action` at the service boundary with `actions.ParseC2CAction` (or a dedicated protocol-to-seam adapter) before executing, and return a typed unsupported-action error for anything outside `NamespaceC2C`.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "runtime_contract_seal"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_dispatcher_global_binding",
+      "summary": "Package-scope action dispatcher creates hard module coupling and hides runtime-architecture boundaries.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`var c2cActionDispatcher = actions.NewActionDispatcher(...)` is declared as global state at package scope.",
+        "Execution behavior for `ConnectAction` is bound there with inline closure logic, rather than being composed in a seam-aware constructor."
+      ],
+      "suggestion": "Move dispatcher construction into `NewC2CServiceForAdapter`/`ProcessC2CMessage` and inject it as a dependency so protocol action wiring is explicit per runtime instance and test seam.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_contract_seal"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "c2c_adapter_nil_callbacks",
+      "summary": "Adapter contract allows nil seam functions, making the execution seam fail by panic instead of contract error.",
+      "related_files": [
+        "goseg/system/wifi/service/c2c_service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`NewC2CServiceForAdapter` accepts `connectToWiFi` and `restartGroundSeg` without nil checks.",
+        "`C2CServiceExecutor.ConnectToWiFi` and `RestartGroundSeg` invoke function fields unconditionally.",
+        "The root README frames these as explicit seam contracts and expects stable runtime boundaries, but constructor currently accepts incomplete adapters silently."
+      ],
+      "suggestion": "Make the constructor (or a `Validate` path) enforce non-nil adapters and return an explicit error, or provide no-op guarded behavior with clear diagnostics before service registration.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "runtime_contract_seal"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "container_orchestration_runtime_duplication",
+      "summary": "Container runtime loaders duplicate startup/config patterns across Netdata, Wireguard, and MinIO with no shared orchestration abstraction.",
+      "related_files": [
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/docker/orchestration/container/minio.go",
+        "goseg/docker/orchestration/volume_writer.go"
+      ],
+      "evidence": [
+        "`LoadNetdataWithRuntime`, `LoadWireguardWithRuntime`, and `LoadMCWithRuntime` all implement the same orchestration shape (runtime validation \u2192 ensure config file/defaults \u2192 write/update container config \u2192 start container \u2192 publish state).",
+        "`writeNDConfigArtifactWithRuntime` and `writeWGConfigArtifact` are separate copies of the same artifact-write pattern, differing mainly by constants.",
+        "Shared infra exists (`writeConfigArtifact`, `copyFileToVolumeWithTempContainer`, volume initialization ops), but each backend still recreates orchestration boilerplate independently."
+      ],
+      "suggestion": "Introduce a generic container-loader builder in `goseg/docker/orchestration/container` (e.g., `ContainerRuntimePlan` + `RunContainerWithRuntime`) to centralize the lifecycle sequence and reduce per-backend scaffolding; keep backend-specific behavior in small strategy hooks and unit-test them separately.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_runtime_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "accesspoint_start_idempotency",
+      "summary": "Access-point start flow is not truly idempotent when already running, so repeated transitions can reconfigure/restart unnecessarily.",
+      "related_files": [
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`startWithRuntime` logs `\"Accesspoint already started\"` but does not return early when `running == true`, then still proceeds to write hostapd config and call `StartRouterFn`.",
+        "C2C mode transitions (`C2CMode`/`C2CConnect`) depend on deterministic start/stop behavior in access-point lifecycle, so repeated calls can produce churn.",
+        "The function lacks a `forceRestart`/`dry-run` distinction, so control flow cannot safely express \"already healthy\" as a no-op."
+      ],
+      "suggestion": "Make `startWithRuntime` explicitly handle `running == true` as a success no-op unless a `forceRestart` option is requested; extract a small helper that splits identity-check, config-generation, and startup execution so idempotent transitions are explicit.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_persistence_consistency",
+      "summary": "Configuration persistence strategies differ across config modules, making atomicity and corruption-recovery behavior inconsistent.",
+      "related_files": [
+        "goseg/config/mc.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`UpdateMcConf` writes via temp file, validates size, then renames into place (`os.CreateTemp` + `os.Rename`), which is crash-safe.",
+        "`CreateDefaultVersion` writes directly with `ioutil.WriteFile` to `version_info.json`, without staged write/rename and before verification, creating a different failure mode.",
+        "`LocalVersion` currently handles missing/invalid version file by falling back to defaults, which can silently mask partial-write events caused by non-atomic writes."
+      ],
+      "suggestion": "Introduce one config persistence helper in `config` that enforces atomic temp-file + fsync + rename semantics for all config writes, then route `UpdateMcConf` and `CreateDefaultVersion` through the same helper.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "config_persistence_model_inconsistency"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "wrap_policy_inconsistent_pack_rollchop",
+      "summary": "Pack/roll/chop helpers inconsistently preserve error context, weakening typed error propagation within one workflow.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "`runPackLifecycle` uses `packError(fmt.Errorf(...%v..., err))` for several lower-level errors, but keeps `%w` only in others (for example around `WaitComplete`), so callers lose the ability to uniformly inspect root causes.",
+        "`runMeldPack` and `rollChopPier` use the same pattern: some wrapped errors use `%v` strings while nearby equivalents use `%w`.",
+        "`goseg/shipworkflow/startram.go` consistently wraps many dispatch errors with `%w`, so this inconsistency is local to the same subsystem and harder to reason about for callers."
+      ],
+      "suggestion": "Introduce a single package-level error wrapping policy for shipworkflow lifecycles (for example, always wrap delegated failures with `%w` and keep context text separate), and remove `%v`-wrapped delegations in `runPackLifecycle`, `packMeldPier`, and `rollChopPier`. Add a small helper that standardizes wrapped context formatting.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mixed_boundary_wrapping"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "missing_context_on_startram_delegation",
+      "summary": "Domain update paths drop operation context when delegating to Startram and returning raw errors.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "`setUrbitDomain` returns `err` directly from `startram.AliasCreate` instead of wrapping it with operation context, while nearby local failures in the same function are wrapped with contextual `%w` messages.",
+        "`setMinIODomain` has the same raw return of `startram.AliasCreate` failure.",
+        "The Startram package advertises a dedicated transport-layer error wrapper (`wrapAPIConnectionError`) intended to preserve and normalize error causality."
+      ],
+      "suggestion": "Wrap `startram.AliasCreate` failures in both `setUrbitDomain` and `setMinIODomain` with contextual `%w` messages (e.g. `fmt.Errorf(\"set %s domain alias for %s: %w\", ...)`) so callers consistently receive both operation-level context and recoverable root cause.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "mixed_boundary_wrapping"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 4,
+    "dimension_coverage": 0.333,
+    "evidence_density": 1.5,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 17.486,
+    "dimensions_with_findings": 3
+  },
+  "review_scope": {
+    "reviewed_files_count": 47,
+    "successful_batch_count": 4,
+    "full_sweep_included": false,
+    "total_files": 297,
+    "imported_dimensions": [
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/protocol/actions/actions.go",
+    "goseg/startram/errors.go",
+    "goseg/system/wifi/service/c2c_service.go",
+    "README.md",
+    "goseg/click/backup/service.go",
+    "goseg/config/mc.go",
+    "goseg/docker/orchestration/container/netdata.go",
+    "goseg/docker/orchestration/container_bridge.go",
+    "goseg/docker/orchestration/volume_writer.go",
+    "goseg/handler/system/support.go",
+    "goseg/leak/handler.go",
+    "goseg/accesspoint/accesspoint.go",
+    "goseg/accesspoint/accesspoint_test.go",
+    "goseg/auth/auth.go",
+    "goseg/backupsvc/service_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/config/config_update.go",
+    "goseg/config/version.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/docker/orchestration/runtime_seams_test.go",
+    "goseg/docker/orchestration/subsystem/docker.go",
+    "goseg/handler/ship/urbit_test.go",
+    "goseg/importer/extract_test.go",
+    "goseg/importer/importer_test.go",
+    "goseg/internal/seams/runtime.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/leak/handler_test.go",
+    "goseg/logger/logger.go",
+    "goseg/main_test.go",
+    "goseg/protocol/actions/actions_test.go",
+    "goseg/rectify/rectify.go",
+    "goseg/shipworkflow/recovery_test.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/startram/backup_runtime_test.go",
+    "goseg/startram/state_sync_test.go",
+    "goseg/startup_orchestrator_test.go",
+    "goseg/structs/ws.go",
+    "goseg/system/disk.go",
+    "goseg/system/disk_test.go",
+    "goseg/system/system.go",
+    "goseg/system/wifi.go",
+    "goseg/system/wifi_test.go",
+    "goseg/uploadsvc/service_test.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260302_034127",
+    "created_at": "2026-03-02T03:42:53+00:00",
+    "batch_count": 4,
+    "batch_indexes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "0dd59b7619e395602c8f9219fbfe16a9bd05fa493cb5e811772522e11f579030"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "cross_module_architecture",
+      "error_consistency",
+      "design_coherence"
+    ],
+    "imported_dimensions": [
+      "cross_module_architecture",
+      "design_coherence",
+      "error_consistency"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization"
+    ]
+  }
+}

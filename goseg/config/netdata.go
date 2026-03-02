@@ -16,7 +16,7 @@ var (
 // write a hardcoded default conf to disk
 func CreateDefaultNetdataConf() error {
 	defaultConfig := defaults.NetdataConfig
-	path := filepath.Join(BasePath, "settings", "netdata.json")
+	path := filepath.Join(BasePath(), "settings", "netdata.json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func UpdateNetdataConf() error {
 			"/etc/os-release:/host/etc/os-release:ro",
 		},
 	}
-	path := filepath.Join(BasePath, "settings", "netdata.json")
+	path := filepath.Join(BasePath(), "settings", "netdata.json")
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		return err
 	}

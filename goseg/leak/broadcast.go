@@ -13,9 +13,9 @@ import (
 )
 
 func listener(patp string, conn net.Conn, info LickStatus) {
+	lickMu.Lock()
 	BytesChan[patp] = make(chan string)
 	readChan := make(chan []byte)
-	lickMu.Lock()
 	// put in status map
 	lickStatuses[patp] = info
 	lickMu.Unlock()
@@ -26,7 +26,9 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 		delete(lickStatuses, patp)
 		lickMu.Unlock()
 		// remove from channel map
+		lickMu.Lock()
 		delete(BytesChan, patp)
+		lickMu.Unlock()
 		// close connection
 		if conn != nil {
 			conn.Close()
@@ -49,9 +51,15 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 		}
 	}()
 	for {
+		lickMu.RLock()
+		patpChan := BytesChan[patp]
+		lickMu.RUnlock()
 		select {
 		// listen to broadcast and send
-		case broadcast := <-BytesChan[patp]:
+		case broadcast, ok := <-patpChan:
+			if !ok {
+				return
+			}
 			c, err := sendBroadcast(conn, broadcast)
 			if err != nil {
 				return
@@ -77,10 +85,11 @@ func updateBroadcast(oldBroadcast, newBroadcast structs.AuthBroadcast) (structs.
 		return oldBroadcast, fmt.Errorf("failed to marshal full broadcast for lick: %w", err)
 	}
 	statuses := GetLickStatuses()
+	channels := GetLickChannels()
 	var sendErrors []error
 
 	for patp, status := range statuses {
-		channel, exists := BytesChan[patp]
+		channel, exists := channels[patp]
 		if !exists {
 			sendErrors = append(sendErrors, fmt.Errorf("no leak channel for %q", patp))
 			continue

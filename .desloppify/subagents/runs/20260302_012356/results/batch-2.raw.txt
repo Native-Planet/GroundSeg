@@ -1,0 +1,98 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "mid_level_elegance": 74.5,
+    "low_level_elegance": 81.0
+  },
+  "dimension_notes": {
+    "mid_level_elegance": {
+      "evidence": [
+        "`startBackgroundServices` in `goseg/startup_orchestrator.go` invokes several runtime callbacks only when non-nil (for example start functions for version/docker/urbit workflows) and does not distinguish optional vs required orchestration dependencies, making startup behavior depend on nil-injected function fields rather than explicit contracts.",
+        "`goseg/docker/orchestration/runtime_seams.go` defines a large callback-oriented seam object (`StartupRuntime`, `Runtime`) where many responsibilities are injected piecemeal, increasing coordination complexity across callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`runBroadcastTickWithRuntime` in `goseg/broadcast/loop.go` continues after `constructPierInfoFn` failure and broadcasts an empty map fallback, which can overwrite previously known state with empty state.",
+        "The fallback behavior is coupled to collector/runtime error handling with no explicit merge-or-skip policy in the same function."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "bcast_state_loss_on_collector_error",
+      "summary": "Collector failures can silently erase in-memory urbit state during broadcast ticks.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "In `runBroadcastTickWithRuntime` (goseg/broadcast/loop.go), when `constructPierInfoFn()` returns an error, the function logs and returns `pierInfo` from a nil-safe empty map path rather than preserving or reconciling prior state.",
+        "This behavior sends a broadcast update with no pier entries for that tick, effectively downgrading known state to unknown."
+      ],
+      "suggestion": "On collector error, keep previous `pierInfo` and merge in successful deltas only, or skip publishing that tick; emit structured telemetry and return an explicit degraded-state indicator instead of replacing state with an empty map.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_semantics_contract"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "startup_optional_runtime_handoffs",
+      "summary": "Startup runtime handoff uses implicit optional callbacks, so required subsystem initialization can be skipped without clear failure signal.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "`startBackgroundServices` in `startup_orchestrator.go` checks for nil before calling many runtime hooks and proceeds regardless of hook presence.",
+        "`StartupRuntime` and related seam structs in `runtime_seams.go` expose many individually injected function fields, which lets callsites hide required dependency presence behind nil checks."
+      ],
+      "suggestion": "Introduce explicit required/optional service contracts in startup (e.g., typed interfaces plus mandatory registration validation), and fail fast when required hooks are missing while leaving truly optional services behind explicit flags.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_runtime_contracts"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "urbit_conf_snapshot_stale_mutation",
+      "summary": "URBIT config flow reads one snapshot, mutates config, then continues logic from stale snapshot values.",
+      "related_files": [
+        "goseg/docker/orchestration/urbit.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`urbitContainerConfWithRuntime` loads `shipConf` up front, invokes `UpdateUrbitFn(shipConf)` (which can persist updates), and later calls `LoadUrbitConfigFn` but continues subsequent `shipConf`-based decisions from the pre-update object.",
+        "Later branches in the same function rely on earlier-copied values to decide container actions, creating possible inconsistency between persisted config and in-memory config used for the decision path."
+      ],
+      "suggestion": "Recompute or refresh the effective config object after any mutating update before deriving container decisions, or make the update path purely persistent and derive `shipConf` from a single read-after-write snapshot.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "stateful_runtime_seams"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Fragile callback/seam interfaces that do not encode mandatory dependency contracts, causing silent partial behavior.",
+      "State snapshot and mutation ordering coupled in hot orchestration paths without explicit post-update refresh."
+    ],
+    "likely_symptoms": [
+      "bcast_state_loss_on_collector_error",
+      "startup_optional_runtime_handoffs",
+      "urbit_conf_snapshot_stale_mutation"
+    ],
+    "possible_false_positives": [
+      "Existing nil-safe fallbacks in broadcast may be intentionally designed for availability-first behavior, though they still risk lossy updates."
+    ]
+  }
+}

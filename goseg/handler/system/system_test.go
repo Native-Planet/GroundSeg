@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/handler/systemsvc"
 	"groundseg/structs"
 	"groundseg/system"
@@ -17,10 +18,10 @@ import (
 
 func resetSystemSeams() {
 	confForSystemHandler = config.Conf
-	stopContainerForSystemHandler = docker.StopContainerByName
+	stopContainerForSystemHandler = orchestration.StopContainerByName
 	updateConfTypedForSystemHandler = config.UpdateConfTyped
 	withPenpaiAllowForSystemHandler = config.WithPenpaiAllow
-	loadLlamaForSystemHandler = docker.LoadLlama
+	loadLlamaForSystemHandler = orchestration.LoadLlama
 	withGracefulExitForSystemHandler = config.WithGracefulExit
 	execCommandForSystemHandler = func(name string, args ...string) systemsvc.CommandRunner {
 		return exec.Command(name, args...)
@@ -30,7 +31,7 @@ func resetSystemSeams() {
 	runUpgradeForSystemHandler = system.RunUpgrade
 	toggleDeviceForSystemHandler = system.ToggleDevice
 	connectToWifiForSystemHandler = system.ConnectToWifi
-	publishSystemTransitionForSystemHandler = docker.PublishSystemTransition
+	publishSystemTransitionForSystemHandler = events.PublishSystemTransition
 	sleepForSystemHandler = time.Sleep
 }
 
@@ -93,9 +94,9 @@ func TestSystemHandlerTogglePenpaiFeature(t *testing.T) {
 
 func TestSystemHandlerGroundsegPowerAndSwap(t *testing.T) {
 	t.Cleanup(resetSystemSeams)
-	origDebug := config.DebugMode
-	config.DebugMode = true
-	t.Cleanup(func() { config.DebugMode = origDebug })
+	origDebug := config.DebugMode()
+	config.SetDebugMode(true)
+	t.Cleanup(func() { config.SetDebugMode(origDebug) })
 
 	updateCalls := 0
 	updateConfTypedForSystemHandler = func(...config.ConfUpdateOption) error {

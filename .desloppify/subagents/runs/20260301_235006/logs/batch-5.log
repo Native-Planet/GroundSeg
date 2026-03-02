@@ -1,0 +1,480 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_235006/results/batch-5.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, high_level_elegance
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/wireguard.go
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/uploadsvc/adapters/upload_payload_test.go
+- goseg/uploadsvc/service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 83.0,
+    "high_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/uploadsvc/service.go` defines shared package-level `CommandValidationError` values (`errOpenEndpointRequestRequired`, `errResetOpenEndpointPayload`, etc.) and mutates their `Action` fields in `ValidateCommand` before returning them.",
+        "`ValidateCommand` can be called on command execution paths that are request-driven and therefore likely concurrent across callers, creating cross-goroutine shared mutable error state."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Fix the shared mutable error template pattern so validation errors are immutable per invocation; this is a core cross-module contract boundary issue that affects observability and safety under concurrency."
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Upload action contracts are split across `goseg/protocol/actions/actions.go` (action token + protocol metadata) and `goseg/uploadsvc/service.go` (dispatcher execution/operation table), with no explicit single source of truth linking the public protocol contract to executor semantics.",
+        "The two tables are guarded only by runtime reconciliation in `newUploadDispatcher`, so action-contract integrity is enforced late rather than by a compile-time-safe contract boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Consolidate action contract ownership so protocol descriptors and service dispatch execution metadata are generated/validated from the same contract definition to prevent future drift."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_shared_validation_errors",
+      "summary": "Package-level validation errors are reused and mutated, violating immutable contract boundaries under concurrent execution.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service.go` defines exported error values as package variables (`errOpenEndpointRequestRequired`, `errResetRequestRequired`, `errResetOpenEndpointPayload`, etc.) and mutates `.Action` in `ValidateCommand` before returning the same instance.",
+        "The code path `Executor.Execute -> ValidateCommand` implies request-parallel handling; mutating a shared error object breaks error immutability and can leak/overwrite metadata between flows."
+      ],
+      "suggestion": "Replace shared error templates with per-call constructors (e.g., `return CommandValidationError{Action: cmd.Action, Problem: \"...\"}`) and remove all package-level mutable `CommandValidationError` variables.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_error_mutability"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "split_upload_contract_ownership",
+      "summary": "Upload action public metadata and execution semantics are maintained in separate modules without a single ownership boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines supported action metadata (`uploadActionMetas`) and parsing boundaries.",
+        "`goseg/uploadsvc/service.go` separately defines `uploadActionDescriptors` for execution behavior and operation text, and `newUploadDispatcher` only verifies alignment at runtime.",
+        "No explicit shared contract type/state links metadata to dispatch binding, so a future contract change in one module risks partial updates and hidden drift."
+      ],
+      "suggestion": "Introduce a single upload action contract artifact (including protocol token, description, validation requirements, and dispatcher binding metadata) and generate/use it from both packages to keep ownership and change flow explicit.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_upload_contract_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Mutable package-level error-template values for request validation contracts.",
+      "Split ownership of action contract surface across protocol and service tables without a shared explicit schema."
+    ],
+    "likely_symptoms": [
+      "mutable_shared_validation_errors",
+      "split_upload_contract_ownership"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cabcf-68a2-7ec2-a2b0-411c3623ff88
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 5
+Batch name: Governance & Contracts
+Batch dimensions: cross_module_architecture, high_level_elegance
+Batch rationale: architecture contracts, compatibility policy, docs-vs-runtime scope, and quality-gate coverage
+
+Files assigned:
+- README.md
+- goseg/config/wireguard.go
+- goseg/protocol/actions/actions.go
+- goseg/startram/errors.go
+- goseg/uploadsvc/adapters/upload_payload_test.go
+- goseg/uploadsvc/service.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll first inspect the blind packet and the six assigned files to extract prior context and current evidence, then produce the batch JSON with assessments plus findings scoped only to `cross_module_architecture` and `high_level_elegance`.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+Total output lines: 3918
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "design_coherence",
+    "cross_module_architecture",
+    "high_level_elegance",
+    "low_level_elegance",
+    "mid_level_elegance"
+  ],
+  "dimension_prompts": {
+    "design_coherence": {
+      "description": "Are structural design decisions sound \u2014 functions focused, abstractions earned, patterns consistent?",
+      "look_for": [
+        "Functions doing too many things \u2014 multiple distinct responsibilities in one body",
+        "Parameter lists that should be config/context objects \u2014 many related params passed together",
+        "Files accumulating issues across many dimensions \u2014 likely mixing unrelated concerns",
+codex
+I’ve got the packet loaded; next I’m pulling prior batch context (IDs/notes tied to this batch) and then the six target files so I can verify whether anything is still actionable.
+exec
+/opt/homebrew/bin/zsh -lc 'cd /Users/chuah/NP/GroundSeg && rg -n "Governance|architecture|open-endpoint|cross_module_architecture|high_level_elegance|batch|findings|id|status|wontfix" .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+7:    "cross_module_architecture",
+8:    "high_level_elegance",
+10:    "mid_level_elegance"
+34:    "cross_module_architecture": {
+39:        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+40:        "Cross-module coordination through shared mutable state or import-time side effects",
+47:        "Package naming/placement tidy-ups without boundary harm (belongs to package_organization)",
+51:    "high_level_elegance": {
+54:        "Top-level packages/files map to domain capabilities rather than historical accidents",
+62:        "When dependency direction/cycle/hub failures are the PRIMARY issue, report under cross_module_architecture (still include here if they materially blur ownership/decomposition)",
+63:        "When handoff mechanics are the PRIMARY issue, report under mid_level_elegance (still include here if they materially affect top-level role clarity)",
+72:        "State mutation and side effects are explicit, local, and bounded",
+74:        "Extraction level is balanced: avoids both monoliths and micro-fragmentation",
+78:        "When file responsibility/package role is the PRIMARY issue, report under high_level_elegance",
+79:        "When inter-module seam choreography is the PRIMARY issue, report under mid_level_elegance",
+80:        "When dependency topology is the PRIMARY issue, report under cross_module_architecture",
+84:    "mid_level_elegance": {
+91:        "Integration seams avoid glue-code entropy (ad-hoc mappers and boundary conditionals)"
+94:        "When top-level decomposition/package shape is the PRIMARY issue, report under high_level_elegance",
+95:        "When implementation craft inside one function/class is the PRIMARY issue, report under low_level_elegance",
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '2920,3320p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+        "encoding/json": 1,
+        "fmt": 1,
+        "net/http": 1
+      },
+      "adapters/": {
+        "groundseg/protocol/actions": 2,
+        "groundseg/structs": 2,
+        "groundseg/uploadsvc": 2
+      },
+      "uploadsvc/": {
+        "errors": 2,
+        "groundseg/protocol/actions": 2,
+        "fmt": 1
+      },
+      "importeradapter/": {
+        "groundseg/importer": 1,
+        "groundseg/structs": 1,
+        "groundseg/uploadsvc": 1
+      }
+    },
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '3320,3720p' .desloppify/review_packet_blind.json" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+      ],
+      "goseg/docker/network/network.go": [
+        "unused: Unused import: com/docker/docker/api/types/container",
+        "unused: Unused import: com/docker/docker/api/types/filters",
+        "unused: Unused import: com/docker/docker/api/types/network",
+        "unused: Unused import: com/docker/docker/api/types/volume",
+        "unused: Unused import: org/zap",
+        "unused: Unused import: com/docker/docker/client",
+        "test_coverage: Untested module (186 LOC, 0 importers)"
+      ],
+      "goseg/docker/registry/registry.go": [
+        "unused: Unused import: com/docker/docker/api/types/image",
+        "unused: Unused import: com/docker/docker/client",
+        "test_coverage: Untested module (114 LOC, 0 importers)"
+      ],
+      "goseg/routines/backup/backup.go": [
+        "unused: Unused import: org/zap",
+        "subjective_review: No design review on record \u2014 run `desloppify review --prepare`"
+      ],
+      "goseg/routines/chop/chop.go": [
+codex
+I’m now validating the currently assigned files to confirm actionable contract/boundary issues and avoid re-reporting fixed ones before scoring this batch.
+exec
+/opt/homebrew/bin/zsh -lc "cd /Users/chuah/NP/GroundSeg && sed -n '1,260p' README.md && printf '
+
+--- config/wireguard.go ---
+' && sed -n '1,260p' goseg/config/wireguard.go && printf '
+
+--- actions.go ---
+' && sed -n '1,260p' goseg/protocol/actions/actions.go && printf '
+
+--- errors.go ---
+' && sed -n '1,260p' goseg/startram/errors.go && printf '
+
+--- upload_payload_test.go ---
+' && sed -n '1,260p' goseg/uploadsvc/adapters/upload_payload_test.go && printf '
+
+--- service.go ---
+' && sed -n '1,360p' goseg/uploadsvc/service.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+# Native Planet GroundSeg
+
+![Groundseg 2 demo](https://user-images.githubusercontent.com/16911914/271397025-f534f6e3-5c62-4b9a-8cb9-9f1d07e5c29a.gif)
+
+#### See the user manual [here](https://manual.groundseg.app) for usage documentation
+
+GroundSeg is a software tool that helps users manage and access their multiple Urbit instances. 
+It simplifies the process of getting onto the Urbit network and provides a range of additional services 
+that enhance the functionality of the user's ship. With a [StarTram](https://www.nativeplanet.io/startram) 
+subscription, users can also access their Urbit ship remotely.
+
+Native Planet develops GroundSeg to run on our [dedicated Urbit-hosting home devices](https://www.nativeplanet.io)! 
+
+## Dependencies
+
+- `docker`
+- `systemd`
+
+### Semi-dependencies
+
+codex
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 5,
+  "assessments": {
+    "cross_module_architecture": 83.0,
+    "high_level_elegance": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/uploadsvc/service.go` defines shared package-level `CommandValidationError` values (`errOpenEndpointRequestRequired`, `errResetOpenEndpointPayload`, etc.) and mutates their `Action` fields in `ValidateCommand` before returning them.",
+        "`ValidateCommand` can be called on command execution paths that are request-driven and therefore likely concurrent across callers, creating cross-goroutine shared mutable error state."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Fix the shared mutable error template pattern so validation errors are immutable per invocation; this is a core cross-module contract boundary issue that affects observability and safety under concurrency."
+    },
+    "high_level_elegance": {
+      "evidence": [
+        "Upload action contracts are split across `goseg/protocol/actions/actions.go` (action token + protocol metadata) and `goseg/uploadsvc/service.go` (dispatcher execution/operation table), with no explicit single source of truth linking the public protocol contract to executor semantics.",
+        "The two tables are guarded only by runtime reconciliation in `newUploadDispatcher`, so action-contract integrity is enforced late rather than by a compile-time-safe contract boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Consolidate action contract ownership so protocol descriptors and service dispatch execution metadata are generated/validated from the same contract definition to prevent future drift."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "mutable_shared_validation_errors",
+      "summary": "Package-level validation errors are reused and mutated, violating immutable contract boundaries under concurrent execution.",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service.go` defines exported error values as package variables (`errOpenEndpointRequestRequired`, `errResetRequestRequired`, `errResetOpenEndpointPayload`, etc.) and mutates `.Action` in `ValidateCommand` before returning the same instance.",
+        "The code path `Executor.Execute -> ValidateCommand` implies request-parallel handling; mutating a shared error object breaks error immutability and can leak/overwrite metadata between flows."
+      ],
+      "suggestion": "Replace shared error templates with per-call constructors (e.g., `return CommandValidationError{Action: cmd.Action, Problem: \"...\"}`) and remove all package-level mutable `CommandValidationError` variables.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_error_mutability"
+    },
+    {
+      "dimension": "high_level_elegance",
+      "identifier": "split_upload_contract_ownership",
+      "summary": "Upload action public metadata and execution semantics are maintained in separate modules without a single ownership boundary.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines supported action metadata (`uploadActionMetas`) and parsing boundaries.",
+        "`goseg/uploadsvc/service.go` separately defines `uploadActionDescriptors` for execution behavior and operation text, and `newUploadDispatcher` only verifies alignment at runtime.",
+        "No explicit shared contract type/state links metadata to dispatch binding, so a future contract change in one module risks partial updates and hidden drift."
+      ],
+      "suggestion": "Introduce a single upload action contract artifact (including protocol token, description, validation requirements, and dispatcher binding metadata) and generate/use it from both packages to keep ownership and change flow explicit.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "split_upload_contract_ownership"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Mutable package-level error-template values for request validation contracts.",
+      "Split ownership of action contract surface across protocol and service tables without a shared explicit schema."
+    ],
+    "likely_symptoms": [
+      "mutable_shared_validation_errors",
+      "split_upload_contract_ownership"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+46,548
+

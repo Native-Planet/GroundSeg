@@ -10,43 +10,80 @@ import (
 	"testing"
 )
 
-func testWireguardRuntime() wireguardRuntime {
-	rt := newWireguardRuntime()
-	rt.osOpen = func(string) (*os.File, error) { return nil, nil }
-	rt.createDefaultWGConf = func() error { return nil }
-	rt.writeWgConf = func(wireguardRuntime) error { return nil }
-	rt.startContainer = func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil }
-	rt.updateContainerState = func(string, structs.ContainerState) {}
-	rt.getLatestContainerInfo = func(string) (map[string]string, error) {
-		return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
+func testWireguardRuntime() WireguardRuntime {
+	return WireguardRuntime{
+		BasePathFn: func() string { return "/tmp" },
+		DockerDirFn: func() string {
+			return "/tmp/docker"
+		},
+		OpenFn: func(string) (*os.File, error) {
+			return nil, nil
+		},
+		ReadFileFn: func(string) ([]byte, error) {
+			return nil, os.ErrNotExist
+		},
+		WriteFileFn: func(string, []byte, os.FileMode) error {
+			return nil
+		},
+		MkdirAllFn: func(string, os.FileMode) error {
+			return nil
+		},
+		StartContainerFn: func(string, string) (structs.ContainerState, error) {
+			return structs.ContainerState{}, nil
+		},
+		UpdateContainerFn: func(string, structs.ContainerState) {},
+		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
+			return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
+		},
+		GetLatestContainerImageFn: func(string) (string, error) {
+			return "wg:latest", nil
+		},
+		CreateDefaultWGConfFn: func() error {
+			return nil
+		},
+		GetWgConfFn: func() (structs.WgConfig, error) {
+			return structs.WgConfig{}, nil
+		},
+		GetWgConfBlobFn: func() (string, error) {
+			return base64.StdEncoding.EncodeToString([]byte("blob")), nil
+		},
+		GetWgPrivkeyFn: func() string {
+			return "k1"
+		},
+		WriteWgConfFn: func(WireguardRuntime) error {
+			return nil
+		},
+		CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error {
+			return nil
+		},
+		VolumeExistsFn: func(string) (bool, error) {
+			return false, nil
+		},
+		CreateVolumeFn: func(string) error {
+			return nil
+		},
 	}
-	rt.getWgConf = func() (structs.WgConfig, error) { return structs.WgConfig{}, nil }
-	rt.getStartramConfig = func() structs.StartramRetrieve {
-		return structs.StartramRetrieve{Conf: base64.StdEncoding.EncodeToString([]byte("privkey"))}
-	}
-	rt.conf = func() structs.SysConfig { return structs.SysConfig{Privkey: "k1"} }
-	rt.readFile = func(string) ([]byte, error) { return nil, os.ErrNotExist }
-	rt.writeFile = func(string, []byte, os.FileMode) error { return nil }
-	rt.mkdirAll = func(string, os.FileMode) error { return nil }
-	rt.copyWGFileToVolume = func(wireguardRuntime, string, string, string) error { return nil }
-	rt.copyFileToVolumeWithTempContainer = func(string, string, string, string, volumeWriterImageSelector) error { return nil }
-	rt.latestContainerImage = func(string) (string, error) { return "wg:latest", nil }
-	return rt
 }
 
 func TestLoadWireguardFlowAndStartError(t *testing.T) {
 	rt := testWireguardRuntime()
 
-	rt.osOpen = func(string) (*os.File, error) { return nil, os.ErrNotExist }
+	rt.OpenFn = func(string) (*os.File, error) { return nil, os.ErrNotExist }
 	defaultCalled := false
-	rt.createDefaultWGConf = func() error { defaultCalled = true; return nil }
+	rt.CreateDefaultWGConfFn = func() error {
+		defaultCalled = true
+		return nil
+	}
 	writeCalled := false
-	rt.writeWgConf = func(wireguardRuntime) error { writeCalled = true; return nil }
-	rt.startContainer = func(string, string) (structs.ContainerState, error) {
+	rt.WriteWgConfFn = func(WireguardRuntime) error {
+		writeCalled = true
+		return nil
+	}
+	rt.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{ActualStatus: "running"}, nil
 	}
 	updated := false
-	rt.updateContainerState = func(name string, _ structs.ContainerState) {
+	rt.UpdateContainerFn = func(name string, _ structs.ContainerState) {
 		if name == "wireguard" {
 			updated = true
 		}
@@ -59,7 +96,7 @@ func TestLoadWireguardFlowAndStartError(t *testing.T) {
 		t.Fatalf("expected default/write/update flow, got default=%v write=%v updated=%v", defaultCalled, writeCalled, updated)
 	}
 
-	rt.startContainer = func(string, string) (structs.ContainerState, error) {
+	rt.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{}, errors.New("start failed")
 	}
 	if err := loadWireguard(rt); err == nil {
@@ -69,10 +106,10 @@ func TestLoadWireguardFlowAndStartError(t *testing.T) {
 
 func TestWgContainerConfBuildsExpectedConfig(t *testing.T) {
 	rt := testWireguardRuntime()
-	rt.getLatestContainerInfo = func(string) (map[string]string, error) {
+	rt.GetLatestContainerInfoFn = func(string) (map[string]string, error) {
 		return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
 	}
-	rt.getWgConf = func() (structs.WgConfig, error) {
+	rt.GetWgConfFn = func() (structs.WgConfig, error) {
 		cfg := structs.WgConfig{CapAdd: []string{"NET_ADMIN", "SYS_MODULE"}}
 		cfg.Sysctls.NetIpv4ConfAllSrcValidMark = 1
 		return cfg, nil
@@ -96,10 +133,10 @@ func TestWgContainerConfBuildsExpectedConfig(t *testing.T) {
 func TestBuildWgConfDecodeAndReplace(t *testing.T) {
 	rt := testWireguardRuntime()
 	template := "PrivateKey = privkey\nAddress = 10.0.0.2/24\n"
-	rt.getStartramConfig = func() structs.StartramRetrieve {
-		return structs.StartramRetrieve{Conf: base64.StdEncoding.EncodeToString([]byte(template))}
+	rt.GetWgConfBlobFn = func() (string, error) {
+		return base64.StdEncoding.EncodeToString([]byte(template)), nil
 	}
-	rt.conf = func() structs.SysConfig { return structs.SysConfig{Privkey: "actual-private-key"} }
+	rt.GetWgPrivkeyFn = func() string { return "actual-private-key" }
 
 	rendered, err := buildWgConfWithRuntime(rt)
 	if err != nil {
@@ -109,9 +146,7 @@ func TestBuildWgConfDecodeAndReplace(t *testing.T) {
 		t.Fatalf("expected private key replacement, got %q", rendered)
 	}
 
-	rt.getStartramConfig = func() structs.StartramRetrieve {
-		return structs.StartramRetrieve{Conf: "***invalid-base64***"}
-	}
+	rt.GetWgConfBlobFn = func() (string, error) { return "***invalid-base64***", nil }
 	if _, err := buildWgConfWithRuntime(rt); err == nil {
 		t.Fatalf("expected base64 decode error")
 	}
@@ -120,20 +155,21 @@ func TestBuildWgConfDecodeAndReplace(t *testing.T) {
 func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 	rt := testWireguardRuntime()
 	tmpDockerDir := t.TempDir()
-	rt.DockerDir = func() string { return tmpDockerDir }
-
-	rt.getStartramConfig = func() structs.StartramRetrieve {
-		return structs.StartramRetrieve{Conf: base64.StdEncoding.EncodeToString([]byte("privkey"))}
+	rt.DockerDirFn = func() string { return tmpDockerDir }
+	rt.GetWgConfBlobFn = func() (string, error) {
+		return base64.StdEncoding.EncodeToString([]byte("privkey")), nil
 	}
-	rt.conf = func() structs.SysConfig { return structs.SysConfig{Privkey: "k1"} }
-	rt.readFile = os.ReadFile
-	rt.writeFile = os.WriteFile
-	rt.mkdirAll = os.MkdirAll
+	rt.GetWgConfFn = func() (structs.WgConfig, error) {
+		return structs.WgConfig{}, nil
+	}
+	rt.ReadFileFn = os.ReadFile
+	rt.WriteFileFn = os.WriteFile
+	rt.MkdirAllFn = os.MkdirAll
 
 	if err := writeWgConfWithRuntime(rt); err != nil {
 		t.Fatalf("writeWgConfWithRuntime failed: %v", err)
 	}
-	confPath := filepath.Join(rt.DockerDir(), "wireguard", "_data", "wg0.conf")
+	confPath := filepath.Join(rt.DockerDirFn(), "wireguard", "_data", "wg0.conf")
 	first, err := os.ReadFile(confPath)
 	if err != nil {
 		t.Fatalf("read wg0.conf failed: %v", err)
@@ -142,7 +178,7 @@ func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 		t.Fatalf("unexpected first wg0.conf content: %q", string(first))
 	}
 
-	rt.conf = func() structs.SysConfig { return structs.SysConfig{Privkey: "k2"} }
+	rt.GetWgPrivkeyFn = func() string { return "k2" }
 	if err := writeWgConfWithRuntime(rt); err != nil {
 		t.Fatalf("writeWgConfWithRuntime update failed: %v", err)
 	}
@@ -155,16 +191,35 @@ func TestWriteWgConfCreateAndUpdate(t *testing.T) {
 	}
 }
 
+func TestWriteWgConfReturnsErrorOnReadFailure(t *testing.T) {
+	rt := testWireguardRuntime()
+	tmpDockerDir := t.TempDir()
+	rt.DockerDirFn = func() string { return tmpDockerDir }
+	rt.GetWgConfBlobFn = func() (string, error) {
+		return base64.StdEncoding.EncodeToString([]byte("privkey")), nil
+	}
+	readErr := errors.New("permission denied")
+	rt.ReadFileFn = func(string) ([]byte, error) {
+		return nil, readErr
+	}
+	rt.WriteFileFn = os.WriteFile
+	rt.MkdirAllFn = os.MkdirAll
+
+	if err := writeWgConfWithRuntime(rt); err == nil {
+		t.Fatalf("expected writeWgConfWithRuntime to fail on read error")
+	}
+}
+
 func TestWriteWgConfToFileFallbackCopy(t *testing.T) {
 	rt := testWireguardRuntime()
 	writeAttempts := 0
-	rt.writeFile = func(string, []byte, os.FileMode) error {
+	rt.WriteFileFn = func(string, []byte, os.FileMode) error {
 		writeAttempts++
 		return errors.New("write fail")
 	}
-	rt.mkdirAll = func(string, os.FileMode) error { return nil }
+	rt.MkdirAllFn = os.MkdirAll
 	copyCalled := false
-	rt.copyWGFileToVolume = func(_ wireguardRuntime, filePath, targetPath, volumeName string) error {
+	rt.CopyFileToVolumeFn = func(filePath string, targetPath string, volumeName string, _ string, _ volumeWriterImageSelector) error {
 		copyCalled = true
 		if targetPath != "/etc/wireguard/" || volumeName != "wireguard" {
 			t.Fatalf("unexpected copy args: %s %s %s", filePath, targetPath, volumeName)
@@ -183,7 +238,7 @@ func TestWriteWgConfToFileFallbackCopy(t *testing.T) {
 func TestCopyWGFileToVolumeDelegates(t *testing.T) {
 	rt := testWireguardRuntime()
 	var gotPath, gotTarget, gotVolume, gotWriter, gotImage string
-	rt.copyFileToVolumeWithTempContainer = func(
+	rt.CopyFileToVolumeFn = func(
 		filePath string,
 		targetPath string,
 		volumeName string,
@@ -201,12 +256,25 @@ func TestCopyWGFileToVolumeDelegates(t *testing.T) {
 		gotImage = img
 		return nil
 	}
-	rt.latestContainerImage = func(string) (string, error) { return "wg:latest", nil }
+	rt.GetLatestContainerImageFn = func(string) (string, error) { return "wg:latest", nil }
 
 	if err := copyWGFileToVolumeWithRuntime(rt, "/tmp/wg0.conf", "/etc/wireguard/", "wireguard"); err != nil {
 		t.Fatalf("copyWGFileToVolume failed: %v", err)
 	}
 	if gotPath != "/tmp/wg0.conf" || gotTarget != "/etc/wireguard/" || gotVolume != "wireguard" || gotWriter != "wg_writer" || gotImage != "wg:latest" {
 		t.Fatalf("unexpected delegated args: %s %s %s %s %s", gotPath, gotTarget, gotVolume, gotWriter, gotImage)
+	}
+}
+
+func TestCopyWGFileToVolumeReturnsErrorWhenCopyRuntimeMissing(t *testing.T) {
+	rt := testWireguardRuntime()
+	rt.CopyFileToVolumeFn = nil
+
+	err := copyWGFileToVolumeWithRuntime(rt, "/tmp/wg0.conf", "/etc/wireguard/", "wireguard")
+	if err == nil {
+		t.Fatalf("expected copy runtime error")
+	}
+	if !strings.Contains(err.Error(), "missing copy-to-volume runtime") {
+		t.Fatalf("expected missing copy runtime error, got %v", err)
 	}
 }

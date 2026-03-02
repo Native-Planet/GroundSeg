@@ -4,24 +4,12 @@ import (
 	"fmt"
 
 	"groundseg/click/internal/runtime"
-	"groundseg/click/luscode"
 	"groundseg/structs"
 )
 
 var (
-	executeClickCommandForStorage = runtime.ExecuteCommand
-	createHoonForStorage          = runtime.CreateHoon
-	deleteHoonForStorage          = runtime.DeleteHoon
-	clearLusCode                  = luscode.ClearLusCode
+	executeClickCommandForStorage = runtime.ExecuteCommandWithSuccess
 )
-
-func createHoonForStorageCommand(patp, file, hoon string) error {
-	if err := createHoonForStorage(patp, file, hoon); err != nil {
-		return err
-	}
-	clearLusCode(patp)
-	return nil
-}
 
 func UnlinkStorage(patp string) error {
 	return unlinkStorage(patp)
@@ -42,7 +30,7 @@ func unlinkStorage(patp string) error {
 		storageAction("%set-current-bucket", ""),
 		"(pure:m !>('success'))",
 	})
-	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click unlink storage")
+	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click unlink storage", nil)
 	return err
 }
 
@@ -57,7 +45,7 @@ func linkStorage(patp, endpoint string, svcAccount structs.MinIOServiceAccount) 
 		storageAction("%set-current-bucket", "bucket"),
 		"(pure:m !>('success'))",
 	})
-	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click link storage")
+	_, err := executeClickCommandForStorage(patp, file, hoon, "", "success", "Click link storage", nil)
 	return err
 }
 

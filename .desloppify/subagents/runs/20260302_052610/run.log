@@ -1,0 +1,28 @@
+2026-03-02T05:26:11+00:00 run-start runner=codex parallel=True max_parallel=3 timeout=1200s heartbeat=15.0s stall_warning=0s stall_kill=120s retries=1 retry_backoff=2.0s upper_bound=40m selected=[1, 2, 3, 4, 5, 6]
+2026-03-02T05:26:11+00:00 run-path /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_052610
+2026-03-02T05:26:11+00:00 packet /Users/chuah/NP/GroundSeg/.desloppify/review_packets/holistic_packet_20260302_052610.json
+2026-03-02T05:26:11+00:00 blind-packet /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+2026-03-02T05:26:11+00:00 batch-queued batch=1 position=1/6
+2026-03-02T05:26:11+00:00 batch-start batch=1 position=1/6
+2026-03-02T05:26:11+00:00 batch-queued batch=2 position=2/6
+2026-03-02T05:26:11+00:00 batch-start batch=2 position=2/6
+2026-03-02T05:26:11+00:00 batch-queued batch=3 position=3/6
+2026-03-02T05:26:11+00:00 batch-queued batch=4 position=4/6
+2026-03-02T05:26:11+00:00 batch-start batch=3 position=3/6
+2026-03-02T05:26:11+00:00 batch-queued batch=5 position=5/6
+2026-03-02T05:26:11+00:00 batch-queued batch=6 position=6/6
+2026-03-02T05:26:23+00:00 batch-start batch=4 position=4/6
+2026-03-02T05:26:23+00:00 batch-done batch=3 position=3/6 code=0 elapsed=12
+2026-03-02T05:26:23+00:00 batch-start batch=5 position=5/6
+2026-03-02T05:26:23+00:00 batch-done batch=1 position=1/6 code=0 elapsed=12
+2026-03-02T05:26:33+00:00 batch-start batch=6 position=6/6
+2026-03-02T05:26:33+00:00 batch-done batch=4 position=4/6 code=0 elapsed=10
+2026-03-02T05:26:38+00:00 batch-done batch=5 position=5/6 code=0 elapsed=15
+2026-03-02T05:26:53+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:42, 6:20}
+2026-03-02T05:27:08+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:57, 6:35}
+2026-03-02T05:27:23+00:00 heartbeat active=[2, 6] queued=[] elapsed={2:72, 6:50}
+2026-03-02T05:27:33+00:00 batch-done batch=6 position=6/6 code=0 elapsed=60
+2026-03-02T05:27:48+00:00 heartbeat active=[2] queued=[] elapsed={2:97}
+2026-03-02T05:28:02+00:00 batch-done batch=2 position=2/6 code=0 elapsed=111
+2026-03-02T05:28:02+00:00 run-summary /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_052610/run_summary.json
+2026-03-02T05:28:02+00:00 run-finished successful=[1, 2, 3, 4, 5, 6] failed=[] imported=/Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_052610/holistic_findings_merged.json

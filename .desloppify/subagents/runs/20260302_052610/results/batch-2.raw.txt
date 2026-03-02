@@ -1,0 +1,112 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 61.0,
+    "mid_level_elegance": 58.0,
+    "low_level_elegance": 35.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Startup orchestration is configured through package-level constructor seams plus direct concrete assignments, but callers still operate at a narrow edge of the same package (`goseg/startup_orchestrator.go`) instead of through stable interfaces.",
+        "The startup boundary mixes cross-cutting concerns (auth/router/system/exporter/importer/broadcast/dockers) in a single assembly path, making unit seams brittle and coupling test setup to internal details (`goseg/docker/orchestration/runtime_seams.go`, `goseg/startup_orchestrator.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 60.0,
+        "interface_honesty": 65.0
+      }
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "Initialization flow in `newStartupOrchestrator` mixes fatal and non-fatal initialization behaviors across sibling subsystem bootstraps, producing non-uniform failure contracts within one orchestrator phase.",
+        "That ambiguity is visible in how some bootstraps append errors while others are invoked without error handling, and one path logs and continues even when dependency setup is critical for later systems (`goseg/startup_orchestrator.go`, `goseg/main.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`WriteWgConfWithRuntime` returns a wrapped error on the nominal success path of writing config, because it wraps the return value of `writeWGConfigArtifactWithRuntime` with `%w` unconditionally after deciding an update is needed.",
+        "This turns successful config reconciliation into an error path and distorts higher-level caller behavior (`goseg/docker/orchestration/wireguard.go`, `goseg/docker/orchestration/wireguard_test.go`)."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "wg_cfg_err_wrap_success",
+      "summary": "WireGuard config reconciliation currently returns a wrapped error even when writing succeeds.",
+      "related_files": [
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/docker/orchestration/wireguard_test.go"
+      ],
+      "evidence": [
+        "In `WriteWgConfWithRuntime`, after detecting config drift and calling `writeWGConfigArtifactWithRuntime`, the function returns `fmt.Errorf(\"failed to update wireguard config: %w\", ...)` instead of returning success when the write helper returns `nil`."
+      ],
+      "suggestion": "Return nil on successful write, and only wrap/propagate an error when write fails. Optionally guard with an explicit `if err := writeWGConfigArtifactWithRuntime(...); err != nil { return fmt.Errorf(..., err) } return nil` branch.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "startup_init_contract_ambiguity"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "startup_init_contract_ambiguity",
+      "summary": "Subsystem initialization in startup orchestration lacks a consistent success/failure contract.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Some initializer steps are invoked without capturing return values while others are collected in an error list and can fail startup; this makes behavior order-dependent and harder to reason about.",
+        "At least one initializer logs/continues on failure while other failures are treated as hard errors, which undermines explicit subsystem contract clarity."
+      ],
+      "suggestion": "Introduce a single initialization contract enum or interface (`required`, `optional`, `disabled`) and enforce one failure policy per subsystem in one place so all startup paths are explicit, testable, and deterministic.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "startup_init_contract_ambiguity"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "orchestrator_boundary_composition",
+      "summary": "Startup assembly remains tightly coupled to concrete orchestration internals, weakening abstraction boundaries.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "The startup module binds multiple runtime/bootstrap functions through direct wiring and package-level seams instead of explicit subsystem interfaces, reducing substitutability and making composition logic depend on concrete init details.",
+        "This tight coupling is visible in the same boundary that also needs special-case handling for failure modes (another sign of insufficient abstraction boundary shaping)."
+      ],
+      "suggestion": "Define explicit subsystem interface contracts for each startup concern (router/auth/importer/etc.) and inject implementations through dependency objects; keep seam functions minimal and declarative.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "startup_init_contract_ambiguity"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Ambiguous startup subsystem contracts created mixed reliability semantics.",
+      "Insufficient boundary abstraction in orchestration bootstrap causes tight coupling and uneven seam behavior."
+    ],
+    "likely_symptoms": [
+      "wg_cfg_err_wrap_success",
+      "startup_init_contract_ambiguity",
+      "orchestrator_boundary_composition"
+    ],
+    "possible_false_positives": [
+      "If startup callers explicitly expect continue-on-warning for specific components, the mid-level finding may overstate failure-severity in those specific environments."
+    ]
+  }
+}

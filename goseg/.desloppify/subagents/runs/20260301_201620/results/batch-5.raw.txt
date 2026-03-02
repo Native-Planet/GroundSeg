@@ -1,0 +1,130 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 79.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "`auth/auth.go` ignores a non-nil return from `AddToAuthMap` in `CreateToken` while still returning a success token result.",
+        "Multipart form construction in `handler/system/support.go` ignores multiple `writer` returns and proceeds to request creation when payload assembly may have failed.",
+        "Multiple codepaths (`config/config.go`, `system/system.go`, `docker/orchestration/volume_writer.go`) intentionally drop cleanup/finalization errors using `_ =`.",
+        "There is also an explicit conversion helper call in `system/system.go` where the returned error is discarded, weakening boundary correctness and making parsing failures silent."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "EC-001",
+      "summary": "`CreateToken` can report success while auth-map registration silently fails.",
+      "related_files": [
+        "auth/auth.go",
+        "main.go"
+      ],
+      "evidence": [
+        "`CreateToken` calls `AddToAuthMap(conn, token, authed)` and does not check the returned error.",
+        "`AddToAuthMap` can return an error (e.g., nil connection path), but callers of `CreateToken` receive only the token/value success result."
+      ],
+      "suggestion": "Capture and propagate `AddToAuthMap` failures in `CreateToken` with a wrapped error so token issuance and auth-map registration remain atomic from the caller’s perspective.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_suppression_in_side_effect_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "EC-002",
+      "summary": "Bug-report multipart payload drops field-write and close errors before request dispatch.",
+      "related_files": [
+        "handler/system/support.go",
+        "protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`writer.WriteField(\"contact\", contact)` and `writer.WriteField(\"string\", description)` return values are not checked.",
+        "`writer.Close()` return value is ignored after all form fields are written.",
+        "The request is still sent via `http.NewRequest(http.MethodPost, ...)` even if multipart assembly likely failed."
+      ],
+      "suggestion": "Check all `WriteField` and `Close` errors, return immediately with context, and avoid sending the request when multipart construction fails.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_suppression_in_side_effect_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "EC-003",
+      "summary": "Network check path discards socket close failures, weakening teardown error guarantees.",
+      "related_files": [
+        "config/config.go",
+        "system/system.go"
+      ],
+      "evidence": [
+        "`NetCheck` performs network dial, then does `_ = conn.Close()` instead of validating close result.",
+        "Resource deallocation errors are the only returned error information here after connection establishment; this reduces observability of edge-case transport lifecycle failures."
+      ],
+      "suggestion": "Replace underscore assignment with explicit close handling: log/return close errors at least in debug or aggregate with context when close is semantically relevant.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_suppression_in_cleanup_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "EC-004",
+      "summary": "Volume writer drops tar writer close errors when setup fails mid-archive creation.",
+      "related_files": [
+        "docker/orchestration/volume_writer.go",
+        "docker/orchestration/runtime_seams_test.go"
+      ],
+      "evidence": [
+        "In error handling branches inside archive creation, `tw.Close()` is called with `_ = tw.Close()`, and errors are dropped.",
+        "This occurs in paths already returning from copy/write failures, so close/flush/flush-to-archive errors can be lost."
+      ],
+      "suggestion": "Capture `tw.Close()` errors in each return path and prefer combining/surfacing them with the original error so archive integrity or finalization failure is not silently ignored.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_suppression_in_cleanup_paths"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "EC-005",
+      "summary": "Mount-table octal-to-ASCII parsing ignores conversion errors and continues with potentially invalid mount points.",
+      "related_files": [
+        "system/system.go",
+        "system/disk.go"
+      ],
+      "evidence": [
+        "`GetDisk` assigns `mountPoint, _ := octalToAscii(fields[1])`, explicitly discarding the parser error.",
+        "The function continues to call `syscall.Statfs` using a possibly malformed mount point instead of failing early or handling the parse failure."
+      ],
+      "suggestion": "Handle the `octalToAscii` error explicitly: skip invalid entries with a warning and avoid stat on malformed paths, or fail the scan with explicit diagnostics.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "error_contract_breach_on_boundary_returns"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Repeated acceptance of partial failure in side-effect or teardown operations (`_ =` patterns) creates silent error-loss at API boundaries.",
+      "Several functions parse/transform data using returning `(value, err)` but ignore `err`, causing error contract drift across modules.",
+      "Error handling is uneven: critical branches return hard errors, while adjacent cleanup/finalization paths intentionally suppress them."
+    ],
+    "likely_symptoms": [
+      "EC-001",
+      "EC-002",
+      "EC-003",
+      "EC-004",
+      "EC-005"
+    ],
+    "possible_false_positives": [
+      "Some dropped close errors in low-level code may be intentionally non-fatal if callers never rely on close semantics."
+    ]
+  }
+}

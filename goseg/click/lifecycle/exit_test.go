@@ -7,16 +7,13 @@ import (
 )
 
 func resetExitState() {
-	createHoonForExit = createHoon
-	deleteHoonForExit = deleteHoon
-	clickExecForExit = clickExec
-	filterResponseForExit = filterResponse
+	executeClickCommandForExit = executeClickCommand
 }
 
 func TestBarExitCreateFailureClearsCode(t *testing.T) {
 	t.Cleanup(resetExitState)
-	createHoonForExit = func(_, _, _ string) error {
-		return errors.New("write failed")
+	executeClickCommandForExit = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("write failed")
 	}
 	if err := BarExit("~zod"); err == nil {
 		t.Fatalf("expected error")
@@ -25,19 +22,13 @@ func TestBarExitCreateFailureClearsCode(t *testing.T) {
 
 func TestBarExitExecFailure(t *testing.T) {
 	t.Cleanup(resetExitState)
-	createHoonForExit = func(_, _, _ string) error { return nil }
-	deleted := false
-	deleteHoonForExit = func(_, _ string) { deleted = true }
-	clickExecForExit = func(_, _, _ string) (string, error) {
+	executeClickCommandForExit = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", errors.New("exec failed")
 	}
 
 	err := BarExit("~bus")
 	if err == nil {
 		t.Fatalf("expected error")
-	}
-	if !deleted {
-		t.Fatalf("expected deferred delete")
 	}
 	if !strings.Contains(err.Error(), "failed to get exec") {
 		t.Fatalf("unexpected error: %v", err)
@@ -46,11 +37,8 @@ func TestBarExitExecFailure(t *testing.T) {
 
 func TestBarExitPokeFailure(t *testing.T) {
 	t.Cleanup(resetExitState)
-	createHoonForExit = func(_, _, _ string) error { return nil }
-	deleteHoonForExit = func(_, _ string) {}
-	clickExecForExit = func(_, _, _ string) (string, error) { return "response", nil }
-	filterResponseForExit = func(_, _ string) (string, bool, error) {
-		return "", false, nil
+	executeClickCommandForExit = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("poke failed")
 	}
 
 	err := BarExit("~nec")
@@ -64,11 +52,8 @@ func TestBarExitPokeFailure(t *testing.T) {
 
 func TestBarExitSuccess(t *testing.T) {
 	t.Cleanup(resetExitState)
-	createHoonForExit = func(_, _, _ string) error { return nil }
-	deleteHoonForExit = func(_, _ string) {}
-	clickExecForExit = func(_, _, _ string) (string, error) { return "response", nil }
-	filterResponseForExit = func(_, _ string) (string, bool, error) {
-		return "", true, nil
+	executeClickCommandForExit = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", nil
 	}
 
 	if err := BarExit("~pal"); err != nil {
@@ -76,11 +61,6 @@ func TestBarExitSuccess(t *testing.T) {
 	}
 }
 
-func createHoon(_, _, _ string) error { return nil }
-func deleteHoon(_, _ string)          {}
-func clickExec(_, _, _ string) (string, error) {
+func executeClickCommand(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 	return "ok", nil
-}
-func filterResponse(_, _ string) (string, bool, error) {
-	return "", true, nil
 }

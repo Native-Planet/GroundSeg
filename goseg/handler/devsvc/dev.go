@@ -34,7 +34,7 @@ type Dependencies struct {
 
 var (
 	isDevFn                        = checkDevMode
-	backupDirFn                    = func() string { return backupsvc.ResolveBackupRoot(config.BasePath) }
+	backupDirFn                    = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 	listHardDisksForDev            = system.ListHardDisks
 	confForDev                     = config.Conf
 	createLocalBackupForDev        = backupsvc.CreateLocalBackup
@@ -176,7 +176,7 @@ func Handler(msg []byte, deps Dependencies) error {
 
 func ResetDevSeams() {
 	isDevFn = checkDevMode
-	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath) }
+	backupDirFn = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 	listHardDisksForDev = system.ListHardDisks
 	confForDev = config.Conf
 	createLocalBackupForDev = backupsvc.CreateLocalBackup

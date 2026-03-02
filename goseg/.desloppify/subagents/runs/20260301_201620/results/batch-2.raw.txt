@@ -1,0 +1,105 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 74.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`routines/docker.go` defines `dockerRoutineRuntime` interfaces and default adapters where most methods are thin delegates to package-level functions (`docker.StartContainer`, `broadcast.GetState`, etc.).",
+        "`docker/orchestration/runtime_seams.go` defines another seam layer with near-identical adapter composition (`dockerRuntime` + context/file/container/image/config/urbit/wireguard ops) that also mostly delegates directly to concrete package functions.",
+        "`shipworkflow/startram.go` introduces a separate `startramRuntime` seam bundle with function fields mirroring existing operational calls, creating a third concurrent injection style for the same dependency needs.",
+        "`broadcast/broadcast.go` keeps a public compatibility wrapper (`ApplyBroadcastUpdate`) over `ApplyBroadcastTransition` and orchestration files add additional `WithRuntime` wrappers that mostly re-route arguments."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 62.0,
+        "indirection_cost": 38.0,
+        "interface_honesty": 68.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_pass_through_runtime_seams",
+      "summary": "Multiple packages maintain parallel, thin runtime-seam abstractions that add indirection without creating real policy boundaries.",
+      "related_files": [
+        "routines/docker.go",
+        "docker/orchestration/runtime_seams.go",
+        "shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "Each file defines its own runtime interface type and default struct implementation that primarily forwards calls to underlying package functions.",
+        "There is substantial overlap in responsibilities across these seam bundles (container/image/config/wireguard/urbit-like concerns) with little unique behavior.",
+        "Callers gain extra hops before reaching concrete logic, but the seams are not used to encapsulate different strategies or boundaries beyond test substitution."
+      ],
+      "suggestion": "Consolidate into a single shared seam model per subsystem (e.g., one runtime abstraction for orchestration/deploy workflows), remove redundant duplicate interfaces, and migrate callsites to depend on one explicit abstraction with meaningful behavior-oriented methods only.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "duplicate_low_value_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "compat_wrapper_chain_without_policy",
+      "summary": "Compatibility and `WithRuntime` wrapper layering in broadcast/wireguard paths preserves old APIs but increases churn for equivalent call paths.",
+      "related_files": [
+        "broadcast/broadcast.go",
+        "docker/orchestration/wireguard.go",
+        "docker/orchestration/wireguard_test.go",
+        "routines/docker.go"
+      ],
+      "evidence": [
+        "`broadcast/broadcast.go` exposes `ApplyBroadcastUpdate` as a pass-through compatibility shim over `ApplyBroadcastTransition`.",
+        "Wireguard orchestration code adds `*WithRuntime` forms that primarily thread runtime fields and delegate to existing apply logic, duplicating invocation shape.",
+        "Tests and helpers reference both styles, increasing maintenance surface and cognitive load with no clear behavior split."
+      ],
+      "suggestion": "Collapse wrappers by choosing one canonical API surface (e.g., keep the newer apply path), deprecate and remove compatibility entry points in a single sweep, and update callers/tests together to avoid dual invocation paths.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicate_low_value_indirection"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_state_isolated_by_name_but_not_dependency_graph",
+      "summary": "Injected seam structs still depend heavily on concrete package globals, so seams do not isolate callers from external dependency changes.",
+      "related_files": [
+        "importer/importer.go",
+        "config/config.go",
+        "auth/auth.go",
+        "defaults/defaults.go",
+        "routines/docker.go"
+      ],
+      "evidence": [
+        "Runtime seams are present, but most methods resolve behavior through package-level calls instead of explicit interfaces for externally swappable providers.",
+        "This reduces the practical benefit of dependency inversion: tests can replace some adapters, yet production code remains coupled to concrete package-level behavior.",
+        "The resulting abstraction graph is leaky: injection appears available in type declarations, but runtime behavior is still owned by direct module-level dependencies."
+      ],
+      "suggestion": "Introduce stable repository-facing interfaces for config/auth/docker/network/wireguard dependencies and inject those through a single constructor root, keeping defaults as concrete implementations only at process boundary.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "duplicate_low_value_indirection"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Replication of seam abstraction patterns across packages without shared design intent",
+      "Shims and compatibility wrappers kept indefinitely, inflating interface surface while not encoding new policy",
+      "Dependency injection used inconsistently (type-level wrappers exist, but concrete module globals remain the real coupling point)"
+    ],
+    "likely_symptoms": [
+      "duplicated_pass_through_runtime_seams",
+      "compat_wrapper_chain_without_policy",
+      "runtime_state_isolated_by_name_but_not_dependency_graph"
+    ],
+    "possible_false_positives": [
+      "Some wrappers may be temporarily retained for external API stability and migration windows; if removals are not yet feasible, mark specific ones as deliberate compatibility seams"
+    ]
+  }
+}

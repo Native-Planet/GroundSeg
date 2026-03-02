@@ -1,0 +1,1243 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260301_212511/results/batch-2.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state_test.go
+- goseg/broadcast/broadcast.go
+- goseg/routines/docker.go
+- goseg/rectify/rectify.go
+- goseg/broadcast/loop_test.go
+- goseg/defaults/defaults.go
+- goseg/routines/docker_test.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/config/wireguard.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/leak/broadcast.go
+- goseg/system/wifi.go
+- goseg/leak/leak_test.go
+- goseg/structs/configs.go
+- goseg/broadcast/collectors/collectors.go
+- goseg/defaults/version.go
+- goseg/importer/importer.go
+- goseg/routines/system_test.go
+- goseg/docker/lifecycle/lifecycle.go
+- goseg/shipworkflow/urbit_operations.go
+- goseg/main.go
+- goseg/routines/runtime_seams.go
+- goseg/docker/orchestration/runtime_seams.go
+- goseg/shipworkflow/startram.go
+- goseg/config/config.go
+- goseg/setup/setup_test.go
+- goseg/routines/version.go
+- goseg/auth/auth.go
+- goseg/docker/orchestration/llama_test.go
+- goseg/handler/system/support.go
+- goseg/dockerclient/client.go
+- goseg/shipworkflow/operations_test.go
+- goseg/docker/network/network.go
+- goseg/docker/orchestration/minio.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtimes define package-wide function variables that only forward to existing package functions, then re-wrap each through tiny methods (e.g., `goseg/routines/runtime_seams.go` var bridge layer and `RequireSeam` methods).",
+        "Docker orchestration mirrors the same pattern with a second, near-identical runtime seam layer (`goseg/docker/orchestration/runtime_seams.go`) mapping dozens of dependencies through pass-through structs and wrappers.",
+        "`goseg/broadcast/broadcast.go` uses a runtime-options pattern where `broadcastRuntime` holds function fields and default values are one-line lambdas directly calling concrete dependencies.",
+        "`shipworkflow/startram.go` continues the same approach with `startramRuntime`, further extending dependency wrapper surface instead of introducing a targeted shared boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 43.2,
+        "indirection_cost": 21.5,
+        "interface_honesty": 49.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_overlayer_duplication",
+      "summary": "There is a pervasive pass-through seam layer duplicated across modules that adds little behavior and dilutes abstraction leverage.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "The routines layer declares global dependency vars such as `getContainerStateForRoutine`, `startContainerForRoutine`, `getShipStatusForRoutine`, then exposes method wrappers that only call `seams.RequireSeam*` (`goseg/routines/runtime_seams.go`).",
+        "Docker orchestration defines an equivalent set (`openForRuntime`, `startContainerForRuntime`, `getContainerRunningStatusForRuntime`, etc.) with equivalent wrapper structs and `RequireSeam` forwarding (`goseg/docker/orchestration/runtime_seams.go`).",
+        "`broadcast/broadcast.go` and `shipworkflow/startram.go` repeat the same pattern for runtime/DI via struct fields whose defaults are wrappers over direct package functions without policy/value-added behavior.",
+        "The result is duplicate interface surfaces where the abstraction boundary appears to exist but does not enforce stronger contracts or behavior."
+      ],
+      "suggestion": "Consolidate these seam layers into targeted interfaces per cohesive responsibility (e.g., lifecycle, orchestration, broadcast, config), and provide small, explicit adapters only where behavior translation is needed; remove thin function-by-function wrappers that provide zero policy/value addition.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_overabstraction_chain"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_surface_test_fragility",
+      "summary": "Testability seams are coupled to package-global mutable state, which increases test coupling and increases maintenance cost versus stable dependency injection.",
+      "related_files": [
+        "goseg/routines/docker_test.go",
+        "goseg/routines/system_test.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/docker.go",
+        "goseg/routines/runtime_seams.go"
+      ],
+      "evidence": [
+        "`routines/docker_test.go` constructs type aliases of runtime structs and manually rebuilds every function field (`testDockerRoutineRuntime`) to inject behavior.",
+        "`routines/system_test.go` snapshots and restores package-level seam variables via `resetSystemSeamsForTest`, showing per-test mutation of global dependency holders.",
+        "`shipworkflow/operations_runtime.go` also exposes package-level function vars with mutator (`SetAliasCNAMELookup`, `SetUrbitCleanupSeams`) rather than immutable constructor-based dependencies.",
+        "This pattern requires each module to remember separate mutation/reset conventions in tests instead of relying on one stable seam contract."
+      ],
+      "suggestion": "Replace mutable package-level seam vars with explicit runtime factory functions that accept dependency providers as constructor arguments, and keep tests passing stable fake implementations through those constructors; keep package globals readonly in production.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_overabstraction_chain"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "interface_honesty_bypass_in_broadcast_wrapper",
+      "summary": "A runtime function field advertises error signaling but discards execution errors, weakening interface honesty at the abstraction boundary.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/system/support.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`broadcastRuntime.broadcastAuth` in `broadcast/broadcast.go` has signature `func(payload []byte) error` but always returns `nil` after calling `auth.GetClientManager().BroadcastAuth(payload)`, regardless of failures.",
+        "This wrapper is part of the runtime abstraction path used by callers expecting an error-aware contract, but the contract is not actually honored.",
+        "Any seam/wrapper in the stack that promises error propagation but doesn't enforce it blurs behavior and encourages silent failure handling in callers."
+      ],
+      "suggestion": "Propagate and wrap errors from underlying auth broadcast operations (or remove `error` from the interface if broadcast is intentionally fire-and-forget) so the abstraction contract matches actual behavior.",
+      "confidence": "medium",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "abstraction_contract_mismatch"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Function-per-dependency seam layering was applied broadly without matching behavior translation, creating indirection with low incremental value.",
+      "Reliance on package-level mutable seams for test injection instead of constructor-based dependency injection.",
+      "Inconsistent wrapper contract discipline (not all wrappers honor the contract shape they expose)."
+    ],
+    "likely_symptoms": [
+      "Longer test setup paths and brittle resets of global seams",
+      "Increased onboarding/maintenance burden when adding new dependencies",
+      "Hidden failure modes when wrappers mask errors"
+    ],
+    "possible_false_positives": [
+      "Some seam abstraction might be intentional for deterministic testing and could be considered acceptable if this codebase explicitly prioritizes seam-based unit testability over stronger interface design"
+    ]
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex-spark
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019cab4a-8027-7c23-b7a0-5fb5fcbb871d
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 2
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state_test.go
+- goseg/broadcast/broadcast.go
+- goseg/routines/docker.go
+- goseg/rectify/rectify.go
+- goseg/broadcast/loop_test.go
+- goseg/defaults/defaults.go
+- goseg/routines/docker_test.go
+- goseg/leak/broadcast_test.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/config/wireguard.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/leak/broadcast.go
+- goseg/system/wifi.go
+- goseg/leak/leak_test.go
+- goseg/structs/configs.go
+- goseg/broadcast/collectors/collectors.go
+- goseg/defaults/version.go
+- goseg/importer/importer.go
+- goseg/routines/system_test.go
+- goseg/docker/lifecycle/lifecycle.go
+- goseg/shipworkflow/urbit_operations.go
+- goseg/main.go
+- goseg/routines/runtime_seams.go
+- goseg/docker/orchestration/runtime_seams.go
+- goseg/shipworkflow/startram.go
+- goseg/config/config.go
+- goseg/setup/setup_test.go
+- goseg/routines/version.go
+- goseg/auth/auth.go
+- goseg/docker/orchestration/llama_test.go
+- goseg/handler/system/support.go
+- goseg/dockerclient/client.go
+- goseg/shipworkflow/operations_test.go
+- goseg/docker/network/network.go
+- goseg/docker/orchestration/minio.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+codex
+I’ll load the blind review packet first to anchor on prior context, then inspect only the assigned files for material, evidence-backed issues in `abstraction_fitness` (abstraction layering, interface boundaries, dependency direction), and return a JSON batch report only.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/handler/system/support.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package system
+
+import (
+	"archive/zip"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/dockerclient"
+	"groundseg/logger"
+	"groundseg/shipworkflow"
+	"groundseg/structs"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+ succeeded in 53ms:
+Total output lines: 3834
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "cross_module_architecture",
+    "error_consistency",
+    "abstraction_fitness",
+    "test_strategy",
+    "design_coherence"
+  ],
+  "dimension_prompts": {
+    "cross_module_architecture": {
+      "description": "Dependency direction, cycles, hub modules, and boundary integrity",
+      "look_for": [
+        "Layer/dependency direction violations repeated across multiple modules",
+        "Cycles or hub modules that create large blast radius for common changes",
+        "Documented architecture contracts drifting from runtime (e.g. dynamic import boundaries)",
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/dockerclient/client.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/runtime_seams.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package dockerclient
+
+import (
+	"context"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/docker/docker/api"
+	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/client"
+	"go.uber.org/zap"
+)
+
+const pingTimeout = 5 * time.Second
+
+var (
+	versionMu           sync.RWMutex
+	cachedVersion       string
+ succeeded in 51ms:
+package routines
+
+import (
+	"net/http"
+	"time"
+
+	"groundseg/broadcast"
+	"groundseg/chopsvc"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/orchestration"
+	"groundseg/handler/ship"
+	"groundseg/handler/system"
+	"groundseg/internal/seams"
+	"groundseg/structs"
+)
+
+var (
+	getContainerStateForRoutine     = config.GetContainerState
+	updateContainerStateForRoutine  = config.UpdateContainerState
+codex
+I’ve confirmed the workflow context and found that several seam/abstraction layers are concentrated in runtime construction. Next I’m checking the rest of the assigned batch for wrapper chains and abstraction leaks that are likely non-beneficial or hiding domain boundaries.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/broadcast/broadcast.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/broadcast/collectors/collectors.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+package broadcast
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/broadcast/collectors"
+	"groundseg/leak"
+	"groundseg/structs"
+	"groundseg/transition"
+	"maps"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	broadcastInterval = 1 * time.Second // how often we refresh system info
+	broadcastState    structs.AuthBroadcast
+ succeeded in 50ms:
+package collectors
+
+import (
+	"fmt"
+	"groundseg/backupsvc"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/orchestration"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/system"
+	"groundseg/transition"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/rectify/rectify.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/docker.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/wireguard.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/docker/orchestration/runtime_seams.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package rectify
+
+// this package is for watching event channels and rectifying mismatches
+// between the desired and actual state, creating broadcast transitions,
+// and anything else that needs to be done asyncronously
+
+import (
+	"fmt"
+	"groundseg/broadcast"
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/transition"
+	"strings"
+
+	"go.uber.org/zap"
+)
+
+func UrbitTransitionHandler() {
+ succeeded in 52ms:
+package orchestration
+
+import (
+	"encoding/base64"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
+	// "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+func LoadWireguard() error {
+	return loadWireguardWithRuntime(newWireguardRuntime())
+}
+
+ succeeded in 52ms:
+package routines
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/dockerclient"
+	"groundseg/lifecycle"
+	"groundseg/orchestration"
+	"groundseg/structs"
+	"groundseg/transition"
+	"net/http"
+	"time"
+
+	eventtypes "github.com/docker/docker/api/types/events"
+	"go.uber.org/zap"
+)
+
+var (
+	eventBus           = make(chan structs.Event, 100)
+ succeeded in 52ms:
+package orchestration
+
+import (
+	"crypto/rand"
+	"groundseg/config"
+	"groundseg/internal/seams"
+	"groundseg/structs"
+	"os"
+	"time"
+)
+
+var (
+	runtimeContextSnapshotForOrchestration = config.RuntimeContextSnapshot
+	openForRuntime                         = os.Open
+	readFileForRuntime                     = os.ReadFile
+	writeFileForRuntime                    = os.WriteFile
+	mkdirAllForRuntime                     = os.MkdirAll
+
+	startContainerForRuntime            = StartContainer
+	createContainerForRuntime           = CreateContainer
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/wifi.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/network/network.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/minio.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package system
+
+import (
+	"fmt"
+	"groundseg/structs"
+	"net/http"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/hsanjuan/go-captive"
+	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
+)
+
+var (
+	proxy = &captive.Portal{
+		LoginPath:           "/",
+		PortalDomain:        "nativeplanet.local",
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/importer/importer.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/system/wifi.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+package orchestration
+
+import (
+	"encoding/hex"
+	"fmt"
+	"groundseg/structs"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"go.uber.org/zap"
+)
+
+func LoadMC() error {
+	return loadMC(newMinIORuntime())
+}
+
+func loadMC(rt minioRuntime) error {
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/main.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+package network
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	dockernetwork "github.com/docker/docker/api/types/network"
+	volumetypes "github.com/docker/docker/api/types/volume"
+	"go.uber.org/zap"
+
+	"github.com/docker/docker/client"
+	"groundseg/dockerclient"
+)
+
+var dockerClientNew = dockerclient.New
+
+ succeeded in 53ms:
+package importer
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"groundseg/auth"
+	"groundseg/click/acme"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/dockerclient"
+	"groundseg/driveresolver"
+	"groundseg/lifecycle"
+	workflowOrchestration "groundseg/orchestration"
+	"groundseg/shipcleanup"
+	"groundseg/shipcreator"
+	"groundseg/shipworkflow"
+	"groundseg/structs"
+	"groundseg/system"
+ succeeded in 52ms:
+package main
+
+// NativePlanet GroundSeg: Go Edition (goseg)
+// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+// This is a Golang rewrite of GroundSeg that serves the v2 json
+// object via websocket.
+// The v2 rewrite decouples the frontend and backend, which makes it
+// straightforward to implement alternative backends.
+//
+// Under development: reimplementing all pyseg functionality.
+// Advantages:
+// - Really, really fast
+// - Event-driven
+// - First-class support for concurrent operations
+// - Very good golang Docker libraries
+
+import (
+	"context"
+	"embed"
+	"fmt"
+ succeeded in 53ms:
+package system
+
+import (
+	"fmt"
+	"groundseg/structs"
+	"net/http"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/hsanjuan/go-captive"
+	"github.com/mdlayher/wifi"
+	"go.uber.org/zap"
+)
+
+var (
+	proxy = &captive.Portal{
+		LoginPath:           "/",
+		PortalDomain:        "nativeplanet.local",
+codex
+I’ve now covered the seam-heavy orchestration and broadcast paths; I’m pulling the remaining assigned files that are most likely to reveal abstraction anti-patterns (runtime seams, importer/config seams, and wrapper layering) to build concrete findings with evidence.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,240p' goseg/config/config.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/config/wireguard.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/runtime_seams.go" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+package config
+
+// code for managing groundseg and container configurations
+
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"groundseg/system"
+	"io"
+	"io/ioutil"
+	"math/rand"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+ succeeded in 51ms:
+package routines
+
+import (
+	"net/http"
+	"time"
+
+	"groundseg/broadcast"
+	"groundseg/chopsvc"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/orchestration"
+	"groundseg/handler/ship"
+	"groundseg/handler/system"
+	"groundseg/internal/seams"
+	"groundseg/structs"
+)
+
+var (
+	getContainerStateForRoutine     = config.GetContainerState
+	updateContainerStateForRoutine  = config.UpdateContainerState
+ succeeded in 51ms:
+package config
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"groundseg/defaults"
+	"groundseg/structs"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+type wireguardRuntime struct {
+	getConf           func() structs.SysConfig
+	getVersionChannel func() structs.Channel
+	getWgKeypair      func() (string, string, error)
+	updateConfTyped   func(...ConfUpdateOption) error
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/shipworkflow/urbit_operations.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/defaults/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/auth/auth.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/defaults/defaults.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/shipworkflow/startram.go" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+package shipworkflow
+
+import (
+	"fmt"
+	"groundseg/broadcast"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
+	"groundseg/exporter"
+	"groundseg/lifecycle"
+	"groundseg/shipcleanup"
+	"groundseg/startram"
+	"groundseg/structs"
+	"strconv"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+)
+ succeeded in 52ms:
+Total output lines: 210
+
+package defaults
+
+// default config json structs
+// these get written to disk in absence of version server
+
+import (
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+var (
+	UrbitConfig = structs.UrbitDocker{
+		PierName:            "",
+		HTTPPort:            0,
+		AmesPort:            0,
+		LoomSize:            31,
+ succeeded in 52ms:
+Total output lines: 190
+
+package defaults
+
+import (
+	"encoding/json"
+	"fmt"
+	"groundseg/structs"
+	"log/slog"
+	"os"
+
+	"go.uber.org/zap"
+)
+
+var (
+	logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	DefaultVersionText = `
+{
+  "groundseg": {
+    "canary": {
+ succeeded in 52ms:
+package auth
+
+// package for authenticating websockets
+// we use a homespun jwt knock-off because no tls on lan
+// tokens contain client metadata for authentication
+// authentication adds you to the AuthenticatedClients map
+// broadcasts get sent to members of this map
+
+// todo: purge old sessions from both maps
+
+// client send:
+// {
+// 	"type": "verify",
+// 	"id": "jsgeneratedid",
+// 	"token<optional>": {
+// 	  "id": "servergeneratedid",
+// 	  "token": "encryptedtext"
+// 	}
+// }
+
+ succeeded in 51ms:
+package shipworkflow
+
+import (
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"groundseg/click"
+	"strings"
+	"time"
+
+	"groundseg/broadcast"
+	"groundseg/config"
+	"groundseg/docker/orchestration"
+	"groundseg/startram"
+	"groundseg/structs"
+	"groundseg/transition"
+	"os"
+
+	"go.uber.org/zap"
+)
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/docker/orchestration/runtime_seams.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/version.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/handler/system/support.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/structs/configs.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/docker/orchestration/runtime_seams.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/leak/leak.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package routines
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"groundseg/config"
+	"groundseg/structs"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier/verify"
+ succeeded in 53ms:
+package orchestration
+
+import (
+	"crypto/rand"
+	"groundseg/config"
+	"groundseg/internal/seams"
+	"groundseg/structs"
+	"os"
+	"time"
+)
+
+var (
+	runtimeContextSnapshotForOrchestration = config.RuntimeContextSnapshot
+	openForRuntime                         = os.Open
+	readFileForRuntime                     = os.ReadFile
+	writeFileForRuntime                    = os.WriteFile
+	mkdirAllForRuntime                     = os.MkdirAll
+
+	startContainerForRuntime            = StartContainer
+	createContainerForRuntime           = CreateContainer
+ succeeded in 53ms:
+package system
+
+import (
+	"archive/zip"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"groundseg/config"
+	"groundseg/docker/events"
+	"groundseg/dockerclient"
+	"groundseg/logger"
+	"groundseg/shipworkflow"
+	"groundseg/structs"
+	"io"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+ succeeded in 51ms:
+package orchestration
+
+import (
+	"crypto/rand"
+	"groundseg/config"
+	"groundseg/internal/seams"
+	"groundseg/structs"
+	"os"
+	"time"
+)
+
+var (
+	runtimeContextSnapshotForOrchestration = config.RuntimeContextSnapshot
+	openForRuntime                         = os.Open
+	readFileForRuntime                     = os.ReadFile
+	writeFileForRuntime                    = os.WriteFile
+	mkdirAllForRuntime                     = os.MkdirAll
+
+	startContainerForRuntime            = StartContainer
+	createContainerForRuntime           = CreateContainer
+ succeeded in 51ms:
+package structs
+
+import (
+	"encoding/json"
+	"time"
+)
+
+// system.json config struct
+type SysConfig struct {
+	RemoteBackupPassword string   `json:"remoteBackupPassword"`
+	GracefulExit         bool     `json:"gracefulExit"`
+	LastKnownMDNS        string   `json:"lastKnownMDNS"`
+	Setup                string   `json:"setup"`
+	EndpointUrl          string   `json:"endpointUrl"`
+	ApiVersion           string   `json:"apiVersion"`
+	Piers                []string `json:"piers"`
+	NetCheck             string   `json:"netCheck"`
+	UpdateMode           string   `json:"updateMode"`
+	UpdateUrl            string   `json:"updateUrl"`
+	UpdateBranch         string   `json:"updateBranch"`
+ succeeded in 51ms:
+package leak
+
+import (
+	"fmt"
+	"groundseg/config"
+	"groundseg/structs"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+	LeakChan     = make(chan structs.AuthBroadcast)
+	BytesChan    = make(map[string]chan string)
+	lickStatuses = make(map[string]LickStatus)
+	lickMu       sync.RWMutex
+
+codex
+I have enough function-level structure to produce evidence-driven findings; next I’m quickly scanning for seam/abstraction repetition and wrapper-only methods across the batch to confirm cluster patterns before final scoring.
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"RequireSeam|type .*Runtime|var \\(|new.*Runtime\\(|WithRuntime|runtime struct\" goseg/broadcast goseg/routines goseg/routines/runtime_seams.go goseg/shipworkflow goseg/importer goseg/config goseg/docker/orchestration goseg/docker/network goseg/docker/lifecycle goseg/system goseg/leak goseg/handler/system" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/routines/runtime_seams.go:18:var (
+goseg/routines/runtime_seams.go:57:type dockerRoutineRuntime struct {
+goseg/routines/runtime_seams.go:76:	return seams.RequireSeam0(ops.getContainerStateFn, "dockerRoutineStateOps.getContainerStateFn")()
+goseg/routines/runtime_seams.go:80:	seams.RequireSeamAction2(ops.updateContainerStateFn, "dockerRoutineStateOps.updateContainerStateFn")(name, state)
+goseg/routines/runtime_seams.go:88:	return seams.RequireSeam2x2(ops.startContainerFn, "dockerRoutineContainerOps.startContainerFn")(name, kind)
+goseg/routines/runtime_seams.go:98:	return seams.RequireSeam1(ops.loadUrbitConfigFn, "dockerRoutineUrbitOps.loadUrbitConfigFn")(patp)
+goseg/routines/runtime_seams.go:102:	return seams.RequireSeam1(ops.urbitConfFn, "dockerRoutineUrbitOps.urbitConfFn")(patp)
+goseg/routines/runtime_seams.go:106:	seams.RequireSeamAction1(ops.clearLusCodeFn, "dockerRoutineUrbitOps.clearLusCodeFn")(patp)
+goseg/routines/runtime_seams.go:115:	return seams.RequireSeam1x2(ops.getContainerNetworkFn, "dockerRoutineNetworkOps.getContainerNetworkFn")(name)
+goseg/routines/runtime_seams.go:119:	return seams.RequireSeam1x2(ops.getLusCodeFn, "dockerRoutineNetworkOps.getLusCodeFn")(name)
+goseg/routines/runtime_seams.go:130:	return seams.RequireSeam0(ops.getBroadcastStateFn, "dockerRoutineBroadcastOps.getBroadcastStateFn")()
+goseg/routines/runtime_seams.go:134:	seams.RequireSeamAction1(ops.updateBroadcastFn, "dockerRoutineBroadcastOps.updateBroadcastFn")(next)
+goseg/routines/runtime_seams.go:138:	return seams.RequireSeam0(ops.broadcastClientsFn, "dockerRoutineBroadcastOps.broadcastClientsFn")()
+goseg/routines/runtime_seams.go:142:	return seams.RequireSeam1(ops.updateWgOnFn, "dockerRoutineBroadcastOps.updateWgOnFn")(enabled)
+goseg/routines/runtime_seams.go:152:	return seams.RequireSeam1x2(ops.getShipStatusFn, "dockerRoutineShipOps.getShipStatusFn")(piers)
+goseg/routines/runtime_seams.go:156:	return seams.RequireSeam0(ops.getShipSettingsFn, "dockerRoutineShipOps.getShipSettingsFn")()
+goseg/routines/runtime_seams.go:160:	return seams.RequireSeam0(ops.getCheck502SettingsFn, "dockerRoutineShipOps.getCheck502SettingsFn")()
+goseg/routines/runtime_seams.go:168:	return seams.RequireSeam2(ops.recoverWireguardFn, "dockerRoutineWireguardOps.recoverWireguardFn")(piers, disable)
+goseg/routines/runtime_seams.go:176:	return seams.RequireSeam1(ops.barExitFn, "dockerRoutineSystemOps.barExitFn")(patp)
+goseg/routines/runtime_seams.go:184:	return seams.RequireSeam1x2(ops.getFn, "dockerRoutineHTTPOps.Get")(url)
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,280p' goseg/shipworkflow/operations_runtime.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package shipworkflow
+
+import (
+	"context"
+	"fmt"
+	"groundseg/click"
+	"groundseg/config"
+	"groundseg/docker/events"
+	dockerOrchestration "groundseg/docker/orchestration"
+	"groundseg/lifecycle"
+	"groundseg/orchestration"
+	"groundseg/structs"
+	"net"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+var (
+exec
+/opt/homebrew/bin/zsh -lc "rg -n \"(.*ForRoutine|ForVersionRuntime|ForRuntime|DockerRuntime|newDockerRuntime\\(|= .*For|Set[A-Za-z0-9_]*Runtime|startContainerForRuntime|openForRuntime|sleepForRuntime|GetWgConfFn|dockerClientNew\\s*=)\" goseg/routines goseg/docker/orchestration goseg/shipworkflow goseg/leak goseg/config goseg/importer goseg/handler/system/support.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+goseg/handler/system/support.go:492:	part, err := writer.CreateFormFile("zip_file", bugReportPath)
+goseg/config/netdata.go:38:	conf := confForNetdata()
+goseg/config/netdata.go:40:	versionInfo := getVersionChannelForNetdata()
+goseg/config/mc.go:21:	path := pathForMc()
+goseg/config/mc.go:40:	conf := confForMc()
+goseg/config/mc.go:41:	versionInfo := getVersionChannelForMc()
+goseg/config/mc.go:49:	path := pathForMc()
+goseg/importer/extract.go:101:	strategy, err := extractionStrategyForFilename(filename)
+goseg/importer/extract.go:274:		entry, err := iteratorForCount.Next()
+goseg/routines/system_test.go:15:	origUpdate := updateCheckForAptLoop
+goseg/routines/system_test.go:16:	origConf := configForSystemRoutine
+goseg/routines/system_test.go:17:	origInterfaces := netInterfacesForSystemRoutine
+goseg/routines/system_test.go:18:	origAddrs := interfaceAddrsForSystemRoutine
+goseg/config/version.go:187:	channel, err := resolveVersionForConfiguredChannel(fetchedVersion, conf.UpdateBranch)
+goseg/importer/importer_test.go:256:	restore := resetStoragePathFnForTest(t)
+goseg/importer/importer_test.go:268:	restore := resetStoragePathFnForTest(t)
+goseg/routines/renewal_test.go:14:	origOne := withStartramReminderOneForRenewal
+goseg/routines/renewal_test.go:15:	origThree := withStartramReminderThreeForRenewal
+goseg/routines/renewal_test.go:16:	origSeven := withStartramReminderSevenForRenewal
+goseg/routines/renewal_test.go:17:	origUpdate := updateConfTypedForRenewal
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,260p' goseg/routines/system_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package routines
+
+import (
+	"errors"
+	"net"
+	"reflect"
+	"testing"
+	"time"
+
+	"groundseg/structs"
+)
+
+func resetSystemSeamsForTest(t *testing.T) {
+	t.Helper()
+	origUpdate := updateCheckForAptLoop
+	origConf := configForSystemRoutine
+	origInterfaces := netInterfacesForSystemRoutine
+	origAddrs := interfaceAddrsForSystemRoutine
+	t.Cleanup(func() {
+		updateCheckForAptLoop = origUpdate
+codex
+I’ve identified concrete seams-driven abstraction friction with production and test coupling. I’ll now gather one small extra test seam example already in batch files to support a focused “global seam mutability” finding.
+exec
+/opt/homebrew/bin/zsh -lc "sed -n '1,220p' goseg/routines/docker_test.go" in /Users/chuah/NP/GroundSeg succeeded in 53ms:
+package routines
+
+import (
+	"errors"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"groundseg/config"
+	"groundseg/structs"
+	"groundseg/transition"
+)
+
+type dockerStateOpsStub = dockerRoutineStateOps
+type dockerContainerOpsStub = dockerRoutineContainerOps
+type dockerUrbitOpsStub = dockerRoutineUrbitOps
+type dockerNetworkOpsStub = dockerRoutineNetworkOps
+type dockerBroadcastOpsStub = dockerRoutineBroadcastOps
+type dockerShipOpsStub = dockerRoutineShipOps
+codex
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtimes define package-wide function variables that only forward to existing package functions, then re-wrap each through tiny methods (e.g., `goseg/routines/runtime_seams.go` var bridge layer and `RequireSeam` methods).",
+        "Docker orchestration mirrors the same pattern with a second, near-identical runtime seam layer (`goseg/docker/orchestration/runtime_seams.go`) mapping dozens of dependencies through pass-through structs and wrappers.",
+        "`goseg/broadcast/broadcast.go` uses a runtime-options pattern where `broadcastRuntime` holds function fields and default values are one-line lambdas directly calling concrete dependencies.",
+        "`shipworkflow/startram.go` continues the same approach with `startramRuntime`, further extending dependency wrapper surface instead of introducing a targeted shared boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 43.2,
+        "indirection_cost": 21.5,
+        "interface_honesty": 49.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_overlayer_duplication",
+      "summary": "There is a pervasive pass-through seam layer duplicated across modules that adds little behavior and dilutes abstraction leverage.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/shipworkflow/startram.go"
+      ],
+      "evidence": [
+        "The routines layer declares global dependency vars such as `getContainerStateForRoutine`, `startContainerForRoutine`, `getShipStatusForRoutine`, then exposes method wrappers that only call `seams.RequireSeam*` (`goseg/routines/runtime_seams.go`).",
+        "Docker orchestration defines an equivalent set (`openForRuntime`, `startContainerForRuntime`, `getContainerRunningStatusForRuntime`, etc.) with equivalent wrapper structs and `RequireSeam` forwarding (`goseg/docker/orchestration/runtime_seams.go`).",
+        "`broadcast/broadcast.go` and `shipworkflow/startram.go` repeat the same pattern for runtime/DI via struct fields whose defaults are wrappers over direct package functions without policy/value-added behavior.",
+        "The result is duplicate interface surfaces where the abstraction boundary appears to exist but does not enforce stronger contracts or behavior."
+      ],
+      "suggestion": "Consolidate these seam layers into targeted interfaces per cohesive responsibility (e.g., lifecycle, orchestration, broadcast, config), and provide small, explicit adapters only where behavior translation is needed; remove thin function-by-function wrappers that provide zero policy/value addition.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_overabstraction_chain"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "seam_surface_test_fragility",
+      "summary": "Testability seams are coupled to package-global mutable state, which increases test coupling and increases maintenance cost versus stable dependency injection.",
+      "related_files": [
+        "goseg/routines/docker_test.go",
+        "goseg/routines/system_test.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/routines/docker.go",
+        "goseg/routines/runtime_seams.go"
+      ],
+      "evidence": [
+        "`routines/docker_test.go` constructs type aliases of runtime structs and manually rebuilds every function field (`testDockerRoutineRuntime`) to inject behavior.",
+        "`routines/system_test.go` snapshots and restores package-level seam variables via `resetSystemSeamsForTest`, showing per-test mutation of global dependency holders.",
+        "`shipworkflow/operations_runtime.go` also exposes package-level function vars with mutator (`SetAliasCNAMELookup`, `SetUrbitCleanupSeams`) rather than immutable constructor-based dependencies.",
+        "This pattern requires each module to remember separate mutation/reset conventions in tests instead of relying on one stable seam contract."
+      ],
+      "suggestion": "Replace mutable package-level seam vars with explicit runtime factory functions that accept dependency providers as constructor arguments, and keep tests passing stable fake implementations through those constructors; keep package globals readonly in production.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_overabstraction_chain"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "interface_honesty_bypass_in_broadcast_wrapper",
+      "summary": "A runtime function field advertises error signaling but discards execution errors, weakening interface honesty at the abstraction boundary.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/handler/system/support.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`broadcastRuntime.broadcastAuth` in `broadcast/broadcast.go` has signature `func(payload []byte) error` but always returns `nil` after calling `auth.GetClientManager().BroadcastAuth(payload)`, regardless of failures.",
+        "This wrapper is part of the runtime abstraction path used by callers expecting an error-aware contract, but the contract is not actually honored.",
+        "Any seam/wrapper in the stack that promises error propagation but doesn't enforce it blurs behavior and encourages silent failure handling in callers."
+      ],
+      "suggestion": "Propagate and wrap errors from underlying auth broadcast operations (or remove `error` from the interface if broadcast is intentionally fire-and-forget) so the abstraction contract matches actual behavior.",
+      "confidence": "medium",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "abstraction_contract_mismatch"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Function-per-dependency seam layering was applied broadly without matching behavior translation, creating indirection with low incremental value.",
+      "Reliance on package-level mutable seams for test injection instead of constructor-based dependency injection.",
+      "Inconsistent wrapper contract discipline (not all wrappers honor the contract shape they expose)."
+    ],
+    "likely_symptoms": [
+      "Longer test setup paths and brittle resets of global seams",
+      "Increased onboarding/maintenance burden when adding new dependencies",
+      "Hidden failure modes when wrappers mask errors"
+    ],
+    "possible_false_positives": [
+      "Some seam abstraction might be intentional for deterministic testing and could be considered acceptable if this codebase explicitly prioritizes seam-based unit testability over stronger interface design"
+    ]
+  }
+}
+tokens used
+119,431
+

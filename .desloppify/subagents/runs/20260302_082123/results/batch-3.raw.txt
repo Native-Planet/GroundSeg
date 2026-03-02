@@ -1,0 +1,93 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 79.5,
+    "test_strategy": 84.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Protocol actions defines its own compatibility aliases and constants (`ContractCompatibility`, `CompatibilityStable`, `CompatibilityDeprecated`, `CompatibilityRemoved`, `CompatibilityBackwardSafe`) and current-version helper constants in `goseg/protocol/actions/actions.go`.",
+        "StarTram error contracts redefines the same compatibility alias/constant set and its own versioned descriptor shape in `goseg/startram/errors.go`.",
+        "Each module independently owns a parallel contract descriptor surface, creating duplicated evolution paths for compatibility policy.",
+        "README explicitly treats both files as core contract surfaces (`goseg/protocol/actions/actions.go` and `goseg/startram/errors.go`) but does not describe a single canonical governance owner.",
+        "A policy evolution (deprecation/removal handling) would require dual-package edits and synchronized reasoning to avoid drift."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 74.0,
+        "interface_honesty": 62.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "README relies on a Runtime Contract Gate script path check for contract surface changes, but edge-case behavior of contract predicates is not asserted in the files under review (`IsUploadActionContractDeprecated`, `IsUploadActionContractActive`, `APIConnectionErrorContractForVersion`).",
+        "Both contract modules are boundary-facing and expose version-compatibility decisions; missing direct unit assertions increases risk that boundary semantics regress before gate catches script-level contract mismatches.",
+        "No explicit co-located test cases are visible in this batch’s contract files for removed/deprecated/empty-version transition behavior."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Add deterministic in-package tests for contract-version edge cases (introduced, deprecated, removed, and unset/invalid versions) to complement the path-based gate and prevent silent drift."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-gov-dup",
+      "summary": "Contract governance is duplicated across protocol/actions and startram packages, creating drift risk as compatibility policy evolves.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` and `goseg/startram/errors.go` both re-declare equivalent compatibility aliases/constants and build contract descriptors in parallel.",
+        "Each file independently implements helper-style compatibility checks (`IsUploadActionContract*`, `IsAPIConnectionErrorContract*`) without shared policy ownership.",
+        "README identifies both as canonical contract surfaces, implying cross-module boundary coupling if policy changes are applied inconsistently."
+      ],
+      "suggestion": "Create a shared contract-governance module (or explicit API in `protocol/contracts`) for version policy descriptors and lifecycle helpers, and consume it from both modules so compatibility semantics remain single-sourced.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_surface_duplication"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "contract-edge-test-missing",
+      "summary": "Contract/version edge behavior is not directly unit-tested in the listed boundary files, so compatibility regressions can slip past scripted checks.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go",
+        "README.md"
+      ],
+      "evidence": [
+        "Public helpers expose boundary behavior critical to compatibility (`IsUploadActionContractDeprecated`, `IsUploadActionContractActive`, `APIConnectionErrorContractForVersion`) but no immediate unit tests are defined in these modules to validate transition boundaries.",
+        "README documents CI gates for contract change verification, but does not show deterministic unit tests for these version predicate edge cases in the same batch scope.",
+        "Coverage of these boundary predicates is especially important because contract acceptance/compatibility decisions drive runtime and wire compatibility."
+      ],
+      "suggestion": "Add explicit unit test files for both `goseg/protocol/actions` and `goseg/startram` that assert compatibility predicate behavior across introduced/deprecated/removed/empty-version inputs and verify `UnsupportedActionError`/masked-error return semantics.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_surface_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Contract-policy ownership is split across modules instead of centralized governance.",
+      "Boundary behavior relies on script-level contract checks without explicit in-module version-behavior tests."
+    ],
+    "likely_symptoms": [
+      "contract-gov-dup",
+      "contract-edge-test-missing"
+    ],
+    "possible_false_positives": [
+      "test-strategy concern assumes absence of direct tests in this scope and may overstate risk if equivalent tests are intentionally colocated outside batch-filtered files."
+    ]
+  }
+}

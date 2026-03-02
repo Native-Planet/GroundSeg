@@ -16,18 +16,10 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func resetWGSeams() {
-	confForWG = Conf
-	getVersionChannelForWG = GetVersionChannel
-	wgKeyGenForCycle = WgKeyGen
-	updateConfTypedForCycle = UpdateConfTyped
-}
-
 func TestCreateDefaultWGConfAndGetWgConf(t *testing.T) {
-	t.Cleanup(resetWGSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
 	if err := CreateDefaultWGConf(); err != nil {
 		t.Fatalf("CreateDefaultWGConf failed: %v", err)
@@ -42,14 +34,13 @@ func TestCreateDefaultWGConfAndGetWgConf(t *testing.T) {
 }
 
 func TestUpdateWGConfWritesVersionData(t *testing.T) {
-	t.Cleanup(resetWGSeams)
-	oldBasePath := BasePath
-	BasePath = t.TempDir()
-	t.Cleanup(func() { BasePath = oldBasePath })
+	oldBasePath := BasePath()
+	SetBasePath(t.TempDir())
+	t.Cleanup(func() { SetBasePath(oldBasePath) })
 
-	confForWG = func() structs.SysConfig { return structs.SysConfig{UpdateBranch: "latest"} }
-	getVersionChannelForWG = func() structs.Channel {
-		return structs.Channel{
+	runtime := defaultWireguardRuntime()
+	runtime.loadWGSpecs = func() (structs.SysConfig, structs.Channel) {
+		return structs.SysConfig{UpdateBranch: "latest"}, structs.Channel{
 			Wireguard: structs.VersionDetails{
 				Repo:        "ghcr.io/nativeplanet/wireguard",
 				Amd64Sha256: "amd-hash",
@@ -58,10 +49,10 @@ func TestUpdateWGConfWritesVersionData(t *testing.T) {
 		}
 	}
 
-	if err := UpdateWGConf(); err != nil {
+	if err := updateWGConf(runtime); err != nil {
 		t.Fatalf("UpdateWGConf failed: %v", err)
 	}
-	path := filepath.Join(BasePath, "settings", "wireguard.json")
+	path := filepath.Join(BasePath(), "settings", "wireguard.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read wireguard.json failed: %v", err)
@@ -96,28 +87,19 @@ func TestWgKeyGenProducesValidKeys(t *testing.T) {
 }
 
 func TestCycleWgKeyUpdatesConfFromGeneratedKeys(t *testing.T) {
-	t.Cleanup(resetWGSeams)
-
-	wgKeyGenForCycle = func() (string, string, error) {
+	runtime := defaultWireguardRuntime()
+	runtime.generateWgKeypair = func() (string, string, error) {
 		return "private-key", "public-key", nil
 	}
 
 	var capturedPub, capturedPriv string
-	updateConfTypedForCycle = func(opts ...ConfUpdateOption) error {
-		patch := &ConfPatch{}
-		for _, opt := range opts {
-			opt(patch)
-		}
-		if patch.Pubkey != nil {
-			capturedPub = *patch.Pubkey
-		}
-		if patch.Privkey != nil {
-			capturedPriv = *patch.Privkey
-		}
+	runtime.applyWgKeys = func(pub, priv string) error {
+		capturedPub = pub
+		capturedPriv = priv
 		return nil
 	}
 
-	if err := CycleWgKey(); err != nil {
+	if err := cycleWGKey(runtime); err != nil {
 		t.Fatalf("CycleWgKey failed: %v", err)
 	}
 	if capturedPub != "public-key" || capturedPriv != "private-key" {
@@ -126,22 +108,24 @@ func TestCycleWgKeyUpdatesConfFromGeneratedKeys(t *testing.T) {
 }
 
 func TestCycleWgKeyErrors(t *testing.T) {
-	t.Cleanup(resetWGSeams)
+	runtime := defaultWireguardRuntime()
+	keyGenErr := errors.New("gen failed")
+	updateErr := errors.New("update failed")
 
-	wgKeyGenForCycle = func() (string, string, error) {
-		return "", "", errors.New("gen failed")
+	runtime.generateWgKeypair = func() (string, string, error) {
+		return "", "", keyGenErr
 	}
-	if err := CycleWgKey(); err == nil || !strings.Contains(err.Error(), "Couldn't reset WG keys") {
-		t.Fatalf("expected keygen failure, got %v", err)
+	if err := cycleWGKey(runtime); err == nil || !errors.Is(err, keyGenErr) {
+		t.Fatalf("expected wrapped keygen failure, got %v", err)
 	}
 
-	wgKeyGenForCycle = func() (string, string, error) {
+	runtime.generateWgKeypair = func() (string, string, error) {
 		return "priv", "pub", nil
 	}
-	updateConfTypedForCycle = func(...ConfUpdateOption) error {
-		return errors.New("update failed")
+	runtime.applyWgKeys = func(string, string) error {
+		return updateErr
 	}
-	if err := CycleWgKey(); err == nil || !strings.Contains(err.Error(), "Couldn't update new WG keys") {
-		t.Fatalf("expected update failure, got %v", err)
+	if err := cycleWGKey(runtime); err == nil || !errors.Is(err, updateErr) {
+		t.Fatalf("expected wrapped update failure, got %v", err)
 	}
 }

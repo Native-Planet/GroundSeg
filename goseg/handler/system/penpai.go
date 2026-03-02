@@ -3,21 +3,21 @@ package system
 import (
 	"encoding/json"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/handler/systemsvc"
 	"runtime"
 )
 
 var (
 	confForPenpai                 = config.Conf
-	stopContainerByNameForPenpai  = docker.StopContainerByName
-	startContainerForPenpai       = docker.StartContainer
+	stopContainerByNameForPenpai  = orchestration.StopContainerByName
+	startContainerForPenpai       = orchestration.StartContainer
 	updateContainerStateForPenpai = config.UpdateContainerState
 	updateConfTypedForPenpai      = config.UpdateConfTyped
 	withPenpaiRunningForPenpai    = config.WithPenpaiRunning
 	withPenpaiActiveForPenpai     = config.WithPenpaiActive
 	withPenpaiCoresForPenpai      = config.WithPenpaiCores
-	deleteContainerForPenpai      = docker.DeleteContainer
+	deleteContainerForPenpai      = orchestration.DeleteContainer
 	numCPUForPenpai               = runtime.NumCPU
 )
 

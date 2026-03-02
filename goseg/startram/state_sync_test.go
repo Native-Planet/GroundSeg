@@ -43,8 +43,8 @@ func (service *spyStartramConfigService) SetStartramConfig(retrieve structs.Star
 	service.setConfigs = append(service.setConfigs, retrieve)
 }
 
-func (service *spyStartramConfigService) BasePath() string {
-	return ""
+func (service *spyStartramConfigService) RuntimeContext() config.RuntimeContext {
+	return config.RuntimeContext{}
 }
 
 type spyEventPublisher struct {
@@ -133,6 +133,47 @@ func TestSyncRetrievePropagatesApplyStateError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "apply failed") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSyncRetrieveMasksConnectionErrors(t *testing.T) {
+	originalAPIClient := defaultAPIClient
+	originalConfigService := defaultConfigService
+	t.Cleanup(func() {
+		defaultAPIClient = originalAPIClient
+		defaultConfigService = originalConfigService
+	})
+
+	service := &spyStartramConfigService{
+		settings: config.StartramSettings{
+			EndpointURL: "api.example.com",
+			Pubkey:      "abc123DEF4560K",
+		},
+	}
+	upstreamErr := errors.New("unable to dial upstream host")
+	SetConfigService(service)
+	SetAPIClient(stubStartramAPIClient{
+		getFn: func(string) (*http.Response, error) {
+			return nil, upstreamErr
+		},
+		postFn: func(string, string, io.Reader) (*http.Response, error) {
+			t.Fatal("post should not be called by SyncRetrieve")
+			return nil, nil
+		},
+	})
+
+	_, err := SyncRetrieve()
+	if err == nil {
+		t.Fatal("expected SyncRetrieve to fail on client connection error")
+	}
+	if err.Error() != APIConnectionErrorMessage {
+		t.Fatalf("expected masked API connection message %q, got %q", APIConnectionErrorMessage, err)
+	}
+	if !strings.Contains(err.Error(), "connect") {
+		t.Fatalf("unexpected stable message: %q", err)
+	}
+	if !errors.Is(err, upstreamErr) {
+		t.Fatalf("expected wrapped connection error chain to preserve original cause")
 	}
 }
 

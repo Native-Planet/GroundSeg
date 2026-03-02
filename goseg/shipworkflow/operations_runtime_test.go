@@ -6,25 +6,20 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"groundseg/docker"
-	"groundseg/structs"
 )
 
-func resetWorkflowSeams() {
-	publishUrbitTransitionForWorkflow = docker.PublishUrbitTransition
-	sleepForWorkflow = time.Sleep
-}
-
 func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
-	t.Cleanup(resetWorkflowSeams)
-	sleepForWorkflow = func(time.Duration) {}
 	var events []string
-	publishUrbitTransitionForWorkflow = func(trans structs.UrbitTransition) {
-		events = append(events, trans.Event)
+	runtime := workflowRuntime{
+		emitTransitionFn: func(patp, transitionType, event string) {
+			_ = patp
+			_ = transitionType
+			events = append(events, event)
+		},
+		sleepFn: func(time.Duration) {},
 	}
 
-	err := RunTransitionedOperation("~zod", "backup", "loading", "success", time.Second, func() error { return nil })
+	err := runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -33,7 +28,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	}
 
 	events = nil
-	err = RunTransitionedOperation("~zod", "backup", "loading", "success", 0, func() error {
+	err = runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", 0, func() error {
 		return errors.New("boom")
 	})
 	if err == nil {
@@ -45,8 +40,6 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 }
 
 func TestPollWithTimeout(t *testing.T) {
-	t.Cleanup(resetWorkflowSeams)
-
 	attempts := 0
 	err := PollWithTimeout(context.Background(), time.Millisecond, func() (bool, error) {
 		attempts++
@@ -74,14 +67,15 @@ func TestPollWithTimeout(t *testing.T) {
 }
 
 func TestPublishTransitionWithPolicy(t *testing.T) {
-	t.Cleanup(resetWorkflowSeams)
-	sleepForWorkflow = func(time.Duration) {}
-
 	var events []int
+	runtime := workflowRuntime{
+		emitTransitionFn: func(string, string, string) {},
+		sleepFn:          func(time.Duration) {},
+	}
 	publish := func(value int) {
 		events = append(events, value)
 	}
-	PublishTransitionWithPolicy(publish, 1, 0, time.Second)
+	publishTransition(runtime, publish, 1, 0, time.Second)
 	if !reflect.DeepEqual(events, []int{1, 0}) {
 		t.Fatalf("unexpected transition sequence: %v", events)
 	}

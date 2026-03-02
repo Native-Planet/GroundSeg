@@ -1,19 +1,25 @@
 package adapters
 
 import (
+	"groundseg/protocol/actions"
 	"groundseg/structs"
 	"groundseg/uploadsvc"
 )
 
 func CommandFromWsPayload(payload structs.WsUploadPayload) (uploadsvc.Command, error) {
-	action, err := uploadsvc.ParseAction(payload.Payload.Action)
+	action, err := actions.ParseUploadAction(payload.Payload.Action)
 	if err != nil {
 		return uploadsvc.Command{}, err
 	}
-	return uploadsvc.Command{
-		Action:              action,
-		OpenEndpointRequest: OpenEndpointRequestFromWsPayload(payload),
-	}, nil
+
+	openEndpointRequest := OpenEndpointRequestFromWsPayload(payload)
+	var resetRequest *uploadsvc.ResetRequest
+
+	switch action {
+	case actions.ActionUploadReset:
+		resetRequest = &uploadsvc.ResetRequest{}
+	}
+	return uploadsvc.CommandFromUploadInputs(action, openEndpointRequest, resetRequest)
 }
 
 func OpenEndpointRequestFromWsPayload(payload structs.WsUploadPayload) uploadsvc.OpenEndpointRequest {

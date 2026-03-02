@@ -32,6 +32,7 @@ changed_files="$(git diff --name-only "${base_ref}"...HEAD)"
 upload_handler_changed=0
 upload_service_changed=0
 startram_errors_changed=0
+protocol_actions_changed=0
 if changed "goseg/handler/ws/upload.go"; then
   upload_handler_changed=1
 fi
@@ -41,8 +42,11 @@ fi
 if changed "goseg/startram/errors.go"; then
   startram_errors_changed=1
 fi
+if changed "goseg/protocol/actions/actions.go"; then
+  protocol_actions_changed=1
+fi
 
-if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 ]]; then
+if [[ ${upload_handler_changed} -eq 0 && ${upload_service_changed} -eq 0 && ${startram_errors_changed} -eq 0 && ${protocol_actions_changed} -eq 0 ]]; then
   echo "Runtime contract surfaces unchanged; contract gate passed."
   exit 0
 fi
@@ -68,9 +72,17 @@ if [[ ${startram_errors_changed} -eq 1 ]] && ! changed "goseg/startram/errors_te
   exit 1
 fi
 
+if [[ ${protocol_actions_changed} -eq 1 ]] && ! changed "goseg/protocol/actions/actions_test.go"; then
+  echo "Protocol actions contract violation:"
+  echo "  goseg/protocol/actions/actions.go changed without goseg/protocol/actions/actions_test.go update."
+  echo "Required coverage: namespace contract parity and unsupported-action behavior."
+  exit 1
+fi
+
 echo "Runtime contract files changed with matching tests. Running targeted contract suites."
 cd goseg
 
 go test ./handler/ws -run 'TestUploadHandlerBranchMatrix|TestUploadHandlerDispatchesActions|TestUploadHandlerPropagatesServiceErrors|TestUploadHandlerRejectsUnknownAction|TestNewUploadMessageHandlerNilServiceAndUploadRejectsMalformedJSON' -count=1
 go test ./uploadsvc -run 'TestExecutorDispatchTableParityAcrossSupportedActions|TestExecutorSupportedActionsMatchesContract|TestExecutorReturnsUnsupportedActionError' -count=1
 go test ./startram -run 'TestWrapAPIConnectionErrorRedactsUpstreamDetailsAndPreservesCause|TestWrapAPIConnectionErrorRetainsStableMessageWithoutPubkey' -count=1
+go test ./protocol/actions -run 'TestParseUploadActionRejectsUnknown|TestSupportedUploadActionsMatchesContract|TestSupportedC2CActionsMatchesContract' -count=1

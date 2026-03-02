@@ -1,0 +1,69 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 82.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`README.md` defines the Runtime Contract Gate as checking only `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, and `goseg/startram/errors.go`, while `goseg/protocol/actions/actions.go` is the shared action contract source for upload/c2c flows.",
+        "The action contract in `goseg/protocol/actions/actions.go` is consumed across transport/service boundaries (notably by upload-related code), so skipping it from governance coverage leaves cross-module action changes unreviewed by docs/runtime contract checks.",
+        "The same file has no local contract test coverage in the packet (`actions.go` was previously flagged as an untested module), so parser/namespace behavior drift is only indirectly caught through higher-layer tests."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract_surface_excluded_from_runtime_gate",
+      "summary": "Action-contract registry is outside documented runtime contract gate coverage despite being a shared boundary.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`README.md` documents runtime contract gate inputs and excludes `goseg/protocol/actions/actions.go`.",
+        "`goseg/protocol/actions/actions.go` defines canonical action tokens and validation for upload/c2c namespaces used by other modules, so governance coverage has a boundary blind spot."
+      ],
+      "suggestion": "Add `goseg/protocol/actions/actions.go` (and its test target) to the Runtime Contract Gate inputs and update the contract-gate script/checklist to treat action set changes as contract changes requiring paired tests.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_surface_coverage_gap"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "shared_action_contract_lacks_boundary_tests",
+      "summary": "Shared action parser/registry has no direct boundary tests, weakening cross-module contract enforcement.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "The listed module provides `ParseAction`, namespace lists, and `UnsupportedActionError` mapping logic used across transports, yet there is no direct `_test` in that package in the reviewed surface.",
+        "`goseg/uploadsvc/adapters/upload_payload_test.go` validates adapter mapping for known cases but does not independently assert parser invariants (namespace validation/error semantics order/casing/unsupported behavior) of the shared actions contract."
+      ],
+      "suggestion": "Create protocol-level tests for `ParseAction`, `SupportedActions`, and namespace-specific invalid/duplicate/unknown behavior, then lock these to the adapter/service expected contract through a shared parity test pattern.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "contract_surface_coverage_gap"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Architecture governance is documenting and gating select contract surfaces, but shared protocol contracts in `protocol/actions` are not included, creating a governance gap."
+    ],
+    "likely_symptoms": [
+      "contract_surface_excluded_from_runtime_gate",
+      "shared_action_contract_lacks_boundary_tests"
+    ],
+    "possible_false_positives": [
+      "A future CI redesign might enforce protocol contract checks outside README-listed paths, which would invalidate this finding if documented."
+    ]
+  }
+}

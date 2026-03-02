@@ -1,62 +1,73 @@
 package config
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"groundseg/config/wireguardbuilder"
+	"groundseg/config/wireguardkeys"
+	"groundseg/config/wireguardstore"
 	"groundseg/defaults"
 	"groundseg/structs"
-	"io/ioutil"
-	"os"
 	"path/filepath"
-
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-var (
-	confForWG               = Conf
-	getVersionChannelForWG  = GetVersionChannel
-	wgKeyGenForCycle        = WgKeyGen
-	updateConfTypedForCycle = UpdateConfTyped
-)
+type wireguardSpecsSource func() (structs.SysConfig, structs.Channel)
+type wireguardKeyGenerator func() (string, string, error)
+type wireguardConfigBuilder func(structs.SysConfig, structs.Channel) structs.WgConfig
+type wireguardKeyApplier func(string, string) error
+
+type wireguardRuntime struct {
+	loadWGSpecs       wireguardSpecsSource
+	generateWgKeypair wireguardKeyGenerator
+	applyWgKeys       wireguardKeyApplier
+	buildConfig       wireguardConfigBuilder
+	wgConfigPath      func() string
+	configStore       wireguardstore.WireguardConfigStore
+}
+
+func defaultWireguardRuntime() wireguardRuntime {
+	return wireguardRuntime{
+		loadWGSpecs: func() (structs.SysConfig, structs.Channel) {
+			return Conf(), GetVersionChannel()
+		},
+		generateWgKeypair: WgKeyGen,
+		applyWgKeys: func(pub, priv string) error {
+			return UpdateConfTyped(
+				WithPubkey(pub),
+				WithPrivkey(priv),
+			)
+		},
+		buildConfig:  wireguardbuilder.BuildConfig,
+		wgConfigPath: func() string { return filepath.Join(BasePath(), "settings", "wireguard.json") },
+		configStore:  wireguardstore.FileStore{},
+	}
+}
 
 // retrieve struct corresponding with urbit json file
 func GetWgConf() (structs.WgConfig, error) {
-	var wgConf structs.WgConfig
-	path := filepath.Join(BasePath, "settings", "wireguard.json")
-	configFile, err := os.Open(path)
-	if err != nil {
-		return wgConf, err
-	}
-	defer configFile.Close()
+	return getWgConf(defaultWireguardRuntime())
+}
 
-	// Read file contents into byte slice
-	byteValue, err := ioutil.ReadAll(configFile)
+func getWgConf(runtime wireguardRuntime) (structs.WgConfig, error) {
+	path := runtime.wgConfigPath()
+	wgConf, err := runtime.configStore.Load(path)
 	if err != nil {
-		return wgConf, err
-	}
-
-	if err := json.Unmarshal(byteValue, &wgConf); err != nil {
-		return wgConf, err
+		return structs.WgConfig{}, fmt.Errorf("couldn't open WireGuard config %s: %w", path, err)
 	}
 	return wgConf, nil
 }
 
 // write a hardcoded default container conf to disk
 func CreateDefaultWGConf() error {
+	return createDefaultWGConf(defaultWireguardRuntime())
+}
+
+func createDefaultWGConf(runtime wireguardRuntime) error {
 	defaultConfig := defaults.WgConfig
-	path := filepath.Join(BasePath, "settings", "wireguard.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
+	path := runtime.wgConfigPath()
+	if err := runtime.configStore.EnsureDir(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("failed to create WireGuard settings directory %s: %w", filepath.Dir(path), err)
 	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&defaultConfig); err != nil {
+	if err := runtime.configStore.Save(path, defaultConfig); err != nil {
 		return err
 	}
 	return nil
@@ -64,65 +75,40 @@ func CreateDefaultWGConf() error {
 
 // write a container conf to disk from version server info
 func UpdateWGConf() error {
-	conf := confForWG()
-	versionInfo := getVersionChannelForWG()
-	releaseChannel := conf.UpdateBranch
-	wgRepo := versionInfo.Wireguard.Repo
-	amdHash := versionInfo.Wireguard.Amd64Sha256
-	armHash := versionInfo.Wireguard.Arm64Sha256
-	newConfig := structs.WgConfig{
-		WireguardName:    "wireguard",
-		WireguardVersion: releaseChannel,
-		Repo:             wgRepo,
-		Amd64Sha256:      amdHash,
-		Arm64Sha256:      armHash,
-		CapAdd:           []string{"NET_ADMIN", "SYS_MODULE"},
-		Volumes:          []string{"/lib/modules:/lib/modules"},
-		Sysctls: struct {
-			NetIpv4ConfAllSrcValidMark int `json:"net.ipv4.conf.all.src_valid_mark"`
-		}{
-			NetIpv4ConfAllSrcValidMark: 1,
-		},
-	}
-	path := filepath.Join(BasePath, "settings", "wireguard.json")
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(&newConfig); err != nil {
-		return err
+	return updateWGConf(defaultWireguardRuntime())
+}
+
+func updateWGConf(runtime wireguardRuntime) error {
+	conf, versionInfo := runtime.loadWGSpecs()
+	newConfig := runtime.buildConfig(conf, versionInfo)
+	path := runtime.wgConfigPath()
+	if err := runtime.configStore.Save(path, newConfig); err != nil {
+		return fmt.Errorf("failed to write updated WireGuard config %s: %w", path, err)
 	}
 	return nil
 }
 
-// wireguard keypair gen
+// write a container conf to disk from version server info
 func WgKeyGen() (privateKeyStr string, publicKeyStr string, err error) {
-	privateKey, err := wgtypes.GeneratePrivateKey()
+	privateKeyStr, publicKeyStr, err = wireguardkeys.GenerateKeyPair()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate private key: %v", err)
+		return "", "", fmt.Errorf("failed to generate private key: %w", err)
 	}
-	// derive pubkey and use startram encoding
-	publicKey := base64.StdEncoding.EncodeToString([]byte(privateKey.PublicKey().String() + "\n"))
-	return privateKey.String(), publicKey, nil
+	return privateKeyStr, publicKeyStr, nil
 }
 
 // cycle on re-reg
 func CycleWgKey() error {
-	priv, pub, err := wgKeyGenForCycle()
+	return cycleWGKey(defaultWireguardRuntime())
+}
+
+func cycleWGKey(runtime wireguardRuntime) error {
+	priv, pub, err := runtime.generateWgKeypair()
 	if err != nil {
-		return fmt.Errorf("Couldn't reset WG keys: %v", err)
+		return fmt.Errorf("Couldn't reset WG keys: %w", err)
 	}
-	if err := updateConfTypedForCycle(
-		WithPubkey(pub),
-		WithPrivkey(priv),
-	); err != nil {
-		return fmt.Errorf("Couldn't update new WG keys: %v", err)
+	if err := runtime.applyWgKeys(pub, priv); err != nil {
+		return fmt.Errorf("Couldn't update new WG keys: %w", err)
 	}
 	return nil
 }

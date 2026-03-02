@@ -142,9 +142,6 @@ func HandleSystem(msg []byte, deps SystemDependencies) error {
 		if err := deps.UpdateConfTyped(deps.WithSwapVal(systemPayload.Payload.Value)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't update swap value: %v", err))
 		}
-		go func() {
-			deps.Sleep(2 * time.Second)
-		}()
 		zap.L().Info(fmt.Sprintf("Swap successfully set to %v", systemPayload.Payload.Value))
 	case "update":
 		if systemPayload.Payload.Update == "linux" {

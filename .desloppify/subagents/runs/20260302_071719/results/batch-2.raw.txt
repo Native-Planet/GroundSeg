@@ -1,0 +1,139 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 58.0,
+    "mid_level_elegance": 70.0,
+    "low_level_elegance": 78.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_seams.go` and `goseg/broadcast/broadcast.go` both introduce large closure-heavy runtime structs instead of cohesive interfaces, each test seam re-creating similar dependency concerns (state update, logging, config retrieval, subsystem orchestration).",
+        "`goseg/main.go` builds subsystems by wiring long lists of functions rather than passing narrow interface contracts, forcing call sites to know too much about implementation details.",
+        "The same dependency concepts (e.g., logging, config/runtime synchronization, external process hooks) are rewrapped across modules instead of being normalized behind shared abstractions."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 52.0,
+        "indirection_cost": 63.0,
+        "interface_honesty": 58.0
+      }
+    },
+    "mid_level_elegance": {
+      "evidence": [
+        "`goseg/routines/version.go` triggers background sync in `startVersionDiscovery` via a detached goroutine that sends results through a channel without structured failure handling or lifecycle cancellation hooks from the caller.",
+        "`goseg/importer/importer.go` performs environment/drive resolution before completing token-based authorization checks, increasing failure surface and making side effects occur before the primary security guard.",
+        "Cross-module seams in `goseg/auth/auth.go` and `goseg/startup_orchestrator.go` are coupled by ad-hoc callback signatures rather than stable contracts, making it easy to compose inconsistent call patterns."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    },
+    "low_level_elegance": {
+      "evidence": [
+        "`goseg/broadcast/broadcast.go` starts goroutines in the broadcast loop while explicitly discarding returned errors from tick execution, so failures are silently dropped.",
+        "The same path has no bounded backoff or centralized stop-aware retry strategy when tick/update operations fail repeatedly.",
+        "`goseg/routines/version.go` has a fire-and-forget version-sync goroutine that reports only via channel value, not via explicit error propagation."
+      ],
+      "impact_scope": "local",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "low_level_elegance",
+      "identifier": "broadcast-tick-errors-silenced",
+      "summary": "Broadcast runtime drops tick errors, making background update failures invisible and unobservable.",
+      "related_files": [
+        "goseg/broadcast/broadcast.go",
+        "goseg/broadcast/loop.go"
+      ],
+      "evidence": [
+        "`StartBroadcastLoopWithRuntime` launches async tick execution and the returned error is intentionally ignored, so update/transform failures never bubble to startup orchestration or observability.",
+        "No retry cap/backoff and no error channel means repeated transport/config errors cannot be surfaced or tripped into a controlled shutdown path."
+      ],
+      "suggestion": "Return tick errors through an explicit result channel or callback, add bounded retry/backoff with cancellation-aware loop termination, and fail fast or degrade gracefully when persistent errors are detected.",
+      "confidence": "high",
+      "impact_scope": "local",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "async-error-opaque-flow"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime-seams-fragmented-adapters",
+      "summary": "Runtime seam layer is fragmented into many function fields, reducing interface clarity and compounding adapter complexity.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/broadcast/broadcast.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "Multiple modules independently define constructor-time function bags for overlapping concerns instead of reusable interfaces, forcing consumers to wire broad, manually-maintained dependency lists.",
+        "`main`-level bootstrap logic is coupled to module-specific callback shapes, which defeats stable module boundaries and increases coupling for tests and consumers.",
+        "New seams are added as ad-hoc closures without a consolidated contract for lifecycle, configuration, and system interactions."
+      ],
+      "suggestion": "Introduce small, cohesive interfaces for each dependency domain (e.g., broadcaster, version sync, ship/runtime ops) and compose them in a small adapter layer so modules consume stable contracts rather than hand-built closure maps.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime-seam-entropy"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "version-discovery-without-cancel",
+      "summary": "Version-sync goroutine has no cancellation-aware error/exit channel contract, risking blocked sends and unbounded background work.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "A spawned goroutine in version discovery sends sync output into a channel but error handling is limited to the success path and is not tied to caller cancellation.",
+        "The loop structure assumes a single happy-path value and does not expose an explicit failure signal separate from data updates."
+      ],
+      "suggestion": "Thread a context/cancel path through discovery, return both update and error via a structured channel payload, and ensure goroutine exits without blocking when background orchestration is stopped.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "async-error-opaque-flow"
+    },
+    {
+      "dimension": "mid_level_elegance",
+      "identifier": "import-auth-late-validation",
+      "summary": "Importer performs resource selection before authorization validation, enabling avoidable work on unauthorized calls and inconsistent failure timing.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`OpenUploadEndpoint` resolves selected/custom drives before confirming the request is authorized.",
+        "This order can trigger IO and lookup side effects even when the caller fails auth, and pushes security checks late in the call path."
+      ],
+      "suggestion": "Reorder `OpenUploadEndpoint` to perform authentication/authorization first, then execute storage discovery and endpoint creation only for authorized sessions.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "auth-first-flow"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam design is over-fragmented and function-bag driven, which makes dependency flow hard to reason about and increases coupling between modules.",
+      "Asynchronous operations frequently treat background tasks as fire-and-forget, with weak error surfaces and weak lifecycle termination semantics.",
+      "Security/capability checks are not consistently placed at method entry for some external-facing paths."
+    ],
+    "likely_symptoms": [
+      "broadcast-tick-errors-silenced",
+      "runtime-seams-fragmented-adapters",
+      "version-discovery-without-cancel",
+      "import-auth-late-validation"
+    ],
+    "possible_false_positives": [
+      "The broadcast tick error suppression may be intentionally tolerated for non-fatal telemetry behavior; if so, this is a design-policy issue versus a hard correctness defect.",
+      "The auth ordering issue in importer may have been intentionally chosen for UX/perf reasons if drive resolution has side effects that need to be shown before auth denial."
+    ]
+  }
+}

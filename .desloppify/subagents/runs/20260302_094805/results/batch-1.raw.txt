@@ -1,0 +1,123 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 74.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seam objects are very large callback bags with manual merge/validation logic (for example startupRuntime.withDefaults and startupRuntime.validate in goseg/startup_orchestrator.go, plus many nested *Ops callback structs in goseg/docker/orchestration/runtime_seams.go).",
+        "Several \"WithRuntime\" paths still read global config/static state directly, bypassing the seam contract (ConstructPierInfoWithRuntime in goseg/broadcast/collectors/collectors.go calls config.GetStartramConfig; areSubdomainsAliasesWithRuntime in goseg/shipworkflow/operations_runtime.go calls config.GetStartramConfig directly).",
+        "Multiple exported wrappers are thin pass-through layers that mainly nil-check and forward (bootstrapRuntimeFns methods in goseg/main.go; package-level wrappers forwarding to defaultRuntime methods in goseg/docker/lifecycle/lifecycle.go).",
+        "Context and non-context variants duplicate substantial workflow bodies instead of sharing a single core implementation (RectifyUrbit vs RectifyUrbitWithContext in goseg/rectify/rectify.go; DiskUsageWarning vs DiskUsageWarningWithContext and SmartDiskCheck variants in goseg/routines/healthcheck/disk.go)."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 71.0,
+        "indirection_cost": 68.0,
+        "interface_honesty": 73.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "callback_bag_runtime_overgrowth",
+      "summary": "Oversized callback-bag runtimes create high indirection and fragile wiring surfaces.",
+      "related_files": [
+        "goseg/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "startupRuntime.withDefaults manually copies many individual function fields and startupRuntime.validate repeats the same callback inventory, indicating seam surface bloat.",
+        "startBackgroundServicesRuntime.validate enumerates a long list of required callbacks before any behavior runs, signaling orchestration defined by callback completeness rather than cohesive collaborators.",
+        "docker/orchestration runtime_seams defines many nested ops structs with dozens of function pointers and manual assignment in newDockerRuntime, increasing mapping overhead and drift risk.",
+        "importerRuntime uses multiple callback fields with explicit ensure* checks; this repeats the same callback-bag pattern in another subsystem."
+      ],
+      "suggestion": "Replace large function-pointer bags with smaller capability interfaces per use case (for example StartupInit, BackgroundServiceLauncher, ContainerImageResolver), then inject concrete structs that own related behavior. Keep constructor-time validation per capability interface instead of field-by-field nil checks.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "withruntime_leaks_to_globals",
+      "summary": "Injected runtime seams are bypassed by direct global config/state reads in core paths.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "ConstructPierInfoWithRuntime accepts collectorRuntime but still calls config.GetStartramConfig directly for backups/subdomains, so caller-provided runtime cannot fully control behavior.",
+        "areSubdomainsAliasesWithRuntime accepts workflowRuntime for dependency injection but directly calls config.GetStartramConfig for CNAME short-circuit logic.",
+        "startramTransitionCommand.Apply directly reads config.Conf while transition update flow otherwise uses command abstractions, mixing seam-based and global access patterns."
+      ],
+      "suggestion": "Make seam-bearing functions fully seam-owned: add snapshot/config providers to the runtime objects (or pass explicit immutable settings structs) and remove direct package-global config reads from \"WithRuntime\" code paths.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_overengineering"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_layers",
+      "summary": "Multiple exported wrappers add call depth without adding policy or translation.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/subsystem/docker.go"
+      ],
+      "evidence": [
+        "bootstrapRuntimeFns methods in main.go mostly perform nil checks and delegate directly to stored callbacks, creating an extra abstraction layer with little domain behavior.",
+        "bootstrapSubsystemsWithRuntime wraps runtime.ops methods into StartupOptions closures that simply forward calls, increasing indirection around startup flow.",
+        "docker/lifecycle exposes package-level functions (e.g., GetShipStatus, GetContainerImageTag, StartContainer, CreateContainer) that immediately delegate to defaultRuntime methods with no policy transformation.",
+        "subsystem entrypoints like StartDockerSubsystem call StartDockerSubsystemWithContext then swallow returned error, reducing usefulness of wrapper boundaries."
+      ],
+      "suggestion": "Collapse pass-through wrappers where no policy is added. Keep one public boundary per workflow (either function API or runtime object API), and move nil-check/defaulting into constructors so call sites invoke behavior directly.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "indirection_without_policy"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "parallel_context_noncontext_implementations",
+      "summary": "Context and non-context API pairs duplicate logic instead of sharing a single core loop.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/routines/healthcheck/disk.go",
+        "goseg/routines/system/system.go"
+      ],
+      "evidence": [
+        "RectifyUrbit and RectifyUrbitWithContext contain nearly identical event dispatch switch logic, duplicated across two loops.",
+        "SmartDiskCheck and SmartDiskCheckWithContext duplicate body logic for listing/checking disks and notifications; only the wait/cancel mechanism differs.",
+        "DiskUsageWarning and DiskUsageWarningWithContext duplicate large switch-based warning update logic; only sleep vs select differs.",
+        "Similar dual-path patterns appear in routines/system (Start* and Start*WithContext variants), reinforcing repeated maintenance surfaces."
+      ],
+      "suggestion": "Refactor each pair to a single internal implementation that takes a wait/cancel strategy (or context + ticker abstraction). Keep one behavior core and expose thin adapters for legacy signatures.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "dual_path_api_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Function-pointer seam design scaled by accretion rather than capability-oriented boundaries.",
+      "Incomplete migration from global mutable config access to explicit injected snapshots/runtime dependencies.",
+      "Legacy API compatibility retained by duplicating full implementations instead of delegating to shared cores."
+    ],
+    "likely_symptoms": [
+      "withruntime_leaks_to_globals",
+      "pass_through_wrapper_layers",
+      "parallel_context_noncontext_implementations"
+    ],
+    "possible_false_positives": []
+  }
+}

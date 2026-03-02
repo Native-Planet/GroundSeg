@@ -2,8 +2,8 @@ package system
 
 import (
 	"archive/zip"
-	"io"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -118,11 +118,6 @@ func TestSanitizeJSONRemovesRequestedKeys(t *testing.T) {
 }
 
 func TestSendBugReportIncludesServerBodyOnFailure(t *testing.T) {
-	originalEndpoint := bugEndpoint
-	t.Cleanup(func() {
-		bugEndpoint = originalEndpoint
-	})
-
 	var gotPayload []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
@@ -135,15 +130,13 @@ func TestSendBugReportIncludesServerBodyOnFailure(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	bugEndpoint = srv.URL
-
 	tmpDir := t.TempDir()
 	zipPath := filepath.Join(tmpDir, "report.zip")
 	if err := os.WriteFile(zipPath, []byte("dummy"), 0o644); err != nil {
 		t.Fatalf("write bug report zip: %v", err)
 	}
 
-	err := sendBugReport(zipPath, "test@example.com", "desc")
+	err := sendBugReportWithEndpoint(zipPath, "test@example.com", "desc", srv.URL)
 	if err == nil {
 		t.Fatal("expected sendBugReport to return error")
 	}

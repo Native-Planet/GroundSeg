@@ -1,0 +1,49 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 87.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` is the protocol-level source of action tokens and validators (`ParseAction`, `SupportedActions`, `ActionUploadOpenEndpoint`, `ActionC2CConnect`).",
+        "`goseg/uploadsvc/adapters/upload_payload_test.go` exercises upload actions via `uploadsvc.ActionOpenEndpoint` and `uploadsvc.ActionReset` and checks for `uploadsvc.UnsupportedActionError`, indicating a separate action contract surface at call sites."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "Action contract appears to be defined in multiple modules, creating coupling-by-convention and drift risk between protocol action validation and upload service command construction."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "action_contract_split",
+      "summary": "Upload action contract is duplicated across protocol and upload service boundaries instead of being shared through one canonical type.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/adapters/upload_payload_test.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` defines `ActionUploadOpenEndpoint`, `ActionUploadReset`, namespace-aware parsing, and `UnsupportedActionError` for protocol actions.",
+        "The adapter test constructs payloads using `uploadsvc.ActionOpenEndpoint` / `uploadsvc.ActionReset` and validates `uploadsvc.UnsupportedActionError`, not the protocol action type path.",
+        "This introduces parallel action enums and duplicate transport-level validation semantics without explicit parity checks."
+      ],
+      "suggestion": "Create a single canonical action type used by both protocol parsing and uploadsvc command mapping (for example, re-export protocol actions from uploadsvc or move parse/validation into a shared boundary module), then delete duplicated action constants and keep explicit compile-time/per-module parity tests.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "action_contract_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Lack of a single ownership boundary for action vocabularies between protocol and upload service."
+    ],
+    "likely_symptoms": [
+      "action_contract_split"
+    ],
+    "possible_false_positives": []
+  }
+}

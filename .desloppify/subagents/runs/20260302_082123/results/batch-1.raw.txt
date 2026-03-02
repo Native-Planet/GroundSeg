@@ -1,0 +1,72 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 79.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "goseg/protocol/actions/actions.go defines `type ContractCompatibility = contracts.ContractCompatibility` and re-exports four contract-compatibility constants directly from `groundseg/protocol/contracts`.",
+        "goseg/startram/errors.go duplicates the same compatibility alias + constant mapping and defines a separate protocol-ish error contract descriptor plus version-gating helpers.",
+        "Both files maintain independent helpers for contract-version behavior (`isActionContractDeprecated`/`isActionContractActive` in actions vs `IsAPIConnectionErrorContractActive`/`IsAPIConnectionErrorContractDeprecated` in startram), which duplicates evolution policy across module boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-boundary-shim-dup",
+      "summary": "Protocol and StarTram each duplicate contract-compatibility type/constant shims, creating coupled boundary boilerplate across modules.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "actions.go: `type ContractCompatibility = contracts.ContractCompatibility` and `CompatibilityStable`, `CompatibilityDeprecated`, `CompatibilityRemoved`, `CompatibilityBackwardSafe` constants are redefined as aliases.",
+        "errors.go: same alias type and same four compatibility constants are redefined again for StarTram-specific use."
+      ],
+      "suggestion": "Extract a shared protocol-contract boundary module (or dedicated compatibility façade) that owns contract compatibility constants and expose canonical types once, then consume from both modules; remove duplicated re-export blocks.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_duplication"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "contract-evolution-policy-fragmentation",
+      "summary": "Contract lifecycle checks are split into separate module-specific implementations, increasing risk of drift in compatibility semantics.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/startram/errors.go"
+      ],
+      "evidence": [
+        "actions.go computes deprecation/active state in local helpers (`isActionContractDeprecated`, `isActionContractActive`) against `ContractMetadata`.",
+        "errors.go has independent exported helpers (`IsAPIConnectionErrorContractActive`, `IsAPIConnectionErrorContractDeprecated`, `APIConnectionErrorContractForVersion`) that separately evaluate version gates.",
+        "The two modules each maintain contract descriptors/metadata logic (`uploadActionContracts` + `apiConnectionErrorContract`) without a single shared contract registry."
+      ],
+      "suggestion": "Introduce a shared contract descriptor registry and generic lifecycle evaluator used by both modules so activation/removal/deprecation semantics remain consistent and centrally testable.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_boundary_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Boundary leakage via local contract-compatibility shims and independent contract-lifecycle helpers",
+      "Lack of a central protocol contract registry for cross-module version policy"
+    ],
+    "likely_symptoms": [
+      "contract-boundary-shim-dup",
+      "contract-evolution-policy-fragmentation"
+    ],
+    "possible_false_positives": [
+      "The duplication is intentional API-shaping/encapsulation for module-specific public APIs",
+      "Current duplication is stable and covered by explicit tests preventing semantic drift"
+    ]
+  }
+}

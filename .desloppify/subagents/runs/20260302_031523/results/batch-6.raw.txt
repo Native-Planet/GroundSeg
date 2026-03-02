@@ -1,0 +1,203 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "error_consistency": 78.5,
+    "abstraction_fitness": 90.0,
+    "test_strategy": 79.0,
+    "design_coherence": 82.5
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/config/config.go: Conf()` serializes all readers by taking a write mutex lock for a read-only path.",
+        "`goseg/config/urbit.go: UrbitConf()` also takes a write lock for map reads, creating a shared lock-hotspot across core runtime call sites.",
+        "`goseg/handler/authsvc/auth.go` and `goseg/handler/devsvc/dev.go` repeatedly read config snapshots that transitively depend on these locks."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The architecture already separates config via typed snapshot accessors, but read paths are still centralized on a write lock and create cross-module contention. This limits scalability under high websocket/status polling pressure."
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/config/config_update.go` rejects `swapVal`, `penpaiCores`, and `c2cInterval` only when they are `int`, while JSON-decoded bodies produce `float64` without explicit coercion.",
+        "`goseg/config/config_update.go` requires `authorizedSessions`, `unauthorizedSessions`, and `diskWarning` as concrete typed maps, which will not match raw `map[string]interface{}` payloads.",
+        "`goseg/broadcast/loop.go` ignores the return value of `rt.broadcastToClientsFn()`, so broadcast failures are unobserved and cannot be handled consistently."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Error boundaries are incomplete in two high-risk paths: config patch parsing and broadcast fanout failure handling. Both are user-facing state transitions, so silent failures are still possible even with existing tests."
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_seams.go` introduces broad indirection seams with many pass-through function fields where most closures delegate directly to package functions without policy translation.",
+        "This seam layer is mostly mechanical and can reduce signal in reviews by requiring a wider context for control flow with limited behavioral gain."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "The seam architecture supports testability, but some indirection layers are still largely declarative plumbing. Pruning or consolidating low-value wrappers would improve cohesion and traceability.",
+      "sub_axes": {
+        "abstraction_leverage": 86.0,
+        "indirection_cost": 72.0,
+        "interface_honesty": 89.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "`goseg/exporter/exporter_test.go` validates basic success/failure cases but does not cover multi-file export walk failure paths or descriptor-pressure scenarios where callback-level failures/defer behavior would surface.",
+        "`goseg/broadcast/loop_test.go` tests success and nil-error broadcast flows but does not assert behavior when `broadcastToClientsFn` returns an error."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Critical runtime paths have partial but not failure-mode coverage. Add targeted tests for broadcast notification failure handling and exporter large-directory/file-open failure behavior to reduce blind spots."
+    },
+    "design_coherence": {
+      "evidence": [
+        "`goseg/config/bootstrap.go` shadows `keyPath` inside `initializeConfig` and updates config with the local variable while leaving the package-level `keyPath` stale.",
+        "This creates a split between persistent config value and runtime key path state that can diverge across startup phases.",
+        "`goseg/config/bootstrap.go` also seeds config with key path handling but no clear single source of truth is enforced for follow-on uses."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "confidence": "high",
+      "issues_preventing_higher_score": "Most config path initialization is coherent, but this shadowing introduces a localized state split that undermines predictability in security-related file resolution."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "config-read-locks-serialize-state-access",
+      "summary": "Config read methods use write locks, forcing global serialization across read-heavy handlers.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/urbit.go",
+        "goseg/config/bootstrap.go",
+        "goseg/handler/authsvc/auth.go"
+      ],
+      "evidence": [
+        "`Conf()` takes `confMutex.Lock()` and `defer confMutex.Unlock()` even for immutable read access.",
+        "`UrbitConf()` in `goseg/config/urbit.go` also takes `urbitMutex.Lock()` for read-only lookup.",
+        "Handler paths call these accessors frequently (`handler/authsvc`, `handler/devsvc`) while holding other orchestration/runtime locks in normal operation."
+      ],
+      "suggestion": "Switch these read-mostly paths to `sync.RWMutex` and use `RLock/RUnlock` for reads, then reserve write locks for mutation paths. Consider adding a `ConfigSnapshot()` API that returns immutable snapshots for read-heavy flows.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "shared_runtime_state_locking"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "config-patch-json-type-assumptions",
+      "summary": "Config map patch parsing rejects valid JSON values due to strict `int`/typed-map assertions.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`buildConfigPatch` asserts `swapVal`, `penpaiCores`, `c2cInterval` as `int` and returns type errors for `float64` values.",
+        "`authorizedSessions` and `diskWarning` are asserted as concrete maps instead of decoding from decoded JSON shape.",
+        "The same module also accepts `piers` only as `[]interface{}` or `[]string`, indicating mixed contract handling."
+      ],
+      "suggestion": "Accept JSON payloads using a typed DTO with `json.Decoder.UseNumber()` and normalize numeric fields explicitly (`int(num)`) and nested map shapes through helper decoders instead of direct assertions.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "broadcast-loop-ignores-client-broadcast-errors",
+      "summary": "Broadcast loop discards websocket broadcast failures, masking operational regressions.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/broadcast.go"
+      ],
+      "evidence": [
+        "`runBroadcastTickWithRuntime` calls `rt.broadcastToClientsFn()` and does not inspect the returned error.",
+        "No recovery/backoff/health signal is emitted when broadcast fanout fails.",
+        "Tests in `broadcast/loop_test.go` verify only successful broadcast callbacks."
+      ],
+      "suggestion": "Capture and act on the error from `broadcastToClientsFn`: log with context, increment a metrics counter, and optionally trigger a retry/backoff policy or degraded-mode transition.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "bootstrap-keyfile-path-shadowing",
+      "summary": "Session key path initialization uses a local shadow variable, leaving global path state stale.",
+      "related_files": [
+        "goseg/config/bootstrap.go",
+        "goseg/config/config.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`initializeConfig` defines `keyPath := filepath.Join(BasePath, \"settings\", \"session.key\")` inside the empty-key path branch.",
+        "`UpdateConfTyped(WithKeyfile(keyPath))` updates config but does not update package-level `keyPath` used elsewhere as canonical path state.",
+        "Subsequent code depends on `config`-level state for auth/session key behavior, so dual-path state can diverge."
+      ],
+      "suggestion": "Use package-level `keyPath` consistently in bootstrap/update flow (assign to shared var, then persist), or remove global `keyPath` in favor of deriving from config snapshot everywhere.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "exporter-defers-file-close-in-walk-loop",
+      "summary": "Exporter walk callback defers `Close` inside a tight loop, deferring all file descriptors until handler exit.",
+      "related_files": [
+        "goseg/exporter/exporter.go",
+        "goseg/exporter/exporter_test.go"
+      ],
+      "evidence": [
+        "In `ExportHandler`, each `walkForExporter` callback does `fileReader, err := os.Open(path)` followed by `defer fileReader.Close()`.",
+        "This defer executes when `ExportHandler` returns, not per file iteration, so descriptor count grows with every exported file.",
+        "Current tests only cover a small one-file success path and token checks, not many-file stress behavior."
+      ],
+      "suggestion": "Refactor to `if _, err := ...; err != nil { ... }` then `if _, err := io.Copy(...); err != nil { ... }` with explicit `fileReader.Close()`/`file.Close()` before callback returns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "resource-lifecycle-consistency"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "broadcast-and-export-failure-paths-not-covered",
+      "summary": "Failure-mode tests are missing for high-impact runtime loops and export traversal behavior.",
+      "related_files": [
+        "goseg/broadcast/loop.go",
+        "goseg/broadcast/loop_test.go",
+        "goseg/exporter/exporter.go",
+        "goseg/exporter/exporter_test.go"
+      ],
+      "evidence": [
+        "Broadcast loop tests validate happy-path tick and nil-error callback behavior; no test covers `broadcastToClientsFn` returning an error.",
+        "Exporter tests do not include multi-file exports, induced file-open errors during walk, or descriptor-limit stress cases tied to per-iteration `defer` behavior.",
+        "This leaves two production error paths behaviorally unverified in automated tests."
+      ],
+      "suggestion": "Add focused tests for `broadcastToClientsFn` error propagation and a synthetic multi-file export that forces per-file open/read errors, asserting cleanup, error response code, and absence of resource leaks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Shared mutable singletons (`global config + path state`) are still used as cross-cutting dependencies without strict read/write separation.",
+      "Config patch ingestion relies on hand-rolled assertion-heavy JSON parsing instead of a schema-stable DTO decode pipeline.",
+      "Long-lived I/O loops rely on implicit lifecycle semantics (`defer` in callbacks), which can hide resource-pressure regressions."
+    ],
+    "likely_symptoms": [
+      "config read contention under websocket activity",
+      "runtime config update requests rejected for otherwise valid payload shape",
+      "flaky export behavior on large datasets due descriptor exhaustion"
+    ],
+    "possible_false_positives": [
+      "If `UpdateConf(values map[string]interface{})` is strictly internal dead code, its strict assertions may be lower risk than indicated here."
+    ]
+  }
+}

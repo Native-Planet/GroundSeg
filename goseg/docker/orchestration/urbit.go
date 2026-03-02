@@ -3,6 +3,7 @@ package orchestration
 // start up urbits
 
 import (
+	"errors"
 	"fmt"
 	"groundseg/defaults"
 	"groundseg/structs"
@@ -16,74 +17,84 @@ import (
 
 // load existing urbits from config json
 func LoadUrbits() error {
-	return loadUrbits(newUrbitRuntime())
+	return loadUrbits(urbitRuntimeFromDocker(newDockerRuntime()))
 }
 
-func loadUrbits(rt urbitRuntime) error {
+func loadUrbits(rt UrbitRuntime) error {
 	zap.L().Info("Loading Urbit ships")
+	var startupErrs []error
 	// Loop through pier list
-	ships := rt.shipSettings()
+	ships := rt.ShipSettingsSnapshotFn()
 	for _, pier := range ships.Piers {
 		zap.L().Info(fmt.Sprintf("Loading pier %s", pier))
 		// load json into struct
-		err := rt.loadUrbitConfig(pier)
+		err := rt.LoadUrbitConfigFn(pier)
 		if err != nil {
-			zap.L().Error(fmt.Sprintf("Error loading %s config: %v", pier, err))
+			err = fmt.Errorf("error loading %s config: %w", pier, err)
+			zap.L().Error(err.Error())
+			startupErrs = append(startupErrs, err)
 			continue
 		}
-		shipConf := rt.urbitConf(pier)
+		shipConf := rt.UrbitConfFn(pier)
 		// don't bootstrap if it's busted
 		if shipConf.BootStatus != "noboot" {
-			info, err := rt.startContainer(pier, "vere")
+			info, err := rt.StartContainerFn(pier, "vere")
 			if err != nil {
-				zap.L().Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				err = fmt.Errorf("error starting %s: %w", pier, err)
+				zap.L().Error(err.Error())
+				startupErrs = append(startupErrs, err)
 				continue
 			}
-			rt.updateContainerState(pier, info)
+			rt.UpdateContainerStateFn(pier, info)
 		} else {
-			info, err := rt.createContainer(pier, "vere")
+			info, err := rt.CreateContainerFn(pier, "vere")
 			if err != nil {
-				zap.L().Error(fmt.Sprintf("Error starting %s: %v", pier, err))
+				err = fmt.Errorf("error creating %s: %w", pier, err)
+				zap.L().Error(err.Error())
+				startupErrs = append(startupErrs, err)
 				continue
 			}
-			rt.updateContainerState(pier, info)
+			rt.UpdateContainerStateFn(pier, info)
 		}
+	}
+	if len(startupErrs) > 0 {
+		return fmt.Errorf("load urbits failed for one or more ships: %w", errors.Join(startupErrs...))
 	}
 	return nil
 }
 
 // urbit container config builder
 func urbitContainerConf(containerName string) (container.Config, container.HostConfig, error) {
-	return urbitContainerConfWithRuntime(newUrbitRuntime(), containerName)
+	return urbitContainerConfWithRuntime(urbitRuntimeFromDocker(newDockerRuntime()), containerName)
 }
 
-func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (container.Config, container.HostConfig, error) {
-	runtimeSettings := rt.runtimeSettings()
+func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (container.Config, container.HostConfig, error) {
+	runtimeSettings := rt.RuntimeSettingsSnapshotFn()
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	var scriptContent string
 	// construct the container metadata from version server info
-	containerInfo, err := rt.getLatestContainerInfo("vere")
+	containerInfo, err := rt.GetLatestContainerInfoFn("vere")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
-	minioInfo, err := rt.getLatestContainerInfo("minio")
+	minioInfo, err := rt.GetLatestContainerInfoFn("minio")
 	if err != nil {
 		return containerConfig, hostConfig, err
 	}
 	// compare existing config to current version info
 	// update if new
 	// sorry this is ugly
-	shipConf := rt.urbitConf(containerName)
+	shipConf := rt.UrbitConfFn(containerName)
 	newConf := shipConf
-	if rt.Architecture() == "amd64" {
+	if rt.ArchitectureFn() == "amd64" {
 		if containerInfo["hash"] != shipConf.UrbitAmd64Sha256 {
 			newConf.UrbitAmd64Sha256 = containerInfo["hash"]
 		}
 		if minioInfo["hash"] != shipConf.MinioAmd64Sha256 {
 			newConf.MinioAmd64Sha256 = minioInfo["hash"]
 		}
-	} else if rt.Architecture() == "arm64" {
+	} else if rt.ArchitectureFn() == "arm64" {
 		if containerInfo["hash"] != shipConf.UrbitArm64Sha256 {
 			newConf.UrbitArm64Sha256 = containerInfo["hash"]
 		}
@@ -96,7 +107,7 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 	newConf.MinioVersion = minioInfo["tag"]
 	newConf.MinioRepo = minioInfo["repo"]
 	if shipConf != newConf {
-		if err := rt.updateUrbit(containerName, func(conf *structs.UrbitDocker) error {
+		if err := rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
 			*conf = newConf
 			return nil
 		}); err != nil {
@@ -105,13 +116,14 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
 	// reload urbit conf from disk
-	err = rt.loadUrbitConfig(containerName)
+	err = rt.LoadUrbitConfigFn(containerName)
 	if err != nil {
 		errmsg := fmt.Errorf("Error loading %s config: %v", containerName, err)
 		return containerConfig, hostConfig, errmsg
 	}
+	effectiveConf := rt.UrbitConfFn(containerName)
 	// todo: this BootStatus doesnt actually have anythin to do with pack and meld right now
-	act := shipConf.BootStatus
+	act := effectiveConf.BootStatus
 	// get the correct startup script based on BootStatus val
 	switch act {
 	case "boot", "noboot":
@@ -137,9 +149,9 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 	case "pack", "meld", "chop", "noboot":
 		// we'll set this to noboot because we want to manually control the boot
 		// status the next time handler (or other modules) decides to call this func
-		updateUrbitConf := shipConf
+		updateUrbitConf := effectiveConf
 		updateUrbitConf.BootStatus = "noboot"
-		err = rt.updateUrbit(containerName, func(conf *structs.UrbitDocker) error {
+		err = rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
 			*conf = updateUrbitConf
 			return nil
 		})
@@ -148,9 +160,9 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 		}
 	default:
 		// set everything else back to boot
-		updateUrbitConf := shipConf
+		updateUrbitConf := effectiveConf
 		updateUrbitConf.BootStatus = "boot"
-		err = rt.updateUrbit(containerName, func(conf *structs.UrbitDocker) error {
+		err = rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
 			*conf = updateUrbitConf
 			return nil
 		})
@@ -159,19 +171,19 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 		}
 	}
 	// write the script
-	scriptPath := filepath.Join(rt.DockerDir(), containerName, "_data", "start_urbit.sh")
-	if shipConf.CustomPierLocation != "" {
-		scriptPath = filepath.Join(shipConf.CustomPierLocation, "start_urbit.sh")
+	scriptPath := filepath.Join(rt.DockerDirFn(), containerName, "_data", "start_urbit.sh")
+	if effectiveConf.CustomPierLocation != "" {
+		scriptPath = filepath.Join(effectiveConf.CustomPierLocation, "start_urbit.sh")
 	}
-	err = rt.writeFile(scriptPath, []byte(scriptContent), 0755) // make the script executable
+	err = rt.WriteFileFn(scriptPath, []byte(scriptContent), 0755) // make the script executable
 	if err != nil {
 		return containerConfig, hostConfig, fmt.Errorf("Failed to write script: %v", err)
 	}
 	// gather boot option values
-	shipName := shipConf.PierName
-	loomValue := fmt.Sprintf("%v", shipConf.LoomSize)
+	shipName := effectiveConf.PierName
+	loomValue := fmt.Sprintf("%v", effectiveConf.LoomSize)
 	var devMode string
-	if shipConf.DevMode == true {
+	if effectiveConf.DevMode == true {
 		devMode = "True"
 	} else {
 		devMode = "False"
@@ -182,18 +194,18 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 		snapTime = fmt.Sprintf("%v", runtimeSettings.SnapTime)
 	}
 	// per-ship snap time default
-	if shipConf.SnapTime != 0 && shipConf.SnapTime != 60 {
-		snapTime = fmt.Sprintf("%v", shipConf.SnapTime)
+	if effectiveConf.SnapTime != 0 && effectiveConf.SnapTime != 60 {
+		snapTime = fmt.Sprintf("%v", effectiveConf.SnapTime)
 	}
 	// construct the network configuration based on conf val
 	var httpPort string
 	var amesPort string
 	var network string
 	var portMap nat.PortMap
-	if shipConf.Network == "wireguard" {
-		zap.L().Debug(fmt.Sprintf("%v ship conf: %v", containerName, shipConf))
-		httpPort = fmt.Sprintf("%v", shipConf.WgHTTPPort)
-		amesPort = fmt.Sprintf("%v", shipConf.WgAmesPort)
+	if effectiveConf.Network == "wireguard" {
+		zap.L().Debug(fmt.Sprintf("%v ship conf: %v", containerName, effectiveConf))
+		httpPort = fmt.Sprintf("%v", effectiveConf.WgHTTPPort)
+		amesPort = fmt.Sprintf("%v", effectiveConf.WgAmesPort)
 		network = "container:wireguard"
 		containerConfig = container.Config{
 			Image: desiredImage,
@@ -209,8 +221,8 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 			},
 		}
 	} else {
-		httpPort = fmt.Sprintf("%v", shipConf.HTTPPort)
-		amesPort = fmt.Sprintf("%v", shipConf.AmesPort)
+		httpPort = fmt.Sprintf("%v", effectiveConf.HTTPPort)
+		amesPort = fmt.Sprintf("%v", effectiveConf.AmesPort)
 		network = "default"
 		//httpPortStr := nat.Port(fmt.Sprintf(httpPort + "/tcp"))
 		//amesPortStr := nat.Port(fmt.Sprintf(amesPort + "/udp"))
@@ -242,9 +254,9 @@ func urbitContainerConfWithRuntime(rt urbitRuntime, containerName string) (conta
 	}
 	mountType := mount.TypeVolume
 	sourceStr := shipName
-	if shipConf.CustomPierLocation != "" {
+	if effectiveConf.CustomPierLocation != "" {
 		mountType = mount.TypeBind
-		sourceStr = shipConf.CustomPierLocation
+		sourceStr = effectiveConf.CustomPierLocation
 	}
 	mounts := []mount.Mount{
 		{

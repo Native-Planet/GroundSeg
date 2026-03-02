@@ -1,0 +1,52 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 7,
+  "assessments": {
+    "authorization_consistency": 77.0
+  },
+  "dimension_notes": {
+    "authorization_consistency": {
+      "evidence": [
+        "In `goseg/importer/importer.go`, the upload-websocket/open-endpoint path accepts a token identifier with a looser validation policy than the actual upload-data path.",
+        "In the same file, chunk/upload request validation uses a stricter policy that requires full token value + request context binding, while endpoint-opening only validates identity, causing a policy boundary mismatch.",
+        "Adjacent auth checks in `goseg/auth/auth.go` define token validation policy fields that are used inconsistently across related entry points."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "issues_preventing_higher_score": "The two upload lifecycle entry points (`OpenUploadEndpoint` and `validateUploadRequest`) do not enforce the same authorization contract; one can authorize a session with reduced proof and another requires stronger proof, which blocks the subsystem from scoring consistently in authorization consistency."
+    }
+  },
+  "findings": [
+    {
+      "dimension": "authorization_consistency",
+      "identifier": "upload_auth_policy_split",
+      "summary": "Upload session setup and upload request processing use different token-validation strictness, creating an authorization consistency gap.",
+      "related_files": [
+        "goseg/importer/importer.go",
+        "goseg/auth/auth.go"
+      ],
+      "evidence": [
+        "`OpenUploadEndpoint` validates token/session with a policy that does not require token value validation and does not require request-context binding.",
+        "`validateUploadRequest` (HTTP upload handler path) validates with `ValidateTokenValue: true` and `RequireRequestContext: true`, forcing stronger proof for the data-plane step.",
+        "These two methods gate different parts of the same upload workflow, so an actor that can present only session ID-level proof can progress into session state before strict validation is applied."
+      ],
+      "suggestion": "Introduce a single authorization policy for upload lifecycle operations (e.g., `UploadAuthPolicy`) and apply it in both `OpenUploadEndpoint` and `validateUploadRequest`; if split is intentional, document and encode the rationale explicitly and add regression tests that assert identical required identity guarantees for both setup and ingestion stages.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_auth_policy_inconsistency"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Policy drift where related operations share a workflow but validate different auth guarantees via duplicated call sites."
+    ],
+    "likely_symptoms": [
+      "upload_auth_policy_inconsistency"
+    ],
+    "possible_false_positives": [
+      "The codebase may intentionally separate bootstrap-stage and execution-stage auth guarantees, but this is not documented at call sites and currently appears as a contract mismatch."
+    ]
+  }
+}

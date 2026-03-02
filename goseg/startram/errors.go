@@ -1,12 +1,60 @@
 package startram
 
-import "groundseg/errpolicy"
+import (
+	"groundseg/errpolicy"
+	"groundseg/protocol/contracts"
+)
 
-// apiConnectionErrorMessage is the stable public contract for API transport failures.
-// The wrapped error must keep the original cause for observability while masking
-// transport details from callers.
-const apiConnectionErrorMessage = "Unable to connect to API server"
+var APIConnectionErrorMessage = contracts.MustContractDescriptor(contracts.APIConnectionError).Message
+
+type APIConnectionErrorContractDescriptor = contracts.ContractDescriptor
+
+var apiConnectionErrorContract = APIConnectionErrorContractDescriptor(
+	contracts.MustContractDescriptor(contracts.APIConnectionError),
+)
+
+func APIConnectionErrorContract() APIConnectionErrorContractDescriptor {
+	return apiConnectionErrorContract
+}
+
+type APIConnectionError struct {
+	masked error
+	cause  error
+}
+
+func (e APIConnectionError) Error() string {
+	return e.masked.Error()
+}
+
+func (e APIConnectionError) Unwrap() error {
+	return e.cause
+}
+
+func APIConnectionErrorContractForVersion(version string) (APIConnectionErrorContractDescriptor, bool) {
+	if version == "" {
+		return APIConnectionErrorContract(), false
+	}
+	contract := APIConnectionErrorContract()
+	if !contract.IsActive(version) {
+		return contract, false
+	}
+	return contract, true
+}
+
+func IsAPIConnectionErrorContractActive(version string) bool {
+	_, ok := APIConnectionErrorContractForVersion(version)
+	return ok
+}
+
+func IsAPIConnectionErrorContractDeprecated(version string) bool {
+	contract := APIConnectionErrorContract()
+	return contract.IsDeprecated(version)
+}
 
 func wrapAPIConnectionError(err error) error {
-	return errpolicy.WrapMasked(apiConnectionErrorMessage, err)
+	masked := errpolicy.WrapMasked(APIConnectionErrorMessage, err)
+	return APIConnectionError{
+		masked: masked,
+		cause:  err,
+	}
 }

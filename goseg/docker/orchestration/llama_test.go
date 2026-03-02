@@ -2,44 +2,62 @@ package orchestration
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"groundseg/config"
 	"groundseg/structs"
 )
 
-func TestLoadLlamaDisabledNoop(t *testing.T) {
-	t.Cleanup(func() {
-		confForLlama = config.Conf
-		stopContainerByNameForLlama = StopContainerByName
-		startContainerForLlama = StartContainer
-		updateContainerStateForLlama = config.UpdateContainerState
-	})
+func testLlamaRuntime(dockerDir string) dockerRuntime {
+	return dockerRuntime{
+		contextOps: dockerRuntimeContextOps{
+			DockerDirFn: func() string { return dockerDir },
+		},
+		fileOps: dockerRuntimeFileOps{
+			WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
+		},
+		containerOps: dockerRuntimeContainerOps{
+			StopContainerByNameFn:  func(string) error { return nil },
+			StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
+			UpdateContainerStateFn: func(string, structs.ContainerState) {},
+			AddOrGetNetworkFn:      func(string) (string, error) { return "default", nil },
+		},
+		configOps: dockerRuntimeConfigOps{
+			ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
+		},
+		urbitOps: dockerRuntimeUrbitOps{
+			UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
+		},
+		volumeOps: dockerRuntimeVolumeOps{
+			VolumeExistsFn: func(string) (bool, error) { return false, nil },
+			CreateVolumeFn: func(string) error { return nil },
+		},
+	}
+}
 
-	started := false
-	stopped := false
-	updated := false
-	confForLlama = func() structs.SysConfig {
+func TestLoadLlamaDisabledNoop(t *testing.T) {
+	var stopped, started, updated bool
+
+	rt := testLlamaRuntime(t.TempDir())
+	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{PenpaiAllow: false}
 	}
-	stopContainerByNameForLlama = func(string) error {
+	rt.containerOps.StopContainerByNameFn = func(string) error {
 		stopped = true
 		return nil
 	}
-	startContainerForLlama = func(string, string) (structs.ContainerState, error) {
+	rt.containerOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		started = true
 		return structs.ContainerState{}, nil
 	}
-	updateContainerStateForLlama = func(string, structs.ContainerState) {
+	rt.containerOps.UpdateContainerStateFn = func(string, structs.ContainerState) {
 		updated = true
 	}
 
-	if err := LoadLlama(); err != nil {
+	if err := loadLlamaWithRuntime(llamaRuntimeFromDocker(rt)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if started || stopped || updated {
@@ -48,35 +66,29 @@ func TestLoadLlamaDisabledNoop(t *testing.T) {
 }
 
 func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
-	t.Cleanup(func() {
-		confForLlama = config.Conf
-		stopContainerByNameForLlama = StopContainerByName
-		startContainerForLlama = StartContainer
-		updateContainerStateForLlama = config.UpdateContainerState
-	})
-
 	var stoppedName string
 	var startedName, startedType string
 	var updatedName string
 	var updatedState structs.ContainerState
 
-	confForLlama = func() structs.SysConfig {
+	rt := testLlamaRuntime(t.TempDir())
+	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{PenpaiAllow: true, PenpaiRunning: false}
 	}
-	stopContainerByNameForLlama = func(name string) error {
+	rt.containerOps.StopContainerByNameFn = func(name string) error {
 		stoppedName = name
 		return nil
 	}
-	startContainerForLlama = func(name, containerType string) (structs.ContainerState, error) {
+	rt.containerOps.StartContainerFn = func(name, containerType string) (structs.ContainerState, error) {
 		startedName, startedType = name, containerType
 		return structs.ContainerState{ActualStatus: "running"}, nil
 	}
-	updateContainerStateForLlama = func(name string, state structs.ContainerState) {
+	rt.containerOps.UpdateContainerStateFn = func(name string, state structs.ContainerState) {
 		updatedName = name
 		updatedState = state
 	}
 
-	if err := LoadLlama(); err != nil {
+	if err := loadLlamaWithRuntime(llamaRuntimeFromDocker(rt)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if stoppedName != "llama-gpt-api" {
@@ -91,69 +103,51 @@ func TestLoadLlamaStartsAndUpdatesState(t *testing.T) {
 }
 
 func TestLoadLlamaStartError(t *testing.T) {
-	t.Cleanup(func() {
-		confForLlama = config.Conf
-		startContainerForLlama = StartContainer
-	})
-
-	confForLlama = func() structs.SysConfig {
+	rt := testLlamaRuntime(t.TempDir())
+	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{PenpaiAllow: true, PenpaiRunning: true}
 	}
-	startContainerForLlama = func(string, string) (structs.ContainerState, error) {
+	rt.containerOps.StartContainerFn = func(string, string) (structs.ContainerState, error) {
 		return structs.ContainerState{}, errors.New("start failed")
 	}
 
-	err := LoadLlama()
+	err := loadLlamaWithRuntime(llamaRuntimeFromDocker(rt))
 	if err == nil || !strings.Contains(err.Error(), "Error starting Llama API") {
 		t.Fatalf("expected wrapped start error, got %v", err)
 	}
 }
 
 func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
-	t.Cleanup(func() {
-		confForLlama = config.Conf
-		volumeExistsForLlama = VolumeExists
-		createVolumeForLlama = CreateVolume
-		addOrGetNetworkForLlama = AddOrGetNetwork
-		writeFileForLlama = ioutil.WriteFile
-	})
-
-	oldDockerDir := config.DockerDir
-	oldVolumeDir := VolumeDir
-	oldUrbitConfig := config.UrbitsConfig
-	config.DockerDir = "/tmp/docker-data"
-	VolumeDir = "/tmp/volume-data"
-	t.Cleanup(func() {
-		config.DockerDir = oldDockerDir
-		VolumeDir = oldVolumeDir
-		config.UrbitsConfig = oldUrbitConfig
-	})
-
-	config.UrbitsConfig = map[string]structs.UrbitDocker{
+	dockerDir := t.TempDir()
+	rt := testLlamaRuntime(dockerDir)
+	urbitConfig := map[string]structs.UrbitDocker{
 		"~zod": {BootStatus: "boot"},
 		"~bus": {BootStatus: "stopped"},
 	}
+	rt.urbitOps.UrbitConfAllFn = func() map[string]structs.UrbitDocker {
+		return urbitConfig
+	}
 
 	var volumeChecks []string
-	volumeExistsForLlama = func(name string) (bool, error) {
+	rt.volumeOps.VolumeExistsFn = func(name string) (bool, error) {
 		volumeChecks = append(volumeChecks, name)
 		return false, nil
 	}
 	var createdVolumes []string
-	createVolumeForLlama = func(name string) error {
+	rt.volumeOps.CreateVolumeFn = func(name string) error {
 		createdVolumes = append(createdVolumes, name)
 		return nil
 	}
-	addOrGetNetworkForLlama = func(string) (string, error) {
+	rt.containerOps.AddOrGetNetworkFn = func(string) (string, error) {
 		return "llama-net", nil
 	}
 	var gotScriptPath string
-	writeFileForLlama = func(path string, _ []byte, _ os.FileMode) error {
+	rt.fileOps.WriteFileFn = func(path string, _ []byte, _ os.FileMode) error {
 		gotScriptPath = path
 		return nil
 	}
 
-	confForLlama = func() structs.SysConfig {
+	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{
 			Piers:        []string{"~zod", "~bus"},
 			PenpaiActive: "phi.gguf",
@@ -163,7 +157,7 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 		}
 	}
 
-	containerCfg, hostCfg, err := llamaApiContainerConf()
+	containerCfg, hostCfg, err := llamaApiContainerConfWithRuntime(llamaRuntimeFromDocker(rt))
 	if err != nil {
 		t.Fatalf("llamaApiContainerConf failed: %v", err)
 	}
@@ -173,7 +167,7 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 	if !reflect.DeepEqual(createdVolumes, []string{"llama-gpt-api", "llama-gpt-api_api"}) {
 		t.Fatalf("unexpected created volumes: %v", createdVolumes)
 	}
-	wantScriptPath := filepath.Join(config.DockerDir, "llama-gpt-api_api", "_data", "run.sh")
+	wantScriptPath := filepath.Join(dockerDir, "llama-gpt-api_api", "_data", "run.sh")
 	if gotScriptPath != wantScriptPath {
 		t.Fatalf("unexpected script path: got %s want %s", gotScriptPath, wantScriptPath)
 	}
@@ -193,24 +187,18 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 }
 
 func TestLlamaApiContainerConfErrorsWhenActiveModelMissing(t *testing.T) {
-	t.Cleanup(func() {
-		confForLlama = config.Conf
-		volumeExistsForLlama = VolumeExists
-		addOrGetNetworkForLlama = AddOrGetNetwork
-		writeFileForLlama = ioutil.WriteFile
-	})
-
-	volumeExistsForLlama = func(string) (bool, error) { return true, nil }
-	addOrGetNetworkForLlama = func(string) (string, error) { return "llama-net", nil }
-	writeFileForLlama = func(string, []byte, os.FileMode) error { return nil }
-	confForLlama = func() structs.SysConfig {
+	rt := testLlamaRuntime(t.TempDir())
+	rt.volumeOps.VolumeExistsFn = func(string) (bool, error) { return true, nil }
+	rt.containerOps.AddOrGetNetworkFn = func(string) (string, error) { return "llama-net", nil }
+	rt.fileOps.WriteFileFn = func(string, []byte, os.FileMode) error { return nil }
+	rt.configOps.ConfFn = func() structs.SysConfig {
 		return structs.SysConfig{
 			PenpaiActive: "missing-model",
 			PenpaiModels: []structs.Penpai{{ModelName: "other-model", ModelUrl: "url"}},
 		}
 	}
 
-	_, _, err := llamaApiContainerConf()
+	_, _, err := llamaApiContainerConfWithRuntime(llamaRuntimeFromDocker(rt))
 	if err == nil || !strings.Contains(err.Error(), "active penpai model") {
 		t.Fatalf("expected missing model error, got %v", err)
 	}

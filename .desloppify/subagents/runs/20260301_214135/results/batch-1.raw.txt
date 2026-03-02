@@ -1,0 +1,68 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "uploadsvc is reusing protocol primitives (`Action`, `UnsupportedActionError`) instead of defining a stable service-local command contract.",
+        "Upload action support is declared in `actions.go` (`uploadSupported`) and separately in `service.go` (`actionBindings`), creating two coupled sources of supported-action truth.",
+        "The adapter test file also imports protocol action constants directly, amplifying cross-module coupling at the test boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "uploadsvc_action_contract_leak",
+      "summary": "Upload service exposes protocol action/error types, leaking transport contracts across module boundaries",
+      "related_files": [
+        "goseg/uploadsvc/service.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`goseg/uploadsvc/service.go` defines `type Action = actions.Action` and `type UnsupportedActionError = actions.UnsupportedActionError`, so callers of uploadsvc inherit protocol package types.",
+        "This couples upload service API evolution directly to protocol package edits instead of via a service-owned boundary contract."
+      ],
+      "suggestion": "Introduce uploadsvc-owned exported action/error types and adapt them at the adapter edge (e.g., translate `actions.Action` to `uploadsvc.Action` in one adapter translator), then remove direct alias/export coupling from `service.go`.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "upload_action_contract_leakage"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "upload_action_support_split",
+      "summary": "Supported upload actions are duplicated between protocol and service modules, risking drift",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/uploadsvc/service.go"
+      ],
+      "evidence": [
+        "`goseg/protocol/actions/actions.go` maintains `uploadSupported` for parse-time validation.",
+        "`goseg/uploadsvc/service.go` separately encodes supported runtime actions through `actionBindings` keys.",
+        "A new/removed action must be kept in sync across both lists manually; no shared canonical source is enforced here."
+      ],
+      "suggestion": "Derive both validation and dispatch bindings from a single uploadsvc-owned definition (e.g., local action descriptor registry used to build the parser whitelist and dispatcher map), then keep protocol package generic and transport-agnostic.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "upload_action_contract_leakage"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol-level action vocabulary is being used as both transport contract and service execution contract without a stable adapter-owned canonical model."
+    ],
+    "likely_symptoms": [
+      "upload_action_contract_leak",
+      "upload_action_support_split"
+    ],
+    "possible_false_positives": []
+  }
+}

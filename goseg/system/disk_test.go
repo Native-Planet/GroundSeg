@@ -27,6 +27,7 @@ func resetDiskSeams() func() {
 	originalOpenFile := openFileFn
 	originalMountAll := mountAllCommandFn
 	originalMkfsExt4 := mkfsExt4CommandFn
+	originalStat := statFn
 	return func() {
 		runDiskCommandFn = originalRunDiskCommand
 		listPartitionsFn = originalListPartitions
@@ -43,6 +44,21 @@ func resetDiskSeams() func() {
 		openFileFn = originalOpenFile
 		mountAllCommandFn = originalMountAll
 		mkfsExt4CommandFn = originalMkfsExt4
+		statFn = originalStat
+	}
+}
+
+func TestCreateGroundSegFilesystemPropagatesStatError(t *testing.T) {
+	restore := resetDiskSeams()
+	t.Cleanup(restore)
+
+	statErr := errors.New("stat failed")
+	statFn = func(path string) (os.FileInfo, error) {
+		return nil, statErr
+	}
+
+	if _, err := CreateGroundSegFilesystem("sda"); err == nil || !errors.Is(err, statErr) {
+		t.Fatalf("expected create filesystem to fail with stat error, got %v", err)
 	}
 }
 
@@ -205,5 +221,64 @@ func TestSmartCheckAllDrivesSkipsFailedChecks(t *testing.T) {
 	}
 	if results["nvme0n1"] != true {
 		t.Fatalf("expected nvme result true, got %+v", results["nvme0n1"])
+	}
+}
+
+func TestParseFstabLineIgnoresCommentsAndBlankLines(t *testing.T) {
+	if _, ok := parseFstabLine("   # not a mount entry"); ok {
+		t.Fatal("expected comment line to be ignored")
+	}
+	if _, ok := parseFstabLine(""); ok {
+		t.Fatal("expected blank line to be ignored")
+	}
+}
+
+func TestReconcileFstabLinesIsIdempotent(t *testing.T) {
+	recorded := []string{
+		"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
+		"tmpfs /run tmpfs defaults 0 0",
+	}
+	desired := fstabRecord{
+		Device:     "UUID=abc123",
+		MountPoint: "/groundseg-1",
+		FSType:     "ext4",
+		Options:    "defaults,nofail",
+		Dump:       "0",
+		Pass:       "2",
+	}
+
+	reconciled, changed := reconcileFstabLines(recorded, desired)
+	if changed {
+		t.Fatal("expected idempotent reconcile to report no changes")
+	}
+	if len(reconciled) != len(recorded) {
+		t.Fatalf("expected reconciled line count to remain %d, got %d", len(recorded), len(reconciled))
+	}
+}
+
+func TestReconcileFstabLinesReplacesExistingAndDedupes(t *testing.T) {
+	recorded := []string{
+		"UUID=abc123 /groundseg-1 ext4 defaults 0 0",
+		"UUID=abc123 /groundseg-1 ext4 defaults,nofail 0 2",
+		"tmpfs /run tmpfs defaults 0 0",
+	}
+	desired := fstabRecord{
+		Device:     "UUID=abc123",
+		MountPoint: "/groundseg-1",
+		FSType:     "ext4",
+		Options:    "defaults,nofail",
+		Dump:       "0",
+		Pass:       "2",
+	}
+
+	reconciled, changed := reconcileFstabLines(recorded, desired)
+	if !changed {
+		t.Fatal("expected reconcile to report changes")
+	}
+	if len(reconciled) != 2 {
+		t.Fatalf("expected duplicate entry to be removed, got %d lines", len(reconciled))
+	}
+	if reconciled[0] != desired.line() {
+		t.Fatalf("expected first reconciled line to be normalized desired entry, got %q", reconciled[0])
 	}
 }

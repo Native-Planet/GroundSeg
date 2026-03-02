@@ -1,0 +1,217 @@
+{
+  "assessments": {
+    "abstraction_fitness": {
+      "score": 56.6,
+      "components": [
+        "Abstraction Leverage",
+        "Indirection Cost",
+        "Interface Honesty"
+      ],
+      "component_scores": {
+        "Abstraction Leverage": 64.0,
+        "Indirection Cost": 57.0,
+        "Interface Honesty": 72.0
+      }
+    }
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`routines/runtime_seams.go` and `docker/orchestration/runtime_seams.go` both define large `runtime` structs composed only of function fields and constructors that mostly rebind one function per op with `seams.RequireSeam*` wrappers.",
+        "`lifecycle` and `network` each declare their own `dockerClientNew` plus `SetClientFactory` seam, duplicating the same dependency override abstraction for the same boundary.",
+        "`broadcast/collectors/collectors.go` composes configuration, orchestration, click, and system concerns in one function chain (`ConstructPierInfo` -> `runtimeSnapshotForPiers` -> `collectUrbitViewInputs`) with no abstraction boundary for data providers.",
+        "This indicates repeated cross-cutting indirection layers and a single layer doing orchestration duties across modules instead of clean composition."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "medium",
+      "issues_preventing_higher_score": "",
+      "sub_axes": {
+        "abstraction_leverage": 64.0,
+        "indirection_cost": 57.0,
+        "interface_honesty": 72.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_boilerplate",
+      "summary": "Runtime seam layers are duplicated across packages with mostly pass-through behavior, increasing indirection and cognitive load.",
+      "related_files": [
+        "goseg/routines/runtime_seams.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`routines/runtime_seams.go` defines `dockerRoutineRuntime` and `dockerRoutineStateOps`/`dockerRoutineContainerOps` wrappers where most fields are direct passthroughs to module-level functions.",
+        "`docker/orchestration/runtime_seams.go` defines a parallel seam graph (`dockerRuntime`, `dockerRuntimeContextOps`, `dockerRuntimeContainerOps`, etc.) with equivalent pass-through initialization.",
+        "Both files create largely parallel abstractions for similar boundaries without evidence of policy separation beyond seam injection/testing indirection."
+      ],
+      "suggestion": "Introduce a shared seam-building utility or unified runtime abstraction layer so orchestration and routine call-sites share a small set of explicit constructor arguments instead of duplicated per-package op-struct scaffolding.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicated_docker_factory_seams",
+      "summary": "Docker client factory seams are repeated in multiple layers with inconsistent surface area, causing duplicate test/DI setup and fragmented ownership.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/dockerclient/client.go"
+      ],
+      "evidence": [
+        "`goseg/docker/network/network.go` exports `dockerClientNew` and `SetClientFactory` as a mutable seam to override `dockerclient.New`.",
+        "`goseg/docker/lifecycle/lifecycle.go` repeats the same pattern (`dockerClientNew` + `SetClientFactory`) instead of reusing a single shared client-seam contract.",
+        "`goseg/dockerclient/client.go` already owns the version-aware client construction and ping-caching behavior, so the upper layers are re-wrapping a behavior that is already centralized."
+      ],
+      "suggestion": "Move client creation seams behind one package-level abstraction (or explicit runtime parameter) and remove duplicated mutable factory globals from both callers so all docker client injection is configured consistently.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "collector_orchestration_conflation",
+      "summary": "Collector logic aggregates state acquisition, policy, and view assembly, making it hard to test and reuse as a true abstraction.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/docker/orchestration/urbit.go",
+        "goseg/config/config.go"
+      ],
+      "evidence": [
+        "`ConstructPierInfo` in `collectors` not only transforms state but also calls into `config` (`StartramSettingsSnapshot`, `GetStartramConfig`, `LoadUrbitConfig`) and orchestration (`runtimeSnapshotCollector` via `GetShipStatus`) directly.",
+        "`collectUrbitViewInputs` loads config (`UrbitConf`), pulls container status info, resolves network/minIO state, and performs derived view mapping in a single function.",
+        "This conflates provider boundaries: callers cannot inject isolated data providers without rebuilding broad global seams, so abstraction does not provide clear replacement points."
+      ],
+      "suggestion": "Split collectors into explicit provider interfaces (state providers, network/status providers, and view-mapping composer) and inject these at runtime so each stage has single responsibility and test seams are focused.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "collector_dependency_aggregation"
+    }
+  ],
+  "review_quality": {
+    "batch_count": 1,
+    "dimension_coverage": 1.0,
+    "evidence_density": 1.333,
+    "high_score_missing_issue_note": 0,
+    "finding_pressure": 7.164,
+    "dimensions_with_findings": 1
+  },
+  "review_scope": {
+    "reviewed_files_count": 36,
+    "successful_batch_count": 1,
+    "full_sweep_included": false,
+    "total_files": 250,
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ]
+  },
+  "reviewed_files": [
+    "goseg/broadcast/state_test.go",
+    "goseg/broadcast/broadcast.go",
+    "goseg/routines/docker.go",
+    "goseg/rectify/rectify.go",
+    "goseg/docker/orchestration/wireguard.go",
+    "goseg/broadcast/loop_test.go",
+    "goseg/defaults/defaults.go",
+    "goseg/routines/docker_test.go",
+    "goseg/leak/broadcast_test.go",
+    "goseg/docker/orchestration/wireguard_test.go",
+    "goseg/config/wireguard.go",
+    "goseg/rectify/rectify_test.go",
+    "goseg/leak/broadcast.go",
+    "goseg/system/wifi.go",
+    "goseg/leak/leak_test.go",
+    "goseg/structs/configs.go",
+    "goseg/broadcast/collectors/collectors.go",
+    "goseg/defaults/version.go",
+    "goseg/importer/importer.go",
+    "goseg/docker/orchestration/urbit.go",
+    "goseg/docker/lifecycle/lifecycle.go",
+    "goseg/shipworkflow/urbit_operations.go",
+    "goseg/main.go",
+    "goseg/routines/runtime_seams.go",
+    "goseg/docker/orchestration/runtime_seams.go",
+    "goseg/config/config.go",
+    "goseg/setup/setup_test.go",
+    "goseg/routines/version.go",
+    "goseg/shipworkflow/startram.go",
+    "goseg/auth/auth.go",
+    "goseg/docker/orchestration/llama_test.go",
+    "goseg/handler/system/support.go",
+    "goseg/dockerclient/client.go",
+    "goseg/shipworkflow/operations_test.go",
+    "goseg/docker/network/network.go",
+    "goseg/docker/orchestration/minio.go"
+  ],
+  "provenance": {
+    "kind": "blind_review_batch_import",
+    "blind": true,
+    "runner": "codex",
+    "run_stamp": "20260301_213548",
+    "created_at": "2026-03-01T21:36:20+00:00",
+    "batch_count": 1,
+    "batch_indexes": [
+      1
+    ],
+    "packet_path": "/Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json",
+    "packet_sha256": "152b957dd9078fde389e156acdb656dd37861a6820e5aa19ba8555a95537c748"
+  },
+  "assessment_coverage": {
+    "scored_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "abstraction_fitness",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ],
+    "selected_dimensions": [
+      "abstraction_fitness"
+    ],
+    "imported_dimensions": [
+      "abstraction_fitness"
+    ],
+    "missing_dimensions": [
+      "naming_quality",
+      "logic_clarity",
+      "type_safety",
+      "contract_coherence",
+      "error_consistency",
+      "ai_generated_debt",
+      "high_level_elegance",
+      "mid_level_elegance",
+      "low_level_elegance",
+      "cross_module_architecture",
+      "initialization_coupling",
+      "convention_outlier",
+      "dependency_health",
+      "test_strategy",
+      "api_surface_coherence",
+      "authorization_consistency",
+      "incomplete_migration",
+      "package_organization",
+      "design_coherence"
+    ]
+  }
+}

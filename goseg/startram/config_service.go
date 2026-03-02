@@ -11,7 +11,7 @@ type ConfigService interface {
 	IsWgRegistered() bool
 	SetWgRegistered(registered bool) error
 	SetStartramConfig(retrieve structs.StartramRetrieve)
-	BasePath() string
+	RuntimeContext() config.RuntimeContext
 }
 
 type configService struct{}
@@ -40,6 +40,6 @@ func (configService) SetStartramConfig(retrieve structs.StartramRetrieve) {
 	config.SetStartramConfig(retrieve)
 }
 
-func (configService) BasePath() string {
-	return config.BasePath
+func (configService) RuntimeContext() config.RuntimeContext {
+	return config.RuntimeContextSnapshot()
 }

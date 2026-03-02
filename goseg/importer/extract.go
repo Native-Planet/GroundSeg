@@ -6,7 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"groundseg/docker"
+	"groundseg/docker/events"
 	"groundseg/structs"
 	"io"
 	"os"
@@ -137,7 +137,7 @@ func extractWithStrategy(src, dest string, strategy archiveExtractionStrategy) e
 
 		entry, err := iterator.Next()
 		if err == io.EOF {
-			docker.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
+			events.PublishImportShipTransition(structs.UploadTransition{Type: "extracted", Value: 100})
 			return nil
 		}
 		if err != nil {
@@ -430,7 +430,7 @@ func (p *extractionProgressTracker) tryPublish(processedEntries, processedBytes 
 	if percentExtracted > 99 {
 		percentExtracted = 99
 	}
-	docker.PublishImportShipTransition(structs.UploadTransition{
+	events.PublishImportShipTransition(structs.UploadTransition{
 		Type:  "extracted",
 		Value: percentExtracted,
 	})

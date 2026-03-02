@@ -1,0 +1,208 @@
+{
+  "batch": "Full Codebase Sweep",
+  "batch_index": 6,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "error_consistency": 76.0,
+    "abstraction_fitness": 81.0,
+    "test_strategy": 68.0,
+    "design_coherence": 80.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "`goseg/docker/orchestration/orchestration.go` is a mutable hub with package-level wiring (`subpackageOnce`, `containerConfigResolver`, package-level client and resolver setters) and central package setup (`ConfigureSubpackages`) that directly mutates multiple subpackage seams.",
+        "`goseg/docker/orchestration/subsystem/runtime_seams.go` builds a broad `dockerRoutineRuntime` by importing and composing unrelated modules (`click`, `config`, `broadcast`, `handler/system`) in one aggregate.",
+        "`goseg/docker/lifecycle/lifecycle.go` also exposes mutable global function pointers for core container behaviors, increasing implicit coupling across import boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "error_consistency": {
+      "evidence": [
+        "`goseg/docker/orchestration/container/minio.go` panics when `ConfFn` is nil in `LoadMCWithRuntime` and `LoadMinIOsWithRuntime`.",
+        "`goseg/docker/orchestration/container/llama.go` panics when `ConfFn` is nil in `LoadLlamaWithRuntime` and `LlamaContainerConfWithRuntime`.",
+        "Similar startup paths in `goseg/docker/orchestration/container/wireguard.go` and `.../container/netdata.go` return typed errors instead, so callers of container seam builders must handle three different failure modes in practice."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/docker/orchestration/container/helpers.go` is mostly type aliases and pass-through constructors (`NewVolumeInitializationPlan`, `newVolumeInitializationPlan`, `TarArchiveForSingleFile`) that forward directly to `artifactwriter` without adding policy.",
+        "`goseg/docker/orchestration/container/helpers.go` `writeConfigArtifact` only maps fields into `artifactwriter.Write` and returns.",
+        "`goseg/docker/orchestration/container/wireguard.go` and `.../container/netdata.go` expose several `XWithRuntime` functions that are simple delegations to private helpers with no behavioral enforcement.",
+        "`goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go` includes another thin wrapper `WriteConfigArtifact` -> `Write`, adding another delegation layer."
+      ],
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 52.0,
+        "indirection_cost": 34.0,
+        "interface_honesty": 78.0
+      }
+    },
+    "test_strategy": {
+      "evidence": [
+        "No `*_test.go` files exist for several high-impact modules in scope, including `goseg/docker/orchestration/orchestration.go`, `goseg/docker/orchestration/container/llama.go`, `goseg/docker/orchestration/container/minio.go`, `goseg/docker/orchestration/container/netdata.go`, and `goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go`.",
+        "High-risk orchestration and config surfaces with substantial logic (`goseg/config/version.go`, `goseg/docker/lifecycle/lifecycle.go`, `goseg/docker/network/network.go`) also have no tests, leaving retry/failure and side-effect behavior unvalidated.",
+        "`goseg/accesspoint/config.go`, `goseg/accesspoint/router.go`, and `goseg/click/click.go` are untested despite command execution/validation flow and user-facing behavior."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    },
+    "design_coherence": {
+      "evidence": [
+        "`goseg/config/config.go` mixes initialization, runtime configuration loading, persistence, session bootstrapping, storage-path derivation, and patch application in one package with global mutable state.",
+        "The file manages process-global mutable state through exported vars and shared locks (`BasePath`, `DockerDir`, `Ready`, `globalConfig`, `confMutex`, `startramMu`, etc.) and exposes many mutation-centric entry points.",
+        "Large helper surface is shared across unrelated concerns (environment bootstrap, disk/system checks, config patching, storage path resolution) without a clear boundary layer split."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "container-runtime-failure-contracts",
+      "summary": "Container runtime loaders mix panic and error returns for missing seam prerequisites.",
+      "related_files": [
+        "goseg/docker/orchestration/container/minio.go",
+        "goseg/docker/orchestration/container/llama.go",
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "In `minio.go`, `LoadMCWithRuntime` and `LoadMinIOsWithRuntime` call `panic(\"... requires ConfFn\")` when `rt.ConfFn == nil`.",
+        "`llama.go` also panics in `LoadLlamaWithRuntime` and `LlamaContainerConfWithRuntime` if `ConfFn` is missing.",
+        "`wireguard.go` and `netdata.go` return error values (`missing file runtime`, `missing container runtime`) instead of panicking for comparable prerequisites."
+      ],
+      "suggestion": "Normalize all container seam entrypoints to return descriptive wrapped errors on misconfiguration and fail callers deterministically; remove panics and add guard tests to enforce contract uniformity.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_contract_drift"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wrapper-chains-with-no-leverage",
+      "summary": "Container artifact helpers create low-leverage abstraction layers with only delegation.",
+      "related_files": [
+        "goseg/docker/orchestration/container/helpers.go",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+        "goseg/docker/orchestration/container/wireguard.go",
+        "goseg/docker/orchestration/container/netdata.go"
+      ],
+      "evidence": [
+        "`helpers.go` exports type aliases and wrappers that do not add policy (`NewVolumeInitializationPlan` and `TarArchiveForSingleFile` are direct pass-throughs).",
+        "`writeConfigArtifact` in `helpers.go` only maps incoming fields into `artifactwriter.Write`, with no validation or behavior change.",
+        "Several public helpers in container packages (`WriteWgConfToFileWithRuntime`, `WriteNDConfToFileWithRuntime`) simply forward to lower-level private functions."
+      ],
+      "suggestion": "Collapse or remove the pass-through layers and keep orchestration-specific behavior in a single place; ensure exported abstractions either enforce validation/policy or compose multiple behaviors beyond a direct forwarder.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "abstraction_stack_overhead"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "orchestration-hub-mutation-pattern",
+      "summary": "Orchestration layer functions as a mutable hub and cross-module seam aggregator.",
+      "related_files": [
+        "goseg/docker/orchestration/orchestration.go",
+        "goseg/docker/orchestration/subsystem/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`orchestration.go` holds global function configuration/state (`containerConfigResolver`, `subpackageOnce`, mutable client factory and resolver setters) and wires subpackages in `ConfigureSubpackages`.",
+        "`lifecycle.go` also uses package-level mutable vars for docker dependencies (`containerConfigResolver`, `getLatestContainerInfoFn`, etc.), increasing hidden coupling across modules.",
+        "`runtime_seams.go` combines operations from config, broadcast, click, and system domains into one runtime struct, making ownership boundaries blurry."
+      ],
+      "suggestion": "Introduce a narrow orchestrator facade and per-domain interfaces injected from composition root; keep one-way, explicit data flow and avoid package-level mutable resolver state.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "hub_coupling"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config-package-god-object",
+      "summary": "Configuration package owns too many unrelated responsibilities in a single mutable module.",
+      "related_files": [
+        "goseg/config/config.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config.go` mixes process bootstrap (`Initialize`), filesystem layout, config persistence, disk detection, environment defaults, patch application, and snapshots in one package and file.",
+        "Global mutable state and locks are centralized (`globalConfig`, `BasePath`, `DockerDir`, `confMutex`, `versMutex`) and reused across many unrelated workflows.",
+        "`version.go` also sits in the same package but manages network fetch/retry/persistence policy independently from core config lifecycle."
+      ],
+      "suggestion": "Split `config` into dedicated modules for runtime context, persistence, session/bootstrap, and version metadata with explicit immutable snapshots to reduce blast radius and hidden coupling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "untested-core-orchestration-surface",
+      "summary": "Critical orchestration/config paths are untested despite high blast radius.",
+      "related_files": [
+        "goseg/docker/orchestration/orchestration.go",
+        "goseg/docker/orchestration/container/minio.go",
+        "goseg/docker/orchestration/container/llama.go",
+        "goseg/docker/orchestration/container/netdata.go",
+        "goseg/docker/orchestration/internal/artifactwriter/artifact_writer.go",
+        "goseg/docker/orchestration/subsystem/runtime_seams.go"
+      ],
+      "evidence": [
+        "No `_test.go` files exist for these modules, yet they include complex retryable I/O/seams orchestration, runtime construction, and failure-path behavior.",
+        "These components are imported by container boot and lifecycle flows, so regressions here impact container startup, recovery, and artifact writes."
+      ],
+      "suggestion": "Add focused unit tests using injectable seams for failure-injection (nil/timeout/disk/network errors) and a small orchestration integration test suite around runtime composition and error propagation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "untested-accesspoint-and-command-entrypoints",
+      "summary": "Router/accesspoint/click entrypoints lack tests on validation and command-assembly behavior.",
+      "related_files": [
+        "goseg/accesspoint/router.go",
+        "goseg/accesspoint/config.go",
+        "goseg/accesspoint/parameters.go",
+        "goseg/click/click.go"
+      ],
+      "evidence": [
+        "No test files exist for these command-centric entry modules despite branching around validation (`checkParameters`, input checks) and shell command sequencing.",
+        "Current behavior can be validated via seam functions (`executeRouterCommand`, `preStart`, `validatePatp`) but currently lacks tests to assert command-generation and error-path handling."
+      ],
+      "suggestion": "Introduce unit tests that inject fake shell functions and validate parameter checks, command formatting, and error normalization for these handlers.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "runtime seam contract drift across container modules",
+      "abstraction chains with no behavioral value",
+      "stateful orchestration hub with mutable package-level wiring",
+      "single-package ownership of config/version responsibilities",
+      "insufficient test coverage for failure and seam-contract behavior"
+    ],
+    "likely_symptoms": [
+      "panic-based startup crashes from misconfigured container runtimes",
+      "hard-to-trace behavior when one seam boundary changes",
+      "increased change cost when modifying orchestration/container boot paths"
+    ],
+    "possible_false_positives": [
+      "Some wrappers may be intentionally kept for external API stability; if so, their consolidation should be coordinated with callers and public contracts."
+    ]
+  }
+}

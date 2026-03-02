@@ -16,7 +16,7 @@ func TestUnlinkStorageBuildsClearPayload(t *testing.T) {
 	t.Cleanup(resetStorageSeams)
 
 	var gotFile, gotHoon, gotOp string
-	executeClickCommandForStorage = func(_, file, hoon, _, _, operation string) (string, error) {
+	executeClickCommandForStorage = func(_, file, hoon, _, _, operation string, _clearLusCode func(string)) (string, error) {
 		gotFile = file
 		gotHoon = hoon
 		gotOp = operation
@@ -40,7 +40,7 @@ func TestLinkStorageBuildsAccountPayload(t *testing.T) {
 	t.Cleanup(resetStorageSeams)
 
 	var gotFile, gotHoon, gotOp string
-	executeClickCommandForStorage = func(_, file, hoon, _, _, operation string) (string, error) {
+	executeClickCommandForStorage = func(_, file, hoon, _, _, operation string, _clearLusCode func(string)) (string, error) {
 		gotFile = file
 		gotHoon = hoon
 		gotOp = operation
@@ -63,7 +63,7 @@ func TestLinkStorageBuildsAccountPayload(t *testing.T) {
 
 func TestStorageCommandsBubbleErrors(t *testing.T) {
 	t.Cleanup(resetStorageSeams)
-	executeClickCommandForStorage = func(_, _, _, _, _, _ string) (string, error) {
+	executeClickCommandForStorage = func(_, _, _, _, _, _ string, _clearLusCode func(string)) (string, error) {
 		return "", errors.New("failed")
 	}
 
@@ -75,6 +75,6 @@ func TestStorageCommandsBubbleErrors(t *testing.T) {
 	}
 }
 
-func executeStorageCommand(_, _, _, _, _, _ string) (string, error) {
+func executeStorageCommand(_, _, _, _, _, _ string, _clearLusCode func(string)) (string, error) {
 	return "ok", nil
 }

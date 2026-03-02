@@ -8,11 +8,8 @@ import (
 )
 
 func resetBackupSeams() {
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string) (string, error) {
+	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", nil
-	}
-	filterResponseForBackup = func(_ string, _ string) (string, bool, error) {
-		return "", true, nil
 	}
 	joinGapForBackup = func(parts []string) string {
 		return strings.Join(parts, "  ")
@@ -22,7 +19,7 @@ func resetBackupSeams() {
 
 func TestBackupAgentExecFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string) (string, error) {
+	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", errors.New("exec failed")
 	}
 
@@ -37,36 +34,30 @@ func TestBackupAgentExecFailure(t *testing.T) {
 
 func TestBackupAgentFilterFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string) (string, error) {
-		return "response", nil
-	}
-	filterResponseForBackup = func(_, _ string) (string, bool, error) {
-		return "", false, errors.New("parse failed")
+	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("parse failed")
 	}
 
 	err := backupAgent("~zod", "groups")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "failed to get exec") {
+	if !strings.Contains(err.Error(), "parse failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestBackupAgentPokeFailure(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
-	executeClickCommandForBackup = func(_, _, _, _, _, _ string) (string, error) {
-		return "response", nil
-	}
-	filterResponseForBackup = func(_, _ string) (string, bool, error) {
-		return "", false, nil
+	executeClickCommandForBackup = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("click command failed")
 	}
 
 	err := backupAgent("~zod", "groups")
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !strings.Contains(err.Error(), "failed poke") {
+	if !strings.Contains(err.Error(), "click command failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -75,15 +66,15 @@ func TestBackupAgentBuildsExpectedCommand(t *testing.T) {
 	t.Cleanup(resetBackupSeams)
 
 	var gotPatp, gotFile, gotHoon, gotOperation string
-	executeClickCommandForBackup = func(patp, file, hoon, _, _, operation string) (string, error) {
+	executeClickCommandForBackup = func(
+		patp, file, hoon, sourcePath, successToken, operation string,
+		_clearLusCode func(string),
+	) (string, error) {
 		gotPatp = patp
 		gotFile = file
 		gotHoon = hoon
 		gotOperation = operation
-		return "[0 %avow 0 %noun %success]", nil
-	}
-	filterResponseForBackup = func(_, _ string) (string, bool, error) {
-		return "", true, nil
+		return "ok", nil
 	}
 	joinGapForBackup = func(parts []string) string {
 		return strings.Join(parts, "  ")

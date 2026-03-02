@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/defaults"
-	"groundseg/docker"
+	"groundseg/docker/events"
+	"groundseg/docker/orchestration"
 	"groundseg/structs"
 	"io"
 	"net/http"
@@ -25,19 +26,27 @@ var (
 	exportMu  sync.Mutex
 	exportDir string
 
-	mkdirAllForExporter               = os.MkdirAll
-	getStoragePathForExporter         = config.GetStoragePath
-	createTempForExporter             = os.CreateTemp
-	removeForExporter                 = os.Remove
+	mkdirAllForExporter       = os.MkdirAll
+	getStoragePathForExporter = config.GetStoragePath
+	createTempForExporter     = os.CreateTemp
+	removeForExporter         = os.Remove
+	openForExporter           = func(path string) (io.ReadCloser, error) {
+		return os.Open(path)
+	}
+	copyForExporter                   = io.Copy
 	walkForExporter                   = filepath.Walk
 	dockerDataForExporter             = defaults.DockerData
 	urbitConfForExporter              = config.UrbitConf
-	publishUrbitTransitionForExporter = docker.PublishUrbitTransition
-	getShipStatusForExporter          = docker.GetShipStatus
+	publishUrbitTransitionForExporter = events.PublishUrbitTransition
+	getShipStatusForExporter          = orchestration.GetShipStatus
 )
 
 func Initialize() error {
-	exportDir = getStoragePathForExporter("export")
+	var err error
+	exportDir, err = getStoragePathForExporter("exports")
+	if err != nil {
+		return err
+	}
 	if err := mkdirAllForExporter(exportDir, 0755); err != nil {
 		return err
 	}
@@ -208,13 +217,13 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		fileReader, err := os.Open(path)
+		fileReader, err := openForExporter(path)
 		if err != nil {
 			return err
 		}
 		defer fileReader.Close()
 
-		_, err = io.Copy(f, fileReader)
+		_, err = copyForExporter(f, fileReader)
 		if err != nil {
 			return err
 		}

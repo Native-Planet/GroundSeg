@@ -5,7 +5,7 @@ import (
 	"groundseg/backupsvc"
 	"groundseg/click"
 	"groundseg/config"
-	"groundseg/docker"
+	"groundseg/docker/orchestration"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/system"
@@ -20,121 +20,66 @@ import (
 	"go.uber.org/zap"
 )
 
-// Dependency seams for easier testing and future runtime overrides.
-func resolveBackupRoot(basePath string) string {
-	return backupsvc.ResolveBackupRoot(basePath)
+type collectorRuntime struct {
+	loadUrbitConfigFn        func(string) error
+	urbitConfFn              func(string) structs.UrbitDocker
+	getContainerStatsFn      func(string) structs.ContainerStats
+	getContainerImageTagFn   func(string) (string, error)
+	getMinIOLinkedStatusFn   func(string) bool
+	getMinIOPasswordFn       func(string) (string, error)
+	getContainerNetworkFn    func(string) (string, error)
+	getContainerShipStatusFn func([]string) (map[string]string, error)
+	lusCodeFn                func(string) (string, error)
+	getDeskFn                func(string, string, bool) (string, error)
 }
 
-func currentBasePath() string {
-	return config.BasePath
-}
-
-func startramSettingsSnapshot() config.StartramSettings {
-	return config.StartramSettingsSnapshot()
-}
-
-func startramConfigSnapshot() structs.StartramRetrieve {
-	return config.GetStartramConfig()
-}
-
-func loadUrbitConfig(pier string) error {
-	return config.LoadUrbitConfig(pier)
-}
-
-func urbitConfig(pier string) structs.UrbitDocker {
-	return config.UrbitConf(pier)
-}
-
-func getMinIOPassword(name string) (string, error) {
-	return config.GetMinIOPassword(name)
-}
-
-func isMinIOLinked(patp string) bool {
-	return config.GetMinIOLinkedStatus(patp)
-}
-
-func getShipStatus(piers []string) (map[string]string, error) {
-	return docker.GetShipStatus(piers)
-}
-
-func getContainerNetwork(container string) (string, error) {
-	return docker.GetContainerNetwork(container)
-}
-
-func getContainerStats(container string) structs.ContainerStats {
-	return docker.GetContainerStats(container)
-}
-
-func getContainerImageTag(container string) (string, error) {
-	return docker.GetContainerImageTag(container)
-}
-
-func getLusCode(pier string) (string, error) {
-	return click.GetLusCode(pier)
-}
-
-func getDesk(pier, desk string, bypass bool) (string, error) {
-	return click.GetDesk(pier, desk, bypass)
-}
-
-func broadcastHostName() string {
-	return system.LocalUrl
-}
-
-func listHardDisks() (structs.LSBLKDevice, error) {
-	return system.ListHardDisks()
-}
-
-func isDevMounted(dev structs.BlockDev) bool {
-	return system.IsDevMounted(dev)
-}
-
-func runtimeSnapshotCollectorImpl() runtimeSnapshotCollector {
-	return runtimeSnapshotCollector{}
-}
-
-func startramRegionsFn() (map[string]structs.StartramRegion, error) {
-	return startram.SyncRegions()
-}
-
-func startramRetrieveFn() (structs.StartramRetrieve, error) {
-	return startram.Retrieve()
+func defaultCollectorRuntime() collectorRuntime {
+	return collectorRuntime{
+		loadUrbitConfigFn:        config.LoadUrbitConfig,
+		urbitConfFn:              config.UrbitConf,
+		getContainerStatsFn:      orchestration.GetContainerStats,
+		getContainerImageTagFn:   orchestration.GetContainerImageTag,
+		getMinIOLinkedStatusFn:   config.GetMinIOLinkedStatus,
+		getMinIOPasswordFn:       config.GetMinIOPassword,
+		getContainerNetworkFn:    orchestration.GetContainerNetwork,
+		getContainerShipStatusFn: orchestration.GetShipStatus,
+		lusCodeFn:                click.GetLusCode,
+		getDeskFn:                click.GetDesk,
+	}
 }
 
 // ConstructPierInfo builds the urbit entries for broadcast state.
-func ConstructPierInfo(currentState structs.AuthBroadcast, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
-	settings := startramSettingsSnapshot()
-	piers := settings.Piers
-	updates := make(map[string]structs.Urbit)
+func ConstructPierInfo(existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
+ 	return constructPierInfoWithRuntime(defaultCollectorRuntime(), existingUrbits, scheduled)
+}
 
-	backups := backupSnapshotForPiers(piers, startramConfigSnapshot().Backups)
-	rtSnapshot, err := runtimeSnapshotForPiers(piers, currentState)
+func constructPierInfoWithRuntime(runtime collectorRuntime, existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
+	settings := config.StartramSettingsSnapshot()
+	piers := settings.Piers
+	sgContext := wireguardContext{
+		registered: settings.WgRegistered,
+		on:         settings.WgOn,
+	}
+
+	backups := backupSnapshotForPiers(piers, config.GetStartramConfig().Backups)
+	rtSnapshot, err := runtimeSnapshotForPiersWithRuntime(runtime, piers, existingUrbits)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
 		zap.L().Error(errmsg)
-		return updates, err
+		return nil, err
 	}
-	startramSnapshot := startramSnapshotForPiers(startramConfigSnapshot().Subdomains)
-	urbitInputs := map[string]urbitViewInputs{}
-	for pier, status := range rtSnapshot.pierStatus {
-		inputs, ok := collectUrbitViewInputs(pier, status, settings, rtSnapshot, startramSnapshot, scheduled)
-		if !ok {
-			continue
-		}
-		urbitInputs[pier] = inputs
-	}
-
-	for pier := range rtSnapshot.pierStatus {
-		inputs, ok := urbitInputs[pier]
-		if !ok {
-			continue
-		}
-		urbit, ok := urbitViewMapper{}.assemble(pier, inputs, backups)
-		if ok {
-			updates[pier] = urbit
-		}
-	}
-	return updates, nil
+	startramSnapshot := startramSnapshotForPiers(config.GetStartramConfig().Subdomains)
+	deploymentInputs := collectUrbitDeploymentInputsForPiersWithRuntime(runtime, piers, rtSnapshot.hostName, sgContext, startramSnapshot)
+	runtimeInputs := collectUrbitRuntimeInputsForPiersWithRuntime(
+		runtime,
+		rtSnapshot.pierStatus,
+		urbitRuntimeContext{
+			existingUrbits: rtSnapshot.currentState,
+			shipNetworks:   rtSnapshot.shipNetworks,
+		},
+		scheduled,
+	)
+	return composeUrbitViewsWithRuntime(piers, runtimeInputs, deploymentInputs, backups), nil
 }
 
 func ConstructAppsInfo() structs.Apps {
@@ -151,7 +96,7 @@ func ConstructSystemInfo() structs.System {
 }
 
 func LoadStartramRegions() (map[string]structs.StartramRegion, error) {
-	regions, err := startramRegionsFn()
+	regions, err := startram.SyncRegions()
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +105,7 @@ func LoadStartramRegions() (map[string]structs.StartramRegion, error) {
 
 func GetStartramServices() error {
 	zap.L().Info("Retrieving StarTram services info")
-	res, err := startramRetrieveFn()
+	res, err := startram.Retrieve()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("%v", err))
 		return err
@@ -177,7 +122,7 @@ type pierBackupSnapshot struct {
 }
 
 type pierRuntimeSnapshot struct {
-	currentState structs.AuthBroadcast
+	currentState map[string]structs.Urbit
 	shipNetworks map[string]string
 	pierStatus   map[string]string
 	hostName     string
@@ -209,7 +154,7 @@ func flattenRemoteBackups(remoteBackups []structs.Backup) structs.Backup {
 func localBackupsForPeriod(piers []string, period string) structs.Backup {
 	localBackups := make(structs.Backup)
 	for _, ship := range piers {
-		backupDir := resolveBackupRoot(currentBasePath())
+		backupDir := backupsvc.ResolveBackupRoot(config.BasePath())
 		shipBackups, err := filepath.Glob(filepath.Join(backupDir, ship, period, "*"))
 		if err != nil {
 			continue
@@ -225,12 +170,26 @@ func localBackupsForPeriod(piers []string, period string) structs.Backup {
 	return localBackups
 }
 
-func runtimeSnapshotForPiers(piers []string, currentState structs.AuthBroadcast) (pierRuntimeSnapshot, error) {
-	return runtimeSnapshotCollectorImpl().collect(piers, currentState)
+func runtimeSnapshotForPiers(piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
+	return runtimeSnapshotForPiersWithRuntime(defaultCollectorRuntime(), piers, urbits)
+}
+
+func runtimeSnapshotForPiersWithRuntime(runtime collectorRuntime, piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
+	snapshot := pierRuntimeSnapshot{
+		currentState: urbits,
+		shipNetworks: getContainerNetworksWithRuntime(runtime.getContainerNetworkFn, piers),
+		hostName:     resolveBroadcastHostName(),
+	}
+	pierStatus, err := runtime.getContainerShipStatusFn(piers)
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.pierStatus = pierStatus
+	return snapshot, nil
 }
 
 func resolveBroadcastHostName() string {
-	hostName := broadcastHostName()
+	hostName := system.LocalUrl
 	if hostName == "" {
 		zap.L().Debug("Defaulting to `nativeplanet.local`")
 		hostName = "nativeplanet.local"
@@ -264,122 +223,303 @@ func normalizePackSchedule(meldDay string, meldDate int) (string, int) {
 	return packDay, packDate
 }
 
-type runtimeSnapshotCollector struct{}
-
-func (runtimeSnapshotCollector) collect(piers []string, currentState structs.AuthBroadcast) (pierRuntimeSnapshot, error) {
-	snapshot := pierRuntimeSnapshot{
-		currentState: currentState,
-		shipNetworks: getContainerNetworks(piers),
-		hostName:     resolveBroadcastHostName(),
-	}
-	pierStatus, err := getShipStatus(piers)
-	if err != nil {
-		return snapshot, err
-	}
-	snapshot.pierStatus = pierStatus
-	return snapshot, nil
-}
-
-func collectUrbitViewInputs(
+func collectUrbitDeploymentInputsWithRuntime(
+	runtime collectorRuntime,
 	pier string,
-	status string,
-	settings config.StartramSettings,
-	rtSnapshot pierRuntimeSnapshot,
+	hostName string,
+	wireguardCtx wireguardContext,
 	startramSnapshot pierStartramSnapshot,
-	getScheduledPack func(string) time.Time,
-) (urbitViewInputs, bool) {
-	if err := loadUrbitConfig(pier); err != nil {
+) (urbitDeploymentInputs, bool) {
+	if err := runtime.loadUrbitConfigFn(pier); err != nil {
 		errmsg := fmt.Sprintf("Unable to load %s config: %v", pier, err)
 		zap.L().Error(errmsg)
-		return urbitViewInputs{}, false
+		return urbitDeploymentInputs{}, false
 	}
 
-	dockerConfig := urbitConfig(pier)
-	dockerStats := getContainerStats(pier)
-
-	existing := structs.Urbit{}
-	if existingUrbit, exists := rtSnapshot.currentState.Urbits[pier]; exists {
-		existing = existingUrbit
-	}
-
-	isRunning := status == "Up" || strings.HasPrefix(status, "Up ")
-	bootStatus := dockerConfig.BootStatus != "ignore"
+	dockerConfig := runtime.urbitConfFn(pier)
 	remote := dockerConfig.Network == "wireguard"
-	urbitURL := fmt.Sprintf("http://%s:%d", rtSnapshot.hostName, dockerConfig.HTTPPort)
+	url := fmt.Sprintf("http://%s:%d", hostName, dockerConfig.HTTPPort)
 	if remote {
-		urbitURL = fmt.Sprintf("https://%s", dockerConfig.WgURL)
+		url = fmt.Sprintf("https://%s", dockerConfig.WgURL)
 	}
 
-	minIOURL := fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL)
-	minIOPwd := existing.Info.MinIOPwd
-	if settings.WgRegistered && settings.WgOn {
-		retrievedPwd, err := getMinIOPassword(fmt.Sprintf("minio_%s", pier))
+	minIOPwd := dockerConfig.MinioPassword
+	if wireguardCtx.registered && wireguardCtx.on {
+		retrievedPwd, err := runtime.getMinIOPasswordFn(fmt.Sprintf("minio_%s", pier))
 		if err != nil {
 			zap.L().Warn(fmt.Sprintf("Unable to refresh MinIO password for %s: %v", pier, err))
 		} else {
 			minIOPwd = retrievedPwd
 		}
 	}
-
-	disableShipRestarts := !dockerConfig.DisableShipRestarts
 	packDay, packDate := normalizePackSchedule(dockerConfig.MeldDay, dockerConfig.MeldDate)
-	lusCode, err := lusCodeIfRunning(pier, status)
-	if err != nil {
-		zap.L().Warn(fmt.Sprintf("Unable to resolve +code for %s: %v", pier, err))
-	}
+	minIOLinked := runtime.getMinIOLinkedStatusFn(pier)
 
-	packUnixTime := int64(0)
-	if getScheduledPack != nil {
-		packUnixTime = getScheduledPack(pier).Unix()
-	}
-
-	return urbitViewInputs{
-		existingUrbit:       existing,
+	return urbitDeploymentInputs{
 		dockerConfig:        dockerConfig,
-		dockerStats:         dockerStats,
-		network:             rtSnapshot.shipNetworks[pier],
-		isRunning:           isRunning,
-		bootStatus:          bootStatus,
+		url:                 url,
 		remote:              remote,
-		url:                 urbitURL,
 		remoteReady:         startramSnapshot.remoteReadyByURL[dockerConfig.WgURL],
 		showUrbitWebAlias:   dockerConfig.ShowUrbitWeb == "custom",
 		minIOPwd:            minIOPwd,
-		disableShipRestarts: disableShipRestarts,
-		lusCode:             lusCode,
-		minIOLinked:         isMinIOLinked(pier),
-		penpaiCompanion:     deskInstalledIfRunning(pier, status, "penpai"),
-		gallsegInstalled:    deskInstalledIfRunning(pier, status, "groundseg"),
+		disableShipRestarts: !dockerConfig.DisableShipRestarts,
+		bootStatus:          dockerConfig.BootStatus != "ignore",
+		minIOLinked:         minIOLinked,
 		startramReminder:    dockerConfig.StartramReminder,
 		chopOnUpgrade:       dockerConfig.ChopOnUpgrade,
 		packDay:             packDay,
 		packDate:            packDate,
-		minIOURL:            minIOURL,
-		packUnixTime:        packUnixTime,
+		minIOURL:            fmt.Sprintf("https://console.s3.%s", dockerConfig.WgURL),
 	}, true
 }
 
-func lusCodeIfRunning(pier string, status string) (string, error) {
+func collectUrbitDeploymentInputs(
+	pier string,
+	hostName string,
+	wireguardCtx wireguardContext,
+	startramSnapshot pierStartramSnapshot,
+) (urbitDeploymentInputs, bool) {
+	return collectUrbitDeploymentInputsWithRuntime(defaultCollectorRuntime(), pier, hostName, wireguardCtx, startramSnapshot)
+}
+
+func collectUrbitDeploymentInputsForPiers(
+	piers []string,
+	hostName string,
+	wireguardCtx wireguardContext,
+	startramSnapshot pierStartramSnapshot,
+) map[string]urbitDeploymentInputs {
+	return collectUrbitDeploymentInputsForPiersWithRuntime(
+		defaultCollectorRuntime(),
+		piers,
+		hostName,
+		wireguardCtx,
+		startramSnapshot,
+	)
+}
+
+func collectUrbitDeploymentInputsForPiersWithRuntime(
+	runtime collectorRuntime,
+	piers []string,
+	hostName string,
+	wireguardCtx wireguardContext,
+	startramSnapshot pierStartramSnapshot,
+) map[string]urbitDeploymentInputs {
+	inputs := make(map[string]urbitDeploymentInputs, len(piers))
+	for _, pier := range piers {
+		deploymentInputs, ok := collectUrbitDeploymentInputsWithRuntime(runtime, pier, hostName, wireguardCtx, startramSnapshot)
+		if !ok {
+			continue
+		}
+		inputs[pier] = deploymentInputs
+	}
+	return inputs
+}
+
+type urbitRuntimeContext struct {
+	existingUrbits map[string]structs.Urbit
+	shipNetworks   map[string]string
+}
+
+func collectUrbitRuntimeInputsWithRuntime(
+	runtime collectorRuntime,
+	pier, status string,
+	rtContext urbitRuntimeContext,
+	getScheduledPack func(string) time.Time,
+) urbitRuntimeInputs {
+	existing := structs.Urbit{}
+	if existingUrbit, exists := rtContext.existingUrbits[pier]; exists {
+		existing = existingUrbit
+	}
+	isRunning := status == "Up" || strings.HasPrefix(status, "Up ")
+	lusCode, err := lusCodeIfRunningWithRuntime(runtime, pier, status)
+	if err != nil {
+		zap.L().Warn(fmt.Sprintf("Unable to resolve +code for %s: %v", pier, err))
+	}
+	packUnixTime := int64(0)
+	if getScheduledPack != nil {
+		packUnixTime = getScheduledPack(pier).Unix()
+	}
+	return urbitRuntimeInputs{
+		existingUrbit:     existing,
+		containerImageTag: func() (string, error) { return runtime.getContainerImageTagFn(pier) },
+		dockerStats:       runtime.getContainerStatsFn(pier),
+		network:           rtContext.shipNetworks[pier],
+		isRunning:         isRunning,
+		lusCode:           lusCode,
+		penpaiCompanion:   deskInstalledIfRunningWithRuntime(runtime, pier, status, "penpai"),
+		gallsegInstalled:  deskInstalledIfRunningWithRuntime(runtime, pier, status, "groundseg"),
+		packUnixTime:      packUnixTime,
+	}
+}
+
+func collectUrbitRuntimeInputs(
+	pier, status string,
+	rtContext urbitRuntimeContext,
+	getScheduledPack func(string) time.Time,
+) urbitRuntimeInputs {
+	return collectUrbitRuntimeInputsWithRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
+}
+
+func collectUrbitRuntimeInputsForPiers(
+	pierStatus map[string]string,
+	rtContext urbitRuntimeContext,
+	getScheduledPack func(string) time.Time,
+) map[string]urbitRuntimeInputs {
+	inputs := make(map[string]urbitRuntimeInputs, len(pierStatus))
+	for pier, status := range pierStatus {
+		inputs[pier] = collectUrbitRuntimeInputsWithRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
+	}
+	return inputs
+}
+
+func collectUrbitRuntimeInputsForPiersWithRuntime(
+	runtime collectorRuntime,
+	pierStatus map[string]string,
+	rtContext urbitRuntimeContext,
+	getScheduledPack func(string) time.Time,
+) map[string]urbitRuntimeInputs {
+	inputs := make(map[string]urbitRuntimeInputs, len(pierStatus))
+	for pier, status := range pierStatus {
+		inputs[pier] = collectUrbitRuntimeInputsWithRuntime(runtime, pier, status, rtContext, getScheduledPack)
+	}
+	return inputs
+}
+
+func composeUrbitViewInputs(runtimeInputs urbitRuntimeInputs, deployInputs urbitDeploymentInputs) urbitViewInputs {
+	runningTag := ""
+	if runtimeInputs.containerImageTag != nil {
+		if tag, err := runtimeInputs.containerImageTag(); err == nil && tag != "" {
+			runningTag = tag
+		}
+	}
+	return urbitViewInputs{
+		existingUrbit:       runtimeInputs.existingUrbit,
+		dockerConfig:        deployInputs.dockerConfig,
+		dockerStats:         runtimeInputs.dockerStats,
+		network:             runtimeInputs.network,
+		isRunning:           runtimeInputs.isRunning,
+		minIOLinked:         deployInputs.minIOLinked,
+		bootStatus:          deployInputs.bootStatus,
+		remote:              deployInputs.remote,
+		url:                 deployInputs.url,
+		remoteReady:         deployInputs.remoteReady,
+		showUrbitWebAlias:   deployInputs.showUrbitWebAlias,
+		minIOPwd:            deployInputs.minIOPwd,
+		disableShipRestarts: deployInputs.disableShipRestarts,
+		lusCode:             runtimeInputs.lusCode,
+		penpaiCompanion:     runtimeInputs.penpaiCompanion,
+		gallsegInstalled:    runtimeInputs.gallsegInstalled,
+		startramReminder:    deployInputs.startramReminder,
+		chopOnUpgrade:       deployInputs.chopOnUpgrade,
+		packDay:             deployInputs.packDay,
+		packDate:            deployInputs.packDate,
+		minIOURL:            deployInputs.minIOURL,
+		packUnixTime:        runtimeInputs.packUnixTime,
+		containerImageTag:   runningTag,
+	}
+}
+
+func composeUrbitViews(
+	piers []string,
+	runtimeInputs map[string]urbitRuntimeInputs,
+	deploymentInputs map[string]urbitDeploymentInputs,
+	backups pierBackupSnapshot,
+) map[string]structs.Urbit {
+	return composeUrbitViewsWithRuntime(piers, runtimeInputs, deploymentInputs, backups)
+}
+
+func composeUrbitViewsWithRuntime(
+	piers []string,
+	runtimeInputs map[string]urbitRuntimeInputs,
+	deploymentInputs map[string]urbitDeploymentInputs,
+	backups pierBackupSnapshot,
+) map[string]structs.Urbit {
+	updates := make(map[string]structs.Urbit, len(piers))
+	for _, pier := range piers {
+		runtimeInput, ok := runtimeInputs[pier]
+		if !ok {
+			continue
+		}
+		deployInput, ok := deploymentInputs[pier]
+		if !ok {
+			continue
+		}
+		urbit, ok := urbitViewMapper{}.assemble(
+			pier,
+			composeUrbitViewInputs(runtimeInput, deployInput),
+			backups,
+		)
+		if !ok {
+			continue
+		}
+		updates[pier] = urbit
+	}
+	return updates
+}
+
+func lusCodeIfRunningWithRuntime(runtime collectorRuntime, pier, status string) (string, error) {
 	if !transition.IsContainerUpStatus(status) {
 		return "", nil
 	}
-	lusCode, err := getLusCode(pier)
+	lusCode, err := runtime.lusCodeFn(pier)
 	if err != nil {
 		return "", fmt.Errorf("unable to resolve +code for %s: %w", pier, err)
 	}
 	return lusCode, nil
 }
 
-func deskInstalledIfRunning(pier string, status string, desk string) bool {
+func lusCodeIfRunning(pier string, status string) (string, error) {
+	return lusCodeIfRunningWithRuntime(defaultCollectorRuntime(), pier, status)
+}
+
+func deskInstalledIfRunningWithRuntime(runtime collectorRuntime, pier, status, desk string) bool {
 	if !transition.IsContainerUpStatus(status) {
 		return false
 	}
-	deskStatus, err := getDesk(pier, desk, false)
+	deskStatus, err := runtime.getDeskFn(pier, desk, false)
 	if err != nil {
 		zap.L().Debug(fmt.Sprintf("Broadcast failed to get %s desk info for %v: %v", desk, pier, err))
 		return false
 	}
 	return deskStatus == string(transition.ContainerStatusRunning)
+}
+
+func deskInstalledIfRunning(pier, status, desk string) bool {
+	return deskInstalledIfRunningWithRuntime(defaultCollectorRuntime(), pier, status, desk)
+}
+
+type urbitDeploymentInputs struct {
+	dockerConfig        structs.UrbitDocker
+	url                 string
+	remote              bool
+	remoteReady         bool
+	showUrbitWebAlias   bool
+	minIOPwd            string
+	disableShipRestarts bool
+	minIOLinked         bool
+	bootStatus          bool
+	startramReminder    bool
+	chopOnUpgrade       bool
+	packDay             string
+	packDate            int
+	minIOURL            string
+}
+
+type wireguardContext struct {
+	registered bool
+	on         bool
+}
+
+type urbitRuntimeInputs struct {
+	existingUrbit     structs.Urbit
+	dockerStats       structs.ContainerStats
+	network           string
+	isRunning         bool
+	containerImageTag func() (string, error)
+	lusCode           string
+	penpaiCompanion   bool
+	gallsegInstalled  bool
+	packUnixTime      int64
 }
 
 type urbitViewInputs struct {
@@ -397,6 +537,7 @@ type urbitViewInputs struct {
 	disableShipRestarts bool
 	lusCode             string
 	minIOLinked         bool
+	containerImageTag   string
 	penpaiCompanion     bool
 	gallsegInstalled    bool
 	startramReminder    bool
@@ -431,7 +572,7 @@ func assembleUrbitViewFromInputs(pier string, inputs urbitViewInputs, backups pi
 	urbit.Info.DetectBootStatus = inputs.bootStatus
 	urbit.Info.Remote = inputs.remote
 	urbit.Info.RemoteReady = inputs.remoteReady
-	if runningTag, err := getContainerImageTag(pier); err == nil {
+	if runningTag := inputs.containerImageTag; runningTag != "" {
 		urbit.Info.Vere = runningTag
 	} else {
 		urbit.Info.Vere = inputs.dockerConfig.UrbitVersion
@@ -546,6 +687,7 @@ func (systemInfoCollector) collect() structs.System {
 	var sysInfo structs.System
 	sysInfo.Info.Updates = system.SystemUpdates
 	sysInfo.Info.Wifi = system.WifiInfoSnapshot()
+	smart := system.SmartResultsSnapshot()
 
 	if usedRam, totalRam, err := system.GetMemory(); err != nil {
 		zap.L().Warn(fmt.Sprintf("Error getting memory usage: %v", err))
@@ -569,7 +711,7 @@ func (systemInfoCollector) collect() structs.System {
 		sysInfo.Info.Usage.SwapFile = config.SwapSettingsSnapshot().SwapVal
 	}
 	drives := make(map[string]structs.SystemDrive)
-	if blockDevices, err := listHardDisks(); err != nil {
+	if blockDevices, err := system.ListHardDisks(); err != nil {
 		zap.L().Warn(fmt.Sprintf("Error getting block devices: %v", err))
 	} else {
 		for _, dev := range blockDevices.BlockDevices {
@@ -577,7 +719,7 @@ func (systemInfoCollector) collect() structs.System {
 				continue
 			}
 			if len(dev.Children) < 1 {
-				if isDevMounted(dev) {
+				if system.IsDevMounted(dev) {
 					re := regexp.MustCompile(`^/groundseg-(\d+)$`)
 					matches := re.FindStringSubmatch(dev.Mountpoints[0])
 					if len(matches) > 1 {
@@ -595,17 +737,21 @@ func (systemInfoCollector) collect() structs.System {
 					}
 				}
 			}
-			sysInfo.Info.SMART = system.SmartResults
 		}
 	}
+	sysInfo.Info.SMART = smart
 	sysInfo.Info.Drives = drives
 	return sysInfo
 }
 
 func getContainerNetworks(containers []string) map[string]string {
+	return getContainerNetworksWithRuntime(defaultCollectorRuntime().getContainerNetworkFn, containers)
+}
+
+func getContainerNetworksWithRuntime(getContainerNetworkFn func(string) (string, error), containers []string) map[string]string {
 	res := make(map[string]string)
 	for _, container := range containers {
-		network, err := getContainerNetwork(container)
+		network, err := getContainerNetworkFn(container)
 		if err != nil {
 			continue
 		} else {

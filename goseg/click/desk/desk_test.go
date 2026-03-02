@@ -14,10 +14,7 @@ func resetDeskState() {
 	shipDesks = make(map[string]map[string]structs.ClickDesks)
 	desksMutex.Unlock()
 	executeClickCommandForDesk = executeCommandForDesk
-	createHoonForDesk = createHoon
-	deleteHoonForDesk = deleteHoon
-	clickExecForDesk = clickExec
-	filterResponseForDesk = filterResponse
+	parseClickResponseForDesk = parseResponseForDesk
 }
 
 func TestAllowDeskRequestFlowControl(t *testing.T) {
@@ -77,10 +74,10 @@ func TestGetDeskUsesCachedStatus(t *testing.T) {
 	}
 	desksMutex.Unlock()
 
-	createCalled := false
-	createHoonForDesk = func(_, _, _ string) error {
-		createCalled = true
-		return nil
+	commandCalled := false
+	executeClickCommandForDesk = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		commandCalled = true
+		return "", nil
 	}
 
 	status, err := getDesk("~nec", "garden", false)
@@ -90,18 +87,19 @@ func TestGetDeskUsesCachedStatus(t *testing.T) {
 	if status != "running" {
 		t.Fatalf("unexpected status: %s", status)
 	}
-	if createCalled {
+	if commandCalled {
 		t.Fatalf("expected cached read without command execution")
 	}
 }
 
 func TestGetDeskBypassFetchesFreshStatus(t *testing.T) {
 	t.Cleanup(resetDeskState)
-	createHoonForDesk = func(_, _, _ string) error { return nil }
-	deleteHoonForDesk = func(_, _ string) {}
-	clickExecForDesk = func(_, _, _ string) (string, error) { return "response", nil }
-	filterResponseForDesk = func(_, _ string) (string, bool, error) {
-		return "mounted", false, nil
+	executeClickCommandForDesk = func(_, _, _, _, _, _ string, _ func(string)) (string, error) { return "response", nil }
+	parseClickResponseForDesk = func(
+		patp, file, hoon, sourcePath, responseToken, operation string,
+		clearLusCode func(string),
+	) (string, string, bool, error) {
+		return "", "mounted", true, nil
 	}
 
 	got, err := getDesk("~bus", "base", true)
@@ -115,21 +113,20 @@ func TestGetDeskBypassFetchesFreshStatus(t *testing.T) {
 
 func TestGetDeskExecFailureStoresError(t *testing.T) {
 	t.Cleanup(resetDeskState)
-	createHoonForDesk = func(_, _, _ string) error { return nil }
-	deleted := false
-	deleteHoonForDesk = func(_, _ string) { deleted = true }
-	clickExecForDesk = func(_, _, _ string) (string, error) {
+	executeClickCommandForDesk = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", errors.New("exec failed")
+	}
+	parseClickResponseForDesk = func(
+		_, _, _, _, _, _ string, _ func(string),
+	) (string, string, bool, error) {
+		return "", "", false, errors.New("exec failed")
 	}
 
 	_, err := getDesk("~zod", "base", true)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if !deleted {
-		t.Fatalf("expected deferred delete to run")
-	}
-	if !strings.Contains(err.Error(), "failed to get exec") {
+	if !strings.Contains(err.Error(), "exec failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -143,24 +140,22 @@ func TestGetDeskExecFailureStoresError(t *testing.T) {
 
 func TestMountDeskAndCommitDeskPokeFailures(t *testing.T) {
 	t.Cleanup(resetDeskState)
-	executeClickCommandForDesk = func(_, _, _, _, _, _ string) (string, error) {
-		return "response", nil
+	executeClickCommandForDesk = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
+		return "", errors.New("failed poke")
 	}
-	filterResponseForDesk = func(_, _ string) (string, bool, error) {
-		return "", false, nil
-	}
+	parseClickResponseForDesk = parseResponseForDeskError
 
-	if err := mountDesk("~zod", "base"); err == nil || !strings.Contains(err.Error(), "poke failed") {
+	if err := mountDesk("~zod", "base"); err == nil || !strings.Contains(err.Error(), "failed poke") {
 		t.Fatalf("expected mount poke failure, got: %v", err)
 	}
-	if err := commitDesk("~zod", "base"); err == nil || !strings.Contains(err.Error(), "poke failed") {
+	if err := commitDesk("~zod", "base"); err == nil || !strings.Contains(err.Error(), "failed poke") {
 		t.Fatalf("expected commit poke failure, got: %v", err)
 	}
 }
 
 func TestDeskActionCommandsBubbleErrors(t *testing.T) {
 	t.Cleanup(resetDeskState)
-	executeClickCommandForDesk = func(_, _, _, _, _, _ string) (string, error) {
+	executeClickCommandForDesk = func(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 		return "", errors.New("command failed")
 	}
 
@@ -175,13 +170,15 @@ func TestDeskActionCommandsBubbleErrors(t *testing.T) {
 	}
 }
 
-func executeCommandForDesk(_, _, _, _, _, _ string) (string, error) {
+func executeCommandForDesk(_, _, _, _, _, _ string, _ func(string)) (string, error) {
 	return "ok", nil
 }
-
-func createHoon(_, _, _ string) error { return nil }
-func deleteHoon(_, _ string)          {}
-func clickExec(_, _, _ string) (string, error) {
-	return "ok", nil
+func parseResponseForDesk(_, _, _, _, _, _ string, _ func(string)) (string, string, bool, error) {
+	return "", "", true, nil
 }
-func filterResponse(_, _ string) (string, bool, error) { return "", true, nil }
+func parseResponseForDeskError(
+	_, _, _, _, _, _ string,
+	_ func(string),
+) (string, string, bool, error) {
+	return "", "", false, nil
+}
