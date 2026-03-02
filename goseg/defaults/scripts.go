@@ -203,19 +203,167 @@ var (
 
 	trap_urbit() {
 		local args="$@"
-		local logfile=$(mktemp)
-		
-		urbit $args 2>&1 | tee "$logfile"
-		local exit_code=${PIPESTATUS[0]}
-		
-		if [[ $exit_code -ne 0 ]] && grep -q "stale snapshot" "$logfile"; then
-				echo "Detected stale snapshot, replaying with previous binary"
-				rm -f "$logfile"
-				exec prev-urbit -Lx $ttyflag $args
+
+		# probe for stale snapshot with a quick exit
+		local probe_log=$(mktemp)
+		echo "Probing pier with urbit -Lx..."
+		if urbit -Lx $ttyflag --loom $loom $dirname >"$probe_log" 2>&1; then
+			probe_exit=0
+		else
+			probe_exit=$?
 		fi
-		
-		rm -f "$logfile"
-		exit $exit_code
+
+		if [[ $probe_exit -ne 0 ]] && grep -q "stale snapshot" "$probe_log"; then
+			echo "Detected stale snapshot, attempting vere migration rollback"
+			rm -f "$probe_log"
+
+			# Detect architecture
+			export device_arch=$(uname -m)
+			export asset_name=""
+			if [[ $device_arch == "aarch64" ]]; then
+				asset_name="linux-aarch64.tgz"
+			elif [[ $device_arch == "x86_64" ]]; then
+				asset_name="linux-x86_64.tgz"
+			else
+				echo "Unsupported architecture: $device_arch"
+				exit 1
+			fi
+
+			export version_output=$(urbit -R 2>&1 || true)
+			export raw_version=$(echo "$version_output" | awk 'tolower($1) == "urbit" {print $2; exit}')
+			if [[ -z "$raw_version" ]]; then
+				echo "Cannot determine current vere version from 'urbit -R'"
+				exec prev-urbit -Lx $ttyflag $args
+			fi
+			# normalize to release tag format
+			export cleaned=$(echo "$raw_version" | sed 's/^vere-//; s/^v//')
+			export ver_num=$(echo "$cleaned" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+			if [[ -z "$ver_num" ]]; then
+				echo "Cannot parse version number from: $raw_version"
+				exec prev-urbit -Lx $ttyflag $args
+			fi
+			export current_tag="vere-v${ver_num}"
+			echo "Detected current vere version: $current_tag"
+
+			# fetch releases from GitHub
+			releases=$(curl -sL "https://api.github.com/repos/urbit/vere/releases?per_page=100")
+			# build ordered list of release tags
+			export -a tags_array=()
+			export current_idx=-1
+			export idx=0
+			while IFS= read -r tag; do
+				tags_array+=("$tag")
+				if [[ "$tag" == "$current_tag" ]]; then
+					current_idx=$idx
+				fi
+				idx=$((idx + 1))
+			done < <(echo "$releases" | jq -r '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+
+			if [[ $current_idx -eq -1 ]]; then
+				# not an exact match, prob prerelease
+				# Find insertion point: first release with version <= our base
+				export base_major=$(echo "$ver_num" | cut -d. -f1)
+				export base_minor=$(echo "$ver_num" | cut -d. -f2)
+				export insert_idx=${#tags_array[@]}
+				for (( j=0; j < ${#tags_array[@]}; j++ )); do
+					export tv=$(echo "${tags_array[$j]}" | sed 's/^vere-v//; s/-.*//')
+					export tm=$(echo "$tv" | cut -d. -f1)
+					export tn=$(echo "$tv" | cut -d. -f2)
+					if (( tm < base_major || (tm == base_major && tn <= base_minor) )); then
+						insert_idx=$j
+						break
+					fi
+				done
+				# set current_idx just before that release (virtual position)
+				current_idx=$((insert_idx - 1))
+				echo "Test build detected, will migrate through releases from index $insert_idx"
+			fi
+
+			export tmpdir=$(mktemp -d)
+
+			# Download and cache a vere binary for a given release tag.
+			fetch_vere() {
+				export tag="$1"
+				export bindir="$tmpdir/$tag"
+				binpath=""
+				mkdir -p "$bindir"
+				export url=$(echo "$releases" | jq -r --arg tag "$tag" --arg name "$asset_name" '
+					.[] | select(.tag_name == $tag)
+						| .assets[]?
+						| select(.name == $name)
+						| .browser_download_url
+					' | head -n 1)
+				if [[ -z "$url" || "$url" == "null" ]]; then
+					return
+				fi
+				if ! curl -sL "$url" | tar xz -C "$bindir" 2>/dev/null; then
+					return
+				fi
+				binpath=$(find "$bindir" -maxdepth 1 -type f -name 'vere-*' | head -1)
+				if [[ -n "$binpath" ]]; then
+					chmod +x "$binpath"
+				fi
+			}
+
+			# Iterate backwards to find a version that works >= vere-v3.5
+			export working_idx=-1
+			for (( i = current_idx + 1; i < ${#tags_array[@]}; i++ )); do
+				export tag="${tags_array[$i]}"
+				# Stop if we've gone past the floor version
+				export tv=$(echo "$tag" | sed 's/^vere-v//; s/-.*//')
+				export tm=$(echo "$tv" | cut -d. -f1)
+				export tn=$(echo "$tv" | cut -d. -f2)
+				if (( tm < 3 || (tm == 3 && tn < 5) )); then
+					echo "Reached floor version (vere-v3.5), stopping backward search"
+					break
+				fi
+				export binpath=""
+				fetch_vere "$tag"
+				if [[ -z "$binpath" ]]; then
+					echo "No binary for $tag on $device_arch, skipping"
+					continue
+				fi
+				echo "Trying older version $tag..."
+				if $binpath -Lx $ttyflag --loom $loom $dirname; then
+					echo "Version $tag succeeded"
+					working_idx=$i
+					break
+				else
+					echo "Version $tag failed (exit $?), trying older..."
+				fi
+			done
+
+			if [[ $working_idx -eq -1 ]]; then
+				echo "No working older version found"
+				rm -rf "$tmpdir"
+				exit 1
+			fi
+
+			# Iterate forward from working version back to current
+			for (( i = working_idx - 1; i > current_idx; i-- )); do
+				export tag="${tags_array[$i]}"
+				export binpath=""
+				fetch_vere "$tag"
+				if [[ -z "$binpath" ]]; then
+					echo "No binary for $tag, skipping forward step"
+					continue
+				fi
+				echo "Migrating forward to $tag..."
+				if ! $binpath -Lx $ttyflag --loom $loom $dirname; then
+					echo "Warning: migration step $tag failed (exit $?), continuing..."
+				fi
+			done
+
+			echo "Migrating to current version $current_tag..."
+			urbit -Lx $ttyflag --loom $loom $dirname
+
+			rm -rf "$tmpdir"
+			echo "Migration complete"
+			exec urbit $args
+		fi
+
+		rm -f "$probe_log"
+		exec urbit $args
 	}
 	
 	if [ $devMode == "True" ]; then
