@@ -10,6 +10,7 @@ import (
 	"groundseg/broadcast"
 	"groundseg/config"
 	"groundseg/docker/events"
+	"groundseg/internal/transitionlifecycle"
 	"groundseg/startram"
 	"groundseg/structs"
 	"groundseg/transition"
@@ -19,36 +20,77 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	getStartramSettings  = config.StartramSettingsSnapshot
-	getStartramConfigFn  = config.GetStartramConfig
-	updateConfTypedFn    = config.UpdateConfTyped
-	getContainerStatesFn = config.GetContainerState
-	getUrbitConfigsFn    = config.UrbitConfAll
-	getUrbitConfigFn     = config.UrbitConf
-	loadUrbitConfigFn    = config.LoadUrbitConfig
-	updateUrbitConfigFn  = config.UpdateUrbit
-)
+type RectifyRuntime struct {
+	StartramSettingsSnapshotFn func() config.StartramSettings
+	GetStartramConfigFn        func() structs.StartramRetrieve
+	UpdateConfTypedFn          func(...config.ConfUpdateOption) error
+	GetContainerStateFn        func() map[string]structs.ContainerState
+	UrbitConfAllFn             func() map[string]structs.UrbitDocker
+	UrbitConfFn                func(string) structs.UrbitDocker
+	LoadUrbitConfigFn          func(string) error
+	UpdateUrbitFn              func(string, func(*structs.UrbitDocker) error) error
+}
+
+type RectifyRuntimeDependencies struct {
+	StartramSettingsSnapshotFn func() config.StartramSettings
+	GetStartramConfigFn        func() structs.StartramRetrieve
+	UpdateConfTypedFn          func(...config.ConfUpdateOption) error
+	GetContainerStateFn        func() map[string]structs.ContainerState
+	UrbitConfAllFn             func() map[string]structs.UrbitDocker
+	UrbitConfFn                func(string) structs.UrbitDocker
+	LoadUrbitConfigFn          func(string) error
+	UpdateUrbitFn              func(string, func(*structs.UrbitDocker) error) error
+}
+
+func NewRectifyRuntime() RectifyRuntime {
+	return NewRectifyRuntimeWithDependencies(defaultRectifyRuntimeDependencies())
+}
+
+func NewRectifyRuntimeWithDependencies(dependencies RectifyRuntimeDependencies) RectifyRuntime {
+	return RectifyRuntime{
+		StartramSettingsSnapshotFn: dependencies.StartramSettingsSnapshotFn,
+		GetStartramConfigFn:        dependencies.GetStartramConfigFn,
+		UpdateConfTypedFn:          dependencies.UpdateConfTypedFn,
+		GetContainerStateFn:        dependencies.GetContainerStateFn,
+		UrbitConfAllFn:             dependencies.UrbitConfAllFn,
+		UrbitConfFn:                dependencies.UrbitConfFn,
+		LoadUrbitConfigFn:          dependencies.LoadUrbitConfigFn,
+		UpdateUrbitFn:              dependencies.UpdateUrbitFn,
+	}
+}
+
+func defaultRectifyRuntimeDependencies() RectifyRuntimeDependencies {
+	return RectifyRuntimeDependencies{
+		StartramSettingsSnapshotFn: config.StartramSettingsSnapshot,
+		GetStartramConfigFn:        config.GetStartramConfig,
+		UpdateConfTypedFn:          config.UpdateConfTyped,
+		GetContainerStateFn:        config.GetContainerState,
+		UrbitConfAllFn:             config.UrbitConfAll,
+		UrbitConfFn:                config.UrbitConf,
+		LoadUrbitConfigFn:          config.LoadUrbitConfig,
+		UpdateUrbitFn:              config.UpdateUrbit,
+	}
+}
+
+func (runtime RectifyRuntime) startramSettings() config.StartramSettings {
+	if runtime.StartramSettingsSnapshotFn == nil {
+		return config.StartramSettingsSnapshot()
+	}
+	return runtime.StartramSettingsSnapshotFn()
+}
 
 func UrbitTransitionHandler() {
-	for {
-		event := <-events.UrbitTransitions()
-		applyTransitionUpdate("urbit", urbitTransitionCommand{event: event})
+	if err := runTransitionEventLoopWithoutContext("urbit", events.UrbitTransitions(), func(event structs.UrbitTransition) broadcast.BroadcastTransition {
+		return urbitTransitionCommand{event: event}
+	}); err != nil {
+		zap.L().Warn(fmt.Sprintf("urbit transition handler stopped with error: %v", err))
 	}
 }
 
 func UrbitTransitionHandlerWithContext(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case event := <-events.UrbitTransitions():
-			applyTransitionUpdate("urbit", urbitTransitionCommand{event: event})
-		}
-	}
+	return runTransitionEventLoop(ctx, "urbit", events.UrbitTransitions(), func(event structs.UrbitTransition) broadcast.BroadcastTransition {
+		return urbitTransitionCommand{event: event}
+	})
 }
 
 type urbitTransitionCommand struct {
@@ -68,21 +110,7 @@ func (command urbitTransitionCommand) Apply(current *structs.AuthBroadcast) erro
 	return nil
 }
 
-type transitionReducer[K comparable, T any, E any] func(*T, E) bool
-
-func setByTransition[K comparable, T any, E any](
-	reducers map[K]transitionReducer[K, T, E],
-	target *T,
-	key K,
-	event E,
-) bool {
-	if reducer, ok := reducers[key]; ok {
-		return reducer(target, event)
-	}
-	return false
-}
-
-var urbitTransitionReducers = map[transition.UrbitTransitionType]transitionReducer[transition.UrbitTransitionType, structs.UrbitTransitionBroadcast, structs.UrbitTransition]{
+var urbitTransitionReducers = map[transition.UrbitTransitionType]transitionlifecycle.Reducer[transition.UrbitTransitionType, structs.UrbitTransitionBroadcast, structs.UrbitTransition]{
 	transition.UrbitTransitionRollChop: func(state *structs.UrbitTransitionBroadcast, event structs.UrbitTransition) bool {
 		state.RollChop = event.Event
 		return true
@@ -198,28 +226,26 @@ var urbitTransitionReducers = map[transition.UrbitTransitionType]transitionReduc
 }
 
 func setUrbitTransition(transitionState *structs.UrbitTransitionBroadcast, event structs.UrbitTransition) bool {
-	return setByTransition(urbitTransitionReducers, transitionState, transition.UrbitTransitionType(event.Type), event)
+	return transitionlifecycle.ApplyReducer(
+		urbitTransitionReducers,
+		transitionState,
+		transition.UrbitTransitionType(event.Type),
+		event,
+	)
 }
 
 func NewShipTransitionHandler() {
-	for {
-		event := <-events.NewShipTransitions()
-		applyTransitionUpdate("new ship", newShipTransitionCommand{event: event})
+	if err := runTransitionEventLoopWithoutContext("new ship", events.NewShipTransitions(), func(event structs.NewShipTransition) broadcast.BroadcastTransition {
+		return newShipTransitionCommand{event: event}
+	}); err != nil {
+		zap.L().Warn(fmt.Sprintf("new ship transition handler stopped with error: %v", err))
 	}
 }
 
 func NewShipTransitionHandlerWithContext(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case event := <-events.NewShipTransitions():
-			applyTransitionUpdate("new ship", newShipTransitionCommand{event: event})
-		}
-	}
+	return runTransitionEventLoop(ctx, "new ship", events.NewShipTransitions(), func(event structs.NewShipTransition) broadcast.BroadcastTransition {
+		return newShipTransitionCommand{event: event}
+	})
 }
 
 type newShipTransitionCommand struct {
@@ -233,7 +259,7 @@ func (command newShipTransitionCommand) Apply(current *structs.AuthBroadcast) er
 	return nil
 }
 
-var newShipTransitionReducers = map[transition.NewShipTransitionType]transitionReducer[transition.NewShipTransitionType, structs.NewShip, structs.NewShipTransition]{
+var newShipTransitionReducers = map[transition.NewShipTransitionType]transitionlifecycle.Reducer[transition.NewShipTransitionType, structs.NewShip, structs.NewShipTransition]{
 	transition.NewShipTransitionError: func(target *structs.NewShip, event structs.NewShipTransition) bool {
 		target.Transition.Error = event.Event
 		return true
@@ -260,10 +286,15 @@ var newShipTransitionReducers = map[transition.NewShipTransitionType]transitionR
 }
 
 func setNewShipTransition(target *structs.NewShip, event structs.NewShipTransition) bool {
-	return setByTransition(newShipTransitionReducers, target, transition.NewShipTransitionType(event.Type), event)
+	return transitionlifecycle.ApplyReducer(
+		newShipTransitionReducers,
+		target,
+		transition.NewShipTransitionType(event.Type),
+		event,
+	)
 }
 
-var systemTransitionReducers = map[transition.SystemTransitionType]transitionReducer[transition.SystemTransitionType, structs.SystemTransitionBroadcast, structs.SystemTransition]{
+var systemTransitionReducers = map[transition.SystemTransitionType]transitionlifecycle.Reducer[transition.SystemTransitionType, structs.SystemTransitionBroadcast, structs.SystemTransition]{
 	transition.SystemTransitionWifiConnect: func(target *structs.SystemTransitionBroadcast, event structs.SystemTransition) bool {
 		target.WifiConnect = event.Event
 		return true
@@ -283,10 +314,15 @@ var systemTransitionReducers = map[transition.SystemTransitionType]transitionRed
 }
 
 func setSystemTransition(target *structs.SystemTransitionBroadcast, event structs.SystemTransition) bool {
-	return setByTransition(systemTransitionReducers, target, transition.SystemTransitionType(event.Type), event)
+	return transitionlifecycle.ApplyReducer(
+		systemTransitionReducers,
+		target,
+		transition.SystemTransitionType(event.Type),
+		event,
+	)
 }
 
-var startramTransitionReducers = map[transition.EventType]transitionReducer[transition.EventType, structs.StartramTransition, any]{
+var startramTransitionReducers = map[transition.EventType]transitionlifecycle.Reducer[transition.EventType, structs.StartramTransition, any]{
 	transition.StartramTransitionRestart: func(target *structs.StartramTransition, eventData any) bool {
 		target.Restart = fmt.Sprintf("%v", eventData)
 		return true
@@ -310,7 +346,12 @@ var startramTransitionReducers = map[transition.EventType]transitionReducer[tran
 }
 
 func setStartramTransition(target *structs.StartramTransition, eventType string, eventData any) bool {
-	return setByTransition(startramTransitionReducers, target, transition.EventType(eventType), eventData)
+	return transitionlifecycle.ApplyReducer(
+		startramTransitionReducers,
+		target,
+		transition.EventType(eventType),
+		eventData,
+	)
 }
 
 func applyTransitionUpdate(context string, transition broadcast.BroadcastTransition) {
@@ -320,52 +361,54 @@ func applyTransitionUpdate(context string, transition broadcast.BroadcastTransit
 }
 
 func RectifyUrbit() {
-	for {
-		event := <-startram.Events()
-		switch transition.EventType(event.Type) {
-		case transition.StartramTransitionRestart:
-			applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-		case transition.StartramTransitionEndpoint:
-			applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-		case transition.StartramTransitionToggle:
-			applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-		case transition.StartramTransitionRegister:
-			applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-		case transition.StartramTransitionRetrieve:
-			applyTransitionUpdate("startram", startramRetrieveTransition{})
-		default:
+	runtime := NewRectifyRuntime()
+	if err := runTransitionEventLoopWithoutContext("startram", startram.Events(), func(event structs.Event) broadcast.BroadcastTransition {
+		transitionType := transition.EventType(event.Type)
+		switcher, ok := rectifyStartramTransitionRouters[transitionType]
+		if !ok {
+			return nil
 		}
+		return switcher(runtime, event)
+	}); err != nil {
+		zap.L().Warn(fmt.Sprintf("startram rectify handler stopped with error: %v", err))
 	}
 }
 
 func RectifyUrbitWithContext(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	for {
-		select {
-		case <-ctx.Done():
+	runtime := NewRectifyRuntime()
+	return runTransitionEventLoop(ctx, "startram", startram.Events(), func(event structs.Event) broadcast.BroadcastTransition {
+		transitionType := transition.EventType(event.Type)
+		switcher, ok := rectifyStartramTransitionRouters[transitionType]
+		if !ok {
 			return nil
-		case event := <-startram.Events():
-			switch transition.EventType(event.Type) {
-			case transition.StartramTransitionRestart:
-				applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-			case transition.StartramTransitionEndpoint:
-				applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-			case transition.StartramTransitionToggle:
-				applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-			case transition.StartramTransitionRegister:
-				applyTransitionUpdate("startram", startramTransitionCommand{event: event})
-			case transition.StartramTransitionRetrieve:
-				applyTransitionUpdate("startram", startramRetrieveTransition{})
-			default:
-			}
 		}
-	}
+		return switcher(runtime, event)
+	})
+}
+
+type rectifyStartramTransitionRouter func(RectifyRuntime, structs.Event) broadcast.BroadcastTransition
+
+var rectifyStartramTransitionRouters = map[transition.EventType]rectifyStartramTransitionRouter{
+	transition.StartramTransitionRestart: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
+		return startramTransitionCommand{event: event, runtime: runtime}
+	},
+	transition.StartramTransitionEndpoint: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
+		return startramTransitionCommand{event: event, runtime: runtime}
+	},
+	transition.StartramTransitionToggle: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
+		return startramTransitionCommand{event: event, runtime: runtime}
+	},
+	transition.StartramTransitionRegister: func(runtime RectifyRuntime, event structs.Event) broadcast.BroadcastTransition {
+		return startramTransitionCommand{event: event, runtime: runtime}
+	},
+	transition.StartramTransitionRetrieve: func(runtime RectifyRuntime, _ structs.Event) broadcast.BroadcastTransition {
+		return startramRetrieveTransition{runtime: runtime}
+	},
 }
 
 type startramTransitionCommand struct {
-	event structs.Event
+	event   structs.Event
+	runtime RectifyRuntime
 }
 
 func (command startramTransitionCommand) Apply(current *structs.AuthBroadcast) error {
@@ -375,20 +418,20 @@ func (command startramTransitionCommand) Apply(current *structs.AuthBroadcast) e
 	switch transition.EventType(command.event.Type) {
 	case transition.StartramTransitionEndpoint:
 		if command.event.Data == transition.StartramTransitionComplete {
-			settings := getStartramSettings()
+			settings := command.runtime.startramSettings()
 			current.Profile.Startram.Info.Endpoint = settings.EndpointURL
 		}
 	case transition.StartramTransitionRegister:
 		if command.event.Data != transition.StartramTransitionComplete {
 			return nil
 		}
-		settings := getStartramSettings()
+		settings := command.runtime.startramSettings()
 		current.Profile.Startram.Info.Running = settings.WgOn
-		containerState, exists := getContainerStatesFn()[string(transition.ContainerTypeWireguard)]
+		containerState, exists := command.runtime.GetContainerStateFn()[string(transition.ContainerTypeWireguard)]
 		if exists {
 			running := containerState.ActualStatus == string(transition.ContainerStatusRunning)
 			current.Profile.Startram.Info.Running = running
-			if err := updateConfTypedFn(config.WithWgOn(running)); err != nil {
+			if err := command.runtime.UpdateConfTypedFn(config.WithWgOn(running)); err != nil {
 				zap.L().Error(fmt.Sprintf("%v", err))
 			}
 		}
@@ -397,16 +440,19 @@ func (command startramTransitionCommand) Apply(current *structs.AuthBroadcast) e
 	return nil
 }
 
-type startramRetrieveTransition struct{}
+type startramRetrieveTransition struct {
+	runtime RectifyRuntime
+}
 
-func (startramRetrieveTransition) Apply(current *structs.AuthBroadcast) error {
-	startramSettings := getStartramSettings()
-	startramConfig := getStartramConfigFn()
-	for patp := range getUrbitConfigsFn() {
+func (transitionCommand startramRetrieveTransition) Apply(current *structs.AuthBroadcast) error {
+	runtime := transitionCommand.runtime
+	startramSettings := runtime.startramSettings()
+	startramConfig := runtime.GetStartramConfigFn()
+	for patp := range runtime.UrbitConfAllFn() {
 		modified := false
 		serviceCreated := true
-		local := getUrbitConfigFn(patp)
-		loadUrbitConfigFn(patp)
+		local := runtime.UrbitConfFn(patp)
+		runtime.LoadUrbitConfigFn(patp)
 
 		found := false
 		for _, remote := range startramConfig.Subdomains {
@@ -492,7 +538,7 @@ func (startramRetrieveTransition) Apply(current *structs.AuthBroadcast) error {
 			}
 		}
 		if modified {
-			if err := updateUrbitConfigFn(patp, func(conf *structs.UrbitDocker) error {
+			if err := runtime.UpdateUrbitFn(patp, func(conf *structs.UrbitDocker) error {
 				*conf = local
 				return nil
 			}); err != nil {
@@ -564,4 +610,26 @@ func (command systemTransitionCommand) Apply(current *structs.AuthBroadcast) err
 		zap.L().Warn(fmt.Sprintf("Unrecognized transition: %v", command.event.Type))
 	}
 	return nil
+}
+
+func runTransitionEventLoop[T any](ctx context.Context, label string, ch <-chan T, mapEvent func(T) broadcast.BroadcastTransition) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case event := <-ch:
+			command := mapEvent(event)
+			if command == nil {
+				continue
+			}
+			applyTransitionUpdate(label, command)
+		}
+	}
+}
+
+func runTransitionEventLoopWithoutContext[T any](label string, ch <-chan T, mapEvent func(T) broadcast.BroadcastTransition) error {
+	return runTransitionEventLoop(context.Background(), label, ch, mapEvent)
 }

@@ -5,8 +5,6 @@ import (
 	"net"
 )
 
-var netInterfacesFn = net.Interfaces
-
 // validateIP validates the IP address format.
 func validateIP(ip string) bool {
 	parsedIP := net.ParseIP(ip)
@@ -28,7 +26,10 @@ func checkParameters() error {
 
 func checkParametersWithContext(rt AccessPointRuntime) error {
 	// get interfaces
-	interfaces, err := netInterfacesFn()
+	if rt.NetInterfacesFn == nil {
+		return fmt.Errorf("net interfaces function is not configured")
+	}
+	interfaces, err := rt.NetInterfacesFn()
 	if err != nil {
 		return err
 	}

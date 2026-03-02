@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/errdefs"
 	"groundseg/auth"
 	"groundseg/click/acme"
 	"groundseg/config"
@@ -73,14 +74,15 @@ var (
 )
 
 type importerRuntime struct {
-	runImportedPierWorkflowFn           func(importedPierContext) error
-	runImportedPierPostImportWorkflowFn func(importedPierContext) error
+	runImportedPierWorkflowFn           func(importedPierContext, importerRuntime) error
+	runImportedPierPostImportWorkflowFn func(importedPierContext, importerRuntime) error
 	resolveImportedPierVolumePathFn     func(context.Context, string) (string, error)
 	cleanupMultipartFn                  func(string) error
 	storagePathForFn                    func(string) (string, error)
-	// uploadCoordinator should remain an interface seam because it represents a meaningful
-	// cross-package handoff with its own lifecycle and test seam.
-	uploadCoordinator shipworkflow.UploadImportCoordinator
+	uploadCoordinator                   shipworkflow.UploadImportCoordinator
+	swapSettingsFn                      func() config.SwapSettings
+	startramSettingsFn                  func() config.StartramSettings
+	updateContainerStateFn              func(string, structs.ContainerState)
 }
 
 func defaultImporterRuntime() importerRuntime {
@@ -92,15 +94,21 @@ func defaultImporterRuntime() importerRuntime {
 		},
 		cleanupMultipartFn: system.RemoveMultipartFiles,
 		storagePathForFn:   config.GetStoragePath,
-		uploadCoordinator: shipworkflow.UploadImportCoordinatorFunc(func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
-			return shipworkflow.DispatchUploadImportWithCoordinator(shipworkflow.UploadImportCoordinatorFunc(configureUploadedPier), ctx, cmd)
-		}),
+		uploadCoordinator: func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
+			return shipworkflow.DispatchUploadImportWithCoordinator(configureUploadedPier, ctx, cmd)
+		},
+		swapSettingsFn:         config.SwapSettingsSnapshot,
+		startramSettingsFn:     config.StartramSettingsSnapshot,
+		updateContainerStateFn: config.UpdateContainerState,
 	}
 }
 
 func (runtime importerRuntime) ensureInitializedForInit() error {
 	if runtime.storagePathForFn == nil {
 		return errors.New("importer runtime storage path callback is not configured")
+	}
+	if runtime.swapSettingsFn == nil {
+		return errors.New("importer runtime swap settings callback is not configured")
 	}
 	return nil
 }
@@ -118,10 +126,37 @@ func (runtime importerRuntime) ensureForWorkflow() error {
 	if runtime.runImportedPierPostImportWorkflowFn == nil {
 		return errors.New("importer runtime post-import workflow callback is not configured")
 	}
+	if runtime.startramSettingsFn == nil {
+		return errors.New("importer runtime startram settings callback is not configured")
+	}
+	if runtime.updateContainerStateFn == nil {
+		return errors.New("importer runtime container state callback is not configured")
+	}
 	if runtime.uploadCoordinator == nil {
 		return errUploadImportCoordinatorUnconfigured
 	}
 	return nil
+}
+
+func (runtime importerRuntime) swapSettings() config.SwapSettings {
+	if runtime.swapSettingsFn == nil {
+		return config.SwapSettings{}
+	}
+	return runtime.swapSettingsFn()
+}
+
+func (runtime importerRuntime) startramSettings() config.StartramSettings {
+	if runtime.startramSettingsFn == nil {
+		return config.StartramSettings{}
+	}
+	return runtime.startramSettingsFn()
+}
+
+func (runtime importerRuntime) updateContainerState(patp string, state structs.ContainerState) {
+	if runtime.updateContainerStateFn == nil {
+		return
+	}
+	runtime.updateContainerStateFn(patp, state)
 }
 
 func resolveImportedPierVolumePath(patp string) (string, error) {
@@ -138,12 +173,12 @@ var (
 )
 
 func Initialize() error {
- 	return initializeWithRuntime(defaultImporterRuntime())
+	return initialize(defaultImporterRuntime())
 }
 
-func initializeWithRuntime(runtime importerRuntime) error {
+func initialize(runtime importerRuntime) error {
 	if err := runtime.ensureInitializedForInit(); err != nil {
-		return err
+		return fmt.Errorf("initialize importer runtime: %w", err)
 	}
 	var err error
 	uploadDir, err = runtime.storagePathForFn("uploads")
@@ -154,7 +189,7 @@ func initializeWithRuntime(runtime importerRuntime) error {
 	if err != nil {
 		return fmt.Errorf("initialize temp directory: %w", err)
 	}
-	swapSettings := config.SwapSettingsSnapshot()
+	swapSettings := runtime.swapSettings()
 	if !strings.HasPrefix(swapSettings.SwapFile, "/opt") {
 		var tempPath string
 		lastSlashIndex := strings.LastIndex(swapSettings.SwapFile, "/")
@@ -165,10 +200,10 @@ func initializeWithRuntime(runtime importerRuntime) error {
 		}
 	}
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create upload directory %q: %w", uploadDir, err)
 	}
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create temp directory %q: %w", tempDir, err)
 	}
 	return nil
 }
@@ -381,7 +416,7 @@ func ensureUploadDriveReady(sessionID string, sesh uploadSession) (uploadSession
 		NeedsFormatting: sesh.NeedsFormatting,
 	})
 	if err != nil {
-		return sesh, err
+		return sesh, fmt.Errorf("ensure selected drive ready for upload session %s: %w", sessionID, err)
 	}
 
 	uploadMu.Lock()
@@ -436,12 +471,15 @@ func combineChunksWithTimeout(filename string, total int, timeout time.Duration)
 	}()
 	select {
 	case err := <-resultCh:
-		return err
+		if err != nil {
+			return fmt.Errorf("combine chunks for %s: %w", filename, err)
+		}
+		return nil
 	case <-combineCtx.Done():
 		if errors.Is(combineCtx.Err(), context.DeadlineExceeded) {
-			return errChunkCombineTimeout
+			return fmt.Errorf("combine chunks for %s: %w", filename, errChunkCombineTimeout)
 		}
-		return combineCtx.Err()
+		return fmt.Errorf("combine chunks for %s timed out: %w", filename, combineCtx.Err())
 	}
 }
 
@@ -625,7 +663,7 @@ func (pipeline *importUploadPipeline) run() uploadPipelineResult {
 func (pipeline *importUploadPipeline) prepareSession() error {
 	session, err := prepareUploadSessionForChunk(pipeline.validated.SessionID, pipeline.validated.Session)
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare upload session for %s: %w", pipeline.validated.Patp, err)
 	}
 	pipeline.session = session
 	pipeline.validated.Session = session
@@ -639,7 +677,7 @@ func (pipeline *importUploadPipeline) persistChunk() error {
 func (pipeline *importUploadPipeline) setUploadFinalizationState() error {
 	allChunks, err := allChunksReceived(pipeline.chunk.Filename, pipeline.chunk.Total)
 	if err != nil {
-		return err
+		return fmt.Errorf("read chunk manifest for %s: %w", pipeline.chunk.Filename, err)
 	}
 	completed, err := finalizeUploadOnCompletion(
 		uploadChunkProgress{
@@ -654,7 +692,7 @@ func (pipeline *importUploadPipeline) setUploadFinalizationState() error {
 		IsComplete: completed,
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("finalize upload on completion for %s: %w", pipeline.chunk.Filename, err)
 	}
 	return nil
 }
@@ -677,7 +715,7 @@ func readUploadChunk(r *http.Request) (uploadChunkPayload, error) {
 	index, total, err := parseUploadChunkMetadata(r, fileHeader.Filename)
 	if err != nil {
 		file.Close()
-		return uploadChunkPayload{}, err
+		return uploadChunkPayload{}, fmt.Errorf("parse upload chunk metadata for %s: %w", fileHeader.Filename, err)
 	}
 	return uploadChunkPayload{
 		Filename: fileHeader.Filename,
@@ -692,10 +730,10 @@ func persistUploadedChunk(filename string, index int, data io.Reader) error {
 }
 
 func finalizeUploadOnCompletion(progress uploadChunkProgress, validated validatedUploadRequest) (bool, error) {
-	return finalizeUploadOnCompletionWithRuntime(progress, validated, defaultImporterRuntime())
+	return finalizeUploadOnCompletionForRuntime(progress, validated, defaultImporterRuntime())
 }
 
-func finalizeUploadOnCompletionWithRuntime(
+func finalizeUploadOnCompletionForRuntime(
 	progress uploadChunkProgress,
 	validated validatedUploadRequest,
 	runtime importerRuntime,
@@ -705,12 +743,12 @@ func finalizeUploadOnCompletionWithRuntime(
 	}
 	if err := combineChunksWithTimeout(progress.Filename, progress.Total, 30*time.Minute); err != nil {
 		if errors.Is(err, errChunkCombineTimeout) {
-			return true, errChunkCombineTimeout
+			return true, fmt.Errorf("Timed out combining upload chunks for %s: %w", progress.Filename, errChunkCombineTimeout)
 		}
 		return true, fmt.Errorf("Failed to combine chunks: %w", err)
 	}
 	dispatchCmd := toUploadImportCommand(validated, progress)
-	if err := runtime.uploadCoordinator.HandleUploadImport(validated.Context, dispatchCmd); err != nil {
+	if err := runtime.uploadCoordinator(validated.Context, dispatchCmd); err != nil {
 		return true, fmt.Errorf("failed to finalize imported pier config: %w", errors.Join(errImportPierConfig, err))
 	}
 	return true, nil
@@ -732,7 +770,7 @@ func allChunksReceived(filename string, total int) (bool, error) {
 		partPath := filepath.Join(tempDir, fmt.Sprintf("%s-part-%d", filename, i))
 		exists, err := fileExists(partPath)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("check chunk part %d for %s: %w", i, filename, err)
 		}
 		if !exists {
 			return false, nil
@@ -790,27 +828,27 @@ func combineChunks(filename string, total int) error {
 }
 
 func configureUploadedPier(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
-	return configureUploadedPierWithRuntime(ctx, cmd, defaultImporterRuntime())
+	return configureUploadedPierForRuntime(ctx, cmd, defaultImporterRuntime())
 }
 
-func configureUploadedPierWithRuntime(
+func configureUploadedPierForRuntime(
 	ctx context.Context,
 	cmd shipworkflow.UploadImportCommand,
 	runtime importerRuntime,
 ) error {
 	if err := runtime.ensureForWorkflow(); err != nil {
-		return err
+		return fmt.Errorf("prepare importer workflow runtime: %w", err)
 	}
 	defer runtime.cleanupMultipartFn(tempDir)
 	pierCtx, err := newImportedPierContext(ctx, runtime, cmd)
 	if err != nil {
-		return err
+		return fmt.Errorf("build imported pier context: %w", err)
 	}
-	if err := runtime.runImportedPierWorkflowFn(pierCtx); err != nil {
-		return err
+	if err := runtime.runImportedPierWorkflowFn(pierCtx, runtime); err != nil {
+		return fmt.Errorf("run imported pier workflow for %s: %w", pierCtx.Patp, err)
 	}
-	if err := runtime.runImportedPierPostImportWorkflowFn(pierCtx); err != nil {
-		return err
+	if err := runtime.runImportedPierPostImportWorkflowFn(pierCtx, runtime); err != nil {
+		return fmt.Errorf("run imported pier post workflow for %s: %w", pierCtx.Patp, err)
 	}
 	return nil
 }
@@ -835,10 +873,10 @@ func newImportedPierContext(ctx context.Context, runtime importerRuntime, cmd sh
 		return importedPierContext{}, fmt.Errorf("upload command missing ship name")
 	}
 	if _, err := runtime.storagePathForFn("uploads"); err != nil {
-		return importedPierContext{}, err
+		return importedPierContext{}, fmt.Errorf("resolve upload storage path for %s: %w", cmd.Patp, err)
 	}
 	if _, err := runtime.storagePathForFn("temp"); err != nil {
-		return importedPierContext{}, err
+		return importedPierContext{}, fmt.Errorf("resolve temp storage path for %s: %w", cmd.Patp, err)
 	}
 	volumePath, err := runtime.resolveImportedPierVolumePathFn(requestCtx, cmd.Patp)
 	if err != nil {
@@ -867,17 +905,17 @@ func newImportedPierContext(ctx context.Context, runtime importerRuntime, cmd sh
 }
 
 func runImportedPierWorkflow(ctx importedPierContext) error {
-	return runImportedPierWorkflowWithRuntime(ctx, defaultImporterRuntime())
+	return runImportedPierWorkflowForRuntime(ctx, defaultImporterRuntime())
 }
 
-func runImportedPierWorkflowWithRuntime(ctx importedPierContext, runtime importerRuntime) error {
+func runImportedPierWorkflowForRuntime(ctx importedPierContext, runtime importerRuntime) error {
 	if err := runtime.ensureForWorkflow(); err != nil {
-		return err
+		return fmt.Errorf("prepare imported pier workflow for %s: %w", ctx.Patp, err)
 	}
-	return runtime.runImportedPierWorkflowFn(ctx)
+	return fmt.Errorf("run imported pier workflow for %s: %w", ctx.Patp, runtime.runImportedPierWorkflowFn(ctx, runtime))
 }
 
-func runImportedPierWorkflowDefault(ctx importedPierContext) error {
+func runImportedPierWorkflowDefault(ctx importedPierContext, runtime importerRuntime) error {
 	return runImportPhases(
 		ctx.Filename,
 		ctx.Patp,
@@ -901,7 +939,7 @@ func runImportedPierWorkflowDefault(ctx importedPierContext) error {
 				{
 					Phase: lifecycle.Phase("booting"),
 					Run: func() error {
-						return bootImportedPier(ctx)
+						return bootImportedPierWithRuntime(ctx, runtime)
 					},
 				},
 			},
@@ -909,26 +947,26 @@ func runImportedPierWorkflowDefault(ctx importedPierContext) error {
 	)
 }
 
-func runImportedPierPostImportWorkflowWithRuntime(ctx importedPierContext, runtime importerRuntime) error {
+func runImportedPierPostImportWorkflowForRuntime(ctx importedPierContext, runtime importerRuntime) error {
 	if err := runtime.ensureForWorkflow(); err != nil {
-		return err
+		return fmt.Errorf("prepare importer workflow for %s: %w", ctx.Patp, err)
 	}
-	if err := runtime.runImportedPierPostImportWorkflowFn(ctx); err != nil {
+	if err := runtime.runImportedPierPostImportWorkflowFn(ctx, runtime); err != nil {
 		logger.Error(fmt.Sprintf("Imported pier post-processing failed for %s: %v", ctx.Patp, err))
-		return err
+		return fmt.Errorf("import pier post-processing for %s: %w", ctx.Patp, err)
 	}
 	return nil
 }
 
 func runImportedPierPostImportWorkflow(ctx importedPierContext) error {
-	return runImportedPierPostImportWorkflowWithRuntime(ctx, defaultImporterRuntime())
+	return runImportedPierPostImportWorkflowForRuntime(ctx, defaultImporterRuntime())
 }
 
-func runImportedPierPostImportWorkflowDefault(ctx importedPierContext) error {
-	return runImportedPierPostProcessWorkflowWithRuntime(ctx, defaultImporterRuntime())
+func runImportedPierPostImportWorkflowDefault(ctx importedPierContext, runtime importerRuntime) error {
+	return runImportedPierPostProcessWorkflowForRuntime(ctx, runtime)
 }
 
-func runImportedPierPostProcessWorkflowWithRuntime(ctx importedPierContext, _ importerRuntime) error {
+func runImportedPierPostProcessWorkflowForRuntime(ctx importedPierContext, runtime importerRuntime) error {
 	return runImportPhases(
 		ctx.Filename,
 		ctx.Patp,
@@ -938,13 +976,13 @@ func runImportedPierPostProcessWorkflowWithRuntime(ctx importedPierContext, _ im
 				{
 					Phase: lifecycle.Phase("registering"),
 					Run: func() error {
-						return startImportedPierRegistration(ctx.Patp)
+						return startImportedPierRegistrationWithRuntime(ctx.Patp, runtime)
 					},
 				},
 				{
 					Phase: lifecycle.Phase("finalizing"),
 					Run: func() error {
-						return finalizeImportedPierReadiness(ctx)
+						return finalizeImportedPierReadinessWithRuntime(ctx, runtime)
 					},
 				},
 			},
@@ -953,11 +991,15 @@ func runImportedPierPostProcessWorkflowWithRuntime(ctx importedPierContext, _ im
 }
 
 func runImportedPierPostProcessWorkflow(ctx importedPierContext) error {
-	return runImportedPierPostProcessWorkflowWithRuntime(ctx, defaultImporterRuntime())
+	return runImportedPierPostProcessWorkflowForRuntime(ctx, defaultImporterRuntime())
 }
 
 func startImportedPierRegistration(patp string) error {
-	startramSettings := config.StartramSettingsSnapshot()
+	return startImportedPierRegistrationWithRuntime(patp, defaultImporterRuntime())
+}
+
+func startImportedPierRegistrationWithRuntime(patp string, runtime importerRuntime) error {
+	startramSettings := runtime.startramSettings()
 	if startramSettings.WgRegistered {
 		return registerServices(patp)
 	}
@@ -965,6 +1007,10 @@ func startImportedPierRegistration(patp string) error {
 }
 
 func finalizeImportedPierReadiness(ctx importedPierContext) error {
+	return finalizeImportedPierReadinessWithRuntime(ctx, defaultImporterRuntime())
+}
+
+func finalizeImportedPierReadinessWithRuntime(ctx importedPierContext, runtime importerRuntime) error {
 	logger.Info(fmt.Sprintf("Booting ship: %v", ctx.Patp))
 	shipworkflowWaitForBootCodeFn(ctx.Patp, 1*time.Second)
 	if ctx.Fix {
@@ -974,7 +1020,7 @@ func finalizeImportedPierReadiness(ctx importedPierContext) error {
 			return wrappedErr
 		}
 	}
-	startramSettings := config.StartramSettingsSnapshot()
+	startramSettings := runtime.startramSettings()
 	if startramSettings.WgRegistered && startramSettings.WgOn && ctx.Remote {
 		publishImportStatus("remote")
 		shipworkflowWaitForRemoteReadyFn(ctx.Patp, 1*time.Second)
@@ -1028,8 +1074,13 @@ func isIgnorableCleanupDeleteError(err error) bool {
 	if errors.Is(err, os.ErrNotExist) {
 		return true
 	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "not found") || strings.Contains(msg, "no such")
+	if errdefs.IsNotFound(err) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "no such volume") {
+		return true
+	}
+	return false
 }
 
 func extractUploadedPier(ctx importedPierContext) error {
@@ -1061,12 +1112,16 @@ func monitorExtractionProgress(done <-chan struct{}) {
 }
 
 func bootImportedPier(ctx importedPierContext) error {
+	return bootImportedPierWithRuntime(ctx, defaultImporterRuntime())
+}
+
+func bootImportedPierWithRuntime(ctx importedPierContext, runtime importerRuntime) error {
 	logger.Info(fmt.Sprintf("Starting extracted pier: %v", ctx.Patp))
 	info, err := dockerOrchestration.StartContainer(ctx.Patp, "vere")
 	if err != nil {
 		return fmt.Errorf("failed to start imported ship: %w", err)
 	}
-	config.UpdateContainerState(ctx.Patp, info)
+	runtime.updateContainerState(ctx.Patp, info)
 	if err := os.Remove(ctx.ArchivePath); err != nil {
 		logger.Warn(fmt.Sprintf("Failed to remove uploaded archive %s: %v", ctx.Filename, err))
 	}
@@ -1108,14 +1163,14 @@ func restructureDirectory(ctx importedPierContext) error {
 	var urbLoc []string
 	if err := filepath.Walk(volDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("walk volume directory %s: %w", volDir, err)
 		}
 		if info.IsDir() && filepath.Base(path) == ".urb" && !strings.Contains(path, "__MACOSX") {
 			urbLoc = append(urbLoc, filepath.Dir(path))
 		}
 		return nil
 	}); err != nil {
-		return err
+		return fmt.Errorf("find ship directory in volume %s: %w", volDir, err)
 	}
 	// there can only be one
 	if len(urbLoc) > 1 {
@@ -1187,7 +1242,7 @@ func restructureDirectory(ctx importedPierContext) error {
 func registerServices(patp string) error {
 	if err := shipworkflow.RegisterShipServices(patp); err != nil {
 		logger.Error(fmt.Sprintf("Unable to register StarTram service for %s: %v", patp, err))
-		return err
+		return fmt.Errorf("register ship services for %s: %w", patp, err)
 	}
 	return nil
 }

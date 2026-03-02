@@ -5,24 +5,92 @@ import (
 	"fmt"
 	"groundseg/click"
 	"groundseg/config"
+	"groundseg/docker/network"
 	"groundseg/docker/orchestration/container"
+	"groundseg/internal/seams"
 	"groundseg/startram"
 	"groundseg/structs"
 	"os"
-	"reflect"
 	"time"
 )
 
+var (
+	runtimeStartramSettingsSnapshotFn    = config.StartramSettingsSnapshot
+	runtimeShipSettingsSnapshotFn        = config.ShipSettingsSnapshot
+	runtimeCheck502SettingsSnapshotFn    = config.Check502SettingsSnapshot
+	runtimeBasePathFn                    = config.BasePath
+	runtimeArchitectureFn                = config.Architecture
+	runtimeDebugModeFn                   = config.DebugMode
+	runtimeDockerDirFn                   = config.DockerDir
+	runtimeShipRuntimeSettingsSnapshotFn = config.ShipRuntimeSettingsSnapshot
+)
+
 type Runtime struct {
-	RuntimeContainerOps
-	RuntimeUrbitOps
-	RuntimeSnapshotOps
-	RuntimeConfigOps
-	RuntimeLoadOps
-	RuntimeServiceOps
+	RuntimeTransitionOps
+	RuntimeHealthOps
+	RuntimeStartupOps
+}
+
+type RuntimeDependencies struct {
+	RuntimeTransitionOps
+	RuntimeHealthOps
+	RuntimeStartupOps
+}
+
+// DockerTransitionRuntime contains the narrow dependencies required for transition-driven
+// container workflows like start/restart/stop handling.
+type DockerTransitionRuntime struct {
+	LoadUrbitConfigFn   func(string) error
+	UrbitConfFn         func(string) structs.UrbitDocker
+	UpdateUrbitFn       func(string, func(*structs.UrbitDocker) error) error
+	ClearLusCodeFn      func(string)
+	StartContainerFn    func(string, string) (structs.ContainerState, error)
+	GetContainerStateFn func() map[string]structs.ContainerState
+	UpdateContainerFn   func(string, structs.ContainerState)
+}
+
+// DockerHealthRuntime contains the narrow dependencies required for health checks and
+// 502 recovery loops.
+type DockerHealthRuntime struct {
+	Check502SettingsSnapshotFn func() config.Check502Settings
+	GetShipStatusFn            func([]string) (map[string]string, error)
+	GetContainerNetworkFn      func(string) (string, error)
+	GetLusCodeFn               func(string) (string, error)
+	ShipSettingsSnapshotFn     func() config.ShipSettings
+}
+
+// NewDockerTransitionRuntime builds transition-focused dependencies from the general runtime
+// seam, limiting coupling between lifecycle handlers and unrelated concerns.
+func NewDockerTransitionRuntime(runtime Runtime) DockerTransitionRuntime {
+	return DockerTransitionRuntime{
+		LoadUrbitConfigFn:   runtime.LoadUrbitConfigFn,
+		UrbitConfFn:         runtime.UrbitConfFn,
+		UpdateUrbitFn:       runtime.UpdateUrbitFn,
+		ClearLusCodeFn:      runtime.ClearLusCodeFn,
+		StartContainerFn:    runtime.StartContainerFn,
+		GetContainerStateFn: runtime.GetContainerStateFn,
+		UpdateContainerFn:   runtime.UpdateContainerStateFn,
+	}
+}
+
+// NewDockerHealthRuntime builds health-loop focused dependencies from the general runtime seam.
+func NewDockerHealthRuntime(runtime Runtime) DockerHealthRuntime {
+	return DockerHealthRuntime{
+		Check502SettingsSnapshotFn: runtime.Check502SettingsSnapshotFn,
+		GetShipStatusFn:            runtime.GetShipStatusFn,
+		GetContainerNetworkFn:      runtime.GetContainerNetworkFn,
+		GetLusCodeFn:               runtime.GetLusCodeFn,
+		ShipSettingsSnapshotFn:     runtime.ShipSettingsSnapshotFn,
+	}
 }
 
 type StartupRuntime struct {
+	StartupBootstrapOps
+	StartupImageOps
+	StartupLoadOps
+}
+
+type StartupRuntimeDependencies struct {
 	StartupBootstrapOps
 	StartupImageOps
 	StartupLoadOps
@@ -35,105 +103,129 @@ func (runtime StartupRuntime) Initialize() error {
 	return runtime.StartupBootstrapOps.Initialize()
 }
 
-type RuntimeOption func(*Runtime)
+type RuntimeOption func(*RuntimeDependencies)
 
 func WithContainerOps(ops RuntimeContainerOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeContainerOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeTransitionOps.RuntimeContainerOps = seams.Merge(runtime.RuntimeTransitionOps.RuntimeContainerOps, ops)
 	}
 }
 
 func WithUrbitOps(ops RuntimeUrbitOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeUrbitOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeTransitionOps.RuntimeUrbitOps = seams.Merge(runtime.RuntimeTransitionOps.RuntimeUrbitOps, ops)
 	}
 }
 
 func WithSnapshotOps(ops RuntimeSnapshotOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeSnapshotOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeHealthOps.RuntimeSnapshotOps = seams.Merge(runtime.RuntimeHealthOps.RuntimeSnapshotOps, ops)
 	}
 }
 
 func WithConfigOps(ops RuntimeConfigOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeConfigOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeStartupOps.RuntimeConfigOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeConfigOps, ops)
 	}
 }
 
 func WithLoadOps(ops RuntimeLoadOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeLoadOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeStartupOps.RuntimeLoadOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeLoadOps, ops)
 	}
 }
 
 func WithServiceOps(ops RuntimeServiceOps) RuntimeOption {
-	return func(runtime *Runtime) {
-		assignNonNilCallbacks(&runtime.RuntimeServiceOps, ops)
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeStartupOps.RuntimeServiceOps = seams.Merge(runtime.RuntimeStartupOps.RuntimeServiceOps, ops)
+	}
+}
+
+func WithRuntimeDependencies(dependencies RuntimeDependencies) RuntimeOption {
+	return func(runtime *RuntimeDependencies) {
+		runtime.RuntimeTransitionOps = seams.Merge(runtime.RuntimeTransitionOps, dependencies.RuntimeTransitionOps)
+		runtime.RuntimeHealthOps = seams.Merge(runtime.RuntimeHealthOps, dependencies.RuntimeHealthOps)
+		runtime.RuntimeStartupOps = seams.Merge(runtime.RuntimeStartupOps, dependencies.RuntimeStartupOps)
+	}
+}
+
+func NewRuntimeWithDependencies(overrides RuntimeDependencies) Runtime {
+	return Runtime{
+		RuntimeTransitionOps: seams.Merge(defaultRuntimeTransitionOps(), overrides.RuntimeTransitionOps),
+		RuntimeHealthOps:     seams.Merge(defaultRuntimeHealthOps(), overrides.RuntimeHealthOps),
+		RuntimeStartupOps:    seams.Merge(defaultRuntimeStartupOps(), overrides.RuntimeStartupOps),
 	}
 }
 
 func NewRuntime(opts ...RuntimeOption) Runtime {
-	runtime := Runtime{
-		RuntimeContainerOps: defaultRuntimeContainerOps(),
-		RuntimeUrbitOps:     defaultRuntimeUrbit(),
-		RuntimeSnapshotOps:  defaultRuntimeSnapshot(),
-		RuntimeConfigOps:    defaultRuntimeConfig(),
-		RuntimeLoadOps:      defaultRuntimeLoad(),
-		RuntimeServiceOps:   defaultRuntimeService(),
-	}
+	overrides := RuntimeDependencies{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&runtime)
+			opt(&overrides)
 		}
 	}
-	return runtime
+	return NewRuntimeWithDependencies(overrides)
 }
 
-type StartupRuntimeOption func(*StartupRuntime)
+type StartupRuntimeOption func(*StartupRuntimeDependencies)
 
 func WithStartupBootstrapOps(ops StartupBootstrapOps) StartupRuntimeOption {
-	return func(runtime *StartupRuntime) {
-		assignNonNilCallbacks(&runtime.StartupBootstrapOps, ops)
+	return func(runtime *StartupRuntimeDependencies) {
+		runtime.StartupBootstrapOps = seams.Merge(runtime.StartupBootstrapOps, ops)
 	}
 }
 
 func WithStartupImageOps(ops StartupImageOps) StartupRuntimeOption {
-	return func(runtime *StartupRuntime) {
-		assignNonNilCallbacks(&runtime.StartupImageOps, ops)
+	return func(runtime *StartupRuntimeDependencies) {
+		runtime.StartupImageOps = seams.Merge(runtime.StartupImageOps, ops)
 	}
 }
 
 func WithStartupLoadOps(ops StartupLoadOps) StartupRuntimeOption {
-	return func(runtime *StartupRuntime) {
-		assignNonNilCallbacks(&runtime.StartupLoadOps, ops)
+	return func(runtime *StartupRuntimeDependencies) {
+		runtime.StartupLoadOps = seams.Merge(runtime.StartupLoadOps, ops)
 	}
 }
 
-func assignNonNilCallbacks[T any](target *T, source T) {
-	targetVal := reflect.ValueOf(target).Elem()
-	sourceVal := reflect.ValueOf(source)
-	for i := 0; i < targetVal.NumField(); i++ {
-		sourceField := sourceVal.Field(i)
-		if sourceField.Kind() != reflect.Func || sourceField.IsNil() {
-			continue
-		}
-		targetVal.Field(i).Set(sourceField)
+func WithStartupRuntimeDependencies(dependencies StartupRuntimeDependencies) StartupRuntimeOption {
+	return func(runtime *StartupRuntimeDependencies) {
+		runtime.StartupBootstrapOps = seams.Merge(runtime.StartupBootstrapOps, dependencies.StartupBootstrapOps)
+		runtime.StartupImageOps = seams.Merge(runtime.StartupImageOps, dependencies.StartupImageOps)
+		runtime.StartupLoadOps = seams.Merge(runtime.StartupLoadOps, dependencies.StartupLoadOps)
+	}
+}
+
+func NewStartupRuntimeWithDependencies(overrides StartupRuntimeDependencies) StartupRuntime {
+	return StartupRuntime{
+		StartupBootstrapOps: seams.Merge(defaultStartupBootstrap(), overrides.StartupBootstrapOps),
+		StartupImageOps:     seams.Merge(defaultStartupImage(), overrides.StartupImageOps),
+		StartupLoadOps:      seams.Merge(defaultStartupLoad(), overrides.StartupLoadOps),
 	}
 }
 
 func NewStartupRuntime(opts ...StartupRuntimeOption) StartupRuntime {
-	runtime := StartupRuntime{
-		StartupBootstrapOps: defaultStartupBootstrap(),
-		StartupImageOps:     defaultStartupImage(),
-		StartupLoadOps:      defaultStartupLoad(),
-	}
+	overrides := StartupRuntimeDependencies{}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&runtime)
+			opt(&overrides)
 		}
 	}
-	return runtime
+	return NewStartupRuntimeWithDependencies(overrides)
+}
+
+type RuntimeTransitionOps struct {
+	RuntimeContainerOps
+	RuntimeUrbitOps
+}
+
+type RuntimeHealthOps struct {
+	RuntimeSnapshotOps
+}
+
+type RuntimeStartupOps struct {
+	RuntimeConfigOps
+	RuntimeLoadOps
+	RuntimeServiceOps
 }
 
 type RuntimeContainerOps struct {
@@ -180,6 +272,7 @@ type RuntimeLoadOps struct {
 type RuntimeServiceOps struct {
 	SvcDeleteFn func(patp string, kind string) error
 }
+
 type StartupBootstrapOps struct {
 	Initialize func() error
 }
@@ -198,6 +291,27 @@ type StartupLoadOps struct {
 	LoadLlama     func() error
 }
 
+func defaultRuntimeTransitionOps() RuntimeTransitionOps {
+	return RuntimeTransitionOps{
+		RuntimeContainerOps: defaultRuntimeContainerOps(),
+		RuntimeUrbitOps:     defaultRuntimeUrbit(),
+	}
+}
+
+func defaultRuntimeHealthOps() RuntimeHealthOps {
+	return RuntimeHealthOps{
+		RuntimeSnapshotOps: defaultRuntimeSnapshot(),
+	}
+}
+
+func defaultRuntimeStartupOps() RuntimeStartupOps {
+	return RuntimeStartupOps{
+		RuntimeConfigOps:  defaultRuntimeConfig(),
+		RuntimeLoadOps:    defaultRuntimeLoad(),
+		RuntimeServiceOps: defaultRuntimeService(),
+	}
+}
+
 func defaultRuntimeContainerOps() RuntimeContainerOps {
 	return RuntimeContainerOps{
 		StartContainerFn:       StartContainer,
@@ -213,21 +327,23 @@ func defaultRuntimeContainerOps() RuntimeContainerOps {
 
 func defaultRuntimeUrbit() RuntimeUrbitOps {
 	return RuntimeUrbitOps{
-		LoadUrbitConfigFn:     config.LoadUrbitConfig,
-		UrbitConfFn:           config.UrbitConf,
-		UpdateUrbitFn:         config.UpdateUrbit,
-		GetContainerNetworkFn: GetContainerNetwork,
-		GetLusCodeFn:          click.GetLusCode,
-		ClearLusCodeFn:        click.ClearLusCode,
+		LoadUrbitConfigFn: config.LoadUrbitConfig,
+		UrbitConfFn:       config.UrbitConf,
+		UpdateUrbitFn:     config.UpdateUrbit,
+		GetContainerNetworkFn: func(name string) (string, error) {
+			return network.NewNetworkRuntime().GetContainerNetwork(name)
+		},
+		GetLusCodeFn:   click.GetLusCode,
+		ClearLusCodeFn: click.ClearLusCode,
 	}
 }
 
 func defaultRuntimeSnapshot() RuntimeSnapshotOps {
 	return RuntimeSnapshotOps{
-		StartramSettingsSnapshotFn: config.StartramSettingsSnapshot,
-		ShipSettingsSnapshotFn:     config.ShipSettingsSnapshot,
+		StartramSettingsSnapshotFn: runtimeStartramSettingsSnapshotFn,
+		ShipSettingsSnapshotFn:     runtimeShipSettingsSnapshotFn,
 		GetStartramConfigFn:        config.GetStartramConfig,
-		Check502SettingsSnapshotFn: config.Check502SettingsSnapshot,
+		Check502SettingsSnapshotFn: runtimeCheck502SettingsSnapshotFn,
 	}
 }
 
@@ -242,10 +358,12 @@ func defaultRuntimeConfig() RuntimeConfigOps {
 
 func defaultRuntimeLoad() RuntimeLoadOps {
 	return RuntimeLoadOps{
-		LoadWireguardFn: LoadWireguard,
-		LoadMCFn:        LoadMC,
-		LoadMinIOsFn:    LoadMinIOs,
-		LoadUrbitsFn:    LoadUrbits,
+		LoadWireguardFn: func() error {
+			return wireguardRuntimeFromDocker(newDockerRuntime()).LoadWireguard()
+		},
+		LoadMCFn:     LoadMC,
+		LoadMinIOsFn: LoadMinIOs,
+		LoadUrbitsFn: LoadUrbits,
 	}
 }
 
@@ -270,12 +388,14 @@ func defaultStartupImage() StartupImageOps {
 
 func defaultStartupLoad() StartupLoadOps {
 	return StartupLoadOps{
-		LoadWireguard: LoadWireguard,
-		LoadMC:        LoadMC,
-		LoadMinIOs:    LoadMinIOs,
-		LoadNetdata:   LoadNetdata,
-		LoadUrbits:    LoadUrbits,
-		LoadLlama:     LoadLlama,
+		LoadWireguard: func() error {
+			return wireguardRuntimeFromDocker(newDockerRuntime()).LoadWireguard()
+		},
+		LoadMC:      LoadMC,
+		LoadMinIOs:  LoadMinIOs,
+		LoadNetdata: LoadNetdata,
+		LoadUrbits:  LoadUrbits,
+		LoadLlama:   LoadLlama,
 	}
 }
 
@@ -523,10 +643,18 @@ type dockerRuntimeTimerOps struct {
 func newDockerRuntime() dockerRuntime {
 	return dockerRuntime{
 		contextOps: dockerRuntimeContextOps{
-			BasePathFn:     func() string { return config.RuntimeContextSnapshot().BasePath },
-			ArchitectureFn: func() string { return config.RuntimeContextSnapshot().Architecture },
-			DebugModeFn:    func() bool { return config.RuntimeContextSnapshot().DebugMode },
-			DockerDirFn:    func() string { return config.RuntimeContextSnapshot().DockerDir },
+			BasePathFn: func() string {
+				return runtimeBasePathFn()
+			},
+			ArchitectureFn: func() string {
+				return runtimeArchitectureFn()
+			},
+			DebugModeFn: func() bool {
+				return runtimeDebugModeFn()
+			},
+			DockerDirFn: func() string {
+				return runtimeDockerDirFn()
+			},
 		},
 		fileOps: dockerRuntimeFileOps{
 			OpenFn:      os.Open,
@@ -540,16 +668,22 @@ func newDockerRuntime() dockerRuntime {
 			CreateContainerFn:           CreateContainer,
 			UpdateContainerStateFn:      config.UpdateContainerState,
 			GetContainerRunningStatusFn: GetContainerRunningStatus,
-			AddOrGetNetworkFn:           AddOrGetNetwork,
+			AddOrGetNetworkFn: func(networkName string) (string, error) {
+				return network.NewNetworkRuntime().AddOrGetNetwork(networkName)
+			},
 		},
 		imageOps: dockerRuntimeImageOps{
 			GetLatestContainerInfoFn:  GetLatestContainerInfo,
 			GetLatestContainerImageFn: latestContainerImage,
 		},
 		configOps: dockerRuntimeConfigOps{
-			ConfFn:                    config.Conf,
-			ShipSettingsSnapshotFn:    config.ShipSettingsSnapshot,
-			RuntimeSettingsSnapshotFn: config.ShipRuntimeSettingsSnapshot,
+			ConfFn: config.Conf,
+			ShipSettingsSnapshotFn: func() config.ShipSettings {
+				return runtimeShipSettingsSnapshotFn()
+			},
+			RuntimeSettingsSnapshotFn: func() config.ShipRuntimeSettings {
+				return runtimeShipRuntimeSettingsSnapshotFn()
+			},
 		},
 		urbitOps: dockerRuntimeUrbitOps{
 			LoadUrbitConfigFn: config.LoadUrbitConfig,
@@ -564,7 +698,7 @@ func newDockerRuntime() dockerRuntime {
 				return config.GetStartramConfig().Conf, nil
 			},
 			GetWgPrivkeyFn: config.GetWgPrivkey,
-			WriteWgConfFn:  writeWgConfWithRuntime,
+			WriteWgConfFn:  func(rt WireguardRuntime) error { return rt.WriteWgConf() },
 		},
 		netdataOps: dockerRuntimeNetdataOps{
 			CreateDefaultNetdataConfFn: config.CreateDefaultNetdataConf,
@@ -585,8 +719,12 @@ func newDockerRuntime() dockerRuntime {
 			CopyFileToVolumeFn:      copyFileToVolumeWithTempContainer,
 		},
 		volumeOps: dockerRuntimeVolumeOps{
-			VolumeExistsFn: VolumeExists,
-			CreateVolumeFn: CreateVolume,
+			VolumeExistsFn: func(volumeName string) (bool, error) {
+				return network.NewNetworkRuntime().VolumeExists(volumeName)
+			},
+			CreateVolumeFn: func(volumeName string) error {
+				return network.NewNetworkRuntime().CreateVolume(volumeName)
+			},
 		},
 		timerOps: dockerRuntimeTimerOps{
 			SleepFn:        time.Sleep,

@@ -10,6 +10,7 @@ import (
 
 	"groundseg/config"
 	"groundseg/docker/events"
+	"groundseg/docker/network"
 	"groundseg/docker/orchestration"
 	"groundseg/shipcleanup"
 	"groundseg/shipcreator"
@@ -35,18 +36,18 @@ func ProvisionShip(patp string, shipPayload structs.WsNewShipPayload, customDriv
 	if err = orchestration.DeleteContainer(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("delete container error: %v", err))
 	}
-	if err = orchestration.DeleteVolume(patp); err != nil {
+	if err = network.NewNetworkRuntime().DeleteVolume(patp); err != nil {
 		zap.L().Error(fmt.Sprintf("delete volume error: %v", err))
 	}
 
 	if customDrive == "" {
-		if err = orchestration.CreateVolume(patp); err != nil {
+		if err = network.NewNetworkRuntime().CreateVolume(patp); err != nil {
 			errmsg := fmt.Sprintf("create volume error: %v", err)
 			zap.L().Error(errmsg)
 			return handleNewShipErrorCleanup(patp, errmsg, customDrive)
 		}
 		key := shipPayload.Payload.Key
-		if err = orchestration.WriteFileToVolume(patp, patp+".key", key); err != nil {
+		if err = network.NewNetworkRuntime().WriteFileToVolume(patp, patp+".key", key); err != nil {
 			errmsg := fmt.Sprintf("write file to volume error: %v", err)
 			zap.L().Error(errmsg)
 			return handleNewShipErrorCleanup(patp, errmsg, customDrive)

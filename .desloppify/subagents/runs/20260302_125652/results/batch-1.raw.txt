@@ -1,0 +1,69 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action identifiers and contract identifiers are defined in separate packages (`actions.Action*` in `goseg/protocol/actions/actions.go` and `contracts.*Action*` in `goseg/protocol/contracts/contracts.go`) and stitched together manually in `uploadActionContracts`/`c2cActionContracts`.",
+        "Package-level variables in `actions.go` resolve descriptors during import (`contractForAction(... MustContractDescriptor(...))`), creating initialization-time coupling to `contracts` catalog contents.",
+        "`MustContractDescriptor` in `contracts.go` returns a synthetic descriptor when an ID is missing instead of failing fast, so boundary drift can remain latent until runtime behavior depends on missing metadata."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_action_contract_source_of_truth",
+      "summary": "Action and contract identity are split across modules with manual synchronization points.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` declares action tokens (`ActionUploadOpenEndpoint`, `ActionUploadReset`, `ActionC2CConnect`) while `contracts.go` separately declares corresponding contract IDs (`UploadActionOpenEndpoint`, `UploadActionReset`, `C2CConnectAction`).",
+        "The relationship is maintained by hand in `uploadActionContracts` and `c2cActionContracts`, so adding/changing one side requires coordinated edits across both files."
+      ],
+      "suggestion": "Create one canonical registry (for example in `contracts`) that defines action token + contract metadata together, and have `actions` derive supported actions/metadata from that registry instead of duplicating identity declarations.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "import_time_descriptor_binding_with_silent_fallback",
+      "summary": "Import-time descriptor binding plus silent missing-contract fallback weakens boundary integrity.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` builds `uploadActionContracts`/`c2cActionContracts` at package init by calling `contracts.MustContractDescriptor(...)`.",
+        "`MustContractDescriptor` in `contracts.go` does not fail on missing IDs; it returns `ContractDescriptor{Name: string(name)}` with empty metadata/description.",
+        "This allows missing or renamed catalog entries to pass initialization without an explicit failure signal, increasing risk of hidden cross-module contract drift."
+      ],
+      "suggestion": "Replace `MustContractDescriptor` fallback behavior with fail-fast semantics for production paths (panic or explicit error return), and move contract/action assembly behind an explicit initialization/validation function that can return errors and be tested.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "contract_registry_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol identity and compatibility metadata are modeled in separate modules without a single authoritative schema.",
+      "Boundary validation is deferred/implicit (import-time construction + permissive lookup) instead of explicit and fail-fast."
+    ],
+    "likely_symptoms": [
+      "split_action_contract_source_of_truth",
+      "import_time_descriptor_binding_with_silent_fallback"
+    ],
+    "possible_false_positives": []
+  }
+}

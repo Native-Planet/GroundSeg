@@ -1,0 +1,91 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 72.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Multiple no-context wrappers discard returned errors from long-running workers via `_ = ...WithContext(...)`, so failures are silently lost instead of being surfaced or logged (for example in `goseg/routines/version.go`, `goseg/routines/logstream/logs.go`, and `goseg/docker/orchestration/subsystem/docker.go`).",
+        "State/config mutation paths log errors and continue with partially-applied flows instead of returning failure, producing inconsistent failure behavior across similar operational code (for example `UpdateConfTypedFn` in `goseg/rectify/rectify.go` and per-ship upgrade mutations in `goseg/routines/version.go`).",
+        "Version metadata loading uses log-and-fallback behavior without an error-returning contract, while adjacent code paths in the same area do propagate errors, creating mixed expectations for callers (`goseg/defaults/version.go`, `goseg/config/version.go`)."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "discarded_worker_errors_in_entry_wrappers",
+      "summary": "Top-level wrappers drop worker errors, making runtime failures silent and non-actionable.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/docker/orchestration/subsystem/docker.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartVersionSubsystem`, `CheckVersionLoop`, `OldLogsCleaner`, `SysLogStreamer`, `DockerLogStreamer`, and `DockerLogConnRemover` call error-returning functions with `_ = ...` and do not log returned errors.",
+        "`StartDockerSubsystem` calls `StartDockerSubsystemWithContext` and returns on error without logging or propagation.",
+        "`C2cCheckWith` ignores `setC2cMode` failure (`_ = runtime.mode.setC2cMode(true)`), while nearby calls in the same block do check errors."
+      ],
+      "suggestion": "Standardize fire-and-forget entrypoints: either (a) remove error returns from underlying loops that are intentionally non-fatal and log internally, or (b) keep error returns and require wrappers to log and/or publish them to a shared supervisor error channel. Replace `_ =` callsites with explicit handling.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fire_and_forget_error_contract_drift"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "state_mutation_errors_logged_but_not_failed",
+      "summary": "Configuration/state update failures are logged and suppressed in critical transition flows.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/routines/version.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "In `startramTransitionCommand.Apply`, `UpdateConfTypedFn` errors are only logged and function still returns `nil`, so caller sees success after failed state persistence.",
+        "In version upgrade flow, several config/container mutation failures are logged and loop continues, leading to partial upgrade states without a propagated aggregate failure.",
+        "In importer cleanup paths, rollback failures are only logged while outer flow proceeds to publish abort status, masking whether recovery actually completed."
+      ],
+      "suggestion": "Define and apply a consistent policy for operational mutations: classify steps as required vs best-effort, return/aggregate required-step errors (for example via `errors.Join`) to caller-visible failure channels, and mark best-effort steps explicitly with structured warnings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "mutation_failure_policy_inconsistent"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "version_metadata_fallback_hides_decode_failures",
+      "summary": "Version metadata decode failures are converted to silent fallback state instead of surfaced errors.",
+      "related_files": [
+        "goseg/defaults/version.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`defaults/version.go` init unmarshals embedded metadata and only logs on failure, leaving global `VersionInfo` in zero-value state.",
+        "`LocalVersion()` returns `structs.Version` (no error), logs decode/load failures, and falls back to decoded defaults; if defaults decode also fails it still returns zero-value struct."
+      ],
+      "suggestion": "Introduce an explicit error-returning loader (`LoadLocalVersion() (structs.Version, error)`) and make fallback behavior explicit at callers. Keep one strict path for startup validation and one permissive path for degraded mode with a typed sentinel error.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "fire_and_forget_error_contract_drift"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Error-returning APIs are mixed with fire-and-forget entrypoints without a shared supervision strategy.",
+      "Operational flows lack a consistent required-vs-best-effort error policy."
+    ],
+    "likely_symptoms": [
+      "discarded_worker_errors_in_entry_wrappers",
+      "state_mutation_errors_logged_but_not_failed"
+    ],
+    "possible_false_positives": []
+  }
+}

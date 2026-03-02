@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"go.uber.org/zap"
 
 	"groundseg/docker/network"
@@ -114,7 +115,7 @@ func (runtime *Runtime) Initialize() error {
 			zap.L().Warn(fmt.Sprintf("Couldn't stop old webui container: %v", err))
 		}
 	}
-	if err = network.KillContainerUsingPort(80); err != nil {
+	if err = network.NewNetworkRuntime().KillContainerUsingPort(80); err != nil {
 		zap.L().Warn(fmt.Sprintf("Couldn't stop container on port 80: %v", err))
 	}
 
@@ -412,7 +413,7 @@ func (runtime *Runtime) StopContainerByName(containerName string) error {
 			}
 		}
 	}
-	return fmt.Errorf("container with name %s not found", containerName)
+	return errdefs.NotFound(fmt.Errorf("container %s not found", containerName))
 }
 
 func (runtime *Runtime) DeleteContainer(name string) error {
@@ -450,7 +451,7 @@ func isContainerLookupNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "not found")
+	return errdefs.IsNotFound(err)
 }
 
 // ExecDockerCommand executes a command inside a container and returns stdout/stderr plus the exit code.
@@ -515,7 +516,7 @@ func GetContainerIDByName(ctx context.Context, cli *client.Client, name string) 
 			}
 		}
 	}
-	return "", fmt.Errorf("Container not found")
+	return "", errdefs.NotFound(fmt.Errorf("container %s not found", name))
 }
 
 func (runtime *Runtime) RestartContainer(name string) error {
@@ -555,7 +556,7 @@ func (runtime *Runtime) FindContainer(containerName string) (*container.Summary,
 			}
 		}
 	}
-	return nil, fmt.Errorf("container %s not found", containerName)
+	return nil, errdefs.NotFound(fmt.Errorf("container %s not found", containerName))
 }
 
 func (runtime *Runtime) DockerPoller() {

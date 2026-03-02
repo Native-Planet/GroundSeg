@@ -24,6 +24,9 @@ var (
 	dockerHealthLoopMu sync.Mutex
 	healthLoopRunning  bool
 	healthLoopStopFn   context.CancelFunc
+
+	dockerTransitionFailureLimit  = 5
+	dockerTransitionFailureWindow = 3 * time.Minute
 )
 
 func StartDockerHealthLoops() {
@@ -37,10 +40,8 @@ func StartDockerHealthLoopsWithContext(ctx context.Context) {
 	startDockerHealthLoopWithContext(ctx)
 }
 
-func StartDockerSubsystem(ctx context.Context) {
-	if err := StartDockerSubsystemWithContext(ctx); err != nil {
-		return
-	}
+func StartDockerSubsystem(ctx context.Context) error {
+	return StartDockerSubsystemWithContext(ctx)
 }
 
 func StartDockerSubsystemWithContext(ctx context.Context) error {
@@ -50,12 +51,10 @@ func StartDockerSubsystemWithContext(ctx context.Context) error {
 	startDockerHealthLoopWithContext(ctx)
 	errs := make(chan error, 2)
 	go func() {
-		dockerListenerWithContext(ctx)
-		errs <- nil
+		errs <- dockerListenerWithContext(ctx)
 	}()
 	go func() {
-		dockerSubscriptionHandler(ctx)
-		errs <- nil
+		errs <- dockerSubscriptionHandler(ctx)
 	}()
 	for {
 		select {
@@ -67,105 +66,84 @@ func StartDockerSubsystemWithContext(ctx context.Context) error {
 	}
 }
 
-type dockerSubscriptionPlan interface {
-	applyState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error
-	afterState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error
+type dockerSubscriptionPlan struct {
+	applyState func(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error
+	afterState func(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error
 }
 
-type dockerStopTransitionPlan struct{}
-
-func (dockerStopTransitionPlan) applyState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
-	return dockerStopTransition(rt, contName, state)
-}
-
-func (dockerStopTransitionPlan) afterState(_ dockerRoutineRuntime, _ string, _ *structs.ContainerState) error {
-	return nil
-}
-
-type dockerStartTransitionPlan struct{}
-
-func (dockerStartTransitionPlan) applyState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
-	return dockerStartTransition(rt, contName, state)
-}
-
-func (dockerStartTransitionPlan) afterState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
-	return dockerStartAfterTransition(rt, contName, state)
-}
-
-type dockerDieTransitionPlan struct{}
-
-func (dockerDieTransitionPlan) applyState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
-	return dockerDieTransition(rt, contName, state)
-}
-
-func (dockerDieTransitionPlan) afterState(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
-	return dockerDieAfterTransition(rt, contName, state)
+var dockerSubscriptionPlans = map[transition.DockerAction]dockerSubscriptionPlan{
+	transition.DockerActionStop: {
+		applyState: func(rt dockerRoutineRuntime, contName string, state *structs.ContainerState) error {
+			return dockerStopTransition(rt, contName, state)
+		},
+	},
+	transition.DockerActionStart: {
+		applyState: dockerStartTransition,
+		afterState: dockerStartAfterTransition,
+	},
+	transition.DockerActionDie: {
+		applyState: dockerDieTransition,
+		afterState: dockerDieAfterTransition,
+	},
 }
 
 func dockerSubscriptionPlanForAction(action transition.DockerAction) (dockerSubscriptionPlan, bool) {
-	switch action {
-	case transition.DockerActionStop:
-		return dockerStopTransitionPlan{}, true
-	case transition.DockerActionStart:
-		return dockerStartTransitionPlan{}, true
-	case transition.DockerActionDie:
-		return dockerDieTransitionPlan{}, true
-	default:
-		return nil, false
-	}
+	plan, ok := dockerSubscriptionPlans[action]
+	return plan, ok
 }
 
 // dockerListenerWithContext runs until ctx is canceled.
-func dockerListenerWithContext(ctx context.Context) {
+func dockerListenerWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	cli, err := dockerclient.New()
 	if err != nil {
-		logger.Error(fmt.Sprintf("Error initializing Docker client: %v", err))
-		return
+		return fmt.Errorf("initialize Docker client: %w", err)
 	}
 	messages, errs := cli.Events(ctx, eventtypes.ListOptions{})
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Stopping Docker event listener")
-			return
+			return nil
 		case event := <-messages:
 			if ctx.Err() != nil {
-				return
+				return nil
 			}
 			// Convert the Docker event to our custom event and send it to the EventBus.
 			select {
 			case eventBus <- structs.Event{Type: string(event.Action), Data: event}:
 			case <-ctx.Done():
-				return
+				return nil
 			}
 		case err := <-errs:
 			if err == nil {
 				if ctx.Err() != nil {
-					return
+					return nil
 				}
 				continue
 			}
-			logger.Error(fmt.Sprintf("Docker event error: %v", err))
 			if ctx.Err() != nil {
-				return
+				return nil
 			}
+			return fmt.Errorf("docker event error: %w", err)
 		}
 	}
 }
 
-func dockerSubscriptionHandler(ctx context.Context) {
+func dockerSubscriptionHandler(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	rt := newDockerRoutineRuntime()
+	failureCount := 0
+	var lastFailure time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Stopping Docker subscription handler")
-			return
+			return nil
 		case event := <-eventBus:
 			dockerEvent, ok := event.Data.(eventtypes.Message)
 			if !ok {
@@ -177,14 +155,29 @@ func dockerSubscriptionHandler(ctx context.Context) {
 			plan, ok := dockerSubscriptionPlanForAction(action)
 			if !ok {
 				logger.Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
+				failureCount = 0
 				continue
 			}
 			if err := runDockerTransitionWorkflow(rt, contName, plan); err != nil {
+				failureCount, lastFailure = handleSubscriptionFailure(failureCount, lastFailure, err)
 				logger.Warn(fmt.Sprintf("Docker transition failed for %s: %v", contName, err))
+				if failureCount >= dockerTransitionFailureLimit {
+					return fmt.Errorf("docker subscription handler failed after %d consecutive transition failures: %w", dockerTransitionFailureLimit, err)
+				}
 				continue
 			}
+			failureCount = 0
 		}
 	}
+}
+
+func handleSubscriptionFailure(count int, lastFailure time.Time, err error) (int, time.Time) {
+	nextFailure := time.Now()
+	if lastFailure.IsZero() || nextFailure.Sub(lastFailure) > dockerTransitionFailureWindow {
+		return 1, nextFailure
+	}
+	logger.Warn(fmt.Sprintf("Recent docker transition failures in window: %d", count+1))
+	return count + 1, nextFailure
 }
 
 func runDockerTransitionWorkflow(rt dockerRoutineRuntime, contName string, plan dockerSubscriptionPlan) error {
@@ -217,18 +210,18 @@ func runDockerTransitionWorkflow(rt dockerRoutineRuntime, contName string, plan 
 						return plan.afterState(rt, contName, containerState)
 					},
 				},
+				{
+					Phase: lifecycle.Phase("broadcast"),
+					Run: func() error {
+						if containerState == nil {
+							return nil
+						}
+						return publishDockerTransition(rt)
+					},
+				},
 			},
 		},
-		orchestration.WorkflowCallbacks{
-			OnSuccess: func() {
-				if containerState == nil {
-					return
-				}
-				if err := publishDockerTransition(rt); err != nil {
-					logger.Warn(fmt.Sprintf("Docker broadcast failed for %s: %v", contName, err))
-				}
-			},
-		},
+		orchestration.WorkflowCallbacks{},
 	)
 }
 
@@ -270,10 +263,10 @@ func dockerDieTransition(rt dockerRoutineRuntime, contName string, state *struct
 	if state.Type != string(transition.ContainerTypeVere) {
 		return nil
 	}
-	if err := rt.runtimeOps.LoadUrbitConfigFn(contName); err != nil {
+	if err := rt.transitionOps.LoadUrbitConfigFn(contName); err != nil {
 		return fmt.Errorf("failed to load config for %s: %w", contName, err)
 	}
-	conf := rt.runtimeOps.UrbitConfFn(contName)
+	conf := rt.transitionOps.UrbitConfFn(contName)
 	if conf.DisableShipRestarts {
 		logger.Infof("Leaving %s container alone after death due to DisableShipRestarts=true", contName)
 		state.DesiredStatus = string(transition.ContainerStatusStopped)
@@ -285,7 +278,7 @@ func dockerDieAfterTransition(rt dockerRoutineRuntime, contName string, state *s
 	if state.Type != string(transition.ContainerTypeVere) {
 		return nil
 	}
-	rt.runtimeOps.ClearLusCodeFn(contName)
+	rt.transitionOps.ClearLusCodeFn(contName)
 	if state.DesiredStatus == string(transition.ContainerStatusDied) || state.DesiredStatus == string(transition.ContainerStatusStopped) {
 		logger.Infof("Ship desired status: %s", state.DesiredStatus)
 		return nil
@@ -305,14 +298,14 @@ func defaultStopTransitionRestart(rt dockerRoutineRuntime, contName string, stat
 	if state.DesiredStatus == string(transition.ContainerStatusStopped) {
 		return nil
 	}
-	_, err := rt.runtimeOps.StartContainerFn(contName, state.Type)
+	_, err := rt.transitionOps.StartContainerFn(contName, state.Type)
 	return err
 }
 
 func defaultRestartAfterDeath(rt dockerRoutineRuntime, containerName, containerType string) error {
 	go func(name, ctype string) {
 		rt.timer.sleepFn(rt.recovery.restartDelay)
-		_, err := rt.runtimeOps.StartContainerFn(name, ctype)
+		_, err := rt.transitionOps.StartContainerFn(name, ctype)
 		if err != nil {
 			logger.Errorf("Failed to restart %s after death: %v", name, err)
 			return
@@ -330,7 +323,7 @@ func defaultRecoverWireguardAfter502(rt dockerRoutineRuntime, settings dockerChe
 }
 
 func updateContainerTransition(rt dockerRoutineRuntime, contName string, mutate func(*structs.ContainerState) error) (*structs.ContainerState, error) {
-	containerState, exists := rt.runtimeOps.GetContainerStateFn()[contName]
+	containerState, exists := rt.transitionOps.GetContainerStateFn()[contName]
 	if !exists {
 		return nil, nil
 	}
@@ -338,7 +331,7 @@ func updateContainerTransition(rt dockerRoutineRuntime, contName string, mutate 
 	if err := mutate(&containerState); err != nil {
 		return nil, err
 	}
-	rt.runtimeOps.UpdateContainerStateFn(contName, containerState)
+	rt.transitionOps.UpdateContainerFn(contName, containerState)
 	return &containerState, nil
 }
 
@@ -373,8 +366,8 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 		if threshold < 1 {
 			threshold = 1
 		}
-		settings := rt.runtimeOps.Check502SettingsSnapshotFn()
-		pierStatus, err := rt.runtimeOps.GetShipStatusFn(settings.Piers)
+		settings := rt.healthOps.Check502SettingsSnapshotFn()
+		pierStatus, err := rt.healthOps.GetShipStatusFn(settings.Piers)
 		if err != nil {
 			logger.Errorf("Couldn't get pier status: %v", err)
 			continue
@@ -383,13 +376,13 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 			if ctx.Err() != nil {
 				return
 			}
-			err := rt.runtimeOps.LoadUrbitConfigFn(pier)
+			err := rt.transitionOps.LoadUrbitConfigFn(pier)
 			if err != nil {
 				logger.Errorf("Error loading %s config: %v", pier, err)
 				continue
 			}
-			shipConf := rt.runtimeOps.UrbitConfFn(pier)
-			pierNetwork, err := rt.runtimeOps.GetContainerNetworkFn(pier)
+			shipConf := rt.transitionOps.UrbitConfFn(pier)
+			pierNetwork, err := rt.healthOps.GetContainerNetworkFn(pier)
 			if err != nil {
 				logger.Warnf("Couldn't get network for %v: %v", pier, err)
 				continue
@@ -399,7 +392,7 @@ func check502Loop(ctx context.Context, rt dockerRoutineRuntime) {
 				turnedOn = true
 			}
 			if turnedOn && pierNetwork != "default" && settings.WgOn {
-				if _, err := rt.runtimeOps.GetLusCodeFn(pier); err != nil {
+				if _, err := rt.healthOps.GetLusCodeFn(pier); err != nil {
 					logger.Warnf("%v is not booted yet, skipping", pier)
 					continue
 				}
@@ -445,7 +438,7 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 		DisableShipRestart = false
 	}()
 	getShipRunningStatus := func(patp string) (string, error) {
-		statuses, err := rt.runtimeOps.GetShipStatusFn([]string{patp})
+		statuses, err := rt.healthOps.GetShipStatusFn([]string{patp})
 		if err != nil {
 			return "", fmt.Errorf("Failed to get statuses for %s: %w", patp, err)
 		}
@@ -455,8 +448,8 @@ func gracefulShipExit(rt dockerRoutineRuntime) error {
 		}
 		return status, nil
 	}
-	piers := rt.runtimeOps.ShipSettingsSnapshotFn().Piers
-	pierStatus, err := rt.runtimeOps.GetShipStatusFn(piers)
+	piers := rt.healthOps.ShipSettingsSnapshotFn().Piers
+	pierStatus, err := rt.healthOps.GetShipStatusFn(piers)
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve ship information: %w", err)
 	}

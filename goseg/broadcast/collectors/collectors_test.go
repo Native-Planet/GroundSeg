@@ -48,7 +48,7 @@ func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 		runtime.getMinIOLinkedStatusFn = func(string) bool { return true }
 	})
 
-	inputs, ok := collectUrbitDeploymentInputsWithRuntime(
+	inputs, ok := collectUrbitDeploymentInputsForRuntime(
 		runtime,
 		"~zod",
 		"host.internal",
@@ -123,7 +123,7 @@ func TestCollectUrbitRuntimeInputsCollectsRuntimeState(t *testing.T) {
 		return t
 	}
 
-	inputs := collectUrbitRuntimeInputsWithRuntime(runtime, "~zod", "Up 1 minute", rtContext, scheduled)
+	inputs := collectUrbitRuntimeInputsForRuntime(runtime, "~zod", "Up 1 minute", rtContext, scheduled)
 	if inputs.network != "bridge" {
 		t.Fatalf("expected network bridge, got %q", inputs.network)
 	}
@@ -227,7 +227,7 @@ func TestCollectUrbitDeploymentInputsForPiersSkipsInvalidConfig(t *testing.T) {
 		runtime.getMinIOLinkedStatusFn = func(string) bool { return false }
 	})
 
-	inputs := collectUrbitDeploymentInputsForPiersWithRuntime(
+	inputs := collectUrbitDeploymentInputsForPiersForRuntime(
 		runtime,
 		[]string{"~zod", "~sam"},
 		"localhost",
@@ -265,7 +265,7 @@ func TestCollectUrbitRuntimeInputsForPiersCollectsAllShips(t *testing.T) {
 			"~sam": "net2",
 		},
 	}
-	inputs := collectUrbitRuntimeInputsForPiersWithRuntime(
+	inputs := collectUrbitRuntimeInputsForPiersForRuntime(
 		runtime,
 		map[string]string{"~zod": "Up 1 second", "~sam": "Exited"},
 		rtContext,

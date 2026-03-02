@@ -5,6 +5,118 @@ import (
 	"sync"
 )
 
+type LogstreamRuntime interface {
+	SysLogSessions() []*websocket.Conn
+	SetSysLogSessions([]*websocket.Conn)
+	SysSessionsToRemove() []*websocket.Conn
+	SetSysSessionsToRemove([]*websocket.Conn)
+	AddSysLogSession(*websocket.Conn)
+	RemoveSysLogSessions()
+	AddSysSessionToRemove(*websocket.Conn)
+	DockerLogSessions() map[string]map[*websocket.Conn]bool
+	SetDockerLogSessions(map[string]map[*websocket.Conn]bool)
+	SetDockerLogSession(string, *websocket.Conn, bool)
+	SetDockerLogSessionLive(string, *websocket.Conn, bool)
+	RemoveDockerLogSession(string, *websocket.Conn)
+	SystemLogMessages() <-chan []byte
+	PublishSystemLog([]byte)
+}
+
+type logstreamRuntime struct {
+	sysLogMessages chan []byte
+}
+
+func (_ *logstreamRuntime) SysLogSessions() []*websocket.Conn {
+	return SysLogSessions()
+}
+
+func (_ *logstreamRuntime) SetSysLogSessions(sessions []*websocket.Conn) {
+	SetSysLogSessions(sessions)
+}
+
+func (_ *logstreamRuntime) SysSessionsToRemove() []*websocket.Conn {
+	return SysSessionsToRemove()
+}
+
+func (_ *logstreamRuntime) SetSysSessionsToRemove(sessions []*websocket.Conn) {
+	SetSysSessionsToRemove(sessions)
+}
+
+func (_ *logstreamRuntime) AddSysLogSession(conn *websocket.Conn) {
+	AddSysLogSession(conn)
+}
+
+func (_ *logstreamRuntime) RemoveSysLogSessions() {
+	RemoveSysLogSessions()
+}
+
+func (_ *logstreamRuntime) AddSysSessionToRemove(conn *websocket.Conn) {
+	AddSysSessionToRemove(conn)
+}
+
+func (_ *logstreamRuntime) DockerLogSessions() map[string]map[*websocket.Conn]bool {
+	return DockerLogSessions()
+}
+
+func (_ *logstreamRuntime) SetDockerLogSessions(sessions map[string]map[*websocket.Conn]bool) {
+	SetDockerLogSessions(sessions)
+}
+
+func (_ *logstreamRuntime) SetDockerLogSession(container string, conn *websocket.Conn, live bool) {
+	SetDockerLogSession(container, conn, live)
+}
+
+func (_ *logstreamRuntime) SetDockerLogSessionLive(container string, conn *websocket.Conn, live bool) {
+	SetDockerLogSessionLive(container, conn, live)
+}
+
+func (_ *logstreamRuntime) RemoveDockerLogSession(container string, conn *websocket.Conn) {
+	RemoveDockerLogSession(container, conn)
+}
+
+func (runtime *logstreamRuntime) SystemLogMessages() <-chan []byte {
+	return runtime.sysLogMessages
+}
+
+func (runtime *logstreamRuntime) PublishSystemLog(logData []byte) {
+	if runtime == nil || runtime.sysLogMessages == nil {
+		return
+	}
+	runtime.sysLogMessages <- logData
+}
+
+var logstreamRuntimeState struct {
+	sync.RWMutex
+	active LogstreamRuntime
+}
+
+func init() {
+	logstreamRuntimeState.Lock()
+	logstreamRuntimeState.active = NewLogstreamRuntime()
+	logstreamRuntimeState.Unlock()
+}
+
+func NewLogstreamRuntime() LogstreamRuntime {
+	return &logstreamRuntime{
+		sysLogMessages: make(chan []byte, 100),
+	}
+}
+
+func LogstreamRuntimeState() LogstreamRuntime {
+	logstreamRuntimeState.RLock()
+	defer logstreamRuntimeState.RUnlock()
+	return logstreamRuntimeState.active
+}
+
+func SetLogstreamRuntime(rt LogstreamRuntime) {
+	if rt == nil {
+		return
+	}
+	logstreamRuntimeState.Lock()
+	defer logstreamRuntimeState.Unlock()
+	logstreamRuntimeState.active = rt
+}
+
 type sessionState struct {
 	authMu        sync.RWMutex
 	clientManager *ClientManager

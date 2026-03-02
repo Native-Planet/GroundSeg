@@ -2,28 +2,29 @@
   "command": "next",
   "items": [
     {
-      "id": "review::.::holistic::design_coherence::scattered_transition_state_machine::c086d247",
+      "id": "review::.::holistic::abstraction_fitness::runtime_callback_bag_fragmentation::07833012",
       "kind": "finding",
       "tier": 3,
       "effective_tier": 1,
       "confidence": "high",
       "detector": "review",
       "file": ".",
-      "summary": "Transition lifecycle behavior is duplicated across ship and startram workflows instead of centralized in one orchestration model.",
+      "summary": "Function-field runtime bags are over-fragmented, creating high wiring/validation overhead without equivalent behavioral leverage.",
       "detail": {
         "holistic": true,
-        "dimension": "design_coherence",
+        "dimension": "abstraction_fitness",
         "related_files": [
-          "goseg/shipworkflow/urbit_operations.go",
-          "goseg/shipworkflow/startram.go",
-          "goseg/rectify/rectify.go"
+          "goseg/docker/orchestration/runtime_seams.go",
+          "goseg/startup_orchestrator.go",
+          "goseg/docker/orchestration/runtime_seams_test.go",
+          "goseg/startup_orchestrator_test.go"
         ],
         "evidence": [
-          "`urbit_operations.go` repeatedly emits transition states inline (for example `pack`, `packMeld`, `deleteShip`, `togglePower`, `rollChop`) with per-function start/error/success/clear handling.",
-          "`startram.go` separately re-implements transition sequencing via direct `startram.PublishEvent(...)` calls and `PublishTransitionWithPolicy(...)` wrappers for restart/toggle/register/endpoint flows.",
-          "`rectify.go` contains another distinct transition-application path (`applyTransitionUpdate`, `set*Transition` functions) that updates broadcast state independently from workflow emitters."
+          "`runtime_seams.go` defines many callback bags and option-merging layers, then startup has separate callback bags and validation paths in `startup_orchestrator.go`.",
+          "Tests in `runtime_seams_test.go` and `startup_orchestrator_test.go` require extensive stub structs and nil-guard scaffolding to assemble runtimes, indicating high indirection cost at call sites.",
+          "Most validators check callback presence rather than domain invariants, suggesting the abstraction is primarily wiring complexity."
         ],
-        "suggestion": "Introduce a shared transition orchestration component (typed state progression + terminal policy + clear timing) used by both shipworkflow and rectify paths; migrate existing operations to declarative transition plans instead of inline event strings.",
+        "suggestion": "Collapse callback-bag fragmentation into fewer behavior-oriented interfaces (or concrete dependency structs) per workflow boundary, with constructor-time defaults and invariant checks; reduce per-function callback exposure to only true variability points.",
         "reasoning": ""
       },
       "status": "open",
@@ -32,47 +33,46 @@
   ],
   "queue": {
     "tier_counts": {
-      "1": 2,
-      "2": 3,
-      "3": 299,
-      "4": 104
+      "1": 11,
+      "2": 0,
+      "3": 340,
+      "4": 111
     },
     "requested_tier": null,
     "selected_tier": null,
     "fallback_reason": null,
     "available_tiers": [
       1,
-      2,
       3,
       4
     ],
-    "total": 408
+    "total": 462
   },
   "narrative": {
     "phase": "stagnation",
-    "headline": "Score plateaued at 77.8 for 5 scans. Abstraction fit (44.5%) is where the breakthrough is. (2 review findings \u2014 run `desloppify issues`)",
+    "headline": "All T1 and T2 items cleared! (11 review findings \u2014 run `desloppify issues`)",
     "dimensions": {
       "lowest_dimensions": [
         {
           "name": "Abstraction fit",
           "strict": 44.5,
-          "issues": 0,
+          "issues": 3,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
           "name": "Design coherence",
-          "strict": 58.8,
-          "issues": 2,
+          "strict": 48.0,
+          "issues": 5,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
         },
         {
-          "name": "High elegance",
-          "strict": 60.0,
-          "issues": 0,
+          "name": "Error consistency",
+          "strict": 58.0,
+          "issues": 3,
           "impact": 0.0,
           "subjective": true,
           "impact_description": "re-review to improve"
@@ -82,32 +82,27 @@
       "stagnant_dimensions": [
         {
           "name": "File health",
-          "strict": 94.1,
+          "strict": 94.2,
           "stuck_scans": 5
         },
         {
           "name": "Code quality",
-          "strict": 88.9,
+          "strict": 89.7,
           "stuck_scans": 5
         },
         {
           "name": "Duplication",
-          "strict": 99.8,
+          "strict": 99.9,
+          "stuck_scans": 5
+        },
+        {
+          "name": "Test health",
+          "strict": 66.5,
           "stuck_scans": 5
         },
         {
           "name": "Security",
           "strict": 100.0,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Error consistency",
-          "strict": 61.3,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Abstraction fit",
-          "strict": 44.5,
           "stuck_scans": 5
         },
         {
@@ -118,11 +113,6 @@
         {
           "name": "Test strategy",
           "strict": 65.7,
-          "stuck_scans": 5
-        },
-        {
-          "name": "Design coherence",
-          "strict": 58.8,
           "stuck_scans": 5
         },
         {
@@ -206,8 +196,8 @@
       {
         "type": "issue_queue",
         "detector": "review",
-        "count": 2,
-        "description": "2 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
+        "count": 11,
+        "description": "11 review findings need investigation \u2014 run `desloppify issues` to see the work queue",
         "command": "desloppify issues",
         "impact": 0.0,
         "dimension": "Unknown",
@@ -217,8 +207,8 @@
       {
         "type": "reorganize",
         "detector": "flat_dirs",
-        "count": 2,
-        "description": "2 flat_dirs findings \u2014 create subdirectories and use `desloppify move`",
+        "count": 3,
+        "description": "3 flat_dirs findings \u2014 create subdirectories and use `desloppify move`",
         "command": "desloppify show flat_dirs --status open",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -228,8 +218,8 @@
       {
         "type": "refactor",
         "detector": "structural",
-        "count": 21,
-        "description": "21 structural findings \u2014 decompose large files \u2014 extract logic into focused modules",
+        "count": 22,
+        "description": "22 structural findings \u2014 decompose large files \u2014 extract logic into focused modules",
         "command": "desloppify show structural --status open",
         "impact": 0.0,
         "dimension": "File health",
@@ -250,8 +240,8 @@
       {
         "type": "refactor",
         "detector": "test_coverage",
-        "count": 73,
-        "description": "73 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
+        "count": 78,
+        "description": "78 test_coverage findings \u2014 add tests for untested production modules \u2014 prioritize by import count",
         "command": "desloppify show test_coverage --status open",
         "impact": 0.0,
         "dimension": "Test health",
@@ -272,8 +262,8 @@
       {
         "type": "refactor",
         "detector": "responsibility_cohesion",
-        "count": 36,
-        "description": "36 responsibility_cohesion findings \u2014 split modules with too many responsibilities \u2014 extract focused sub-modules",
+        "count": 34,
+        "description": "34 responsibility_cohesion findings \u2014 split modules with too many responsibilities \u2014 extract focused sub-modules",
         "command": "desloppify show responsibility_cohesion --status open",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -283,8 +273,8 @@
       {
         "type": "refactor",
         "detector": "boilerplate_duplication",
-        "count": 6,
-        "description": "6 boilerplate_duplication findings \u2014 extract shared boilerplate into reusable helpers or base classes",
+        "count": 5,
+        "description": "5 boilerplate_duplication findings \u2014 extract shared boilerplate into reusable helpers or base classes",
         "command": "desloppify show boilerplate_duplication --status open",
         "impact": 0.0,
         "dimension": "Duplication",
@@ -294,8 +284,8 @@
       {
         "type": "manual_fix",
         "detector": "unused",
-        "count": 143,
-        "description": "143 unused findings \u2014 inspect with `desloppify next` and fix manually",
+        "count": 177,
+        "description": "177 unused findings \u2014 inspect with `desloppify next` and fix manually",
         "command": "desloppify show unused --status open",
         "impact": 0.0,
         "dimension": "Code quality",
@@ -305,8 +295,8 @@
       {
         "type": "manual_fix",
         "detector": "subjective_review",
-        "count": 91,
-        "description": "91 files need design review \u2014 run design review with dimension templates",
+        "count": 98,
+        "description": "98 files need design review \u2014 run design review with dimension templates",
         "command": "desloppify fix review",
         "impact": 0.0,
         "dimension": "Test health",
@@ -317,7 +307,7 @@
     "strategy": {
       "fixer_leverage": {
         "auto_fixable_count": 0,
-        "total_count": 399,
+        "total_count": 471,
         "coverage": 0.0,
         "impact_ratio": 0.0,
         "recommendation": "none"
@@ -327,7 +317,7 @@
           "actions": [
             2
           ],
-          "file_count": 2,
+          "file_count": 3,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
@@ -351,7 +341,7 @@
             9,
             10
           ],
-          "file_count": 171,
+          "file_count": 189,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
@@ -360,21 +350,21 @@
           "actions": [
             5
           ],
-          "file_count": 73,
+          "file_count": 78,
           "total_impact": 0.0,
           "automation": "manual",
           "run_first": false
         }
       },
       "can_parallelize": true,
-      "hint": "4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 2 finding(s) \u2014 `desloppify issues`."
+      "hint": "4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 11 finding(s) \u2014 `desloppify issues`."
     },
     "tools": {
       "fixers": [],
       "move": {
         "available": true,
         "relevant": true,
-        "reason": "2 flat directories",
+        "reason": "3 flat directories",
         "usage": "desloppify move <source> <dest> [--dry-run]"
       },
       "plan": {
@@ -395,12 +385,12 @@
       "worst_gap": 0.0,
       "trend": "stable"
     },
-    "milestone": null,
+    "milestone": "All T1 and T2 items cleared!",
     "primary_action": {
       "command": "desloppify issues",
-      "description": "2 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
+      "description": "11 review findings need investigation \u2014 run `desloppify issues` to see the work queue"
     },
-    "why_now": "4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 2 finding(s) \u2014 `desloppify issues`.",
+    "why_now": "4 independent workstreams, safe to parallelize. Rescan after each phase to verify. Review: 11 finding(s) \u2014 `desloppify issues`.",
     "verification_step": {
       "command": "desloppify scan",
       "reason": "revalidate after changes"
@@ -408,14 +398,14 @@
     "risk_flags": [],
     "strict_target": {
       "target": 95.0,
-      "current": 77.8,
-      "gap": 17.2,
+      "current": 77.6,
+      "gap": 17.4,
       "state": "below",
       "warning": null
     },
     "reminders": [],
     "reminder_history": {
-      "report_scores": 159,
+      "report_scores": 192,
       "feedback_nudge": 3,
       "stagnant_nudge": 8,
       "zone_classification": 3,
@@ -423,16 +413,16 @@
       "fp_calibration_unused_production": 3
     }
   },
-  "overall_score": 77.8,
-  "objective_score": 90.1,
-  "strict_score": 77.8,
+  "overall_score": 77.6,
+  "objective_score": 90.8,
+  "strict_score": 77.6,
   "scorecard_dimensions": [
     {
       "name": "File health",
-      "score": 94.1,
-      "strict": 94.1,
-      "checks": 191,
-      "issues": 16,
+      "score": 94.2,
+      "strict": 94.2,
+      "checks": 206,
+      "issues": 17,
       "tier": 3,
       "subjective": false
     },
@@ -467,7 +457,7 @@
       "score": 44.5,
       "strict": 44.5,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "subjective": true,
       "placeholder": false,
@@ -490,10 +480,10 @@
     },
     {
       "name": "Code quality",
-      "score": 88.9,
-      "strict": 88.9,
-      "checks": 120,
-      "issues": 19,
+      "score": 89.7,
+      "strict": 89.7,
+      "checks": 122,
+      "issues": 18,
       "tier": 3,
       "subjective": false
     },
@@ -538,10 +528,10 @@
     },
     {
       "name": "Design coherence",
-      "score": 58.8,
-      "strict": 58.8,
+      "score": 48.0,
+      "strict": 48.0,
       "checks": 10,
-      "issues": 2,
+      "issues": 5,
       "tier": 4,
       "subjective": true,
       "placeholder": false,
@@ -551,10 +541,10 @@
     },
     {
       "name": "Duplication",
-      "score": 99.8,
-      "strict": 99.8,
-      "checks": 2455,
-      "issues": 7,
+      "score": 99.9,
+      "strict": 99.9,
+      "checks": 2569,
+      "issues": 6,
       "tier": 3,
       "subjective": false
     },
@@ -575,10 +565,10 @@
     },
     {
       "name": "Error consistency",
-      "score": 61.3,
-      "strict": 61.3,
+      "score": 58.0,
+      "strict": 58.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "subjective": true,
       "placeholder": false,
@@ -616,7 +606,7 @@
       "name": "Security",
       "score": 100.0,
       "strict": 100.0,
-      "checks": 191,
+      "checks": 206,
       "issues": 0,
       "tier": 4,
       "subjective": false
@@ -649,10 +639,10 @@
     },
     {
       "name": "Test health",
-      "score": 63.9,
-      "strict": 63.9,
-      "checks": 2306,
-      "issues": 164,
+      "score": 66.5,
+      "strict": 66.5,
+      "checks": 2439,
+      "issues": 176,
       "tier": 4,
       "subjective": false
     },
@@ -702,7 +692,7 @@
       "score": 44.5,
       "strict": 44.5,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "subjective": true,
       "placeholder": false,
@@ -764,10 +754,10 @@
     },
     {
       "name": "Design coherence",
-      "score": 58.8,
-      "strict": 58.8,
+      "score": 48.0,
+      "strict": 48.0,
       "checks": 10,
-      "issues": 2,
+      "issues": 5,
       "tier": 4,
       "subjective": true,
       "placeholder": false,
@@ -792,10 +782,10 @@
     },
     {
       "name": "Error consistency",
-      "score": 61.3,
-      "strict": 61.3,
+      "score": 58.0,
+      "strict": 58.0,
       "checks": 10,
-      "issues": 0,
+      "issues": 3,
       "tier": 4,
       "subjective": true,
       "placeholder": false,

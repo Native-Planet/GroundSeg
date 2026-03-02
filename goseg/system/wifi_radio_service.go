@@ -24,8 +24,15 @@ func (nmcliWiFiRadioService) PrimaryDevice() (string, error) {
 
 func (nmcliWiFiRadioService) RefreshInfo(device string) {
 	info := structs.SystemWifi{
-		Status: ifCheckForWiFi(),
+		Status: false,
 	}
+	wifiEnabled, err := ifCheckForWiFi()
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("couldn't read wifi radio state: %v", err))
+		setWifiInfo(info)
+		return
+	}
+	info.Status = wifiEnabled
 	if !info.Status {
 		setWifiInfo(info)
 		return
@@ -39,7 +46,13 @@ func (nmcliWiFiRadioService) RefreshInfo(device string) {
 	}
 	defer client.Close()
 
-	info.Active = getConnectedSSID(client, device)
+	active, err := getConnectedSSID(client, device)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("couldn't get active SSID for %s: %v", device, err))
+		info.Active = ""
+	} else {
+		info.Active = active
+	}
 	ssids, err := ListWifiSSIDs(device)
 	if err != nil {
 		zap.L().Error(err.Error())

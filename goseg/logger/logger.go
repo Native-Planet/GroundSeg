@@ -14,19 +14,27 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
-	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 var (
 	LogPath        string
-	SysLogChannel  = make(chan []byte, 100)
+	sysLogSinkMu   sync.RWMutex
+	sysLogSink     logStreamSink = logStreamNoopSink{}
 	loggerInitMu   sync.Mutex
 	loggerInitErr  error
 	mkdirAllFn     = os.MkdirAll
 	pathResolverFn = makeLogPath
 )
+
+type logStreamNoopSink struct{}
+
+func (logStreamNoopSink) PublishSystemLog(_ []byte) {}
+
+type logStreamSink interface {
+	PublishSystemLog([]byte)
+}
 
 type loggerInitLifecycle uint8
 
@@ -93,6 +101,16 @@ func makeLoggerCore(level zapcore.Level) zapcore.Core {
 	)
 }
 
+func ConfigureLogstreamRuntime(runtime session.LogstreamRuntime) {
+	sysLogSinkMu.Lock()
+	defer sysLogSinkMu.Unlock()
+	if runtime == nil {
+		sysLogSink = logStreamNoopSink{}
+		return
+	}
+	sysLogSink = runtime
+}
+
 func buildLogger(level zapcore.Level) *zap.Logger {
 	core := makeLoggerCore(level)
 	return zap.Must(zap.New(core, zap.AddCaller()), nil)
@@ -156,8 +174,21 @@ func (fw FileWriter) Sync() error {
 type ChanWriter struct{}
 
 func (cw ChanWriter) Write(p []byte) (n int, err error) {
-	SysLogChannel <- p
+	sysLogSinkMu.RLock()
+	sink := sysLogSink
+	sysLogSinkMu.RUnlock()
+	sink.PublishSystemLog(p)
 	return len(p), nil
+}
+
+func configureSystemLogSink(sink logStreamSink) {
+	sysLogSinkMu.Lock()
+	defer sysLogSinkMu.Unlock()
+	if sink == nil {
+		sysLogSink = logStreamNoopSink{}
+		return
+	}
+	sysLogSink = sink
 }
 
 func (cw ChanWriter) Sync() error {
@@ -251,54 +282,6 @@ func makeLogPath() (string, error) {
 	return config.GetStoragePath("logs")
 }
 
-func SysLogSessions() []*websocket.Conn {
-	return session.SysLogSessions()
-}
-
-func SetSysLogSessions(sessions []*websocket.Conn) {
-	session.SetSysLogSessions(sessions)
-}
-
-func SysSessionsToRemove() []*websocket.Conn {
-	return session.SysSessionsToRemove()
-}
-
-func SetSysSessionsToRemove(sessions []*websocket.Conn) {
-	session.SetSysSessionsToRemove(sessions)
-}
-
-func AddSysLogSession(conn *websocket.Conn) {
-	session.AddSysLogSession(conn)
-}
-
-func AddSysSessionToRemove(conn *websocket.Conn) {
-	session.AddSysSessionToRemove(conn)
-}
-
-func DockerLogSessions() map[string]map[*websocket.Conn]bool {
-	return session.DockerLogSessions()
-}
-
-func SetDockerLogSessions(sessions map[string]map[*websocket.Conn]bool) {
-	session.SetDockerLogSessions(sessions)
-}
-
-func SetDockerLogSession(container string, conn *websocket.Conn, live bool) {
-	session.SetDockerLogSession(container, conn, live)
-}
-
-func SetDockerLogSessionLive(container string, conn *websocket.Conn, live bool) {
-	session.SetDockerLogSessionLive(container, conn, live)
-}
-
-func RemoveDockerLogSession(container string, conn *websocket.Conn) {
-	session.RemoveDockerLogSession(container, conn)
-}
-
-func RemoveSysSessions() {
-	session.RemoveSysLogSessions()
-}
-
 func getDockerLogs(name string) ([]byte, error) {
 	cli, err := dockerclient.New()
 	if err != nil {
@@ -327,7 +310,7 @@ func getDockerLogs(name string) ([]byte, error) {
 	}
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading docker logs: %v", err)
+		return []byte{}, fmt.Errorf("Error reading docker logs: %w", err)
 	}
 	jsArray := fmt.Sprintf("[%s]", strings.Join(logEntries, ", "))
 
@@ -340,7 +323,7 @@ func RetrieveSysLogHistory() ([]byte, error) {
 	// Open the file
 	file, err := os.Open(filePath)
 	if err != nil {
-		return []byte{}, fmt.Errorf("Error opening file: %v", err)
+		return []byte{}, fmt.Errorf("Error opening file: %w", err)
 	}
 	defer file.Close()
 
@@ -355,7 +338,7 @@ func RetrieveSysLogHistory() ([]byte, error) {
 
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		return []byte{}, fmt.Errorf("Error reading file: %v", err)
+		return []byte{}, fmt.Errorf("Error reading file: %w", err)
 	}
 
 	// Join the lines slice into a single string resembling a JavaScript array

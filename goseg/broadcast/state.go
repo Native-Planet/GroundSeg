@@ -40,7 +40,7 @@ func bootstrapBroadcastState() error {
 	zap.L().Info("Resolving pier status")
 	urbits, err := ConstructPierInfo()
 	if err != nil {
-		return err
+		return fmt.Errorf("bootstrap broadcast state: %w", err)
 	}
 	nextState := structs.AuthBroadcast{
 		Urbits:  urbits,
@@ -61,7 +61,7 @@ func LoadStartramRegions() error {
 	zap.L().Info("Retrieving StarTram region info")
 	regions, err := collectors.LoadStartramRegions()
 	if err != nil {
-		return err
+		return fmt.Errorf("load startram regions: %w", err)
 	}
 	mu.Lock()
 	broadcastState.Profile.Startram.Info.Regions = regions

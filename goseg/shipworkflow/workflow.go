@@ -69,7 +69,7 @@ func SwitchShipToWireguard(patp string, gracefulStop bool) error {
 		}
 		status, exists := statuses[patp]
 		if !exists {
-			return fmt.Errorf("%s status doesn't exist", patp)
+			return shipStatusNotFoundErr(patp)
 		}
 		if strings.Contains(status, "Up") {
 			if err := click.BarExit(patp); err != nil {

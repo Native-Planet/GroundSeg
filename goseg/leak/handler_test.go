@@ -85,12 +85,16 @@ func TestProcessActionReturnsErrorForInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestProcessActionNoopsForUnknownPatp(t *testing.T) {
+func TestProcessActionReturnsProtocolErrorForUnknownPatp(t *testing.T) {
 	resetLeakStateForTest(t)
 	payload := []byte(`{"payload":{"type":"poke"}}`)
 
-	if err := processAction("~zod", payload); err != nil {
-		t.Fatalf("expected nil error for unknown patp, got %v", err)
+	err := processAction("~zod", payload)
+	if err == nil {
+		t.Fatal("expected protocol error for unknown patp")
+	}
+	if _, ok := err.(leakProtocolError); !ok {
+		t.Fatalf("expected leak protocol error for unknown patp, got %T", err)
 	}
 }
 
@@ -179,7 +183,9 @@ func TestUrbitLoginSendsResponseEvent(t *testing.T) {
 		t.Fatalf("failed to marshal login payload: %v", err)
 	}
 
-	urbitLogin(false, "~zod", payloadBytes)
+	if err := urbitLogin("~zod", payloadBytes); err != nil {
+		t.Fatalf("urbitLogin returned error: %v", err)
+	}
 
 	message := mustReceiveString(t, BytesChan["~zod"], "login response")
 	var response AuthEvent
@@ -193,14 +199,19 @@ func TestUrbitLoginSendsResponseEvent(t *testing.T) {
 
 func TestSendToLeakChannelForwardsAction(t *testing.T) {
 	payload := []byte(`{"payload":{"type":"poke"}}`)
-	go sendToLeakChannel("~zod", true, "poke", payload)
-
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sendToLeakChannel("~zod", true, "poke", payload)
+	}()
 	action := mustReceiveLeakAction(t, "sendToLeakChannel")
 	if action.Patp != "~zod" || action.Type != "poke" || !action.Auth {
 		t.Fatalf("unexpected action forwarded to leak channel: %+v", action)
 	}
 	if !reflect.DeepEqual(action.Content, payload) {
 		t.Fatalf("unexpected action content: got %s want %s", action.Content, payload)
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("sendToLeakChannel returned error: %v", err)
 	}
 }
 
@@ -210,8 +221,9 @@ func TestHandleActionDecodesAndDispatchesPayload(t *testing.T) {
 	payload := []byte(`{"payload":{"type":"poke"}}`)
 
 	done := make(chan struct{})
+	errCh := make(chan error, 1)
 	go func() {
-		handleAction("~zod", makeLickPacket(payload))
+		errCh <- handleAction("~zod", makeLickPacket(payload))
 		close(done)
 	}()
 
@@ -226,6 +238,9 @@ func TestHandleActionDecodesAndDispatchesPayload(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for handleAction to return")
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("handleAction(default) returned error: %v", err)
 	}
 }
 
@@ -248,8 +263,9 @@ func TestHandleActionReportsMalformedPayloads(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			done := make(chan struct{})
+			errCh := make(chan error, 1)
 			go func() {
-				handleAction("~zod", tc.packet)
+				errCh <- handleAction("~zod", tc.packet)
 				close(done)
 			}()
 
@@ -257,8 +273,8 @@ func TestHandleActionReportsMalformedPayloads(t *testing.T) {
 			if action.Patp != "~zod" {
 				t.Fatalf("expected action for ~zod, got %q", action.Patp)
 			}
-			if action.Type != string(leakPayloadError) {
-				t.Fatalf("expected %q action type, got %q", leakPayloadError, action.Type)
+			if action.Type != string(leakPayloadProtocolError) {
+				t.Fatalf("expected %q action type, got %q", leakPayloadProtocolError, action.Type)
 			}
 			var payload leakProtocolErrorPayload
 			if err := json.Unmarshal(action.Content, &payload); err != nil {
@@ -271,6 +287,13 @@ func TestHandleActionReportsMalformedPayloads(t *testing.T) {
 			case <-done:
 			case <-time.After(2 * time.Second):
 				t.Fatal("timed out waiting for handleAction to return")
+			}
+			err := <-errCh
+			if err == nil {
+				t.Fatal("expected handleAction to return protocol error")
+			}
+			if _, ok := err.(leakProtocolError); !ok {
+				t.Fatalf("expected protocol error, got %T", err)
 			}
 		})
 	}

@@ -8,11 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var (
-	WsEventBus      = make(chan WsChanEvent, 100)
-	InactiveSession = &MuConn{}
-)
-
 // wrapped ws+mutex
 type MuConn struct {
 	Conn       *websocket.Conn
@@ -140,7 +135,7 @@ func (cm *ClientManager) HasAuthSession() bool {
 	defer cm.Mu.RUnlock()
 	for _, clients := range cm.AuthClients {
 		for _, client := range clients {
-			if client != InactiveSession && client.Active {
+			if client.Active {
 				return true
 			}
 		}
@@ -160,10 +155,6 @@ func (cm *ClientManager) DeactivateConnection(conn *websocket.Conn) bool {
 	}
 	return false
 }
-
-// func (ws *MuConn) Write(data []byte) {
-// 	WsEventBus <- WsChanEvent{Conn: ws, Data: data}
-// }
 
 // wrappers for mutexed token:websocket maps
 // the maps are also mutexed as wholes

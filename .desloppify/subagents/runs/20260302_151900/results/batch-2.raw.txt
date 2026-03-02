@@ -1,0 +1,138 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Dependency injection is implemented through package-level mutable function variables in multiple modules (`goseg/docker/orchestration/runtime_seams.go`, `goseg/system/wifi.go`, `goseg/logger/logger.go`) rather than explicit runtime objects passed through call graphs.",
+        "Large orchestration files mix multiple responsibilities: `goseg/docker/lifecycle/lifecycle.go` combines bootstrap, image planning, reconciliation, command execution, polling, and helper utilities; `goseg/docker/orchestration/subsystem/docker.go` combines listener, subscription processing, health loop control, and restart policy.",
+        "Schema/update flow in `goseg/config/config_update_schema.go` requires parallel maintenance across a large `ConfPatch` struct and a long registry of parse/apply closures, indicating duplicated structural intent.",
+        "Transition handling shows repeated table-plus-template patterns across `goseg/rectify/rectify.go` and `goseg/shipworkflow/urbit_operations_runtime.go`, with many near-identical action/reducer entries and per-action boilerplate."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_seam_state_coupling",
+      "summary": "Global mutable seam variables are used as the primary dependency boundary, creating hidden coupling and test-reset overhead across modules.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/system/wifi.go",
+        "goseg/logger/logger.go",
+        "goseg/system/wifi_test.go",
+        "goseg/logger/logger_test.go"
+      ],
+      "evidence": [
+        "`runtime_seams.go` defines package-level function vars (e.g., `runtimeBasePathFn`, `runtimeDockerDirFn`) that are read by default runtime builders rather than injected per instance.",
+        "`wifi.go` exposes many package-level seam vars (`execCommandForWiFi`, `runCommandForWiFi`, `wifiNewClientForWiFi`) plus mutable global state (`Device`, `WifiInfo`, `c2cEnabled`).",
+        "`logger.go` similarly keeps mutable package-level init/runtime seam state (`sysLogSink`, `mkdirAllFn`, `pathResolverFn`, init-state globals).",
+        "Tests rely on manual seam reset helpers (`resetWifiSeamsForTest`, `resetLoggerInitForTest`), showing mutation-based DI is systemic and leaks across test boundaries."
+      ],
+      "suggestion": "Introduce explicit subsystem runtime objects owned per test/process (constructor-injected interfaces), and remove package-level mutable seam vars. Keep one immutable default wiring function for production and pass dependencies explicitly to call sites.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "docker_lifecycle_god_module",
+      "summary": "Docker lifecycle/subsystem logic is concentrated into broad modules that mix orchestration policy, state reconciliation, transport, and recovery behavior.",
+      "related_files": [
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/docker/orchestration/subsystem/docker.go",
+        "goseg/docker/orchestration/volume_writer.go"
+      ],
+      "evidence": [
+        "`lifecycle.go` (614 lines) contains container planning, image management, start/create/stop/delete/restart operations, exec command plumbing, polling loop health logic, and utility helpers.",
+        "`subsystem/docker.go` combines event listener I/O, subscription routing, transition workflow execution, failure-window policy, and restart scheduling logic in one file.",
+        "`volume_writer.go` contains low-level temp-container mechanics and image selection policy that also appears in higher-level runtime wiring."
+      ],
+      "suggestion": "Split into coherent units: image/plan resolver, container reconciler, docker command executor, and health/event supervisors. Move policy (restart windows, monitored container set) to dedicated policy modules and keep transport/client code in adapters.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "orchestration_layer_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_patch_dual_schema_drift_risk",
+      "summary": "Configuration update schema is duplicated between patch struct fields and registry mappings, increasing drift risk and maintenance cost.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/config_test.go",
+        "goseg/config/persistence.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` is large (575 lines) with a wide `ConfPatch` struct plus a long `confPatchRegistry` that separately encodes parse/apply behavior per key.",
+        "Adding/changing a config key requires touching multiple disconnected loci (patch field, registry entry, parsing/apply closures, and tests), not a single source of truth.",
+        "`config_test.go` contains extensive merge/update behavior checks, indicating high coordination burden around schema evolution."
+      ],
+      "suggestion": "Adopt a declarative field descriptor model (or generated mapping) where key, parser, patch target, and apply target are defined once and consumed by parser/apply paths; enforce completeness with compile-time or table-driven tests.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_parallel_schema_definition"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_rule_duplication",
+      "summary": "Transition handling is implemented with repeated per-event/per-action boilerplate across runtime handlers instead of a unified declarative rule engine.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/leak/handler.go"
+      ],
+      "evidence": [
+        "`rectify.go` (607 lines) defines several large reducer maps and repetitive glue handlers for different transition families.",
+        "`urbit_operations_runtime.go` (549 lines) repeats `runUrbitTransitionTemplateFn` scaffolding with similar lifecycle parameters and localized action logic across many operations.",
+        "`leak/handler.go` adds another custom action-routing pipeline with manual payload-type switching and auth routing, reinforcing repeated bespoke transition/action dispatch patterns."
+      ],
+      "suggestion": "Create a shared declarative transition/action registry with reusable step pipelines (validation, state mutation, side-effects, broadcast) so new actions are data entries plus focused handlers instead of repeated orchestration scaffolding.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_state_transition_orchestration"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_runtime_surface_split",
+      "summary": "Session/logstream behavior is split between global state functions and a pass-through runtime interface, creating an incoherent ownership model.",
+      "related_files": [
+        "goseg/session/session.go",
+        "goseg/session/ws.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`session.go` defines global mutable session state plus `LogstreamRuntime` and `logstreamRuntime` methods that mostly forward to package-level functions.",
+        "The runtime abstraction only owns one channel while most behaviors are still delegated to global functions, so abstraction boundaries do not map cleanly to owned state.",
+        "`logger.go` depends on this sink/runtime path (`ConfigureLogstreamRuntime`), binding logging flow to mixed global/runtime session ownership."
+      ],
+      "suggestion": "Consolidate session and logstream state into a single manager type implementing a narrow interface, then inject that manager where needed (logger/handlers) and retire pass-through wrappers over package globals.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_runtime_pattern"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Incremental testability retrofits via package-level seams instead of explicit dependency ownership",
+      "Orchestration modules grew by accretion without responsibility boundaries",
+      "Manual schema and transition mapping patterns duplicated across subsystems"
+    ],
+    "likely_symptoms": [
+      "session_runtime_surface_split",
+      "transition_rule_duplication",
+      "config_patch_dual_schema_drift_risk"
+    ],
+    "possible_false_positives": []
+  }
+}

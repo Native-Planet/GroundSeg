@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/structs"
+	"io"
 	"net"
 	"reflect"
 
@@ -41,6 +42,10 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 		for {
 			n, err := conn.Read(buf)
 			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					zap.L().Error(fmt.Sprintf("Error reading from lick connection for %s: %v", patp, err))
+					reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to read leak packet: %v", err))
+				}
 				// handle error or end of read
 				close(readChan)
 				return
@@ -62,6 +67,7 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 			}
 			c, err := sendBroadcast(conn, broadcast)
 			if err != nil {
+				reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to send broadcast: %v", err))
 				return
 			}
 			conn = c
@@ -70,7 +76,17 @@ func listener(patp string, conn net.Conn, info LickStatus) {
 			if !ok {
 				return
 			}
-			go handleAction(patp, action)
+			if err := handleAction(patp, action); err != nil {
+				if reason, isProtocol := leakProtocolErrorReason(err); isProtocol {
+					zap.L().Warn(fmt.Sprintf("leak protocol error from %s: %v", patp, reason))
+					continue
+				}
+				if reason, isInternal := leakInternalErrorReason(err); isInternal {
+					reportLeakInternalError(patp, info.Auth, reason)
+					continue
+				}
+				reportLeakInternalError(patp, info.Auth, fmt.Sprintf("failed to handle leak action: %v", err))
+			}
 		}
 	}
 }

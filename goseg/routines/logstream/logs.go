@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"groundseg/dockerclient"
 	"groundseg/logger"
+	"groundseg/session"
 	"groundseg/structs"
 	"io"
 	"io/ioutil"
@@ -15,6 +17,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	// "io/ioutil"
@@ -33,21 +36,63 @@ type DockerCancel struct {
 
 const (
 	MaxChunkSize = 10 * 1024 * 1024 // 10MB
+
+	maxLogCleanerConsecutiveFailures = 3
 )
+
+type logstreamRuntimeConfig struct {
+	sessionRuntime    session.LogstreamRuntime
+	systemLogMessages <-chan []byte
+}
 
 var (
 	// zap
-	logsMap                = make(map[*structs.MuConn]map[string]*structs.CtxWithCancel)
 	dockerLogCancelChannel = make(chan DockerCancel, 100)
 	wsLogMessagePool       = sync.Pool{
 		New: func() interface{} {
 			return new(structs.WsLogMessage)
 		},
 	}
+	logstreamRuntimeMu  sync.RWMutex
+	logstreamRuntimeCfg = logstreamRuntimeConfig{
+		sessionRuntime:    session.LogstreamRuntimeState(),
+		systemLogMessages: session.LogstreamRuntimeState().SystemLogMessages(),
+	}
+	systemLogParseFailureTotal uint64
 )
 
-func OldLogsCleaner() {
-	_ = OldLogsCleanerWithContext(context.Background())
+const maxSystemLogParseWarnings = 5
+
+func logstreamRuntimeSnapshot() logstreamRuntimeConfig {
+	logstreamRuntimeMu.RLock()
+	defer logstreamRuntimeMu.RUnlock()
+	return logstreamRuntimeCfg
+}
+
+func Configure(logRuntime session.LogstreamRuntime, systemLogMessages <-chan []byte) {
+	logstreamRuntimeMu.Lock()
+	defer logstreamRuntimeMu.Unlock()
+	if logRuntime != nil {
+		logstreamRuntimeCfg.sessionRuntime = logRuntime
+	} else {
+		logstreamRuntimeCfg.sessionRuntime = session.LogstreamRuntimeState()
+	}
+	currentRuntime := logstreamRuntimeCfg.sessionRuntime
+	if systemLogMessages != nil {
+		logstreamRuntimeCfg.systemLogMessages = systemLogMessages
+		return
+	}
+	if currentRuntime != nil {
+		logstreamRuntimeCfg.systemLogMessages = currentRuntime.SystemLogMessages()
+	}
+}
+
+func removeSysSessions() {
+	logstreamRuntimeSnapshot().sessionRuntime.RemoveSysLogSessions()
+}
+
+func OldLogsCleaner() error {
+	return OldLogsCleanerWithContext(context.Background())
 }
 
 func OldLogsCleanerWithContext(ctx context.Context) error {
@@ -56,67 +101,59 @@ func OldLogsCleanerWithContext(ctx context.Context) error {
 	}
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
+	failureCount := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
 			// split legacy logs
-			files, err := ioutil.ReadDir(logger.LogPath)
-			if err != nil {
-				zap.L().Error(fmt.Sprintf("failed to read logs directory: %v", err))
+			if err := runLogCleanupCycle(); err != nil {
+				failureCount++
+				zap.L().Error(fmt.Sprintf("failed to clean up logs: %v", err))
+				if failureCount >= maxLogCleanerConsecutiveFailures {
+					return fmt.Errorf("log cleanup failed after %d consecutive attempts: %w", maxLogCleanerConsecutiveFailures, err)
+				}
 				continue
 			}
-			for _, file := range files {
-				fn := file.Name()
-				matched, err := regexp.MatchString(`^\d{4}-\d{2}\.log$`, filepath.Base(fn))
-				if err != nil {
-					zap.L().Error(fmt.Sprintf("regex failed: %v", err))
-				}
-				if matched {
-					fullName := fmt.Sprintf("%s%s", logger.LogPath, fn)
-					if err := splitLogFile(fullName); err != nil {
-						zap.L().Error(fmt.Sprintf("failed to split legacy logfile %s: %v", fn, err))
-						continue
-					}
-					if err := os.Remove(fullName); err != nil {
-						zap.L().Error(fmt.Sprintf("failed to remove legacy logfile %s: %v", fn, err))
-					}
-				}
-			}
-			// clear logs
-			if err := keepMostRecentFiles(logger.LogPath); err != nil {
-				zap.L().Error(fmt.Sprintf("failed to clear old logs: %v", err))
-			}
+			failureCount = 0
 		}
 	}
 }
 
-// zap
-func SysLogStreamer() {
-	for {
-		logger.RemoveSysSessions()
-		log, _ := <-logger.SysLogChannel
-
-		// cleanup log string
-		var buffer bytes.Buffer
-		err := json.Compact(&buffer, log)
+func runLogCleanupCycle() error {
+	files, err := ioutil.ReadDir(logger.LogPath)
+	if err != nil {
+		return fmt.Errorf("read logs directory %q: %w", logger.LogPath, err)
+	}
+	var splitErrs []error
+	for _, file := range files {
+		fn := file.Name()
+		matched, err := regexp.MatchString(`^\d{4}-\d{2}\.log$`, filepath.Base(fn))
 		if err != nil {
+			return fmt.Errorf("compile log filename regex: %w", err)
+		}
+		if !matched {
 			continue
 		}
-		escapedLog := buffer.Bytes()
-		logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, escapedLog))
-		if err != nil {
+		fullName := fmt.Sprintf("%s%s", logger.LogPath, fn)
+		if err := splitLogFile(fullName); err != nil {
+			splitErrs = append(splitErrs, fmt.Errorf("split legacy logfile %s: %w", fn, err))
 			continue
 		}
-		for _, conn := range logger.SysLogSessions() {
-			if err := conn.WriteMessage(1, logJSON); err != nil {
-				zap.L().Error(fmt.Sprintf("error writing message: %v", err))
-				conn.Close()
-				logger.AddSysSessionToRemove(conn)
-			}
+		if err := os.Remove(fullName); err != nil {
+			splitErrs = append(splitErrs, fmt.Errorf("remove legacy logfile %s: %w", fn, err))
 		}
 	}
+	if err := keepMostRecentFiles(logger.LogPath); err != nil {
+		splitErrs = append(splitErrs, fmt.Errorf("clear old logs: %w", err))
+	}
+	return errors.Join(splitErrs...)
+}
+
+// zap
+func SysLogStreamer() error {
+	return SysLogStreamerWithContext(context.Background())
 }
 
 func SysLogStreamerWithContext(ctx context.Context) error {
@@ -124,69 +161,67 @@ func SysLogStreamerWithContext(ctx context.Context) error {
 		ctx = context.Background()
 	}
 	for {
-		logger.RemoveSysSessions()
+		removeSysSessions()
 		select {
 		case <-ctx.Done():
 			return nil
-		case log := <-logger.SysLogChannel:
+		case log, ok := <-logstreamRuntimeSnapshot().systemLogMessages:
+			if !ok {
+				return nil
+			}
 			var buffer bytes.Buffer
-			err := json.Compact(&buffer, log)
-			if err != nil {
+			if err := json.Compact(&buffer, log); err != nil {
+				parseFailures := atomic.AddUint64(&systemLogParseFailureTotal, 1)
+				if parseFailures <= maxSystemLogParseWarnings {
+					sample := string(log)
+					if len(sample) > 80 {
+						sample = sample[:80] + "..."
+					}
+					zap.L().Warn(fmt.Sprintf("failed to compact system log payload (len=%d total=%d): %v sample=%q", len(log), parseFailures, err, sample))
+				}
 				continue
 			}
-			escapedLog := buffer.Bytes()
-			logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, escapedLog))
-			for _, conn := range logger.SysLogSessions() {
+			logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, buffer.Bytes()))
+			for _, conn := range logstreamRuntimeSnapshot().sessionRuntime.SysLogSessions() {
 				if err := conn.WriteMessage(1, logJSON); err != nil {
 					zap.L().Error(fmt.Sprintf("error writing message: %v", err))
 					conn.Close()
-					logger.AddSysSessionToRemove(conn)
+					logstreamRuntimeSnapshot().sessionRuntime.AddSysSessionToRemove(conn)
 				}
 			}
 		}
 	}
 }
 
-func DockerLogStreamer() {
-	for {
-		for container, sessionMap := range logger.DockerLogSessions() {
-			for conn, live := range sessionMap {
-				if !live {
-					go streamToConn(container, conn)
-					logger.SetDockerLogSessionLive(container, conn, true)
-				}
-			}
-		}
-		time.Sleep(1 * time.Second)
-	}
+func DockerLogStreamer() error {
+	return DockerLogStreamerWithContext(context.Background())
 }
 
 func DockerLogStreamerWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 	for {
-		for container, sessionMap := range logger.DockerLogSessions() {
+		for container, sessionMap := range logstreamRuntimeSnapshot().sessionRuntime.DockerLogSessions() {
 			for conn, live := range sessionMap {
 				if !live {
 					go streamToConnWithContext(ctx, container, conn)
-					logger.SetDockerLogSessionLive(container, conn, true)
+					logstreamRuntimeSnapshot().sessionRuntime.SetDockerLogSessionLive(container, conn, true)
 				}
 			}
 		}
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(1 * time.Second):
+		case <-ticker.C:
 		}
 	}
 }
 
-func DockerLogConnRemover() {
-	for {
-		c, _ := <-dockerLogCancelChannel
-		logger.RemoveDockerLogSession(c.Container, c.Conn)
-	}
+func DockerLogConnRemover() error {
+	return DockerLogConnRemoverWithContext(context.Background())
 }
 
 func DockerLogConnRemoverWithContext(ctx context.Context) error {
@@ -198,7 +233,7 @@ func DockerLogConnRemoverWithContext(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case c := <-dockerLogCancelChannel:
-			logger.RemoveDockerLogSession(c.Container, c.Conn)
+			logstreamRuntimeSnapshot().sessionRuntime.RemoveDockerLogSession(c.Container, c.Conn)
 		}
 	}
 }
@@ -283,34 +318,38 @@ func splitLogFile(inputFile string) error {
 	)
 
 	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && err.Error() != "EOF" {
-			return err
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return fmt.Errorf("read legacy log file %s: %w", inputFile, readErr)
 		}
 
 		if chunkFile == nil || currentSize+len(line) > MaxChunkSize {
 			if chunkWriter != nil {
-				chunkWriter.Flush()
-				chunkFile.Close()
+				if flushErr := chunkWriter.Flush(); flushErr != nil {
+					return fmt.Errorf("flush split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, flushErr)
+				}
+				if closeErr := chunkFile.Close(); closeErr != nil {
+					return fmt.Errorf("close split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, closeErr)
+				}
 			}
 
 			outputFileName := fmt.Sprintf("%s%s-part-%d.log", logger.LogPath, baseName, partNumber)
 			chunkFile, err = os.Create(outputFileName)
 			if err != nil {
-				return err
+				return fmt.Errorf("create split log file %s: %w", outputFileName, err)
 			}
 			chunkWriter = bufio.NewWriter(chunkFile)
 			partNumber++
 			currentSize = 0
 		}
 
-		n, err := chunkWriter.WriteString(line)
-		if err != nil {
-			return err
+		n, writeErr := chunkWriter.WriteString(line)
+		if writeErr != nil {
+			return fmt.Errorf("write split log file %s: %w", inputFile, writeErr)
 		}
 		currentSize += n
 
-		if err == io.EOF {
+		if errors.Is(readErr, io.EOF) {
 			break
 		}
 
@@ -320,8 +359,12 @@ func splitLogFile(inputFile string) error {
 	}
 
 	if chunkWriter != nil {
-		chunkWriter.Flush()
-		chunkFile.Close()
+		if flushErr := chunkWriter.Flush(); flushErr != nil {
+			return fmt.Errorf("flush split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, flushErr)
+		}
+		if closeErr := chunkFile.Close(); closeErr != nil {
+			return fmt.Errorf("close split log file chunk %s-part-%d.log: %w", baseName, partNumber-1, closeErr)
+		}
 	}
 
 	return nil
@@ -332,7 +375,7 @@ func keepMostRecentFiles(dirPath string) error {
 	// Read the directory
 	files, err := ioutil.ReadDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %v", err)
+		return fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	recentFiles := logger.MostRecentPartedLogPaths(dirPath, files, 10)
@@ -341,9 +384,8 @@ func keepMostRecentFiles(dirPath string) error {
 	for _, file := range files {
 		fullPath := filepath.Join(dirPath, file.Name())
 		if !logContains(recentFiles, fullPath) {
-			err := os.Remove(fullPath)
-			if err != nil {
-				fmt.Printf("Failed to delete file: %s\n", fullPath)
+			if err := os.Remove(fullPath); err != nil {
+				return fmt.Errorf("failed to delete file %s: %w", fullPath, err)
 			}
 		}
 	}

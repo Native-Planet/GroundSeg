@@ -371,19 +371,18 @@ func TestGetStoragePathReturnsErrorWhenDirectoryCreationFails(t *testing.T) {
 
 func TestCreateDefaultConfPropagatesCloseError(t *testing.T) {
 	oldBasePath := BasePath()
-	oldCloseFileFn := closeConfigFileFn
 	closeErr := errors.New("close failed")
 
 	SetBasePath(t.TempDir())
-	closeConfigFileFn = func(_ *os.File) error {
-		return closeErr
-	}
 	t.Cleanup(func() {
 		SetBasePath(oldBasePath)
-		closeConfigFileFn = oldCloseFileFn
 	})
 
-	if err := createDefaultConf(); err == nil || !errors.Is(err, closeErr) {
+	runtime := NewCloseFileRuntime()
+	runtime.CloseConfigFileFn = func(_ *os.File) error {
+		return closeErr
+	}
+	if err := createDefaultConfWithRuntime(runtime); err == nil || !errors.Is(err, closeErr) {
 		t.Fatalf("expected close error wrapped, got: %v", err)
 	}
 }

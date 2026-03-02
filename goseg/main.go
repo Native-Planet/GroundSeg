@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/orchestration/subsystem"
+	"groundseg/internal/seams"
 	"groundseg/logger"
 	"groundseg/system"
 	"io/fs"
@@ -56,9 +57,21 @@ var (
 )
 
 type bootstrapRuntime struct {
-	runBootstrapFn func(context.Context, StartupOptions) error
-	startServerFn  func(context.Context, int) error
-	runC2cCheckFn  func(context.Context)
+	Orchestrator bootstrapOrchestratorRuntime
+	Server       bootstrapServerRuntime
+	Connectivity bootstrapConnectivityRuntime
+}
+
+type bootstrapOrchestratorRuntime struct {
+	RunBootstrapFn func(context.Context, StartupOptions) error
+}
+
+type bootstrapServerRuntime struct {
+	StartServerFn func(context.Context, int) error
+}
+
+type bootstrapConnectivityRuntime struct {
+	RunC2cCheckFn func(context.Context)
 }
 
 type serverRuntime struct {
@@ -67,15 +80,15 @@ type serverRuntime struct {
 }
 
 func defaultBootstrapRuntime() bootstrapRuntime {
-	return bootstrapRuntime{
-		runBootstrapFn: Bootstrap,
-		startServerFn: func(ctx context.Context, httpPort int) error {
+	return bootstrapRuntimeWith(
+		Bootstrap,
+		func(ctx context.Context, httpPort int) error {
 			return runServer(ctx, httpPort, defaultServerRuntime())
 		},
-		runC2cCheckFn: func(ctx context.Context) {
+		func(ctx context.Context) {
 			go C2cCheckWith(ctx, defaultC2cRuntime())
 		},
-	}
+	)
 }
 
 func bootstrapRuntimeWith(
@@ -83,10 +96,37 @@ func bootstrapRuntimeWith(
 	startServerFn func(context.Context, int) error,
 	runC2cCheckFn func(context.Context),
 ) bootstrapRuntime {
+	return seams.Merge(
+		defaultBootstrapRuntimeBase(),
+		bootstrapRuntime{
+			Orchestrator: bootstrapOrchestratorRuntime{
+				RunBootstrapFn: runBootstrapFn,
+			},
+			Server: bootstrapServerRuntime{
+				StartServerFn: startServerFn,
+			},
+			Connectivity: bootstrapConnectivityRuntime{
+				RunC2cCheckFn: runC2cCheckFn,
+			},
+		},
+	)
+}
+
+func defaultBootstrapRuntimeBase() bootstrapRuntime {
 	return bootstrapRuntime{
-		runBootstrapFn: runBootstrapFn,
-		startServerFn:  startServerFn,
-		runC2cCheckFn:  runC2cCheckFn,
+		Orchestrator: bootstrapOrchestratorRuntime{
+			RunBootstrapFn: Bootstrap,
+		},
+		Server: bootstrapServerRuntime{
+			StartServerFn: func(ctx context.Context, httpPort int) error {
+				return runServer(ctx, httpPort, defaultServerRuntime())
+			},
+		},
+		Connectivity: bootstrapConnectivityRuntime{
+			RunC2cCheckFn: func(ctx context.Context) {
+				go C2cCheckWith(ctx, defaultC2cRuntime())
+			},
+		},
 	}
 }
 
@@ -107,6 +147,25 @@ const (
 	c2cCheckInterval = 5 * time.Second
 )
 
+type c2cRuntimeContext struct {
+	basePath               string
+	netCheck               func(string) bool
+	connectivitySnapshotFn func() config.ConnectivitySettings
+	isNPBoxFn              func(string) bool
+	isDebugModeFn          func() bool
+}
+
+func defaultC2cRuntimeContext() c2cRuntimeContext {
+	context := config.RuntimeContextSnapshot()
+	return c2cRuntimeContext{
+		basePath:               context.BasePath,
+		netCheck:               config.NetCheck,
+		connectivitySnapshotFn: config.ConnectivitySettingsSnapshot,
+		isNPBoxFn:              system.IsNPBox,
+		isDebugModeFn:          config.DebugMode,
+	}
+}
+
 type connectivityCheckRuntime struct {
 	netCheck func(string) bool
 	timeout  time.Duration
@@ -114,38 +173,73 @@ type connectivityCheckRuntime struct {
 }
 
 type c2cRuntime struct {
-	isNPBox         func() bool
-	connCheck       func() bool
-	isC2cMode       func() error
-	setC2CMode      func(bool) error
-	startKillSwitch func(context.Context, func() config.ConnectivitySettings)
-	connectivity    func() config.ConnectivitySettings
-	hasDevice       func() bool
+	connectivity c2cConnectivityRuntime
+	device       c2cDeviceRuntime
+	mode         c2cModeRuntime
 }
 
-func defaultConnectivityCheckRuntime() connectivityCheckRuntime {
+type c2cConnectivityRuntime struct {
+	connCheck    func() bool
+	settingsSnap func() config.ConnectivitySettings
+}
+
+type c2cDeviceRuntime struct {
+	isNPBox   func() bool
+	hasDevice func() bool
+	wifiInfo  func() (bool, error)
+}
+
+type c2cModeRuntime struct {
+	isC2cMode       func() error
+	setC2cMode      func(bool) error
+	startKillSwitch func(context.Context, func() config.ConnectivitySettings)
+}
+
+func defaultConnectivityCheckRuntime(netCheck func(string) bool) connectivityCheckRuntime {
+	if netCheck == nil {
+		netCheck = config.NetCheck
+	}
 	return connectivityCheckRuntime{
-		netCheck: config.NetCheck,
+		netCheck: netCheck,
 		timeout:  c2cCheckTimeout,
 		interval: c2cCheckInterval,
 	}
 }
 
 func defaultC2cRuntime() c2cRuntime {
+	return defaultC2cRuntimeWithContext(defaultC2cRuntimeContext())
+}
+
+func defaultC2cRuntimeWithContext(runtimeContext c2cRuntimeContext) c2cRuntime {
 	return c2cRuntime{
-		isNPBox: func() bool {
-			return system.IsNPBox(config.BasePath())
+		connectivity: c2cConnectivityRuntime{
+			connCheck: func() bool {
+				return connCheckWith(defaultConnectivityCheckRuntime(runtimeContext.netCheck))
+			},
+			settingsSnap: func() config.ConnectivitySettings {
+				if runtimeContext.connectivitySnapshotFn == nil {
+					return config.ConnectivitySettingsSnapshot()
+				}
+				return runtimeContext.connectivitySnapshotFn()
+			},
 		},
-		connCheck:  func() bool { return connCheckWith(defaultConnectivityCheckRuntime()) },
-		isC2cMode:  system.C2CMode,
-		setC2CMode: system.SetC2CMode,
-		startKillSwitch: func(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings) {
-			killSwitch(ctx, connectivitySnapshot)
+		device: c2cDeviceRuntime{
+			isNPBox: func() bool {
+				if runtimeContext.isNPBoxFn == nil {
+					return system.IsNPBox(runtimeContext.basePath)
+				}
+				return runtimeContext.isNPBoxFn(runtimeContext.basePath)
+			},
+			hasDevice: system.HasWifiDevice,
+			wifiInfo:  system.IsWifiEnabled,
 		},
-		connectivity: func() config.ConnectivitySettings {
-			return config.ConnectivitySettingsSnapshot()
+		mode: c2cModeRuntime{
+			isC2cMode:  system.C2CMode,
+			setC2cMode: system.SetC2CMode,
+			startKillSwitch: func(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings) {
+				killSwitchWithMode(ctx, connectivitySnapshot, runtimeContext.isDebugModeFn)
+			},
 		},
-		hasDevice: system.HasWifiDevice,
 	}
 }
 
@@ -153,18 +247,30 @@ func C2cCheckWith(ctx context.Context, runtime c2cRuntime) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	connectivity := runtime.connectivity()
-	isNPBox := runtime.isNPBox()
-	internetAvailable := runtime.connCheck()
-	if !internetAvailable && runtime.hasDevice() && isNPBox {
-		if err := runtime.isC2cMode(); err != nil {
+	connectivity := runtime.connectivity.settingsSnap()
+	isNPBox := runtime.device.isNPBox()
+	wifiEnabled := true
+	wifiErr := error(nil)
+	internetAvailable := runtime.connectivity.connCheck()
+	if !internetAvailable && runtime.device.hasDevice() && isNPBox {
+		if runtime.device.wifiInfo != nil {
+			wifiEnabled, wifiErr = runtime.device.wifiInfo()
+			if wifiErr != nil {
+				logger.Warnf("Failed to read wifi radio state: %v", wifiErr)
+				return
+			}
+		}
+		if !wifiEnabled {
+			return
+		}
+		if err := runtime.mode.isC2cMode(); err != nil {
 			logger.Errorf("Error activating C2C mode: %v", err)
 		} else {
 			logger.Info("GroundSeg is in C2C Mode")
-			_ = runtime.setC2CMode(true)
+			_ = runtime.mode.setC2cMode(true)
 			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
 			if connectivity.C2cInterval > 0 {
-				go runtime.startKillSwitch(ctx, runtime.connectivity)
+				go runtime.mode.startKillSwitch(ctx, runtime.connectivity.settingsSnap)
 			}
 		}
 	}
@@ -182,13 +288,17 @@ func init() {
 
 // test for internet connectivity and interrupt ServerControl if we need to switch
 func killSwitch(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings) {
+	killSwitchWithMode(ctx, connectivitySnapshot, config.DebugMode)
+}
+
+func killSwitchWithMode(ctx context.Context, connectivitySnapshot func() config.ConnectivitySettings, isDebugMode func() bool) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if connectivitySnapshot == nil {
 		connectivitySnapshot = config.ConnectivitySettingsSnapshot
 	}
-	if config.DebugMode() {
+	if isDebugMode != nil && isDebugMode() {
 		logger.Debug("Debug mode enabled; skipping killswitch reboot path")
 		return
 	}
@@ -233,7 +343,7 @@ func connCheckWith(runtime connectivityCheckRuntime) bool {
 }
 
 func connCheck() bool {
-	return connCheckWith(defaultConnectivityCheckRuntime())
+	return connCheckWith(defaultConnectivityCheckRuntime(config.NetCheck))
 }
 
 // autodetect mime type
@@ -400,23 +510,23 @@ func startupRuntimeFromAppOptions(_ appStartupOptions) startupRuntime {
 }
 
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
-	if runtime.runBootstrapFn == nil {
+	if runtime.Orchestrator.RunBootstrapFn == nil {
 		return fmt.Errorf("bootstrap runtime is not configured")
 	}
-	if runtime.startServerFn == nil {
+	if runtime.Server.StartServerFn == nil {
 		return fmt.Errorf("bootstrap runtime is not configured")
 	}
-	return runtime.runBootstrapFn(ctx, StartupOptions{
+	return runtime.Orchestrator.RunBootstrapFn(ctx, StartupOptions{
 		HTTPPort: opts.httpPort,
 		ValidateConfig: func() error {
 			return initWebErr
 		},
 		StartServer: func(ctx context.Context, httpPort int) error {
-			return runtime.startServerFn(ctx, httpPort)
+			return runtime.Server.StartServerFn(ctx, httpPort)
 		},
 		StartC2cCheck: func(ctx context.Context) {
-			if runtime.runC2cCheckFn != nil {
-				runtime.runC2cCheckFn(ctx)
+			if runtime.Connectivity.RunC2cCheckFn != nil {
+				runtime.Connectivity.RunC2cCheckFn(ctx)
 			}
 		},
 		StartupRuntime: startupRuntimeFromAppOptions(opts),

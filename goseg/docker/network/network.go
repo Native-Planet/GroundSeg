@@ -17,26 +17,37 @@ import (
 	"groundseg/dockerclient"
 )
 
-var dockerClientNew = dockerclient.New
-var networkOperationTimeout = 30 * time.Second
-
-func SetClientFactory(factory func(...client.Opt) (*client.Client, error)) {
-	if factory == nil {
-		dockerClientNew = dockerclient.New
-		return
-	}
-	dockerClientNew = factory
+type NetworkRuntime struct {
+	DockerClientNewFn func(...client.Opt) (*client.Client, error)
+	OperationTimeout  time.Duration
 }
 
-// KillContainerUsingPort stops the first running container that is bound to the provided port.
-func KillContainerUsingPort(n uint16) error {
-	cli, err := dockerClientNew()
+func NewNetworkRuntime() NetworkRuntime {
+	return NetworkRuntime{
+		DockerClientNewFn: dockerclient.New,
+		OperationTimeout:  30 * time.Second,
+	}
+}
+
+func (runtime NetworkRuntime) withDefaults() NetworkRuntime {
+	if runtime.DockerClientNewFn == nil {
+		runtime.DockerClientNewFn = dockerclient.New
+	}
+	if runtime.OperationTimeout <= 0 {
+		runtime.OperationTimeout = 30 * time.Second
+	}
+	return runtime
+}
+
+func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return err
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 
 	listFilters := filters.NewArgs()
@@ -44,18 +55,16 @@ func KillContainerUsingPort(n uint16) error {
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{Filters: listFilters})
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", n))
-		return fmt.Errorf("failed to list running containers while finding a handler for port %d: %w", n, err)
+		zap.L().Error(fmt.Sprintf("Unable to get container list. Failed to kill container using port %v", port))
+		return fmt.Errorf("failed to list running containers while finding a handler for port %d: %w", port, err)
 	}
-
 	for _, cont := range containers {
-		for _, port := range cont.Ports {
-			if port.PublicPort == n {
-				zap.L().Debug(fmt.Sprintf("Stopping container %s to free port %v", cont.ID, n))
-				options := container.StopOptions{}
-				if err := cli.ContainerStop(ctx, cont.ID, options); err != nil {
+		for _, containerPort := range cont.Ports {
+			if containerPort.PublicPort == port {
+				zap.L().Debug(fmt.Sprintf("Stopping container %s to free port %d", cont.ID, containerPort.PublicPort))
+				if err := cli.ContainerStop(ctx, cont.ID, container.StopOptions{}); err != nil {
 					zap.L().Error(fmt.Sprintf("failed to stop container %s: %v", cont.ID, err))
-					return fmt.Errorf("failed to stop container %s while releasing port %d: %w", cont.ID, n, err)
+					return fmt.Errorf("failed to stop container %s while releasing port %d: %w", cont.ID, containerPort.PublicPort, err)
 				}
 				return nil
 			}
@@ -64,15 +73,15 @@ func KillContainerUsingPort(n uint16) error {
 	return nil
 }
 
-// GetContainerNetwork returns the raw network mode name attached to a container.
-func GetContainerNetwork(name string) (string, error) {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) GetContainerNetwork(name string) (string, error) {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create docker client for network lookup of %s: %w", name, err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 	containerJSON, err := cli.ContainerInspect(ctx, name)
 	if err != nil {
@@ -84,81 +93,73 @@ func GetContainerNetwork(name string) (string, error) {
 	return "", fmt.Errorf("container is not attached to any network: %v", name)
 }
 
-// CreateVolume creates a named Docker volume.
-func CreateVolume(name string) error {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) CreateVolume(name string) error {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
-		errmsg := fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
-		return errmsg
+		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 	vol, err := cli.VolumeCreate(ctx, volumetypes.CreateOptions{Name: name})
 	if err != nil {
-		errmsg := fmt.Errorf("failed to create docker volume %q: %w", name, err)
-		return errmsg
+		return fmt.Errorf("failed to create docker volume %q: %w", name, err)
 	}
 	zap.L().Info(fmt.Sprintf("Created volume: %s", vol.Name))
 	return nil
 }
 
-// DeleteVolume removes a named Docker volume.
-func DeleteVolume(name string) error {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) DeleteVolume(name string) error {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
-		errmsg := fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
-		return errmsg
+		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
-	err = cli.VolumeRemove(ctx, name, true)
-	if err != nil {
-		errmsg := fmt.Errorf("failed to remove docker volume %q: %w", name, err)
-		return errmsg
+	if err := cli.VolumeRemove(ctx, name, true); err != nil {
+		return fmt.Errorf("failed to remove docker volume %q: %w", name, err)
 	}
 	zap.L().Info(fmt.Sprintf("Deleted volume: %s", name))
 	return nil
 }
 
-// WriteFileToVolume writes content to a file inside a docker volume.
-func WriteFileToVolume(name string, file string, content string) error {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, content string) error {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
-		errmsg := fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
-		return errmsg
+		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 	vol, err := cli.VolumeInspect(ctx, name)
 	if err != nil {
-		errmsg := fmt.Errorf("failed to inspect volume %q: %w", name, err)
-		return errmsg
+		return fmt.Errorf("failed to inspect volume %q: %w", name, err)
 	}
 
 	fullPath := filepath.Join(vol.Mountpoint, file)
-	if err = os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-		errmsg := fmt.Errorf("failed to write %q for volume %q: %w", file, name, err)
-		return errmsg
+	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write %q for volume %q: %w", file, name, err)
 	}
 	zap.L().Info(fmt.Sprintf("Successfully wrote to file: %s", fullPath))
 	return nil
 }
 
-// VolumeExists reports whether the named docker volume exists.
-func VolumeExists(volumeName string) (bool, error) {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) VolumeExists(volumeName string) (bool, error) {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return false, fmt.Errorf("failed to create client for volume check: %w", err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 	volumeList, err := cli.VolumeList(ctx, volumetypes.ListOptions{})
 	if err != nil {
@@ -172,15 +173,15 @@ func VolumeExists(volumeName string) (bool, error) {
 	return false, nil
 }
 
-// AddOrGetNetwork returns an existing network id or creates a new local bridge network.
-func AddOrGetNetwork(networkName string) (string, error) {
-	cli, err := dockerClientNew()
+func (runtime NetworkRuntime) AddOrGetNetwork(networkName string) (string, error) {
+	runtime = runtime.withDefaults()
+	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return "", fmt.Errorf("failed to create client for network lookup: %w", err)
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), networkOperationTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), runtime.OperationTimeout)
 	defer cancel()
 	networks, err := cli.NetworkList(ctx, dockernetwork.ListOptions{})
 	if err != nil {

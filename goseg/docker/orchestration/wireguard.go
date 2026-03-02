@@ -16,11 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func LoadWireguard() error {
-	return loadWireguard(wireguardRuntimeFromDocker(newDockerRuntime()))
-}
-
-func loadWireguard(rt WireguardRuntime) error {
+func (rt WireguardRuntime) LoadWireguard() error {
 	zap.L().Info("Loading Startram Wireguard container")
 	if rt.BasePathFn == nil {
 		return fmt.Errorf("missing base path getter")
@@ -30,7 +26,7 @@ func loadWireguard(rt WireguardRuntime) error {
 		if rt.WriteWgConfFn != nil {
 			return rt.WriteWgConfFn(rt)
 		}
-		return WriteWgConfWithRuntime(rt)
+		return rt.WriteWgConf()
 	}
 	return container.RunContainerWithRuntime(container.ContainerRuntimePlan{
 		ContainerName:         "wireguard",
@@ -44,11 +40,7 @@ func loadWireguard(rt WireguardRuntime) error {
 	})
 }
 
-func wgContainerConf() (dockerc.Config, dockerc.HostConfig, error) {
-	return wgContainerConfWithRuntime(wireguardRuntimeFromDocker(newDockerRuntime()))
-}
-
-func wgContainerConfWithRuntime(rt WireguardRuntime) (dockerc.Config, dockerc.HostConfig, error) {
+func (rt WireguardRuntime) wgContainerConf() (dockerc.Config, dockerc.HostConfig, error) {
 	if rt.GetLatestContainerInfoFn == nil {
 		return dockerc.Config{}, dockerc.HostConfig{}, fmt.Errorf("missing image runtime")
 	}
@@ -82,11 +74,7 @@ func wgContainerConfWithRuntime(rt WireguardRuntime) (dockerc.Config, dockerc.Ho
 	return containerConfig, hostConfig, nil
 }
 
-func buildWgConf() (string, error) {
-	return buildWgConfWithRuntime(wireguardRuntimeFromDocker(newDockerRuntime()))
-}
-
-func buildWgConfWithRuntime(rt WireguardRuntime) (string, error) {
+func (rt WireguardRuntime) buildWgConf() (string, error) {
 	if rt.GetWgConfBlobFn == nil || rt.GetWgPrivkeyFn == nil {
 		return "", fmt.Errorf("missing wireguard config runtime")
 	}
@@ -101,16 +89,8 @@ func buildWgConfWithRuntime(rt WireguardRuntime) (string, error) {
 	return strings.Replace(string(confBytes), "privkey", rt.GetWgPrivkeyFn(), -1), nil
 }
 
-func WriteWgConf() error {
-	return WriteWgConfWithRuntime(wireguardRuntimeFromDocker(newDockerRuntime()))
-}
-
-func WriteWgConfWithRuntime(rt WireguardRuntime) error {
-	return writeWgConfWithRuntime(rt)
-}
-
-func writeWgConfWithRuntime(rt WireguardRuntime) error {
-	newConf, err := buildWgConfWithRuntime(rt)
+func (rt WireguardRuntime) WriteWgConf() error {
+	newConf, err := rt.buildWgConf()
 	if err != nil {
 		return fmt.Errorf("failed to build wireguard configuration: %w", err)
 	}
@@ -142,11 +122,7 @@ func writeWgConfWithRuntime(rt WireguardRuntime) error {
 	return nil
 }
 
-func WriteWgConfToFile(filePath string, content string) error {
-	return writeWgConfToFileWithRuntime(wireguardRuntimeFromDocker(newDockerRuntime()), filePath, content)
-}
-
-func writeWgConfToFileWithRuntime(rt WireguardRuntime, filePath string, content string) error {
+func (rt WireguardRuntime) writeWgConfToFile(filePath string, content string) error {
 	return artifactwriter.Write(wireguardConfigWriteArtifactOptions(rt, filePath, content))
 }
 
@@ -176,11 +152,7 @@ func wireguardConfigWriteArtifactOptions(rt WireguardRuntime, filePath string, c
 	}
 }
 
-func copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
-	return copyWGFileToVolumeWithRuntime(wireguardRuntimeFromDocker(newDockerRuntime()), filePath, targetPath, volumeName)
-}
-
-func copyWGFileToVolumeWithRuntime(rt WireguardRuntime, filePath string, targetPath string, volumeName string) error {
+func (rt WireguardRuntime) copyWGFileToVolume(filePath string, targetPath string, volumeName string) error {
 	if rt.CopyFileToVolumeFn == nil {
 		return fmt.Errorf("missing copy-to-volume runtime")
 	}

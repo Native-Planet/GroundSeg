@@ -1,10 +1,13 @@
 package lifecycle
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"groundseg/structs"
+
+	"github.com/docker/docker/errdefs"
 )
 
 func TestRunDockerPollerTickSkipsStartForHealthyContainer(t *testing.T) {
@@ -33,7 +36,7 @@ func TestRunDockerPollerTickStartsContainerWhenMissing(t *testing.T) {
 			if name != "netdata" {
 				t.Fatalf("unexpected container query: %q", name)
 			}
-			return "", fmt.Errorf("container with name %s not found", name)
+			return "", errdefs.NotFound(errors.New("container with name netdata not found"))
 		}),
 		WithStartContainerFn(func(name, containerType string) (structs.ContainerState, error) {
 			if name != "netdata" || containerType != "netdata" {
@@ -94,4 +97,3 @@ func TestEnsureMonitoredContainerHealthyRestartsStoppedContainer(t *testing.T) {
 		t.Fatal("expected start to be attempted for non-running monitored container")
 	}
 }
-

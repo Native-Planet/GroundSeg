@@ -67,11 +67,11 @@ func NetdataContainerConfWithRuntime(rt NetdataRuntime) (container.Config, conta
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	if rt.GetLatestContainerInfoFn == nil {
-		return containerConfig, hostConfig, fmt.Errorf("missing image metadata runtime")
+		return containerConfig, hostConfig, fmt.Errorf("missing latest netdata metadata runtime")
 	}
 	containerInfo, err := rt.GetLatestContainerInfoFn("netdata")
 	if err != nil {
-		return containerConfig, hostConfig, err
+		return containerConfig, hostConfig, fmt.Errorf("lookup latest netdata metadata: %w", err)
 	}
 	desiredImage := fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"])
 	containerConfig = container.Config{

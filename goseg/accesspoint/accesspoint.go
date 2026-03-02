@@ -3,8 +3,8 @@ package accesspoint
 import (
 	"bytes"
 	"crypto/sha256"
-	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,26 +31,21 @@ type AccessPointRuntime struct {
 	EnsureRootDirFn      func(string) error
 	StartRouterFn        func(AccessPointRuntime) error
 	StopRouterFn         func(AccessPointRuntime) error
+	UseDefaultStartFn    bool
+	UseDefaultStopFn     bool
+	RunProcessProbeFn    func(name string, arg ...string) *exec.Cmd
+	NetInterfacesFn      func() ([]net.Interface, error)
 }
 
 var (
-	wlan                 = "wlan0"
-	inet                 = ""
-	ip                   = "192.168.45.1"
-	netmask              = "255.255.255.0"
-	ssid                 = "NativePlanetConnect"
-	password             = resolveAPPassword()
-	rootDir              = "/etc/accesspoint/"
-	hostapdConfigPath    = filepath.Join(rootDir, "hostapd.config")
-	runProcessProbeFn    = exec.Command
-	checkDependenciesFn  = checkDependencies
-	writeHostapdConfigFn = writeHostapdConfig
-	checkParametersFn    = func() error {
-		return checkParametersWithContext(defaultAccessPointContext())
-	}
-	isRunningFn = func() (bool, error) {
-		return isRunningWithRuntime(defaultAccessPointContext())
-	}
+	wlan              = "wlan0"
+	inet              = ""
+	ip                = "192.168.45.1"
+	netmask           = "255.255.255.0"
+	ssid              = "NativePlanetConnect"
+	password          = resolveAPPassword()
+	rootDir           = "/etc/accesspoint/"
+	hostapdConfigPath = filepath.Join(rootDir, "hostapd.config")
 )
 
 func defaultAccessPointContext() AccessPointRuntime {
@@ -76,17 +71,21 @@ func accessPointRuntime() AccessPointRuntime {
 		Password:            password,
 		RootDir:             rootDir,
 		HostapdConfigPath:   hostapdConfigPath,
-		CheckDependenciesFn: checkDependenciesFn,
+		CheckDependenciesFn: checkDependencies,
 		CheckParametersFn: func(rt AccessPointRuntime) error {
-			return checkParametersFn()
+			return checkParametersWithContext(rt)
 		},
 		IsRunningFn: func(rt AccessPointRuntime) (bool, error) {
-			return isRunningFn()
+			return isRunningWithRuntime(rt)
 		},
-		WriteHostapdConfigFn: writeHostapdConfigFn,
+		WriteHostapdConfigFn: writeHostapdConfig,
 		EnsureRootDirFn:      ensureRootDir,
 		StartRouterFn:        startRouterWithRuntime,
 		StopRouterFn:         stopRouterWithRuntime,
+		UseDefaultStartFn:    true,
+		UseDefaultStopFn:     true,
+		RunProcessProbeFn:    exec.Command,
+		NetInterfacesFn:      net.Interfaces,
 	}
 }
 
@@ -116,7 +115,7 @@ func normalizeAccessPointRuntime(rt AccessPointRuntime) AccessPointRuntime {
 		rt.HostapdConfigPath = filepath.Join(rt.RootDir, "hostapd.config")
 	}
 	if rt.CheckDependenciesFn == nil {
-		rt.CheckDependenciesFn = checkDependenciesFn
+		rt.CheckDependenciesFn = checkDependencies
 	}
 	if rt.CheckParametersFn == nil {
 		rt.CheckParametersFn = checkParametersWithContext
@@ -132,21 +131,33 @@ func normalizeAccessPointRuntime(rt AccessPointRuntime) AccessPointRuntime {
 	}
 	if rt.StartRouterFn == nil {
 		rt.StartRouterFn = startRouterWithRuntime
+		rt.UseDefaultStartFn = true
+	} else {
+		rt.UseDefaultStartFn = false
 	}
 	if rt.StopRouterFn == nil {
 		rt.StopRouterFn = stopRouterWithRuntime
+		rt.UseDefaultStopFn = true
+	} else {
+		rt.UseDefaultStopFn = false
+	}
+	if rt.RunProcessProbeFn == nil {
+		rt.RunProcessProbeFn = exec.Command
+	}
+	if rt.NetInterfacesFn == nil {
+		rt.NetInterfacesFn = net.Interfaces
 	}
 	return rt
 }
 
 func StartWithRuntime(rt AccessPointRuntime) error {
 	rt = normalizeAccessPointRuntime(rt)
-	return startWithRuntime(rt)
+	return accessPointLifecycleCoordinator{}.Start(rt)
 }
 
 func StopWithRuntime(rt AccessPointRuntime) error {
 	rt = normalizeAccessPointRuntime(rt)
-	return stopWithRuntime(rt)
+	return accessPointLifecycleCoordinator{}.Stop(rt)
 }
 
 func resolveAPPassword() string {
@@ -176,58 +187,7 @@ func Start(dev string) error {
 }
 
 func startWithRuntime(rt AccessPointRuntime) error {
-	zap.L().Info(fmt.Sprintf("Starting router on %v", rt.Wlan))
-	if rt.EnsureRootDirFn == nil {
-		return errors.New("missing root directory init runtime")
-	}
-	if err := rt.EnsureRootDirFn(rt.RootDir); err != nil {
-		return err
-	}
-	// make sure dependencies are met
-	if rt.CheckDependenciesFn == nil {
-		return errors.New("missing dependency runtime")
-	}
-	if err := rt.CheckDependenciesFn(); err != nil {
-		return err
-	}
-	// make sure params are set (maybe not needed)
-	if rt.CheckParametersFn == nil {
-		return errors.New("missing parameter validation runtime")
-	}
-	if err := rt.CheckParametersFn(rt); err != nil {
-		return err
-	}
-	// check if AP already running
-	if rt.IsRunningFn == nil {
-		return errors.New("missing status runtime")
-	}
-	running, err := rt.IsRunningFn(rt)
-	if err != nil {
-		return err
-	}
-	if running {
-		if rt.ForceRestart {
-			zap.L().Info("Accesspoint already started; force restart requested")
-		} else {
-			zap.L().Info("Accesspoint already started")
-			return nil
-		}
-	}
-	// dump config to file
-	if rt.WriteHostapdConfigFn == nil {
-		return errors.New("missing hostapd config runtime")
-	}
-	if err := rt.WriteHostapdConfigFn(rt.HostapdConfigPath, rt.Wlan, rt.SSID, rt.Password); err != nil {
-		return err
-	}
-	// start the router
-	if rt.StartRouterFn == nil {
-		return errors.New("missing router start runtime")
-	}
-	if err := rt.StartRouterFn(rt); err != nil {
-		return fmt.Errorf("start router: %w", err)
-	}
-	return nil
+	return accessPointLifecycleCoordinator{}.Start(rt)
 }
 
 func Stop(dev string) error {
@@ -237,33 +197,7 @@ func Stop(dev string) error {
 }
 
 func stopWithRuntime(rt AccessPointRuntime) error {
-	zap.L().Info(fmt.Sprintf("Stopping router on %v", rt.Wlan))
-	if rt.CheckParametersFn == nil {
-		return errors.New("missing parameter validation runtime")
-	}
-	if err := rt.CheckParametersFn(rt); err != nil {
-		return err
-	}
-	// check if AP is running
-	if rt.IsRunningFn == nil {
-		return errors.New("missing status runtime")
-	}
-	running, err := rt.IsRunningFn(rt)
-	if err != nil {
-		return err
-	}
-	// stop the router
-	if running {
-		if rt.StopRouterFn == nil {
-			return errors.New("missing router stop runtime")
-		}
-		if err := rt.StopRouterFn(rt); err != nil {
-			return fmt.Errorf("stop router: %w", err)
-		}
-	} else {
-		zap.L().Info("Accesspoint already stopped")
-	}
-	return nil
+	return accessPointLifecycleCoordinator{}.Stop(rt)
 }
 
 func ensureRootDir(path string) error {
@@ -354,8 +288,12 @@ func accessPointProcessMatcher() (processProbeMatcher, error) {
 	return newProcessProbeMatcher(processMatchKindExact, "hostapd", "dnsmasq")
 }
 
-func isRunningWithMatcher(matcher processProbeMatcher) (bool, error) {
-	out, err := runProcessProbeFn("ps", "-eo", "args").Output()
+func isRunningWithMatcher(matcher processProbeMatcher, rt AccessPointRuntime) (bool, error) {
+	rt = normalizeAccessPointRuntime(rt)
+	if rt.RunProcessProbeFn == nil {
+		return false, fmt.Errorf("missing process probe runtime")
+	}
+	out, err := rt.RunProcessProbeFn("ps", "-eo", "args").Output()
 	if err != nil {
 		return false, fmt.Errorf("process probe failed: %w", err)
 	}
@@ -371,20 +309,20 @@ func isRunningWithMatcher(matcher processProbeMatcher) (bool, error) {
 	return false, nil
 }
 
-func isRunningWithRuntime(_ AccessPointRuntime) (bool, error) {
+func isRunningWithRuntime(rt AccessPointRuntime) (bool, error) {
 	matcher, err := accessPointProcessMatcher()
 	if err != nil {
 		return false, fmt.Errorf("build process matcher: %w", err)
 	}
-	return isRunningWithMatcher(matcher)
+	return isRunningWithMatcher(matcher, rt)
 }
 
 func checkDependencies() error {
 	if _, err := exec.LookPath("hostapd"); err != nil {
-		return err
+		return fmt.Errorf("failed to locate hostapd: %w", err)
 	}
 	if _, err := exec.LookPath("dnsmasq"); err != nil {
-		return err
+		return fmt.Errorf("failed to locate dnsmasq: %w", err)
 	}
 	return nil
 }
@@ -405,9 +343,9 @@ func executeShell(commandString string) (string, error) {
 	if err != nil {
 		stderrText := strings.TrimSpace(stderr.String())
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("command %q failed with exit status %d: %v: %s", commandString, exitErr.ExitCode(), exitErr, stderrText)
+			return "", fmt.Errorf("command %q failed with exit status %d: %w: %s", commandString, exitErr.ExitCode(), exitErr, stderrText)
 		}
-		return "", fmt.Errorf("command %q failed: %v: %s", commandString, err, stderrText)
+		return "", fmt.Errorf("command %q failed: %w: %s", commandString, err, stderrText)
 	}
 
 	// Decode the result

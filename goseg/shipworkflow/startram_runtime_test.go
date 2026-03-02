@@ -12,13 +12,9 @@ import (
 func TestDefaultDispatchUrbitPayloadRoutesToggleNetwork(t *testing.T) {
 	t.Parallel()
 
-	originalDispatch := dispatchStartramToggleNetworkFn
-	defer func() {
-		dispatchStartramToggleNetworkFn = originalDispatch
-	}()
-
 	var gotPatp string
-	dispatchStartramToggleNetworkFn = func(patp string) error {
+	runtime := defaultStartramRuntime()
+	runtime.dispatchStartramToggleNetworkFn = func(patp string) error {
 		gotPatp = patp
 		return nil
 	}
@@ -29,7 +25,7 @@ func TestDefaultDispatchUrbitPayloadRoutesToggleNetwork(t *testing.T) {
 			Patp:   "~zod",
 		},
 	}
-	if err := defaultDispatchUrbitPayload(payload); err != nil {
+	if err := dispatchUrbitPayloadWithRuntime(runtime, payload); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if gotPatp != "~zod" {
@@ -77,7 +73,7 @@ func TestDefaultDispatchUrbitPayloadValidatesAction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := defaultDispatchUrbitPayload(tt.pay)
+			err := dispatchUrbitPayloadWithRuntime(defaultStartramRuntime(), tt.pay)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -89,22 +85,10 @@ func TestDefaultDispatchUrbitPayloadValidatesAction(t *testing.T) {
 }
 
 func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
-	originalRuntimeFn := startramRuntimeFn
-	originalToggleNetworkFn := dispatchStartramToggleNetworkFn
-	originalDispatchUrbitPayloadFn := startramDispatchUrbitPayloadFn
-
-	var dispatched []string
 	var updateConfCalled bool
+	var dispatched []string
 
-	dispatchStartramToggleNetworkFn = func(patp string) error {
-		dispatched = append(dispatched, patp)
-		return nil
-	}
-	startramDispatchUrbitPayloadFn = func(payload structs.WsUrbitPayload) error {
-		return dispatchStartramToggleNetworkFn(payload.Payload.Patp)
-	}
-
-	runtime := orchestration.NewRuntime(
+	runtimeConfig := orchestration.NewRuntime(
 		orchestration.WithSnapshotOps(orchestration.RuntimeSnapshotOps{
 			StartramSettingsSnapshotFn: func() config.StartramSettings {
 				return config.StartramSettings{
@@ -134,25 +118,31 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 		}),
 	)
 
-	startramRuntimeFn = func() orchestration.StartramRuntime {
-		return orchestration.StartramRuntime{
-			StartramSettingsSnapshotFn: runtime.StartramSettingsSnapshotFn,
-			UrbitConfFn:                runtime.UrbitConfFn,
-			UpdateConfTypedFn:          runtime.UpdateConfTypedFn,
-			StopContainerByNameFn:      runtime.StopContainerByNameFn,
-			DeleteContainerFn:          runtime.DeleteContainerFn,
-			LoadMCFn:                   runtime.LoadMCFn,
-			LoadMinIOsFn:               runtime.LoadMinIOsFn,
-		}
+	toggleFn := func(patp string) error {
+		dispatched = append(dispatched, patp)
+		return nil
 	}
-	defer func() {
-		startramRuntimeFn = originalRuntimeFn
-		startramDispatchUrbitPayloadFn = originalDispatchUrbitPayloadFn
-		dispatchStartramToggleNetworkFn = originalToggleNetworkFn
-	}()
 
-	if err := HandleStartramToggle(); err != nil {
-		t.Fatalf("HandleStartramToggle() returned error: %v", err)
+	runtime := startramRuntime{
+		dispatchStartramToggleNetworkFn: toggleFn,
+		startramDispatchUrbitPayloadFn: func(payload structs.WsUrbitPayload) error {
+			return toggleFn(payload.Payload.Patp)
+		},
+		startramRuntimeFn: func() orchestration.StartramRuntime {
+			return orchestration.StartramRuntime{
+				StartramSettingsSnapshotFn: runtimeConfig.StartramSettingsSnapshotFn,
+				UrbitConfFn:                runtimeConfig.UrbitConfFn,
+				UpdateConfTypedFn:          runtimeConfig.UpdateConfTypedFn,
+				StopContainerByNameFn:      runtimeConfig.StopContainerByNameFn,
+				DeleteContainerFn:          runtimeConfig.DeleteContainerFn,
+				LoadMCFn:                   runtimeConfig.LoadMCFn,
+				LoadMinIOsFn:               runtimeConfig.LoadMinIOsFn,
+			}
+		},
+	}
+
+	if err := runStartramToggleWithRuntime(runtime); err != nil {
+		t.Fatalf("runStartramToggleWithRuntime() returned error: %v", err)
 	}
 
 	if !updateConfCalled {

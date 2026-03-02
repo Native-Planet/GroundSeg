@@ -11,28 +11,40 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func resetLoggerGlobalsForTest(t *testing.T) {
-	t.Helper()
-	originalLogPath := LogPath
-	originalSysSessions := SysLogSessions()
-	originalToRemove := SysSessionsToRemove()
+type testSystemLogSink struct {
+	ch chan []byte
+}
 
+func (sink *testSystemLogSink) PublishSystemLog(payload []byte) {
+	sink.ch <- payload
+}
+
+func resetSystemLogSinkForTest(t *testing.T, ch chan []byte) {
+	t.Helper()
+	originalSink := sysLogSink
+	configureSystemLogSink(&testSystemLogSink{ch: ch})
 	t.Cleanup(func() {
-		LogPath = originalLogPath
-		SetSysLogSessions(originalSysSessions)
-		SetSysSessionsToRemove(originalToRemove)
+		configureSystemLogSink(originalSink)
 	})
 }
 
-func drainSysLogChannel() {
+func resetLoggerGlobalsForTest(t *testing.T) {
+	t.Helper()
+	originalLogPath := LogPath
+
+	t.Cleanup(func() {
+		LogPath = originalLogPath
+	})
+}
+
+func drainSystemLogChannel(ch chan []byte) {
 	for {
 		select {
-		case <-SysLogChannel:
+		case <-ch:
 		default:
 			return
 		}
@@ -40,7 +52,9 @@ func drainSysLogChannel() {
 }
 
 func TestChanWriterWritePublishesBytes(t *testing.T) {
-	drainSysLogChannel()
+	systemLogs := make(chan []byte, 2)
+	resetSystemLogSinkForTest(t, systemLogs)
+	drainSystemLogChannel(systemLogs)
 
 	writer := ChanWriter{}
 	payload := []byte(`{"msg":"hello"}`)
@@ -53,12 +67,12 @@ func TestChanWriterWritePublishesBytes(t *testing.T) {
 	}
 
 	select {
-	case got := <-SysLogChannel:
+	case got := <-systemLogs:
 		if !reflect.DeepEqual(got, payload) {
 			t.Fatalf("unexpected channel payload: got %q want %q", got, payload)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for SysLogChannel write")
+		t.Fatal("timed out waiting for system log sink write")
 	}
 }
 
@@ -213,25 +227,6 @@ func TestBuildLoggerRespectsLevel(t *testing.T) {
 	}
 	if entry := logger.Check(zapcore.DebugLevel, "dbg"); entry != nil {
 		t.Fatalf("unexpected debug logs to be enabled with error-level logger")
-	}
-}
-
-func TestRemoveSysSessionsDropsQueuedConnections(t *testing.T) {
-	resetLoggerGlobalsForTest(t)
-
-	a := &websocket.Conn{}
-	b := &websocket.Conn{}
-	c := &websocket.Conn{}
-	SetSysLogSessions([]*websocket.Conn{a, b, c})
-	SetSysSessionsToRemove([]*websocket.Conn{b})
-
-	RemoveSysSessions()
-
-	if !reflect.DeepEqual(SysLogSessions(), []*websocket.Conn{a, c}) {
-		t.Fatalf("unexpected remaining sessions: %+v", SysLogSessions())
-	}
-	if len(SysSessionsToRemove()) != 0 {
-		t.Fatalf("expected SysSessionsToRemove to be cleared, got %+v", SysSessionsToRemove())
 	}
 }
 

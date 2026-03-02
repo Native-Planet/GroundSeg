@@ -177,11 +177,11 @@ func ListHardDisks() (structs.LSBLKDevice, error) {
 	var dev structs.LSBLKDevice
 	out, err := runDiskCommandFn("lsblk", "-f", "--json", "--bytes")
 	if err != nil {
-		return dev, fmt.Errorf("Failed to lsblk: %v", err)
+		return dev, fmt.Errorf("Failed to lsblk: %w", err)
 	}
 	err = json.Unmarshal([]byte(out), &dev)
 	if err != nil {
-		return dev, fmt.Errorf("Failed to unmarshal lsblk json: %v", err)
+		return dev, fmt.Errorf("Failed to unmarshal lsblk json: %w", err)
 	}
 	return dev, nil
 }
@@ -196,69 +196,77 @@ func IsDevMounted(dev structs.BlockDev) bool {
 }
 
 func CreateGroundSegFilesystem(sel string) (string, error) {
-	// Check for the existence of /groundseg-1 and increment if it exists
-	var dirName string
-	var dirPath string
+	dirPath, err := nextGroundSegPath()
+	if err != nil {
+		return "", err
+	}
+	if err := mkdirFn(dirPath, 0755); err != nil {
+		return "", fmt.Errorf("Failed to create directory %s: %w", dirPath, err)
+	}
+	fsID, err := formatGroundSegFilesystem(sel)
+	if err != nil {
+		return "", err
+	}
+	if err := reconcileGroundSegFstab(sel, dirPath, fsID); err != nil {
+		return "", err
+	}
+	return dirPath, nil
+}
+
+func nextGroundSegPath() (string, error) {
 	for i := 1; ; i++ {
-		dirName = fmt.Sprintf("groundseg-%d", i)
-		dirPath = "/" + dirName
-		exists, err := filePathExists(dirPath)
+		path := fmt.Sprintf("/groundseg-%d", i)
+		exists, err := filePathExists(path)
 		if err != nil {
 			return "", err
 		}
 		if !exists {
-			break
+			return path, nil
 		}
 	}
-	// Create the directory since it doesn't exist
-	err := mkdirFn(dirPath, 0755)
-	if err != nil {
-		return "", fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
-	}
-	// Create an ext4 filesystem on this drive using it in its entirety.
-	devPath := "/dev/" + sel
-	uuid := uuid.NewString()
-	// Run the command and wait for it to complete
-	err = mkfsExt4CommandFn(uuid, devPath)
-	if err != nil {
-		return "", fmt.Errorf("Failed to create ext4 filesystem: %v", err)
-	}
+}
 
-	// make sure to retrieve blockDevices AFTER creating the new fs!
-	// this is so that the UUID is updated
+func formatGroundSegFilesystem(sel string) (string, error) {
+	devPath := "/dev/" + sel
+	fsID := uuid.NewString()
+	if err := mkfsExt4CommandFn(fsID, devPath); err != nil {
+		return "", fmt.Errorf("Failed to create ext4 filesystem: %w", err)
+	}
+	return fsID, nil
+}
+
+func reconcileGroundSegFstab(sel string, dirPath string, fsID string) error {
 	blockDevices, err := ListHardDisks()
 	if err != nil {
-		return "", fmt.Errorf("Failed to retrieve block devices: %v", err)
+		return fmt.Errorf("Failed to retrieve block devices: %w", err)
 	}
 	for _, dev := range blockDevices.BlockDevices {
-		if dev.Name == sel {
-			rawLines, err := readFstabLines("/etc/fstab")
-			if err != nil {
-				return "", fmt.Errorf("Error opening fstab: %v", err)
-			}
-
-			reconciledLines, changed := reconcileFstabLines(rawLines, fstabRecord{
-				Device:     "UUID=" + uuid,
-				MountPoint: dirPath,
-				FSType:     "ext4",
-				Options:    "defaults,nofail",
-				Dump:       "0",
-				Pass:       "2",
-			})
-			if changed {
-				if err := writeFstabLines("/etc/fstab", reconciledLines); err != nil {
-					return "", fmt.Errorf("Error writing to fstab: %v", err)
-				}
-			}
-
-			// Mount the newly created ext4 filesystem at /groundseg-<n>
-			err = mountAllCommandFn()
-			if err != nil {
-				return "", fmt.Errorf("Failed to mount filesystem: %v", err)
+		if dev.Name != sel {
+			continue
+		}
+		rawLines, err := readFstabLines("/etc/fstab")
+		if err != nil {
+			return fmt.Errorf("Error opening fstab: %w", err)
+		}
+		reconciledLines, changed := reconcileFstabLines(rawLines, fstabRecord{
+			Device:     "UUID=" + fsID,
+			MountPoint: dirPath,
+			FSType:     "ext4",
+			Options:    "defaults,nofail",
+			Dump:       "0",
+			Pass:       "2",
+		})
+		if changed {
+			if err := writeFstabLines("/etc/fstab", reconciledLines); err != nil {
+				return fmt.Errorf("Error writing to fstab: %w", err)
 			}
 		}
+		if err := mountAllCommandFn(); err != nil {
+			return fmt.Errorf("Failed to mount filesystem: %w", err)
+		}
+		break
 	}
-	return dirPath, nil
+	return nil
 }
 
 func filePathExists(path string) (bool, error) {
@@ -276,7 +284,7 @@ func RemoveMultipartFiles(path string) error {
 	// Read the contents of the directory
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		return fmt.Errorf("failed to read directory: %v", err)
+		return fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	// Iterate through the contents
@@ -288,7 +296,7 @@ func RemoveMultipartFiles(path string) error {
 			// Remove the file
 			err := os.Remove(filePath)
 			if err != nil {
-				return fmt.Errorf("failed to remove file %s: %v", filePath, err)
+				return fmt.Errorf("failed to remove file %s: %w", filePath, err)
 			}
 			zap.L().Debug(fmt.Sprintf("Removed file: %s", filePath))
 		}
@@ -308,7 +316,7 @@ func SetupTmpDir() error {
 	// check if /tmp is on emmc
 	mmc, err := isMountedMMCFn(symlink)
 	if err != nil {
-		return fmt.Errorf("failed to check check /tmp mountpoint: %v", err)
+		return fmt.Errorf("failed to check check /tmp mountpoint: %w", err)
 	}
 
 	// is mounted on emmc
@@ -317,7 +325,7 @@ func SetupTmpDir() error {
 		tmpDir, err := lstatFn(symlink)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				return fmt.Errorf("failed to get /tmp info: %v", err)
+				return fmt.Errorf("failed to get /tmp info: %w", err)
 			}
 		} else {
 			isSym = tmpDir.Mode()&os.ModeSymlink != 0
@@ -328,17 +336,17 @@ func SetupTmpDir() error {
 			altDir := "/media/data/tmp"
 			// make alt dir
 			if err := mkdirAllFn(altDir, 1777); err != nil {
-				return fmt.Errorf("failed to create alternate tmp directory: %v", err)
+				return fmt.Errorf("failed to create alternate tmp directory: %w", err)
 			}
 
 			// delete /tmp
 			if err := removeAllFn(symlink); err != nil {
-				return fmt.Errorf("failed to remove %v: %v", symlink, err)
+				return fmt.Errorf("failed to remove %v: %w", symlink, err)
 			}
 
 			// create symlink
 			if err := symlinkFn(altDir, symlink); err != nil {
-				return fmt.Errorf("failed to create symlink from %v to %v: %v", altDir, symlink, err)
+				return fmt.Errorf("failed to create symlink from %v to %v: %w", altDir, symlink, err)
 			}
 		}
 	}
@@ -348,7 +356,7 @@ func SetupTmpDir() error {
 func IsMountedMMC(dirPath string) (bool, error) {
 	partitions, err := listPartitionsFn(true)
 	if err != nil {
-		return false, fmt.Errorf("failed to get list of partitions: %v", err)
+		return false, fmt.Errorf("failed to get list of partitions: %w", err)
 	}
 	/*
 		the outer loop loops from child up the unix path

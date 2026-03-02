@@ -5,6 +5,7 @@ import (
 	"groundseg/backupsvc"
 	"groundseg/click"
 	"groundseg/config"
+	"groundseg/docker/network"
 	"groundseg/docker/orchestration"
 	"groundseg/startram"
 	"groundseg/structs"
@@ -35,13 +36,15 @@ type collectorRuntime struct {
 
 func defaultCollectorRuntime() collectorRuntime {
 	return collectorRuntime{
-		loadUrbitConfigFn:        config.LoadUrbitConfig,
-		urbitConfFn:              config.UrbitConf,
-		getContainerStatsFn:      orchestration.GetContainerStats,
-		getContainerImageTagFn:   orchestration.GetContainerImageTag,
-		getMinIOLinkedStatusFn:   config.GetMinIOLinkedStatus,
-		getMinIOPasswordFn:       config.GetMinIOPassword,
-		getContainerNetworkFn:    orchestration.GetContainerNetwork,
+		loadUrbitConfigFn:      config.LoadUrbitConfig,
+		urbitConfFn:            config.UrbitConf,
+		getContainerStatsFn:    orchestration.GetContainerStats,
+		getContainerImageTagFn: orchestration.GetContainerImageTag,
+		getMinIOLinkedStatusFn: config.GetMinIOLinkedStatus,
+		getMinIOPasswordFn:     config.GetMinIOPassword,
+		getContainerNetworkFn: func(name string) (string, error) {
+			return network.NewNetworkRuntime().GetContainerNetwork(name)
+		},
 		getContainerShipStatusFn: orchestration.GetShipStatus,
 		lusCodeFn:                click.GetLusCode,
 		getDeskFn:                click.GetDesk,
@@ -50,10 +53,10 @@ func defaultCollectorRuntime() collectorRuntime {
 
 // ConstructPierInfo builds the urbit entries for broadcast state.
 func ConstructPierInfo(existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
- 	return constructPierInfoWithRuntime(defaultCollectorRuntime(), existingUrbits, scheduled)
+	return constructPierInfo(defaultCollectorRuntime(), existingUrbits, scheduled)
 }
 
-func constructPierInfoWithRuntime(runtime collectorRuntime, existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
+func constructPierInfo(runtime collectorRuntime, existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
 	settings := config.StartramSettingsSnapshot()
 	piers := settings.Piers
 	sgContext := wireguardContext{
@@ -62,15 +65,15 @@ func constructPierInfoWithRuntime(runtime collectorRuntime, existingUrbits map[s
 	}
 
 	backups := backupSnapshotForPiers(piers, config.GetStartramConfig().Backups)
-	rtSnapshot, err := runtimeSnapshotForPiersWithRuntime(runtime, piers, existingUrbits)
+	rtSnapshot, err := runtimeSnapshotForPiersForRuntime(runtime, piers, existingUrbits)
 	if err != nil {
 		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
 		zap.L().Error(errmsg)
 		return nil, err
 	}
 	startramSnapshot := startramSnapshotForPiers(config.GetStartramConfig().Subdomains)
-	deploymentInputs := collectUrbitDeploymentInputsForPiersWithRuntime(runtime, piers, rtSnapshot.hostName, sgContext, startramSnapshot)
-	runtimeInputs := collectUrbitRuntimeInputsForPiersWithRuntime(
+	deploymentInputs := collectUrbitDeploymentInputsForPiersForRuntime(runtime, piers, rtSnapshot.hostName, sgContext, startramSnapshot)
+	runtimeInputs := collectUrbitRuntimeInputsForPiersForRuntime(
 		runtime,
 		rtSnapshot.pierStatus,
 		urbitRuntimeContext{
@@ -79,7 +82,7 @@ func constructPierInfoWithRuntime(runtime collectorRuntime, existingUrbits map[s
 		},
 		scheduled,
 	)
-	return composeUrbitViewsWithRuntime(piers, runtimeInputs, deploymentInputs, backups), nil
+	return composeUrbitViewsForRuntime(piers, runtimeInputs, deploymentInputs, backups), nil
 }
 
 func ConstructAppsInfo() structs.Apps {
@@ -171,13 +174,13 @@ func localBackupsForPeriod(piers []string, period string) structs.Backup {
 }
 
 func runtimeSnapshotForPiers(piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
-	return runtimeSnapshotForPiersWithRuntime(defaultCollectorRuntime(), piers, urbits)
+	return runtimeSnapshotForPiersForRuntime(defaultCollectorRuntime(), piers, urbits)
 }
 
-func runtimeSnapshotForPiersWithRuntime(runtime collectorRuntime, piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
+func runtimeSnapshotForPiersForRuntime(runtime collectorRuntime, piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
 	snapshot := pierRuntimeSnapshot{
 		currentState: urbits,
-		shipNetworks: getContainerNetworksWithRuntime(runtime.getContainerNetworkFn, piers),
+		shipNetworks: getContainerNetworksWithLookup(runtime.getContainerNetworkFn, piers),
 		hostName:     resolveBroadcastHostName(),
 	}
 	pierStatus, err := runtime.getContainerShipStatusFn(piers)
@@ -223,7 +226,7 @@ func normalizePackSchedule(meldDay string, meldDate int) (string, int) {
 	return packDay, packDate
 }
 
-func collectUrbitDeploymentInputsWithRuntime(
+func collectUrbitDeploymentInputsForRuntime(
 	runtime collectorRuntime,
 	pier string,
 	hostName string,
@@ -279,7 +282,7 @@ func collectUrbitDeploymentInputs(
 	wireguardCtx wireguardContext,
 	startramSnapshot pierStartramSnapshot,
 ) (urbitDeploymentInputs, bool) {
-	return collectUrbitDeploymentInputsWithRuntime(defaultCollectorRuntime(), pier, hostName, wireguardCtx, startramSnapshot)
+	return collectUrbitDeploymentInputsForRuntime(defaultCollectorRuntime(), pier, hostName, wireguardCtx, startramSnapshot)
 }
 
 func collectUrbitDeploymentInputsForPiers(
@@ -288,7 +291,7 @@ func collectUrbitDeploymentInputsForPiers(
 	wireguardCtx wireguardContext,
 	startramSnapshot pierStartramSnapshot,
 ) map[string]urbitDeploymentInputs {
-	return collectUrbitDeploymentInputsForPiersWithRuntime(
+	return collectUrbitDeploymentInputsForPiersForRuntime(
 		defaultCollectorRuntime(),
 		piers,
 		hostName,
@@ -297,7 +300,7 @@ func collectUrbitDeploymentInputsForPiers(
 	)
 }
 
-func collectUrbitDeploymentInputsForPiersWithRuntime(
+func collectUrbitDeploymentInputsForPiersForRuntime(
 	runtime collectorRuntime,
 	piers []string,
 	hostName string,
@@ -306,7 +309,7 @@ func collectUrbitDeploymentInputsForPiersWithRuntime(
 ) map[string]urbitDeploymentInputs {
 	inputs := make(map[string]urbitDeploymentInputs, len(piers))
 	for _, pier := range piers {
-		deploymentInputs, ok := collectUrbitDeploymentInputsWithRuntime(runtime, pier, hostName, wireguardCtx, startramSnapshot)
+		deploymentInputs, ok := collectUrbitDeploymentInputsForRuntime(runtime, pier, hostName, wireguardCtx, startramSnapshot)
 		if !ok {
 			continue
 		}
@@ -320,7 +323,7 @@ type urbitRuntimeContext struct {
 	shipNetworks   map[string]string
 }
 
-func collectUrbitRuntimeInputsWithRuntime(
+func collectUrbitRuntimeInputsForRuntime(
 	runtime collectorRuntime,
 	pier, status string,
 	rtContext urbitRuntimeContext,
@@ -331,7 +334,7 @@ func collectUrbitRuntimeInputsWithRuntime(
 		existing = existingUrbit
 	}
 	isRunning := status == "Up" || strings.HasPrefix(status, "Up ")
-	lusCode, err := lusCodeIfRunningWithRuntime(runtime, pier, status)
+	lusCode, err := lusCodeForRuntime(runtime, pier, status)
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Unable to resolve +code for %s: %v", pier, err))
 	}
@@ -346,8 +349,8 @@ func collectUrbitRuntimeInputsWithRuntime(
 		network:           rtContext.shipNetworks[pier],
 		isRunning:         isRunning,
 		lusCode:           lusCode,
-		penpaiCompanion:   deskInstalledIfRunningWithRuntime(runtime, pier, status, "penpai"),
-		gallsegInstalled:  deskInstalledIfRunningWithRuntime(runtime, pier, status, "groundseg"),
+		penpaiCompanion:   deskInstalledForRuntime(runtime, pier, status, "penpai"),
+		gallsegInstalled:  deskInstalledForRuntime(runtime, pier, status, "groundseg"),
 		packUnixTime:      packUnixTime,
 	}
 }
@@ -357,7 +360,7 @@ func collectUrbitRuntimeInputs(
 	rtContext urbitRuntimeContext,
 	getScheduledPack func(string) time.Time,
 ) urbitRuntimeInputs {
-	return collectUrbitRuntimeInputsWithRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
+	return collectUrbitRuntimeInputsForRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
 }
 
 func collectUrbitRuntimeInputsForPiers(
@@ -367,12 +370,12 @@ func collectUrbitRuntimeInputsForPiers(
 ) map[string]urbitRuntimeInputs {
 	inputs := make(map[string]urbitRuntimeInputs, len(pierStatus))
 	for pier, status := range pierStatus {
-		inputs[pier] = collectUrbitRuntimeInputsWithRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
+		inputs[pier] = collectUrbitRuntimeInputsForRuntime(defaultCollectorRuntime(), pier, status, rtContext, getScheduledPack)
 	}
 	return inputs
 }
 
-func collectUrbitRuntimeInputsForPiersWithRuntime(
+func collectUrbitRuntimeInputsForPiersForRuntime(
 	runtime collectorRuntime,
 	pierStatus map[string]string,
 	rtContext urbitRuntimeContext,
@@ -380,7 +383,7 @@ func collectUrbitRuntimeInputsForPiersWithRuntime(
 ) map[string]urbitRuntimeInputs {
 	inputs := make(map[string]urbitRuntimeInputs, len(pierStatus))
 	for pier, status := range pierStatus {
-		inputs[pier] = collectUrbitRuntimeInputsWithRuntime(runtime, pier, status, rtContext, getScheduledPack)
+		inputs[pier] = collectUrbitRuntimeInputsForRuntime(runtime, pier, status, rtContext, getScheduledPack)
 	}
 	return inputs
 }
@@ -425,10 +428,10 @@ func composeUrbitViews(
 	deploymentInputs map[string]urbitDeploymentInputs,
 	backups pierBackupSnapshot,
 ) map[string]structs.Urbit {
-	return composeUrbitViewsWithRuntime(piers, runtimeInputs, deploymentInputs, backups)
+	return composeUrbitViewsForRuntime(piers, runtimeInputs, deploymentInputs, backups)
 }
 
-func composeUrbitViewsWithRuntime(
+func composeUrbitViewsForRuntime(
 	piers []string,
 	runtimeInputs map[string]urbitRuntimeInputs,
 	deploymentInputs map[string]urbitDeploymentInputs,
@@ -457,7 +460,7 @@ func composeUrbitViewsWithRuntime(
 	return updates
 }
 
-func lusCodeIfRunningWithRuntime(runtime collectorRuntime, pier, status string) (string, error) {
+func lusCodeForRuntime(runtime collectorRuntime, pier, status string) (string, error) {
 	if !transition.IsContainerUpStatus(status) {
 		return "", nil
 	}
@@ -469,10 +472,10 @@ func lusCodeIfRunningWithRuntime(runtime collectorRuntime, pier, status string) 
 }
 
 func lusCodeIfRunning(pier string, status string) (string, error) {
-	return lusCodeIfRunningWithRuntime(defaultCollectorRuntime(), pier, status)
+	return lusCodeForRuntime(defaultCollectorRuntime(), pier, status)
 }
 
-func deskInstalledIfRunningWithRuntime(runtime collectorRuntime, pier, status, desk string) bool {
+func deskInstalledForRuntime(runtime collectorRuntime, pier, status, desk string) bool {
 	if !transition.IsContainerUpStatus(status) {
 		return false
 	}
@@ -485,7 +488,7 @@ func deskInstalledIfRunningWithRuntime(runtime collectorRuntime, pier, status, d
 }
 
 func deskInstalledIfRunning(pier, status, desk string) bool {
-	return deskInstalledIfRunningWithRuntime(defaultCollectorRuntime(), pier, status, desk)
+	return deskInstalledForRuntime(defaultCollectorRuntime(), pier, status, desk)
 }
 
 type urbitDeploymentInputs struct {
@@ -745,10 +748,10 @@ func (systemInfoCollector) collect() structs.System {
 }
 
 func getContainerNetworks(containers []string) map[string]string {
-	return getContainerNetworksWithRuntime(defaultCollectorRuntime().getContainerNetworkFn, containers)
+	return getContainerNetworksWithLookup(defaultCollectorRuntime().getContainerNetworkFn, containers)
 }
 
-func getContainerNetworksWithRuntime(getContainerNetworkFn func(string) (string, error), containers []string) map[string]string {
+func getContainerNetworksWithLookup(getContainerNetworkFn func(string) (string, error), containers []string) map[string]string {
 	res := make(map[string]string)
 	for _, container := range containers {
 		network, err := getContainerNetworkFn(container)

@@ -17,11 +17,15 @@ func resetWifiSeamsForTest(t *testing.T) {
 	origRun := runCommandForWiFi
 	origIfCheck := ifCheckForWiFi
 	origWifiNew := wifiNewClientForWiFi
+	origInterfaces := wifiClientInterfaces
+	origBSS := wifiClientBSS
 	t.Cleanup(func() {
 		execCommandForWiFi = origExec
 		runCommandForWiFi = origRun
 		ifCheckForWiFi = origIfCheck
 		wifiNewClientForWiFi = origWifiNew
+		wifiClientInterfaces = origInterfaces
+		wifiClientBSS = origBSS
 	})
 }
 
@@ -42,6 +46,41 @@ func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 	want := []string{"wlan0", "wlan1"}
 	if !reflect.DeepEqual(devices, want) {
 		t.Fatalf("unexpected wifi devices: got %v want %v", devices, want)
+	}
+}
+
+func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
+	resetWifiSeamsForTest(t)
+
+	called := 0
+	bssCalled := 0
+	wifiClientInterfaces = func(c *wifi.Client) ([]*wifi.Interface, error) {
+		_ = c
+		called++
+		return []*wifi.Interface{{Name: "wlan1", Type: wifi.InterfaceTypeStation}}, nil
+	}
+	wifiClientBSS = func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) {
+		_ = c
+		_ = iface
+		bssCalled++
+		return &wifi.BSS{}, nil
+	}
+
+	ssid, err := getConnectedSSID(&wifi.Client{}, "wlan0")
+	if err == nil {
+		t.Fatal("expected getConnectedSSID to fail when interface is missing")
+	}
+	if !errors.Is(err, errWifiInterfaceNotFound) {
+		t.Fatalf("expected wifi interface not found error, got: %v", err)
+	}
+	if ssid != "" {
+		t.Fatalf("expected empty ssid on missing interface, got %q", ssid)
+	}
+	if called != 1 {
+		t.Fatalf("unexpected direct interface call count: %d", called)
+	}
+	if bssCalled != 0 {
+		t.Fatalf("expected BSS lookup to be skipped when interface is missing: %d", bssCalled)
 	}
 }
 
@@ -125,7 +164,11 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 		}
 		return "", nil
 	}
-	if !ifCheck() {
+	wifiEnabled, err := ifCheck()
+	if err != nil {
+		t.Fatalf("ifCheck returned error: %v", err)
+	}
+	if !wifiEnabled {
 		t.Fatal("expected ifCheck to return true when nmcli output contains enabled")
 	}
 
@@ -133,14 +176,20 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 		t.Fatalf("ToggleDevice(off) returned error: %v", err)
 	}
 
-	ifCheckForWiFi = func() bool { return false }
+	ifCheckForWiFi = func() (bool, error) {
+		return false, nil
+	}
 	if err := ToggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(on) returned error: %v", err)
 	}
 
 	runCommandForWiFi = func(string, ...string) (string, error) { return "", errors.New("nmcli error") }
-	if ifCheck() {
-		t.Fatal("expected ifCheck to return false when command errors")
+	wifiEnabled, err = ifCheck()
+	if err == nil {
+		t.Fatal("expected ifCheck to return error when command fails")
+	}
+	if wifiEnabled {
+		t.Fatal("expected ifCheck to default to false when command fails")
 	}
 }
 

@@ -54,7 +54,7 @@ func GetDisk() (map[string][2]uint64, error) {
 	diskUsageMap := make(map[string][2]uint64)
 	file, err := os.Open("/proc/mounts")
 	if err != nil {
-		return diskUsageMap, err
+		return diskUsageMap, fmt.Errorf("open /proc/mounts: %w", err)
 	}
 	defer file.Close()
 	getDiskLabel := func(device string) (string, string) {
@@ -111,7 +111,7 @@ func GetDisk() (map[string][2]uint64, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return diskUsageMap, err
+		return diskUsageMap, fmt.Errorf("read /proc/mounts: %w", err)
 	}
 	return diskUsageMap, nil
 }
@@ -187,7 +187,7 @@ func FixerScript(basePath string) error {
 			zap.L().Info("Fixer script not detected, creating")
 			err := ioutil.WriteFile(fixer, []byte(defaults.Fixer), 0755)
 			if err != nil {
-				return err
+				return fmt.Errorf("create fixer script %q: %w", fixer, err)
 			}
 		}
 		//make it a cron
@@ -196,7 +196,7 @@ func FixerScript(basePath string) error {
 			cronJob := fmt.Sprintf("*/5 * * * * /bin/bash %s\n", fixer)
 			err := addCron(cronJob)
 			if err != nil {
-				return err
+				return fmt.Errorf("setup fixer cron: %w", err)
 			}
 		} else {
 			zap.L().Info("Fixer cron found. Doing nothing")
@@ -217,7 +217,7 @@ func cronExists(fixerPath string) bool {
 func addCron(job string) error {
 	tmpfile, err := ioutil.TempFile("", "cron")
 	if err != nil {
-		return err
+		return fmt.Errorf("create temporary crontab file: %w", err)
 	}
 	defer os.Remove(tmpfile.Name())
 	out, err := exec.Command("crontab", "-l").Output()
@@ -246,5 +246,8 @@ func runCommand(command string, args ...string) (string, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	return out.String(), err
+	if err != nil {
+		return out.String(), fmt.Errorf("run command %q: %w", command, err)
+	}
+	return out.String(), nil
 }

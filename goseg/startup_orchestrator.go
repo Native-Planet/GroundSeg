@@ -11,9 +11,13 @@ import (
 	"groundseg/handler/router"
 	groundSystem "groundseg/handler/system"
 	"groundseg/importer"
+	"groundseg/internal/seams"
 	"groundseg/leak"
+	"groundseg/logger"
 	"groundseg/rectify"
 	"groundseg/routines"
+	"groundseg/routines/logstream"
+	"groundseg/session"
 	"groundseg/startram"
 	"groundseg/startupdeps"
 	"groundseg/system"
@@ -102,156 +106,139 @@ func runStartupSubsystems(steps []startupSubsystemStep) error {
 
 func (runtime startupRuntime) startupInitSubsystems() []startupSubsystemStep {
 	return []startupSubsystemStep{
-		startupSubsystemRequiredStep("initialize config subsystem", runtime.initializeConfigFn),
-		startupSubsystemAction("initialize auth subsystem", startupSubsystemRequired, runtime.initializeAuthFn),
-		startupSubsystemAction("initialize router subsystem", startupSubsystemRequired, runtime.initializeRouterFn),
-		startupSubsystemAction("initialize system support subsystem", startupSubsystemRequired, runtime.initializeSystemSupportFn),
-		startupSubsystemRequiredStep("initialize exporter subsystem", runtime.initializeExporterFn),
-		startupSubsystemRequiredStep("initialize importer subsystem", runtime.initializeImporterFn),
-		startupSubsystemOptionalStep("initialize wifi subsystem", runtime.initializeWiFiFn),
-		startupSubsystemAction("start mDNS server", startupSubsystemOptional, runtime.startMDNSServerFn),
-		startupSubsystemOptionalStep("enable systemd-resolved", runtime.initializeResolvedFn),
-		startupSubsystemRequiredStep("initialize broadcast subsystem", runtime.initializeBroadcastFn),
-		startupSubsystemRequiredStep("initialize docker subsystem", runtime.initializeDockerFn),
+		startupSubsystemRequiredStep("initialize config subsystem", runtime.Initialization.InitializeConfigFn),
+		startupSubsystemAction("initialize auth subsystem", startupSubsystemRequired, runtime.Initialization.InitializeAuthFn),
+		startupSubsystemAction("initialize router subsystem", startupSubsystemRequired, runtime.Initialization.InitializeRouterFn),
+		startupSubsystemAction("initialize system support subsystem", startupSubsystemRequired, runtime.Initialization.InitializeSystemSupportFn),
+		startupSubsystemRequiredStep("initialize exporter subsystem", runtime.Initialization.InitializeExporterFn),
+		startupSubsystemRequiredStep("initialize importer subsystem", runtime.Initialization.InitializeImporterFn),
+		startupSubsystemOptionalStep("initialize wifi subsystem", runtime.Initialization.InitializeWiFiFn),
+		startupSubsystemAction("start mDNS server", startupSubsystemOptional, runtime.Initialization.StartMDNSServerFn),
+		startupSubsystemOptionalStep("enable systemd-resolved", runtime.Initialization.InitializeResolvedFn),
+		startupSubsystemRequiredStep("initialize broadcast subsystem", runtime.Initialization.InitializeBroadcastFn),
+		startupSubsystemRequiredStep("initialize docker subsystem", runtime.Initialization.InitializeDockerFn),
 		startupSubsystemOptionalStep("network reachability", func() error {
-			if runtime.networkReachabilityFn == nil {
+			if runtime.Control.NetworkReachabilityFn == nil {
 				return nil
 			}
-			internetAvailable := runtime.networkReachabilityFn(cloudCheckHost)
+			internetAvailable := runtime.Control.NetworkReachabilityFn(cloudCheckHost)
 			zap.L().Info(fmt.Sprintf("Internet available: %t", internetAvailable))
 			return nil
 		}),
 		startupSubsystemOptionalStep("swap configuration", func() error {
 			return applySwapAndTmpDirSettings(runtime)
 		}),
-		startupSubsystemAction("prime rekor key", startupSubsystemOptional, runtime.primeRekorKeyFn),
+		startupSubsystemAction("prime rekor key", startupSubsystemOptional, runtime.Initialization.PrimeRekorKeyFn),
 	}
 }
 
 type startupRuntime struct {
-	initializeConfigFn        func() error
-	startConfigEventLoopFn    func(context.Context) error
-	initializeAuthFn          func() error
-	initializeRouterFn        func() error
-	initializeSystemSupportFn func() error
-	initializeExporterFn      func() error
-	initializeImporterFn      func() error
-	initializeBroadcastFn     func() error
-	initializeResolvedFn      func() error
-	initializeDockerFn        func() error
-	startStartupContainersFn  func(bool)
-	networkReachabilityFn     func(string) bool
-	configureSwapFn           func(string, int) error
-	setupTmpDirFn             func() error
-	startMDNSServerFn         func() error
-	initializeWiFiFn          func() error
-	primeRekorKeyFn           func() error
+	Initialization startupSubsystemInitializationRuntime
+	Control        startupRuntimeControlRuntime
+}
+
+type startupSubsystemInitializationRuntime struct {
+	InitializeConfigFn        func() error
+	InitializeAuthFn          func() error
+	InitializeRouterFn        func() error
+	InitializeSystemSupportFn func() error
+	InitializeExporterFn      func() error
+	InitializeImporterFn      func() error
+	InitializeBroadcastFn     func() error
+	InitializeResolvedFn      func() error
+	InitializeDockerFn        func() error
+	StartMDNSServerFn         func() error
+	InitializeWiFiFn          func() error
+	PrimeRekorKeyFn           func() error
+}
+
+type startupRuntimeControlRuntime struct {
+	StartConfigEventLoopFn   func(context.Context) error
+	StartStartupContainersFn func(bool)
+	NetworkReachabilityFn    func(string) bool
+	ConfigureSwapFn          func(string, int) error
+	SetupTmpDirFn            func() error
 }
 
 func defaultStartupRuntime() startupRuntime {
 	return startupRuntime{
-		initializeConfigFn:     config.Initialize,
-		startConfigEventLoopFn: func(ctx context.Context) error { return config.StartConfEventLoop(ctx, system.ConfChannel) },
-		initializeAuthFn: func() error {
-			auth.Initialize()
-			return nil
+		Initialization: startupSubsystemInitializationRuntime{
+			InitializeConfigFn: config.Initialize,
+			InitializeAuthFn: func() error {
+				auth.Initialize()
+				return nil
+			},
+			InitializeRouterFn: func() error {
+				router.Initialize()
+				return nil
+			},
+			InitializeSystemSupportFn: func() error {
+				groundSystem.InitializeSupport()
+				return nil
+			},
+			InitializeExporterFn:  func() error { return exporter.Initialize() },
+			InitializeImporterFn:  func() error { return importer.Initialize() },
+			InitializeBroadcastFn: func() error { return startupdeps.InitializeBroadcast() },
+			InitializeResolvedFn:  func() error { return system.EnableResolved() },
+			InitializeDockerFn:    func() error { return startupdeps.NewStartupDockerRuntime().Initialize() },
+			StartMDNSServerFn:     func() error { routines.StartMDNSServer(); return nil },
+			InitializeWiFiFn:      func() error { return system.InitializeWiFi() },
+			PrimeRekorKeyFn:       func() error { routines.PrimeRekorKey(); return nil },
 		},
-		initializeRouterFn: func() error {
-			router.Initialize()
-			return nil
+		Control: startupRuntimeControlRuntime{
+			StartConfigEventLoopFn:   func(ctx context.Context) error { return config.StartConfEventLoop(ctx, system.ConfChannel) },
+			StartStartupContainersFn: func(bool) {},
+			NetworkReachabilityFn:    config.NetCheck,
+			ConfigureSwapFn:          system.ConfigureSwap,
+			SetupTmpDirFn:            func() error { return system.SetupTmpDir() },
 		},
-		initializeSystemSupportFn: func() error {
-			groundSystem.InitializeSupport()
-			return nil
-		},
-		initializeExporterFn:     func() error { return exporter.Initialize() },
-		initializeImporterFn:     func() error { return importer.Initialize() },
-		initializeBroadcastFn:    func() error { return startupdeps.InitializeBroadcast() },
-		initializeResolvedFn:     func() error { return system.EnableResolved() },
-		initializeDockerFn:       func() error { return startupdeps.NewStartupDockerRuntime().Initialize() },
-		startStartupContainersFn: func(bool) {},
-		networkReachabilityFn:    config.NetCheck,
-		configureSwapFn:          system.ConfigureSwap,
-		setupTmpDirFn:            func() error { return system.SetupTmpDir() },
-		startMDNSServerFn:        func() error { routines.StartMDNSServer(); return nil },
-		initializeWiFiFn:         func() error { return system.InitializeWiFi() },
-		primeRekorKeyFn:          func() error { routines.PrimeRekorKey(); return nil },
 	}
 }
 
 func (runtime startupRuntime) withDefaults(opts startupRuntime) startupRuntime {
-	merged := runtime
-	setIfNonNil(&merged.initializeConfigFn, opts.initializeConfigFn)
-	setIfNonNil(&merged.startConfigEventLoopFn, opts.startConfigEventLoopFn)
-	setIfNonNil(&merged.initializeAuthFn, opts.initializeAuthFn)
-	setIfNonNil(&merged.initializeRouterFn, opts.initializeRouterFn)
-	setIfNonNil(&merged.initializeSystemSupportFn, opts.initializeSystemSupportFn)
-	setIfNonNil(&merged.initializeExporterFn, opts.initializeExporterFn)
-	setIfNonNil(&merged.initializeImporterFn, opts.initializeImporterFn)
-	setIfNonNil(&merged.initializeBroadcastFn, opts.initializeBroadcastFn)
-	setIfNonNil(&merged.initializeResolvedFn, opts.initializeResolvedFn)
-	setIfNonNil(&merged.initializeDockerFn, opts.initializeDockerFn)
-	setIfNonNil(&merged.startStartupContainersFn, opts.startStartupContainersFn)
-	setIfNonNil(&merged.networkReachabilityFn, opts.networkReachabilityFn)
-	setIfNonNil(&merged.configureSwapFn, opts.configureSwapFn)
-	setIfNonNil(&merged.setupTmpDirFn, opts.setupTmpDirFn)
-	setIfNonNil(&merged.startMDNSServerFn, opts.startMDNSServerFn)
-	setIfNonNil(&merged.initializeWiFiFn, opts.initializeWiFiFn)
-	setIfNonNil(&merged.primeRekorKeyFn, opts.primeRekorKeyFn)
-	return merged
+	return seams.Merge(runtime, opts)
 }
 
 func (runtime startBackgroundServicesRuntime) withDefaults(opts startBackgroundServicesRuntime) startBackgroundServicesRuntime {
-	merged := runtime
-	setIfNonNil(&merged.startVersionSubsystemFn, opts.startVersionSubsystemFn)
-	setIfNonNil(&merged.startDockerSubsystemFn, opts.startDockerSubsystemFn)
-	setIfNonNil(&merged.startUrbitTransitionHandlerFn, opts.startUrbitTransitionHandlerFn)
-	setIfNonNil(&merged.startSystemTransitionHandlerFn, opts.startSystemTransitionHandlerFn)
-	setIfNonNil(&merged.startNewShipTransitionHandlerFn, opts.startNewShipTransitionHandlerFn)
-	setIfNonNil(&merged.startImportShipTransitionHandlerFn, opts.startImportShipTransitionHandlerFn)
-	setIfNonNil(&merged.startRectifyUrbitFn, opts.startRectifyUrbitFn)
-	setIfNonNil(&merged.syncRetrieveFn, opts.syncRetrieveFn)
-	setIfNonNil(&merged.startLeakFn, opts.startLeakFn)
-	setIfNonNil(&merged.startSysLogStreamerFn, opts.startSysLogStreamerFn)
-	setIfNonNil(&merged.startDockerLogStreamerFn, opts.startDockerLogStreamerFn)
-	setIfNonNil(&merged.startDockerLogConnRemoverFn, opts.startDockerLogConnRemoverFn)
-	setIfNonNil(&merged.startOldLogsCleanerFn, opts.startOldLogsCleanerFn)
-	setIfNonNil(&merged.startDiskUsageWarningFn, opts.startDiskUsageWarningFn)
-	setIfNonNil(&merged.startSmartDiskCheckFn, opts.startSmartDiskCheckFn)
-	setIfNonNil(&merged.startStartramRenewalReminderFn, opts.startStartramRenewalReminderFn)
-	setIfNonNil(&merged.startPackScheduleLoopFn, opts.startPackScheduleLoopFn)
-	setIfNonNil(&merged.startChopRoutinesFn, opts.startChopRoutinesFn)
-	setIfNonNil(&merged.startBackupRoutinesFn, opts.startBackupRoutinesFn)
-	return merged
-}
-
-func setIfNonNil[T any](target *T, value T) {
-	if any(value) == nil {
-		return
-	}
-	*target = value
+	return seams.Merge(runtime, opts)
 }
 
 type startBackgroundServicesRuntime struct {
-	startVersionSubsystemFn            func(context.Context) error
-	startDockerSubsystemFn             func(context.Context) error
-	startUrbitTransitionHandlerFn      func(context.Context) error
-	startSystemTransitionHandlerFn     func(context.Context) error
-	startNewShipTransitionHandlerFn    func(context.Context) error
-	startImportShipTransitionHandlerFn func(context.Context) error
-	startRectifyUrbitFn                func(context.Context) error
-	syncRetrieveFn                     func() error
-	startLeakFn                        func(context.Context) error
-	startSysLogStreamerFn              func(context.Context) error
-	startDockerLogStreamerFn           func(context.Context) error
-	startDockerLogConnRemoverFn        func(context.Context) error
-	startOldLogsCleanerFn              func(context.Context) error
-	startDiskUsageWarningFn            func(context.Context) error
-	startSmartDiskCheckFn              func(context.Context) error
-	startStartramRenewalReminderFn     func(context.Context) error
-	startPackScheduleLoopFn            func(context.Context) error
-	startChopRoutinesFn                func(context.Context) error
-	startBackupRoutinesFn              func(context.Context) error
+	Transition  transitionBackgroundServicesRuntime
+	Streaming   streamingBackgroundServicesRuntime
+	Maintenance maintenanceBackgroundServicesRuntime
+	Startram    startramBackgroundServicesRuntime
+}
+
+type transitionBackgroundServicesRuntime struct {
+	StartVersionSubsystemFn            func(context.Context) error
+	StartDockerSubsystemFn             func(context.Context) error
+	StartUrbitTransitionHandlerFn      func(context.Context) error
+	StartSystemTransitionHandlerFn     func(context.Context) error
+	StartNewShipTransitionHandlerFn    func(context.Context) error
+	StartImportShipTransitionHandlerFn func(context.Context) error
+	StartRectifyUrbitFn                func(context.Context) error
+	StartLeakFn                        func(context.Context) error
+}
+
+type streamingBackgroundServicesRuntime struct {
+	StartSysLogStreamerFn       func(context.Context) error
+	StartDockerLogStreamerFn    func(context.Context) error
+	StartDockerLogConnRemoverFn func(context.Context) error
+}
+
+type maintenanceBackgroundServicesRuntime struct {
+	StartOldLogsCleanerFn   func(context.Context) error
+	StartDiskUsageWarningFn func(context.Context) error
+	StartSmartDiskCheckFn   func(context.Context) error
+	StartPackScheduleLoopFn func(context.Context) error
+	StartChopRoutinesFn     func(context.Context) error
+	StartBackupRoutinesFn   func(context.Context) error
+}
+
+type startramBackgroundServicesRuntime struct {
+	SyncRetrieveFn                 func() error
+	StartStartramRenewalReminderFn func(context.Context) error
 }
 
 func syncRetrieveWithStartram() error {
@@ -262,36 +249,12 @@ func syncRetrieveWithStartram() error {
 type startupTaskID string
 
 func (runtime startupRuntime) validate() error {
-	missing := make([]string, 0, 10)
-	if runtime.initializeConfigFn == nil {
-		missing = append(missing, "initializeConfig")
+	var missing []string
+	for _, err := range runtime.Initialization.validate() {
+		missing = append(missing, err)
 	}
-	if runtime.initializeAuthFn == nil {
-		missing = append(missing, "initializeAuth")
-	}
-	if runtime.initializeRouterFn == nil {
-		missing = append(missing, "initializeRouter")
-	}
-	if runtime.initializeSystemSupportFn == nil {
-		missing = append(missing, "initializeSystemSupport")
-	}
-	if runtime.initializeExporterFn == nil {
-		missing = append(missing, "initializeExporter")
-	}
-	if runtime.initializeImporterFn == nil {
-		missing = append(missing, "initializeImporter")
-	}
-	if runtime.initializeBroadcastFn == nil {
-		missing = append(missing, "initializeBroadcast")
-	}
-	if runtime.initializeDockerFn == nil {
-		missing = append(missing, "initializeDocker")
-	}
-	if runtime.startStartupContainersFn == nil {
-		missing = append(missing, "startStartupContainers")
-	}
-	if runtime.networkReachabilityFn == nil {
-		missing = append(missing, "isNetworkReachable")
+	if err := runtime.Control.validate(); err != nil {
+		missing = append(missing, err.Error())
 	}
 	if len(missing) == 0 {
 		return nil
@@ -299,71 +262,159 @@ func (runtime startupRuntime) validate() error {
 	return fmt.Errorf("startup runtime missing required callbacks: %s", strings.Join(missing, ", "))
 }
 
-func (runtime startBackgroundServicesRuntime) validate(startramWgRegistered bool) error {
+func (runtime startupSubsystemInitializationRuntime) validate() []string {
 	missing := make([]string, 0, 8)
-	if runtime.startVersionSubsystemFn == nil {
-		missing = append(missing, "startVersionSubsystem")
+	if runtime.InitializeConfigFn == nil {
+		missing = append(missing, "initializeConfig")
 	}
-	if runtime.startDockerSubsystemFn == nil {
-		missing = append(missing, "startDockerSubsystem")
+	if runtime.InitializeAuthFn == nil {
+		missing = append(missing, "initializeAuth")
 	}
-	if runtime.startUrbitTransitionHandlerFn == nil {
-		missing = append(missing, "startUrbitTransitionHandler")
+	if runtime.InitializeRouterFn == nil {
+		missing = append(missing, "initializeRouter")
 	}
-	if runtime.startSystemTransitionHandlerFn == nil {
-		missing = append(missing, "startSystemTransitionHandler")
+	if runtime.InitializeSystemSupportFn == nil {
+		missing = append(missing, "initializeSystemSupport")
 	}
-	if runtime.startNewShipTransitionHandlerFn == nil {
-		missing = append(missing, "startNewShipTransitionHandler")
+	if runtime.InitializeExporterFn == nil {
+		missing = append(missing, "initializeExporter")
 	}
-	if runtime.startImportShipTransitionHandlerFn == nil {
-		missing = append(missing, "startImportShipTransitionHandler")
+	if runtime.InitializeImporterFn == nil {
+		missing = append(missing, "initializeImporter")
 	}
-	if runtime.startRectifyUrbitFn == nil {
-		missing = append(missing, "startRectifyUrbit")
+	if runtime.InitializeBroadcastFn == nil {
+		missing = append(missing, "initializeBroadcast")
 	}
-	if runtime.startLeakFn == nil {
-		missing = append(missing, "startLeak")
+	if runtime.InitializeDockerFn == nil {
+		missing = append(missing, "initializeDocker")
 	}
-	if runtime.startSysLogStreamerFn == nil {
-		missing = append(missing, "startSysLogStreamer")
+	return missing
+}
+
+func (runtime startupRuntimeControlRuntime) validate() error {
+	missing := make([]string, 0, 2)
+	if runtime.StartStartupContainersFn == nil {
+		missing = append(missing, "startStartupContainers")
 	}
-	if runtime.startDockerLogStreamerFn == nil {
-		missing = append(missing, "startDockerLogStreamer")
+	if runtime.NetworkReachabilityFn == nil {
+		missing = append(missing, "isNetworkReachable")
 	}
-	if runtime.startDockerLogConnRemoverFn == nil {
-		missing = append(missing, "startDockerLogConnRemover")
+	if len(missing) == 0 {
+		return nil
 	}
-	if runtime.startOldLogsCleanerFn == nil {
-		missing = append(missing, "startOldLogsCleaner")
+	return fmt.Errorf("startup runtime control runtime missing required callbacks: %s", strings.Join(missing, ", "))
+}
+
+func (runtime startBackgroundServicesRuntime) validate(startramWgRegistered bool) error {
+	var missing []string
+	if err := runtime.Transition.validate(); err != nil {
+		missing = append(missing, err.Error())
 	}
-	if runtime.startDiskUsageWarningFn == nil {
-		missing = append(missing, "startDiskUsageWarning")
+	if err := runtime.Streaming.validate(); err != nil {
+		missing = append(missing, err.Error())
 	}
-	if runtime.startSmartDiskCheckFn == nil {
-		missing = append(missing, "startSmartDiskCheck")
+	if err := runtime.Maintenance.validate(); err != nil {
+		missing = append(missing, err.Error())
 	}
-	if runtime.startPackScheduleLoopFn == nil {
-		missing = append(missing, "startPackScheduleLoop")
-	}
-	if runtime.startChopRoutinesFn == nil {
-		missing = append(missing, "startChopRoutines")
-	}
-	if runtime.startBackupRoutinesFn == nil {
-		missing = append(missing, "startBackupRoutines")
-	}
-	if startramWgRegistered {
-		if runtime.syncRetrieveFn == nil {
-			missing = append(missing, "syncRetrieve")
-		}
-		if runtime.startStartramRenewalReminderFn == nil {
-			missing = append(missing, "startStartramRenewalReminder")
-		}
+	if err := runtime.Startram.validate(startramWgRegistered); err != nil {
+		missing = append(missing, err.Error())
 	}
 	if len(missing) == 0 {
 		return nil
 	}
 	return fmt.Errorf("start background services runtime missing required callbacks: %s", strings.Join(missing, ", "))
+}
+
+func (runtime transitionBackgroundServicesRuntime) validate() error {
+	missing := make([]string, 0, 7)
+	if runtime.StartVersionSubsystemFn == nil {
+		missing = append(missing, "startVersionSubsystem")
+	}
+	if runtime.StartDockerSubsystemFn == nil {
+		missing = append(missing, "startDockerSubsystem")
+	}
+	if runtime.StartUrbitTransitionHandlerFn == nil {
+		missing = append(missing, "startUrbitTransitionHandler")
+	}
+	if runtime.StartSystemTransitionHandlerFn == nil {
+		missing = append(missing, "startSystemTransitionHandler")
+	}
+	if runtime.StartNewShipTransitionHandlerFn == nil {
+		missing = append(missing, "startNewShipTransitionHandler")
+	}
+	if runtime.StartImportShipTransitionHandlerFn == nil {
+		missing = append(missing, "startImportShipTransitionHandler")
+	}
+	if runtime.StartRectifyUrbitFn == nil {
+		missing = append(missing, "startRectifyUrbit")
+	}
+	if runtime.StartLeakFn == nil {
+		missing = append(missing, "startLeak")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("start transition background services runtime missing required callbacks: %s", strings.Join(missing, ", "))
+}
+
+func (runtime streamingBackgroundServicesRuntime) validate() error {
+	missing := make([]string, 0, 3)
+	if runtime.StartSysLogStreamerFn == nil {
+		missing = append(missing, "startSysLogStreamer")
+	}
+	if runtime.StartDockerLogStreamerFn == nil {
+		missing = append(missing, "startDockerLogStreamer")
+	}
+	if runtime.StartDockerLogConnRemoverFn == nil {
+		missing = append(missing, "startDockerLogConnRemover")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("start streaming background services runtime missing required callbacks: %s", strings.Join(missing, ", "))
+}
+
+func (runtime maintenanceBackgroundServicesRuntime) validate() error {
+	missing := make([]string, 0, 6)
+	if runtime.StartOldLogsCleanerFn == nil {
+		missing = append(missing, "startOldLogsCleaner")
+	}
+	if runtime.StartDiskUsageWarningFn == nil {
+		missing = append(missing, "startDiskUsageWarning")
+	}
+	if runtime.StartSmartDiskCheckFn == nil {
+		missing = append(missing, "startSmartDiskCheck")
+	}
+	if runtime.StartPackScheduleLoopFn == nil {
+		missing = append(missing, "startPackScheduleLoop")
+	}
+	if runtime.StartChopRoutinesFn == nil {
+		missing = append(missing, "startChopRoutines")
+	}
+	if runtime.StartBackupRoutinesFn == nil {
+		missing = append(missing, "startBackupRoutines")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("start maintenance background services runtime missing required callbacks: %s", strings.Join(missing, ", "))
+}
+
+func (runtime startramBackgroundServicesRuntime) validate(startramWgRegistered bool) error {
+	if !startramWgRegistered {
+		return nil
+	}
+	missing := make([]string, 0, 2)
+	if runtime.SyncRetrieveFn == nil {
+		missing = append(missing, "syncRetrieve")
+	}
+	if runtime.StartStartramRenewalReminderFn == nil {
+		missing = append(missing, "startStartramRenewalReminder")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("start startram background services runtime missing required callbacks: %s", strings.Join(missing, ", "))
 }
 
 type startupPhase struct {
@@ -618,8 +669,8 @@ func newStartupOrchestrator(opts startupOptions) startupOrchestrator {
 			required:     true,
 			startFn: func(ctx context.Context) error {
 				updateSettings := config.UpdateSettingsSnapshot()
-				if opts.startupRuntime.startConfigEventLoopFn != nil {
-					if err := opts.startupRuntime.startConfigEventLoopFn(ctx); err != nil {
+				if opts.startupRuntime.Control.StartConfigEventLoopFn != nil {
+					if err := opts.startupRuntime.Control.StartConfigEventLoopFn(ctx); err != nil {
 						return fmt.Errorf("start config event loop failed: %w", err)
 					}
 				}
@@ -632,7 +683,7 @@ func newStartupOrchestrator(opts startupOptions) startupOrchestrator {
 				backgroundServices = services
 
 				waitForVersionDiscovery(remoteVersion, versionUpdateChannel, updateSettings.UpdateBranch)
-				opts.startupRuntime.startStartupContainersFn(startramSettings.WgRegistered)
+				opts.startupRuntime.Control.StartStartupContainersFn(startramSettings.WgRegistered)
 				return nil
 			},
 			healthFn: func(ctx context.Context) error {
@@ -662,21 +713,21 @@ func applySwapAndTmpDirSettings(runtimeOps startupRuntime) error {
 	swapSettings := config.SwapSettingsSnapshot()
 	var startupErrs []error
 	zap.L().Info(fmt.Sprintf("Setting up swap %v for %vG", swapSettings.SwapFile, swapSettings.SwapVal))
-	if runtimeOps.configureSwapFn == nil {
+	if runtimeOps.Control.ConfigureSwapFn == nil {
 		return nil
 	}
-	if err := runtimeOps.configureSwapFn(swapSettings.SwapFile, swapSettings.SwapVal); err != nil {
+	if err := runtimeOps.Control.ConfigureSwapFn(swapSettings.SwapFile, swapSettings.SwapVal); err != nil {
 		zap.L().Error(fmt.Sprintf("Unable to set swap: %v", err))
 		startupErrs = append(startupErrs, fmt.Errorf("unable to set swap: %w", err))
 	}
 	zap.L().Info("Setting up /tmp directory")
-	if runtimeOps.setupTmpDirFn == nil {
+	if runtimeOps.Control.SetupTmpDirFn == nil {
 		if len(startupErrs) == 0 {
 			return nil
 		}
 		return fmt.Errorf("unable to setup swap or /tmp: %w", errors.Join(startupErrs...))
 	}
-	if err := runtimeOps.setupTmpDirFn(); err != nil {
+	if err := runtimeOps.Control.SetupTmpDirFn(); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to setup /tmp: %v", err))
 		startupErrs = append(startupErrs, fmt.Errorf("unable to setup /tmp: %w", err))
 	}
@@ -723,6 +774,9 @@ func startBackgroundServicesWithRuntime(ctx context.Context, startramWgRegistere
 	if err := runtime.validate(startramWgRegistered); err != nil {
 		return nil, err
 	}
+	systemRuntime := session.LogstreamRuntimeState()
+	logger.ConfigureLogstreamRuntime(systemRuntime)
+	logstream.Configure(systemRuntime, systemRuntime.SystemLogMessages())
 	services := &startupBackgroundServices{}
 	if startC2cCheck != nil {
 		services.add(superviseBackgroundService(ctx, "c2c-check", func(ctx context.Context) error {
@@ -730,16 +784,16 @@ func startBackgroundServicesWithRuntime(ctx context.Context, startramWgRegistere
 			return nil
 		}))
 	}
-	services.add(superviseBackgroundService(ctx, "version", runtime.startVersionSubsystemFn))
-	services.add(superviseBackgroundService(ctx, "docker", runtime.startDockerSubsystemFn))
-	services.add(superviseBackgroundService(ctx, "urbit-transition", runtime.startUrbitTransitionHandlerFn))
-	services.add(superviseBackgroundService(ctx, "system-transition", runtime.startSystemTransitionHandlerFn))
-	services.add(superviseBackgroundService(ctx, "new-ship-transition", runtime.startNewShipTransitionHandlerFn))
-	services.add(superviseBackgroundService(ctx, "import-ship-transition", runtime.startImportShipTransitionHandlerFn))
-	services.add(superviseBackgroundService(ctx, "rectify", runtime.startRectifyUrbitFn))
+	services.add(superviseBackgroundService(ctx, "version", runtime.Transition.StartVersionSubsystemFn))
+	services.add(superviseBackgroundService(ctx, "docker", runtime.Transition.StartDockerSubsystemFn))
+	services.add(superviseBackgroundService(ctx, "urbit-transition", runtime.Transition.StartUrbitTransitionHandlerFn))
+	services.add(superviseBackgroundService(ctx, "system-transition", runtime.Transition.StartSystemTransitionHandlerFn))
+	services.add(superviseBackgroundService(ctx, "new-ship-transition", runtime.Transition.StartNewShipTransitionHandlerFn))
+	services.add(superviseBackgroundService(ctx, "import-ship-transition", runtime.Transition.StartImportShipTransitionHandlerFn))
+	services.add(superviseBackgroundService(ctx, "rectify", runtime.Transition.StartRectifyUrbitFn))
 	if startramWgRegistered {
 		syncHandle := superviseBackgroundService(ctx, "startram-sync", func(_ context.Context) error {
-			return runtime.syncRetrieveFn()
+			return runtime.Startram.SyncRetrieveFn()
 		})
 		services.add(syncHandle)
 		select {
@@ -750,43 +804,51 @@ func startBackgroundServicesWithRuntime(ctx context.Context, startramWgRegistere
 		default:
 		}
 	}
-	services.add(superviseBackgroundService(ctx, "leak", runtime.startLeakFn))
-	services.add(superviseBackgroundService(ctx, "sys-log-streamer", runtime.startSysLogStreamerFn))
-	services.add(superviseBackgroundService(ctx, "docker-log-streamer", runtime.startDockerLogStreamerFn))
-	services.add(superviseBackgroundService(ctx, "docker-log-conn-remover", runtime.startDockerLogConnRemoverFn))
-	services.add(superviseBackgroundService(ctx, "old-logs-cleaner", runtime.startOldLogsCleanerFn))
-	services.add(superviseBackgroundService(ctx, "disk-usage-warning", runtime.startDiskUsageWarningFn))
-	services.add(superviseBackgroundService(ctx, "smart-disk-check", runtime.startSmartDiskCheckFn))
+	services.add(superviseBackgroundService(ctx, "leak", runtime.Transition.StartLeakFn))
+	services.add(superviseBackgroundService(ctx, "sys-log-streamer", runtime.Streaming.StartSysLogStreamerFn))
+	services.add(superviseBackgroundService(ctx, "docker-log-streamer", runtime.Streaming.StartDockerLogStreamerFn))
+	services.add(superviseBackgroundService(ctx, "docker-log-conn-remover", runtime.Streaming.StartDockerLogConnRemoverFn))
+	services.add(superviseBackgroundService(ctx, "old-logs-cleaner", runtime.Maintenance.StartOldLogsCleanerFn))
+	services.add(superviseBackgroundService(ctx, "disk-usage-warning", runtime.Maintenance.StartDiskUsageWarningFn))
+	services.add(superviseBackgroundService(ctx, "smart-disk-check", runtime.Maintenance.StartSmartDiskCheckFn))
 	if startramWgRegistered {
-		services.add(superviseBackgroundService(ctx, "startram-renewal", runtime.startStartramRenewalReminderFn))
+		services.add(superviseBackgroundService(ctx, "startram-renewal", runtime.Startram.StartStartramRenewalReminderFn))
 	}
-	services.add(superviseBackgroundService(ctx, "pack-schedule", runtime.startPackScheduleLoopFn))
-	services.add(superviseBackgroundService(ctx, "chop-routines", runtime.startChopRoutinesFn))
-	services.add(superviseBackgroundService(ctx, "backup-routines", runtime.startBackupRoutinesFn))
+	services.add(superviseBackgroundService(ctx, "pack-schedule", runtime.Maintenance.StartPackScheduleLoopFn))
+	services.add(superviseBackgroundService(ctx, "chop-routines", runtime.Maintenance.StartChopRoutinesFn))
+	services.add(superviseBackgroundService(ctx, "backup-routines", runtime.Maintenance.StartBackupRoutinesFn))
 	return services, nil
 }
 
 func defaultStartBackgroundServicesRuntime() startBackgroundServicesRuntime {
 	return startBackgroundServicesRuntime{
-		startVersionSubsystemFn:            routines.StartVersionSubsystemWithContext,
-		startDockerSubsystemFn:             subsystem.StartDockerSubsystemWithContext,
-		startUrbitTransitionHandlerFn:      rectify.UrbitTransitionHandlerWithContext,
-		startSystemTransitionHandlerFn:     rectify.SystemTransitionHandlerWithContext,
-		startNewShipTransitionHandlerFn:    rectify.NewShipTransitionHandlerWithContext,
-		startImportShipTransitionHandlerFn: rectify.ImportShipTransitionHandlerWithContext,
-		startRectifyUrbitFn:                rectify.RectifyUrbitWithContext,
-		syncRetrieveFn:                     syncRetrieveWithStartram,
-		startLeakFn:                        leak.StartLeakWithContext,
-		startSysLogStreamerFn:              routines.SysLogStreamerWithContext,
-		startDockerLogStreamerFn:           routines.DockerLogStreamerWithContext,
-		startDockerLogConnRemoverFn:        routines.DockerLogConnRemoverWithContext,
-		startOldLogsCleanerFn:              routines.OldLogsCleanerWithContext,
-		startDiskUsageWarningFn:            routines.DiskUsageWarningWithContext,
-		startSmartDiskCheckFn:              routines.SmartDiskCheckWithContext,
-		startStartramRenewalReminderFn:     routines.StartramRenewalReminderWithContext,
-		startPackScheduleLoopFn:            routines.PackScheduleLoopWithContext,
-		startChopRoutinesFn:                routines.StartChopRoutinesWithContext,
-		startBackupRoutinesFn:              routines.StartBackupRoutinesWithContext,
+		Transition: transitionBackgroundServicesRuntime{
+			StartVersionSubsystemFn:            routines.StartVersionSubsystemWithContext,
+			StartDockerSubsystemFn:             subsystem.StartDockerSubsystemWithContext,
+			StartUrbitTransitionHandlerFn:      rectify.UrbitTransitionHandlerWithContext,
+			StartSystemTransitionHandlerFn:     rectify.SystemTransitionHandlerWithContext,
+			StartNewShipTransitionHandlerFn:    rectify.NewShipTransitionHandlerWithContext,
+			StartImportShipTransitionHandlerFn: rectify.ImportShipTransitionHandlerWithContext,
+			StartRectifyUrbitFn:                rectify.RectifyUrbitWithContext,
+			StartLeakFn:                        leak.StartLeakWithContext,
+		},
+		Streaming: streamingBackgroundServicesRuntime{
+			StartSysLogStreamerFn:       logstream.SysLogStreamerWithContext,
+			StartDockerLogStreamerFn:    logstream.DockerLogStreamerWithContext,
+			StartDockerLogConnRemoverFn: logstream.DockerLogConnRemoverWithContext,
+		},
+		Maintenance: maintenanceBackgroundServicesRuntime{
+			StartOldLogsCleanerFn:   logstream.OldLogsCleanerWithContext,
+			StartDiskUsageWarningFn: routines.DiskUsageWarningWithContext,
+			StartSmartDiskCheckFn:   routines.SmartDiskCheckWithContext,
+			StartPackScheduleLoopFn: routines.PackScheduleLoopWithContext,
+			StartChopRoutinesFn:     routines.StartChopRoutinesWithContext,
+			StartBackupRoutinesFn:   routines.StartBackupRoutinesWithContext,
+		},
+		Startram: startramBackgroundServicesRuntime{
+			SyncRetrieveFn:                 syncRetrieveWithStartram,
+			StartStartramRenewalReminderFn: routines.StartramRenewalReminderWithContext,
+		},
 	}
 }
 

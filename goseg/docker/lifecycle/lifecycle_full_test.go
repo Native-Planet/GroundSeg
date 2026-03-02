@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 )
 
 func TestNewRuntimeSetsDefaultsAndAcceptsOverrides(t *testing.T) {
@@ -36,7 +37,7 @@ func TestNewRuntimeSetsDefaultsAndAcceptsOverrides(t *testing.T) {
 }
 
 func TestIsContainerLookupNotFoundChecksText(t *testing.T) {
-	if !isContainerLookupNotFound(errors.New("container with name netdata not found")) {
+	if !isContainerLookupNotFound(errdefs.NotFound(errors.New("container netdata not found"))) {
 		t.Fatal("expected missing-container error to be identified")
 	}
 	if isContainerLookupNotFound(errors.New("daemon disconnected")) {

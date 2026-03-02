@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"groundseg/config"
+	"groundseg/docker/network"
 	"groundseg/docker/orchestration"
 	"groundseg/shipcreator"
 	"os"
@@ -44,7 +45,7 @@ func RollbackProvisioning(patp string, opts RollbackOptions) error {
 			rollbackErrors = append(rollbackErrors, fmt.Errorf("remove custom pier path %s: %w", opts.CustomPierPath, err))
 		}
 	} else {
-		if err := orchestration.DeleteVolume(patp); err != nil {
+		if err := network.NewNetworkRuntime().DeleteVolume(patp); err != nil {
 			rollbackErrors = append(rollbackErrors, fmt.Errorf("delete docker volume %s: %w", patp, err))
 		}
 	}

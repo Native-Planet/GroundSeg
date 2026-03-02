@@ -54,22 +54,26 @@ func TestRunStartupSubsystemSkipsDisabledSubsystem(t *testing.T) {
 
 func TestBootstrapRequiresStartupRuntimeCallbacks(t *testing.T) {
 	runtime := startupRuntime{
-		// initializeConfigFn intentionally omitted
-		initializeAuthFn:          func() error { return nil },
-		initializeRouterFn:        func() error { return nil },
-		initializeSystemSupportFn: func() error { return nil },
-		initializeExporterFn:      func() error { return nil },
-		initializeImporterFn:      func() error { return nil },
-		initializeBroadcastFn:     func() error { return nil },
-		initializeResolvedFn:      func() error { return nil },
-		initializeDockerFn:        func() error { return nil },
-		startStartupContainersFn:  func(bool) {},
-		networkReachabilityFn:     func(string) bool { return true },
-		configureSwapFn:           func(string, int) error { return nil },
-		setupTmpDirFn:             func() error { return nil },
-		startMDNSServerFn:         func() error { return nil },
-		initializeWiFiFn:          func() error { return nil },
-		primeRekorKeyFn:           func() error { return nil },
+		// InitializeConfigFn intentionally omitted
+		Initialization: startupSubsystemInitializationRuntime{
+			InitializeAuthFn:          func() error { return nil },
+			InitializeRouterFn:        func() error { return nil },
+			InitializeSystemSupportFn: func() error { return nil },
+			InitializeExporterFn:      func() error { return nil },
+			InitializeImporterFn:      func() error { return nil },
+			InitializeBroadcastFn:     func() error { return nil },
+			InitializeResolvedFn:      func() error { return nil },
+			InitializeDockerFn:        func() error { return nil },
+			StartMDNSServerFn:        func() error { return nil },
+			InitializeWiFiFn:          func() error { return nil },
+			PrimeRekorKeyFn:           func() error { return nil },
+		},
+		Control: startupRuntimeControlRuntime{
+			StartStartupContainersFn: func(bool) {},
+			NetworkReachabilityFn:    func(string) bool { return true },
+			ConfigureSwapFn:          func(string, int) error { return nil },
+			SetupTmpDirFn:            func() error { return nil },
+		},
 	}
 	if err := runtime.validate(); err == nil {
 		t.Fatal("expected startup runtime validation failure when required callbacks are missing")
@@ -91,25 +95,33 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 	c2cCalled := make(chan struct{}, 1)
 
 	runtime := startBackgroundServicesRuntime{
-		startVersionSubsystemFn:            func(context.Context) error { calls <- "version"; return nil },
-		startDockerSubsystemFn:             func(context.Context) error { calls <- "docker"; return nil },
-		startUrbitTransitionHandlerFn:      func(context.Context) error { calls <- "urbit"; return nil },
-		startSystemTransitionHandlerFn:     func(context.Context) error { return nil },
-		startNewShipTransitionHandlerFn:    func(context.Context) error { return nil },
-		startImportShipTransitionHandlerFn: func(context.Context) error { calls <- "import"; return nil },
-		startRectifyUrbitFn:                func(context.Context) error { calls <- "rectify"; return nil },
-		syncRetrieveFn:                     func() error { calls <- "sync"; return nil },
-		startLeakFn:                        func(context.Context) error { calls <- "leak"; return nil },
-		startDockerLogStreamerFn:           func(context.Context) error { calls <- "logstream"; return nil },
-		startDockerLogConnRemoverFn:        func(context.Context) error { return nil },
-		startSysLogStreamerFn:              func(context.Context) error { return nil },
-		startOldLogsCleanerFn:              func(context.Context) error { return nil },
-		startDiskUsageWarningFn:            func(context.Context) error { return nil },
-		startSmartDiskCheckFn:              func(context.Context) error { return nil },
-		startStartramRenewalReminderFn:     func(context.Context) error { return nil },
-		startPackScheduleLoopFn:            func(context.Context) error { return nil },
-		startChopRoutinesFn:                func(context.Context) error { return nil },
-		startBackupRoutinesFn:              func(context.Context) error { return nil },
+		Transition: transitionBackgroundServicesRuntime{
+			StartVersionSubsystemFn:            func(context.Context) error { calls <- "version"; return nil },
+			StartDockerSubsystemFn:             func(context.Context) error { calls <- "docker"; return nil },
+			StartUrbitTransitionHandlerFn:      func(context.Context) error { calls <- "urbit"; return nil },
+			StartSystemTransitionHandlerFn:     func(context.Context) error { return nil },
+			StartNewShipTransitionHandlerFn:    func(context.Context) error { return nil },
+			StartImportShipTransitionHandlerFn: func(context.Context) error { calls <- "import"; return nil },
+			StartRectifyUrbitFn:                func(context.Context) error { calls <- "rectify"; return nil },
+			StartLeakFn:                        func(context.Context) error { calls <- "leak"; return nil },
+		},
+		Streaming: streamingBackgroundServicesRuntime{
+			StartDockerLogStreamerFn:    func(context.Context) error { calls <- "logstream"; return nil },
+			StartDockerLogConnRemoverFn: func(context.Context) error { return nil },
+			StartSysLogStreamerFn:       func(context.Context) error { return nil },
+		},
+		Maintenance: maintenanceBackgroundServicesRuntime{
+			StartOldLogsCleanerFn:   func(context.Context) error { return nil },
+			StartDiskUsageWarningFn: func(context.Context) error { return nil },
+			StartSmartDiskCheckFn:   func(context.Context) error { return nil },
+			StartPackScheduleLoopFn: func(context.Context) error { return nil },
+			StartChopRoutinesFn:     func(context.Context) error { return nil },
+			StartBackupRoutinesFn:   func(context.Context) error { return nil },
+		},
+		Startram: startramBackgroundServicesRuntime{
+			SyncRetrieveFn:                func() error { calls <- "sync"; return nil },
+			StartStartramRenewalReminderFn: func(context.Context) error { return nil },
+		},
 	}
 
 	services, err := startBackgroundServicesWithRuntime(context.Background(), true, func(_ context.Context) {
@@ -150,28 +162,36 @@ func TestStartBackgroundServicesWithRuntimeCallsExpectedServices(t *testing.T) {
 func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T) {
 	callCount := 0
 	runtime := startBackgroundServicesRuntime{
-		startVersionSubsystemFn:            func(context.Context) error { return nil },
-		startDockerSubsystemFn:             func(context.Context) error { return nil },
-		startUrbitTransitionHandlerFn:      func(context.Context) error { return nil },
-		startSystemTransitionHandlerFn:     func(context.Context) error { return nil },
-		startNewShipTransitionHandlerFn:    func(context.Context) error { return nil },
-		startImportShipTransitionHandlerFn: func(context.Context) error { return nil },
-		startRectifyUrbitFn:                func(context.Context) error { return nil },
-		syncRetrieveFn: func() error {
-			callCount++
-			return errors.New("unexpected sync call")
+		Transition: transitionBackgroundServicesRuntime{
+			StartVersionSubsystemFn:            func(context.Context) error { return nil },
+			StartDockerSubsystemFn:             func(context.Context) error { return nil },
+			StartUrbitTransitionHandlerFn:      func(context.Context) error { return nil },
+			StartSystemTransitionHandlerFn:     func(context.Context) error { return nil },
+			StartNewShipTransitionHandlerFn:    func(context.Context) error { return nil },
+			StartImportShipTransitionHandlerFn: func(context.Context) error { return nil },
+			StartRectifyUrbitFn:                func(context.Context) error { return nil },
+			StartLeakFn:                        func(context.Context) error { return nil },
 		},
-		startLeakFn:                    func(context.Context) error { return nil },
-		startDockerLogStreamerFn:       func(context.Context) error { return nil },
-		startDockerLogConnRemoverFn:    func(context.Context) error { return nil },
-		startSysLogStreamerFn:          func(context.Context) error { return nil },
-		startOldLogsCleanerFn:          func(context.Context) error { return nil },
-		startDiskUsageWarningFn:        func(context.Context) error { return nil },
-		startSmartDiskCheckFn:          func(context.Context) error { return nil },
-		startStartramRenewalReminderFn: func(context.Context) error { return nil },
-		startPackScheduleLoopFn:        func(context.Context) error { return nil },
-		startChopRoutinesFn:            func(context.Context) error { return nil },
-		startBackupRoutinesFn:          func(context.Context) error { return nil },
+		Streaming: streamingBackgroundServicesRuntime{
+			StartDockerLogStreamerFn:    func(context.Context) error { return nil },
+			StartDockerLogConnRemoverFn: func(context.Context) error { return nil },
+			StartSysLogStreamerFn:       func(context.Context) error { return nil },
+		},
+		Maintenance: maintenanceBackgroundServicesRuntime{
+			StartOldLogsCleanerFn:   func(context.Context) error { return nil },
+			StartDiskUsageWarningFn: func(context.Context) error { return nil },
+			StartSmartDiskCheckFn:   func(context.Context) error { return nil },
+			StartPackScheduleLoopFn: func(context.Context) error { return nil },
+			StartChopRoutinesFn:     func(context.Context) error { return nil },
+			StartBackupRoutinesFn:   func(context.Context) error { return nil },
+		},
+		Startram: startramBackgroundServicesRuntime{
+			SyncRetrieveFn: func() error {
+				callCount++
+				return errors.New("unexpected sync call")
+			},
+			StartStartramRenewalReminderFn: func(context.Context) error { return nil },
+		},
 	}
 	services, err := startBackgroundServicesWithRuntime(context.Background(), false, nil, runtime)
 	if err != nil {
@@ -184,12 +204,19 @@ func TestStartBackgroundServicesSkipsStartramSyncWhenNotRegistered(t *testing.T)
 }
 
 func TestStartBackgroundServicesRuntimeValidation(t *testing.T) {
-	_, err := startBackgroundServicesWithRuntime(context.Background(), true, nil, startBackgroundServicesRuntime{})
-	if err == nil {
+	var runtime startBackgroundServicesRuntime
+	if err := runtime.validate(true); err == nil {
 		t.Fatal("expected validation failure when required background services are missing")
 	}
-	if !strings.Contains(err.Error(), "start background services runtime missing required callbacks") {
+	if err := runtime.validate(true); err == nil || !strings.Contains(err.Error(), "start background services runtime missing required callbacks") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestStartBackgroundServicesDefaultsApply(t *testing.T) {
+	_, err := startBackgroundServicesWithRuntime(context.Background(), true, nil, startBackgroundServicesRuntime{})
+	if err != nil {
+		t.Fatalf("expected defaults to make empty background runtime valid, got %v", err)
 	}
 }
 

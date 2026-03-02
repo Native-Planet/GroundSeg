@@ -11,15 +11,15 @@ import (
 func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	var events []string
 	runtime := workflowRuntime{
-		emitTransitionFn: func(patp, transitionType, event string) {
+		EmitTransitionFn: func(patp, transitionType, event string) {
 			_ = patp
 			_ = transitionType
 			events = append(events, event)
 		},
-		sleepFn: func(time.Duration) {},
+		SleepFn: func(time.Duration) {},
 	}
 
-	err := runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
+	err := runTransitionedOperation(runtime, "~zod", "backup", "loading", "success", time.Second, func() error { return nil })
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -28,7 +28,7 @@ func TestRunTransitionedOperationSuccessAndError(t *testing.T) {
 	}
 
 	events = nil
-	err = runTransitionedOperationWithRuntime(runtime, "~zod", "backup", "loading", "success", 0, func() error {
+	err = runTransitionedOperation(runtime, "~zod", "backup", "loading", "success", 0, func() error {
 		return errors.New("boom")
 	})
 	if err == nil {
@@ -69,8 +69,8 @@ func TestPollWithTimeout(t *testing.T) {
 func TestPublishTransitionWithPolicy(t *testing.T) {
 	var events []int
 	runtime := workflowRuntime{
-		emitTransitionFn: func(string, string, string) {},
-		sleepFn:          func(time.Duration) {},
+		EmitTransitionFn: func(string, string, string) {},
+		SleepFn:          func(time.Duration) {},
 	}
 	publish := func(value int) {
 		events = append(events, value)

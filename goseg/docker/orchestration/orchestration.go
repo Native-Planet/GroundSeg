@@ -3,7 +3,6 @@ package orchestration
 import (
 	"groundseg/config"
 	"groundseg/docker/lifecycle"
-	"groundseg/docker/network"
 	"groundseg/docker/registry"
 	"groundseg/dockerclient"
 	"groundseg/structs"
@@ -83,28 +82,12 @@ func (runtime *orchestrationRuntime) GetContainerRunningStatus(containerName str
 	return runtime.lifecycleRuntime.GetContainerRunningStatus(containerName)
 }
 
-func GetContainerNetwork(name string) (string, error) {
-	return network.GetContainerNetwork(name)
-}
-
-func CreateVolume(name string) error {
-	return network.CreateVolume(name)
-}
-
-func DeleteVolume(name string) error {
-	return network.DeleteVolume(name)
-}
-
 func DeleteContainer(name string) error {
 	return getOrchestrationRuntime().DeleteContainer(name)
 }
 
 func (runtime *orchestrationRuntime) DeleteContainer(name string) error {
 	return runtime.lifecycleRuntime.DeleteContainer(name)
-}
-
-func WriteFileToVolume(name string, file string, content string) error {
-	return network.WriteFileToVolume(name, file, content)
 }
 
 func StartContainer(containerName string, containerType string) (structs.ContainerState, error) {
@@ -181,12 +164,4 @@ func (runtime *orchestrationRuntime) DockerPoller() {
 
 func Contains(slice []string, str string) bool {
 	return lifecycle.Contains(slice, str)
-}
-
-func VolumeExists(volumeName string) (bool, error) {
-	return network.VolumeExists(volumeName)
-}
-
-func AddOrGetNetwork(networkName string) (string, error) {
-	return network.AddOrGetNetwork(networkName)
 }

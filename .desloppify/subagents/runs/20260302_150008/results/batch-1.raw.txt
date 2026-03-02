@@ -1,0 +1,124 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 72.4
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "goseg/docker/orchestration/runtime_seams.go defines a large composite Runtime (RuntimeContainerOps, RuntimeUrbitOps, RuntimeSnapshotOps, RuntimeConfigOps, RuntimeLoadOps, RuntimeServiceOps) plus multiple narrow runtime variants, each composed of many function fields.",
+        "goseg/startup_orchestrator.go and goseg/main.go define additional large callback bags (startupSubsystemInitializationRuntime, startBackgroundServicesRuntime and sub-structs), creating another seam layer with dozens of callbacks.",
+        "goseg/docker/network/network.go and goseg/docker/orchestration/wireguard.go repeatedly expose public function -> default runtime constructor -> withRuntime function chains that mostly forward calls with little domain policy added.",
+        "goseg/config/config_view.go exposes a broad ConfigView interface (many settings families) and many global snapshot wrappers; consumers like goseg/importer/importer.go and goseg/routines/healthcheck/disk.go only need small slices, but still depend on globally materialized config snapshots."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 69.0,
+        "indirection_cost": 60.0,
+        "interface_honesty": 78.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_fragmentation",
+      "summary": "Runtime seam structs have grown into callback registries that increase wiring and test indirection more than they reduce coupling.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/startup_orchestrator.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "runtime_seams.go defines multiple layered runtime structs with many function members and option-merging paths, while startup_orchestrator.go introduces another independent callback-runtime hierarchy for startup/background services.",
+        "runtime_seams_test.go and startup_orchestrator_test.go spend substantial code constructing stub callback bags and nil-guard wrappers, indicating the seam shape itself is a major test burden.",
+        "These seams frequently expose low-level operations directly (container, urbit, config, service ops) rather than cohesive domain-oriented ports, so call sites must understand broad internal mechanics."
+      ],
+      "suggestion": "Collapse callback bags into a smaller set of cohesive domain ports (for example TransitionOps, HealthOps, StartupOps) with focused method sets; move default implementations behind constructor functions and prefer typed interfaces over per-function fields to reduce assembly overhead.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_runtime_wrappers",
+      "summary": "Many exported APIs are thin pass-through wrappers that add call depth without adding policy or translation.",
+      "related_files": [
+        "goseg/docker/network/network.go",
+        "goseg/docker/orchestration/wireguard.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "network.go repeats a pattern like ExportedFn -> XWithRuntime(defaultRuntime, args) -> withDefaults -> concrete logic for nearly every operation (KillContainerUsingPort, GetContainerNetwork, CreateVolume, DeleteVolume, WriteFileToVolume, VolumeExists, AddOrGetNetwork).",
+        "wireguard.go duplicates the same structure (LoadWireguard/loadWireguard, wgContainerConf/wgContainerConfForRuntime, buildWgConf/buildWgConfForRuntime, WriteWgConf/writeWgConf, WriteWgConfToFile/writeWgConfToFileForRuntime, copyWGFileToVolume/copyWGFileToVolumeForRuntime).",
+        "rectify.go adds additional defaulting wrappers (NewRectifyRuntime + withDefaultsRectifyRuntime + context/non-context wrappers), expanding API surface even when behavior is mostly the same."
+      ],
+      "suggestion": "Standardize on a single internal runtime entrypoint per domain and keep only one external API per behavior; use runtime injection at constructor/module level instead of per-function wrapper pairs.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "overgeneralized_runtime_seams"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_snapshot_as_service_locator",
+      "summary": "Config snapshot abstractions act as a broad service locator, weakening boundary clarity between subsystems.",
+      "related_files": [
+        "goseg/config/config_view.go",
+        "goseg/config/config.go",
+        "goseg/importer/importer.go",
+        "goseg/routines/healthcheck/disk.go"
+      ],
+      "evidence": [
+        "ConfigView in config_view.go aggregates many unrelated concerns (auth, update, swap, runtime, connectivity, startram, etc.) into one interface, then global snapshot helper functions expose each slice again.",
+        "importer.go depends on config.NewConfigViewSnapshot() and reads SwapSettings from a full snapshot object during initialization, tying importer behavior to global config materialization.",
+        "healthcheck/disk.go reads HealthCheckSettingsSnapshot and writes back via global UpdateConfTyped function variables, combining read/write global config dependencies in a single routine.",
+        "config/config.go still maintains mutable process-level runtime context and startram config globals, so snapshot abstractions do not fully isolate callers from shared mutable state."
+      ],
+      "suggestion": "Replace broad ConfigView usage with narrow, feature-specific settings providers (for example SwapConfigProvider, HealthCheckConfigProvider) injected per subsystem; keep mutable global config behind explicit domain services and reduce package-level snapshot helpers.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_config_bag_dependency"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "dual_context_api_duplication",
+      "summary": "Parallel context and non-context function surfaces duplicate behavior and widen abstraction surface unnecessarily.",
+      "related_files": [
+        "goseg/routines/system/system.go",
+        "goseg/routines/healthcheck/disk.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "system.go duplicates routine entrypoints (StartBackupRoutines/StartBackupRoutinesWithContext, StartChopRoutines/StartChopRoutinesWithContext, plus helper variants) with mostly shared logic.",
+        "healthcheck/disk.go duplicates SmartDiskCheck and DiskUsageWarning with corresponding WithContext forms that largely replicate loop bodies and differ only in cancellation handling.",
+        "logs.go repeats OldLogsCleaner/SysLogStreamer/DockerLogStreamer and corresponding WithContext variants, adding API and maintenance overhead.",
+        "rectify.go similarly keeps both non-context and context variants for transition handlers."
+      ],
+      "suggestion": "Make context-aware functions the single canonical implementation and keep non-context entrypoints as minimal one-line adapters (or remove them where not required externally), centralizing loop logic to one path.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "api_surface_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Overuse of function-field runtime seams as a default testability mechanism, even when narrower domain ports would be clearer.",
+      "Reliance on global config snapshots encourages broad dependency bags instead of explicit feature-scoped contracts.",
+      "Incremental introduction of context/test seams has produced parallel API layers instead of converging interfaces."
+    ],
+    "likely_symptoms": [
+      "pass_through_runtime_wrappers",
+      "dual_context_api_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

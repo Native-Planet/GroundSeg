@@ -1,0 +1,114 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 1,
+  "assessments": {
+    "error_consistency": 71.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "Error wrapping is inconsistent across core modules: some paths preserve causes with `%w` while many sibling paths use `%v` and lose unwrap semantics (e.g., `goseg/system/disk.go:180`, `goseg/shipworkflow/urbit_operations_runtime.go:148`, `goseg/logger/logger.go:280`).",
+        "Error classification relies on message text matching in multiple subsystems (`goseg/docker/lifecycle/lifecycle.go:453`, `goseg/importer/importer.go:1034`) instead of typed/sentinel checks, making behavior fragile to wording changes.",
+        "Operational failures are handled differently for similar side effects: some functions return joined errors, while others only log and continue (`goseg/shipworkflow/urbit_operations_runtime.go:163-189`, `goseg/routines/logstream/logs.go:390-393`).",
+        "At least one boundary uses brittle string equality for EOF detection (`goseg/routines/logstream/logs.go:333`) rather than `errors.Is(err, io.EOF)`, creating inconsistent failure handling patterns."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "mixed_wrapping_breaks_unwrap_contract",
+      "summary": "Cross-module error wrapping alternates between `%w` and `%v`, causing unpredictable loss of causal chains.",
+      "related_files": [
+        "goseg/system/disk.go",
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/logger/logger.go"
+      ],
+      "evidence": [
+        "`goseg/system/disk.go:180` and `:184` return `fmt.Errorf(...: %v, err)` while nearby code uses `%w` (`:269`).",
+        "`goseg/shipworkflow/urbit_operations_runtime.go:148`, `:237`, `:402` use `%v` for wrapped operational errors while sibling paths in the same file use `%w` (`:320`, `:327`, `:334`).",
+        "`goseg/logger/logger.go:280`, `:293`, `:308` use `%v`, preventing reliable upstream `errors.Is/As` classification."
+      ],
+      "suggestion": "Standardize to `%w` whenever returning an existing error, reserve `%v` for logging only, and add a lint/check (or shared helper) to enforce wrapping consistency at return boundaries.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "untyped_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "string_matched_error_classification",
+      "summary": "Error handling decisions depend on brittle substring matching instead of typed/sentinel errors.",
+      "related_files": [
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/importer/importer.go",
+        "goseg/shipworkflow/operations_runtime.go"
+      ],
+      "evidence": [
+        "`goseg/docker/lifecycle/lifecycle.go:449-453` treats any error containing \"not found\" as a missing container.",
+        "`goseg/importer/importer.go:1027-1035` ignores cleanup failures by scanning `err.Error()` for \"not found\"/\"no such\".",
+        "Siblings emit different untyped not-found messages (`goseg/docker/lifecycle/lifecycle.go:518` \"Container not found\" vs `goseg/shipworkflow/operations_runtime.go:328` \"status doesn't exist\"), making cross-package classification ad hoc."
+      ],
+      "suggestion": "Introduce shared sentinel/typed not-found errors at docker/import/workflow boundaries and replace message parsing with `errors.Is` checks, while mapping low-level provider errors once at boundary adapters.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "untyped_error_contracts"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "log_and_continue_masks_failure_modes",
+      "summary": "Several operational write/restart failures are logged but not propagated, creating inconsistent success semantics.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/routines/logstream/logs.go",
+        "goseg/docker/orchestration/subsystem/docker.go"
+      ],
+      "evidence": [
+        "`goseg/shipworkflow/urbit_operations_runtime.go:163-189` logs container start/stop failures and still returns nil from the transition step.",
+        "`goseg/routines/logstream/logs.go:390-393` file deletion failures are printed and ignored, and the function returns success.",
+        "`goseg/docker/orchestration/subsystem/docker.go:244-246` transition broadcast failures are downgraded to warn-only while other transition failures can trip hard failure thresholds (`:185-190`)."
+      ],
+      "suggestion": "Define per-operation error policy (critical vs best-effort) and encode it explicitly via return types or wrapped policy errors; propagate non-best-effort failures consistently and aggregate best-effort failures into structured warnings.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "inconsistent_failure_policy"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "brittle_eof_handling_by_error_string",
+      "summary": "EOF handling in log splitting uses string equality and shadowed error variables, making boundary behavior fragile.",
+      "related_files": [
+        "goseg/routines/logstream/logs.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`goseg/routines/logstream/logs.go:333` checks `err.Error() != \"EOF\"` instead of `errors.Is(err, io.EOF)`.",
+        "In the same loop, `err` is reassigned by `chunkWriter.WriteString` (`:353`), so later EOF checks (`:359`) do not refer to the read error anymore.",
+        "Elsewhere in scope, error handling already expects wrapped/sentinel-style checks (`goseg/docker/lifecycle/lifecycle.go:449-453`), highlighting inconsistency in boundary error strategy."
+      ],
+      "suggestion": "Use separate `readErr`/`writeErr` variables, switch EOF logic to `errors.Is(readErr, io.EOF)`, and return wrapped context for non-EOF read/write failures.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "string_based_error_logic"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "No shared typed error taxonomy across docker/workflow/importer boundaries.",
+      "Inconsistent policy for when side-effect failures must fail the caller versus only log.",
+      "Legacy formatting conventions (`%v`) still mixed with newer wrapped-error patterns (`%w`)."
+    ],
+    "likely_symptoms": [
+      "mixed_wrapping_breaks_unwrap_contract",
+      "string_matched_error_classification",
+      "log_and_continue_masks_failure_modes"
+    ],
+    "possible_false_positives": []
+  }
+}

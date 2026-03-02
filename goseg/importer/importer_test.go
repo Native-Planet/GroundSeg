@@ -20,6 +20,7 @@ import (
 	"groundseg/shipworkflow"
 	"groundseg/structs"
 
+	"github.com/docker/docker/errdefs"
 	"github.com/gorilla/mux"
 )
 
@@ -317,7 +318,7 @@ func TestInitializeReturnsErrorForStoragePathFailures(t *testing.T) {
 		return "", errors.New("storage unavailable")
 	}
 
-	if err := initializeWithRuntime(runtime); err == nil {
+	if err := initialize(runtime); err == nil {
 		t.Fatal("expected Initialize to fail when storage path cannot be resolved")
 	}
 }
@@ -332,7 +333,7 @@ func TestInitializeSetsUploadAndTempDirectories(t *testing.T) {
 		return filepath.Join(base, "temp"), nil
 	}
 
-	if err := initializeWithRuntime(runtime); err != nil {
+	if err := initialize(runtime); err != nil {
 		t.Fatalf("Initialize returned error: %v", err)
 	}
 	if uploadDir != filepath.Join(base, "uploads") {
@@ -612,7 +613,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 	}
 	runtime.cleanupMultipartFn = func(string) error { return nil }
 
-	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -633,7 +634,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 		postCalled = false
 		return nil
 	}
-	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -654,7 +655,7 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 		postCalled = true
 		return postErr
 	}
-	if err := configureUploadedPierWithRuntime(context.Background(), shipworkflow.UploadImportCommand{
+	if err := configureUploadedPierForRuntime(context.Background(), shipworkflow.UploadImportCommand{
 		ArchivePath: filepath.Join(uploadDir, "ship.tgz"),
 		Filename:    "ship.tgz",
 		Patp:        "~zod",
@@ -673,19 +674,19 @@ func TestFinalizeUploadOnCompletionDispatchesUploadImportCommand(t *testing.T) {
 
 	requestCtx := context.WithValue(context.Background(), "test-key", "test-value")
 	var observedCmd shipworkflow.UploadImportCommand
-	runtime.uploadCoordinator = shipworkflow.UploadImportCoordinatorFunc(func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
+	runtime.uploadCoordinator = func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
 		if ctx != requestCtx {
 			t.Fatalf("unexpected dispatch context: %v", ctx)
 		}
 		observedCmd = cmd
 		return nil
-	})
+	}
 
 	if err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0); err != nil {
 		t.Fatalf("persistChunkToTemp returned error: %v", err)
 	}
 
-	completed, err := finalizeUploadOnCompletionWithRuntime(
+	completed, err := finalizeUploadOnCompletionForRuntime(
 		uploadChunkProgress{
 			Filename:  "ship.tgz",
 			Total:     1,
@@ -727,14 +728,14 @@ func TestFinalizeUploadOnCompletionWrapsDispatchFailureAndImportError(t *testing
 
 	dispatchErr := errors.New("dispatch failed")
 	runtime := defaultImporterRuntime()
-	runtime.uploadCoordinator = shipworkflow.UploadImportCoordinatorFunc(func(context.Context, shipworkflow.UploadImportCommand) error {
+	runtime.uploadCoordinator = func(context.Context, shipworkflow.UploadImportCommand) error {
 		return dispatchErr
-	})
+	}
 
 	if err := persistChunkToTemp(strings.NewReader("payload"), "ship.tgz", 0); err != nil {
 		t.Fatalf("persistChunkToTemp returned error: %v", err)
 	}
-	completed, err := finalizeUploadOnCompletionWithRuntime(
+	completed, err := finalizeUploadOnCompletionForRuntime(
 		uploadChunkProgress{
 			Filename:  "ship.tgz",
 			Total:     1,
@@ -848,7 +849,7 @@ func TestPrepareImportedPierEnvironmentIgnoresNotFoundCleanupErrors(t *testing.T
 	shipcreatorCreateUrbitConfigFn = func(string, string) error { return nil }
 	shipcreatorAppendSysConfigPierFn = func(string) error { return nil }
 	dockerDeleteContainerFn = func(string) error {
-		return errors.New("No such container")
+		return errdefs.NotFound(errors.New("container not found"))
 	}
 	dockerDeleteVolumeFn = func(string) error {
 		return errors.New("no such volume")
@@ -872,7 +873,7 @@ func TestIgnorableCleanupDeleteError(t *testing.T) {
 	}{
 		{
 			name: "not found",
-			err:  errors.New("No such container"),
+			err:  errdefs.NotFound(errors.New("container not found")),
 			want: true,
 		},
 		{

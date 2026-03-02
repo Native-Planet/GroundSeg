@@ -1,0 +1,136 @@
+{
+  "batch": "Design coherence \u2014 Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 62.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/shipworkflow/urbit_operations.go concentrates many unrelated workflows (desk install/uninstall, pack/meld lifecycle, export/delete, network/power toggles, schedule updates) in one file with long procedural handlers.",
+        "goseg/shipworkflow/startram.go repeats the same transition-lifecycle orchestration style with large inline step assembly, instead of sharing a higher-level workflow abstraction with urbit operations.",
+        "goseg/config/config_update.go mixes field schema/registry, parsing, patch application, persistence, and public option constructors in one module, creating a broad change surface.",
+        "goseg/routines/logstream/logs.go and goseg/logger/logger.go duplicate closely related streaming/session responsibilities and context/non-context loop variants."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "workflow_orchestration_fragmented_patterns",
+      "summary": "Transition workflows are implemented as repeated ad-hoc step assembly across modules, indicating missing shared orchestration abstraction.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/startram.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "urbit_operations repeatedly builds near-identical transition plans (`EmitStart`, `ErrorEvent`, `ClearDelay`) around bespoke step lists for many actions.",
+        "startram handlers build similarly structured multi-step workflows inline (`HandleStartramToggle`, `HandleStartramRegister`, `HandleStartramEndpoint`) with the same lifecycle concerns.",
+        "rectify handlers duplicate event-loop and transition-apply scaffolding for urbit/new ship/system/startram streams."
+      ],
+      "suggestion": "Introduce a domain-level workflow DSL or template helpers (pre/post hooks, standard events, retry/publish policy) shared by urbit/startram/rectify transitions; keep each action handler focused on business rules rather than lifecycle plumbing.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_shared_transition_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_operations_god_module",
+      "summary": "The urbit operations module mixes multiple business domains and operational concerns in one large file, reducing cohesion and increasing coupling.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations.go",
+        "goseg/shipworkflow/startram.go",
+        "goseg/docker/orchestration/subsystem/docker.go"
+      ],
+      "evidence": [
+        "urbit_operations contains desk lifecycle logic, startram service cleanup, container lifecycle toggles, config mutations, export logic, and scheduling logic in the same module.",
+        "The file directly coordinates click commands, docker state updates, config persistence, and broadcast side effects, which are distinct responsibilities.",
+        "docker subsystem recovery and startram flows consume overlapping lifecycle behaviors, reinforcing cross-module coupling to this monolithic operations layer."
+      ],
+      "suggestion": "Split `urbit_operations` into focused services (e.g., `desk_service`, `maintenance_service`, `network_service`, `export_service`) behind a narrow facade so handlers compose capabilities instead of embedding all concerns.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_shared_transition_abstraction"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "global_runtime_seams_hidden_coupling",
+      "summary": "Package-level mutable function seams and globals create hidden dependency direction and inconsistent composition boundaries.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/shipworkflow/startram.go",
+        "goseg/accesspoint/accesspoint.go",
+        "goseg/docker/network/network.go"
+      ],
+      "evidence": [
+        "rectify uses many package-level function vars (`getStartramSettings`, `updateConfTypedFn`, `getUrbitConfigFn`) as implicit dependencies.",
+        "startram uses package globals for dispatch/runtime builders (`startramRuntimeFn`, `startramDispatchUrbitPayloadFn`, `startramRecoverWireguardFleetFn`).",
+        "accesspoint and docker/network also rely on mutable package-level runtime hooks (`checkDependenciesFn`, `isRunningFn`, `dockerClientNew`, `networkOperationTimeout`)."
+      ],
+      "suggestion": "Standardize on explicit constructor-injected runtime structs per subsystem (no mutable package globals), then pass dependencies through coordinator types to make module boundaries and ownership explicit.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "implicit_global_dependency_injection"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "logging_session_concerns_scattered",
+      "summary": "Logging stream management is split across logger/session/logstream with duplicated control loops and overlapping responsibilities.",
+      "related_files": [
+        "goseg/routines/logstream/logs.go",
+        "goseg/logger/logger.go",
+        "goseg/session/ws.go"
+      ],
+      "evidence": [
+        "logstream implements both context and non-context versions for sys/docker stream loops with duplicated internals (`SysLogStreamer` vs `SysLogStreamerWithContext`, `DockerLogStreamer` vs context variant).",
+        "logger both configures zap and acts as a session facade (`SysLogSessions`, `SetDockerLogSession*`, `RemoveSysSessions`), while session/ws manages connection lifecycle separately.",
+        "Cross-package delegation makes ownership unclear (logger -> session wrappers, logstream -> logger session APIs), increasing indirection for simple stream-path changes."
+      ],
+      "suggestion": "Define a single log-stream service boundary that owns session registries and stream loops; keep `logger` focused on logging backend initialization/writers and move websocket/session orchestration into one dedicated runtime service.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "implicit_global_dependency_injection"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_update_multi_responsibility_module",
+      "summary": "Configuration patching combines schema definition, parsing, mutation, persistence, and public API construction in one module.",
+      "related_files": [
+        "goseg/config/config_update.go",
+        "goseg/config/config_test.go",
+        "goseg/config/version.go"
+      ],
+      "evidence": [
+        "`config_update.go` defines `ConfPatch`, registry schema (`confPatchRegistry`), parsing helpers, storage update flow, and dozens of `WithX` option constructors together.",
+        "The same module maintains both typed option-path updates (`UpdateConfTyped`) and map-driven patch path (`UpdateConf`), expanding behavioral surface in one place.",
+        "Tests and adjacent config modules must account for this broad module behavior, increasing blast radius of changes."
+      ],
+      "suggestion": "Separate config concerns into modules: schema/field registry, patch parsing, persistence adapter, and option constructors; then expose a small orchestrator API that composes them.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "module_boundary_blur"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Missing shared transition abstraction caused repeated workflow boilerplate and oversized handlers.",
+      "Reliance on package-level mutable seams created implicit dependency wiring and blurred ownership.",
+      "Module boundaries favor convenience aggregation over cohesive domain partitioning."
+    ],
+    "likely_symptoms": [
+      "workflow_orchestration_fragmented_patterns",
+      "urbit_operations_god_module",
+      "logging_session_concerns_scattered"
+    ],
+    "possible_false_positives": []
+  }
+}

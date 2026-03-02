@@ -1,0 +1,133 @@
+{
+  "batch": "Design coherence \u2014 Mechanical Concern Signals",
+  "batch_index": 4,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime seam wiring is replicated in multiple places: `goseg/main.go` defines several nested runtime structs/options (`bootstrapRuntime`, `c2cRuntime`, `serverRuntime`), while `goseg/docker/lifecycle/lifecycle.go` and `goseg/docker/orchestration/runtime_seams.go` repeat nearly identical option/merge/default patterns with many per-field nil checks.",
+        "Large functions mix unrelated concerns: `goseg/docker/orchestration/subsystem/docker.go` `check502Loop` combines polling loop control, config reads, network HTTP probing, recovery policy/threshold accounting, and transition side effects in one body.",
+        "State/session flows are split into duplicated parallel tracks: `goseg/session/ws.go` duplicates auth/unauth traversal logic in broadcast/cleanup paths, and `goseg/routines/logstream/logs.go` duplicates system/docker session management wrappers and stream loops, increasing divergence risk."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_pattern_duplication",
+      "summary": "Runtime seam construction and override logic is duplicated across subsystems instead of using a shared composition pattern.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`runtime_seams.go` contains multiple merge functions (`mergeRuntimeContainerOps`, `mergeRuntimeUrbitOps`, `mergeRuntimeSnapshotOps`, etc.) that repeat the same per-field nil override pattern.",
+        "`lifecycle.go` defines its own `RuntimeOption` family (`WithDockerClientFactory`, `WithContainerConfigResolver`, `WithImageInfoLookup`, etc.) plus default assembly in `NewRuntime`, mirroring the same seam approach.",
+        "`main.go` introduces another parallel runtime wiring layer (`bootstrapRuntime`, `c2cRuntime`, `serverRuntime`, and default builders), creating a third variant of the same pattern."
+      ],
+      "suggestion": "Introduce a single reusable runtime composition helper (or generated option-merger) and converge `main`, `lifecycle`, and orchestration seam wiring onto it so override/default behavior is defined once.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_boilerplate"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "docker_health_loop_mixed_responsibilities",
+      "summary": "Docker 502 health loop combines monitoring, policy, IO, and recovery orchestration in one function.",
+      "related_files": [
+        "goseg/docker/orchestration/subsystem/docker.go",
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/docker/lifecycle/lifecycle.go"
+      ],
+      "evidence": [
+        "`check502Loop` in `subsystem/docker.go` owns timer scheduling, cancellation checks, settings reads, status acquisition, per-ship iteration, HTTP probing, threshold counting, and recovery triggering in one body.",
+        "The function also embeds policy branches (`Disable502`, threshold normalization, strike bookkeeping) alongside transport operations (`httpOps.getFn`) and state transitions, making intent boundaries unclear.",
+        "Runtime seams in `runtime_seams.go` expose many low-level function fields, but no higher-level cohesive interface for health-check policy, forcing this orchestration function to absorb too many responsibilities."
+      ],
+      "suggestion": "Split into dedicated collaborators: a probe collector, a strike-policy evaluator, and a recovery executor; keep `check502Loop` as a small coordinator over these abstractions.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "global_orchestration_sprawl"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_and_logstream_parallel_state_models",
+      "summary": "Session and log streaming layers maintain parallel, duplicated state-management flows that are easy to drift.",
+      "related_files": [
+        "goseg/session/ws.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "`ws.go` duplicates near-identical traversal/update logic for auth vs unauth maps in `BroadcastAuth`/`BroadcastUnauth` and in both cleanup loops inside `CleanupStaleSessions`.",
+        "`logs.go` wraps and re-exposes many near-pass-through session operations (`SysLogSessions`, `SetSysLogSessions`, `DockerLogSessions`, `SetDockerLogSessionLive`, etc.), then runs separate stream loops for system and docker paths with similar lifecycle mechanics.",
+        "Both files rely on package-level mutable state/channels (`WsEventBus`, `dockerLogCancelChannel`, global session accessors), which increases coupling and makes ownership boundaries fuzzy."
+      ],
+      "suggestion": "Unify around a single session-stream registry abstraction with typed channels and a generic broadcast/cleanup pipeline to remove auth/unauth and sys/docker duplication.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "parallel_state_machines"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "urbit_operation_handlers_repeat_template_steps",
+      "summary": "Urbit operation handlers repeat the same transition and restart choreography across many functions.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/rectify/rectify.go",
+        "goseg/handler/ship/urbit_test.go"
+      ],
+      "evidence": [
+        "Multiple handlers (`handleLoom`, `handleSnapTime`, `toggleNetwork`, `toggleDevMode`, `togglePower`) repeat similar sequences: read config, persist mutation, clean/recreate container, optionally restart, emit transition events.",
+        "The same transition-template scaffolding is re-specified repeatedly with slight parameter changes, indicating missing domain-level operation abstractions.",
+        "`rectify.go` separately maintains large transition reducer maps for related lifecycle state, so behavior is spread between imperative per-handler flows and map-based reducers rather than a single coherent command model."
+      ],
+      "suggestion": "Introduce composable operation primitives (e.g., `mutateConfig`, `rebuildIfBooted`, `emitTransition`) and build handlers declaratively from these primitives to collapse duplicated choreography.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "transition_workflow_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "system_package_concern_blending",
+      "summary": "System module blends host metrics, disk provisioning, WiFi control, and cron/bootstrap scripting into loosely related files.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/disk.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`system.go` mixes telemetry (`GetMemory`, `GetCPU`, `GetTemp`) with machine mutation logic (`FixerScript`, cron editing, shell command execution).",
+        "`disk.go` combines storage discovery, filesystem creation, `/etc/fstab` reconciliation, mount orchestration, temp-dir symlink policy, and SMART diagnostics in one module.",
+        "`wifi.go` simultaneously owns long-running loop lifecycle, nmcli command execution, client-based WiFi operations, and C2C mode state globals."
+      ],
+      "suggestion": "Split the `system` package into focused services (`metrics`, `host_maintenance`, `storage_provisioning`, `wifi_runtime`) with explicit interfaces so lifecycle/stateful concerns are isolated.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "global_orchestration_sprawl"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were added incrementally per package, creating repeated runtime-option boilerplate instead of one shared composition strategy.",
+      "Long-lived background loops evolved inside feature modules without extracting policy/transport boundaries.",
+      "Global mutable state patterns (channels/maps/singletons) encouraged parallel code paths rather than unified state abstractions."
+    ],
+    "likely_symptoms": [
+      "docker_health_loop_mixed_responsibilities",
+      "urbit_operation_handlers_repeat_template_steps",
+      "session_and_logstream_parallel_state_models"
+    ],
+    "possible_false_positives": []
+  }
+}

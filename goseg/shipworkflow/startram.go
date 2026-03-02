@@ -18,24 +18,68 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	dispatchStartramToggleNetworkFn = ToggleNetwork
-	startramDispatchUrbitPayloadFn  = defaultDispatchUrbitPayload
-	startramRuntimeFn               = func() orchestration.StartramRuntime {
-		return orchestration.NewStartramRuntime(
-			orchestration.WithStartramServiceLoaders(
-				broadcast.GetStartramServices,
-				broadcast.LoadStartramRegions,
-			),
-		)
+type startramRuntime struct {
+	dispatchStartramToggleNetworkFn func(string) error
+	startramDispatchUrbitPayloadFn  func(structs.WsUrbitPayload) error
+	startramPublishEventFn          func(structs.Event)
+	startramRuntimeFn               func() orchestration.StartramRuntime
+	startramRecoverWireguardFleetFn func(piers []string, deleteMinioClient bool) error
+}
+
+func defaultStartramRuntime() startramRuntime {
+	return startramRuntime{
+		dispatchStartramToggleNetworkFn: ToggleNetwork,
+		startramDispatchUrbitPayloadFn:  defaultDispatchUrbitPayload,
+		startramPublishEventFn:          startram.PublishEvent,
+		startramRuntimeFn: func() orchestration.StartramRuntime {
+			return orchestration.NewStartramRuntime(
+				orchestration.WithStartramServiceLoaders(
+					broadcast.GetStartramServices,
+					broadcast.LoadStartramRegions,
+				),
+			)
+		},
+		startramRecoverWireguardFleetFn: func(piers []string, deleteMinioClient bool) error {
+			rt := orchestration.NewRuntime()
+			return RecoverWireguardFleet(NewWireguardRecoveryRuntime(rt), piers, deleteMinioClient)
+		},
 	}
-	startramRecoverWireguardFleetFn = func(piers []string, deleteMinioClient bool) error {
-		rt := orchestration.NewRuntime()
-		return RecoverWireguardFleet(NewWireguardRecoveryRuntime(rt), piers, deleteMinioClient)
+}
+
+func withDefaultsStartramRuntime(runtime startramRuntime) startramRuntime {
+	if runtime.dispatchStartramToggleNetworkFn == nil {
+		runtime.dispatchStartramToggleNetworkFn = ToggleNetwork
 	}
-)
+	if runtime.startramDispatchUrbitPayloadFn == nil {
+		runtime.startramDispatchUrbitPayloadFn = defaultDispatchUrbitPayload
+	}
+	if runtime.startramPublishEventFn == nil {
+		runtime.startramPublishEventFn = startram.PublishEvent
+	}
+	if runtime.startramRuntimeFn == nil {
+		runtime.startramRuntimeFn = func() orchestration.StartramRuntime {
+			return orchestration.NewStartramRuntime(
+				orchestration.WithStartramServiceLoaders(
+					broadcast.GetStartramServices,
+					broadcast.LoadStartramRegions,
+				),
+			)
+		}
+	}
+	if runtime.startramRecoverWireguardFleetFn == nil {
+		runtime.startramRecoverWireguardFleetFn = func(piers []string, deleteMinioClient bool) error {
+			rt := orchestration.NewRuntime()
+			return RecoverWireguardFleet(NewWireguardRecoveryRuntime(rt), piers, deleteMinioClient)
+		}
+	}
+	return runtime
+}
 
 func defaultDispatchUrbitPayload(payload structs.WsUrbitPayload) error {
+	return dispatchUrbitPayloadWithRuntime(defaultStartramRuntime(), payload)
+}
+
+func dispatchUrbitPayloadWithRuntime(runtime startramRuntime, payload structs.WsUrbitPayload) error {
 	if payload.Payload.Action == "" {
 		return fmt.Errorf("no urbit action provided")
 	}
@@ -45,7 +89,7 @@ func defaultDispatchUrbitPayload(payload structs.WsUrbitPayload) error {
 
 	switch payload.Payload.Action {
 	case "toggle-network":
-		return dispatchStartramToggleNetworkFn(payload.Payload.Patp)
+		return runtime.dispatchStartramToggleNetworkFn(payload.Payload.Patp)
 	default:
 		return fmt.Errorf("unsupported urbit action in startram dispatch: %q", payload.Payload.Action)
 	}
@@ -58,34 +102,48 @@ func startramEvent(transitionType transition.EventType, data any) structs.Event 
 	}
 }
 
-func runStartramTransitionWithRuntime(transitionType transition.EventType, plan transitionPlan[structs.Event], steps ...transitionStep[structs.Event]) error {
+func runStartramTransitionWithRuntime(runtime startramRuntime, transitionType transition.EventType, plan transitionPlan[structs.Event], steps ...transitionStep[structs.Event]) error {
+	runtime = withDefaultsStartramRuntime(runtime)
 	if plan.ErrorEvent == nil {
 		plan.ErrorEvent = func(err error) structs.Event {
 			return startramEvent(transitionType, fmt.Sprintf("Error: %v", err))
 		}
 	}
-	return runTransitionLifecycleWithRuntime[structs.Event](
+	return runTransitionLifecycle[structs.Event](
 		defaultWorkflowRuntime(),
-		func(event structs.Event) {
-			startram.PublishEvent(event)
-		},
+		func(event structs.Event) { runtime.startramPublishEventFn(event) },
 		plan,
 		steps...,
 	)
 }
 
 func HandleStartramServices() error {
-	return startramRuntimeFn().GetStartramServicesFn()
+	return runStartramServicesWithRuntime(defaultStartramRuntime())
+}
+
+func runStartramServicesWithRuntime(runtime startramRuntime) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	return runtime.startramRuntimeFn().GetStartramServicesFn()
 }
 
 func HandleStartramRegions() error {
-	return startramRuntimeFn().LoadStartramRegionsFn()
+	return runStartramRegionsWithRuntime(defaultStartramRuntime())
+}
+
+func runStartramRegionsWithRuntime(runtime startramRuntime) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	return runtime.startramRuntimeFn().LoadStartramRegionsFn()
 }
 
 func HandleStartramRestart() error {
-	runtime := startramRuntimeFn()
+	return runStartramRestartWithRuntime(defaultStartramRuntime())
+}
+
+func runStartramRestartWithRuntime(runtime startramRuntime) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
 	zap.L().Info("Restarting StarTram")
-	settings := runtime.StartramSettingsSnapshotFn()
+	settings := startramRuntime.StartramSettingsSnapshotFn()
 	steps := []transitionStep[structs.Event]{
 		{
 			Run: func() error {
@@ -107,36 +165,39 @@ func HandleStartramRestart() error {
 			transitionStep[structs.Event]{
 				Run: func() error {
 					zap.L().Info("Recreating containers")
-					return startramRecoverWireguardFleetFn(settings.Piers, true)
+					return runtime.startramRecoverWireguardFleetFn(settings.Piers, true)
 				},
 			},
 		)
 	}
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionRestart,
-		transitionPlan[structs.Event]{
-			EmitStart:    true,
-			StartEvent:   startramEvent(transition.StartramTransitionRestart, "startram"),
-			SuccessEvent: startramEvent(transition.StartramTransitionRestart, string(transition.StartramTransitionDone)),
-			EmitSuccess:  true,
-			ClearEvent:   startramEvent(transition.StartramTransitionRestart, ""),
-			ClearDelay:   3 * time.Second,
+	return runStartramTransitionTemplate(
+		runtime,
+		startramTransitionTemplate{
+			transitionType: transition.StartramTransitionRestart,
+			startEvent:     startramEvent(transition.StartramTransitionRestart, "startram"),
+			successEvent:   startramEvent(transition.StartramTransitionRestart, string(transition.StartramTransitionDone)),
+			emitSuccess:    true,
+			clearEvent:     startramEvent(transition.StartramTransitionRestart, ""),
+			clearDelay:     3 * time.Second,
 		},
 		steps...,
 	)
 }
 
 func HandleStartramToggle() error {
-	runtime := startramRuntimeFn()
-	settings := runtime.StartramSettingsSnapshotFn()
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionToggle,
-		transitionPlan[structs.Event]{
-			EmitStart:  true,
-			StartEvent: startramEvent(transition.StartramTransitionToggle, transition.StartramTransitionLoading),
-			ClearEvent: startramEvent(transition.StartramTransitionToggle, nil),
-			ClearDelay: 3 * time.Second,
-		},
+	return runStartramToggleWithRuntime(defaultStartramRuntime())
+}
+
+func runStartramToggleWithRuntime(runtime startramRuntime) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	settings := startramRuntime.StartramSettingsSnapshotFn()
+	return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+		transitionType: transition.StartramTransitionToggle,
+		startEvent:     startramEvent(transition.StartramTransitionToggle, transition.StartramTransitionLoading),
+		clearEvent:     startramEvent(transition.StartramTransitionToggle, nil),
+		clearDelay:     3 * time.Second,
+	},
 		transitionStep[structs.Event]{
 			Run: func() error {
 				steps := []workflow.Step{}
@@ -144,18 +205,18 @@ func HandleStartramToggle() error {
 					steps = append(steps, workflow.Step{
 						Name: "update config to disable wireguard",
 						Run: func() error {
-							return runtime.UpdateConfTypedFn(config.WithWgOn(false))
+							return startramRuntime.UpdateConfTypedFn(config.WithWgOn(false))
 						},
 					})
 					steps = append(steps, workflow.Step{
 						Name: "stop wireguard container",
 						Run: func() error {
-							return runtime.StopContainerByNameFn("wireguard")
+							return startramRuntime.StopContainerByNameFn("wireguard")
 						},
 					})
 					// toggle ships back to local
 					for _, patp := range settings.Piers {
-						dockerConfig := runtime.UrbitConfFn(patp)
+						dockerConfig := startramRuntime.UrbitConfFn(patp)
 						if dockerConfig.Network == "wireguard" {
 							patpCopy := patp
 							payload := structs.WsUrbitPayload{
@@ -168,7 +229,7 @@ func HandleStartramToggle() error {
 							steps = append(steps, workflow.Step{
 								Name: fmt.Sprintf("dispatch toggle-network for %s", patpCopy),
 								Run: func(payload structs.WsUrbitPayload) func() error {
-									return func() error { return startramDispatchUrbitPayloadFn(payload) }
+									return func() error { return runtime.startramDispatchUrbitPayloadFn(payload) }
 								}(payload),
 							})
 						}
@@ -177,22 +238,22 @@ func HandleStartramToggle() error {
 					steps = append(steps, workflow.Step{
 						Name: "update config to enable wireguard",
 						Run: func() error {
-							return runtime.UpdateConfTypedFn(config.WithWgOn(true))
+							return startramRuntime.UpdateConfTypedFn(config.WithWgOn(true))
 						},
 					})
 					steps = append(steps, workflow.Step{
 						Name: "start wireguard container",
 						Run: func() error {
-							_, err := runtime.StartContainerFn("wireguard", "wireguard")
+							_, err := startramRuntime.StartContainerFn("wireguard", "wireguard")
 							return err
 						},
 					})
 				}
 				// delete mc
 				steps = appendShipContainerRebuildSteps(steps, shipContainerRebuildRuntime{
-					DeleteContainerFn: runtime.DeleteContainerFn,
-					LoadMCFn:          runtime.LoadMCFn,
-					LoadMinIOsFn:      runtime.LoadMinIOsFn,
+					DeleteContainerFn: startramRuntime.DeleteContainerFn,
+					LoadMCFn:          startramRuntime.LoadMCFn,
+					LoadMinIOsFn:      startramRuntime.LoadMinIOsFn,
 				}, shipContainerRebuildOptions{
 					piers:             settings.Piers,
 					deletePiers:       false,
@@ -212,21 +273,24 @@ func HandleStartramToggle() error {
 }
 
 func HandleStartramRegister(regCode, region string) error {
-	runtime := startramRuntimeFn()
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionRegister,
-		transitionPlan[structs.Event]{
-			EmitStart:    true,
-			StartEvent:   startramEvent(transition.StartramTransitionRegister, transition.StartramTransitionLoading),
-			SuccessEvent: startramEvent(transition.StartramTransitionRegister, transition.StartramTransitionComplete),
-			EmitSuccess:  true,
-			ClearEvent:   startramEvent(transition.StartramTransitionRegister, nil),
-			ClearDelay:   3 * time.Second,
-		},
+	return runStartramRegisterWithRuntime(defaultStartramRuntime(), regCode, region)
+}
+
+func runStartramRegisterWithRuntime(runtime startramRuntime, regCode, region string) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+		transitionType: transition.StartramTransitionRegister,
+		startEvent:     startramEvent(transition.StartramTransitionRegister, transition.StartramTransitionLoading),
+		successEvent:   startramEvent(transition.StartramTransitionRegister, transition.StartramTransitionComplete),
+		emitSuccess:    true,
+		clearEvent:     startramEvent(transition.StartramTransitionRegister, nil),
+		clearDelay:     3 * time.Second,
+	},
 		transitionStep[structs.Event]{
 			Run: func() error {
 				// Reset key pair
-				if err := runtime.CycleWgKeyFn(); err != nil {
+				if err := startramRuntime.CycleWgKeyFn(); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					return fmt.Errorf("cycle wireguard key: %w", err)
 				}
@@ -251,7 +315,7 @@ func HandleStartramRegister(regCode, region string) error {
 		transitionStep[structs.Event]{
 			Event: startramEvent(transition.StartramTransitionRegister, transition.StartramTransitionStarting),
 			Run: func() error {
-				if err := runtime.LoadWireguardFn(); err != nil {
+				if err := startramRuntime.LoadWireguardFn(); err != nil {
 					zap.L().Error(fmt.Sprintf("Unable to start Wireguard: %v", err))
 					return fmt.Errorf("start wireguard: %w", err)
 				}
@@ -262,25 +326,28 @@ func HandleStartramRegister(regCode, region string) error {
 }
 
 func HandleStartramEndpoint(endpoint string) error {
-	runtime := startramRuntimeFn()
-	settings := runtime.StartramSettingsSnapshotFn()
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionEndpoint,
-		transitionPlan[structs.Event]{
-			EmitStart:    true,
-			StartEvent:   startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionInit),
-			SuccessEvent: startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionComplete),
-			EmitSuccess:  true,
-			ClearEvent:   startramEvent(transition.StartramTransitionEndpoint, nil),
-			ClearDelay:   3 * time.Second,
-		},
+	return runStartramEndpointWithRuntime(defaultStartramRuntime(), endpoint)
+}
+
+func runStartramEndpointWithRuntime(runtime startramRuntime, endpoint string) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	settings := startramRuntime.StartramSettingsSnapshotFn()
+	return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+		transitionType: transition.StartramTransitionEndpoint,
+		startEvent:     startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionInit),
+		successEvent:   startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionComplete),
+		emitSuccess:    true,
+		clearEvent:     startramEvent(transition.StartramTransitionEndpoint, nil),
+		clearDelay:     3 * time.Second,
+	},
 		transitionStep[structs.Event]{
 			Event: startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionStopping),
 			Run: func() error {
 				if !settings.WgOn {
 					return nil
 				}
-				if err := runtime.StopContainerByNameFn("wireguard"); err != nil {
+				if err := startramRuntime.StopContainerByNameFn("wireguard"); err != nil {
 					return fmt.Errorf("stop wireguard: %w", err)
 				}
 				return nil
@@ -293,10 +360,10 @@ func HandleStartramEndpoint(endpoint string) error {
 					return nil
 				}
 				for _, p := range settings.Piers {
-					if err := runtime.SvcDeleteFn(p, "urbit"); err != nil {
+					if err := startramRuntime.SvcDeleteFn(p, "urbit"); err != nil {
 						zap.L().Error(fmt.Sprintf("Couldn't remove urbit anchor for %v", p))
 					}
-					if err := runtime.SvcDeleteFn("s3."+p, "s3"); err != nil {
+					if err := startramRuntime.SvcDeleteFn("s3."+p, "s3"); err != nil {
 						zap.L().Error(fmt.Sprintf("Couldn't remove s3 anchor for %v", p))
 					}
 				}
@@ -306,13 +373,13 @@ func HandleStartramEndpoint(endpoint string) error {
 		transitionStep[structs.Event]{
 			Event: startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionConfiguring),
 			Run: func() error {
-				return runtime.CycleWgKeyFn()
+				return startramRuntime.CycleWgKeyFn()
 			},
 		},
 		transitionStep[structs.Event]{
 			Event: startramEvent(transition.StartramTransitionEndpoint, transition.StartramTransitionFinalizing),
 			Run: func() error {
-				return runtime.UpdateConfTypedFn(
+				return startramRuntime.UpdateConfTypedFn(
 					config.WithEndpointURL(endpoint),
 					config.WithWgRegistered(false),
 				)
@@ -322,21 +389,22 @@ func HandleStartramEndpoint(endpoint string) error {
 }
 
 func HandleStartramCancel(key string, reset bool) error {
-	runtime := startramRuntimeFn()
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionCancel,
-		transitionPlan[structs.Event]{
-			ClearEvent: startramEvent(transition.StartramTransitionCancel, nil),
-			ClearDelay: 3 * time.Second,
-			ErrorEvent: func(err error) structs.Event {
-				return startramEvent(transition.StartramTransitionCancel, fmt.Sprintf("Error: %v", err))
-			},
-		},
+	return runStartramCancelWithRuntime(defaultStartramRuntime(), key, reset)
+}
+
+func runStartramCancelWithRuntime(runtime startramRuntime, key string, reset bool) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+		transitionType: transition.StartramTransitionCancel,
+		clearEvent:     startramEvent(transition.StartramTransitionCancel, nil),
+		clearDelay:     3 * time.Second,
+	},
 		transitionStep[structs.Event]{
 			Run: func() error {
 				if reset {
-					for _, svc := range runtime.GetStartramConfigFn().Subdomains {
-						if err := runtime.SvcDeleteFn(svc.URL, svc.SvcType); err != nil {
+					for _, svc := range startramRuntime.GetStartramConfigFn().Subdomains {
+						if err := startramRuntime.SvcDeleteFn(svc.URL, svc.SvcType); err != nil {
 							zap.L().Error(fmt.Sprintf("Couldn't delete service %v: %v", svc.URL, err))
 						}
 					}
@@ -345,7 +413,7 @@ func HandleStartramCancel(key string, reset bool) error {
 					zap.L().Error(fmt.Sprintf("Couldn't cancel subscription: %v", err))
 					return fmt.Errorf("cancel subscription: %w", err)
 				}
-				if err := runtime.CycleWgKeyFn(); err != nil {
+				if err := startramRuntime.CycleWgKeyFn(); err != nil {
 					zap.L().Error(fmt.Sprintf("%v", err))
 					return fmt.Errorf("cycle wireguard key: %w", err)
 				}
@@ -356,15 +424,20 @@ func HandleStartramCancel(key string, reset bool) error {
 }
 
 func HandleStartramReminder(remind bool) error {
-	runtime := startramRuntimeFn()
-	ships := runtime.ShipSettingsSnapshotFn()
+	return runStartramReminderWithRuntime(defaultStartramRuntime(), remind)
+}
+
+func runStartramReminderWithRuntime(runtime startramRuntime, remind bool) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	ships := startramRuntime.ShipSettingsSnapshotFn()
 	var steps []workflow.Step
 	for _, patp := range ships.Piers {
 		pier := patp
 		steps = append(steps, workflow.Step{
 			Name: fmt.Sprintf("update startram reminder for %s", pier),
 			Run: func() error {
-				return runtime.UpdateUrbitFn(pier, func(shipConf *structs.UrbitDocker) error {
+				return startramRuntime.UpdateUrbitFn(pier, func(shipConf *structs.UrbitDocker) error {
 					shipConf.StartramReminder = remind
 					return nil
 				})
@@ -380,8 +453,13 @@ func HandleStartramReminder(remind bool) error {
 }
 
 func HandleStartramSetBackupPassword(password string) error {
-	runtime := startramRuntimeFn()
-	err := runtime.UpdateConfTypedFn(config.WithRemoteBackupPassword(password))
+	return runStartramSetBackupPasswordWithRuntime(defaultStartramRuntime(), password)
+}
+
+func runStartramSetBackupPasswordWithRuntime(runtime startramRuntime, password string) error {
+	runtime = withDefaultsStartramRuntime(runtime)
+	startramRuntime := runtime.startramRuntimeFn()
+	err := startramRuntime.UpdateConfTypedFn(config.WithRemoteBackupPassword(password))
 	if err != nil {
 		return fmt.Errorf("set backup password: %w", err)
 	}
@@ -389,14 +467,16 @@ func HandleStartramSetBackupPassword(password string) error {
 }
 
 func HandleStartramUploadBackup(patp string) error {
-	return runStartramTransitionWithRuntime(
-		transition.StartramTransitionUploadBackup,
-		transitionPlan[structs.Event]{
-			EmitStart:  true,
-			StartEvent: startramEvent(transition.StartramTransitionUploadBackup, "upload"),
-			ClearEvent: startramEvent(transition.StartramTransitionUploadBackup, nil),
-			ClearDelay: 3 * time.Second,
-		},
+	return runStartramUploadBackupWithRuntime(defaultStartramRuntime(), patp)
+}
+
+func runStartramUploadBackupWithRuntime(runtime startramRuntime, patp string) error {
+	return runStartramTransitionTemplate(runtime, startramTransitionTemplate{
+		transitionType: transition.StartramTransitionUploadBackup,
+		startEvent:     startramEvent(transition.StartramTransitionUploadBackup, "upload"),
+		clearEvent:     startramEvent(transition.StartramTransitionUploadBackup, nil),
+		clearDelay:     3 * time.Second,
+	},
 		transitionStep[structs.Event]{
 			Run: func() error {
 				filePath := "backup.key"

@@ -1,0 +1,102 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 61.4
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "A pass-through facade exists in goseg/routines/logs.go where all exported functions only nil-check context and delegate directly to goseg/routines/logstream/logs.go equivalents (e.g., SysLogStreamer*, OldLogsCleaner*, DockerLogStreamer*, DockerLogConnRemover*), adding call depth without policy translation.",
+        "Runtime seam composition is heavily fragmented across multiple modules (goseg/startup_orchestrator.go, goseg/docker/orchestration/runtime_seams.go, goseg/shipworkflow/operations_runtime.go, goseg/main.go) with many merge/setIfNonNil/default wrappers and callback fields, while tests must build large stub structs (goseg/docker/orchestration/runtime_seams_test.go, goseg/startup_orchestrator_test.go, goseg/docker/orchestration/wireguard_test.go).",
+        "Interface/seam boundaries are bypassed by direct global config access in runtime-oriented code paths (e.g., goseg/routines/version.go calls config.UpdateConfTyped directly; goseg/shipworkflow/operations_runtime.go calls config.GetStartramConfig directly; goseg/broadcast/collectors/collectors.go directly reads config.StartramSettingsSnapshot/GetStartramConfig/BasePath), reducing interface honesty."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 42.0,
+        "interface_honesty": 64.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_log_facade",
+      "summary": "The routines log facade is a pure pass-through wrapper layer that adds indirection but no policy, behavior, or boundary value.",
+      "related_files": [
+        "goseg/routines/logs.go",
+        "goseg/routines/logstream/logs.go"
+      ],
+      "evidence": [
+        "goseg/routines/logs.go:9-49 re-exports SysLogStreamer/OldLogsCleaner/DockerLogStreamer/DockerLogConnRemover and WithContext variants, each forwarding directly to logstream.",
+        "The concrete logic remains in goseg/routines/logstream/logs.go:113-256, so wrapper-level API does not enforce additional contracts, metrics, auth, or retry semantics."
+      ],
+      "suggestion": "Either remove the facade and import `logstream` directly at callsites, or make `routines/logs.go` the true boundary by owning cross-cutting policy (shared cancellation, backoff/error policy, instrumentation) and keeping the lower package internal.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_seam_overfragmentation",
+      "summary": "Runtime seam design has fragmented into many callback bags and merge helpers, increasing indirection and test setup cost faster than leverage gained.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_seams.go",
+        "goseg/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/main.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "goseg/docker/orchestration/runtime_seams.go defines many ops structs and merge functions (mergeRuntime* / mergeStartup*) plus runtime conversion helpers, creating broad callback surfaces.",
+        "goseg/startup_orchestrator.go contains multiple runtime structs with merge + setIfNonNil patterns across initialization, transition, streaming, maintenance, and startram layers.",
+        "goseg/docker/orchestration/runtime_seams_test.go introduces many dedicated `*TestOps` adapter types to satisfy seam shape, indicating high ceremony to test ordinary behavior."
+      ],
+      "suggestion": "Collapse callback bags into fewer cohesive ports aligned to domain responsibilities (e.g., ConfigPort, ContainerPort, TransitionPublisher), then inject explicit small interfaces into orchestrators; keep per-test defaults via focused builders instead of parallel `merge` ecosystems.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "seam_overfragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "dishonest_runtime_boundaries",
+      "summary": "Several modules define runtime seams but still bypass them with direct global config calls, making abstractions non-authoritative and harder to reason about.",
+      "related_files": [
+        "goseg/routines/version.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "goseg/routines/version.go uses runtime ops in parts of the flow but directly calls config.UpdateConfTyped at multiple points, sidestepping injected configOps boundaries.",
+        "goseg/shipworkflow/operations_runtime.go directly references config.GetStartramConfig in alias logic despite having workflow runtime seams elsewhere.",
+        "goseg/broadcast/collectors/collectors.go mixes collector runtime callbacks with direct config.StartramSettingsSnapshot/GetStartramConfig/BasePath reads, splitting dependency ownership."
+      ],
+      "suggestion": "Enforce a strict rule: once a runtime port exists for a concern, all reads/writes for that concern must flow through it. Add lintable conventions or constructor-time wiring checks so direct package-global access cannot coexist with the same seam in one module.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "seam_boundary_leakage"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seams were added incrementally for testability without consolidating around stable domain ports.",
+      "Facade layers were retained after extraction, but without being upgraded to policy-enforcing boundaries.",
+      "Global config access remained convenient and was not prohibited after runtime abstractions were introduced."
+    ],
+    "likely_symptoms": [
+      "pass_through_log_facade",
+      "runtime_seam_overfragmentation",
+      "dishonest_runtime_boundaries"
+    ],
+    "possible_false_positives": []
+  }
+}

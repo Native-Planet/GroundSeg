@@ -22,13 +22,13 @@ func copyFileToVolumeWithTempContainer(
 	ctx := context.Background()
 	cli, err := dockerclient.New()
 	if err != nil {
-		return err
+		return fmt.Errorf("initialize docker client for %s: %w", writerContainerName, err)
 	}
 	defer cli.Close()
 
 	image, err := selectImage()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve writer image for %s: %w", writerContainerName, err)
 	}
 
 	// Best-effort cleanup in case a previous run left this writer container behind.
@@ -40,7 +40,7 @@ func copyFileToVolumeWithTempContainer(
 		Binds: []string{volumeName + ":" + targetPath},
 	}, nil, nil, writerContainerName)
 	if err != nil {
-		return err
+		return fmt.Errorf("create temporary writer container %s: %w", writerContainerName, err)
 	}
 	defer func() {
 		if removeErr := cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); removeErr != nil {
@@ -49,15 +49,15 @@ func copyFileToVolumeWithTempContainer(
 	}()
 
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return err
+		return fmt.Errorf("start temporary writer container %s: %w", writerContainerName, err)
 	}
 
 	tarReader, err := artifactwriter.TarArchiveForSingleFile(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare archive for file %s: %w", filePath, err)
 	}
 	if err := cli.CopyToContainer(ctx, resp.ID, targetPath, tarReader, container.CopyToContainerOptions{}); err != nil {
-		return err
+		return fmt.Errorf("copy file %s to container %s path %s: %w", filePath, writerContainerName, targetPath, err)
 	}
 	return nil
 }

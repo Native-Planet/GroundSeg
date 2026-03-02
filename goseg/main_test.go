@@ -127,26 +127,33 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 	killStarted := make(chan struct{}, 1)
 
 	runtime := c2cRuntime{
-		isNPBox: func() bool { return true },
-		connCheck: func() bool {
-			return false
+		device: c2cDeviceRuntime{
+			isNPBox:   func() bool { return true },
+			hasDevice: func() bool { return true },
+			wifiInfo:  nil,
 		},
-		isC2cMode: func() error {
+		connectivity: c2cConnectivityRuntime{
+			connCheck: func() bool {
+				return false
+			},
+			settingsSnap: func() config.ConnectivitySettings {
+				return config.ConnectivitySettings{C2cInterval: 42}
+			},
+		},
+		mode: c2cModeRuntime{
+			isC2cMode: func() error {
 			activated = true
 			return nil
 		},
-		setC2CMode: func(enabled bool) error {
+			setC2cMode: func(enabled bool) error {
 			setModeCalled = true
 			setModeValue = enabled
 			return nil
 		},
-		startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
+			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
 			killStarted <- struct{}{}
 		},
-		connectivity: func() config.ConnectivitySettings {
-			return config.ConnectivitySettings{C2cInterval: 42}
 		},
-		hasDevice: func() bool { return true },
 	}
 
 	C2cCheckWith(context.Background(), runtime)
@@ -166,19 +173,28 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 
 func TestC2cCheckSkipsWhenOnline(t *testing.T) {
 	activated := false
-	runtime := c2cRuntime{
-		isNPBox:   func() bool { return true },
-		connCheck: func() bool { return true },
-		isC2cMode: func() error {
-			activated = true
+		runtime := c2cRuntime{
+			device: c2cDeviceRuntime{
+				isNPBox:   func() bool { return true },
+				hasDevice: func() bool { return true },
+				wifiInfo:  nil,
+			},
+			connectivity: c2cConnectivityRuntime{
+				connCheck: func() bool { return true },
+				settingsSnap: func() config.ConnectivitySettings {
+					return config.ConnectivitySettings{}
+				},
+			},
+			mode: c2cModeRuntime{
+				isC2cMode: func() error {
+				activated = true
 			return nil
 		},
-		setC2CMode: func(enabled bool) error { return nil },
-		startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
+			setC2cMode: func(enabled bool) error { return nil },
+			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
 			t.Fatal("killSwitch should not be started when internet is available")
 		},
-		connectivity: func() config.ConnectivitySettings { return config.ConnectivitySettings{} },
-		hasDevice:    func() bool { return true },
+		},
 	}
 
 	C2cCheckWith(context.Background(), runtime)

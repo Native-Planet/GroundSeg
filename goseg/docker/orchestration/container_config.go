@@ -35,7 +35,7 @@ func mcContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, con
 }
 
 func wgContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, container.HostConfig, error) {
-	return wgContainerConfWithRuntime(wireguardRuntimeFromDocker(rt))
+	return wireguardRuntimeFromDocker(rt).wgContainerConf()
 }
 
 func llamaApiContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, container.HostConfig, error) {
