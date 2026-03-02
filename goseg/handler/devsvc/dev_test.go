@@ -141,9 +141,17 @@ func TestDevHandlerStartramReminderAndToggle(t *testing.T) {
 	nowForDev = func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }
 	urbitConfForDev = func(patp string) structs.UrbitDocker {
 		if patp == "~zod" {
-			return structs.UrbitDocker{StartramReminder: true}
+			return structs.UrbitDocker{
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{
+					StartramReminder: true,
+				},
+			}
 		}
-		return structs.UrbitDocker{StartramReminder: false}
+		return structs.UrbitDocker{
+			UrbitFeatureConfig: structs.UrbitFeatureConfig{
+				StartramReminder: false,
+			},
+		}
 	}
 	notified := ""
 	sendNotificationForDev = func(patp string, noti structs.HarkNotification) error {

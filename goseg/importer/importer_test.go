@@ -601,12 +601,12 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled := false
 	postCalled := false
-	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		t.Logf("configure workflow called")
 		return nil
 	}
-	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = true
 		t.Logf("post-import workflow called")
 		return nil
@@ -626,11 +626,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		return configureErr
 	}
-	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = false
 		return nil
 	}
@@ -647,11 +647,11 @@ func TestConfigureUploadedPierRunsPostImportWorkflowAndPropagatesErrors(t *testi
 
 	workflowCalled = false
 	postCalled = false
-	runtime.runImportedPierWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		workflowCalled = true
 		return nil
 	}
-	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext) error {
+	runtime.runImportedPierPostImportWorkflowFn = func(_ importedPierContext, _ importerRuntime) error {
 		postCalled = true
 		return postErr
 	}

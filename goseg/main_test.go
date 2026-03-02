@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"groundseg/startuporchestrator"
+
 	"groundseg/config"
 )
 
@@ -142,21 +144,23 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 		},
 		mode: c2cModeRuntime{
 			isC2cMode: func() error {
-			activated = true
-			return nil
-		},
+				activated = true
+				return nil
+			},
 			setC2cMode: func(enabled bool) error {
-			setModeCalled = true
-			setModeValue = enabled
-			return nil
-		},
+				setModeCalled = true
+				setModeValue = enabled
+				return nil
+			},
 			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
-			killStarted <- struct{}{}
-		},
+				killStarted <- struct{}{}
+			},
 		},
 	}
 
-	C2cCheckWith(context.Background(), runtime)
+	if err := C2cCheckWith(context.Background(), runtime); err != nil {
+		t.Fatalf("expected no error when enabling C2C mode, got %v", err)
+	}
 
 	if !activated {
 		t.Fatal("expected C2C mode activation call")
@@ -173,31 +177,33 @@ func TestC2cCheckActivatesModeWhenOfflineOnNPBox(t *testing.T) {
 
 func TestC2cCheckSkipsWhenOnline(t *testing.T) {
 	activated := false
-		runtime := c2cRuntime{
-			device: c2cDeviceRuntime{
-				isNPBox:   func() bool { return true },
-				hasDevice: func() bool { return true },
-				wifiInfo:  nil,
-			},
-			connectivity: c2cConnectivityRuntime{
-				connCheck: func() bool { return true },
-				settingsSnap: func() config.ConnectivitySettings {
-					return config.ConnectivitySettings{}
-				},
-			},
-			mode: c2cModeRuntime{
-				isC2cMode: func() error {
-				activated = true
-			return nil
+	runtime := c2cRuntime{
+		device: c2cDeviceRuntime{
+			isNPBox:   func() bool { return true },
+			hasDevice: func() bool { return true },
+			wifiInfo:  nil,
 		},
+		connectivity: c2cConnectivityRuntime{
+			connCheck: func() bool { return true },
+			settingsSnap: func() config.ConnectivitySettings {
+				return config.ConnectivitySettings{}
+			},
+		},
+		mode: c2cModeRuntime{
+			isC2cMode: func() error {
+				activated = true
+				return nil
+			},
 			setC2cMode: func(enabled bool) error { return nil },
 			startKillSwitch: func(context.Context, func() config.ConnectivitySettings) {
-			t.Fatal("killSwitch should not be started when internet is available")
-		},
+				t.Fatal("killSwitch should not be started when internet is available")
+			},
 		},
 	}
 
-	C2cCheckWith(context.Background(), runtime)
+	if err := C2cCheckWith(context.Background(), runtime); err != nil {
+		t.Fatalf("expected online checks to skip C2C mode with no error, got %v", err)
+	}
 	if activated {
 		t.Fatal("C2cCheck should not activate C2C mode when internet is available")
 	}
@@ -232,7 +238,7 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 	gotServer := false
 	gotC2c := false
 	runtime := bootstrapRuntimeWith(
-		func(_ context.Context, opts StartupOptions) error {
+		func(_ context.Context, opts startuporchestrator.StartupOptions) error {
 			if opts.HTTPPort != expectedPort {
 				t.Fatalf("expected startup port %d, got %d", expectedPort, opts.HTTPPort)
 			}
@@ -245,7 +251,9 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 			if err := opts.StartServer(context.Background(), opts.HTTPPort); err != nil {
 				return err
 			}
-			opts.StartC2cCheck(context.Background())
+			if err := opts.StartC2cCheck(context.Background()); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(_ context.Context, httpPort int) error {
@@ -253,8 +261,9 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 			gotServer = true
 			return nil
 		},
-		func(context.Context) {
+		func(context.Context) error {
 			gotC2c = true
+			return nil
 		},
 	)
 
@@ -275,7 +284,7 @@ func TestBootstrapSubsystemsForwardsCallbacks(t *testing.T) {
 func TestBootstrapSubsystemsPropagatesBootstrapError(t *testing.T) {
 	expectedErr := errors.New("bootstrap failed")
 	runtime := bootstrapRuntimeWith(
-		func(context.Context, StartupOptions) error { return expectedErr },
+		func(context.Context, startuporchestrator.StartupOptions) error { return expectedErr },
 		func(context.Context, int) error { return nil },
 		nil,
 	)

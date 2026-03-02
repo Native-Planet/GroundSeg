@@ -195,21 +195,37 @@ func PublishVersionMetadata(version structs.Version, channel structs.Channel) er
 	return nil
 }
 
-// CheckVersion fetches release metadata and returns the channel for the current branch.
-func CheckVersion() (structs.Channel, bool) {
+// CheckVersionWithError fetches release metadata and returns the channel for the
+// current branch.
+func CheckVersionWithError() (structs.Channel, error) {
 	versMutex.Lock()
 	defer versMutex.Unlock()
 
 	conf := Conf()
 	_, channel, err := ResolveLatestChannel(conf)
 	if err != nil {
-		return GetVersionChannel(), false
+		return GetVersionChannel(), fmt.Errorf("resolve latest version channel: %w", err)
 	}
-	return channel, true
+	return channel, nil
+}
+
+// CheckVersion fetches release metadata and returns the channel for the current
+// branch. It preserves the legacy boolean contract by adapting the explicit error
+// variant.
+func CheckVersion() (structs.Channel, bool) {
+	channel, err := CheckVersionWithError()
+	return channel, err == nil
 }
 
 // SyncVersionInfo fetches remote metadata, persists it, and refreshes version globals.
 func SyncVersionInfo() (structs.Channel, bool) {
+	channel, err := SyncVersionInfoWithError()
+	return channel, err == nil
+}
+
+// SyncVersionInfoWithError fetches remote metadata, persists it, and refreshes
+// version globals, returning the active channel or an error.
+func SyncVersionInfoWithError() (structs.Channel, error) {
 	versMutex.Lock()
 	defer versMutex.Unlock()
 
@@ -218,16 +234,16 @@ func SyncVersionInfo() (structs.Channel, bool) {
 	if err != nil {
 		zap.L().Warn(fmt.Sprintf("Unable to resolve latest version channel: %v", err))
 		versionStore.SetServerReady(false)
-		return GetVersionChannel(), false
+		return GetVersionChannel(), fmt.Errorf("resolve latest version channel: %w", err)
 	}
 
 	if err := PublishVersionMetadata(fetchedVersion, channel); err != nil {
 		errmsg := fmt.Sprintf("Failed to persist version metadata: %v", err)
 		zap.L().Error(errmsg)
 		versionStore.SetServerReady(false)
-		return GetVersionChannel(), false
+		return GetVersionChannel(), fmt.Errorf("publish version metadata: %w", err)
 	}
-	return GetVersionChannel(), true
+	return GetVersionChannel(), nil
 }
 
 // write the defaults.VersionInfo value to disk

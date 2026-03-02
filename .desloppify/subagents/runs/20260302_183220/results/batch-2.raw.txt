@@ -1,0 +1,130 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 71.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Docker runtime dependencies are declared and wired in multiple parallel structures (`Runtime*Ops` in `runtime_ops.go`, `Runtime` projection in `runtime_core.go`, and `dockerRuntime`/`UrbitRuntime`/`WireguardRuntime` constructors in `runtime_docker.go`) with overlapping function-field inventories.",
+        "Session management duplicates nearly identical auth/unauth traversal and mutation logic (`BroadcastUnauth` vs `BroadcastAuth`, and repeated cleanup loops) while `session.go` adds additional map/slice-copy state management methods over the same structures.",
+        "`system/system.go` mixes host metrics, filesystem discovery, cron script provisioning, and generic shell execution; neighboring `wifi.go` and `disk.go` each add their own runtime/command seams, creating fragmented but overlapping responsibility boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_wiring_triplication",
+      "summary": "Runtime dependency wiring is triplicated across orchestration layers, increasing drift risk and cognitive load.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_docker.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines large `Runtime*Ops` structs and default constructors (for example `defaultRuntimeContainerOps`/`defaultRuntimeUrbit`).",
+        "`runtime_core.go` re-projects similar dependencies into `DockerTransitionRuntime` and `DockerHealthRuntime` via manual field-by-field assignment.",
+        "`runtime_docker.go` introduces another constructor path (`newDockerRuntime`, `newUrbitRuntime`, `newWireguardRuntime`) that re-wires many of the same dependencies again."
+      ],
+      "suggestion": "Consolidate runtime assembly into a single composition source (for example one canonical builder + narrow adapters generated from it), and derive transition/health views from that canonical runtime instead of duplicating field inventories.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_dependency_composition"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "system_package_boundary_blur",
+      "summary": "System package files mix unrelated operational concerns, weakening module cohesion.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/wifi.go",
+        "goseg/system/disk.go"
+      ],
+      "evidence": [
+        "`system.go` combines hardware telemetry (`GetMemory`, `GetCPU`, `GetTemp`), mount inspection (`GetDisk`), cron mutation (`FixerScript`, `addCron`), and process execution (`runCommand`).",
+        "`wifi.go` depends on command execution semantics and global mutable runtime state while also implementing Wi-Fi domain operations.",
+        "`disk.go` defines another broad command/runtime seam (`runDiskCommandFn`, `mountAllCommandFn`, `mkfsExt4CommandFn`) and filesystem mutation logic, overlapping infrastructure responsibilities already present in `system.go`."
+      ],
+      "suggestion": "Split by bounded contexts: isolate command/process adapters into a dedicated infra layer, keep Wi-Fi and disk services domain-focused, and move installer/cron behavior to a separate provisioning component.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "boundaryless_system_module"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_dual_map_duplication",
+      "summary": "Auth/unauth session handling duplicates traversal and mutation patterns instead of using a unified collection abstraction.",
+      "related_files": [
+        "goseg/session/ws.go",
+        "goseg/session/session.go"
+      ],
+      "evidence": [
+        "`ws.go` has near-duplicate broadcast implementations (`BroadcastUnauth` and `BroadcastAuth`) and duplicated stale cleanup loops for `AuthClients` and `UnauthClients`.",
+        "`ws.go` also repeats map-scan logic across `findMuConnLocked`, `HasAnyAuthConnection`, and `removeConnectionByConnLocked`.",
+        "`session.go` adds another layer of repetitive copy/lock boilerplate for session slices and nested maps (`SetSysLogSessions`, `SetSysSessionsToRemove`, `SetDockerLogSessions`)."
+      ],
+      "suggestion": "Introduce a shared bucket-iteration helper (or typed collection) for connection maps and lifecycle operations; centralize scan/remove/broadcast paths to one implementation parameterized by bucket type.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "duplicated_state_collection_algorithms"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "transition_workflow_pattern_sprawl",
+      "summary": "Transition orchestration patterns are manually repeated across workflow handlers, making behavior consistency harder to enforce.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`urbit_operations_runtime.go` contains many operations (`setUrbitDomain`, `setMinIODomain`, `toggleChopOnVereUpdate`, `togglePower`, `toggleNetwork`) that each hand-build similar transition templates and step closures.",
+        "`rectify.go` keeps a large transition reducer map and separate event-loop wiring for transition domains, indicating multiple bespoke transition orchestration styles in neighboring subsystems."
+      ],
+      "suggestion": "Define a single transition-operation DSL/service with reusable policies (start/success/clear/error semantics, persistence hooks, restart policies), then express handlers declaratively to reduce per-operation bespoke control flow.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "transition_orchestration_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_dependency_setup_repetition",
+      "summary": "Large test dependency structs are repeatedly assembled inline, obscuring test intent and increasing fixture maintenance cost.",
+      "related_files": [
+        "goseg/handler/systemsvc/system_test.go",
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "`system_test.go` repeatedly constructs verbose `SystemDependencies` literals with many mostly-static callbacks across test cases.",
+        "`startup_orchestrator_test.go` repeatedly builds runtime structs and callback maps (`StartupRuntime`, `startBackgroundServicesRuntime`, switch-based override helper) to test narrow behaviors.",
+        "`main_test.go` similarly assembles deep runtime literals for C2C behavior tests, duplicating setup shape across scenarios."
+      ],
+      "suggestion": "Adopt test builders with sensible defaults and scenario-specific overrides (fluent helpers or table-driven fixture factories) so each test declares only behavior-relevant differences.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual function-field dependency injection expanded without a canonical assembly boundary.",
+      "State is modeled as parallel maps/slices (auth vs unauth, many runtime structs) without shared collection abstractions.",
+      "Transition/state-machine concerns are implemented through repeated ad hoc control-flow templates."
+    ],
+    "likely_symptoms": [
+      "runtime_wiring_triplication",
+      "session_dual_map_duplication",
+      "transition_workflow_pattern_sprawl"
+    ],
+    "possible_false_positives": []
+  }
+}

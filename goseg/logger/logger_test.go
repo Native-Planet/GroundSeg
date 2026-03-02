@@ -166,23 +166,34 @@ func resetLoggerInitForTest(t *testing.T) {
 	t.Helper()
 	originalErr := loggerInitErr
 	originalState := loggerInitState
-	originalMkdir := mkdirAllFn
 	t.Cleanup(func() {
 		loggerInitErr = originalErr
 		loggerInitState = originalState
-		mkdirAllFn = originalMkdir
 	})
 	loggerInitState = loggerInitNotInitialized
 	loggerInitErr = nil
 }
 
+func loggerRuntimeForTest(overrides loggerRuntime) loggerRuntime {
+	runtime := defaultLoggerRuntime()
+	if overrides.mkdirAllFn != nil {
+		runtime.mkdirAllFn = overrides.mkdirAllFn
+	}
+	if overrides.pathResolverFn != nil {
+		runtime.pathResolverFn = overrides.pathResolverFn
+	}
+	return runtime
+}
+
 func TestInitializeReturnsErrorWhenLogDirectoryFails(t *testing.T) {
 	resetLoggerInitForTest(t)
-	mkdirAllFn = func(_ string, _ os.FileMode) error {
-		return errors.New("permission denied")
-	}
+	runtime := loggerRuntimeForTest(loggerRuntime{
+		mkdirAllFn: func(_ string, _ os.FileMode) error {
+			return errors.New("permission denied")
+		},
+	})
 
-	err := Initialize()
+	err := InitializeWithRuntime(runtime)
 	if err == nil {
 		t.Fatalf("expected Initialize to return an error when log directory creation fails")
 	}
@@ -198,11 +209,16 @@ func TestInitializeSucceedsWithConfiguredPath(t *testing.T) {
 	resetLoggerInitForTest(t)
 	tmpDir := filepath.Join(t.TempDir(), "groundseg-logs")
 	t.Setenv("GS_BASE_PATH", tmpDir)
-	mkdirAllFn = func(path string, _ os.FileMode) error {
-		return nil
-	}
+	runtime := loggerRuntimeForTest(loggerRuntime{
+		pathResolverFn: func() (string, error) {
+			return tmpDir + string(os.PathSeparator), nil
+		},
+		mkdirAllFn: func(path string, _ os.FileMode) error {
+			return nil
+		},
+	})
 
-	err := Initialize()
+	err := InitializeWithRuntime(runtime)
 	if err != nil {
 		t.Fatalf("expected Initialize to succeed with writable configured path, got: %v", err)
 	}

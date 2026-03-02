@@ -1,0 +1,69 @@
+{
+  "batch": "Cross-cutting Sweep",
+  "batch_index": 5,
+  "assessments": {
+    "error_consistency": 82.0
+  },
+  "dimension_notes": {
+    "error_consistency": {
+      "evidence": [
+        "The logging path mixes propagation styles: some functions return wrapped errors while others only log and return without a failure signal (e.g., streamToConnWithContext).",
+        "Version update code mixes detailed error contracts and boolean-only failure signaling in the same subsystem, which drops causal context for callers."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "medium"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "error_consistency",
+      "identifier": "logstream_error_propagation_gap",
+      "summary": "Log streaming workers drop runtime errors instead of propagating actionable context",
+      "related_files": [
+        "goseg/routines/logstream/logs.go",
+        "goseg/logger/logger.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "goseg/routines/logstream/logs.go streamToConnWithContext logs Docker client/log read/write failures and returns from a void function, so callers cannot observe or react to failure causes.",
+        "goseg/logger/logger.go getDockerLogs returns raw errors (e.g., direct `return []byte{}, err`) while most other cross-module runtime paths use contextual wrapping (`fmt.Errorf(...: %w)`).",
+        "goseg/startuporchestrator/startup_orchestrator.go already uses an error channel pattern for background services, showing a different failure contract for similar long-running goroutine work."
+      ],
+      "suggestion": "Standardize background task failure handling in the logging subsystem: return or publish structured errors from log stream workers (matching startup supervisor behavior), and wrap boundary errors with operation/container context before propagation.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    },
+    {
+      "dimension": "error_consistency",
+      "identifier": "version_api_error_signal_loss",
+      "summary": "Version APIs inconsistently collapse errors to bool, losing diagnostics on failure paths",
+      "related_files": [
+        "goseg/config/version.go",
+        "goseg/routines/version.go"
+      ],
+      "evidence": [
+        "goseg/config/version.go has detailed error-returning internals (ResolveLatestChannel, PublishVersionMetadata, fetchVersionFromServer) but CheckVersion/SyncVersionInfo convert failures to `(channel, false)` and suppress causal errors.",
+        "goseg/routines/version.go uses explicit wrapped errors and consecutive-failure thresholds for updater loops, creating a different contract from the bool-only APIs in the same domain."
+      ],
+      "suggestion": "Unify version failure contracts around explicit `error` returns; keep bool helpers as thin adapters only where needed, and preserve root-cause errors for callers that need retry/backoff and telemetry decisions.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "error_contract_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Subsystems evolved with different error contracts (boolean status, logged-only failure, and wrapped error propagation) without a shared boundary policy.",
+      "Long-running goroutine workflows lack a uniform error reporting interface."
+    ],
+    "likely_symptoms": [
+      "logstream_error_propagation_gap",
+      "version_api_error_signal_loss"
+    ],
+    "possible_false_positives": []
+  }
+}

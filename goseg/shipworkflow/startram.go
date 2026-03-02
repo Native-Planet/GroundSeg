@@ -437,8 +437,8 @@ func runStartramReminderWithRuntime(runtime startramRuntime, remind bool) error 
 		steps = append(steps, workflow.Step{
 			Name: fmt.Sprintf("update startram reminder for %s", pier),
 			Run: func() error {
-				return startramRuntime.UpdateUrbitFn(pier, func(shipConf *structs.UrbitDocker) error {
-					shipConf.StartramReminder = remind
+				return startramRuntime.UpdateUrbitFeatureConfigFn(pier, func(featureConf *structs.UrbitFeatureConfig) error {
+					featureConf.StartramReminder = remind
 					return nil
 				})
 			},

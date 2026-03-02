@@ -13,25 +13,25 @@ import (
 
 func testLlamaRuntime(dockerDir string) dockerRuntime {
 	return dockerRuntime{
-		contextOps: dockerRuntimeContextOps{
+		contextOps: RuntimeContextOps{
 			DockerDirFn: func() string { return dockerDir },
 		},
-		fileOps: dockerRuntimeFileOps{
+		fileOps: RuntimeFileOps{
 			WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		},
-		containerOps: dockerRuntimeContainerOps{
+		containerOps: RuntimeContainerOps{
 			StopContainerByNameFn:  func(string) error { return nil },
 			StartContainerFn:       func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 			UpdateContainerStateFn: func(string, structs.ContainerState) {},
 			AddOrGetNetworkFn:      func(string) (string, error) { return "default", nil },
 		},
-		configOps: dockerRuntimeConfigOps{
+		configOps: RuntimeSnapshotOps{
 			ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
 		},
-		urbitOps: dockerRuntimeUrbitOps{
+		urbitOps: RuntimeUrbitOps{
 			UrbitConfAllFn: func() map[string]structs.UrbitDocker { return map[string]structs.UrbitDocker{} },
 		},
-		volumeOps: dockerRuntimeVolumeOps{
+		volumeOps: RuntimeVolumeOps{
 			VolumeExistsFn: func(string) (bool, error) { return false, nil },
 			CreateVolumeFn: func(string) error { return nil },
 		},
@@ -121,8 +121,16 @@ func TestLlamaApiContainerConfBuildsExpectedConfig(t *testing.T) {
 	dockerDir := t.TempDir()
 	rt := testLlamaRuntime(dockerDir)
 	urbitConfig := map[string]structs.UrbitDocker{
-		"~zod": {BootStatus: "boot"},
-		"~bus": {BootStatus: "stopped"},
+		"~zod": {
+			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+				BootStatus: "boot",
+			},
+		},
+		"~bus": {
+			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+				BootStatus: "stopped",
+			},
+		},
 	}
 	rt.urbitOps.UrbitConfAllFn = func() map[string]structs.UrbitDocker {
 		return urbitConfig

@@ -54,6 +54,9 @@ func AptUpdateLoopWithContext(ctx context.Context) error {
 
 func aptUpdateCheckInterval(conf structs.SysConfig) time.Duration {
 	val := time.Duration(conf.LinuxUpdates.Value)
+	if val <= 0 {
+		val = 1
+	}
 	var interval time.Duration
 	if interv := conf.LinuxUpdates.Interval; interv == "week" {
 		interval = 7 * (time.Hour * 24)

@@ -22,25 +22,29 @@ type NetworkRuntime struct {
 	OperationTimeout  time.Duration
 }
 
-func NewNetworkRuntime() NetworkRuntime {
-	return NetworkRuntime{
-		DockerClientNewFn: dockerclient.New,
-		OperationTimeout:  30 * time.Second,
-	}
+const defaultNetworkOperationTimeout = 30 * time.Second
+
+var defaultNetworkRuntime = NetworkRuntime{
+	DockerClientNewFn: dockerclient.New,
+	OperationTimeout:  defaultNetworkOperationTimeout,
 }
 
-func (runtime NetworkRuntime) withDefaults() NetworkRuntime {
-	if runtime.DockerClientNewFn == nil {
-		runtime.DockerClientNewFn = dockerclient.New
+func NewNetworkRuntime() NetworkRuntime {
+	return defaultNetworkRuntime
+}
+
+func NewNetworkRuntimeWith(overrides NetworkRuntime) NetworkRuntime {
+	runtime := defaultNetworkRuntime
+	if overrides.DockerClientNewFn != nil {
+		runtime.DockerClientNewFn = overrides.DockerClientNewFn
 	}
-	if runtime.OperationTimeout <= 0 {
-		runtime.OperationTimeout = 30 * time.Second
+	if overrides.OperationTimeout > 0 {
+		runtime.OperationTimeout = overrides.OperationTimeout
 	}
 	return runtime
 }
 
 func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return err
@@ -74,7 +78,6 @@ func (runtime NetworkRuntime) KillContainerUsingPort(port uint16) error {
 }
 
 func (runtime NetworkRuntime) GetContainerNetwork(name string) (string, error) {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return "", fmt.Errorf("failed to create docker client for network lookup of %s: %w", name, err)
@@ -94,7 +97,6 @@ func (runtime NetworkRuntime) GetContainerNetwork(name string) (string, error) {
 }
 
 func (runtime NetworkRuntime) CreateVolume(name string) error {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
@@ -112,7 +114,6 @@ func (runtime NetworkRuntime) CreateVolume(name string) error {
 }
 
 func (runtime NetworkRuntime) DeleteVolume(name string) error {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
@@ -129,7 +130,6 @@ func (runtime NetworkRuntime) DeleteVolume(name string) error {
 }
 
 func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, content string) error {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return fmt.Errorf("failed to create docker client for volume %q: %w", name, err)
@@ -152,7 +152,6 @@ func (runtime NetworkRuntime) WriteFileToVolume(name string, file string, conten
 }
 
 func (runtime NetworkRuntime) VolumeExists(volumeName string) (bool, error) {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return false, fmt.Errorf("failed to create client for volume check: %w", err)
@@ -174,7 +173,6 @@ func (runtime NetworkRuntime) VolumeExists(volumeName string) (bool, error) {
 }
 
 func (runtime NetworkRuntime) AddOrGetNetwork(networkName string) (string, error) {
-	runtime = runtime.withDefaults()
 	cli, err := runtime.DockerClientNewFn()
 	if err != nil {
 		return "", fmt.Errorf("failed to create client for network lookup: %w", err)

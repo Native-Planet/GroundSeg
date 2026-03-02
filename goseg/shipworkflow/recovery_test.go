@@ -36,7 +36,7 @@ func (runtime testRecoveryRuntimeContainer) runtimeOps() orchestration.RuntimeCo
 			}
 			return runtime.deleteContainerFn(patp)
 		},
-		GetContainerStateFn:   func() map[string]structs.ContainerState { return nil },
+		GetContainerStateFn:    func() map[string]structs.ContainerState { return nil },
 		UpdateContainerStateFn: func(string, structs.ContainerState) {},
 		GetShipStatusFn: func(piers []string) (map[string]string, error) {
 			if runtime.getShipStatusFn == nil {
@@ -66,10 +66,10 @@ func (runtime testRecoveryRuntimeUrbit) runtimeOps() orchestration.RuntimeUrbitO
 			}
 			return runtime.urbitConfFn(patp)
 		},
-		UpdateUrbitFn:        func(string, func(*structs.UrbitDocker) error) error { return nil },
+		UpdateUrbitFn:         func(string, func(*structs.UrbitDocker) error) error { return nil },
 		GetContainerNetworkFn: func(string) (string, error) { return "", nil },
-		GetLusCodeFn:         func(string) (string, error) { return "", nil },
-		ClearLusCodeFn:       func(string) {},
+		GetLusCodeFn:          func(string) (string, error) { return "", nil },
+		ClearLusCodeFn:        func(string) {},
 	}
 }
 
@@ -80,8 +80,8 @@ type testRecoveryRuntimeConfig struct {
 func (runtime testRecoveryRuntimeConfig) runtimeOps() orchestration.RuntimeConfigOps {
 	return orchestration.RuntimeConfigOps{
 		UpdateConfTypedFn: func(...config.ConfUpdateOption) error { return nil },
-		WithWgOnFn:       func(enabled bool) config.ConfUpdateOption { return config.WithWgOn(enabled) },
-		CycleWgKeyFn:     func() error { return nil },
+		WithWgOnFn:        func(enabled bool) config.ConfUpdateOption { return config.WithWgOn(enabled) },
+		CycleWgKeyFn:      func() error { return nil },
 		BarExitFn: func(patp string) error {
 			if runtime.barExitFn == nil {
 				return nil
@@ -125,9 +125,9 @@ func TestRecoverWireguardFleet(t *testing.T) {
 	t.Parallel()
 
 	var calls []string
-		runtime := orchestration.NewRuntime(
-			orchestration.WithContainerOps(testRecoveryRuntimeContainer{
-				getShipStatusFn: func(piers []string) (map[string]string, error) {
+	runtime := orchestration.NewRuntime(
+		orchestration.WithContainerOps(testRecoveryRuntimeContainer{
+			getShipStatusFn: func(piers []string) (map[string]string, error) {
 				calls = append(calls, "get-status:"+strings.Join(piers, ","))
 				return map[string]string{
 					"sampel": "Up 20 minutes",
@@ -142,41 +142,45 @@ func TestRecoverWireguardFleet(t *testing.T) {
 				calls = append(calls, "delete:"+name)
 				return nil
 			},
-				restartContainerFn: func(name string) error {
-					calls = append(calls, "restart:"+name)
-					return nil
-				},
-			}.runtimeOps()),
-			orchestration.WithUrbitOps(testRecoveryRuntimeUrbit{
-				urbitConfFn: func(patp string) structs.UrbitDocker {
-					calls = append(calls, "urbit-conf:"+patp)
-					if patp == "sampel" {
-					return structs.UrbitDocker{Network: "wireguard"}
+			restartContainerFn: func(name string) error {
+				calls = append(calls, "restart:"+name)
+				return nil
+			},
+		}.runtimeOps()),
+		orchestration.WithUrbitOps(testRecoveryRuntimeUrbit{
+			urbitConfFn: func(patp string) structs.UrbitDocker {
+				calls = append(calls, "urbit-conf:"+patp)
+				if patp == "sampel" {
+					return structs.UrbitDocker{
+						UrbitNetworkConfig: structs.UrbitNetworkConfig{Network: "wireguard"},
+					}
 				}
-				return structs.UrbitDocker{Network: "default"}
-				},
-			}.runtimeOps()),
-			orchestration.WithConfigOps(testRecoveryRuntimeConfig{
-				barExitFn: func(patp string) error {
-					calls = append(calls, "bar-exit:"+patp)
-					return nil
-				},
-			}.runtimeOps()),
-			orchestration.WithLoadOps(testRecoveryRuntimeLoad{
-				loadUrbitsFn: func() error {
-					calls = append(calls, "load:urbits")
-					return nil
-				},
+				return structs.UrbitDocker{
+					UrbitNetworkConfig: structs.UrbitNetworkConfig{Network: "default"},
+				}
+			},
+		}.runtimeOps()),
+		orchestration.WithConfigOps(testRecoveryRuntimeConfig{
+			barExitFn: func(patp string) error {
+				calls = append(calls, "bar-exit:"+patp)
+				return nil
+			},
+		}.runtimeOps()),
+		orchestration.WithLoadOps(testRecoveryRuntimeLoad{
+			loadUrbitsFn: func() error {
+				calls = append(calls, "load:urbits")
+				return nil
+			},
 			loadMCFn: func() error {
 				calls = append(calls, "load:mc")
 				return nil
 			},
 			loadMinIOsFn: func() error {
 				calls = append(calls, "load:minios")
-					return nil
-				},
-			}.runtimeOps()),
-		)
+				return nil
+			},
+		}.runtimeOps()),
+	)
 
 	if err := RecoverWireguardFleet(NewWireguardRecoveryRuntime(runtime), []string{"sampel", "zod"}, true); err != nil {
 		t.Fatalf("RecoverWireguardFleet() unexpected error: %v", err)
@@ -200,9 +204,9 @@ func TestRecoverWireguardFleetAggregatesErrors(t *testing.T) {
 	var calls []string
 	statusErr := errors.New("status down")
 	deleteErr := errors.New("delete failed")
-		runtime := orchestration.NewRuntime(
-			orchestration.WithContainerOps(testRecoveryRuntimeContainer{
-				getShipStatusFn: func(piers []string) (map[string]string, error) {
+	runtime := orchestration.NewRuntime(
+		orchestration.WithContainerOps(testRecoveryRuntimeContainer{
+			getShipStatusFn: func(piers []string) (map[string]string, error) {
 				calls = append(calls, "get-status")
 				return map[string]string{"sampel": "Up 2m"}, statusErr
 			},
@@ -211,21 +215,23 @@ func TestRecoverWireguardFleetAggregatesErrors(t *testing.T) {
 				calls = append(calls, "delete:"+name)
 				return deleteErr
 			},
-				restartContainerFn: func(string) error { return nil },
-			}.runtimeOps()),
-			orchestration.WithUrbitOps(testRecoveryRuntimeUrbit{
-				urbitConfFn: func(patp string) structs.UrbitDocker {
-					calls = append(calls, "urbit-conf")
-					return structs.UrbitDocker{Network: "wireguard"}
-				},
-			}.runtimeOps()),
-			orchestration.WithLoadOps(testRecoveryRuntimeLoad{
-				loadMinIOsFn: func() error {
-					calls = append(calls, "load-minios")
-					return nil
-				},
-			}.runtimeOps()),
-		)
+			restartContainerFn: func(string) error { return nil },
+		}.runtimeOps()),
+		orchestration.WithUrbitOps(testRecoveryRuntimeUrbit{
+			urbitConfFn: func(patp string) structs.UrbitDocker {
+				calls = append(calls, "urbit-conf")
+				return structs.UrbitDocker{
+					UrbitNetworkConfig: structs.UrbitNetworkConfig{Network: "wireguard"},
+				}
+			},
+		}.runtimeOps()),
+		orchestration.WithLoadOps(testRecoveryRuntimeLoad{
+			loadMinIOsFn: func() error {
+				calls = append(calls, "load-minios")
+				return nil
+			},
+		}.runtimeOps()),
+	)
 
 	err := RecoverWireguardFleet(NewWireguardRecoveryRuntime(runtime), []string{"sampel"}, false)
 	if err == nil {

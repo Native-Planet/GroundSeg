@@ -8,25 +8,26 @@ import (
 )
 
 func TestRemoveSysLogSessionsDropsQueuedConnections(t *testing.T) {
-	originalSessions := SysLogSessions()
-	originalToRemove := SysSessionsToRemove()
+	systemRuntime := LogstreamRuntimeState()
+	originalSessions := systemRuntime.SysLogSessions()
+	originalToRemove := systemRuntime.SysSessionsToRemove()
 	t.Cleanup(func() {
-		SetSysLogSessions(originalSessions)
-		SetSysSessionsToRemove(originalToRemove)
+		systemRuntime.SetSysLogSessions(originalSessions)
+		systemRuntime.SetSysSessionsToRemove(originalToRemove)
 	})
 
 	a := &websocket.Conn{}
 	b := &websocket.Conn{}
 	c := &websocket.Conn{}
-	SetSysLogSessions([]*websocket.Conn{a, b, c})
-	SetSysSessionsToRemove([]*websocket.Conn{b})
+	systemRuntime.SetSysLogSessions([]*websocket.Conn{a, b, c})
+	systemRuntime.SetSysSessionsToRemove([]*websocket.Conn{b})
 
-	RemoveSysLogSessions()
+	systemRuntime.RemoveSysLogSessions()
 
-	if !reflect.DeepEqual(SysLogSessions(), []*websocket.Conn{a, c}) {
-		t.Fatalf("unexpected remaining sessions: %+v", SysLogSessions())
+	if !reflect.DeepEqual(systemRuntime.SysLogSessions(), []*websocket.Conn{a, c}) {
+		t.Fatalf("unexpected remaining sessions: %+v", systemRuntime.SysLogSessions())
 	}
-	if len(SysSessionsToRemove()) != 0 {
-		t.Fatalf("expected SysSessionsToRemove to be cleared, got %+v", SysSessionsToRemove())
+	if len(systemRuntime.SysSessionsToRemove()) != 0 {
+		t.Fatalf("expected SysSessionsToRemove to be cleared, got %+v", systemRuntime.SysSessionsToRemove())
 	}
 }

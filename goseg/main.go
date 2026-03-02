@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/docker/orchestration/subsystem"
-	"groundseg/internal/seams"
 	"groundseg/logger"
+	"groundseg/startuporchestrator"
 	"groundseg/system"
 	"io/fs"
 	"mime"
@@ -63,7 +63,7 @@ type bootstrapRuntime struct {
 }
 
 type bootstrapOrchestratorRuntime struct {
-	RunBootstrapFn func(context.Context, StartupOptions) error
+	RunBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error
 }
 
 type bootstrapServerRuntime struct {
@@ -71,7 +71,7 @@ type bootstrapServerRuntime struct {
 }
 
 type bootstrapConnectivityRuntime struct {
-	RunC2cCheckFn func(context.Context)
+	RunC2cCheckFn func(context.Context) error
 }
 
 type serverRuntime struct {
@@ -79,53 +79,33 @@ type serverRuntime struct {
 	shutdown       func(context.Context, *http.Server) error
 }
 
-func defaultBootstrapRuntime() bootstrapRuntime {
-	return bootstrapRuntimeWith(
-		Bootstrap,
-		func(ctx context.Context, httpPort int) error {
-			return runServer(ctx, httpPort, defaultServerRuntime())
-		},
-		func(ctx context.Context) {
-			go C2cCheckWith(ctx, defaultC2cRuntime())
-		},
-	)
-}
-
 func bootstrapRuntimeWith(
-	runBootstrapFn func(context.Context, StartupOptions) error,
+	runBootstrapFn func(context.Context, startuporchestrator.StartupOptions) error,
 	startServerFn func(context.Context, int) error,
-	runC2cCheckFn func(context.Context),
+	runC2cCheckFn func(context.Context) error,
 ) bootstrapRuntime {
-	return seams.Merge(
-		defaultBootstrapRuntimeBase(),
-		bootstrapRuntime{
-			Orchestrator: bootstrapOrchestratorRuntime{
-				RunBootstrapFn: runBootstrapFn,
-			},
-			Server: bootstrapServerRuntime{
-				StartServerFn: startServerFn,
-			},
-			Connectivity: bootstrapConnectivityRuntime{
-				RunC2cCheckFn: runC2cCheckFn,
-			},
-		},
-	)
-}
-
-func defaultBootstrapRuntimeBase() bootstrapRuntime {
+	if runBootstrapFn == nil {
+		runBootstrapFn = startuporchestrator.Bootstrap
+	}
+	if startServerFn == nil {
+		startServerFn = func(ctx context.Context, httpPort int) error {
+			return runServer(ctx, httpPort, defaultServerRuntime())
+		}
+	}
+	if runC2cCheckFn == nil {
+		runC2cCheckFn = func(ctx context.Context) error {
+			return C2cCheckWith(ctx, defaultC2cRuntime())
+		}
+	}
 	return bootstrapRuntime{
 		Orchestrator: bootstrapOrchestratorRuntime{
-			RunBootstrapFn: Bootstrap,
+			RunBootstrapFn: runBootstrapFn,
 		},
 		Server: bootstrapServerRuntime{
-			StartServerFn: func(ctx context.Context, httpPort int) error {
-				return runServer(ctx, httpPort, defaultServerRuntime())
-			},
+			StartServerFn: startServerFn,
 		},
 		Connectivity: bootstrapConnectivityRuntime{
-			RunC2cCheckFn: func(ctx context.Context) {
-				go C2cCheckWith(ctx, defaultC2cRuntime())
-			},
+			RunC2cCheckFn: runC2cCheckFn,
 		},
 	}
 }
@@ -243,7 +223,7 @@ func defaultC2cRuntimeWithContext(runtimeContext c2cRuntimeContext) c2cRuntime {
 	}
 }
 
-func C2cCheckWith(ctx context.Context, runtime c2cRuntime) {
+func C2cCheckWith(ctx context.Context, runtime c2cRuntime) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -257,23 +237,27 @@ func C2cCheckWith(ctx context.Context, runtime c2cRuntime) {
 			wifiEnabled, wifiErr = runtime.device.wifiInfo()
 			if wifiErr != nil {
 				logger.Warnf("Failed to read wifi radio state: %v", wifiErr)
-				return
+				return wifiErr
 			}
 		}
 		if !wifiEnabled {
-			return
+			return nil
 		}
 		if err := runtime.mode.isC2cMode(); err != nil {
 			logger.Errorf("Error activating C2C mode: %v", err)
+			return err
 		} else {
 			logger.Info("GroundSeg is in C2C Mode")
-			_ = runtime.mode.setC2cMode(true)
+			if err := runtime.mode.setC2cMode(true); err != nil {
+				return fmt.Errorf("unable to set C2C mode: %w", err)
+			}
 			// start killswitch timer in another routine if c2cInterval in system.json is greater than 0
 			if connectivity.C2cInterval > 0 {
 				go runtime.mode.startKillSwitch(ctx, runtime.connectivity.settingsSnap)
 			}
 		}
 	}
+	return nil
 }
 
 func init() {
@@ -505,8 +489,8 @@ func startDevMode(opts appStartupOptions) {
 	go http.ListenAndServe("0.0.0.0:6060", nil)
 }
 
-func startupRuntimeFromAppOptions(_ appStartupOptions) startupRuntime {
-	return startupRuntime{}
+func startupRuntimeFromAppOptions(_ appStartupOptions) startuporchestrator.StartupRuntime {
+	return startuporchestrator.StartupRuntime{}
 }
 
 func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime bootstrapRuntime) error {
@@ -516,7 +500,7 @@ func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime
 	if runtime.Server.StartServerFn == nil {
 		return fmt.Errorf("bootstrap runtime is not configured")
 	}
-	return runtime.Orchestrator.RunBootstrapFn(ctx, StartupOptions{
+	return runtime.Orchestrator.RunBootstrapFn(ctx, startuporchestrator.StartupOptions{
 		HTTPPort: opts.httpPort,
 		ValidateConfig: func() error {
 			return initWebErr
@@ -524,10 +508,11 @@ func runBootstrapSubsystems(ctx context.Context, opts appStartupOptions, runtime
 		StartServer: func(ctx context.Context, httpPort int) error {
 			return runtime.Server.StartServerFn(ctx, httpPort)
 		},
-		StartC2cCheck: func(ctx context.Context) {
+		StartC2cCheck: func(ctx context.Context) error {
 			if runtime.Connectivity.RunC2cCheckFn != nil {
-				runtime.Connectivity.RunC2cCheckFn(ctx)
+				return runtime.Connectivity.RunC2cCheckFn(ctx)
 			}
+			return nil
 		},
 		StartupRuntime: startupRuntimeFromAppOptions(opts),
 	})
@@ -541,7 +526,7 @@ func main() {
 	}
 	startupOptions := parseStartupOptions(os.Args[1:])
 	startDevMode(startupOptions)
-	if err := runBootstrapSubsystems(ctx, startupOptions, defaultBootstrapRuntime()); err != nil {
+	if err := runBootstrapSubsystems(ctx, startupOptions, bootstrapRuntimeWith(nil, nil, nil)); err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}

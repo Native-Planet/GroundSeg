@@ -45,6 +45,20 @@ func TestAptUpdateCheckIntervalUsesConfiguredCadence(t *testing.T) {
 	if got := aptUpdateCheckInterval(defaultConf); got != 90*24*time.Hour {
 		t.Fatalf("unexpected default interval: got %v want %v", got, 90*24*time.Hour)
 	}
+
+	zeroConf := structs.SysConfig{}
+	zeroConf.LinuxUpdates.Interval = "day"
+	zeroConf.LinuxUpdates.Value = 0
+	if got := aptUpdateCheckInterval(zeroConf); got != 24*time.Hour {
+		t.Fatalf("expected zero interval to default to one multiplier: got %v want %v", got, 24*time.Hour)
+	}
+
+	negativeConf := structs.SysConfig{}
+	negativeConf.LinuxUpdates.Interval = "week"
+	negativeConf.LinuxUpdates.Value = -1
+	if got := aptUpdateCheckInterval(negativeConf); got != 7*24*time.Hour {
+		t.Fatalf("expected negative interval to default to one multiplier: got %v want %v", got, 7*24*time.Hour)
+	}
 }
 
 func TestGetAllIPsFiltersLocalAndIPv6Addresses(t *testing.T) {

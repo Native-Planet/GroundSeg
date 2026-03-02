@@ -99,7 +99,11 @@ func TestHandleStartramToggleDispatchesPerShipWithLocalPayload(t *testing.T) {
 		}),
 		orchestration.WithUrbitOps(orchestration.RuntimeUrbitOps{
 			UrbitConfFn: func(patp string) structs.UrbitDocker {
-				return structs.UrbitDocker{Network: "wireguard"}
+				return structs.UrbitDocker{
+					UrbitNetworkConfig: structs.UrbitNetworkConfig{
+						Network: "wireguard",
+					},
+				}
 			},
 		}),
 		orchestration.WithConfigOps(orchestration.RuntimeConfigOps{

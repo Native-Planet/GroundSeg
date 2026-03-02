@@ -98,7 +98,7 @@ Runtime boundary expectations for backend changes:
 CI policy checks:
 
 1. `Runtime Contract Gate` (`.github/workflows/upload-contract-gate.yml`) runs a path-aware check that fails if contract surfaces change without paired tests:
-   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`, `goseg/protocol/actions/actions.go`.
+   `goseg/handler/ws/upload.go`, `goseg/uploadsvc/service.go`, `goseg/startram/errors.go`, `goseg/protocol/contracts/contracts.go`, `goseg/protocol/actions/actions.go`.
 2. The same gate runs targeted contract tests via `.github/scripts/check-upload-contract.sh` for upload branch matrix, upload dispatch parity, and startram masked-error semantics.
 
 ## Removing GroundSeg (Uninstall)

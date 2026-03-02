@@ -18,7 +18,14 @@ func resetUrbitTestState() {
 func TestUrbitConfAccessorsAndCopy(t *testing.T) {
 	t.Cleanup(resetUrbitTestState)
 	urbitMutex.Lock()
-	UrbitsConfig["~zod"] = structs.UrbitDocker{PierName: "~zod", MinIOLinked: true}
+	UrbitsConfig["~zod"] = structs.UrbitDocker{
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: "~zod",
+		},
+		UrbitFeatureConfig: structs.UrbitFeatureConfig{
+			MinIOLinked: true,
+		},
+	}
 	urbitMutex.Unlock()
 
 	if !GetMinIOLinkedStatus("~zod") {
@@ -30,7 +37,11 @@ func TestUrbitConfAccessorsAndCopy(t *testing.T) {
 	}
 
 	all := UrbitConfAll()
-	all["~zod"] = structs.UrbitDocker{PierName: "mutated"}
+	all["~zod"] = structs.UrbitDocker{
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: "mutated",
+		},
+	}
 	if UrbitConf("~zod").PierName != "~zod" {
 		t.Fatalf("UrbitConfAll should return a copy, not original map")
 	}
@@ -94,7 +105,12 @@ func TestUpdateUrbitPersistsMutations(t *testing.T) {
 
 	pier := "~nec"
 	urbitMutex.Lock()
-	UrbitsConfig[pier] = structs.UrbitDocker{PierName: pier, SnapTime: 30}
+	UrbitsConfig[pier] = structs.UrbitDocker{
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: pier,
+			SnapTime: 30,
+		},
+	}
 	urbitMutex.Unlock()
 
 	err := UpdateUrbit(pier, func(conf *structs.UrbitDocker) error {

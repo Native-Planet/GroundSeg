@@ -39,6 +39,18 @@ type ConfPatch struct {
 	BinHash               *string
 }
 
+type confPatchParser func(*ConfPatch, interface{}) error
+type confPatchHasUpdateFn func(*ConfPatch) bool
+type confPatchApplyFn func(*structs.SysConfig, *ConfPatch)
+
+type confPatchField struct {
+	key          string
+	patchField   string
+	parse        confPatchParser
+	hasUpdates   confPatchHasUpdateFn
+	applyUpdates confPatchApplyFn
+}
+
 func (patch *ConfPatch) hasUpdates() bool {
 	for _, field := range confPatchRegistry {
 		if field.hasUpdates(patch) {
@@ -48,126 +60,25 @@ func (patch *ConfPatch) hasUpdates() bool {
 	return false
 }
 
-type confPatchField struct {
-	key        string
-	hasUpdates func(*ConfPatch) bool
-	parse      func(*ConfPatch, interface{}) error
-	apply      func(*structs.SysConfig, *ConfPatch)
-}
-
-type confPatchParser[T any] func(string, interface{}) (T, error)
-
-func scalarConfPatchField[T any](
-	key string,
-	parse confPatchParser[T],
-	getPatch func(*ConfPatch) *T,
-	setPatch func(*ConfPatch, T),
-	applyConfig func(*structs.SysConfig, T),
-) confPatchField {
-	return confPatchField{
-		key: key,
-		hasUpdates: func(p *ConfPatch) bool {
-			return getPatch(p) != nil
-		},
-		parse: func(p *ConfPatch, value interface{}) error {
-			parsed, err := parse(key, value)
-			if err != nil {
-				return err
-			}
-			setPatch(p, parsed)
-			return nil
-		},
-		apply: func(configStruct *structs.SysConfig, p *ConfPatch) {
-			value := getPatch(p)
-			if value == nil {
-				return
-			}
-			applyConfig(configStruct, *value)
-		},
+func (field confPatchField) has(patch *ConfPatch) bool {
+	if field.hasUpdates == nil {
+		return false
 	}
+	return field.hasUpdates(patch)
 }
 
-func boolConfPatchField(
-	key string,
-	getPatch func(*ConfPatch) *bool,
-	setPatch func(*ConfPatch, bool),
-	applyConfig func(*structs.SysConfig, bool),
-) confPatchField {
-	return scalarConfPatchField(key, parseBoolValue, getPatch, setPatch, applyConfig)
-}
-
-func intConfPatchField(
-	key string,
-	getPatch func(*ConfPatch) *int,
-	setPatch func(*ConfPatch, int),
-	applyConfig func(*structs.SysConfig, int),
-) confPatchField {
-	return scalarConfPatchField(key, parseIntValue, getPatch, setPatch, applyConfig)
-}
-
-func stringConfPatchField(
-	key string,
-	getPatch func(*ConfPatch) *string,
-	setPatch func(*ConfPatch, string),
-	applyConfig func(*structs.SysConfig, string),
-) confPatchField {
-	return scalarConfPatchField(key, parseStringValue, getPatch, setPatch, applyConfig)
-}
-
-func parseStringSliceField(_ string, value interface{}) ([]string, error) {
-	return parseStringSlice(value)
-}
-
-func stringSliceConfPatchField(
-	key string,
-	getPatch func(*ConfPatch) *[]string,
-	setPatch func(*ConfPatch, []string),
-	applyConfig func(*structs.SysConfig, []string),
-) confPatchField {
-	return scalarConfPatchField(key, parseStringSliceField, getPatch, setPatch, applyConfig)
-}
-
-func mapConfPatchField[V any](
-	key string,
-	parse confPatchParser[map[string]V],
-	getPatch func(*ConfPatch) map[string]V,
-	setPatch func(*ConfPatch, map[string]V),
-	applyConfig func(*structs.SysConfig, map[string]V),
-) confPatchField {
-	return confPatchField{
-		key: key,
-		hasUpdates: func(p *ConfPatch) bool {
-			return len(getPatch(p)) > 0
-		},
-		parse: func(p *ConfPatch, value interface{}) error {
-			parsed, err := parse(key, value)
-			if err != nil {
-				return err
-			}
-			setPatch(p, parsed)
-			return nil
-		},
-		apply: func(configStruct *structs.SysConfig, p *ConfPatch) {
-			updates := getPatch(p)
-			if len(updates) == 0 {
-				return
-			}
-			applyConfig(configStruct, updates)
-		},
+func (field confPatchField) parsePatch(patch *ConfPatch, value interface{}) error {
+	if field.parse == nil {
+		return nil
 	}
+	return field.parse(patch, value)
 }
 
-func unsupportedConfPatchField(key string) confPatchField {
-	return confPatchField{
-		key: key,
-		hasUpdates: func(*ConfPatch) bool {
-			return false
-		},
-		parse: func(_ *ConfPatch, _ interface{}) error {
-			return fmt.Errorf("unsupported config key: %s", key)
-		},
-		apply: func(*structs.SysConfig, *ConfPatch) {},
+func (field confPatchField) apply(config *structs.SysConfig, patch *ConfPatch) {
+	if field.applyUpdates == nil || !field.has(patch) {
+		return
 	}
+	field.applyUpdates(config, patch)
 }
 
 func mergeSessions(target map[string]structs.SessionInfo, sessions map[string]structs.SessionInfo) map[string]structs.SessionInfo {
@@ -189,339 +100,602 @@ func copyDiskWarnings(warnings map[string]structs.DiskWarning) map[string]struct
 }
 
 var confPatchRegistry = []confPatchField{
-	stringSliceConfPatchField(
-		"piers",
-		func(p *ConfPatch) *[]string { return p.Piers },
-		func(p *ConfPatch, piers []string) {
-			p.Piers = &piers
-		},
-		func(configStruct *structs.SysConfig, piers []string) {
-			configStruct.Piers = append([]string(nil), piers...)
-		},
-	),
-	boolConfPatchField(
-		"wgOn",
-		func(p *ConfPatch) *bool { return p.WgOn },
-		func(p *ConfPatch, value bool) {
-			p.WgOn = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.WgOn = value
-		},
-	),
-	boolConfPatchField(
-		"startramSetReminderOne",
-		func(p *ConfPatch) *bool { return p.StartramReminderOne },
-		func(p *ConfPatch, value bool) {
-			p.StartramReminderOne = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.StartramSetReminder.One = value
-		},
-	),
-	boolConfPatchField(
-		"startramSetReminderThree",
-		func(p *ConfPatch) *bool { return p.StartramReminderThree },
-		func(p *ConfPatch, value bool) {
-			p.StartramReminderThree = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.StartramSetReminder.Three = value
-		},
-	),
-	boolConfPatchField(
-		"startramSetReminderSeven",
-		func(p *ConfPatch) *bool { return p.StartramReminderSeven },
-		func(p *ConfPatch, value bool) {
-			p.StartramReminderSeven = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.StartramSetReminder.Seven = value
-		},
-	),
-	boolConfPatchField(
-		"penpaiAllow",
-		func(p *ConfPatch) *bool { return p.PenpaiAllow },
-		func(p *ConfPatch, value bool) {
-			p.PenpaiAllow = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.PenpaiAllow = value
-		},
-	),
-	boolConfPatchField(
-		"gracefulExit",
-		func(p *ConfPatch) *bool { return p.GracefulExit },
-		func(p *ConfPatch, value bool) {
-			p.GracefulExit = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.GracefulExit = value
-		},
-	),
-	intConfPatchField(
-		"swapVal",
-		func(p *ConfPatch) *int { return p.SwapVal },
-		func(p *ConfPatch, value int) {
-			p.SwapVal = &value
-		},
-		func(configStruct *structs.SysConfig, value int) {
-			configStruct.SwapVal = value
-		},
-	),
-	boolConfPatchField(
-		"penpaiRunning",
-		func(p *ConfPatch) *bool { return p.PenpaiRunning },
-		func(p *ConfPatch, value bool) {
-			p.PenpaiRunning = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.PenpaiRunning = value
-		},
-	),
-	stringConfPatchField(
-		"penpaiActive",
-		func(p *ConfPatch) *string { return p.PenpaiActive },
-		func(p *ConfPatch, value string) {
-			p.PenpaiActive = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.PenpaiActive = value
-		},
-	),
-	intConfPatchField(
-		"penpaiCores",
-		func(p *ConfPatch) *int { return p.PenpaiCores },
-		func(p *ConfPatch, value int) {
-			p.PenpaiCores = &value
-		},
-		func(configStruct *structs.SysConfig, value int) {
-			configStruct.PenpaiCores = value
-		},
-	),
-	stringConfPatchField(
-		"endpointUrl",
-		func(p *ConfPatch) *string { return p.EndpointURL },
-		func(p *ConfPatch, value string) {
-			p.EndpointURL = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.EndpointUrl = value
-		},
-	),
-	boolConfPatchField(
-		"wgRegistered",
-		func(p *ConfPatch) *bool { return p.WgRegistered },
-		func(p *ConfPatch, value bool) {
-			p.WgRegistered = &value
-		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.WgRegistered = value
-		},
-	),
-	stringConfPatchField(
-		"remoteBackupPassword",
-		func(p *ConfPatch) *string { return p.RemoteBackupPassword },
-		func(p *ConfPatch, value string) {
-			p.RemoteBackupPassword = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.RemoteBackupPassword = value
-		},
-	),
-	stringConfPatchField(
-		"pubkey",
-		func(p *ConfPatch) *string { return p.Pubkey },
-		func(p *ConfPatch, value string) {
-			p.Pubkey = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.Pubkey = value
-		},
-	),
-	stringConfPatchField(
-		"privkey",
-		func(p *ConfPatch) *string { return p.Privkey },
-		func(p *ConfPatch, value string) {
-			p.Privkey = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.Privkey = value
-		},
-	),
-	stringConfPatchField(
-		"salt",
-		func(p *ConfPatch) *string { return p.Salt },
-		func(p *ConfPatch, value string) {
-			p.Salt = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.Salt = value
-		},
-	),
-	stringConfPatchField(
-		"keyFile",
-		func(p *ConfPatch) *string { return p.KeyFile },
-		func(p *ConfPatch, value string) {
-			p.KeyFile = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.KeyFile = value
-		},
-	),
-	intConfPatchField(
-		"c2cInterval",
-		func(p *ConfPatch) *int { return p.C2cInterval },
-		func(p *ConfPatch, value int) {
-			p.C2cInterval = &value
-		},
-		func(configStruct *structs.SysConfig, value int) {
-			configStruct.C2cInterval = value
-		},
-	),
-	stringConfPatchField(
-		"setup",
-		func(p *ConfPatch) *string { return p.Setup },
-		func(p *ConfPatch, value string) {
-			p.Setup = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.Setup = value
-		},
-	),
-	stringConfPatchField(
-		"pwHash",
-		func(p *ConfPatch) *string { return p.PwHash },
-		func(p *ConfPatch, value string) {
-			p.PwHash = &value
-		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.PwHash = value
-		},
-	),
-	mapConfPatchField(
-		"authorizedSessions",
-		parseSessionMap,
-		func(p *ConfPatch) map[string]structs.SessionInfo {
-			return p.AuthorizedSessions
-		},
-		func(p *ConfPatch, sessions map[string]structs.SessionInfo) {
-			p.AuthorizedSessions = sessions
-		},
-		func(configStruct *structs.SysConfig, sessions map[string]structs.SessionInfo) {
-			configStruct.Sessions.Authorized = mergeSessions(configStruct.Sessions.Authorized, sessions)
-		},
-	),
-	mapConfPatchField(
-		"unauthorizedSessions",
-		parseSessionMap,
-		func(p *ConfPatch) map[string]structs.SessionInfo {
-			return p.UnauthorizedSessions
-		},
-		func(p *ConfPatch, sessions map[string]structs.SessionInfo) {
-			p.UnauthorizedSessions = sessions
-		},
-		func(configStruct *structs.SysConfig, sessions map[string]structs.SessionInfo) {
-			configStruct.Sessions.Unauthorized = mergeSessions(configStruct.Sessions.Unauthorized, sessions)
-		},
-	),
-	mapConfPatchField(
-		"diskWarning",
-		func(name string, value interface{}) (map[string]structs.DiskWarning, error) {
-			return parseDiskWarningMap(value)
-		},
-		func(p *ConfPatch) map[string]structs.DiskWarning {
-			if p.DiskWarning == nil {
-				return nil
+	{
+		key:        "piers",
+		patchField: "Piers",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringSliceValue("piers", value)
+			if err != nil {
+				return err
 			}
-			return *p.DiskWarning
+			copied := append([]string(nil), parsed...)
+			patch.Piers = &copied
+			return nil
 		},
-		func(p *ConfPatch, warnings map[string]structs.DiskWarning) {
-			copied := copyDiskWarnings(warnings)
-			p.DiskWarning = &copied
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.Piers != nil && len(*patch.Piers) > 0
 		},
-		func(configStruct *structs.SysConfig, warnings map[string]structs.DiskWarning) {
-			configStruct.DiskWarning = copyDiskWarnings(warnings)
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Piers = *patch.Piers
 		},
-	),
-	stringConfPatchField(
-		"lastKnownMDNS",
-		func(p *ConfPatch) *string { return p.LastKnownMDNS },
-		func(p *ConfPatch, value string) {
-			p.LastKnownMDNS = &value
+	},
+	{
+		key:        "wgOn",
+		patchField: "WgOn",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("wgOn", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.WgOn = &parsedBool
+			return nil
 		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.LastKnownMDNS = value
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.WgOn != nil
 		},
-	),
-	boolConfPatchField(
-		"disableSlsa",
-		func(p *ConfPatch) *bool { return p.DisableSlsa },
-		func(p *ConfPatch, value bool) {
-			p.DisableSlsa = &value
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.WgOn = *patch.WgOn
 		},
-		func(configStruct *structs.SysConfig, value bool) {
-			configStruct.DisableSlsa = value
+	},
+	{
+		key:        "startramSetReminderOne",
+		patchField: "StartramReminderOne",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("startramSetReminderOne", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.StartramReminderOne = &parsedBool
+			return nil
 		},
-	),
-	stringConfPatchField(
-		"gsVersion",
-		func(p *ConfPatch) *string { return p.GSVersion },
-		func(p *ConfPatch, value string) {
-			p.GSVersion = &value
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.StartramReminderOne != nil
 		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.GsVersion = value
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.StartramSetReminder.One = *patch.StartramReminderOne
 		},
-	),
-	stringConfPatchField(
-		"binHash",
-		func(p *ConfPatch) *string { return p.BinHash },
-		func(p *ConfPatch, value string) {
-			p.BinHash = &value
+	},
+	{
+		key:        "startramSetReminderThree",
+		patchField: "StartramReminderThree",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("startramSetReminderThree", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.StartramReminderThree = &parsedBool
+			return nil
 		},
-		func(configStruct *structs.SysConfig, value string) {
-			configStruct.BinHash = value
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.StartramReminderThree != nil
 		},
-	),
-	unsupportedConfPatchField("isEMMCMachine"),
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.StartramSetReminder.Three = *patch.StartramReminderThree
+		},
+	},
+	{
+		key:        "startramSetReminderSeven",
+		patchField: "StartramReminderSeven",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("startramSetReminderSeven", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.StartramReminderSeven = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.StartramReminderSeven != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.StartramSetReminder.Seven = *patch.StartramReminderSeven
+		},
+	},
+	{
+		key:        "penpaiAllow",
+		patchField: "PenpaiAllow",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("penpaiAllow", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.PenpaiAllow = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.PenpaiAllow != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.PenpaiAllow = *patch.PenpaiAllow
+		},
+	},
+	{
+		key:        "gracefulExit",
+		patchField: "GracefulExit",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("gracefulExit", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.GracefulExit = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.GracefulExit != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.GracefulExit = *patch.GracefulExit
+		},
+	},
+	{
+		key:        "swapVal",
+		patchField: "SwapVal",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseIntValue("swapVal", value)
+			if err != nil {
+				return err
+			}
+			parsedInt := parsed.(int)
+			patch.SwapVal = &parsedInt
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.SwapVal != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.SwapVal = *patch.SwapVal
+		},
+	},
+	{
+		key:        "penpaiRunning",
+		patchField: "PenpaiRunning",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("penpaiRunning", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.PenpaiRunning = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.PenpaiRunning != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.PenpaiRunning = *patch.PenpaiRunning
+		},
+	},
+	{
+		key:        "penpaiActive",
+		patchField: "PenpaiActive",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("penpaiActive", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.PenpaiActive = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.PenpaiActive != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.PenpaiActive = *patch.PenpaiActive
+		},
+	},
+	{
+		key:        "penpaiCores",
+		patchField: "PenpaiCores",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseIntValue("penpaiCores", value)
+			if err != nil {
+				return err
+			}
+			parsedInt := parsed.(int)
+			patch.PenpaiCores = &parsedInt
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.PenpaiCores != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.PenpaiCores = *patch.PenpaiCores
+		},
+	},
+	{
+		key:        "endpointUrl",
+		patchField: "EndpointURL",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("endpointUrl", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.EndpointURL = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.EndpointURL != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.EndpointUrl = *patch.EndpointURL
+		},
+	},
+	{
+		key:        "wgRegistered",
+		patchField: "WgRegistered",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("wgRegistered", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.WgRegistered = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.WgRegistered != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.WgRegistered = *patch.WgRegistered
+		},
+	},
+	{
+		key:        "remoteBackupPassword",
+		patchField: "RemoteBackupPassword",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("remoteBackupPassword", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.RemoteBackupPassword = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.RemoteBackupPassword != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.RemoteBackupPassword = *patch.RemoteBackupPassword
+		},
+	},
+	{
+		key:        "pubkey",
+		patchField: "Pubkey",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("pubkey", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.Pubkey = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.Pubkey != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Pubkey = *patch.Pubkey
+		},
+	},
+	{
+		key:        "privkey",
+		patchField: "Privkey",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("privkey", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.Privkey = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.Privkey != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Privkey = *patch.Privkey
+		},
+	},
+	{
+		key:        "salt",
+		patchField: "Salt",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("salt", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.Salt = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.Salt != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Salt = *patch.Salt
+		},
+	},
+	{
+		key:        "keyFile",
+		patchField: "KeyFile",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("keyFile", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.KeyFile = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.KeyFile != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.KeyFile = *patch.KeyFile
+		},
+	},
+	{
+		key:        "c2cInterval",
+		patchField: "C2cInterval",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseIntValue("c2cInterval", value)
+			if err != nil {
+				return err
+			}
+			parsedInt := parsed.(int)
+			patch.C2cInterval = &parsedInt
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.C2cInterval != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.C2cInterval = *patch.C2cInterval
+		},
+	},
+	{
+		key:        "setup",
+		patchField: "Setup",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("setup", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.Setup = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.Setup != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Setup = *patch.Setup
+		},
+	},
+	{
+		key:        "pwHash",
+		patchField: "PwHash",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("pwHash", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.PwHash = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.PwHash != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.PwHash = *patch.PwHash
+		},
+	},
+	{
+		key:        "authorizedSessions",
+		patchField: "AuthorizedSessions",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseSessionMap("authorizedSessions", value)
+			if err != nil {
+				return err
+			}
+			patch.AuthorizedSessions = parsed.(map[string]structs.SessionInfo)
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return len(patch.AuthorizedSessions) > 0
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Sessions.Authorized = mergeSessions(config.Sessions.Authorized, patch.AuthorizedSessions)
+		},
+	},
+	{
+		key:        "unauthorizedSessions",
+		patchField: "UnauthorizedSessions",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseSessionMap("unauthorizedSessions", value)
+			if err != nil {
+				return err
+			}
+			patch.UnauthorizedSessions = parsed.(map[string]structs.SessionInfo)
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return len(patch.UnauthorizedSessions) > 0
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.Sessions.Unauthorized = mergeSessions(config.Sessions.Unauthorized, patch.UnauthorizedSessions)
+		},
+	},
+	{
+		key:        "diskWarning",
+		patchField: "DiskWarning",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseDiskWarningMap("diskWarning", value)
+			if err != nil {
+				return err
+			}
+			parsedWarnings := parsed.(map[string]structs.DiskWarning)
+			patch.DiskWarning = &parsedWarnings
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.DiskWarning != nil && len(*patch.DiskWarning) > 0
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.DiskWarning = copyDiskWarnings(*patch.DiskWarning)
+		},
+	},
+	{
+		key:        "lastKnownMDNS",
+		patchField: "LastKnownMDNS",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("lastKnownMDNS", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.LastKnownMDNS = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.LastKnownMDNS != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.LastKnownMDNS = *patch.LastKnownMDNS
+		},
+	},
+	{
+		key:        "disableSlsa",
+		patchField: "DisableSlsa",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseBoolValue("disableSlsa", value)
+			if err != nil {
+				return err
+			}
+			parsedBool := parsed.(bool)
+			patch.DisableSlsa = &parsedBool
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.DisableSlsa != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.DisableSlsa = *patch.DisableSlsa
+		},
+	},
+	{
+		key:        "gsVersion",
+		patchField: "GSVersion",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("gsVersion", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.GSVersion = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.GSVersion != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.GsVersion = *patch.GSVersion
+		},
+	},
+	{
+		key:        "binHash",
+		patchField: "BinHash",
+		parse: func(patch *ConfPatch, value interface{}) error {
+			parsed, err := parseStringValue("binHash", value)
+			if err != nil {
+				return err
+			}
+			parsedString := parsed.(string)
+			patch.BinHash = &parsedString
+			return nil
+		},
+		hasUpdates: func(patch *ConfPatch) bool {
+			return patch.BinHash != nil
+		},
+		applyUpdates: func(config *structs.SysConfig, patch *ConfPatch) {
+			config.BinHash = *patch.BinHash
+		},
+	},
+	{
+		key: "isEMMCMachine",
+		parse: func(_ *ConfPatch, _ interface{}) error {
+			return fmt.Errorf("unsupported config key: isEMMCMachine")
+		},
+		hasUpdates: func(_ *ConfPatch) bool {
+			return false
+		},
+		applyUpdates: nil,
+	},
 }
 
-var confPatchByKey = buildConfPatchByKey(confPatchRegistry)
+var (
+	confPatchByKey    = map[string]confPatchField{}
+	confPatchByKeyErr error
+)
 
-func buildConfPatchByKey(fields []confPatchField) map[string]confPatchField {
+func init() {
+	var err error
+	confPatchByKey, err = buildConfPatchByKey(confPatchRegistry)
+	confPatchByKeyErr = err
+}
+
+func buildConfPatchByKey(fields []confPatchField) (map[string]confPatchField, error) {
 	registry := make(map[string]confPatchField, len(fields))
 	for _, field := range fields {
+		if _, exists := registry[field.key]; exists {
+			return nil, fmt.Errorf("duplicate config patch key: %s", field.key)
+		}
 		registry[field.key] = field
 	}
-	return registry
+	return registry, nil
 }
 
-func parseBoolValue(name string, value interface{}) (bool, error) {
+func parseBoolValue(name string, value interface{}) (any, error) {
 	parsed, ok := value.(bool)
 	if !ok {
-		return false, fmt.Errorf("invalid %s value: %T", name, value)
+		return nil, fmt.Errorf("invalid %s value: %T", name, value)
 	}
 	return parsed, nil
 }
 
-func parseIntValue(name string, value interface{}) (int, error) {
-	parsed, ok := value.(int)
-	if !ok {
-		return 0, fmt.Errorf("invalid %s value: %T", name, value)
+func parseIntValue(name string, value interface{}) (any, error) {
+	switch parsed := value.(type) {
+	case int:
+		return parsed, nil
+	case float64:
+		return int(parsed), nil
+	default:
+		return nil, fmt.Errorf("invalid %s value: %T", name, value)
 	}
-	return parsed, nil
 }
 
-func parseStringValue(name string, value interface{}) (string, error) {
+func parseStringValue(name string, value interface{}) (any, error) {
 	parsed, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("invalid %s value: %T", name, value)
+		return nil, fmt.Errorf("invalid %s value: %T", name, value)
 	}
 	return parsed, nil
 }
 
-func parseSessionMap(name string, value interface{}) (map[string]structs.SessionInfo, error) {
+func parseStringSliceValue(_ string, value interface{}) ([]string, error) {
+	return parseStringSlice(value)
+}
+
+func parseSessionMap(name string, value interface{}) (any, error) {
 	sessions, ok := value.(map[string]structs.SessionInfo)
 	if !ok {
 		return nil, fmt.Errorf("invalid %s value: %T", name, value)
@@ -548,7 +722,7 @@ func parseStringSlice(value interface{}) ([]string, error) {
 	return piers, nil
 }
 
-func parseDiskWarningMap(value interface{}) (map[string]structs.DiskWarning, error) {
+func parseDiskWarningMap(name string, value interface{}) (any, error) {
 	rawWarnings, ok := value.(map[string]structs.DiskWarning)
 	if !ok {
 		return nil, fmt.Errorf("invalid diskWarning value: %T", value)
@@ -561,13 +735,16 @@ func parseDiskWarningMap(value interface{}) (map[string]structs.DiskWarning, err
 }
 
 func buildConfigPatch(values map[string]interface{}) (*ConfPatch, error) {
+	if confPatchByKeyErr != nil {
+		return nil, fmt.Errorf("invalid config patch registry: %w", confPatchByKeyErr)
+	}
 	patch := &ConfPatch{}
 	for key, value := range values {
 		field, exists := confPatchByKey[key]
 		if !exists {
 			return nil, fmt.Errorf("unsupported config key: %s", key)
 		}
-		if err := field.parse(patch, value); err != nil {
+		if err := field.parsePatch(patch, value); err != nil {
 			return nil, err
 		}
 	}

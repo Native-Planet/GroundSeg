@@ -1,0 +1,103 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 2,
+  "assessments": {
+    "abstraction_fitness": 72.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Runtime seam construction is repeated as large function-field structs across multiple modules: `Runtime*Ops` in `goseg/docker/orchestration/runtime_ops.go`, `dockerRuntime`/`UrbitRuntime`/`WireguardRuntime` in `goseg/docker/orchestration/runtime_docker.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`, `importerRuntime` in `goseg/importer/importer.go`, and startup/bootstrap runtimes in `goseg/startuporchestrator/startup_orchestrator.go` and `goseg/main.go`.",
+        "Several seam wrappers degrade interface honesty by treating missing dependencies as zero-value/no-op behavior instead of enforcing required contracts (for example nil checks returning empty structs in `collectorRuntime` accessors and silent return in `importerRuntime.updateContainerState`).",
+        "A transition abstraction layer introduces extra command/router indirection with little policy gain: `broadcast.BroadcastTransition` plus multiple tiny command structs in `goseg/rectify/rectify.go` that mostly forward to services."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 70.0,
+        "indirection_cost": 66.0,
+        "interface_honesty": 71.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "function_bag_runtime_seams",
+      "summary": "Runtime seams are implemented as duplicated function-bag structs across modules, increasing indirection cost and drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`goseg/docker/orchestration/runtime_ops.go` defines many grouped function bags (`RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc.) and default constructors.",
+        "`goseg/docker/orchestration/runtime_docker.go` rebuilds similar dependency bags (`dockerRuntime`, `UrbitRuntime`, `WireguardRuntime`) and aliases several `Runtime*Ops` types, effectively creating parallel seam systems.",
+        "`goseg/shipworkflow/operations_runtime.go` and `goseg/importer/importer.go` repeat the same pattern with large nested runtime structs plus custom default wiring and nil handling.",
+        "`goseg/startuporchestrator/startup_orchestrator.go` and `goseg/main.go` add additional runtime shells for startup/bootstrap concerns, continuing the same abstraction style instead of sharing a cohesive seam boundary."
+      ],
+      "suggestion": "Standardize on a single seam model per subsystem (for example small capability interfaces or one cohesive runtime struct with explicit required dependencies), then eliminate duplicate function-bag layers and alias indirection. Consolidate constructor/wiring logic so each concern has one authoritative dependency boundary.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "silent_nil_dependency_contracts",
+      "summary": "Several seam methods silently degrade to no-op/zero values when dependencies are unset, making abstractions dishonest about required capabilities.",
+      "related_files": [
+        "goseg/broadcast/collectors/collectors.go",
+        "goseg/importer/importer.go",
+        "goseg/startuporchestrator/startup_orchestrator.go"
+      ],
+      "evidence": [
+        "`collectorRuntime` accessors in `goseg/broadcast/collectors/collectors.go` return empty defaults on nil callbacks (for example `startramSettings`, `startramConfig`, `penpaiSettings`, `swapSettings`, `backupRoot`, `backupTime`).",
+        "`importerRuntime.updateContainerState` in `goseg/importer/importer.go` silently returns when callback is nil, while other importer paths perform explicit runtime validation, producing inconsistent contract strictness inside one abstraction.",
+        "`loadService` in `goseg/startuporchestrator/startup_orchestrator.go` warns and returns if callback is nil, allowing optionality to leak into runtime behavior even for operationally important startup tasks."
+      ],
+      "suggestion": "Split dependencies into explicit required vs optional contracts and enforce required ones at constructor time. Replace silent nil fallbacks with typed errors or explicit optional wrappers so callers can reason about behavior deterministically.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "transition_command_passthrough_layer",
+      "summary": "Transition command abstractions add call depth with minimal policy by wrapping direct service calls in thin command types and repetitive router entries.",
+      "related_files": [
+        "goseg/broadcast/transitions.go",
+        "goseg/rectify/rectify.go",
+        "goseg/rectify/rectify_services.go"
+      ],
+      "evidence": [
+        "`goseg/broadcast/transitions.go` defines `BroadcastTransition` and generic apply pipeline.",
+        "`goseg/rectify/rectify.go` creates multiple command structs (`startramTransitionCommand`, `startramRetrieveTransition`, `systemTransitionCommand`, etc.) where `Apply` mainly forwards to underlying service/reconciler logic.",
+        "In `rectifyStartramTransitionRouters`, several event cases construct effectively the same command shape with `NewStartramTransitionService(runtime)` and event assignment, creating repetitive indirection rather than differentiated behavior."
+      ],
+      "suggestion": "Collapse thin command wrappers where no distinct policy exists (for example use direct reducer/service function mapping per event type), and keep command objects only where they encapsulate meaningful behavior/state transitions.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams were introduced incrementally as per-function callback bags, but without a shared abstraction strategy.",
+      "Optional dependency handling was encoded as nil-tolerant wrappers, which obscures required contracts and propagates silent fallbacks.",
+      "Event/transition handling favored uniform wrappers, but many wrappers no longer add behavior beyond forwarding."
+    ],
+    "likely_symptoms": [
+      "function_bag_runtime_seams",
+      "silent_nil_dependency_contracts",
+      "transition_command_passthrough_layer"
+    ],
+    "possible_false_positives": []
+  }
+}

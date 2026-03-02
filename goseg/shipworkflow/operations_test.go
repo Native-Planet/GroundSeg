@@ -29,8 +29,12 @@ func setupUrbitOperationsConfig(t *testing.T, patp string, conf structs.UrbitDoc
 func TestToggleAliasPersistsUpdatedDisplayMode(t *testing.T) {
 	patp := "~zod"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:     patp,
-		ShowUrbitWeb: "custom",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitWebConfig: structs.UrbitWebConfig{
+			ShowUrbitWeb: "custom",
+		},
 	})
 
 	if err := ToggleAlias(patp); err != nil {
@@ -51,8 +55,12 @@ func TestToggleAliasPersistsUpdatedDisplayMode(t *testing.T) {
 func TestStartramReminderPersistsConfigFlag(t *testing.T) {
 	patp := "~bus"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:         patp,
-		StartramReminder: false,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitFeatureConfig: structs.UrbitFeatureConfig{
+			StartramReminder: false,
+		},
 	})
 
 	if err := StartramReminder(patp, true); err != nil {
@@ -67,9 +75,13 @@ func TestStartramReminderPersistsConfigFlag(t *testing.T) {
 func TestSchedulePackValidatesInputsAndPersistsSchedule(t *testing.T) {
 	patp := "~nec"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:      patp,
-		MeldSchedule:  false,
-		MeldFrequency: 0,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitScheduleConfig: structs.UrbitScheduleConfig{
+			MeldSchedule:  false,
+			MeldFrequency: 0,
+		},
 	})
 
 	if err := SchedulePack(patp, structs.WsUrbitPayload{
@@ -126,9 +138,13 @@ func TestSchedulePackValidatesInputsAndPersistsSchedule(t *testing.T) {
 func TestPausePackScheduleAndSetNewMaxPierSizePersistConfig(t *testing.T) {
 	patp := "~rov"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:     patp,
-		MeldSchedule: true,
-		SizeLimit:    64,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:  patp,
+			SizeLimit: 64,
+		},
+		UrbitScheduleConfig: structs.UrbitScheduleConfig{
+			MeldSchedule: true,
+		},
 	})
 
 	if err := PausePackSchedule(patp, structs.WsUrbitPayload{}); err != nil {
@@ -151,10 +167,16 @@ func TestPausePackScheduleAndSetNewMaxPierSizePersistConfig(t *testing.T) {
 func TestToggleChopOnVereUpdateAndBootStatusPersist(t *testing.T) {
 	patp := "~dop"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:      patp,
-		ChopOnUpgrade: false,
-		BootStatus:    "boot",
-		ShowUrbitWeb:  "default",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:   patp,
+			BootStatus: "boot",
+		},
+		UrbitFeatureConfig: structs.UrbitFeatureConfig{
+			ChopOnUpgrade: false,
+		},
+		UrbitWebConfig: structs.UrbitWebConfig{
+			ShowUrbitWeb: "default",
+		},
 	})
 
 	if err := ToggleChopOnVereUpdate(patp); err != nil {

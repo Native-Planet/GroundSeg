@@ -9,7 +9,7 @@ import (
 )
 
 func startramReminder(patp string, remind bool) error {
-	if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+	if err := persistShipFeatureConfig(patp, func(conf *structs.UrbitFeatureConfig) error {
 		conf.StartramReminder = remind
 		return nil
 	}); err != nil {

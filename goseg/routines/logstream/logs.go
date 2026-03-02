@@ -38,6 +38,7 @@ const (
 	MaxChunkSize = 10 * 1024 * 1024 // 10MB
 
 	maxLogCleanerConsecutiveFailures = 3
+	maxDockerLogConsecutiveFailures  = 5
 )
 
 type logstreamRuntimeConfig struct {
@@ -160,6 +161,17 @@ func SysLogStreamerWithContext(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	writeFailure := func(conn *websocket.Conn, scope string, err error) {
+		if conn == nil {
+			return
+		}
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("%s: %v", scope, err))
+		}
+		if closeErr := conn.Close(); closeErr != nil {
+			zap.L().Error(fmt.Sprintf("%s: failed to close websocket connection: %v", scope, closeErr))
+		}
+	}
 	for {
 		removeSysSessions()
 		select {
@@ -184,8 +196,7 @@ func SysLogStreamerWithContext(ctx context.Context) error {
 			logJSON := []byte(fmt.Sprintf(`{"type":"system","history":false,"log":%s}`, buffer.Bytes()))
 			for _, conn := range logstreamRuntimeSnapshot().sessionRuntime.SysLogSessions() {
 				if err := conn.WriteMessage(1, logJSON); err != nil {
-					zap.L().Error(fmt.Sprintf("error writing message: %v", err))
-					conn.Close()
+					writeFailure(conn, "system log websocket write failure", err)
 					logstreamRuntimeSnapshot().sessionRuntime.AddSysSessionToRemove(conn)
 				}
 			}
@@ -203,11 +214,28 @@ func DockerLogStreamerWithContext(ctx context.Context) error {
 	}
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+	streamErrs := make(chan error, 16)
+	failures := 0
+	recordFailure := func(err error) error {
+		if err == nil {
+			failures = 0
+			return nil
+		}
+		failures++
+		zap.L().Error(fmt.Sprintf("docker log stream failed: %v", err))
+		if failures >= maxDockerLogConsecutiveFailures {
+			return fmt.Errorf("docker log stream failed after %d consecutive attempts: %w", maxDockerLogConsecutiveFailures, err)
+		}
+		return nil
+	}
+
 	for {
 		for container, sessionMap := range logstreamRuntimeSnapshot().sessionRuntime.DockerLogSessions() {
 			for conn, live := range sessionMap {
 				if !live {
-					go streamToConnWithContext(ctx, container, conn)
+					go func(name string, streamConn *websocket.Conn) {
+						streamErrs <- streamToConnWithContext(ctx, name, streamConn)
+					}(container, conn)
 					logstreamRuntimeSnapshot().sessionRuntime.SetDockerLogSessionLive(container, conn, true)
 				}
 			}
@@ -215,7 +243,29 @@ func DockerLogStreamerWithContext(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case err := <-streamErrs:
+			if err := recordFailure(err); err != nil {
+				return err
+			}
 		case <-ticker.C:
+			if failures > 0 {
+				failures = 0
+			}
+		}
+
+		drain := true
+		for {
+			if !drain {
+				break
+			}
+			select {
+			case err := <-streamErrs:
+				if err := recordFailure(err); err != nil {
+					return err
+				}
+			default:
+				drain = false
+			}
 		}
 	}
 }
@@ -239,12 +289,15 @@ func DockerLogConnRemoverWithContext(ctx context.Context) error {
 }
 
 func streamToConn(containerName string, conn *websocket.Conn) {
-	streamToConnWithContext(context.Background(), containerName, conn)
+	_ = streamToConnWithContext(context.Background(), containerName, conn)
 }
 
-func streamToConnWithContext(ctx context.Context, containerName string, conn *websocket.Conn) {
+func streamToConnWithContext(ctx context.Context, containerName string, conn *websocket.Conn) error {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if conn == nil {
+		return fmt.Errorf("missing websocket connection for %s", containerName)
 	}
 	defer func() {
 		dockerLogCancelChannel <- DockerCancel{Container: containerName, Conn: conn}
@@ -262,15 +315,13 @@ func streamToConnWithContext(ctx context.Context, containerName string, conn *we
 	// Create a Docker client
 	cli, err := dockerclient.New()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("failed to create Docker client: %v", err))
-		return
+		return fmt.Errorf("create docker client for %s: %w", containerName, err)
 	}
 	defer cli.Close()
 
 	out, err := cli.ContainerLogs(ctx, containerName, options)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("failed to get logs for container %s: %v", containerName, err))
-		return
+		return fmt.Errorf("read docker logs for %s: %w", containerName, err)
 	}
 	defer out.Close()
 
@@ -279,7 +330,7 @@ func streamToConnWithContext(ctx context.Context, containerName string, conn *we
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		default:
 		}
 		line := ""
@@ -289,21 +340,21 @@ func streamToConnWithContext(ctx context.Context, containerName string, conn *we
 		line = strings.ReplaceAll(line, "\\", "\\\\")
 		logJSON := []byte(fmt.Sprintf(`{"type":"%s","history":false,"log":"%s"}`, containerName, line))
 		if err := conn.WriteMessage(1, logJSON); err != nil {
-			zap.L().Error(fmt.Sprintf("error writing message for %v: %v", containerName, err))
-			return
+			_ = conn.Close()
+			return fmt.Errorf("write docker log websocket message for %s: %w", containerName, err)
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		zap.L().Error(fmt.Sprintf("error reading logs: %v", err))
-		return
+		return fmt.Errorf("read docker logs stream for %s: %w", containerName, err)
 	}
+	return nil
 }
 
 func splitLogFile(inputFile string) error {
 	zap.L().Info(fmt.Sprintf("splitting legacy log file %s", inputFile))
 	file, err := os.Open(inputFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("open legacy log file %s: %w", inputFile, err)
 	}
 	defer file.Close()
 

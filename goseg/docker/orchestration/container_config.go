@@ -18,8 +18,8 @@ var containerConfigBuilders = map[transition.ContainerType]containerConfigBuilde
 	transition.ContainerTypeLlamaAPI:  llamaApiContainerConfigBuilder,
 }
 
-func urbitContainerConfigBuilder(rt dockerRuntime, containerName string) (container.Config, container.HostConfig, error) {
-	return urbitContainerConfWithRuntime(urbitRuntimeFromDocker(rt), containerName)
+func urbitContainerConfigBuilder(_ dockerRuntime, containerName string) (container.Config, container.HostConfig, error) {
+	return urbitContainerConfWithRuntime(newUrbitRuntimeForContainerConfig(), containerName)
 }
 
 func netdataContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, container.HostConfig, error) {
@@ -34,8 +34,8 @@ func mcContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, con
 	return mcContainerConfWithRuntime(minioRuntimeFromDocker(rt))
 }
 
-func wgContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, container.HostConfig, error) {
-	return wireguardRuntimeFromDocker(rt).wgContainerConf()
+func wgContainerConfigBuilder(_ dockerRuntime, _ string) (container.Config, container.HostConfig, error) {
+	return newWireguardRuntimeForContainerConfig().wgContainerConf()
 }
 
 func llamaApiContainerConfigBuilder(rt dockerRuntime, _ string) (container.Config, container.HostConfig, error) {

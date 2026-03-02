@@ -200,8 +200,11 @@ func TestUpdateBroadcastReturnsOldStateOnScopedMarshalFailure(t *testing.T) {
 
 type failingConn struct{}
 
-func (f *failingConn) Read(_ []byte) (int, error)         { return 0, io.EOF }
-func (f *failingConn) Write(_ []byte) (int, error)        { return 0, errors.New("write failed") }
+func (f *failingConn) Read(_ []byte) (int, error) { return 0, io.EOF }
+
+var errWriteFailed = errors.New("write failed")
+
+func (f *failingConn) Write(_ []byte) (int, error)        { return 0, errWriteFailed }
 func (f *failingConn) Close() error                       { return nil }
 func (f *failingConn) LocalAddr() net.Addr                { return &net.IPAddr{} }
 func (f *failingConn) RemoteAddr() net.Addr               { return &net.IPAddr{} }
@@ -267,6 +270,9 @@ func TestSendBroadcastReturnsErrorWhenConnectionWriteFails(t *testing.T) {
 	conn, err := sendBroadcast(&failingConn{}, "payload")
 	if err == nil {
 		t.Fatal("expected write error")
+	}
+	if !errors.Is(err, errWriteFailed) {
+		t.Fatalf("expected wrapped write error, got %v", err)
 	}
 	if conn != nil {
 		t.Fatalf("expected nil conn on write failure, got %#v", conn)

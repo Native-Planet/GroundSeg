@@ -99,7 +99,11 @@ func TestRunLocalBackupPassCreatesBackupForStaleSnapshot(t *testing.T) {
 		return structs.SysConfig{Piers: []string{"~zod"}}
 	}
 	UrbitConfForRoutine = func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{BackupTime: "0100"}
+		return structs.UrbitDocker{
+			UrbitBackupConfig: structs.UrbitBackupConfig{
+				BackupTime: "0100",
+			},
+		}
 	}
 	mostRecent := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Add(-48 * time.Hour)
 	LatestDailyBackupForRoutine = func(_, _ string) (time.Time, error) {
@@ -127,7 +131,11 @@ func TestRunLocalBackupPassSkipsWhenRecent(t *testing.T) {
 		return structs.SysConfig{Piers: []string{"~zod"}}
 	}
 	UrbitConfForRoutine = func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{BackupTime: "2359"}
+		return structs.UrbitDocker{
+			UrbitBackupConfig: structs.UrbitBackupConfig{
+				BackupTime: "2359",
+			},
+		}
 	}
 	recent := time.Date(2020, 1, 1, 23, 58, 0, 0, time.UTC)
 	LatestDailyBackupForRoutine = func(_, _ string) (time.Time, error) {

@@ -164,8 +164,7 @@ func sendBroadcast(conn net.Conn, broadcast string) (net.Conn, error) {
 	if conn != nil {
 		_, err := conn.Write(jBytes)
 		if err != nil {
-			zap.L().Error(fmt.Sprintf("Send broadcast error: %v", err))
-			return nil, err
+			return nil, fmt.Errorf("send broadcast: %w", err)
 		}
 	}
 	return conn, nil

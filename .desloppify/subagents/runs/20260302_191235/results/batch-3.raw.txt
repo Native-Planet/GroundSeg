@@ -1,0 +1,102 @@
+{
+  "batch": "Governance & Contracts",
+  "batch_index": 3,
+  "assessments": {
+    "cross_module_architecture": 74.0,
+    "test_strategy": 71.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Protocol action tokens are defined in `goseg/protocol/actions/actions.go` while compatibility descriptors are separately defined in `goseg/protocol/contracts/contracts.go`, with only manual table wiring (`uploadActionContracts`, `c2cActionContracts`) connecting them.",
+        "`MustContractDescriptor` in `contracts.go` returns a fallback descriptor when a contract ID is missing instead of failing fast; `actions.go` consumes this in contract construction, which can silently degrade contract metadata across module boundaries.",
+        "README governance text explicitly requires maintaining descriptors in both files, indicating boundary correctness currently depends on process discipline rather than an enforceable runtime/build-time contract."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    },
+    "test_strategy": {
+      "evidence": [
+        "README CI policy names path-aware contract checks for `goseg/protocol/actions/actions.go` but does not include `goseg/protocol/contracts/contracts.go`, even though that file defines the canonical contract catalog and compatibility metadata.",
+        "The compatibility logic in `contracts.go` (`IsContractDeprecated`, `IsContractActive`, version parsing/comparisons) is central to runtime contract behavior, but the documented targeted quality gate scope is narrower than this governance source of truth.",
+        "README also states protocol compatibility descriptors must be maintained in both actions and contracts surfaces, but the documented targeted tests do not assert registry completeness/parity across those files."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_contract_registry_without_enforced_parity",
+      "summary": "Action and contract registries are split across modules with no enforceable parity check.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go",
+        "README.md"
+      ],
+      "evidence": [
+        "`actions.go` defines action enums and per-namespace registration tables, while `contracts.go` separately defines `ContractID` and `contractCatalog` entries.",
+        "Parity between an action token and descriptor ID is maintained by manual mapping (`contractForAction(...)`) rather than a compile-time or test-enforced invariant.",
+        "README governance requires both files to be updated for protocol/error contract surfaces, confirming process coupling that can drift."
+      ],
+      "suggestion": "Introduce a single canonical registry (or generated map) that declares action token + namespace + contract descriptor in one place, then derive both action metadata and contract catalog views from that source; add a strict parity validator that fails tests/CI when any action lacks a descriptor or metadata entry.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_governance_over_runtime_contracts"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fail_open_descriptor_lookup",
+      "summary": "Missing contract descriptors degrade silently due fail-open lookup semantics.",
+      "related_files": [
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "`MustContractDescriptor` returns `ContractDescriptor{Name: string(name)}` when an ID is missing, instead of panicking or returning an error.",
+        "Callers in `actions.go` use descriptor fields (`Description`, metadata checks) as contract truth; fallback descriptors therefore propagate incomplete metadata without an explicit failure path."
+      ],
+      "suggestion": "Change `MustContractDescriptor` to fail fast (panic in init-time paths) or replace with explicit `(descriptor, error)` plumbing in registration setup; add startup validation that rejects any contract entry missing required metadata fields.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_governance_over_runtime_contracts"
+    },
+    {
+      "dimension": "test_strategy",
+      "identifier": "quality_gate_excludes_contract_catalog",
+      "summary": "Documented contract CI gate omits the canonical contract catalog file.",
+      "related_files": [
+        "README.md",
+        "goseg/protocol/contracts/contracts.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "README's `Runtime Contract Gate` path list includes `actions.go` but not `contracts.go`.",
+        "`contracts.go` holds core compatibility policy and lifecycle metadata used by action and error contract logic.",
+        "No documented targeted test requirement in README explicitly covers catalog completeness or compatibility policy invariants for `contracts.go`."
+      ],
+      "suggestion": "Expand the documented and enforced contract gate to include `goseg/protocol/contracts/contracts.go` changes, and add deterministic tests for contract metadata invariants (introduced/deprecated/removed semantics, descriptor completeness, and action-to-contract parity).",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_governance_over_runtime_contracts"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Governance-critical contract definitions are distributed across files without a single executable source of truth.",
+      "Policy relies on README/process guidance more than enforceable runtime and CI invariants."
+    ],
+    "likely_symptoms": [
+      "split_contract_registry_without_enforced_parity",
+      "fail_open_descriptor_lookup",
+      "quality_gate_excludes_contract_catalog"
+    ],
+    "possible_false_positives": []
+  }
+}

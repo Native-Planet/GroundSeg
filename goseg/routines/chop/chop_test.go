@@ -31,7 +31,11 @@ func TestRunChopAtLimitPassSkipsShipsWithoutSizeLimit(t *testing.T) {
 		return structs.SysConfig{Piers: []string{"~zod"}}
 	}
 	UrbitConfForChop = func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{SizeLimit: 0}
+		return structs.UrbitDocker{
+			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+				SizeLimit: 0,
+			},
+		}
 	}
 	ContainerStatsForChop = func(string) structs.ContainerStats {
 		return structs.ContainerStats{DiskUsage: 100 * (int64(1) << 30)}
@@ -58,9 +62,17 @@ func TestRunChopAtLimitPassTriggersChopAtOrAboveLimit(t *testing.T) {
 	UrbitConfForChop = func(patp string) structs.UrbitDocker {
 		switch patp {
 		case "~zod":
-			return structs.UrbitDocker{SizeLimit: 5}
+			return structs.UrbitDocker{
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					SizeLimit: 5,
+				},
+			}
 		case "~bus":
-			return structs.UrbitDocker{SizeLimit: 6}
+			return structs.UrbitDocker{
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					SizeLimit: 6,
+				},
+			}
 		default:
 			return structs.UrbitDocker{}
 		}

@@ -2,7 +2,6 @@ package shipworkflow
 
 import (
 	"fmt"
-	"time"
 
 	"groundseg/broadcast"
 	"groundseg/click"
@@ -17,17 +16,22 @@ import (
 )
 
 func deleteShip(patp string) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionDeleteShip, structs.WsUrbitPayload{})
+}
+
+func exportShip(patp string, urbitPayload structs.WsUrbitPayload) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionExportShip, urbitPayload)
+}
+
+func exportBucket(patp string, urbitPayload structs.WsUrbitPayload) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionExportBucket, urbitPayload)
+}
+
+func buildDeleteShipSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	settings := getStartramSettingsSnapshot()
 	removeServices := false
-	return runUrbitTransitionTemplate(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionDeleteShip),
-		startEvent:     "stopping",
-		successEvent:   "done",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     1 * time.Second,
-	},
-		transitionStep[string]{
+	return []transitionStep[string]{
+		{
 			Run: func() error {
 				// update DesiredStatus to 'stopped'
 				contConf := getContainerStatesFn()
@@ -48,7 +52,7 @@ func deleteShip(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "removing-services",
 			EmitWhen: func() bool {
 				return removeServices
@@ -66,7 +70,7 @@ func deleteShip(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "deleting",
 			Run: func() error {
 				shipConf := getUrbitConfigFn(patp)
@@ -85,21 +89,14 @@ func deleteShip(patp string) error {
 				return nil
 			},
 		},
-	)
+	}
 }
 
-func exportShip(patp string, urbitPayload structs.WsUrbitPayload) error {
-	return runUrbitTransitionTemplate(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionExportShip),
-		startEvent:     "stopping",
-		successEvent:   "ready",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     1 * time.Second,
-	},
-		transitionStep[string]{
+func buildExportShipSteps(patp string, payload structs.WsUrbitPayload) []transitionStep[string] {
+	return []transitionStep[string]{
+		{
 			Run: func() error {
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "noboot"
 					return nil
 				}); err != nil {
@@ -113,35 +110,26 @@ func exportShip(patp string, urbitPayload structs.WsUrbitPayload) error {
 					}
 				}
 				// whitelist the patp token pair
-				if err := exporter.WhitelistContainer(patp, urbitPayload.Token); err != nil {
+				if err := exporter.WhitelistContainer(patp, payload.Token); err != nil {
 					return err
 				}
 				return nil
 			},
 		},
-	)
+	}
 }
 
-func exportBucket(patp string, urbitPayload structs.WsUrbitPayload) error {
-	return runUrbitTransitionTemplate(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionExportBucket),
-		successEvent:   "ready",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     1 * time.Second,
-		err: func(error) string {
-			return "error"
-		},
-	},
-		transitionStep[string]{
+func buildExportBucketSteps(patp string, payload structs.WsUrbitPayload) []transitionStep[string] {
+	return []transitionStep[string]{
+		{
 			Run: func() error {
 				containerName := fmt.Sprintf("minio_%s", patp)
 				// whitelist the patp token pair
-				if err := exporter.WhitelistContainer(containerName, urbitPayload.Token); err != nil {
+				if err := exporter.WhitelistContainer(containerName, payload.Token); err != nil {
 					return err
 				}
 				return nil
 			},
 		},
-	)
+	}
 }

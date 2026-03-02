@@ -53,8 +53,12 @@ func TestSetUrbitDomainUsesUrbitDomainTransition(t *testing.T) {
 	patp := "~zod"
 	var called bool
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName: patp,
-		WgURL:    "groundseg.net",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitNetworkConfig: structs.UrbitNetworkConfig{
+			WgURL: "groundseg.net",
+		},
 	})
 	withTransitionTemplateStub(t, func(gotPatp string, template urbitTransitionTemplate, steps ...transitionStep[string]) error {
 		called = true
@@ -83,8 +87,12 @@ func TestSetMinIODomainUsesMinIODomainTransition(t *testing.T) {
 	patp := "~zod"
 	var called bool
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName: patp,
-		WgURL:    "groundseg.net",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitNetworkConfig: structs.UrbitNetworkConfig{
+			WgURL: "groundseg.net",
+		},
 	})
 	withTransitionTemplateStub(t, func(gotPatp string, template urbitTransitionTemplate, steps ...transitionStep[string]) error {
 		called = true
@@ -111,8 +119,10 @@ func TestSetMinIODomainUsesMinIODomainTransition(t *testing.T) {
 func TestTogglePowerUsesTogglePowerTransition(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName:   patp,
-		BootStatus: "boot",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:   patp,
+			BootStatus: "boot",
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(gotPatp string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -133,8 +143,10 @@ func TestTogglePowerUsesTogglePowerTransition(t *testing.T) {
 func TestToggleDevModeUsesTransitionTemplate(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName:   patp,
-		BootStatus: "boot",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:   patp,
+			BootStatus: "boot",
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(gotPatp string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -155,20 +167,22 @@ func TestToggleDevModeUsesTransitionTemplate(t *testing.T) {
 func TestRebuildContainerUsesRunTransitionedOperation(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName:   patp,
-		BootStatus: "boot",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:   patp,
+			BootStatus: "boot",
+		},
 	})
 	var called bool
-	withTransitionedOperationStub(t, func(gotPatp, transitionType, startEvent, successEvent string, clearDelay time.Duration, _ func() error) error {
+	withTransitionTemplateStub(t, func(gotPatp string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
 		called = true
 		if gotPatp != patp {
 			t.Fatalf("expected patp %q, got %q", patp, gotPatp)
 		}
-		if transitionType != "rebuildContainer" || startEvent != "loading" || successEvent != "success" {
-			t.Fatalf("unexpected transition metadata: %q %q %q", transitionType, startEvent, successEvent)
+		if template.transitionType != string(transition.UrbitTransitionRebuildContainer) || template.startEvent != "loading" || template.successEvent != "success" {
+			t.Fatalf("unexpected transition metadata: %q %q %q", template.transitionType, template.startEvent, template.successEvent)
 		}
-		if clearDelay != 3*time.Second {
-			t.Fatalf("unexpected clear delay: %v", clearDelay)
+		if template.clearDelay != 3*time.Second {
+			t.Fatalf("unexpected clear delay: %v", template.clearDelay)
 		}
 		return nil
 	})
@@ -176,16 +190,20 @@ func TestRebuildContainerUsesRunTransitionedOperation(t *testing.T) {
 		t.Fatalf("RebuildContainer returned error: %v", err)
 	}
 	if !called {
-		t.Fatal("expected run transitioned operation to be invoked")
+		t.Fatal("expected transition template to be invoked")
 	}
 }
 
 func TestToggleNetworkUsesTransitionTemplate(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName:   patp,
-		BootStatus: "boot",
-		Network:    "wireguard",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName:   patp,
+			BootStatus: "boot",
+		},
+		UrbitNetworkConfig: structs.UrbitNetworkConfig{
+			Network: "wireguard",
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(_ string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -206,9 +224,15 @@ func TestToggleNetworkUsesTransitionTemplate(t *testing.T) {
 func TestToggleMinIOLinkUsesTransitionTemplate(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName:    patp,
-		CustomS3Web: "s3.example.com",
-		WgURL:       "groundseg.net",
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitWebConfig: structs.UrbitWebConfig{
+			CustomS3Web: "s3.example.com",
+		},
+		UrbitNetworkConfig: structs.UrbitNetworkConfig{
+			WgURL: "groundseg.net",
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(_ string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -229,7 +253,9 @@ func TestToggleMinIOLinkUsesTransitionTemplate(t *testing.T) {
 func TestHandleLoomUsesTransitionTemplate(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName: patp,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(_ string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -250,7 +276,9 @@ func TestHandleLoomUsesTransitionTemplate(t *testing.T) {
 func TestHandleSnapTimeUsesTransitionTemplate(t *testing.T) {
 	patp := "~zod"
 	withRuntimeUrbitConfig(t, structs.UrbitDocker{
-		PierName: patp,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
 	})
 	var called bool
 	withTransitionTemplateStub(t, func(_ string, template urbitTransitionTemplate, _ ...transitionStep[string]) error {
@@ -271,8 +299,12 @@ func TestHandleSnapTimeUsesTransitionTemplate(t *testing.T) {
 func TestToggleAutoRebootPersistsDisableShipRestarts(t *testing.T) {
 	patp := "~zod"
 	setupUrbitOperationsConfig(t, patp, structs.UrbitDocker{
-		PierName:            patp,
-		DisableShipRestarts: false,
+		UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+			PierName: patp,
+		},
+		UrbitFeatureConfig: structs.UrbitFeatureConfig{
+			DisableShipRestarts: false,
+		},
 	})
 	withLoadUrbitConfigStub(t, func(_ string) error { return nil })
 	if err := ToggleAutoReboot(patp); err != nil {

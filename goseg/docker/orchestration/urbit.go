@@ -17,7 +17,7 @@ import (
 
 // load existing urbits from config json
 func LoadUrbits() error {
-	return loadUrbits(urbitRuntimeFromDocker(newDockerRuntime()))
+	return loadUrbits(newUrbitRuntime())
 }
 
 func loadUrbits(rt UrbitRuntime) error {
@@ -65,11 +65,11 @@ func loadUrbits(rt UrbitRuntime) error {
 
 // urbit container config builder
 func urbitContainerConf(containerName string) (container.Config, container.HostConfig, error) {
-	return urbitContainerConfWithRuntime(urbitRuntimeFromDocker(newDockerRuntime()), containerName)
+	return urbitContainerConfWithRuntime(newUrbitRuntime(), containerName)
 }
 
 func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (container.Config, container.HostConfig, error) {
-	runtimeSettings := rt.RuntimeSettingsSnapshotFn()
+	runtimeSettings := rt.ShipRuntimeSettingsSnapshotFn()
 	var containerConfig container.Config
 	var hostConfig container.HostConfig
 	var scriptContent string
@@ -107,8 +107,23 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 	newConf.MinioVersion = minioInfo["tag"]
 	newConf.MinioRepo = minioInfo["repo"]
 	if shipConf != newConf {
-		if err := rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
-			*conf = newConf
+		if err := persistUrbitRuntimeConfig(containerName, rt, func(conf *structs.UrbitRuntimeConfig) error {
+			conf.UrbitVersion = newConf.UrbitVersion
+			conf.UrbitRepo = newConf.UrbitRepo
+			conf.UrbitAmd64Sha256 = newConf.UrbitAmd64Sha256
+			conf.UrbitArm64Sha256 = newConf.UrbitArm64Sha256
+			conf.MinioVersion = newConf.MinioVersion
+			conf.MinioRepo = newConf.MinioRepo
+			conf.MinioAmd64Sha256 = newConf.MinioAmd64Sha256
+			conf.MinioArm64Sha256 = newConf.MinioArm64Sha256
+			conf.MinioPassword = newConf.MinioPassword
+			conf.BootStatus = newConf.BootStatus
+			conf.PierName = newConf.PierName
+			conf.HTTPPort = newConf.HTTPPort
+			conf.AmesPort = newConf.AmesPort
+			conf.LoomSize = newConf.LoomSize
+			conf.SizeLimit = newConf.SizeLimit
+			conf.SnapTime = newConf.SnapTime
 			return nil
 		}); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't persist updated urbit conf! %v", err))
@@ -151,8 +166,8 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 		// status the next time handler (or other modules) decides to call this func
 		updateUrbitConf := effectiveConf
 		updateUrbitConf.BootStatus = "noboot"
-		err = rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
-			*conf = updateUrbitConf
+		err = persistUrbitRuntimeConfig(containerName, rt, func(conf *structs.UrbitRuntimeConfig) error {
+			conf.BootStatus = updateUrbitConf.BootStatus
 			return nil
 		})
 		if err != nil {
@@ -162,8 +177,8 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 		// set everything else back to boot
 		updateUrbitConf := effectiveConf
 		updateUrbitConf.BootStatus = "boot"
-		err = rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
-			*conf = updateUrbitConf
+		err = persistUrbitRuntimeConfig(containerName, rt, func(conf *structs.UrbitRuntimeConfig) error {
+			conf.BootStatus = updateUrbitConf.BootStatus
 			return nil
 		})
 		if err != nil {
@@ -273,4 +288,21 @@ func urbitContainerConfWithRuntime(rt UrbitRuntime, containerName string) (conta
 	}
 	zap.L().Debug(fmt.Sprintf("Boot command: %v", containerConfig.Cmd))
 	return containerConfig, hostConfig, nil
+}
+
+func persistUrbitRuntimeConfig(containerName string, rt UrbitRuntime, mutate func(*structs.UrbitRuntimeConfig) error) error {
+	if rt.UpdateUrbitRuntimeConfigFn != nil {
+		return rt.UpdateUrbitRuntimeConfigFn(containerName, mutate)
+	}
+	if rt.UpdateUrbitFn == nil {
+		return fmt.Errorf("Urbit runtime update dependency is not configured")
+	}
+	return rt.UpdateUrbitFn(containerName, func(conf *structs.UrbitDocker) error {
+		runtimeConfig := conf.UrbitRuntimeConfig
+		if err := mutate(&runtimeConfig); err != nil {
+			return err
+		}
+		conf.UrbitRuntimeConfig = runtimeConfig
+		return nil
+	})
 }

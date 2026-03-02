@@ -1,0 +1,99 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 68.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "`goseg/main.go` and `goseg/startup_orchestrator.go` both define the same startup orchestration abstractions (`startupSubsystemPolicy`, `startupSubsystemStep`, `startupRuntime`, `startBackgroundServicesRuntime`) and the same helper functions (`runStartupSubsystem`, `runStartupSubsystems`, `defaultStartupRuntime`, `validate` methods), creating duplicated abstraction layers instead of a single reusable one.",
+        "`goseg/rectify/rectify.go` defines `RectifyRuntime` and `RectifyRuntimeDependencies` with effectively identical function fields, then manually copies every field in `NewRectifyRuntimeWithDependencies`; `goseg/docker/orchestration/runtime_seams.go` repeats a similar mirror pattern with `Runtime`/`RuntimeDependencies` and multiple overlap-heavy sub-structs.",
+        "Large callback-bag seams dominate control flow: `startupRuntime`/`startBackgroundServicesRuntime` (`goseg/main.go`, `goseg/startup_orchestrator.go`), `workflowRuntime` (`goseg/shipworkflow/operations_runtime.go`), and `RectifyRuntime` (`goseg/rectify/rectify.go`) each expose many low-level function slots, requiring nil checks/default-merges and obscuring true module boundaries."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 62.0,
+        "indirection_cost": 61.0,
+        "interface_honesty": 81.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_startup_orchestrator_layer",
+      "summary": "Startup orchestration abstractions are duplicated across two production files instead of centralized, creating parallel abstraction surfaces.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startup_orchestrator.go",
+        "goseg/main_test.go",
+        "goseg/startup_orchestrator_test.go"
+      ],
+      "evidence": [
+        "Both files define identical orchestration types and policies (`startupSubsystemPolicy`, `startupSubsystemStep`, `startupRuntime`, `startBackgroundServicesRuntime`) plus matching orchestration helpers.",
+        "Both files contain the same runtime defaulting and validation patterns (`defaultStartupRuntime`, `withDefaults`, `validate` methods), so behavior changes must be mirrored in two places.",
+        "Tests are also split across both (`main_test.go` and `startup_orchestrator_test.go`), reinforcing duplicated seams rather than one authoritative abstraction."
+      ],
+      "suggestion": "Extract startup orchestration into a single dedicated package (for example `startuporchestrator`) with one runtime model and one set of orchestration helpers, then have `main.go` compose and call it; consolidate tests to target the single abstraction surface.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_and_runtime_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "mirrored_runtime_dependency_structs",
+      "summary": "Runtime and dependency structs are mirrored with near-identical fields, adding ceremony without additional policy or translation.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/docker/orchestration/runtime_seams.go"
+      ],
+      "evidence": [
+        "`RectifyRuntime` and `RectifyRuntimeDependencies` in `rectify.go` carry the same dependency fields, followed by full field-by-field copy in `NewRectifyRuntimeWithDependencies`.",
+        "`runtime_seams.go` repeats similar mirroring (`Runtime` vs `RuntimeDependencies`, `StartupRuntime` vs `StartupRuntimeDependencies`) with merge constructors that mostly shuttle fields.",
+        "The extra type layer does not enforce invariants or transform contracts; it primarily increases maintenance overhead when dependencies evolve."
+      ],
+      "suggestion": "Collapse mirrored pairs into a single dependency struct per domain (or a typed options builder) and enforce required seams with constructor validation; keep only narrow derived views where they materially reduce coupling.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "callback_bag_and_runtime_duplication"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "wide_callback_bags_hide_boundaries",
+      "summary": "Large function-pointer runtime bags create leaky, low-cohesion abstractions that blur domain boundaries.",
+      "related_files": [
+        "goseg/main.go",
+        "goseg/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/rectify/rectify.go",
+        "goseg/importer/importer.go"
+      ],
+      "evidence": [
+        "`startupRuntime` and `startBackgroundServicesRuntime` bundle many unrelated concerns (config init, networking checks, subsystem starts, reminders), then rely on manual nil-validation lists.",
+        "`workflowRuntime` and `RectifyRuntime` aggregate persistence, network lookup, event emission, and container operations into one mutable seam object.",
+        "`importerRuntime` repeats the same callback-bag pattern with custom ensure-methods, indicating boundary enforcement is happening procedurally rather than through smaller domain interfaces."
+      ],
+      "suggestion": "Split callback bags into smaller role-specific interfaces/structs (for example config persistence, transition emitter, container ops, network lookup) and pass only the role needed by each workflow function; this reduces nil-check boilerplate and clarifies ownership boundaries.",
+      "confidence": "medium",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "callback_bag_and_runtime_duplication"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Seam/testability strategy is implemented as broad callback bags, but lacks a second step that prunes and composes these seams into cohesive domain abstractions.",
+      "Abstraction extraction appears to have occurred via copy-and-adapt across files, leaving parallel orchestration layers and mirrored dependency structs."
+    ],
+    "likely_symptoms": [
+      "duplicate_startup_orchestrator_layer",
+      "mirrored_runtime_dependency_structs"
+    ],
+    "possible_false_positives": []
+  }
+}

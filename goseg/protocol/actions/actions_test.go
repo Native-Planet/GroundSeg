@@ -340,3 +340,66 @@ func TestUploadActionCompatibilityRejectsUnknownAction(t *testing.T) {
 		t.Fatal("expected unknown action to be non-deprecated")
 	}
 }
+
+func TestActionContractsMatchContractDescriptors(t *testing.T) {
+	cases := []struct {
+		name      string
+		namespace Namespace
+		action    Action
+		contract  contracts.ContractID
+	}{
+		{
+			name:      "upload open-endpoint",
+			namespace: NamespaceUpload,
+			action:    ActionUploadOpenEndpoint,
+			contract:  contracts.UploadActionOpenEndpoint,
+		},
+		{
+			name:      "upload reset",
+			namespace: NamespaceUpload,
+			action:    ActionUploadReset,
+			contract:  contracts.UploadActionReset,
+		},
+		{
+			name:      "c2c connect",
+			namespace: NamespaceC2C,
+			action:    ActionC2CConnect,
+			contract:  contracts.C2CConnectAction,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var contract ActionContract
+			var ok bool
+			switch tc.namespace {
+			case NamespaceUpload:
+				uploadContract, found := UploadActionContractForAction(tc.action)
+				ok = found
+				contract = uploadContract.ActionContract
+			case NamespaceC2C:
+				contract, ok = C2CActionContractForAction(tc.action)
+			default:
+				t.Fatalf("unsupported namespace: %s", tc.namespace)
+			}
+			if !ok {
+				t.Fatalf("expected action %s in namespace %s to resolve", tc.action, tc.namespace)
+			}
+			catalogDescriptor, ok := contracts.ContractDescriptorFor(tc.contract)
+			if !ok {
+				t.Fatalf("expected contract descriptor %s to be present", tc.contract)
+			}
+			if contract.Contract.Name != catalogDescriptor.Name {
+				t.Fatalf("expected action contract name %q to match catalog name %q", contract.Contract.Name, catalogDescriptor.Name)
+			}
+			if contract.Contract.Description != catalogDescriptor.Description {
+				t.Fatalf("expected action contract description %q to match catalog description %q", contract.Contract.Description, catalogDescriptor.Description)
+			}
+			if contract.Contract.IntroducedIn != catalogDescriptor.IntroducedIn {
+				t.Fatalf("expected action contract introduced version %q to match catalog introduced version %q", contract.Contract.IntroducedIn, catalogDescriptor.IntroducedIn)
+			}
+			if contract.Contract.Compatibility != catalogDescriptor.Compatibility {
+				t.Fatalf("expected action contract compatibility %q to match catalog compatibility %q", contract.Contract.Compatibility, catalogDescriptor.Compatibility)
+			}
+		})
+	}
+}

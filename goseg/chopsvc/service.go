@@ -19,9 +19,9 @@ var (
 	getShipStatusFn             = orchestration.GetShipStatus
 	barExitFn                   = click.BarExit
 	stopContainerByNameFn       = orchestration.StopContainerByName
-	updateUrbitFn               = config.UpdateUrbit
 	startContainerFn            = orchestration.StartContainer
 	forceUpdateContainerStatsFn = orchestration.ForceUpdateContainerStats
+	persistShipRuntimeConfigFn  = config.UpdateUrbitRuntimeConfig
 	waitCompleteFn              = func(patp string) error {
 		return WaitComplete(patp)
 	}
@@ -68,7 +68,7 @@ func ChopPier(patp string) error {
 
 	publishTransition("chopping")
 	zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
-	if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+	if err := persistShipRuntimeConfigFn(patp, func(conf *structs.UrbitRuntimeConfig) error {
 		conf.BootStatus = "chop"
 		return nil
 	}); err != nil {
@@ -85,7 +85,7 @@ func ChopPier(patp string) error {
 
 	if isRunning {
 		publishTransition("starting")
-		if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+		if err := persistShipRuntimeConfigFn(patp, func(conf *structs.UrbitRuntimeConfig) error {
 			conf.BootStatus = "boot"
 			return nil
 		}); err != nil {
@@ -102,8 +102,4 @@ func ChopPier(patp string) error {
 
 func WaitComplete(patp string) error {
 	return shipworkflow.WaitForUrbitStop(patp, getShipStatusFn, waitCompletePollerFn)
-}
-
-func persistShipConf(patp string, mutate func(*structs.UrbitDocker) error) error {
-	return shipworkflow.PersistUrbitConfig(patp, mutate, updateUrbitFn)
 }

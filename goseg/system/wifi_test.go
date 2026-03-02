@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mdlayher/wifi"
 	"groundseg/protocol/actions"
@@ -13,33 +14,31 @@ import (
 
 func resetWifiSeamsForTest(t *testing.T) {
 	t.Helper()
-	origExec := execCommandForWiFi
-	origRun := runCommandForWiFi
-	origIfCheck := ifCheckForWiFi
-	origWifiNew := wifiNewClientForWiFi
-	origInterfaces := wifiClientInterfaces
-	origBSS := wifiClientBSS
-	t.Cleanup(func() {
-		execCommandForWiFi = origExec
-		runCommandForWiFi = origRun
-		ifCheckForWiFi = origIfCheck
-		wifiNewClientForWiFi = origWifiNew
-		wifiClientInterfaces = origInterfaces
-		wifiClientBSS = origBSS
-	})
+}
+
+func testWifiRuntime(overrides wifiRuntime) wifiRuntime {
+	runtime := wifiRuntime{}
+	runtime.execCommand = overrides.execCommand
+	runtime.runCommand = overrides.runCommand
+	runtime.newWifiClient = overrides.newWifiClient
+	runtime.clientInterfacesFn = overrides.clientInterfacesFn
+	runtime.clientBSSFn = overrides.clientBSSFn
+	return runtime
 }
 
 func TestGetWifiDeviceParsesAndTrimsOutput(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		if name != "sh" {
-			t.Fatalf("unexpected command: %s", name)
-		}
-		return exec.Command("sh", "-c", "printf 'wlan0\\n wlan1 \\n\\n'")
-	}
+	runtime := testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			if name != "sh" {
+				t.Fatalf("unexpected command: %s", name)
+			}
+			return exec.Command("sh", "-c", "printf 'wlan0\\n wlan1 \\n\\n'")
+		},
+	})
 
-	devices, err := getWifiDevice()
+	devices, err := newWiFiService(runtime).wifiDevices()
 	if err != nil {
 		t.Fatalf("getWifiDevice returned error: %v", err)
 	}
@@ -54,23 +53,25 @@ func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
 
 	called := 0
 	bssCalled := 0
-	wifiClientInterfaces = func(c *wifi.Client) ([]*wifi.Interface, error) {
-		_ = c
-		called++
-		return []*wifi.Interface{{Name: "wlan1", Type: wifi.InterfaceTypeStation}}, nil
-	}
-	wifiClientBSS = func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) {
-		_ = c
-		_ = iface
-		bssCalled++
-		return &wifi.BSS{}, nil
-	}
+	runtime := testWifiRuntime(wifiRuntime{
+		clientInterfacesFn: func(c *wifi.Client) ([]*wifi.Interface, error) {
+			_ = c
+			called++
+			return []*wifi.Interface{{Name: "wlan1", Type: wifi.InterfaceTypeStation}}, nil
+		},
+		clientBSSFn: func(c *wifi.Client, iface *wifi.Interface) (*wifi.BSS, error) {
+			_ = c
+			_ = iface
+			bssCalled++
+			return &wifi.BSS{}, nil
+		},
+	})
 
-	ssid, err := getConnectedSSID(&wifi.Client{}, "wlan0")
+	ssid, err := newWiFiService(runtime).connectedSSID(&wifi.Client{}, "wlan0")
 	if err == nil {
 		t.Fatal("expected getConnectedSSID to fail when interface is missing")
 	}
-	if !errors.Is(err, errWifiInterfaceNotFound) {
+	if !errors.Is(err, ErrWifiInterfaceNotFound) {
 		t.Fatalf("expected wifi interface not found error, got: %v", err)
 	}
 	if ssid != "" {
@@ -87,29 +88,43 @@ func TestGetConnectedSSIDReturnsErrorForMissingInterface(t *testing.T) {
 func TestGetWifiDeviceReturnsErrorForFailureOrEmptyResult(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		return exec.Command("false")
-	}
-	if _, err := getWifiDevice(); err == nil {
+	runtime := testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			_ = args
+			return exec.Command("false")
+		},
+	})
+	if _, err := newWiFiService(runtime).wifiDevices(); err == nil {
 		t.Fatal("expected getWifiDevice to fail when command execution fails")
 	}
 
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		return exec.Command("sh", "-c", "printf '\\n'")
-	}
-	if _, err := getWifiDevice(); err == nil {
+	runtime = testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			_ = name
+			_ = args
+			return exec.Command("sh", "-c", "printf '\\n'")
+		},
+	})
+	if _, err := newWiFiService(runtime).wifiDevices(); err == nil {
 		t.Fatal("expected getWifiDevice to fail when no devices are listed")
+	}
+	if _, err := newWiFiService(runtime).wifiDevices(); err != nil && !errors.Is(err, ErrWifiInterfaceNotFound) {
+		t.Fatalf("expected wifi interface not found error when no devices are listed, got: %v", err)
 	}
 }
 
 func TestPrimaryWifiDeviceReturnsFirstDevice(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		return exec.Command("sh", "-c", "printf 'wlan0\\nwlan1\\n'")
-	}
+	runtime := testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			_ = name
+			_ = args
+			return exec.Command("sh", "-c", "printf 'wlan0\\nwlan1\\n'")
+		},
+	})
 
-	device, err := primaryWifiDevice()
+	device, err := newWiFiService(runtime).primaryWifiDevice()
 	if err != nil {
 		t.Fatalf("primaryWifiDevice returned error: %v", err)
 	}
@@ -121,15 +136,19 @@ func TestPrimaryWifiDeviceReturnsFirstDevice(t *testing.T) {
 func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	runCommandForWiFi = func(command string, args ...string) (string, error) {
-		return strings.Join([]string{
-			"a:b:c:d:e:f:g:HomeWiFi",
-			"malformed:line",
-			"a:b:c:d:e:f:g:",
-		}, "\n"), nil
-	}
+	runtime := testWifiRuntime(wifiRuntime{
+		runCommand: func(command string, args ...string) (string, error) {
+			_ = command
+			_ = args
+			return strings.Join([]string{
+				"a:b:c:d:e:f:g:HomeWiFi",
+				"malformed:line",
+				"a:b:c:d:e:f:g:",
+			}, "\n"), nil
+		},
+	})
 
-	ssids, err := ListWifiSSIDs("wlan0")
+	ssids, err := newWiFiService(runtime).listSSIDs("wlan0")
 	if err != nil {
 		t.Fatalf("ListWifiSSIDs returned error: %v", err)
 	}
@@ -141,10 +160,12 @@ func TestListWifiSSIDsParsesValidEntriesAndSkipsMalformed(t *testing.T) {
 
 func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 	resetWifiSeamsForTest(t)
-	runCommandForWiFi = func(string, ...string) (string, error) {
-		return "", errors.New("nmcli down")
-	}
-	if _, err := ListWifiSSIDs("wlan0"); err == nil {
+	runtime := testWifiRuntime(wifiRuntime{
+		runCommand: func(string, ...string) (string, error) {
+			return "", errors.New("nmcli down")
+		},
+	})
+	if _, err := newWiFiService(runtime).listSSIDs("wlan0"); err == nil {
 		t.Fatal("expected ListWifiSSIDs to return an error")
 	}
 }
@@ -152,19 +173,21 @@ func TestListWifiSSIDsPropagatesScanFailures(t *testing.T) {
 func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	runCommandForWiFi = func(command string, args ...string) (string, error) {
-		if strings.Join(args, " ") == "radio wifi" {
-			return "enabled\n", nil
-		}
-		if strings.Join(args, " ") == "radio wifi off" {
+	runtime := testWifiRuntime(wifiRuntime{
+		runCommand: func(command string, args ...string) (string, error) {
+			if command == "nmcli" && strings.Join(args, " ") == "radio wifi" {
+				return "enabled\n", nil
+			}
+			if strings.Join(args, " ") == "radio wifi off" {
+				return "", nil
+			}
+			if strings.Join(args, " ") == "radio wifi on" {
+				return "", nil
+			}
 			return "", nil
-		}
-		if strings.Join(args, " ") == "radio wifi on" {
-			return "", nil
-		}
-		return "", nil
-	}
-	wifiEnabled, err := ifCheck()
+		},
+	})
+	wifiEnabled, err := newWiFiService(runtime).ifCheck()
 	if err != nil {
 		t.Fatalf("ifCheck returned error: %v", err)
 	}
@@ -172,19 +195,26 @@ func TestIfCheckAndToggleDeviceUseSeams(t *testing.T) {
 		t.Fatal("expected ifCheck to return true when nmcli output contains enabled")
 	}
 
-	if err := ToggleDevice("wlan0"); err != nil {
+	if err := newWiFiService(runtime).toggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(off) returned error: %v", err)
 	}
 
-	ifCheckForWiFi = func() (bool, error) {
-		return false, nil
-	}
-	if err := ToggleDevice("wlan0"); err != nil {
+	runtime = testWifiRuntime(wifiRuntime{
+		runCommand: func(command string, args ...string) (string, error) {
+			if command == "nmcli" && strings.Join(args, " ") == "radio wifi" {
+				return "disabled\n", nil
+			}
+			return "", nil
+		},
+	})
+	if err := newWiFiService(runtime).toggleDevice("wlan0"); err != nil {
 		t.Fatalf("ToggleDevice(on) returned error: %v", err)
 	}
 
-	runCommandForWiFi = func(string, ...string) (string, error) { return "", errors.New("nmcli error") }
-	wifiEnabled, err = ifCheck()
+	runtime = testWifiRuntime(wifiRuntime{
+		runCommand: func(string, ...string) (string, error) { return "", errors.New("nmcli error") },
+	})
+	wifiEnabled, err = newWiFiService(runtime).ifCheck()
 	if err == nil {
 		t.Fatal("expected ifCheck to return error when command fails")
 	}
@@ -197,21 +227,27 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
 	calls := []string{}
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		calls = append(calls, name+" "+strings.Join(args, " "))
-		return exec.Command("true")
-	}
-	if err := ConnectToWifi("HomeWiFi", "secret"); err != nil {
+	runtime := testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			calls = append(calls, name+" "+strings.Join(args, " "))
+			return exec.Command("true")
+		},
+	})
+	if err := newWiFiService(runtime).connect("HomeWiFi", "secret"); err != nil {
 		t.Fatalf("ConnectToWifi returned error: %v", err)
 	}
 	if len(calls) != 1 || !strings.Contains(calls[0], "nmcli dev wifi connect HomeWiFi password secret") {
 		t.Fatalf("unexpected nmcli invocation: %v", calls)
 	}
 
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		return exec.Command("false")
-	}
-	if err := ConnectToWifi("HomeWiFi", "secret"); err == nil {
+	runtime = testWifiRuntime(wifiRuntime{
+		execCommand: func(name string, args ...string) *exec.Cmd {
+			_ = name
+			_ = args
+			return exec.Command("false")
+		},
+	})
+	if err := newWiFiService(runtime).connect("HomeWiFi", "secret"); err == nil {
 		t.Fatal("expected ConnectToWifi to return command failure")
 	}
 }
@@ -219,10 +255,12 @@ func TestConnectToWifiUsesNmcliAndPropagatesErrors(t *testing.T) {
 func TestDisconnectWifiUsesInjectedClientFactoryError(t *testing.T) {
 	resetWifiSeamsForTest(t)
 
-	wifiNewClientForWiFi = func() (*wifi.Client, error) {
-		return nil, errors.New("client unavailable")
-	}
-	if err := DisconnectWifi("wlan0"); err == nil {
+	runtime := testWifiRuntime(wifiRuntime{
+		newWifiClient: func() (*wifi.Client, error) {
+			return nil, errors.New("client unavailable")
+		},
+	})
+	if err := newWiFiService(runtime).disconnect("wlan0"); err == nil {
 		t.Fatal("expected DisconnectWifi to return client creation error")
 	}
 }
@@ -432,35 +470,32 @@ func (accessPointLifecycleNoop) Stop(_ string) error  { return nil }
 
 func TestC2CConnectWrapsConnectAndRestoreErrors(t *testing.T) {
 	resetWifiSeamsForTest(t)
-	originalRadio := defaultWiFiRadio
-	originalAPLifecycle := defaultAccessPointLifecycle
-	originalRunCommand := runCommandForWiFi
-	originalExecCommand := execCommandForWiFi
 	connectErr := errors.New("connect failure")
 	c2cRestoreErr := errors.New("restore failure")
-	defer func() {
-		defaultWiFiRadio = originalRadio
-		defaultAccessPointLifecycle = originalAPLifecycle
-		runCommandForWiFi = originalRunCommand
-		execCommandForWiFi = originalExecCommand
-	}()
 
-	defaultWiFiRadio = wifiRadioConnectErrorService{
-		connectedDevice: "wlan0",
-		connectErr:      connectErr,
-	}
-	defaultAccessPointLifecycle = accessPointLifecycleNoop{}
-	runCommandForWiFi = func(command string, args ...string) (string, error) {
-		if command == "systemctl" && len(args) > 0 && args[0] == "stop" {
-			return "", c2cRestoreErr
-		}
-		return "", nil
-	}
-	execCommandForWiFi = func(name string, args ...string) *exec.Cmd {
-		return exec.Command("true")
-	}
+	flow := newC2CModeFlowWithDependencies(c2cModeDependencies{
+		radio: wifiRadioConnectErrorService{
+			connectedDevice: "wlan0",
+			connectErr:      connectErr,
+		},
+		accessPoint: accessPointLifecycleNoop{},
+		getStoredSSIDs: func(_ []string) {
+		},
+		startResolved: func() error {
+			return nil
+		},
+		stopResolved: func() error {
+			return c2cRestoreErr
+		},
+		rebootSystem: func() error {
+			return nil
+		},
+		pause: func(_ time.Duration) {},
+		publishInterval: func(_ string) {
+		},
+	})
 
-	err := C2CConnect("HomeWiFi", "secret")
+	err := flow.ConnectToNetwork("HomeWiFi", "secret")
 	if err == nil {
 		t.Fatal("expected C2CConnect to return combined error")
 	}

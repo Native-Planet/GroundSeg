@@ -25,7 +25,9 @@ func TestCreateAndDeleteHoonRespectCustomPierLocation(t *testing.T) {
 	config.SetDockerDir(t.TempDir() + "/")
 	config.UrbitsConfig = make(map[string]structs.UrbitDocker)
 	config.UrbitsConfig[patp] = structs.UrbitDocker{
-		CustomPierLocation: customLocation,
+		UrbitWebConfig: structs.UrbitWebConfig{
+			CustomPierLocation: customLocation,
+		},
 	}
 	t.Cleanup(func() {
 		config.SetDockerDir(originalDockerDir)
@@ -88,7 +90,9 @@ func TestExecuteCommandWithLusInvalidationClearsLusAndDeletesHoon(t *testing.T) 
 	config.SetDockerDir(t.TempDir() + "/")
 	config.UrbitsConfig = make(map[string]structs.UrbitDocker)
 	config.UrbitsConfig[patp] = structs.UrbitDocker{
-		CustomPierLocation: customLocation,
+		UrbitWebConfig: structs.UrbitWebConfig{
+			CustomPierLocation: customLocation,
+		},
 	}
 	t.Cleanup(func() {
 		config.SetDockerDir(originalDockerDir)
@@ -131,7 +135,9 @@ func TestExecuteCommandWithLusInvalidationReturnsFailureOnMissingSuccessToken(t 
 	config.SetDockerDir(t.TempDir() + "/")
 	config.UrbitsConfig = make(map[string]structs.UrbitDocker)
 	config.UrbitsConfig["~zod"] = structs.UrbitDocker{
-		CustomPierLocation: t.TempDir(),
+		UrbitWebConfig: structs.UrbitWebConfig{
+			CustomPierLocation: t.TempDir(),
+		},
 	}
 	t.Cleanup(func() {
 		config.SetDockerDir(originalDockerDir)

@@ -53,8 +53,18 @@ func TestCreateUrbitConfigAssignsPortsAndCustomDrive(t *testing.T) {
 	mock := &mockConfigService{
 		conf: structs.SysConfig{Piers: []string{"~bus", "~nec"}},
 		urbits: map[string]structs.UrbitDocker{
-			"~bus": {HTTPPort: 8081, AmesPort: 34344},
-			"~nec": {HTTPPort: 8083, AmesPort: 34346},
+			"~bus": {
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					HTTPPort: 8081,
+					AmesPort: 34344,
+				},
+			},
+			"~nec": {
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					HTTPPort: 8083,
+					AmesPort: 34346,
+				},
+			},
 		},
 	}
 	svc := NewService(mock)

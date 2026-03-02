@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,6 +117,36 @@ func TestCheckVersionReturnsStoredChannelOnFailure(t *testing.T) {
 	}
 }
 
+func TestCheckVersionWithErrorReturnsCauseOnFailure(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	existing := structs.Channel{Groundseg: structs.VersionDetails{Repo: "existing-repo"}}
+	store := newInMemoryVersionStore()
+	store.SetState(existing, true)
+	versionStore = store
+
+	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.GsVersion = "1.0.0"
+	globalConfig.UpdateBranch = "latest"
+	versionFetchRetryCount = 1
+	versionFetchRetryDelay = time.Millisecond
+	versionFetchSleep = func(time.Duration) {}
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{{err: os.ErrDeadlineExceeded}},
+	}
+
+	got, err := CheckVersionWithError()
+	if err == nil {
+		t.Fatalf("expected CheckVersionWithError to fail")
+	}
+	if got.Groundseg.Repo != "existing-repo" {
+		t.Fatalf("expected fallback channel on failure, got %+v", got)
+	}
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("expected wrapped cause, got %v", err)
+	}
+}
+
 func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	preserveVersionGlobals(t)
 
@@ -158,6 +190,49 @@ func TestSyncVersionInfoSuccessThenMissingChannelFailure(t *testing.T) {
 	}
 	if IsVersionServerReady() {
 		t.Fatalf("expected server ready false after failure")
+	}
+}
+
+func TestSyncVersionInfoWithErrorReturnsCauseOnFailure(t *testing.T) {
+	preserveVersionGlobals(t)
+
+	SetBasePath(t.TempDir())
+	if err := os.MkdirAll(filepath.Join(BasePath(), "settings"), 0o755); err != nil {
+		t.Fatalf("mkdir settings failed: %v", err)
+	}
+	versionStore = newInMemoryVersionStore()
+	versionFetchRetryCount = 1
+	versionFetchRetryDelay = time.Millisecond
+	versionFetchSleep = func(time.Duration) {}
+	globalConfig.UpdateUrl = "https://updates.example/version"
+	globalConfig.GsVersion = "1.0.0"
+	globalConfig.UpdateBranch = "latest"
+
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{
+			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
+		},
+	}
+	channel, err := SyncVersionInfoWithError()
+	if err != nil {
+		t.Fatalf("expected SyncVersionInfoWithError success, got %v", err)
+	}
+	if channel.Groundseg.Repo != "repo-latest" {
+		t.Fatalf("expected initial channel, got %+v", channel)
+	}
+
+	globalConfig.UpdateBranch = "missing"
+	versionHTTPClient = &stubVersionHTTPClient{
+		results: []stubVersionHTTPResult{
+			{resp: newHTTPResponse(200, `{"groundseg":{"latest":{"groundseg":{"repo":"repo-latest"}}}}`)},
+		},
+	}
+	_, err = SyncVersionInfoWithError()
+	if err == nil {
+		t.Fatalf("expected SyncVersionInfoWithError failure")
+	}
+	if !strings.Contains(err.Error(), "resolve latest version channel") {
+		t.Fatalf("expected wrapped resolution error, got %v", err)
 	}
 }
 

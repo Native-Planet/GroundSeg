@@ -44,7 +44,7 @@ type runtimeUrbitTestOps struct {
 	loadUrbitConfigFn     func(string) error
 	urbitConfFn           func(string) structs.UrbitDocker
 	updateUrbitFn         func(string, func(*structs.UrbitDocker) error) error
-	getContainerNetworkFn   func(string) (string, error)
+	getContainerNetworkFn func(string) (string, error)
 	getLusCodeFn          func(string) (string, error)
 	clearLusCodeFn        func(string)
 }
@@ -83,7 +83,7 @@ type runtimeSnapshotTestOps struct {
 	startramSettingsSnapshotFn func() config.StartramSettings
 	shipSettingsSnapshotFn     func() config.ShipSettings
 	getStartramConfigFn        func() structs.StartramRetrieve
-	check502SettingsSnapshotFn  func() config.Check502Settings
+	check502SettingsSnapshotFn func() config.Check502Settings
 }
 
 func (ops runtimeSnapshotTestOps) runtimeOps() RuntimeSnapshotOps {
@@ -225,7 +225,7 @@ type startupImageTestOps struct {
 func (ops startupImageTestOps) runtimeOps() StartupImageOps {
 	return StartupImageOps{
 		GetLatestContainerInfo: ops.getLatestContainerInfoFn,
-		PullImageIfNotExist:   ops.pullImageIfNotExistFn,
+		PullImageIfNotExist:    ops.pullImageIfNotExistFn,
 	}
 }
 
@@ -279,19 +279,6 @@ func (ops startupLoadTestOps) runtimeOps() StartupLoadOps {
 	}
 }
 
-type dockerRuntimeContextOpsStub = dockerRuntimeContextOps
-type dockerRuntimeFileOpsStub = dockerRuntimeFileOps
-type dockerRuntimeContainerOpsStub = dockerRuntimeContainerOps
-type dockerRuntimeImageOpsStub = dockerRuntimeImageOps
-type dockerRuntimeConfigOpsStub = dockerRuntimeConfigOps
-type dockerRuntimeUrbitOpsStub = dockerRuntimeUrbitOps
-type dockerRuntimeWireguardOpsStub = dockerRuntimeWireguardOps
-type dockerRuntimeNetdataOpsStub = dockerRuntimeNetdataOps
-type dockerRuntimeMinioOpsStub = dockerRuntimeMinioOps
-type dockerRuntimeCommandOpsStub = dockerRuntimeCommandOps
-type dockerRuntimeTimerOpsStub = dockerRuntimeTimerOps
-type dockerRuntimeVolumeOpsStub = dockerRuntimeVolumeOps
-
 func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	var (
 		startCalled               bool
@@ -324,8 +311,8 @@ func TestNewRuntimeDelegatesToOverrideFns(t *testing.T) {
 	)
 
 	rt := NewRuntime(
-	WithContainerOps(runtimeContainerTestOps{
-		startContainerFn: func(string, string) (structs.ContainerState, error) {
+		WithContainerOps(runtimeContainerTestOps{
+			startContainerFn: func(string, string) (structs.ContainerState, error) {
 				startCalled = true
 				return structs.ContainerState{ActualStatus: "running"}, nil
 			},
@@ -688,22 +675,21 @@ func TestNewStartramRuntimeUsesOverridesForServiceLoaders(t *testing.T) {
 
 func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 	rt := newDockerRuntime()
-	rt.contextOps = dockerRuntimeContextOpsStub{
+	rt.contextOps = RuntimeContextOps{
 		BasePathFn:  func() string { return "/tmp/base" },
 		DockerDirFn: func() string { return "/tmp/docker" },
 	}
-	rt.configOps = dockerRuntimeConfigOpsStub{
+	rt.configOps = RuntimeSnapshotOps{
 		ConfFn:                    func() structs.SysConfig { return structs.SysConfig{} },
 		ShipSettingsSnapshotFn:    func() config.ShipSettings { return config.ShipSettings{} },
-		RuntimeSettingsSnapshotFn: func() config.ShipRuntimeSettings { return config.ShipRuntimeSettings{} },
 	}
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, nil },
 		ReadFileFn:  func(string) ([]byte, error) { return nil, nil },
 		WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo", "tag": "tag", "hash": "hash"}, nil
 		},
@@ -711,35 +697,35 @@ func TestMinioRuntimeFromDockerWiresRuntimeDependencies(t *testing.T) {
 			return "image", nil
 		},
 	}
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn:            func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 		UpdateContainerStateFn:      func(string, structs.ContainerState) {},
 		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 		CreateContainerFn:           func(string, string) (structs.ContainerState, error) { return structs.ContainerState{}, nil },
 	}
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error { return nil },
 	}
-	rt.volumeOps = dockerRuntimeVolumeOpsStub{
+	rt.volumeOps = RuntimeVolumeOps{
 		VolumeExistsFn: func(string) (bool, error) { return true, nil },
 		CreateVolumeFn: func(string) error { return nil },
 	}
-	rt.timerOps = dockerRuntimeTimerOpsStub{
+	rt.timerOps = RuntimeTimerOps{
 		SleepFn:        func(time.Duration) {},
 		PollIntervalFn: func() time.Duration { return 100 * time.Millisecond },
 	}
 	rt.commandOps.RandReadFn = func([]byte) (int, error) { return 0, nil }
-	rt.urbitOps = dockerRuntimeUrbitOpsStub{
+	rt.urbitOps = RuntimeUrbitOps{
 		LoadUrbitConfigFn: func(string) error { return nil },
 		UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
 		UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
 	}
-	rt.minioOps = dockerRuntimeMinioOpsStub{
+	rt.minioOps = RuntimeMinioOps{
 		SetMinIOPasswordFn:    func(string, string) error { return nil },
 		GetMinIOPasswordFn:    func(string) (string, error) { return "pw", nil },
 		CreateDefaultMcConfFn: func() error { return nil },
 	}
-	rt.netdataOps = dockerRuntimeNetdataOpsStub{
+	rt.netdataOps = RuntimeNetdataOps{
 		CreateDefaultNetdataConfFn: func() error { return nil },
 		WriteNDConfFn:              nil,
 	}

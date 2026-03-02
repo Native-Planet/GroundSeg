@@ -92,11 +92,17 @@ func TestSendStartramHarkNotificationOnlyTargetsOptedInShips(t *testing.T) {
 	urbitConfForRenewal = func(patp string) structs.UrbitDocker {
 		switch patp {
 		case "~zod":
-			return structs.UrbitDocker{StartramReminder: true}
+			return structs.UrbitDocker{
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{StartramReminder: true},
+			}
 		case "~bus":
-			return structs.UrbitDocker{StartramReminder: false}
+			return structs.UrbitDocker{
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{StartramReminder: false},
+			}
 		case "~nec":
-			return structs.UrbitDocker{StartramReminder: true}
+			return structs.UrbitDocker{
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{StartramReminder: true},
+			}
 		default:
 			return structs.UrbitDocker{}
 		}
@@ -131,7 +137,9 @@ func TestSendStartramHarkNotificationContinuesOnSendError(t *testing.T) {
 	resetRenewalSeamsForTest(t)
 
 	urbitConfForRenewal = func(string) structs.UrbitDocker {
-		return structs.UrbitDocker{StartramReminder: true}
+		return structs.UrbitDocker{
+			UrbitFeatureConfig: structs.UrbitFeatureConfig{StartramReminder: true},
+		}
 	}
 	calls := 0
 	sendNotificationForRenewal = func(patp string, noti structs.HarkNotification) error {

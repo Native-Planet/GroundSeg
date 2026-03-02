@@ -165,9 +165,7 @@ func GetStateJson(bState structs.AuthBroadcast) ([]byte, error) {
 	}
 	broadcastJson, err := json.Marshal(envelope)
 	if err != nil {
-		errmsg := fmt.Sprintf("Error marshalling response: %v", err)
-		zap.L().Error(errmsg)
-		return nil, err
+		return nil, fmt.Errorf("marshalling broadcast state payload: %w", err)
 	}
 	return broadcastJson, nil
 }
@@ -176,7 +174,7 @@ func ReloadUrbits() error {
 	zap.L().Info("Reloading ships in broadcast")
 	urbits, err := ConstructPierInfo()
 	if err != nil {
-		return err
+		return fmt.Errorf("reload urbit states for broadcast: %w", err)
 	}
 	mu.Lock()
 	broadcastState.Urbits = urbits

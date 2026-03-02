@@ -73,33 +73,37 @@ var (
 	mkdirAllFn                       = os.MkdirAll
 )
 
+var errImporterUpdateContainerStateMissing = errors.New("importer runtime container state callback is not configured")
+var errImporterSwapSettingsMissing = errors.New("importer runtime swap settings callback is not configured")
+var errImporterStartramSettingsMissing = errors.New("importer runtime startram settings callback is not configured")
+
 type importerRuntime struct {
+	storagePathForFn                func(string) (string, error)
+	swapSettingsFn                  func() config.SwapSettings
+	startramSettingsFn              func() config.StartramSettings
+	resolveImportedPierVolumePathFn func(context.Context, string) (string, error)
+	updateContainerStateFn          func(string, structs.ContainerState)
 	runImportedPierWorkflowFn           func(importedPierContext, importerRuntime) error
 	runImportedPierPostImportWorkflowFn func(importedPierContext, importerRuntime) error
-	resolveImportedPierVolumePathFn     func(context.Context, string) (string, error)
 	cleanupMultipartFn                  func(string) error
-	storagePathForFn                    func(string) (string, error)
 	uploadCoordinator                   shipworkflow.UploadImportCoordinator
-	swapSettingsFn                      func() config.SwapSettings
-	startramSettingsFn                  func() config.StartramSettings
-	updateContainerStateFn              func(string, structs.ContainerState)
 }
 
 func defaultImporterRuntime() importerRuntime {
 	return importerRuntime{
-		runImportedPierWorkflowFn:           runImportedPierWorkflowDefault,
-		runImportedPierPostImportWorkflowFn: runImportedPierPostImportWorkflowDefault,
+		storagePathForFn:                config.GetStoragePath,
+		swapSettingsFn:                  config.SwapSettingsSnapshot,
+		startramSettingsFn:              config.StartramSettingsSnapshot,
+		updateContainerStateFn:          config.UpdateContainerState,
 		resolveImportedPierVolumePathFn: func(_ context.Context, patp string) (string, error) {
 			return resolveImportedPierVolumePath(patp)
 		},
-		cleanupMultipartFn: system.RemoveMultipartFiles,
-		storagePathForFn:   config.GetStoragePath,
+		runImportedPierWorkflowFn:           runImportedPierWorkflowDefault,
+		runImportedPierPostImportWorkflowFn: runImportedPierPostImportWorkflowDefault,
+		cleanupMultipartFn:                  system.RemoveMultipartFiles,
 		uploadCoordinator: func(ctx context.Context, cmd shipworkflow.UploadImportCommand) error {
 			return shipworkflow.DispatchUploadImportWithCoordinator(configureUploadedPier, ctx, cmd)
 		},
-		swapSettingsFn:         config.SwapSettingsSnapshot,
-		startramSettingsFn:     config.StartramSettingsSnapshot,
-		updateContainerStateFn: config.UpdateContainerState,
 	}
 }
 
@@ -108,7 +112,7 @@ func (runtime importerRuntime) ensureInitializedForInit() error {
 		return errors.New("importer runtime storage path callback is not configured")
 	}
 	if runtime.swapSettingsFn == nil {
-		return errors.New("importer runtime swap settings callback is not configured")
+		return errImporterSwapSettingsMissing
 	}
 	return nil
 }
@@ -127,7 +131,7 @@ func (runtime importerRuntime) ensureForWorkflow() error {
 		return errors.New("importer runtime post-import workflow callback is not configured")
 	}
 	if runtime.startramSettingsFn == nil {
-		return errors.New("importer runtime startram settings callback is not configured")
+		return errImporterStartramSettingsMissing
 	}
 	if runtime.updateContainerStateFn == nil {
 		return errors.New("importer runtime container state callback is not configured")
@@ -140,23 +144,24 @@ func (runtime importerRuntime) ensureForWorkflow() error {
 
 func (runtime importerRuntime) swapSettings() config.SwapSettings {
 	if runtime.swapSettingsFn == nil {
-		return config.SwapSettings{}
+		panic(errImporterSwapSettingsMissing)
 	}
 	return runtime.swapSettingsFn()
 }
 
 func (runtime importerRuntime) startramSettings() config.StartramSettings {
 	if runtime.startramSettingsFn == nil {
-		return config.StartramSettings{}
+		panic(errImporterStartramSettingsMissing)
 	}
 	return runtime.startramSettingsFn()
 }
 
-func (runtime importerRuntime) updateContainerState(patp string, state structs.ContainerState) {
+func (runtime importerRuntime) updateContainerState(patp string, state structs.ContainerState) error {
 	if runtime.updateContainerStateFn == nil {
-		return
+		return errImporterUpdateContainerStateMissing
 	}
 	runtime.updateContainerStateFn(patp, state)
+	return nil
 }
 
 func resolveImportedPierVolumePath(patp string) (string, error) {
@@ -484,7 +489,7 @@ func combineChunksWithTimeout(filename string, total int, timeout time.Duration)
 }
 
 func runImportPhases(filename, patp, customDrive string, phases workflowOrchestration.WorkflowPhases) error {
-	return workflowOrchestration.RunStructuredWorkflow(
+	workflowErr := workflowOrchestration.RunStructuredWorkflow(
 		phases,
 		workflowOrchestration.WorkflowCallbacks{
 			Emit: func(phase lifecycle.Phase) {
@@ -494,10 +499,17 @@ func runImportPhases(filename, patp, customDrive string, phases workflowOrchestr
 				publishImportStatus(string(phase))
 			},
 			OnError: func(err error) {
-				errorCleanup(filename, patp, customDrive, err)
+				publishImportError(err.Error())
 			},
 		},
 	)
+	if workflowErr == nil {
+		return nil
+	}
+	if cleanupErr := errorCleanup(filename, patp, customDrive, workflowErr); cleanupErr != nil {
+		return fmt.Errorf("import failed for %s: %w", patp, errors.Join(workflowErr, cleanupErr))
+	}
+	return workflowErr
 }
 
 func runImportPhasesWithSteps(filename, patp, customDrive string, steps ...lifecycle.Step) error {
@@ -1027,7 +1039,6 @@ func finalizeImportedPierReadinessWithRuntime(ctx importedPierContext, runtime i
 		if err := shipworkflowSwitchToWireguardFn(ctx.Patp, true); err != nil {
 			wrappedErr := fmt.Errorf("failed to switch imported ship %s to Wireguard: %w", ctx.Patp, err)
 			logger.Error(wrappedErr.Error())
-			errorCleanup(ctx.Filename, ctx.Patp, ctx.CustomDrive, wrappedErr)
 			return wrappedErr
 		}
 	}
@@ -1121,14 +1132,16 @@ func bootImportedPierWithRuntime(ctx importedPierContext, runtime importerRuntim
 	if err != nil {
 		return fmt.Errorf("failed to start imported ship: %w", err)
 	}
-	runtime.updateContainerState(ctx.Patp, info)
+	if err := runtime.updateContainerState(ctx.Patp, info); err != nil {
+		return err
+	}
 	if err := os.Remove(ctx.ArchivePath); err != nil {
 		logger.Warn(fmt.Sprintf("Failed to remove uploaded archive %s: %v", ctx.Filename, err))
 	}
 	return nil
 }
 
-func errorCleanup(filename, patp, customDrive string, err error) {
+func errorCleanup(filename, patp, customDrive string, err error) error {
 	// notify that we are cleaning up
 	logger.Info(fmt.Sprintf("Pier import process failed: %s: %v", patp, err))
 	logger.Info(fmt.Sprintf("Running cleanup routine"))
@@ -1144,10 +1157,11 @@ func errorCleanup(filename, patp, customDrive string, err error) {
 		RemoveContainerState: true,
 	}); err != nil {
 		logger.Error(fmt.Sprintf("Import rollback encountered errors: %v", err))
+		return err
 	}
 	publishImportError(err.Error())
 	publishImportStatus("aborted")
-	return
+	return nil
 }
 
 func restructureDirectory(ctx importedPierContext) error {

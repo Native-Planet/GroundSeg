@@ -1,6 +1,10 @@
 package contracts
 
-import "time"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 // ContractCompatibility models a contract's compatibility policy across versions.
 type ContractCompatibility string
@@ -29,6 +33,22 @@ const (
 	C2CConnectAction         ContractID = "protocol.actions.c2c.connect"
 	APIConnectionError       ContractID = "startram.errors.api-connection"
 )
+
+// ActionNamespace identifies the protocol namespace for action contracts.
+type ActionNamespace string
+
+const (
+	ActionNamespaceUpload ActionNamespace = "upload"
+	ActionNamespaceC2C    ActionNamespace = "c2c"
+)
+
+// ActionContractBinding joins an action identifier with its contract descriptor ID
+// and namespace, allowing runtime validation and single-source discovery.
+type ActionContractBinding struct {
+	Namespace ActionNamespace
+	Action    string
+	Contract  ContractID
+}
 
 // ContractDescriptor captures both lifecycle metadata and human-facing contract details.
 type ContractDescriptor struct {
@@ -87,12 +107,87 @@ func ContractDescriptorFor(name ContractID) (ContractDescriptor, bool) {
 	return contract, ok
 }
 
+var errMissingContractDescriptor = errors.New("contract descriptor lookup failed")
+
 func MustContractDescriptor(name ContractID) ContractDescriptor {
 	contract, ok := ContractDescriptorFor(name)
 	if !ok {
-		return ContractDescriptor{Name: string(name)}
+		panic(fmt.Sprintf("missing contract descriptor for %s", name))
 	}
 	return contract
+}
+
+// ActionContractBindings defines the canonical action-to-contract registry.
+var ActionContractBindings = []ActionContractBinding{
+	{
+		Namespace: ActionNamespaceUpload,
+		Action:    "open-endpoint",
+		Contract:  UploadActionOpenEndpoint,
+	},
+	{
+		Namespace: ActionNamespaceUpload,
+		Action:    "reset",
+		Contract:  UploadActionReset,
+	},
+	{
+		Namespace: ActionNamespaceC2C,
+		Action:    "connect",
+		Contract:  C2CConnectAction,
+	},
+}
+
+func ActionContractDescriptor(namespace, action string) (ContractDescriptor, bool) {
+	for _, binding := range ActionContractBindings {
+		if string(binding.Namespace) != namespace || binding.Action != action {
+			continue
+		}
+		contract, ok := ContractDescriptorFor(binding.Contract)
+		return contract, ok
+	}
+	return ContractDescriptor{}, false
+}
+
+func ActionContractBindingsForNamespace(namespace string) []ActionContractBinding {
+	out := make([]ActionContractBinding, 0, len(ActionContractBindings))
+	for _, binding := range ActionContractBindings {
+		if string(binding.Namespace) == namespace {
+			out = append(out, binding)
+		}
+	}
+	return out
+}
+
+func ValidateActionContractBindings() error {
+	seen := map[string]struct{}{}
+	for _, binding := range ActionContractBindings {
+		if binding.Namespace == "" {
+			return fmt.Errorf("%w: missing namespace for action %s", errMissingContractDescriptor, binding.Action)
+		}
+		if binding.Action == "" {
+			return fmt.Errorf("%w: missing action in namespace %s", errMissingContractDescriptor, binding.Namespace)
+		}
+		descriptor, ok := ContractDescriptorFor(binding.Contract)
+		if !ok {
+			return fmt.Errorf("%w: missing contract %s for action %s:%s", errMissingContractDescriptor, binding.Contract, binding.Namespace, binding.Action)
+		}
+		if descriptor.Name == "" {
+			return fmt.Errorf("%w: contract %s has missing name", errMissingContractDescriptor, binding.Contract)
+		}
+		if descriptor.Description == "" {
+			return fmt.Errorf("%w: contract %s has missing description", errMissingContractDescriptor, binding.Contract)
+		}
+		if _, seenBefore := seen[string(binding.Namespace)+":"+binding.Action]; seenBefore {
+			return fmt.Errorf("%w: duplicate action binding %s:%s", errMissingContractDescriptor, binding.Namespace, binding.Action)
+		}
+		seen[string(binding.Namespace)+":"+binding.Action] = struct{}{}
+	}
+	return nil
+}
+
+func init() {
+	if err := ValidateActionContractBindings(); err != nil {
+		panic(err)
+	}
 }
 
 const contractVersionLayout = "2006.01.02"

@@ -39,21 +39,23 @@ func RunScheduledPack(patp string, delay time.Duration) error {
 }
 
 func runPackLifecycle(patp string) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionPack, structs.WsUrbitPayload{})
+}
+
+func packMeldPier(patp string) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionPackMeld, structs.WsUrbitPayload{})
+}
+
+func rollChopPier(patp string) error {
+	return runUrbitTransitionFromCommandRegistry(patp, transition.UrbitTransitionRollChop, structs.WsUrbitPayload{})
+}
+
+func buildPackSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	packError := func(err error) error {
 		return fmt.Errorf("pack operation: %w", err)
 	}
-	return runUrbitTransitionTemplateFn(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionPack),
-		startEvent:     "packing",
-		successEvent:   "success",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     3 * time.Second,
-		err: func(error) string {
-			return "error"
-		},
-	},
-		transitionStep[string]{
+	return []transitionStep[string]{
+		{
 			Run: func() error {
 				statuses, err := docker.GetShipStatus([]string{patp})
 				if err != nil {
@@ -77,7 +79,7 @@ func runPackLifecycle(patp string) error {
 						updateContainerStateFn(patp, containerState)
 					}
 					// switch boot status to pack
-					err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+					err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 						conf.BootStatus = "pack"
 						return nil
 					})
@@ -87,7 +89,7 @@ func runPackLifecycle(patp string) error {
 				}
 				// set last meld
 				now := time.Now().Unix()
-				err = persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				err = persistShipScheduleConfig(patp, func(conf *structs.UrbitScheduleConfig) error {
 					conf.MeldLast = strconv.FormatInt(now, 10)
 					return nil
 				})
@@ -97,23 +99,13 @@ func runPackLifecycle(patp string) error {
 				return nil
 			},
 		},
-	)
+	}
 }
 
-func packMeldPier(patp string) error {
+func buildPackMeldSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	var isRunning bool
-	return runUrbitTransitionTemplateFn(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionPackMeld),
-		startEvent:     "packing",
-		successEvent:   "success",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     3 * time.Second,
-		err: func(error) string {
-			return "error"
-		},
-	},
-		transitionStep[string]{
+	return []transitionStep[string]{
+		{
 			Run: func() error {
 				statuses, err := docker.GetShipStatus([]string{patp})
 				if err != nil {
@@ -132,7 +124,7 @@ func packMeldPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "stopping",
 			Run: func() error {
 				if !isRunning {
@@ -150,11 +142,11 @@ func packMeldPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Run: func() error {
 				// start ship as pack
 				zap.L().Info(fmt.Sprintf("Attempting to urth pack %s", patp))
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "pack"
 					return nil
 				}); err != nil {
@@ -172,12 +164,12 @@ func packMeldPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "melding",
 			Run: func() error {
 				// start ship as meld
 				zap.L().Info(fmt.Sprintf("Attempting to urth meld %s", patp))
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "meld"
 					return nil
 				}); err != nil {
@@ -195,7 +187,7 @@ func packMeldPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "starting",
 			Run: func() error {
 				if !isRunning {
@@ -206,7 +198,7 @@ func packMeldPier(patp string) error {
 					containerState.DesiredStatus = "running"
 					updateContainerStateFn(patp, containerState)
 				}
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "boot"
 					return nil
 				}); err != nil {
@@ -219,23 +211,13 @@ func packMeldPier(patp string) error {
 				return nil
 			},
 		},
-	)
+	}
 }
 
-func rollChopPier(patp string) error {
+func buildRollChopSteps(patp string, _ structs.WsUrbitPayload) []transitionStep[string] {
 	var isRunning bool
-	return runUrbitTransitionTemplateFn(patp, urbitTransitionTemplate{
-		transitionType: string(transition.UrbitTransitionRollChop),
-		startEvent:     "rolling",
-		successEvent:   "success",
-		emitSuccess:    true,
-		clearEvent:     "",
-		clearDelay:     3 * time.Second,
-		err: func(error) string {
-			return "error"
-		},
-	},
-		transitionStep[string]{
+	return []transitionStep[string]{
+		{
 			Run: func() error {
 				statuses, err := docker.GetShipStatus([]string{patp})
 				if err != nil {
@@ -249,7 +231,7 @@ func rollChopPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "stopping",
 			EmitWhen: func() bool {
 				return isRunning
@@ -267,11 +249,11 @@ func rollChopPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Run: func() error {
 				// start ship as roll
 				zap.L().Info(fmt.Sprintf("Attempting to roll %s", patp))
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "roll"
 					return nil
 				}); err != nil {
@@ -288,12 +270,12 @@ func rollChopPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "chopping",
 			Run: func() error {
 				// start ship as chop
 				zap.L().Info(fmt.Sprintf("Attempting to chop %s", patp))
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "chop"
 					return nil
 				}); err != nil {
@@ -310,13 +292,13 @@ func rollChopPier(patp string) error {
 				return nil
 			},
 		},
-		transitionStep[string]{
+		{
 			Event: "starting",
 			EmitWhen: func() bool {
 				return isRunning
 			},
 			Run: func() error {
-				if err := persistShipConf(patp, func(conf *structs.UrbitDocker) error {
+				if err := persistShipRuntimeConfig(patp, func(conf *structs.UrbitRuntimeConfig) error {
 					conf.BootStatus = "boot"
 					return nil
 				}); err != nil {
@@ -329,5 +311,5 @@ func rollChopPier(patp string) error {
 				return nil
 			},
 		},
-	)
+	}
 }

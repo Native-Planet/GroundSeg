@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,24 +23,36 @@ func TestCollectUrbitDeploymentInputsBuildsDeploymentState(t *testing.T) {
 		runtime.loadUrbitConfigFn = func(string) error { return nil }
 		runtime.urbitConfFn = func(string) structs.UrbitDocker {
 			return structs.UrbitDocker{
-				HTTPPort:            8080,
-				MinioPassword:       "default-minio",
-				Network:             "bridge",
-				WgURL:               "ship.wg.example",
-				BootStatus:          "run",
-				StartramReminder:    true,
-				ChopOnUpgrade:       true,
-				MeldDay:             "monday",
-				MeldDate:            3,
-				MeldFrequency:       7,
-				ShowUrbitWeb:        "custom",
-				CustomUrbitWeb:      "urbit.example.com",
-				CustomS3Web:         "s3.example.com",
-				DisableShipRestarts: true,
-				RemoteTlonBackup:    true,
-				LocalTlonBackup:     false,
-				BackupTime:          "03:00",
-				SnapTime:            2400,
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					HTTPPort:      8080,
+					BootStatus:    "run",
+					SnapTime:      2400,
+					MinioPassword: "default-minio",
+				},
+				UrbitNetworkConfig: structs.UrbitNetworkConfig{
+					Network: "bridge",
+					WgURL:   "ship.wg.example",
+				},
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{
+					StartramReminder:    true,
+					ChopOnUpgrade:       true,
+					DisableShipRestarts: true,
+				},
+				UrbitScheduleConfig: structs.UrbitScheduleConfig{
+					MeldDay:       "monday",
+					MeldDate:      3,
+					MeldFrequency: 7,
+				},
+				UrbitWebConfig: structs.UrbitWebConfig{
+					ShowUrbitWeb:   "custom",
+					CustomUrbitWeb: "urbit.example.com",
+					CustomS3Web:    "s3.example.com",
+				},
+				UrbitBackupConfig: structs.UrbitBackupConfig{
+					RemoteTlonBackup: true,
+					LocalTlonBackup:  false,
+					BackupTime:       "03:00",
+				},
 			}
 		}
 		runtime.getMinIOPasswordFn = func(string) (string, error) {
@@ -160,22 +173,32 @@ func TestComposeUrbitViewInputsCombinesRuntimeAndDeploymentInputs(t *testing.T) 
 	}
 	deploy := urbitDeploymentInputs{
 		dockerConfig: structs.UrbitDocker{
-			LoomSize:            4,
-			DevMode:             true,
-			UrbitVersion:        "v1.2.3",
-			CustomUrbitWeb:      "urbit.example.com",
-			CustomS3Web:         "s3.example.com",
-			MeldSchedule:        true,
-			MeldTime:            "11:00",
-			MeldLast:            "2026-01-01",
-			MeldScheduleType:    "weekly",
-			MeldFrequency:       7,
-			RemoteTlonBackup:    true,
-			LocalTlonBackup:     false,
-			DisableShipRestarts: true,
-			SizeLimit:           2048,
-			BackupTime:          "12:00",
-			SnapTime:            3600,
+			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+				LoomSize:     4,
+				UrbitVersion: "v1.2.3",
+				SizeLimit:    2048,
+				SnapTime:     3600,
+			},
+			UrbitFeatureConfig: structs.UrbitFeatureConfig{
+				DevMode:             true,
+				DisableShipRestarts: true,
+			},
+			UrbitWebConfig: structs.UrbitWebConfig{
+				CustomUrbitWeb: "urbit.example.com",
+				CustomS3Web:    "s3.example.com",
+			},
+			UrbitScheduleConfig: structs.UrbitScheduleConfig{
+				MeldSchedule:     true,
+				MeldTime:         "11:00",
+				MeldLast:         "2026-01-01",
+				MeldScheduleType: "weekly",
+				MeldFrequency:    7,
+			},
+			UrbitBackupConfig: structs.UrbitBackupConfig{
+				RemoteTlonBackup: true,
+				LocalTlonBackup:  false,
+				BackupTime:       "12:00",
+			},
 		},
 		url:                 "https://ship",
 		remote:              true,
@@ -222,7 +245,15 @@ func TestCollectUrbitDeploymentInputsForPiersSkipsInvalidConfig(t *testing.T) {
 			return nil
 		}
 		runtime.urbitConfFn = func(string) structs.UrbitDocker {
-			return structs.UrbitDocker{WgURL: "ship.wg", Network: "bridge", HTTPPort: 8080}
+			return structs.UrbitDocker{
+				UrbitNetworkConfig: structs.UrbitNetworkConfig{
+					WgURL:   "ship.wg",
+					Network: "bridge",
+				},
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					HTTPPort: 8080,
+				},
+			}
 		}
 		runtime.getMinIOLinkedStatusFn = func(string) bool { return false }
 	})
@@ -314,7 +345,9 @@ func TestComposeUrbitViewsSkipsMissingDeploymentInput(t *testing.T) {
 	deploymentInputs := map[string]urbitDeploymentInputs{
 		"~sam": {
 			dockerConfig: structs.UrbitDocker{
-				LoomSize: 4,
+				UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+					LoomSize: 4,
+				},
 			},
 		},
 	}
@@ -333,5 +366,48 @@ func TestComposeUrbitViewsSkipsMissingDeploymentInput(t *testing.T) {
 	}
 	if _, exists := updates["~zod"]; exists {
 		t.Fatal("expected zod to be skipped due to missing deployment inputs")
+	}
+}
+
+func TestConstructPierInfoWrapsRuntimeSnapshotError(t *testing.T) {
+	snapshotErr := errors.New("ship status unavailable")
+	_, err := constructPierInfo(
+		collectorRuntimeWith(func(runtime *collectorRuntime) {
+			runtime.getContainerShipStatusFn = func([]string) (map[string]string, error) {
+				return nil, snapshotErr
+			}
+		}),
+		map[string]structs.Urbit{},
+		func(string) time.Time { return time.Time{} },
+	)
+	if err == nil {
+		t.Fatal("expected error when ship status snapshot fails")
+	}
+	if !errors.Is(err, snapshotErr) {
+		t.Fatalf("expected wrapped status error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "constructing pier info") {
+		t.Fatalf("expected contextual error message, got %v", err)
+	}
+}
+
+func TestGetStartramServicesWrapsRetrieveFailure(t *testing.T) {
+	original := startramServicesRetriever
+	retrieveErr := errors.New("service unavailable")
+	startramServicesRetriever = func() (structs.StartramRetrieve, error) {
+		return structs.StartramRetrieve{}, retrieveErr
+	}
+	t.Cleanup(func() {
+		startramServicesRetriever = original
+	})
+	err := GetStartramServices()
+	if err == nil {
+		t.Fatal("expected error from startram service retrieval")
+	}
+	if !errors.Is(err, retrieveErr) {
+		t.Fatalf("expected wrapped retrieval error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "retrieve startram services") {
+		t.Fatalf("expected contextual error message, got %v", err)
 	}
 }

@@ -37,7 +37,10 @@ func testVersionRuntime() versionRuntime {
 		chopPierFn:        func(string) error { return nil },
 		updateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
 	}
-	rt.updateOps = versionRuntimeUpdateStub{}
+	rt.updateOps = versionRuntimeUpdateStub{
+		updateDockerFn: func(_ versionConfigOps, _ string, _ structs.Channel, _ structs.Channel) error { return nil },
+		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) error { return nil },
+	}
 	return rt
 }
 
@@ -87,11 +90,19 @@ func TestCallUpdaterSkipsWhenSyncFails(t *testing.T) {
 	}
 	called := false
 	rt.updateOps = versionRuntimeUpdateStub{
-		updateDockerFn: func(_ versionConfigOps, _ string, _ structs.Channel, _ structs.Channel) { called = true },
-		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) { called = true },
+		updateDockerFn: func(_ versionConfigOps, _ string, _ structs.Channel, _ structs.Channel) error {
+			called = true
+			return nil
+		},
+		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) error {
+			called = true
+			return nil
+		},
 	}
 
-	callUpdater(context.Background(), rt, "latest")
+	if err := callUpdater(context.Background(), rt, "latest"); err == nil {
+		t.Fatal("expected version metadata sync failure to be reported")
+	}
 
 	if called {
 		t.Fatal("docker or binary update should be skipped when version sync fails")
@@ -122,7 +133,7 @@ func TestCallUpdaterTriggersDockerAndChannelUpdate(t *testing.T) {
 	}
 	dockerCalls := 0
 	rt.updateOps = versionRuntimeUpdateStub{
-		updateDockerFn: func(_ versionConfigOps, release string, gotCurrent, gotLatest structs.Channel) {
+		updateDockerFn: func(_ versionConfigOps, release string, gotCurrent, gotLatest structs.Channel) error {
 			dockerCalls++
 			if release != "latest" {
 				t.Fatalf("unexpected release: %s", release)
@@ -130,13 +141,17 @@ func TestCallUpdaterTriggersDockerAndChannelUpdate(t *testing.T) {
 			if gotCurrent != current || gotLatest != latest {
 				t.Fatalf("unexpected docker update args")
 			}
+			return nil
 		},
-		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) {
+		updateBinaryFn: func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) error {
 			t.Fatal("binary update should not run when hashes match")
+			return nil
 		},
 	}
 
-	callUpdater(context.Background(), rt, "latest")
+	if err := callUpdater(context.Background(), rt, "latest"); err != nil {
+		t.Fatalf("expected docker update path to succeed, got: %v", err)
+	}
 	if dockerCalls != 1 {
 		t.Fatalf("expected one docker update call, got %d", dockerCalls)
 	}
@@ -158,15 +173,19 @@ func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 	}
 	binaryCalls := 0
 	rt.updateOps = versionRuntimeUpdateStub{
-		updateBinaryFn: func(_ context.Context, _ versionUpdateOps, _ versionConfigOps, branch string, info structs.Channel) {
+		updateDockerFn: func(_ versionConfigOps, _ string, _ structs.Channel, _ structs.Channel) error { return nil },
+		updateBinaryFn: func(_ context.Context, _ versionUpdateOps, _ versionConfigOps, branch string, info structs.Channel) error {
 			binaryCalls++
 			if branch != "latest" || info != latest {
 				t.Fatalf("unexpected binary update args")
 			}
+			return nil
 		},
 	}
 
-	callUpdater(context.Background(), rt, "latest")
+	if err := callUpdater(context.Background(), rt, "latest"); err != nil {
+		t.Fatalf("expected binary update path to succeed, got: %v", err)
+	}
 	if binaryCalls != 1 {
 		t.Fatalf("expected one binary update call, got %d", binaryCalls)
 	}
@@ -175,9 +194,11 @@ func TestCallUpdaterTriggersBinaryUpdateOnHashMismatch(t *testing.T) {
 func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 	rt := testVersionRuntime()
 	rt.configOps = versionRuntimeConfigStub{
-		architectureFn:  func() string { return "amd64" },
-		getConfFn:       func() structs.SysConfig { return structs.SysConfig{} },
-		getShipStatusFn: func([]string) (map[string]string, error) { return map[string]string{}, nil },
+		architectureFn: func() string { return "amd64" },
+		getConfFn:      func() structs.SysConfig { return structs.SysConfig{} },
+		getShipStatusFn: func([]string) (map[string]string, error) {
+			return nil, errors.New("status lookup failed")
+		},
 		startContainerFn: func(name, typ string) (structs.ContainerState, error) {
 			return structs.ContainerState{}, nil
 		},
@@ -185,7 +206,9 @@ func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n2", "w2", "m2", "s1", "v1")
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err == nil {
+		t.Fatal("expected docker update to return an error when ship status lookup fails")
+	}
 
 	rt.updateOps = versionRuntimeUpdateStub{}
 	called := map[string]bool{}
@@ -198,7 +221,9 @@ func TestUpdateDockerStartsSharedServicesWhenHashesChange(t *testing.T) {
 		},
 		getShipStatusFn: func([]string) (map[string]string, error) { return map[string]string{}, nil },
 	}
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err != nil {
+		t.Fatalf("expected docker update to succeed, got %v", err)
+	}
 
 	if _, ok := called["netdata:netdata"]; !ok {
 		t.Fatal("expected netdata container start")
@@ -254,7 +279,9 @@ func TestUpdateDockerMinioOnlyStartsRunningPiers(t *testing.T) {
 			return structs.ContainerState{}, nil
 		},
 	}
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err != nil {
+		t.Fatalf("expected docker update to succeed, got %v", err)
+	}
 	if started != 1 {
 		t.Fatalf("expected one start call for running piers, got %d", started)
 	}
@@ -289,7 +316,9 @@ func TestUpdateDockerVereStoppedShipPrepFlow(t *testing.T) {
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v2")
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err != nil {
+		t.Fatalf("expected docker update to succeed, got %v", err)
+	}
 	if seenStatus != "noboot" {
 		t.Fatalf("expected final boot status noboot, got %s", seenStatus)
 	}
@@ -303,7 +332,11 @@ func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 		getShipStatusFn:   func([]string) (map[string]string, error) { return map[string]string{"zod": "Up 1 second"}, nil },
 		loadUrbitConfigFn: func(string) error { return nil },
 		urbitConfFn: func(string) structs.UrbitDocker {
-			return structs.UrbitDocker{ChopOnUpgrade: true}
+			return structs.UrbitDocker{
+				UrbitFeatureConfig: structs.UrbitFeatureConfig{
+					ChopOnUpgrade: true,
+				},
+			}
 		},
 		stopContainerFn: func(name string) error {
 			if name != "zod" {
@@ -338,7 +371,9 @@ func TestUpdateDockerVereRunningShipRestartAndChop(t *testing.T) {
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v2")
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err != nil {
+		t.Fatalf("expected docker update to succeed, got %v", err)
+	}
 }
 
 func TestUpdateDockerReturnsOnStatusError(t *testing.T) {
@@ -355,5 +390,7 @@ func TestUpdateDockerReturnsOnStatusError(t *testing.T) {
 
 	current := versionChannelWithHashes("g1", "n1", "w1", "m1", "s1", "v1")
 	latest := versionChannelWithHashes("g1", "n2", "w1", "m1", "s1", "v1")
-	updateDockerForRuntime(rt.configOps, "latest", current, latest)
+	if err := updateDockerForRuntime(rt.configOps, "latest", current, latest); err == nil {
+		t.Fatal("expected docker update to fail when ship status lookup fails")
+	}
 }

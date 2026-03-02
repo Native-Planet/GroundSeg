@@ -55,7 +55,7 @@ func RegisterShipServices(patp string) error {
 }
 
 func SwitchShipToWireguard(patp string, gracefulStop bool) error {
-	if err := config.UpdateUrbit(patp, func(shipConf *structs.UrbitDocker) error {
+	if err := config.UpdateUrbitNetworkConfig(patp, func(shipConf *structs.UrbitNetworkConfig) error {
 		shipConf.Network = "wireguard"
 		return nil
 	}); err != nil {

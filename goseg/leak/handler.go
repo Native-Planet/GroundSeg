@@ -23,6 +23,7 @@ const (
 	leakPayloadProtocolError leakPayloadType = "protocol_error"
 	leakPayloadInternal      leakPayloadType = "internal_error"
 )
+
 func handleAction(patp string, result []byte) error {
 	sessionAuth := isPatpAuthenticated(patp)
 	payloadBytes, err := decodePacketPayload(result)
@@ -114,7 +115,7 @@ func reportLeakError(patp string, isAuth bool, errorType, reason string) {
 		return
 	}
 	if err := sendToLeakChannel(patp, isAuth, leakPayloadType(errorType), payload); err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to queue leak error for %s: %v", patp, err))
+		zap.L().Error(fmt.Sprintf("failed to queue leak error [%s] for %s (authed=%t): %v", errorType, patp, isAuth, err))
 	}
 }
 

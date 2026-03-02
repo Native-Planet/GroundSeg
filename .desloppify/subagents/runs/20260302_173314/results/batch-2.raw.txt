@@ -1,0 +1,141 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 72.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "Runtime dependency wiring is duplicated across multiple orchestration layers: `defaultRuntimeContainerOps`/`defaultRuntimeUrbit` in `goseg/docker/orchestration/runtime_ops.go`, `newDockerRuntime` in `goseg/docker/orchestration/runtime_docker.go`, and projection builders like `NewDockerTransitionRuntime` in `goseg/docker/orchestration/runtime_core.go` all manually remap overlapping function sets.",
+        "System modules combine unrelated responsibilities: `goseg/system/system.go` mixes host metrics, disk/mount scanning, and cron installer behavior; `goseg/system/disk.go` mixes filesystem provisioning, fstab mutation, tmp symlink policy, and SMART health checks.",
+        "Config update flow uses two disconnected mutation models: reflection/string-path dispatch in `goseg/config/config_update_schema.go` and JSON map re-serialization in `goseg/config/persistence.go`, increasing hidden coupling and runtime-only validation.",
+        "Test files repeatedly implement local seam-reset scaffolding (`resetDiskSeams`, `resetBackupsvcDependencies`, token/session override helpers), indicating missing shared harness conventions across modules."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_wiring_duplication",
+      "summary": "Orchestration runtime assembly is repeated in parallel structures, creating drift-prone design duplication.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/rectify/rectify.go"
+      ],
+      "evidence": [
+        "`runtime_ops.go` defines default ops bundles (`defaultRuntimeContainerOps`, `defaultRuntimeUrbit`, etc.) with explicit function wiring.",
+        "`runtime_docker.go` builds another large function-wired runtime (`newDockerRuntime`) that remaps many of the same capabilities into different nested structs.",
+        "`runtime_core.go` then remaps again into specialized runtimes (`NewDockerTransitionRuntime`, `NewDockerHealthRuntime`).",
+        "`rectify.go` repeats a similar per-field merge/default pattern (`mergeRectify*` + `defaultRectifyRuntime`), showing the same manual composition pattern outside orchestration."
+      ],
+      "suggestion": "Introduce a single canonical dependency registry per subsystem and generate narrowed views through typed adapters/composition helpers instead of hand-copying field mappings in each runtime constructor.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "manual_runtime_composition_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "system_package_mixed_responsibilities",
+      "summary": "System package files aggregate unrelated policies and platform operations in single modules.",
+      "related_files": [
+        "goseg/system/system.go",
+        "goseg/system/disk.go",
+        "goseg/system/wifi.go"
+      ],
+      "evidence": [
+        "`system.go` contains hardware telemetry (`GetMemory`, `GetCPU`, `GetTemp`), disk label/mount traversal (`GetDisk`), and cron/script lifecycle (`FixerScript`, `addCron`).",
+        "`disk.go` combines block device inspection, SMART policy checks, filesystem formatting/fstab reconciliation, and `/tmp` relocation logic (`SetupTmpDir`).",
+        "`wifi.go` includes runtime wiring, radio/device discovery, connection control, and global state loop orchestration in one package-level stateful module."
+      ],
+      "suggestion": "Split `system` into focused components (telemetry, storage provisioning, tmp policy, wifi control) with narrow interfaces, then keep orchestration logic in a coordinator layer rather than in utility-heavy files.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_domain_boundaries"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "config_mutation_model_split",
+      "summary": "Config updates rely on reflective string-key dispatch plus separate JSON map persistence, which obscures invariants and ownership.",
+      "related_files": [
+        "goseg/config/config_update_schema.go",
+        "goseg/config/persistence.go",
+        "goseg/config/config_test.go"
+      ],
+      "evidence": [
+        "`config_update_schema.go` stores patch metadata as string keys/field names/apply paths and mutates via reflection (`confPatchFieldValue`, `confPatchSetConfigValue`) with panic paths for mismatches.",
+        "`persistence.go` converts typed config structs to generic maps via marshal/unmarshal (`structToMap`) before writing, creating a second mutation representation with different failure modes.",
+        "Large config tests in `config_test.go` validate many merge edge-cases, signaling high behavioral surface area that currently depends on implicit mapping conventions rather than explicit typed APIs."
+      ],
+      "suggestion": "Replace reflective apply paths with explicit typed mutators per config section and consolidate persistence/update flow around one typed model with compile-time field linkage.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "stringly_typed_state_updates"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_seam_reset_fragmentation",
+      "summary": "Test suites repeatedly hand-roll global seam reset and fixture wiring patterns instead of using shared test infrastructure.",
+      "related_files": [
+        "goseg/system/disk_test.go",
+        "goseg/backupsvc/service_test.go",
+        "goseg/importer/importer_test.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "`disk_test.go` defines a long `resetDiskSeams` that snapshots/restores many package-level function vars.",
+        "`backupsvc/service_test.go` duplicates the same dependency-reset style via `resetBackupsvcDependencies`.",
+        "`importer/importer_test.go` has custom reset/override helpers for upload sessions and auth token seams.",
+        "`wifi_test.go` adds additional local runtime helper setup (`testWifiRuntime`) and empty reset placeholder (`resetWifiSeamsForTest`), indicating inconsistent conventions."
+      ],
+      "suggestion": "Adopt a shared test seam harness (common helper package) for snapshot/restore and fixture builders so stateful package-level overrides are centralized and consistent.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "manual_runtime_composition_pattern"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "shipworkflow_operation_bloat",
+      "summary": "Urbit operation runtime file centralizes many distinct domain transitions with repeated template blocks and embedded side-effect orchestration.",
+      "related_files": [
+        "goseg/shipworkflow/urbit_operations_runtime.go",
+        "goseg/leak/handler.go",
+        "goseg/docker/orchestration/runtime_core.go"
+      ],
+      "evidence": [
+        "`urbit_operations_runtime.go` contains numerous transition handlers (`togglePower`, `toggleDevMode`, `toggleNetwork`, domain setters) that each mix transition signaling, config mutation, and docker/click side effects.",
+        "Many handlers repeat near-identical transition template scaffolding (`runUrbitTransitionTemplateFn` setup with similar start/clear/error behavior), suggesting extraction opportunities.",
+        "`leak/handler.go` and orchestration runtime files show adjacent concerns also handling transport/state transitions, but there is no clear shared boundary for operation orchestration vs transport/event adaptation."
+      ],
+      "suggestion": "Refactor Urbit operations into smaller command handlers grouped by concern (power/network/domain/backups) and extract a reusable transition execution policy object to remove repeated template setup.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_domain_boundaries"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Manual function-pointer composition is used as the default extension mechanism, leading to repetitive wiring and weak ownership boundaries.",
+      "Package-level state/seam patterns encourage local test-specific scaffolding instead of reusable infrastructure.",
+      "State mutation is split across reflective schemas and ad hoc serialization layers rather than a single typed update model."
+    ],
+    "likely_symptoms": [
+      "runtime_wiring_duplication",
+      "test_seam_reset_fragmentation",
+      "shipworkflow_operation_bloat"
+    ],
+    "possible_false_positives": [
+      "Some runtime wiring duplication may be partially intentional for testability, but current repetition level still increases coordination cost."
+    ]
+  }
+}

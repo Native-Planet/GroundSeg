@@ -12,55 +12,64 @@ import (
 
 func testWireguardRuntime() WireguardRuntime {
 	return WireguardRuntime{
-		BasePathFn: func() string { return "/tmp" },
-		DockerDirFn: func() string {
-			return "/tmp/docker"
+		RuntimeContextOps: RuntimeContextOps{
+			BasePathFn: func() string { return "/tmp" },
+			DockerDirFn: func() string {
+				return "/tmp/docker"
+			},
 		},
-		OpenFn: func(string) (*os.File, error) {
-			return nil, nil
+		RuntimeFileOps: RuntimeFileOps{
+			OpenFn: func(string) (*os.File, error) {
+				return nil, nil
+			},
+			ReadFileFn: func(string) ([]byte, error) {
+				return nil, os.ErrNotExist
+			},
+			WriteFileFn: func(string, []byte, os.FileMode) error {
+				return nil
+			},
+			MkdirAllFn: func(string, os.FileMode) error {
+				return nil
+			},
 		},
-		ReadFileFn: func(string) ([]byte, error) {
-			return nil, os.ErrNotExist
+		RuntimeContainerOps: RuntimeContainerOps{
+			StartContainerFn: func(string, string) (structs.ContainerState, error) {
+				return structs.ContainerState{}, nil
+			},
+			UpdateContainerStateFn: func(string, structs.ContainerState) {},
 		},
-		WriteFileFn: func(string, []byte, os.FileMode) error {
-			return nil
+		RuntimeImageOps: RuntimeImageOps{
+			GetLatestContainerInfoFn: func(string) (map[string]string, error) {
+				return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
+			},
+			GetLatestContainerImageFn: func(string) (string, error) {
+				return "wg:latest", nil
+			},
 		},
-		MkdirAllFn: func(string, os.FileMode) error {
-			return nil
+		RuntimeWireguardOps: RuntimeWireguardOps{
+			CreateDefaultWGConfFn: func() error {
+				return nil
+			},
+			GetWgConfFn: func() (structs.WgConfig, error) {
+				return structs.WgConfig{}, nil
+			},
+			GetWgConfBlobFn: func() (string, error) {
+				return base64.StdEncoding.EncodeToString([]byte("blob")), nil
+			},
+			GetWgPrivkeyFn: func() string {
+				return "k1"
+			},
+			CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error {
+				return nil
+			},
 		},
-		StartContainerFn: func(string, string) (structs.ContainerState, error) {
-			return structs.ContainerState{}, nil
-		},
-		UpdateContainerFn: func(string, structs.ContainerState) {},
-		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
-			return map[string]string{"repo": "repo/wg", "tag": "latest", "hash": "hash"}, nil
-		},
-		GetLatestContainerImageFn: func(string) (string, error) {
-			return "wg:latest", nil
-		},
-		CreateDefaultWGConfFn: func() error {
-			return nil
-		},
-		GetWgConfFn: func() (structs.WgConfig, error) {
-			return structs.WgConfig{}, nil
-		},
-		GetWgConfBlobFn: func() (string, error) {
-			return base64.StdEncoding.EncodeToString([]byte("blob")), nil
-		},
-		GetWgPrivkeyFn: func() string {
-			return "k1"
-		},
-		WriteWgConfFn: func(WireguardRuntime) error {
-			return nil
-		},
-		CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error {
-			return nil
-		},
-		VolumeExistsFn: func(string) (bool, error) {
-			return false, nil
-		},
-		CreateVolumeFn: func(string) error {
-			return nil
+		RuntimeVolumeOps: RuntimeVolumeOps{
+			VolumeExistsFn: func(string) (bool, error) {
+				return false, nil
+			},
+			CreateVolumeFn: func(string) error {
+				return nil
+			},
 		},
 	}
 }
@@ -75,7 +84,7 @@ func TestLoadWireguardFlowAndStartError(t *testing.T) {
 		return nil
 	}
 	writeCalled := false
-	rt.WriteWgConfFn = func(WireguardRuntime) error {
+	rt.WriteWgConfFn = func() error {
 		writeCalled = true
 		return nil
 	}
@@ -83,7 +92,7 @@ func TestLoadWireguardFlowAndStartError(t *testing.T) {
 		return structs.ContainerState{ActualStatus: "running"}, nil
 	}
 	updated := false
-	rt.UpdateContainerFn = func(name string, _ structs.ContainerState) {
+	rt.UpdateContainerStateFn = func(name string, _ structs.ContainerState) {
 		if name == "wireguard" {
 			updated = true
 		}

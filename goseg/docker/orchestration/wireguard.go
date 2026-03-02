@@ -22,21 +22,15 @@ func (rt WireguardRuntime) LoadWireguard() error {
 		return fmt.Errorf("missing base path getter")
 	}
 	confPath := filepath.Join(rt.BasePathFn(), "settings", "wireguard.json")
-	writeConf := func() error {
-		if rt.WriteWgConfFn != nil {
-			return rt.WriteWgConfFn(rt)
-		}
-		return rt.WriteWgConf()
-	}
 	return container.RunContainerWithRuntime(container.ContainerRuntimePlan{
 		ContainerName:         "wireguard",
 		ContainerImage:        "wireguard",
 		ConfigPath:            confPath,
 		OpenConfigFn:          rt.OpenFn,
 		CreateDefaultConfigFn: rt.CreateDefaultWGConfFn,
-		WriteConfigFn:         writeConf,
+		WriteConfigFn:         rt.WriteWgConf,
 		StartContainerFn:      rt.StartContainerFn,
-		UpdateContainerState:  rt.UpdateContainerFn,
+		UpdateContainerState:  rt.UpdateContainerStateFn,
 	})
 }
 
@@ -90,6 +84,9 @@ func (rt WireguardRuntime) buildWgConf() (string, error) {
 }
 
 func (rt WireguardRuntime) WriteWgConf() error {
+	if rt.WriteWgConfFn != nil {
+		return rt.WriteWgConfFn()
+	}
 	newConf, err := rt.buildWgConf()
 	if err != nil {
 		return fmt.Errorf("failed to build wireguard configuration: %w", err)

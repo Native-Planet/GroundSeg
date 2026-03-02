@@ -22,22 +22,9 @@ func updateConfFromPatch(patch *ConfPatch) error {
 		return fmt.Errorf("error decoding JSON: %w", err)
 	}
 
-	var configMap map[string]interface{}
-	if err := json.Unmarshal(file, &configMap); err != nil {
-		return fmt.Errorf("error decoding JSON map: %w", err)
-	}
-
 	applyConfPatch(&configStruct, patch)
 
-	typedMap, err := structToMap(configStruct)
-	if err != nil {
-		return fmt.Errorf("error encoding typed config map: %w", err)
-	}
-	for key, value := range typedMap {
-		configMap[key] = value
-	}
-
-	if err := persistConf(configMap); err != nil {
+	if err := persistConfig(configStruct); err != nil {
 		return fmt.Errorf("unable to persist config update: %w", err)
 	}
 	return nil

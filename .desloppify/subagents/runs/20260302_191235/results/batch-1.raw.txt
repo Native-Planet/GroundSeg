@@ -1,0 +1,70 @@
+{
+  "batch": "Architecture & Coupling",
+  "batch_index": 1,
+  "assessments": {
+    "cross_module_architecture": 74.0
+  },
+  "dimension_notes": {
+    "cross_module_architecture": {
+      "evidence": [
+        "Action identifiers are declared in `goseg/protocol/actions/actions.go` while matching contract IDs are independently declared in `goseg/protocol/contracts/contracts.go`, requiring synchronized edits across modules for each new action.",
+        "`goseg/protocol/actions/actions.go` constructs `uploadActionContracts`, `c2cActionContracts`, and `actionContractsByNamespace` at package init time using `contracts.MustContractDescriptor(...)`, creating import-time binding to another module’s catalog state.",
+        "`contracts.MustContractDescriptor` in `goseg/protocol/contracts/contracts.go` fails open by returning a synthetic descriptor when a contract is missing, which allows boundary drift to pass silently instead of failing at the module boundary."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "split_action_contract_authority",
+      "summary": "Protocol action definitions are split across two modules with duplicated identifiers, creating a hub-like boundary that is easy to drift out of sync.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` defines action tokens (`ActionUploadOpenEndpoint`, `ActionUploadReset`, `ActionC2CConnect`) while `contracts.go` separately defines corresponding `ContractID` constants (`UploadActionOpenEndpoint`, `UploadActionReset`, `C2CConnectAction`).",
+        "Action-to-contract mapping is manually reassembled in `actions.go` (`contractForAction(...)` and `c2cActionContracts`), so introducing/changing an action requires coordinated edits in both files.",
+        "No single registration source exists that can enforce one-to-one correspondence between action token, namespace, and contract descriptor."
+      ],
+      "suggestion": "Introduce a single canonical protocol registry (for example in `contracts`) that declares namespace, action token, and descriptor together, and have `actions` derive supported actions from that registry instead of duplicating constants and mappings.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "missing_single_source_protocol_registry"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "fail_open_import_time_binding",
+      "summary": "Import-time contract wiring plus fail-open descriptor lookup weakens module boundary integrity and hides contract drift.",
+      "related_files": [
+        "goseg/protocol/actions/actions.go",
+        "goseg/protocol/contracts/contracts.go"
+      ],
+      "evidence": [
+        "`actions.go` initializes contract-backed tables in package-level vars, invoking `contracts.MustContractDescriptor(...)` during import.",
+        "`MustContractDescriptor` returns `ContractDescriptor{Name: string(name)}` when missing rather than erroring/panicking, so missing catalog entries can propagate with partial metadata.",
+        "Because lookup happens at import-time and not through an explicit validation phase, architecture-level mismatches are not surfaced through a hard boundary check."
+      ],
+      "suggestion": "Replace fail-open lookup with a strict API (`ContractDescriptorFor` + explicit error handling or panic-on-invalid during startup validation), and move protocol wiring behind an explicit constructor/validation step so boundary violations fail deterministically.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "missing_single_source_protocol_registry"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Protocol metadata ownership is split between `actions` and `contracts` instead of centralized.",
+      "Boundary checks are permissive (fail-open) and executed implicitly at import time."
+    ],
+    "likely_symptoms": [
+      "split_action_contract_authority",
+      "fail_open_import_time_binding"
+    ],
+    "possible_false_positives": []
+  }
+}

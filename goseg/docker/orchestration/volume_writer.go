@@ -61,11 +61,3 @@ func copyFileToVolumeWithTempContainer(
 	}
 	return nil
 }
-
-func latestContainerImage(containerType string) (string, error) {
-	containerInfo, err := GetLatestContainerInfo(containerType)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s:%s@sha256:%s", containerInfo["repo"], containerInfo["tag"], containerInfo["hash"]), nil
-}

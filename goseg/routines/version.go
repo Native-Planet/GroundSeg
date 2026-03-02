@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"groundseg/config"
 	"groundseg/structs"
@@ -21,8 +22,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const maxVersionUpdateConsecutiveFailures = 3
+
 func StartVersionSubsystem() {
-	_ = StartVersionSubsystemWithContext(context.Background())
+	if err := StartVersionSubsystemWithContext(context.Background()); err != nil {
+		zap.L().Warn(fmt.Sprintf("version subsystem stopped with error: %v", err))
+	}
 }
 
 func StartVersionSubsystemWithContext(ctx context.Context) error {
@@ -47,7 +52,9 @@ func StartVersionSubsystemWithContext(ctx context.Context) error {
 }
 
 func CheckVersionLoop() {
-	_ = CheckVersionLoopWithContext(context.Background())
+	if err := CheckVersionLoopWithContext(context.Background()); err != nil {
+		zap.L().Warn(fmt.Sprintf("version check loop stopped with error: %v", err))
+	}
 }
 
 func CheckVersionLoopWithContext(ctx context.Context) error {
@@ -67,20 +74,37 @@ func CheckVersionLoopWithContext(ctx context.Context) error {
 	defer ticker.Stop()
 	releaseChannel := conf.UpdateBranch
 	if conf.UpdateMode == "auto" {
-		callUpdater(ctx, rt, releaseChannel)
+		consecutiveFailures := 0
+		if err := callUpdater(ctx, rt, releaseChannel); err != nil {
+			consecutiveFailures++
+			zap.L().Warn(fmt.Sprintf("version update cycle failed: %v", err))
+			if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
+				return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
+			}
+		} else {
+			consecutiveFailures = 0
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
 			case <-ticker.C:
-				callUpdater(ctx, rt, releaseChannel)
+				if err := callUpdater(ctx, rt, releaseChannel); err != nil {
+					consecutiveFailures++
+					zap.L().Warn(fmt.Sprintf("version update cycle failed: %v", err))
+					if consecutiveFailures >= maxVersionUpdateConsecutiveFailures {
+						return fmt.Errorf("version update failed after %d consecutive attempts: %w", maxVersionUpdateConsecutiveFailures, err)
+					}
+				} else {
+					consecutiveFailures = 0
+				}
 			}
 		}
 	}
 	return nil
 }
 
-func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) {
+func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -91,8 +115,7 @@ func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) 
 	}
 	sha256Fn := rt.configOps.getSha256Fn
 	if sha256Fn == nil {
-		zap.L().Warn("Skipping update cycle because getSha256 seam is unconfigured")
-		return
+		return errors.New("version updater getSha256 seam is unconfigured")
 	}
 	architectureFn := rt.configOps.architectureFn
 	if architectureFn == nil {
@@ -102,26 +125,29 @@ func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) 
 
 	latestVersion, synced := rt.channelOps.syncVersionInfoFn()
 	if !synced {
-		zap.L().Warn("Skipping update cycle because version metadata sync failed")
-		return
+		return errors.New("version metadata sync failed")
 	}
 	currentChannelVersion := rt.channelOps.getVersionChannelFn()
 	latestChannelVersion := latestVersion
 	// check docker updates
 	if latestChannelVersion != currentChannelVersion {
-		if rt.updateOps.updateDockerFn != nil {
-			rt.updateOps.updateDockerFn(rt.configOps, releaseChannel, currentChannelVersion, latestChannelVersion)
+		if rt.updateOps.updateDockerFn == nil {
+			return errors.New("version updater docker runtime is unconfigured")
+		}
+		if err := rt.updateOps.updateDockerFn(rt.configOps, releaseChannel, currentChannelVersion, latestChannelVersion); err != nil {
+			return fmt.Errorf("docker update failed: %w", err)
 		}
 		if setVersionChannelFn != nil {
 			setVersionChannelFn(latestVersion)
+		} else {
+			return errors.New("version channel set seam is unconfigured")
 		}
 	}
 	// Check for gs binary updates based on hash
 	binPath := filepath.Join(basePathFn(), "groundseg")
 	currentHash, err := sha256Fn(binPath)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Couldn't hash binary: %v", err))
-		return
+		return fmt.Errorf("couldn't hash current binary: %w", err)
 	}
 	latestHash := latestVersion.Groundseg.Amd64Sha256
 	if architectureFn() != "amd64" {
@@ -131,10 +157,14 @@ func callUpdater(ctx context.Context, rt versionRuntime, releaseChannel string) 
 		zap.L().Info("GroundSeg Binary update!")
 		// updateBinary will likely restart the program, so
 		// we don't have to care about the docker updates.
-		if rt.updateOps.updateBinaryFn != nil {
-			rt.updateOps.updateBinaryFn(ctx, rt.updateOps, rt.configOps, releaseChannel, latestVersion)
+		if rt.updateOps.updateBinaryFn == nil {
+			return errors.New("version updater binary runtime is unconfigured")
+		}
+		if err := rt.updateOps.updateBinaryFn(ctx, rt.updateOps, rt.configOps, releaseChannel, latestVersion); err != nil {
+			return fmt.Errorf("binary update failed: %w", err)
 		}
 	}
+	return nil
 }
 
 func updateBinary(
@@ -143,7 +173,7 @@ func updateBinary(
 	configOps versionConfigOps,
 	branch string,
 	versionInfo structs.Channel,
-) {
+) error {
 	// get config
 	conf := configOps.getConfFn()
 	var displayedBranch string
@@ -163,7 +193,7 @@ func updateBinary(
 		zap.L().Info("Deleting old groundseg_new download")
 		if err := os.Remove(filepath.Join(configOps.basePathFn(), "groundseg_new")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg_new: %v", err))
-			return
+			return fmt.Errorf("remove old groundseg_new download: %w", err)
 		}
 	}
 	// download new binary, name it groundseg_new
@@ -173,18 +203,16 @@ func updateBinary(
 	}
 	// Create a new HTTP GET request
 	if updateOps.downloadFn == nil {
-		zap.L().Error("Skipping GroundSeg binary download because HTTP download runtime is not configured")
-		return
+		return errors.New("version binary download runtime is unconfigured")
 	}
 	resp, err := updateOps.downloadFn(ctx, url)
 	zap.L().Info(fmt.Sprintf("Downloading new GroundSeg binary from %v", url))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to download new GroundSeg binary: %v", err))
-		return
+		return fmt.Errorf("download new GroundSeg binary: %w", err)
 	}
 	if resp.StatusCode != 200 {
-		zap.L().Error(fmt.Sprintf("Couldn't download binary: %v", resp.StatusCode))
-		return
+		return fmt.Errorf("couldn't download binary: status %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 
@@ -193,7 +221,7 @@ func updateBinary(
 	file, err := os.Create(filepath.Join(configOps.basePathFn(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to save GroundSeg binary: %v", err))
-		return
+		return fmt.Errorf("create groundseg_new download file: %w", err)
 	}
 	defer file.Close()
 	zap.L().Info("Writing groundseg_new contents")
@@ -201,14 +229,14 @@ func updateBinary(
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
-		return
+		return fmt.Errorf("write groundseg_new contents: %w", err)
 	}
 	// Chmod groundseg_new
 	zap.L().Info("Modifying groundseg_new permissions")
 	binaryPath := filepath.Join(configOps.basePathFn(), "groundseg_new")
 	if err := os.Chmod(binaryPath, 0755); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to write contents: %v", err))
-		return
+		return fmt.Errorf("chmod groundseg_new: %w", err)
 	}
 	newVersionHash := versionInfo.Groundseg.Arm64Sha256
 	if configOps.architectureFn() == "amd64" {
@@ -217,11 +245,11 @@ func updateBinary(
 	newBinHash, err := configOps.getSha256Fn(filepath.Join(configOps.basePathFn(), "groundseg_new"))
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get SHA for new binary: %v", err))
-		return
+		return fmt.Errorf("hash downloaded groundseg_new: %w", err)
 	}
 	if newVersionHash != newBinHash {
 		zap.L().Error(fmt.Sprintf("New binary hash does not match downloaded file: remote %v / downloaded %v", newVersionHash, newBinHash))
-		return
+		return fmt.Errorf("binary hash mismatch: remote %v / downloaded %v", newVersionHash, newBinHash)
 	}
 	if !conf.DisableSlsa {
 		zap.L().Info("Verifying SLSA provenance")
@@ -233,7 +261,7 @@ func updateBinary(
 			"git+https://github.com/Native-Planet/GroundSeg",
 		); err != nil {
 			zap.L().Error(fmt.Sprintf("SLSA verification failed: %v", err))
-			return
+			return fmt.Errorf("SLSA verification failed: %w", err)
 		}
 		zap.L().Info("SLSA verification successful")
 	} else {
@@ -245,7 +273,7 @@ func updateBinary(
 		// Remove the file
 		if err := os.Remove(filepath.Join(configOps.basePathFn(), "groundseg")); err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to remove old instance of groundseg: %v", err))
-			return
+			return fmt.Errorf("remove old groundseg: %w", err)
 		}
 	}
 	// rename groundseg_new to groundseg
@@ -254,12 +282,13 @@ func updateBinary(
 	newPath := filepath.Join(configOps.basePathFn(), "groundseg")
 	if err := os.Rename(oldPath, newPath); err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to rename groundseg_new to groundseg: %v", err))
-		return
+		return fmt.Errorf("rename groundseg_new to groundseg: %w", err)
 	}
 	// re-disable bypass after one update
 	if conf.DisableSlsa {
 		if err := config.UpdateConfTyped(config.WithDisableSlsa(false)); err != nil {
 			zap.L().Error(fmt.Sprintf("Couldn't reset SLSA bypass config: %v", err))
+			return fmt.Errorf("reset disable slsa config: %w", err)
 		}
 	}
 	versionStr := "v" + strconv.Itoa(versionInfo.Groundseg.Major) + "." +
@@ -268,26 +297,29 @@ func updateBinary(
 	binHash, err := getSha256(newPath)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't hash new binary: %v", err))
+		return fmt.Errorf("hash new groundseg binary: %w", err)
 	}
 	if err := config.UpdateConfTyped(
 		config.WithGSVersion(versionStr),
 		config.WithBinHash(binHash),
 	); err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't update config: %v", err))
+		return fmt.Errorf("update config with new version: %w", err)
 	}
 	// systemctl restart groundseg
 	if configOps.debugModeFn() {
 		zap.L().Debug("DebugMode detected. Skipping systemd command.")
-		return
+		return nil
 	} else {
 		zap.L().Info("Restarting GroundSeg systemd service")
 		cmd := exec.Command("systemctl", "restart", "groundseg")
 		err := cmd.Run()
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("Failed to restart systemd service: %v", err))
-			return
+			return fmt.Errorf("restart GroundSeg service: %w", err)
 		}
 	}
+	return nil
 }
 
 func verifySlsaProvenance(
@@ -349,13 +381,19 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func updateDockerForRuntime(configOps versionConfigOps, release string, currentVersion structs.Channel, latestVersion structs.Channel) {
+func updateDockerForRuntime(configOps versionConfigOps, release string, currentVersion structs.Channel, latestVersion structs.Channel) error {
 	zap.L().Info(fmt.Sprintf("update docker called: Current: %v , Latest %v", currentVersion, latestVersion))
 	zap.L().Info(fmt.Sprintf(
 		"New version available in %s channel! Current: %+v, Latest: %+v\n",
 		release, currentVersion, latestVersion,
 	))
 	setBootStatus := func(pier, bootStatus string) error {
+		if configOps.updateUrbitRuntimeConfigFn != nil {
+			return configOps.updateUrbitRuntimeConfigFn(pier, func(urbConf *structs.UrbitRuntimeConfig) error {
+				urbConf.BootStatus = bootStatus
+				return nil
+			})
+		}
 		return configOps.updateUrbitFn(pier, func(urbConf *structs.UrbitDocker) error {
 			urbConf.BootStatus = bootStatus
 			return nil
@@ -365,8 +403,9 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 	statuses, err := configOps.getShipStatusFn(conf.Piers)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't get ship statuses: %v", err))
-		return
+		return fmt.Errorf("get ship statuses: %w", err)
 	}
+	var updateErrs []error
 	valCurrent := reflect.ValueOf(currentVersion)
 	valLatest := reflect.ValueOf(latestVersion)
 
@@ -390,12 +429,14 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 		case "netdata", "wireguard", "miniomc":
 			if _, err := configOps.startContainerFn(component, component); err != nil {
 				zap.L().Warn(fmt.Sprintf("Failed to refresh %s image: %v", component, err))
+				updateErrs = append(updateErrs, fmt.Errorf("refresh %s image: %w", component, err))
 			}
 		case "vere":
 			for pier, status := range statuses {
 				isRunning := (status == "Up" || strings.HasPrefix(status, "Up "))
 				if err := configOps.loadUrbitConfigFn(pier); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to load config for %s: %v", pier, err))
+					updateErrs = append(updateErrs, fmt.Errorf("load %s urbit config: %w", pier, err))
 					continue
 				}
 				// Stop ship if running
@@ -403,6 +444,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 					zap.L().Info(fmt.Sprintf("Stopping %s for vere upgrade", pier))
 					if err := configOps.stopContainerFn(pier); err != nil {
 						zap.L().Error(fmt.Sprintf("Failed to stop %s: %v", pier, err))
+						updateErrs = append(updateErrs, fmt.Errorf("stop %s before vere upgrade: %w", pier, err))
 						continue
 					}
 				}
@@ -411,6 +453,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 				zap.L().Info(fmt.Sprintf("Running urbit prep for %s with old vere image before upgrade", pier))
 				if err := setBootStatus(pier, "prep"); err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to update %s config for prep: %v", pier, err))
+					updateErrs = append(updateErrs, fmt.Errorf("set %s boot status to prep: %w", pier, err))
 					continue
 				}
 
@@ -418,6 +461,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 				_, err := configOps.startContainerFn(pier, "vere")
 				if err != nil {
 					zap.L().Error(fmt.Sprintf("Failed to run prep for %s: %v", pier, err))
+					updateErrs = append(updateErrs, fmt.Errorf("start prep container for %s: %w", pier, err))
 					continue
 				}
 
@@ -425,6 +469,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 				zap.L().Info(fmt.Sprintf("Waiting for prep to complete for %s", pier))
 				if err := configOps.waitCompleteFn(pier); err != nil {
 					zap.L().Error(fmt.Sprintf("Wait for prep completion failed for %s: %v", pier, err))
+					updateErrs = append(updateErrs, fmt.Errorf("wait complete for %s: %w", pier, err))
 					continue
 				}
 
@@ -434,11 +479,13 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 					zap.L().Info(fmt.Sprintf("Starting %s with new vere image", pier))
 					if err := setBootStatus(pier, "boot"); err != nil {
 						zap.L().Error(fmt.Sprintf("Failed to update %s config for boot: %v", pier, err))
+						updateErrs = append(updateErrs, fmt.Errorf("set %s boot status to boot: %w", pier, err))
 						continue
 					}
 					_, err = configOps.startContainerFn(pier, "vere")
 					if err != nil {
 						zap.L().Error(fmt.Sprintf("Failed to start %s after vere update: %v", pier, err))
+						updateErrs = append(updateErrs, fmt.Errorf("start %s after vere update: %w", pier, err))
 						continue
 					}
 				} else {
@@ -446,6 +493,7 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 					zap.L().Info(fmt.Sprintf("%s prep complete, keeping ship stopped", pier))
 					if err := setBootStatus(pier, "noboot"); err != nil {
 						zap.L().Error(fmt.Sprintf("Failed to update %s config after prep: %v", pier, err))
+						updateErrs = append(updateErrs, fmt.Errorf("set %s boot status to noboot: %w", pier, err))
 					}
 				}
 
@@ -463,11 +511,13 @@ func updateDockerForRuntime(configOps versionConfigOps, release string, currentV
 				if isRunning {
 					if _, err := configOps.startContainerFn("minio_"+pier, "minio"); err != nil {
 						zap.L().Warn(fmt.Sprintf("Failed to refresh minio for %s: %v", pier, err))
+						updateErrs = append(updateErrs, fmt.Errorf("refresh minio for %s: %w", pier, err))
 					}
 				}
 			}
 		}
 	}
+	return errors.Join(updateErrs...)
 }
 
 func getSha256(filePath string) (string, error) {

@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"errors"
 	"fmt"
 	"groundseg/backupsvc"
 	"groundseg/click"
@@ -21,6 +22,17 @@ import (
 	"go.uber.org/zap"
 )
 
+var startramServicesRetriever = startram.Retrieve
+
+var (
+	errCollectorStartramSettingsMissing = errors.New("collector runtime startram settings callback is not configured")
+	errCollectorStartramConfigMissing   = errors.New("collector runtime startram config callback is not configured")
+	errCollectorPenpaiSettingsMissing   = errors.New("collector runtime penpai settings callback is not configured")
+	errCollectorSwapSettingsMissing     = errors.New("collector runtime swap settings callback is not configured")
+	errCollectorBackupRootMissing       = errors.New("collector runtime backup root callback is not configured")
+	errCollectorBackupTimeMissing       = errors.New("collector runtime backup time callback is not configured")
+)
+
 type collectorRuntime struct {
 	loadUrbitConfigFn        func(string) error
 	urbitConfFn              func(string) structs.UrbitDocker
@@ -32,22 +44,33 @@ type collectorRuntime struct {
 	getContainerShipStatusFn func([]string) (map[string]string, error)
 	lusCodeFn                func(string) (string, error)
 	getDeskFn                func(string, string, bool) (string, error)
+	startramSettingsFn       func() config.StartramSettings
+	startramConfigFn         func() structs.StartramRetrieve
+	penpaiSettingsFn         func() config.PenpaiSettings
+	swapSettingsFn           func() config.SwapSettings
+	backupRootFn             func() string
+	backupTimeFn             func() time.Time
 }
 
 func defaultCollectorRuntime() collectorRuntime {
+	networkRuntime := network.NewNetworkRuntime()
 	return collectorRuntime{
-		loadUrbitConfigFn:      config.LoadUrbitConfig,
-		urbitConfFn:            config.UrbitConf,
-		getContainerStatsFn:    orchestration.GetContainerStats,
-		getContainerImageTagFn: orchestration.GetContainerImageTag,
-		getMinIOLinkedStatusFn: config.GetMinIOLinkedStatus,
-		getMinIOPasswordFn:     config.GetMinIOPassword,
-		getContainerNetworkFn: func(name string) (string, error) {
-			return network.NewNetworkRuntime().GetContainerNetwork(name)
-		},
+		loadUrbitConfigFn:        config.LoadUrbitConfig,
+		urbitConfFn:              config.UrbitConf,
+		getContainerStatsFn:      orchestration.GetContainerStats,
+		getContainerImageTagFn:   orchestration.GetContainerImageTag,
+		getMinIOLinkedStatusFn:   config.GetMinIOLinkedStatus,
+		getMinIOPasswordFn:       config.GetMinIOPassword,
+		getContainerNetworkFn:    networkRuntime.GetContainerNetwork,
 		getContainerShipStatusFn: orchestration.GetShipStatus,
 		lusCodeFn:                click.GetLusCode,
 		getDeskFn:                click.GetDesk,
+		startramSettingsFn:       config.StartramSettingsSnapshot,
+		startramConfigFn:         config.GetStartramConfig,
+		penpaiSettingsFn:         config.PenpaiSettingsSnapshot,
+		swapSettingsFn:           config.SwapSettingsSnapshot,
+		backupRootFn:             func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) },
+		backupTimeFn:             func() time.Time { return config.BackupTime },
 	}
 }
 
@@ -57,21 +80,22 @@ func ConstructPierInfo(existingUrbits map[string]structs.Urbit, scheduled func(s
 }
 
 func constructPierInfo(runtime collectorRuntime, existingUrbits map[string]structs.Urbit, scheduled func(string) time.Time) (map[string]structs.Urbit, error) {
-	settings := config.StartramSettingsSnapshot()
+	if err := runtime.ensureConfigured(); err != nil {
+		return nil, err
+	}
+	settings := runtime.startramSettings()
 	piers := settings.Piers
 	sgContext := wireguardContext{
 		registered: settings.WgRegistered,
 		on:         settings.WgOn,
 	}
 
-	backups := backupSnapshotForPiers(piers, config.GetStartramConfig().Backups)
+	backups := backupSnapshotForPiersForRuntime(runtime, piers, runtime.startramConfig().Backups)
 	rtSnapshot, err := runtimeSnapshotForPiersForRuntime(runtime, piers, existingUrbits)
 	if err != nil {
-		errmsg := fmt.Sprintf("Unable to bootstrap urbit states: %v", err)
-		zap.L().Error(errmsg)
-		return nil, err
+		return nil, fmt.Errorf("constructing pier info: %w", err)
 	}
-	startramSnapshot := startramSnapshotForPiers(config.GetStartramConfig().Subdomains)
+	startramSnapshot := startramSnapshotForPiers(runtime.startramConfig().Subdomains)
 	deploymentInputs := collectUrbitDeploymentInputsForPiersForRuntime(runtime, piers, rtSnapshot.hostName, sgContext, startramSnapshot)
 	runtimeInputs := collectUrbitRuntimeInputsForPiersForRuntime(
 		runtime,
@@ -86,32 +110,65 @@ func constructPierInfo(runtime collectorRuntime, existingUrbits map[string]struc
 }
 
 func ConstructAppsInfo() structs.Apps {
-	return appInfoCollector{}.collect()
+	runtime := defaultCollectorRuntime()
+	if err := runtime.ensureConfigured(); err != nil {
+		panic(err)
+	}
+	return appInfoCollector{}.collect(runtime)
 }
 
 func ConstructProfileInfo(regions map[string]structs.StartramRegion) structs.Profile {
-	return profileInfoCollector{}.collect(regions)
+	runtime := defaultCollectorRuntime()
+	if err := runtime.ensureConfigured(); err != nil {
+		panic(err)
+	}
+	return profileInfoCollector{}.collect(runtime, regions)
 }
 
 // ConstructSystemInfo builds system usage and update health info.
 func ConstructSystemInfo() structs.System {
-	return systemInfoCollector{}.collect()
+	runtime := defaultCollectorRuntime()
+	if err := runtime.ensureConfigured(); err != nil {
+		panic(err)
+	}
+	return systemInfoCollector{}.collect(runtime)
+}
+
+func (runtime collectorRuntime) ensureConfigured() error {
+	if runtime.startramSettingsFn == nil {
+		return errCollectorStartramSettingsMissing
+	}
+	if runtime.startramConfigFn == nil {
+		return errCollectorStartramConfigMissing
+	}
+	if runtime.penpaiSettingsFn == nil {
+		return errCollectorPenpaiSettingsMissing
+	}
+	if runtime.swapSettingsFn == nil {
+		return errCollectorSwapSettingsMissing
+	}
+	if runtime.backupRootFn == nil {
+		return errCollectorBackupRootMissing
+	}
+	if runtime.backupTimeFn == nil {
+		return errCollectorBackupTimeMissing
+	}
+	return nil
 }
 
 func LoadStartramRegions() (map[string]structs.StartramRegion, error) {
 	regions, err := startram.SyncRegions()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading startram regions: %w", err)
 	}
 	return regions, nil
 }
 
 func GetStartramServices() error {
 	zap.L().Info("Retrieving StarTram services info")
-	res, err := startram.Retrieve()
+	res, err := startramServicesRetriever()
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("%v", err))
-		return err
+		return fmt.Errorf("retrieve startram services: %w", err)
 	}
 	zap.L().Info(fmt.Sprintf("%+v", res.Subdomains))
 	return nil
@@ -136,11 +193,15 @@ type pierStartramSnapshot struct {
 }
 
 func backupSnapshotForPiers(piers []string, remoteBackups []structs.Backup) pierBackupSnapshot {
+	return backupSnapshotForPiersForRuntime(defaultCollectorRuntime(), piers, remoteBackups)
+}
+
+func backupSnapshotForPiersForRuntime(runtime collectorRuntime, piers []string, remoteBackups []structs.Backup) pierBackupSnapshot {
 	return pierBackupSnapshot{
 		remote:       flattenRemoteBackups(remoteBackups),
-		localDaily:   localBackupsForPeriod(piers, "daily"),
-		localWeekly:  localBackupsForPeriod(piers, "weekly"),
-		localMonthly: localBackupsForPeriod(piers, "monthly"),
+		localDaily:   localBackupsForPeriodForRuntime(runtime, piers, "daily"),
+		localWeekly:  localBackupsForPeriodForRuntime(runtime, piers, "weekly"),
+		localMonthly: localBackupsForPeriodForRuntime(runtime, piers, "monthly"),
 	}
 }
 
@@ -155,9 +216,16 @@ func flattenRemoteBackups(remoteBackups []structs.Backup) structs.Backup {
 }
 
 func localBackupsForPeriod(piers []string, period string) structs.Backup {
+	return localBackupsForPeriodForRuntime(defaultCollectorRuntime(), piers, period)
+}
+
+func localBackupsForPeriodForRuntime(runtime collectorRuntime, piers []string, period string) structs.Backup {
 	localBackups := make(structs.Backup)
+	backupDir := runtime.backupRoot()
 	for _, ship := range piers {
-		backupDir := backupsvc.ResolveBackupRoot(config.BasePath())
+		if backupDir == "" {
+			continue
+		}
 		shipBackups, err := filepath.Glob(filepath.Join(backupDir, ship, period, "*"))
 		if err != nil {
 			continue
@@ -173,6 +241,48 @@ func localBackupsForPeriod(piers []string, period string) structs.Backup {
 	return localBackups
 }
 
+func (runtime collectorRuntime) startramSettings() config.StartramSettings {
+	if runtime.startramSettingsFn == nil {
+		panic(errCollectorStartramSettingsMissing)
+	}
+	return runtime.startramSettingsFn()
+}
+
+func (runtime collectorRuntime) startramConfig() structs.StartramRetrieve {
+	if runtime.startramConfigFn == nil {
+		panic(errCollectorStartramConfigMissing)
+	}
+	return runtime.startramConfigFn()
+}
+
+func (runtime collectorRuntime) penpaiSettings() config.PenpaiSettings {
+	if runtime.penpaiSettingsFn == nil {
+		panic(errCollectorPenpaiSettingsMissing)
+	}
+	return runtime.penpaiSettingsFn()
+}
+
+func (runtime collectorRuntime) swapSettings() config.SwapSettings {
+	if runtime.swapSettingsFn == nil {
+		panic(errCollectorSwapSettingsMissing)
+	}
+	return runtime.swapSettingsFn()
+}
+
+func (runtime collectorRuntime) backupRoot() string {
+	if runtime.backupRootFn == nil {
+		panic(errCollectorBackupRootMissing)
+	}
+	return runtime.backupRootFn()
+}
+
+func (runtime collectorRuntime) backupTime() time.Time {
+	if runtime.backupTimeFn == nil {
+		panic(errCollectorBackupTimeMissing)
+	}
+	return runtime.backupTimeFn()
+}
+
 func runtimeSnapshotForPiers(piers []string, urbits map[string]structs.Urbit) (pierRuntimeSnapshot, error) {
 	return runtimeSnapshotForPiersForRuntime(defaultCollectorRuntime(), piers, urbits)
 }
@@ -185,7 +295,7 @@ func runtimeSnapshotForPiersForRuntime(runtime collectorRuntime, piers []string,
 	}
 	pierStatus, err := runtime.getContainerShipStatusFn(piers)
 	if err != nil {
-		return snapshot, err
+		return snapshot, fmt.Errorf("getting container ship status: %w", err)
 	}
 	snapshot.pierStatus = pierStatus
 	return snapshot, nil
@@ -623,9 +733,9 @@ func assembleUrbitViewFromInputs(pier string, inputs urbitViewInputs, backups pi
 
 type appInfoCollector struct{}
 
-func (appInfoCollector) collect() structs.Apps {
+func (appInfoCollector) collect(runtimeRt collectorRuntime) structs.Apps {
 	var apps structs.Apps
-	settings := config.PenpaiSettingsSnapshot()
+	settings := runtimeRt.penpaiSettings()
 	var modelTitles []string
 	for _, penpaiInfo := range settings.Models {
 		modelTitles = append(modelTitles, penpaiInfo.ModelTitle)
@@ -641,16 +751,16 @@ func (appInfoCollector) collect() structs.Apps {
 
 type profileInfoCollector struct{}
 
-func (profileInfoCollector) collect(regions map[string]structs.StartramRegion) structs.Profile {
+func (profileInfoCollector) collect(runtimeRt collectorRuntime, regions map[string]structs.StartramRegion) structs.Profile {
 	var startramInfo structs.Startram
-	settings := config.StartramSettingsSnapshot()
+	settings := runtimeRt.startramSettings()
 	startramInfo.Info.Registered = settings.WgRegistered
 	startramInfo.Info.Running = settings.WgOn
 	startramInfo.Info.Endpoint = settings.EndpointURL
 	startramInfo.Info.RemoteBackupReady = settings.RemoteBackupPassword != ""
-	startramInfo.Info.BackupTime = config.BackupTime.Format("3:04PM MST")
+	startramInfo.Info.BackupTime = runtimeRt.backupTime().Format("3:04PM MST")
 
-	startramConfig := config.GetStartramConfig()
+	startramConfig := runtimeRt.startramConfig()
 	startramInfo.Info.Region = startramConfig.Region
 	startramInfo.Info.Expiry = startramConfig.Lease
 	startramInfo.Info.Renew = startramConfig.Ongoing == 0
@@ -685,7 +795,7 @@ func (profileInfoCollector) collect(regions map[string]structs.StartramRegion) s
 
 type systemInfoCollector struct{}
 
-func (systemInfoCollector) collect() structs.System {
+func (systemInfoCollector) collect(runtimeRt collectorRuntime) structs.System {
 	var ramObj []uint64
 	var sysInfo structs.System
 	sysInfo.Info.Updates = system.SystemUpdates
@@ -711,7 +821,7 @@ func (systemInfoCollector) collect() structs.System {
 		zap.L().Warn(fmt.Sprintf("Error getting disk usage: %v", err))
 	} else {
 		sysInfo.Info.Usage.Disk = diskUsage
-		sysInfo.Info.Usage.SwapFile = config.SwapSettingsSnapshot().SwapVal
+		sysInfo.Info.Usage.SwapFile = runtimeRt.swapSettings().SwapVal
 	}
 	drives := make(map[string]structs.SystemDrive)
 	if blockDevices, err := system.ListHardDisks(); err != nil {

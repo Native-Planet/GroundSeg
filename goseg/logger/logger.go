@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"groundseg/config"
 	"groundseg/dockerclient"
-	"groundseg/session"
 	"os"
 	"strings"
 	"sync"
@@ -19,14 +18,35 @@ import (
 )
 
 var (
-	LogPath        string
-	sysLogSinkMu   sync.RWMutex
-	sysLogSink     logStreamSink = logStreamNoopSink{}
-	loggerInitMu   sync.Mutex
-	loggerInitErr  error
-	mkdirAllFn     = os.MkdirAll
-	pathResolverFn = makeLogPath
+	LogPath       string
+	sysLogSinkMu  sync.RWMutex
+	sysLogSink    logStreamSink = logStreamNoopSink{}
+	loggerInitMu  sync.Mutex
+	loggerInitErr error
 )
+
+type loggerRuntime struct {
+	mkdirAllFn     func(string, os.FileMode) error
+	pathResolverFn func() (string, error)
+}
+
+func defaultLoggerRuntime() loggerRuntime {
+	return loggerRuntime{
+		mkdirAllFn:     os.MkdirAll,
+		pathResolverFn: makeLogPath,
+	}
+}
+
+func sanitizeLoggerRuntime(runtime loggerRuntime) loggerRuntime {
+	defaultRuntime := defaultLoggerRuntime()
+	if runtime.mkdirAllFn == nil {
+		runtime.mkdirAllFn = defaultRuntime.mkdirAllFn
+	}
+	if runtime.pathResolverFn == nil {
+		runtime.pathResolverFn = defaultRuntime.pathResolverFn
+	}
+	return runtime
+}
 
 type logStreamNoopSink struct{}
 
@@ -71,8 +91,9 @@ func loggerLevelFromArgs(args []string) zapcore.Level {
 	return zap.InfoLevel
 }
 
-func resolveLoggerPath() (string, error) {
-	return pathResolverFn()
+func resolveLoggerPath(runtime loggerRuntime) (string, error) {
+	runtime = sanitizeLoggerRuntime(runtime)
+	return runtime.pathResolverFn()
 }
 
 func makeLoggerCore(level zapcore.Level) zapcore.Core {
@@ -101,7 +122,7 @@ func makeLoggerCore(level zapcore.Level) zapcore.Core {
 	)
 }
 
-func ConfigureLogstreamRuntime(runtime session.LogstreamRuntime) {
+func ConfigureLogstreamRuntime(runtime logStreamSink) {
 	sysLogSinkMu.Lock()
 	defer sysLogSinkMu.Unlock()
 	if runtime == nil {
@@ -196,6 +217,12 @@ func (cw ChanWriter) Sync() error {
 }
 
 func Initialize() error {
+	runtime := defaultLoggerRuntime()
+	return InitializeWithRuntime(runtime)
+}
+
+func InitializeWithRuntime(runtime loggerRuntime) error {
+	runtime = sanitizeLoggerRuntime(runtime)
 	loggerInitMu.Lock()
 	defer loggerInitMu.Unlock()
 	switch loggerInitState {
@@ -207,7 +234,7 @@ func Initialize() error {
 
 	loggerInitState = loggerInitInitializing
 	loggerInitErr = nil
-	storagePath, err := resolveLoggerPath()
+	storagePath, err := resolveLoggerPath(runtime)
 	if err != nil {
 		loggerInitErr = err
 	} else {
@@ -216,7 +243,7 @@ func Initialize() error {
 	if LogPath == "" {
 		LogPath = loggerFallbackLogPath
 	}
-	err = mkdirAllFn(LogPath, 0755)
+	err = runtime.mkdirAllFn(LogPath, 0755)
 	zap.ReplaceGlobals(buildLogger(loggerLevelFromArgs(os.Args[1:])))
 	printStartupBanner()
 	if err != nil {
@@ -226,7 +253,7 @@ func Initialize() error {
 			"\n   (  >< )\n Love, Native Planet\n")
 		fmt.Print(".・。.・゜✭・.・✫・゜・。..・。.・゜✭・.・✫・゜・。.\n\n")
 		LogPath = loggerFallbackLogPath
-		if mkErr := mkdirAllFn(LogPath, 0755); mkErr != nil {
+		if mkErr := runtime.mkdirAllFn(LogPath, 0755); mkErr != nil {
 			fmt.Printf("Failed to create fallback log directory: %v\n", mkErr)
 			loggerInitErr = fmt.Errorf("log path fallback failed: %w", mkErr)
 		} else {
@@ -285,13 +312,13 @@ func makeLogPath() (string, error) {
 func getDockerLogs(name string) ([]byte, error) {
 	cli, err := dockerclient.New()
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("create docker client: %w", err)
 	}
 
 	options := container.LogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: true}
 	logs, err := cli.ContainerLogs(context.Background(), name, options)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("read docker logs for %s: %w", name, err)
 	}
 	defer logs.Close()
 
@@ -304,7 +331,7 @@ func getDockerLogs(name string) ([]byte, error) {
 		}
 		jsonLine, err := json.Marshal(line)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("marshal docker log line for %s: %w", name, err)
 		}
 		logEntries = append(logEntries, string(jsonLine))
 	}

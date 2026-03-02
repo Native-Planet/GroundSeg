@@ -1,0 +1,1048 @@
+ATTEMPT 1/2
+$ codex exec --ephemeral -C /Users/chuah/NP/GroundSeg -s workspace-write -c approval_policy="never" -c model_reasoning_effort="low" -o /Users/chuah/NP/GroundSeg/.desloppify/subagents/runs/20260302_171127/results/batch-1.raw.txt You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/defaults/defaults.go
+- goseg/system/wifi.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_services.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/broadcast/collectors/collectors.go
+- goseg/defaults/version.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/rectify/rectify.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_seams_test.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/runtime_docker.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/config/config_update_schema.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/config/config.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+
+STDOUT:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules implement large function-bag runtimes plus default/merge helpers (e.g., `StartupRuntime` and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`, `RectifyRuntime` in `goseg/rectify/rectify.go`, `importerRuntime` in `goseg/importer/importer.go`).",
+        "Two orchestration layers duplicate similar dependency surfaces (`WireguardRuntime`/`UrbitRuntime` in `goseg/docker/orchestration/runtime_docker.go` and `Runtime*Ops` families in `goseg/docker/orchestration/runtime_ops.go`), increasing adapter count and translation paths.",
+        "Some wrappers are nearly pure delegation without additional policy (e.g., many `*WithRuntime` and service pass-through methods in `goseg/system/wifi.go`, plus top-level wrappers in `goseg/docker/network/network.go`).",
+        "Large shared config models (`structs.SysConfig`, embedded `structs.UrbitDocker`) remain broad and cross-cutting (`goseg/structs/configs.go`), while parallel snapshot structs exist in `goseg/config/config.go`, indicating mixed abstraction boundaries rather than one cohesive domain API."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 49.0,
+        "interface_honesty": 76.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bag_overgrowth",
+      "summary": "Runtime dependency injection is implemented as repeated large function bags across modules, creating architectural indirection with limited domain leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartupRuntime` embeds multiple runtime structs with many callback fields and relies on `seams.Merge` defaults (`goseg/startuporchestrator/startup_orchestrator.go`).",
+        "`workflowRuntime` similarly embeds multiple callback groups and repeatedly normalizes via `withDefaultsWorkflowRuntime` (`goseg/shipworkflow/operations_runtime.go`).",
+        "`importerRuntime` and `RectifyRuntime` repeat the same pattern: callback bags + nil-guard checks + default builders (`goseg/importer/importer.go`, `goseg/rectify/rectify.go`).",
+        "`main.go` introduces another runtime family (`bootstrapRuntime`, `c2cRuntime`, context structs), extending the same abstraction style at application entrypoint."
+      ],
+      "suggestion": "Define narrower domain services (e.g., `StartupService`, `TransitionService`, `ImportService`) with cohesive method sets and one composition root; keep seam structs internal to tests or construction boundaries rather than passing callback bags through operational code.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_orchestration_adapters",
+      "summary": "Docker orchestration maintains parallel adapter surfaces that map the same dependencies twice, increasing drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`runtime_docker.go` defines `dockerRuntime` plus exported runtime structs (`WireguardRuntime`, `UrbitRuntime`) and conversion functions like `wireguardRuntimeFromDocker`/`urbitRuntimeFromDocker`.",
+        "`runtime_ops.go` independently defines `RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc., with overlapping callbacks to the same config/docker functions.",
+        "Both files include separate default constructors that wire the same dependencies (config updates, container operations, network lookups), creating duplicated abstraction layers.",
+        "`runtime_seams_test.go` contains extensive stubs for these parallel surfaces, indicating non-trivial maintenance overhead from duplicate seam APIs."
+      ],
+      "suggestion": "Unify on a single orchestration runtime contract (or a small set of explicit service interfaces) and remove one adapter family; generate or centrally derive specialized views instead of hand-maintaining parallel structs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_chains",
+      "summary": "Several wrapper functions add call depth without behavior, policy, or translation, reducing abstraction payoff.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/docker/network/network.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`wifi.go` defines many wrappers that immediately call `newWiFiService(...).method` (`ifCheckWithRuntime`, `getWifiDeviceWithRuntime`, `ConnectToWifiWithRuntime`, `runCommandWithRuntime`, etc.) with minimal additional semantics.",
+        "`wifiOperations` includes methods (`runCommand`, `execCommand`, `newClient`, `clientInterfaces`, `clientBSS`) that mostly forward directly to runtime function fields.",
+        "`network.go` top-level `CreateVolume`/`DeleteVolume` are thin pass-throughs into `NewNetworkRuntime()` methods, adding a wrapper layer without policy.",
+        "`main.go` contains wrapper construction (`defaultBootstrapRuntime` + `defaultBootstrapRuntimeBase` + `bootstrapRuntimeWith`) that duplicates delegation paths for the same actions."
+      ],
+      "suggestion": "Collapse trivial wrappers by keeping either direct package functions or a focused service object (not both); reserve wrappers for places enforcing concrete policy (validation, retries, metrics, or translation).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_boundary_leakage",
+      "summary": "Broad config models are still a cross-module dependency backbone despite newer snapshot abstractions, leaving boundaries mixed.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` and embedded `structs.UrbitDocker` remain very wide and multi-concern in `goseg/structs/configs.go`.",
+        "`config/config.go` introduces narrower snapshot abstractions (`ShipSettings`, `ConnectivitySettings`, `RuntimeContext`), but downstream runtimes still frequently wire broad config callbacks directly (e.g., `UrbitConfFn`, many `UpdateUrbit*` callbacks).",
+        "`defaults/defaults.go` initializes large default config payloads directly from these broad structs, reinforcing single-object coupling.",
+        "`collectors.go` and `runtime_ops.go` continue to pull mixed concerns from config/orchestration through large callback sets rather than focused domain services."
+      ],
+      "suggestion": "Introduce stable, bounded domain ports for each concern (runtime context, ship state, startram state, update policy) and progressively retire direct dependencies on broad config aggregates in orchestration/collector paths.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_as_global_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams evolved into primary production abstraction style, creating callback-bag proliferation.",
+      "Config/state access patterns are still organized around broad shared structs, so narrower view models are only partially adopted."
+    ],
+    "likely_symptoms": [
+      "duplicate_orchestration_adapters",
+      "pass_through_wrapper_chains"
+    ],
+    "possible_false_positives": []
+  }
+}
+
+
+STDERR:
+OpenAI Codex v0.106.0 (research preview)
+--------
+workdir: /Users/chuah/NP/GroundSeg
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: low
+reasoning summaries: none
+session id: 019caf88-9081-7072-8c56-a3bee0106898
+--------
+user
+You are a focused subagent reviewer for a single holistic investigation batch.
+
+Repository root: /Users/chuah/NP/GroundSeg
+Blind packet: /Users/chuah/NP/GroundSeg/.desloppify/review_packet_blind.json
+Batch index: 1
+Batch name: Abstractions & Dependencies
+Batch dimensions: abstraction_fitness
+Batch rationale: abstraction hotspots (wrappers/interfaces/param bags), dep cycles
+
+Files assigned:
+- goseg/broadcast/state_test.go
+- goseg/broadcast/state.go
+- goseg/broadcast/loop_test.go
+- goseg/defaults/defaults.go
+- goseg/system/wifi.go
+- goseg/leak/broadcast_test.go
+- goseg/rectify/rectify_services.go
+- goseg/docker/orchestration/wireguard_test.go
+- goseg/rectify/rectify_test.go
+- goseg/docker/orchestration/subsystem/docker_test.go
+- goseg/leak/broadcast.go
+- goseg/docker/orchestration/wireguard.go
+- goseg/leak/leak_test.go
+- goseg/broadcast/transitions.go
+- goseg/structs/configs.go
+- goseg/broadcast/collectors/collectors.go
+- goseg/defaults/version.go
+- goseg/importer/importer.go
+- goseg/accesspoint/accesspoint_test.go
+- goseg/main.go
+- goseg/startuporchestrator/startup_orchestrator.go
+- goseg/startuporchestrator/startup_orchestrator_test.go
+- goseg/main_test.go
+- goseg/routines/version.go
+- goseg/docker/orchestration/subsystem/subsystem_events.go
+- goseg/handler/systemsvc/system_test.go
+- goseg/rectify/rectify.go
+- goseg/routines/logstream/logs.go
+- goseg/docker/orchestration/runtime_seams_test.go
+- goseg/shipworkflow/operations_runtime.go
+- goseg/docker/orchestration/runtime_docker.go
+- goseg/docker/lifecycle/planner.go
+- goseg/routines/system/system.go
+- goseg/docker/network/network.go
+- goseg/config/config_update_schema.go
+- goseg/docker/orchestration/runtime_ops.go
+- goseg/config/config.go
+
+Task requirements:
+1. Read the blind packet and follow `system_prompt` constraints exactly.
+1a. If previously flagged issues are listed above, use them as context for your review.
+    Verify whether each still applies to the current code. Do not re-report fixed or
+    wontfix issues. Use them as starting points to look deeper — inspect adjacent code
+    and related modules for defects the prior review may have missed.
+1c. Think structurally: when you spot multiple individual issues that share a common
+    root cause (missing abstraction, duplicated pattern, inconsistent convention),
+    explain the deeper structural issue in the finding, not just the surface symptom.
+    If the pattern is significant enough, report the structural issue as its own finding
+    with appropriate fix_scope ('multi_file_refactor' or 'architectural_change') and
+    use `root_cause_cluster` to connect related symptom findings together.
+2. Evaluate ONLY listed files and ONLY listed dimensions for this batch.
+3. Return 0-10 high-quality findings for this batch (empty array allowed).
+3a. Do not suppress real defects to keep scores high; report every material issue you can support with evidence.
+3b. Do not default to 100. Reserve 100 for genuinely exemplary evidence in this batch.
+4. Score/finding consistency is required: broader or more severe findings MUST lower dimension scores.
+4a. Any dimension scored below 85.0 MUST include explicit feedback: add at least one finding with the same `dimension` and a non-empty actionable `suggestion`.
+5. Every finding must include `related_files` with at least 2 files when possible.
+6. Every finding must include `dimension`, `identifier`, `summary`, `evidence`, `suggestion`, and `confidence`.
+7. Every finding must include `impact_scope` and `fix_scope`.
+8. Every scored dimension MUST include dimension_notes with concrete evidence.
+9. If a dimension score is >85.0, include `issues_preventing_higher_score` in dimension_notes.
+10. Use exactly one decimal place for every assessment and abstraction sub-axis score.
+11. Ignore prior chat context and any target-threshold assumptions.
+12. Do not edit repository files.
+13. Return ONLY valid JSON, no markdown fences.
+
+Scope enums:
+- impact_scope: "local" | "module" | "subsystem" | "codebase"
+- fix_scope: "single_edit" | "multi_file_refactor" | "architectural_change"
+
+Output schema:
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {"<dimension>": <0-100 with one decimal place>},
+  "dimension_notes": {
+    "<dimension>": {
+      "evidence": ["specific code observations"],
+      "impact_scope": "local|module|subsystem|codebase",
+      "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+      "confidence": "high|medium|low",
+      "issues_preventing_higher_score": "required when score >85.0",
+      "sub_axes": {"abstraction_leverage": 0-100 with one decimal place, "indirection_cost": 0-100 with one decimal place, "interface_honesty": 0-100 with one decimal place}  // required for abstraction_fitness when evidence supports it
+    }
+  },
+  "findings": [{
+    "dimension": "<dimension>",
+    "identifier": "short_id",
+    "summary": "one-line defect summary",
+    "related_files": ["relative/path.py"],
+    "evidence": ["specific code observation"],
+    "suggestion": "concrete fix recommendation",
+    "confidence": "high|medium|low",
+    "impact_scope": "local|module|subsystem|codebase",
+    "fix_scope": "single_edit|multi_file_refactor|architectural_change",
+    "root_cause_cluster": "optional_cluster_name_when_supported_by_history"
+  }],
+  "retrospective": {
+    "root_causes": ["optional: concise root-cause hypotheses"],
+    "likely_symptoms": ["optional: identifiers that look symptom-level"],
+    "possible_false_positives": ["optional: prior concept keys likely mis-scoped"]
+  }
+}
+
+mcp startup: no servers
+
+thinking
+**Planning JSON review process**
+codex
+Reviewing the blind packet and the assigned files for `abstraction_fitness` now. I’ll extract the packet constraints first, then inspect the listed files for abstraction/dependency defects and return strict JSON only.
+exec
+/opt/homebrew/bin/zsh -lc 'cat .desloppify/review_packet_blind.json' in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg --files goseg/broadcast goseg/defaults goseg/system goseg/leak goseg/rectify goseg/docker/orchestration goseg/structs goseg/importer goseg/accesspoint goseg/startuporchestrator goseg/routines goseg/shipworkflow goseg/docker/lifecycle goseg/docker/network goseg/config goseg/handler/systemsvc goseg/main.go goseg/main_test.go' in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+Total output lines: 4962
+
+{
+  "command": "review",
+  "mode": "holistic",
+  "language": "go",
+  "dimensions": [
+    "design_coherence",
+    "abstraction_fitness",
+    "error_consistency"
+  ],
+  "dimension_prompts": {
+    "design_coherence": {
+      "description": "Are structural design decisions sound \u2014 functions focused, abstractions earned, patterns consistent?",
+      "look_for": [
+        "Functions doing too many things \u2014 multiple distinct responsibilities in one body",
+        "Parameter lists that should be config/context objects \u2014 many related params passed together",
+        "Files accumulating issues across many dimensions \u2014 likely mixing unrelated concerns",
+        "Deep nesting that could be flattened with early returns or extraction",
+        "Repeated structural patterns that should be data-driven"
+ succeeded in 50ms:
+goseg/docker/orchestration/container_config_test.go
+goseg/docker/orchestration/netdata.go
+goseg/docker/orchestration/runtime_startram.go
+goseg/docker/orchestration/stats_test.go
+goseg/docker/orchestration/llama_test.go
+goseg/docker/orchestration/wireguard_test.go
+goseg/docker/orchestration/runtime_seams_test.go
+goseg/docker/orchestration/status.go
+goseg/docker/orchestration/minio.go
+goseg/docker/orchestration/runtime_core.go
+goseg/defaults/scripts.go
+goseg/defaults/version_test.go
+goseg/defaults/defaults.go
+goseg/defaults/scripts_test.go
+goseg/defaults/defaults_test.go
+goseg/defaults/version.go
+goseg/rectify/rectify.go
+goseg/rectify/rectify_test.go
+goseg/rectify/importer_test.go
+goseg/rectify/rectify_services.go
+
+thinking
+**Planning targeted code scanning**
+codex
+I’ve loaded the packet constraints and will now inspect the assigned files for concrete abstraction defects (pass-through wrappers, unnecessary interfaces, and config-bag coupling), then map them into evidence-backed findings.
+exec
+/opt/homebrew/bin/zsh -lc 'rg -n "''^type .*interface|''^func '"\\(|structs\\.SysConfig|config\\.Conf\\(|Runtime|Adapter|Facade|Ops|Service\" goseg/broadcast/state_test.go goseg/broadcast/loop_test.go goseg/leak/broadcast_test.go goseg/docker/orchestration/wireguard_test.go goseg/rectify/rectify_test.go goseg/docker/orchestration/subsystem/docker_test.go goseg/leak/leak_test.go goseg/accesspoint/accesspoint_test.go goseg/startuporchestrator/startup_orchestrator_test.go goseg/main_test.go goseg/handler/systemsvc/system_test.go goseg/docker/orchestration/runtime_seams_test.go" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc 'rg -n "''^type .*interface|''^type .*struct|''^func '"\\(|structs\\.SysConfig|config\\.Conf\\(|\\.Conf\\(|Runtime|WithRuntime|Adapter|Facade|Service|Ops|Snapshot|Transition|collect|Collect|Broadcast|ConnectToWifi|ConnectToWiFi\" goseg/broadcast/state.go goseg/broadcast/transitions.go goseg/broadcast/collectors/collectors.go goseg/defaults/defaults.go goseg/defaults/version.go goseg/system/wifi.go goseg/leak/broadcast.go goseg/rectify/rectify_services.go goseg/rectify/rectify.go goseg/docker/orchestration/wireguard.go goseg/importer/importer.go goseg/main.go goseg/startuporchestrator/startup_orchestrator.go goseg/routines/version.go goseg/docker/orchestration/subsystem/subsystem_events.go goseg/routines/logstream/logs.go goseg/shipworkflow/operations_runtime.go goseg/docker/orchestration/runtime_docker.go goseg/docker/lifecycle/planner.go goseg/routines/system/system.go goseg/docker/network/network.go goseg/config/config_update_schema.go goseg/docker/orchestration/runtime_ops.go goseg/config/config.go goseg/structs/configs.go" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+goseg/main_test.go:21:func TestLoadServiceRunsFunction(t *testing.T) {
+goseg/main_test.go:23:	loadService(func() error {
+goseg/main_test.go:31:		t.Fatal("loadService did not execute function")
+goseg/main_test.go:81:	if !connCheckWith(connectivityCheckRuntime{
+goseg/main_test.go:98:	if !connCheckWith(connectivityCheckRuntime{
+goseg/main_test.go:114:	if connCheckWith(connectivityCheckRuntime{
+goseg/main_test.go:131:	runtime := c2cRuntime{
+goseg/main_test.go:132:		device: c2cDeviceRuntime{
+goseg/main_test.go:137:		connectivity: c2cConnectivityRuntime{
+goseg/main_test.go:145:		mode: c2cModeRuntime{
+goseg/main_test.go:178:	runtime := c2cRuntime{
+goseg/main_test.go:179:		device: c2cDeviceRuntime{
+goseg/main_test.go:184:		connectivity: c2cConnectivityRuntime{
+goseg/main_test.go:190:		mode: c2cModeRuntime{
+goseg/main_test.go:236:	runtime := bootstrapRuntimeWith(
+goseg/main_test.go:279:	runtime := bootstrapRuntimeWith(
+goseg/main_test.go:292:	runtime := defaultServerRuntime()
+goseg/main_test.go:318:	runtime := defaultServerRuntime()
+goseg/main_test.go:345:	runtime := defaultServerRuntime()
+goseg/main_test.go:367:	runtime := defaultServerRuntime()
+ succeeded in 51ms:
+Total output lines: 1145
+
+goseg/system/wifi.go:26:	defaultWiFiRadio   wifiRadioService = nmcliWiFiRadioService{}
+goseg/system/wifi.go:31:type wifiRuntime struct {
+goseg/system/wifi.go:40:func defaultWiFiRuntime() wifiRuntime {
+goseg/system/wifi.go:41:	return wifiRuntime{
+goseg/system/wifi.go:51:func withWiFiRuntime(overrides wifiRuntime) wifiRuntime {
+goseg/system/wifi.go:52:	runtime := defaultWiFiRuntime()
+goseg/system/wifi.go:74:type wifiOperations struct {
+goseg/system/wifi.go:75:	runtime wifiRuntime
+goseg/system/wifi.go:78:func newWiFiService(runtime wifiRuntime) wifiOperations {
+goseg/system/wifi.go:80:		runtime: withWiFiRuntime(runtime),
+goseg/system/wifi.go:84:func (svc wifiOperations) ifCheck() (bool, error) {
+goseg/system/wifi.go:93:func (svc wifiOperations) wifiDevices() ([]string, error) {
+goseg/system/wifi.go:113:func (svc wifiOperations) primaryWifiDevice() (string, error) {
+goseg/system/wifi.go:124:func (svc wifiOperations) listSSIDs(dev string) ([]string, error) {
+goseg/system/wifi.go:140:func (svc wifiOperations) connectedSSID(client *wifi.Client, dev string) (string, error) {
+goseg/system/wifi.go:158:func (svc wifiOperations) connect(ssid, password string) error {
+goseg/system/wifi.go:167:func (svc wifiOperations) disconnect(ifaceName string) error {
+goseg/system/wifi.go:180:func (svc wifiOperations) toggleDevice(dev string) error {
+
+thinking
+**Preparing targeted file inspections**
+codex
+I’ve identified likely hotspots around runtime seam layering; I’m now reading the key files directly to confirm concrete defects and avoid reporting test-only scaffolding as production issues.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/main.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/docker/orchestration/runtime_docker.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/system/wifi.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+     1	package main
+     2	
+     3	// NativePlanet GroundSeg: Go Edition (goseg)
+     4	// 🄯 2023 ~nallux-dozryl & ~sitful-hatred
+     5	// This is a Golang rewrite of GroundSeg that serves the v2 json
+     6	// object via websocket.
+     7	// The v2 rewrite decouples the frontend and backend, which makes it
+     8	// straightforward to implement alternative backends.
+     9	//
+    10	// Under development: reimplementing all pyseg functionality.
+    11	// Advantages:
+    12	// - Really, really fast
+    13	// - Event-driven
+    14	// - First-class support for concurrent operations
+    15	// - Very good golang Docker libraries
+    16	
+    17	import (
+    18		"context"
+    19		"embed"
+    20		"fmt"
+ succeeded in 51ms:
+     1	package orchestration
+     2	
+     3	import (
+     4		"crypto/rand"
+     5		"fmt"
+     6		"groundseg/config"
+     7		"groundseg/docker/network"
+     8		"groundseg/docker/orchestration/container"
+     9		"groundseg/structs"
+    10		"os"
+    11		"time"
+    12	)
+    13	
+    14	type dockerRuntime struct {
+    15		contextOps   dockerRuntimeContextOps
+    16		fileOps      dockerRuntimeFileOps
+    17		containerOps dockerRuntimeContainerOps
+    18		imageOps     dockerRuntimeImageOps
+    19		configOps    dockerRuntimeConfigOps
+    20		urbitOps     dockerRuntimeUrbitOps
+ succeeded in 51ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/structs"
+     8		"os/exec"
+     9		"strings"
+    10		"sync"
+    11		"time"
+    12	
+    13		"github.com/mdlayher/wifi"
+    14		"go.uber.org/zap"
+    15	)
+    16	
+    17	var (
+    18		WifiInfo           structs.SystemWifi
+    19		Device             string // wifi device name
+    20		LocalUrl           string // eg nativeplanet.local
+
+thinking
+**Planning multiple mapping functions**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/docker/orchestration/runtime_docker.go | sed -n '260,520p'" in /Users/chuah/NP/GroundSeg succeeded in 51ms:
+   260				GetWgConfBlobFn: func() (string, error) {
+   261					return config.GetStartramConfig().Conf, nil
+   262				},
+   263				GetWgPrivkeyFn: config.GetWgPrivkey,
+   264				WriteWgConfFn:  func(rt WireguardRuntime) error { return rt.WriteWgConf() },
+   265			},
+   266			netdataOps: dockerRuntimeNetdataOps{
+   267				CreateDefaultNetdataConfFn: config.CreateDefaultNetdataConf,
+   268				WriteNDConfFn:              writeNDConfWithRuntime,
+   269			},
+   270			minioOps: dockerRuntimeMinioOps{
+   271				CreateDefaultMcConfFn: config.CreateDefaultMcConf,
+   272				SetMinIOPasswordFn:    config.SetMinIOPassword,
+   273				GetMinIOPasswordFn:    config.GetMinIOPassword,
+   274			},
+   275			commandOps: dockerRuntimeCommandOps{
+   276				ExecDockerCommandFn: func(name string, cmd []string) (string, error) {
+   277					out, _, err := ExecDockerCommand(name, cmd)
+   278					return out, err
+   279				},
+codex
+Next I’m checking startup/config/shipworkflow files, since they appear to share the same “runtime function bag” pattern and may form a single structural root cause.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/shipworkflow/operations_runtime.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/startuporchestrator/startup_orchestrator.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/config/config.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSeg succeeded in 50ms:
+     1	package config
+     2	
+     3	// code for managing groundseg and container configurations
+     4	
+     5	import (
+     6		"groundseg/defaults"
+     7		"sync"
+     8		"time"
+     9	
+    10		"groundseg/structs"
+    11	)
+    12	
+    13	type StartramConfigSnapshot struct {
+    14		Value     structs.StartramRetrieve
+    15		UpdatedAt time.Time
+    16		Fresh     bool
+    17	}
+    18	
+    19	type StartramSettings struct {
+    20		EndpointURL          string
+ succeeded in 51ms:
+     1	package shipworkflow
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/click"
+     8		"groundseg/config"
+     9		"groundseg/docker/events"
+    10		dockerOrchestration "groundseg/docker/orchestration"
+    11		"groundseg/internal/seams"
+    12		"groundseg/internal/transitionlifecycle"
+    13		"groundseg/lifecycle"
+    14		"groundseg/structs"
+    15		"net"
+    16		"strings"
+    17		"time"
+    18	
+    19		"go.uber.org/zap"
+    20	)
+ succeeded in 51ms:
+     1	package startuporchestrator
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"groundseg/auth"
+     8		"groundseg/config"
+     9		"groundseg/docker/orchestration/subsystem"
+    10		"groundseg/exporter"
+    11		"groundseg/handler/router"
+    12		groundSystem "groundseg/handler/system"
+    13		"groundseg/importer"
+    14		"groundseg/internal/seams"
+    15		"groundseg/leak"
+    16		"groundseg/logger"
+    17		"groundseg/rectify"
+    18		"groundseg/routines"
+    19		"groundseg/routines/logstream"
+    20		"groundseg/session"
+
+thinking
+**Inspecting runtime and event modules**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/docker/orchestration/subsystem/subsystem_events.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/docker/orchestration/runtime_ops.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/importer/importer.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package importer
+     2	
+     3	import (
+     4		"context"
+     5		"errors"
+     6		"fmt"
+     7		"github.com/docker/docker/errdefs"
+     8		"groundseg/auth"
+     9		"groundseg/click/acme"
+    10		"groundseg/config"
+    11		"groundseg/docker/events"
+    12		dockerOrchestration "groundseg/docker/orchestration"
+    13		"groundseg/driveresolver"
+    14		"groundseg/lifecycle"
+    15		"groundseg/logger"
+    16		workflowOrchestration "groundseg/orchestration"
+    17		"groundseg/shipcleanup"
+    18		"groundseg/shipcreator"
+    19		"groundseg/shipworkflow"
+    20		"groundseg/structs"
+ succeeded in 52ms:
+     1	package orchestration
+     2	
+     3	import (
+     4		"groundseg/click"
+     5		"groundseg/config"
+     6		"groundseg/docker/network"
+     7		"groundseg/startram"
+     8		"groundseg/structs"
+     9		"time"
+    10	)
+    11	
+    12	type RuntimeTransitionOps struct {
+    13		RuntimeContainerOps
+    14		RuntimeUrbitOps
+    15	}
+    16	
+    17	type RuntimeHealthOps struct {
+    18		RuntimeSnapshotOps
+    19	}
+    20	
+ succeeded in 52ms:
+     1	package subsystem
+     2	
+     3	import (
+     4		"context"
+     5		"fmt"
+     6		"sync"
+     7		"time"
+     8	
+     9		"groundseg/dockerclient"
+    10		"groundseg/logger"
+    11		"groundseg/structs"
+    12		"groundseg/transition"
+    13	
+    14		eventtypes "github.com/docker/docker/api/types/events"
+    15	)
+    16	
+    17	var (
+    18		eventBus           = make(chan structs.Event, 100)
+    19		DisableShipRestart = false
+    20		dockerHealthLoopMu sync.Mutex
+
+thinking
+**Inspecting potential duplication in wrappers**
+codex
+I’ve confirmed repeated function-bag seams in several core modules; I’m doing one more pass over defaults/broadcast/rectify/network to verify additional abstraction leaks before scoring.
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/defaults/version.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/docker/network/network.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/defaults/defaults.go | sed -n '1,240p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/broadcast/collectors/collectors.go | sed -n '1,280p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/rectify/rectify.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package defaults
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"fmt"
+     6		"groundseg/structs"
+     7		"log/slog"
+     8		"os"
+     9	
+    10		"go.uber.org/zap"
+    11	)
+    12	
+    13	var (
+    14		logger             = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    15		DefaultVersionText = `
+    16	{
+    17	  "groundseg": {
+    18	    "canary": {
+    19	      "groundseg": {
+    20	        "amd64_sha256": "653863b4db936794c15b9eff7ba0310458859c84ec6de11d68c0fc13cbf34e9e",
+ succeeded in 52ms:
+     1	package defaults
+     2	
+     3	// default config json structs
+     4	// these get written to disk in absence of version server
+     5	
+     6	import (
+     7		"groundseg/structs"
+     8		"os"
+     9		"path/filepath"
+    10		"strings"
+    11	)
+    12	
+    13	var (
+    14		UrbitConfig = structs.UrbitDocker{
+    15			UrbitRuntimeConfig: structs.UrbitRuntimeConfig{
+    16				PierName:         "",
+    17				HTTPPort:         0,
+    18				AmesPort:         0,
+    19				LoomSize:         31,
+    20				UrbitVersion:     "v2.11",
+ succeeded in 52ms:
+     1	package network
+     2	
+     3	import (
+     4		"context"
+     5		"fmt"
+     6		"os"
+     7		"path/filepath"
+     8		"time"
+     9	
+    10		"github.com/docker/docker/api/types/container"
+    11		"github.com/docker/docker/api/types/filters"
+    12		dockernetwork "github.com/docker/docker/api/types/network"
+    13		volumetypes "github.com/docker/docker/api/types/volume"
+    14		"go.uber.org/zap"
+    15	
+    16		"github.com/docker/docker/client"
+    17		"groundseg/dockerclient"
+    18	)
+    19	
+    20	type NetworkRuntime struct {
+ succeeded in 52ms:
+     1	package rectify
+     2	
+     3	// this package is for watching event channels and rectifying mismatches
+     4	// between the desired and actual state, creating broadcast transitions,
+     5	// and anything else that needs to be done asyncronously
+     6	
+     7	import (
+     8		"context"
+     9		"fmt"
+    10		"groundseg/broadcast"
+    11		"groundseg/config"
+    12		"groundseg/docker/events"
+    13		"groundseg/internal/seams"
+    14		"groundseg/internal/transitionlifecycle"
+    15		"groundseg/startram"
+    16		"groundseg/structs"
+    17		"groundseg/transition"
+    18		"strconv"
+    19	
+    20		"go.uber.org/zap"
+ succeeded in 52ms:
+     1	package collectors
+     2	
+     3	import (
+     4		"fmt"
+     5		"groundseg/backupsvc"
+     6		"groundseg/click"
+     7		"groundseg/config"
+     8		"groundseg/docker/network"
+     9		"groundseg/docker/orchestration"
+    10		"groundseg/startram"
+    11		"groundseg/structs"
+    12		"groundseg/system"
+    13		"groundseg/transition"
+    14		"path/filepath"
+    15		"regexp"
+    16		"runtime"
+    17		"strconv"
+    18		"strings"
+    19		"time"
+    20	
+
+thinking
+**Planning runtime inspection approach**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/routines/version.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/routines/system/system.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSegexec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/routines/logstream/logs.go | sed -n '1,260p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package system
+     2	
+     3	import (
+     4		"context"
+     5		"time"
+     6	
+     7		"groundseg/routines/backup"
+     8		"groundseg/routines/chop"
+     9	)
+    10	
+    11	var (
+    12		remoteBackupSleep = time.Sleep
+    13		localBackupSleep  = time.Sleep
+    14		sleepForChop      = time.Sleep
+    15	)
+    16	
+    17	func StartBackupRoutines() {
+    18		go TlonBackupRemote()
+    19		go TlonBackupLocal()
+    20	}
+ succeeded in 52ms:
+     1	package routines
+     2	
+     3	import (
+     4		"context"
+     5		"crypto/sha256"
+     6		"encoding/hex"
+     7		"errors"
+     8		"fmt"
+     9		"groundseg/config"
+    10		"groundseg/structs"
+    11		"io"
+    12		"net/http"
+    13		"os"
+    14		"os/exec"
+    15		"path/filepath"
+    16		"reflect"
+    17		"strconv"
+    18		"strings"
+    19		"time"
+    20	
+ succeeded in 52ms:
+     1	package logstream
+     2	
+     3	import (
+     4		"bufio"
+     5		"bytes"
+     6		"context"
+     7		"encoding/json"
+     8		"errors"
+     9		"fmt"
+    10		"groundseg/dockerclient"
+    11		"groundseg/logger"
+    12		"groundseg/session"
+    13		"groundseg/structs"
+    14		"io"
+    15		"io/ioutil"
+    16		"os"
+    17		"path/filepath"
+    18		"regexp"
+    19		"strings"
+    20		"sync/atomic"
+
+thinking
+**Assessing abstraction overuse**
+exec
+/opt/homebrew/bin/zsh -lc "nl -ba goseg/structs/configs.go | sed -n '1,300p'" in /Users/chuah/NP/GroundSeg succeeded in 52ms:
+     1	package structs
+     2	
+     3	import (
+     4		"encoding/json"
+     5		"time"
+     6	)
+     7	
+     8	// system.json config struct
+     9	type SysConfig struct {
+    10		RemoteBackupPassword string   `json:"remoteBackupPassword"`
+    11		GracefulExit         bool     `json:"gracefulExit"`
+    12		LastKnownMDNS        string   `json:"lastKnownMDNS"`
+    13		Setup                string   `json:"setup"`
+    14		EndpointUrl          string   `json:"endpointUrl"`
+    15		ApiVersion           string   `json:"apiVersion"`
+    16		Piers                []string `json:"piers"`
+    17		NetCheck             string   `json:"netCheck"`
+    18		UpdateMode           string   `json:"updateMode"`
+    19		UpdateUrl            string   `json:"updateUrl"`
+    20		UpdateBranch         string   `json:"updateBranch"`
+
+thinking
+**Planning detailed abstraction findings**
+codex
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules implement large function-bag runtimes plus default/merge helpers (e.g., `StartupRuntime` and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`, `RectifyRuntime` in `goseg/rectify/rectify.go`, `importerRuntime` in `goseg/importer/importer.go`).",
+        "Two orchestration layers duplicate similar dependency surfaces (`WireguardRuntime`/`UrbitRuntime` in `goseg/docker/orchestration/runtime_docker.go` and `Runtime*Ops` families in `goseg/docker/orchestration/runtime_ops.go`), increasing adapter count and translation paths.",
+        "Some wrappers are nearly pure delegation without additional policy (e.g., many `*WithRuntime` and service pass-through methods in `goseg/system/wifi.go`, plus top-level wrappers in `goseg/docker/network/network.go`).",
+        "Large shared config models (`structs.SysConfig`, embedded `structs.UrbitDocker`) remain broad and cross-cutting (`goseg/structs/configs.go`), while parallel snapshot structs exist in `goseg/config/config.go`, indicating mixed abstraction boundaries rather than one cohesive domain API."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 49.0,
+        "interface_honesty": 76.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bag_overgrowth",
+      "summary": "Runtime dependency injection is implemented as repeated large function bags across modules, creating architectural indirection with limited domain leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartupRuntime` embeds multiple runtime structs with many callback fields and relies on `seams.Merge` defaults (`goseg/startuporchestrator/startup_orchestrator.go`).",
+        "`workflowRuntime` similarly embeds multiple callback groups and repeatedly normalizes via `withDefaultsWorkflowRuntime` (`goseg/shipworkflow/operations_runtime.go`).",
+        "`importerRuntime` and `RectifyRuntime` repeat the same pattern: callback bags + nil-guard checks + default builders (`goseg/importer/importer.go`, `goseg/rectify/rectify.go`).",
+        "`main.go` introduces another runtime family (`bootstrapRuntime`, `c2cRuntime`, context structs), extending the same abstraction style at application entrypoint."
+      ],
+      "suggestion": "Define narrower domain services (e.g., `StartupService`, `TransitionService`, `ImportService`) with cohesive method sets and one composition root; keep seam structs internal to tests or construction boundaries rather than passing callback bags through operational code.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_orchestration_adapters",
+      "summary": "Docker orchestration maintains parallel adapter surfaces that map the same dependencies twice, increasing drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`runtime_docker.go` defines `dockerRuntime` plus exported runtime structs (`WireguardRuntime`, `UrbitRuntime`) and conversion functions like `wireguardRuntimeFromDocker`/`urbitRuntimeFromDocker`.",
+        "`runtime_ops.go` independently defines `RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc., with overlapping callbacks to the same config/docker functions.",
+        "Both files include separate default constructors that wire the same dependencies (config updates, container operations, network lookups), creating duplicated abstraction layers.",
+        "`runtime_seams_test.go` contains extensive stubs for these parallel surfaces, indicating non-trivial maintenance overhead from duplicate seam APIs."
+      ],
+      "suggestion": "Unify on a single orchestration runtime contract (or a small set of explicit service interfaces) and remove one adapter family; generate or centrally derive specialized views instead of hand-maintaining parallel structs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_chains",
+      "summary": "Several wrapper functions add call depth without behavior, policy, or translation, reducing abstraction payoff.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/docker/network/network.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`wifi.go` defines many wrappers that immediately call `newWiFiService(...).method` (`ifCheckWithRuntime`, `getWifiDeviceWithRuntime`, `ConnectToWifiWithRuntime`, `runCommandWithRuntime`, etc.) with minimal additional semantics.",
+        "`wifiOperations` includes methods (`runCommand`, `execCommand`, `newClient`, `clientInterfaces`, `clientBSS`) that mostly forward directly to runtime function fields.",
+        "`network.go` top-level `CreateVolume`/`DeleteVolume` are thin pass-throughs into `NewNetworkRuntime()` methods, adding a wrapper layer without policy.",
+        "`main.go` contains wrapper construction (`defaultBootstrapRuntime` + `defaultBootstrapRuntimeBase` + `bootstrapRuntimeWith`) that duplicates delegation paths for the same actions."
+      ],
+      "suggestion": "Collapse trivial wrappers by keeping either direct package functions or a focused service object (not both); reserve wrappers for places enforcing concrete policy (validation, retries, metrics, or translation).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_boundary_leakage",
+      "summary": "Broad config models are still a cross-module dependency backbone despite newer snapshot abstractions, leaving boundaries mixed.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` and embedded `structs.UrbitDocker` remain very wide and multi-concern in `goseg/structs/configs.go`.",
+        "`config/config.go` introduces narrower snapshot abstractions (`ShipSettings`, `ConnectivitySettings`, `RuntimeContext`), but downstream runtimes still frequently wire broad config callbacks directly (e.g., `UrbitConfFn`, many `UpdateUrbit*` callbacks).",
+        "`defaults/defaults.go` initializes large default config payloads directly from these broad structs, reinforcing single-object coupling.",
+        "`collectors.go` and `runtime_ops.go` continue to pull mixed concerns from config/orchestration through large callback sets rather than focused domain services."
+      ],
+      "suggestion": "Introduce stable, bounded domain ports for each concern (runtime context, ship state, startram state, update policy) and progressively retire direct dependencies on broad config aggregates in orchestration/collector paths.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_as_global_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams evolved into primary production abstraction style, creating callback-bag proliferation.",
+      "Config/state access patterns are still organized around broad shared structs, so narrower view models are only partially adopted."
+    ],
+    "likely_symptoms": [
+      "duplicate_orchestration_adapters",
+      "pass_through_wrapper_chains"
+    ],
+    "possible_false_positives": []
+  }
+}
+tokens used
+95,248
+

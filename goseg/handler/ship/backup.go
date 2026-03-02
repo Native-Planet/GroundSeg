@@ -13,7 +13,7 @@ import (
 
 var (
 	runTransitionedOperationForBackupService = shipworkflow.RunTransitionedOperation
-	persistShipConfForBackupService          = shipworkflow.PersistUrbitConfigValue
+	persistShipBackupConfigForBackupService  = config.UpdateUrbitBackupConfig
 	publishUrbitTransitionForBackupService   = events.PublishUrbitTransition
 	sleepForBackupService                    = time.Sleep
 	createLocalBackupForBackupService        = backupsvc.CreateLocalBackup
@@ -24,7 +24,7 @@ var (
 func handleLocalToggleBackup(patp string) error {
 	return runTransitionedOperationForBackupService(patp, "localTlonBackupsEnabled", "loading", "", 0, func() error {
 		conf := config.UrbitConf(patp)
-		if err := persistShipConfForBackupService(patp, func(updated *structs.UrbitDocker) error {
+		if err := persistShipBackupConfigForBackupService(patp, func(updated *structs.UrbitBackupConfig) error {
 			updated.LocalTlonBackup = !conf.LocalTlonBackup
 			return nil
 		}); err != nil {
@@ -37,7 +37,7 @@ func handleLocalToggleBackup(patp string) error {
 func handleStartramToggleBackup(patp string) error {
 	return runTransitionedOperationForBackupService(patp, "remoteTlonBackupsEnabled", "loading", "", 0, func() error {
 		conf := config.UrbitConf(patp)
-		if err := persistShipConfForBackupService(patp, func(updated *structs.UrbitDocker) error {
+		if err := persistShipBackupConfigForBackupService(patp, func(updated *structs.UrbitBackupConfig) error {
 			updated.RemoteTlonBackup = !conf.RemoteTlonBackup
 			return nil
 		}); err != nil {
@@ -74,7 +74,7 @@ func handleScheduleLocalBackup(patp string, urbitPayload structs.WsUrbitPayload)
 		publishUrbitTransitionForBackupService(structs.UrbitTransition{Patp: patp, Type: "localTlonBackupSchedule", Event: text})
 		return fmt.Errorf("%s", text)
 	}
-	if err := persistShipConfForBackupService(patp, func(conf *structs.UrbitDocker) error {
+	if err := persistShipBackupConfigForBackupService(patp, func(conf *structs.UrbitBackupConfig) error {
 		conf.BackupTime = backupTime
 		return nil
 	}); err != nil {

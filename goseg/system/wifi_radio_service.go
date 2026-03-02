@@ -2,9 +2,9 @@ package system
 
 import (
 	"fmt"
-	"groundseg/structs"
 
 	"go.uber.org/zap"
+	"groundseg/structs"
 )
 
 type wifiRadioService interface {
@@ -19,25 +19,25 @@ type wifiRadioService interface {
 type nmcliWiFiRadioService struct{}
 
 func (nmcliWiFiRadioService) PrimaryDevice() (string, error) {
-	return primaryWifiDevice()
+	return defaultWiFiService.primaryWifiDevice()
 }
 
 func (nmcliWiFiRadioService) RefreshInfo(device string) {
-	info := structs.SystemWifi{
-		Status: false,
-	}
-	wifiEnabled, err := ifCheckForWiFi()
+	info := structs.SystemWifi{Status: false}
+	wifiEnabled, err := defaultWiFiService.ifCheck()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't read wifi radio state: %v", err))
 		setWifiInfo(info)
 		return
 	}
+
 	info.Status = wifiEnabled
 	if !info.Status {
 		setWifiInfo(info)
 		return
 	}
-	client, err := wifiNewClientForWiFi()
+
+	client, err := defaultWiFiService.runtime.newWifiClient()
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Couldn't create wifi client with device %v: %v", device, err))
 		info.Status = false
@@ -46,41 +46,43 @@ func (nmcliWiFiRadioService) RefreshInfo(device string) {
 	}
 	defer client.Close()
 
-	active, err := getConnectedSSID(client, device)
+	active, err := defaultWiFiService.connectedSSID(client, device)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("couldn't get active SSID for %s: %v", device, err))
 		info.Active = ""
 	} else {
 		info.Active = active
 	}
-	ssids, err := ListWifiSSIDs(device)
+
+	ssids, err := defaultWiFiService.listSSIDs(device)
 	if err != nil {
 		zap.L().Error(err.Error())
 		info.Networks = []string{}
 	} else {
 		info.Networks = ssids
 	}
+
 	setWifiInfo(info)
 }
 
 func (nmcliWiFiRadioService) Enable() error {
-	if _, err := runCommandForWiFi("nmcli", "radio", "wifi", "on"); err != nil {
+	if _, err := defaultWiFiService.runtime.runCommand("nmcli", "radio", "wifi", "on"); err != nil {
 		return fmt.Errorf("enable wifi radio: %w", err)
 	}
 	return nil
 }
 
 func (nmcliWiFiRadioService) SetLinkUp(device string) error {
-	if _, err := runCommandForWiFi("sudo", "ip", "link", "set", device, "up"); err != nil {
+	if _, err := defaultWiFiService.runtime.runCommand("sudo", "ip", "link", "set", device, "up"); err != nil {
 		return fmt.Errorf("set ip link for device %s: %w", device, err)
 	}
 	return nil
 }
 
 func (nmcliWiFiRadioService) ListSSIDs(device string) ([]string, error) {
-	return ListWifiSSIDs(device)
+	return defaultWiFiService.listSSIDs(device)
 }
 
 func (nmcliWiFiRadioService) Connect(ssid, password string) error {
-	return ConnectToWifi(ssid, password)
+	return defaultWiFiService.connect(ssid, password)
 }

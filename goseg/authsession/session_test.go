@@ -134,7 +134,7 @@ func TestSessionStoreAddToAuthMapRollsBackOnPersistFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected persist failure to be surfaced")
 	}
-	if len(cm.AuthClients["token-id"]) > 0 {
+	if got := cm.AuthClientCount("token-id"); got > 0 {
 		t.Fatalf("expected rollback on persist failure, but auth map was mutated")
 	}
 
@@ -142,7 +142,7 @@ func TestSessionStoreAddToAuthMapRollsBackOnPersistFailure(t *testing.T) {
 	if err := store.AddToAuthMap(conn, map[string]string{"id": "token-id", "token": "token-value"}, true); err != nil {
 		t.Fatalf("expected successful mutation after persist succeeds: %v", err)
 	}
-	if len(cm.AuthClients["token-id"]) != 1 {
+	if got := cm.AuthClientCount("token-id"); got != 1 {
 		t.Fatalf("expected one auth client after successful persist")
 	}
 }
@@ -169,7 +169,7 @@ func TestSessionStoreAddToAuthMapConcurrentAddsAreDeduplicated(t *testing.T) {
 	}
 	wg.Wait()
 
-	if got := len(cm.UnauthClients["token-id"]); got != 1 {
+	if got := cm.UnauthClientCount("token-id"); got != 1 {
 		t.Fatalf("expected single client entry after deduplicated concurrent adds, got %d", got)
 	}
 }

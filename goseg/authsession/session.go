@@ -103,14 +103,10 @@ func (store *sessionStore) AddToAuthMap(conn *websocket.Conn, token map[string]s
 func (store *sessionStore) RemoveFromAuthMap(tokenID string, fromAuthorized bool) {
 	cm := store.getClientManager()
 	if fromAuthorized {
-		cm.Mu.Lock()
-		delete(cm.AuthClients, tokenID)
-		cm.Mu.Unlock()
+		cm.RemoveAuthorizedToken(tokenID)
 		return
 	}
-	cm.Mu.Lock()
-	delete(cm.UnauthClients, tokenID)
-	cm.Mu.Unlock()
+	cm.RemoveUnauthorizedToken(tokenID)
 }
 
 func defaultTokenHash(tokenValue string) string {

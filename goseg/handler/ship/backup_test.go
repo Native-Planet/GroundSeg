@@ -17,7 +17,7 @@ import (
 func resetBackupServiceSeams() {
 	backupDirForBackupService = func() string { return backupsvc.ResolveBackupRoot(config.BasePath()) }
 	runTransitionedOperationForBackupService = shipworkflow.RunTransitionedOperation
-	persistShipConfForBackupService = shipworkflow.PersistUrbitConfigValue
+	persistShipBackupConfigForBackupService = config.UpdateUrbitBackupConfig
 	publishUrbitTransitionForBackupService = events.PublishUrbitTransition
 	sleepForBackupService = time.Sleep
 	createLocalBackupForBackupService = backupsvc.CreateLocalBackup
@@ -30,9 +30,9 @@ func TestHandleToggleBackupPersistsFlippedFlags(t *testing.T) {
 	runTransitionedOperationForBackupService = func(_ string, _ string, _ string, _ string, _ time.Duration, op func() error) error {
 		return op()
 	}
-	var localSaved, remoteSaved structs.UrbitDocker
-	persistShipConfForBackupService = func(_ string, mutate func(*structs.UrbitDocker) error) error {
-		conf := structs.UrbitDocker{}
+	var localSaved, remoteSaved structs.UrbitBackupConfig
+	persistShipBackupConfigForBackupService = func(_ string, mutate func(*structs.UrbitBackupConfig) error) error {
+		conf := structs.UrbitBackupConfig{}
 		if err := mutate(&conf); err != nil {
 			return err
 		}
@@ -114,9 +114,9 @@ func TestHandleScheduleLocalBackupValidationAndPersist(t *testing.T) {
 		t.Fatalf("expected invalid time format error")
 	}
 
-	var saved structs.UrbitDocker
-	persistShipConfForBackupService = func(_ string, mutate func(*structs.UrbitDocker) error) error {
-		conf := structs.UrbitDocker{}
+	var saved structs.UrbitBackupConfig
+	persistShipBackupConfigForBackupService = func(_ string, mutate func(*structs.UrbitBackupConfig) error) error {
+		conf := structs.UrbitBackupConfig{}
 		if err := mutate(&conf); err != nil {
 			return err
 		}

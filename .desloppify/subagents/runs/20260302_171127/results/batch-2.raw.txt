@@ -1,0 +1,129 @@
+{
+  "batch": "Design coherence — Mechanical Concern Signals",
+  "batch_index": 2,
+  "assessments": {
+    "design_coherence": 68.0
+  },
+  "dimension_notes": {
+    "design_coherence": {
+      "evidence": [
+        "goseg/system/wifi.go exposes many near-duplicate pass-through entrypoints in paired default/with-runtime forms (e.g., ListWifiSSIDs/ListWifiSSIDsWithRuntime, ConnectToWifi/ConnectToWifiWithRuntime, ToggleDevice/ToggleDeviceWithRuntime, runCommandForWiFi/runCommandWithRuntime at lines 360-452).",
+        "Docker orchestration runtime dependencies are represented in multiple overlapping structs and adapters across runtime_ops.go, runtime_core.go, and runtime_docker.go, duplicating container/urbit/config function seams and wiring.",
+        "goseg/rectify/rectify.go duplicates identical startram router construction for multiple event types (Restart/Endpoint/Toggle/Register all create the same startramTransitionCommand with NewStartramTransitionService(runtime)).",
+        "Session lifecycle responsibilities are concentrated and mixed across goseg/session/ws.go and goseg/session/session.go, combining connection registry mutation, sentinel/fake-connection insertion, broadcast delivery, and logstream state synchronization."
+      ],
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "confidence": "high"
+    }
+  },
+  "findings": [
+    {
+      "dimension": "design_coherence",
+      "identifier": "runtime_seam_duplication_orchestration",
+      "summary": "Orchestration runtime seams are duplicated across parallel structs, increasing coupling and edit fan-out for one behavioral change.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_core.go",
+        "goseg/docker/orchestration/runtime_docker.go"
+      ],
+      "evidence": [
+        "RuntimeContainerOps (runtime_ops.go) and dockerRuntimeContainerOps (runtime_docker.go) both carry overlapping fields like StartContainerFn, StopContainerByNameFn, CreateContainerFn, and UpdateContainerStateFn.",
+        "NewDockerTransitionRuntime/NewDockerHealthRuntime (runtime_core.go) and urbitRuntimeFromDocker/wireguardRuntimeFromDocker (runtime_docker.go) re-map largely the same dependency graph through different adapter layers.",
+        "newDockerRuntime and defaultRuntime* constructors each wire similar config/docker/network dependencies separately, requiring synchronized edits."
+      ],
+      "suggestion": "Converge on a single canonical runtime dependency model for orchestration and generate narrower views from it via typed projections/helpers, removing duplicate seam structs and repetitive field copying.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "wifi_wrapper_layer_bloat",
+      "summary": "WiFi module exposes an oversized wrapper surface with repetitive default/with-runtime forwarding, obscuring the true API boundary.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/system/wifi_test.go"
+      ],
+      "evidence": [
+        "wifi.go defines many paired pass-through functions around the same service methods (e.g., lines 360-452 include ListWifiSSIDs/ListWifiSSIDsWithRuntime, ConnectToWifi/ConnectToWifiWithRuntime, ToggleDevice/ToggleDeviceWithRuntime, multiple run/exec/client wrappers).",
+        "Tests rely on this widened wrapper surface via runtime-specific helper paths (e.g., getWifiDeviceWithRuntime, getConnectedSSIDWithRuntime), reinforcing duplicated entrypoints instead of a single cohesive service interface."
+      ],
+      "suggestion": "Collapse wrappers into one exported service API (or small interface) with dependency injection at construction time; keep only one test seam per operation and remove duplicate default/with-runtime forwarding helpers.",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "rectify_router_repetition",
+      "summary": "Startram transition routing repeats identical handler construction for multiple event types instead of using a shared factory pattern.",
+      "related_files": [
+        "goseg/rectify/rectify.go",
+        "goseg/protocol/actions/actions.go"
+      ],
+      "evidence": [
+        "rectifyStartramTransitionRouters in rectify.go (lines 388-410) repeats the same `startramTransitionCommand{event, NewStartramTransitionService(runtime)}` body for Restart, Endpoint, Toggle, and Register.",
+        "actions.go already models action metadata in data tables, showing a contrasting data-driven approach that reduce switch/router duplication in protocol mapping."
+      ],
+      "suggestion": "Replace repeated router entries with a shared constructor for service-backed startram events (or a grouped registration helper), leaving only genuinely distinct handlers in the map.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "single_edit",
+      "root_cause_cluster": "imperative_mapping_duplication"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "session_manager_mixed_responsibilities",
+      "summary": "Session management combines incompatible concerns (registry, lifecycle transitions, broadcast transport, and placeholder-state handling) in one mutable manager.",
+      "related_files": [
+        "goseg/session/ws.go",
+        "goseg/session/session.go"
+      ],
+      "evidence": [
+        "ClientManager in ws.go owns connection maps, state transitions, write-failure cleanup, and broadcast fanout in the same type.",
+        "transitionClientStateLocked triggers enqueueFakeConnIfNilOrUnconnected, inserting synthetic MuConn placeholders (`fakeConn := &MuConn{}`) into auth/unauth maps (ws.go lines 226-255), blending testing/placeholder behavior into production state transitions.",
+        "session.go maintains separate global logstream runtime state and mutable session slices/maps, creating overlapping state ownership between logstream/session state and websocket manager behavior."
+      ],
+      "suggestion": "Split session registry, broadcast delivery, and lifecycle transition policy into separate components; eliminate fake-connection insertion from core state transitions and move it to explicit test helpers/mocks.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "state_owner_conflation"
+    },
+    {
+      "dimension": "design_coherence",
+      "identifier": "test_runtime_literal_duplication",
+      "summary": "Large runtime literals are repeatedly re-specified across tests, indicating missing test-fixture abstraction and raising maintenance cost.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator_test.go",
+        "goseg/accesspoint/accesspoint_test.go",
+        "goseg/main_test.go"
+      ],
+      "evidence": [
+        "startup_orchestrator_test.go repeatedly constructs deeply nested runtime structs with many callback fields across multiple tests.",
+        "accesspoint_test.go and main_test.go both include repeated save/restore-global-state helper patterns and runtime-assembly logic instead of reusable fixture builders."
+      ],
+      "suggestion": "Introduce package-level test fixture builders with focused override options (functional options pattern) to centralize default runtime callbacks and global-state reset behavior.",
+      "confidence": "medium",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "test_fixture_fragmentation"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Runtime seam fragmentation created parallel dependency structs and wrapper layers instead of one stable boundary.",
+      "Imperative per-case mapping is used where data-driven registration/factory patterns would reduce duplication.",
+      "State ownership is diffused across global singletons and mutable managers, encouraging mixed responsibilities."
+    ],
+    "likely_symptoms": [
+      "wifi_wrapper_layer_bloat",
+      "rectify_router_repetition",
+      "test_runtime_literal_duplication"
+    ],
+    "possible_false_positives": []
+  }
+}

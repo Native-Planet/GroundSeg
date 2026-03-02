@@ -112,34 +112,14 @@ func ensureSessionKeyExists() error {
 }
 
 func persistConfig(configStruct structs.SysConfig) error {
-	configMap, err := structToMap(configStruct)
+	payload, err := json.MarshalIndent(configStruct, "", "    ")
 	if err != nil {
-		return fmt.Errorf("serialize config structure: %w", err)
+		return fmt.Errorf("encode config structure: %w", err)
 	}
-	return persistConf(configMap)
-}
-
-func structToMap(configStruct structs.SysConfig) (map[string]interface{}, error) {
-	configBytes, err := json.Marshal(configStruct)
-	if err != nil {
-		return nil, fmt.Errorf("marshal config struct: %w", err)
-	}
-	configMap := make(map[string]interface{})
-	if err := json.Unmarshal(configBytes, &configMap); err != nil {
-		return nil, fmt.Errorf("unmarshal config map: %w", err)
-	}
-	return configMap, nil
-}
-
-func persistConf(configMap map[string]interface{}) error {
-	updatedJSON, err := json.MarshalIndent(configMap, "", "    ")
-	if err != nil {
-		return fmt.Errorf("error encoding JSON: %w", err)
-	}
-	if err := json.Unmarshal(updatedJSON, &globalConfig); err != nil {
+	if err := json.Unmarshal(payload, &globalConfig); err != nil {
 		return fmt.Errorf("error updating global config: %w", err)
 	}
-	if err := persistConfigJSON(ConfigFilePath(), updatedJSON); err != nil {
+	if err := persistConfigJSON(ConfigFilePath(), payload); err != nil {
 		return fmt.Errorf("persist configuration file: %w", err)
 	}
 	return nil

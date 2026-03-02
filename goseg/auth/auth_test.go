@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"groundseg/structs"
 	"testing"
 )
 
@@ -9,17 +10,17 @@ func TestNewClientManagerInitializesMaps(t *testing.T) {
 	if manager == nil {
 		t.Fatal("expected manager instance")
 	}
-	if manager.AuthClients == nil {
-		t.Fatal("expected auth clients map to be initialized")
+	if count := manager.AuthClientCount("test-token"); count != 0 {
+		t.Fatalf("expected auth clients bucket for unknown token to be empty, got %d", count)
 	}
-	if manager.UnauthClients == nil {
-		t.Fatal("expected unauth clients map to be initialized")
+	if count := manager.UnauthClientCount("test-token"); count != 0 {
+		t.Fatalf("expected unauth clients bucket for unknown token to be empty, got %d", count)
 	}
 }
 
 func TestTokenIdAuthed(t *testing.T) {
 	manager := NewClientManager()
-	manager.AuthClients["token-1"] = nil
+	manager.AddAuthClient("token-1", &structs.MuConn{})
 
 	if !TokenIdAuthed(manager, "token-1") {
 		t.Fatal("expected existing token to be authed")

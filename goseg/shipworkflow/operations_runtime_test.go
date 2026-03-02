@@ -70,7 +70,7 @@ func TestPublishTransitionWithPolicy(t *testing.T) {
 	var events []int
 	runtime := workflowRuntime{
 		EmitTransitionFn: func(string, string, string) {},
-		SleepFn:          func(time.Duration) {},
+		SleepFn:         func(time.Duration) {},
 	}
 	publish := func(value int) {
 		events = append(events, value)

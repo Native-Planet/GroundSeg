@@ -18,8 +18,8 @@ func resetChopSvcSeams() {
 	}
 	barExitFn = func(string) error { return nil }
 	stopContainerByNameFn = func(string) error { return nil }
-	updateUrbitFn = func(_ string, update func(*structs.UrbitDocker) error) error {
-		conf := structs.UrbitDocker{}
+	persistShipRuntimeConfigFn = func(_ string, update func(*structs.UrbitRuntimeConfig) error) error {
+		conf := structs.UrbitRuntimeConfig{}
 		return update(&conf)
 	}
 	startContainerFn = func(string, string) (structs.ContainerState, error) {
@@ -62,8 +62,8 @@ func TestChopPierRunningShipTransitionsToChopAndBackToBoot(t *testing.T) {
 		return nil
 	}
 	var savedBootStates []string
-	updateUrbitFn = func(_ string, update func(*structs.UrbitDocker) error) error {
-		conf := structs.UrbitDocker{}
+	persistShipRuntimeConfigFn = func(_ string, update func(*structs.UrbitRuntimeConfig) error) error {
+		conf := structs.UrbitRuntimeConfig{}
 		if err := update(&conf); err != nil {
 			return err
 		}

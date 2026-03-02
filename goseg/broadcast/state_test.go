@@ -2,6 +2,8 @@ package broadcast
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 
 	"groundseg/structs"
@@ -147,6 +149,27 @@ func TestGetStateJSONInjectsStructureMetadata(t *testing.T) {
 	}
 	if decoded["auth_level"] != "authorized" {
 		t.Fatalf("expected auth_level=authorized, got %v", decoded["auth_level"])
+	}
+}
+
+func TestGetStateJsonReturnsContextualErrorOnMarshalFailure(t *testing.T) {
+	badBroadcast := structs.AuthBroadcast{}
+	badUrbit := structs.Urbit{}
+	badUrbit.Info.Vere = func() {}
+	badBroadcast.Urbits = map[string]structs.Urbit{
+		"~zod": badUrbit,
+	}
+
+	_, err := GetStateJson(badBroadcast)
+	if err == nil {
+		t.Fatal("expected json marshal error for invalid broadcast payload")
+	}
+	if !strings.Contains(err.Error(), "marshalling broadcast state payload") {
+		t.Fatalf("expected contextual error message, got %v", err)
+	}
+	var unsupportedTypeErr *json.UnsupportedTypeError
+	if !errors.As(err, &unsupportedTypeErr) {
+		t.Fatalf("expected wrapped json unsupported type error, got %v", err)
 	}
 }
 

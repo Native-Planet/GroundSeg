@@ -13,42 +13,42 @@ import (
 
 func testMinIORuntime() dockerRuntime {
 	rt := newDockerRuntime()
-	rt.contextOps = dockerRuntimeContextOpsStub{
+	rt.contextOps = RuntimeContextOps{
 		BasePathFn:  func() string { return "/tmp" },
 		DockerDirFn: func() string { return "/tmp/docker" },
 	}
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, nil },
 		ReadFileFn:  func(string) ([]byte, error) { return nil, os.ErrNotExist },
 		WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(string, string) (structs.ContainerState, error) {
 			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
 		UpdateContainerStateFn:      func(string, structs.ContainerState) {},
 		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 	}
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo/image", "tag": "latest", "hash": "hash"}, nil
 		},
 	}
-	rt.configOps = dockerRuntimeConfigOpsStub{
+	rt.configOps = RuntimeSnapshotOps{
 		ConfFn: func() structs.SysConfig { return structs.SysConfig{} },
 	}
-	rt.urbitOps = dockerRuntimeUrbitOpsStub{
+	rt.urbitOps = RuntimeUrbitOps{
 		LoadUrbitConfigFn: func(string) error { return nil },
 		UrbitConfFn:       func(string) structs.UrbitDocker { return structs.UrbitDocker{} },
 		UpdateUrbitFn:     func(string, func(*structs.UrbitDocker) error) error { return nil },
 	}
-	rt.minioOps = dockerRuntimeMinioOpsStub{
+	rt.minioOps = RuntimeMinioOps{
 		CreateDefaultMcConfFn: func() error { return nil },
 		SetMinIOPasswordFn:    func(string, string) error { return nil },
 		GetMinIOPasswordFn:    func(string) (string, error) { return "secret", nil },
 	}
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		RandReadFn: func(dst []byte) (int, error) {
 			for i := range dst {
 				dst[i] = byte(i)
@@ -59,11 +59,11 @@ func testMinIORuntime() dockerRuntime {
 		ExecDockerCommandExitFn: func(string, []string) (string, int, error) { return "ok", 0, nil },
 		CopyFileToVolumeFn:      func(string, string, string, string, volumeWriterImageSelector) error { return nil },
 	}
-	rt.volumeOps = dockerRuntimeVolumeOps{
+	rt.volumeOps = RuntimeVolumeOps{
 		VolumeExistsFn: func(string) (bool, error) { return false, nil },
 		CreateVolumeFn: func(string) error { return nil },
 	}
-	rt.timerOps = dockerRuntimeTimerOpsStub{
+	rt.timerOps = RuntimeTimerOps{
 		SleepFn:        func(time.Duration) {},
 		PollIntervalFn: func() time.Duration { return 500 * time.Millisecond },
 	}
@@ -86,17 +86,17 @@ func TestGetPatpFromMinIOName(t *testing.T) {
 
 func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.configOps = dockerRuntimeConfigOpsStub{
+	rt.configOps = RuntimeSnapshotOps{
 		ConfFn: func() structs.SysConfig { return structs.SysConfig{WgRegistered: true} },
 	}
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, os.ErrNotExist },
 		ReadFileFn:  func(string) ([]byte, error) { return nil, os.ErrNotExist },
 		WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
 	defaultCalled := false
-	rt.minioOps = dockerRuntimeMinioOpsStub{
+	rt.minioOps = RuntimeMinioOps{
 		CreateDefaultMcConfFn: func() error {
 			defaultCalled = true
 			return nil
@@ -105,7 +105,7 @@ func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 		GetMinIOPasswordFn: func(string) (string, error) { return "", nil },
 	}
 	var startedName, startedType string
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
 			startedName, startedType = name, ctype
 			return structs.ContainerState{ActualStatus: "running"}, nil
@@ -130,13 +130,13 @@ func TestLoadMCStartsContainerWhenRegistered(t *testing.T) {
 
 func TestLoadMinIOsStartsPerPier(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.configOps = dockerRuntimeConfigOpsStub{
+	rt.configOps = RuntimeSnapshotOps{
 		ConfFn: func() structs.SysConfig {
 			return structs.SysConfig{WgRegistered: true, Piers: []string{"~zod", "~bus"}}
 		},
 	}
 	var started []string
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(name, ctype string) (structs.ContainerState, error) {
 			started = append(started, name+":"+ctype)
 			if strings.Contains(name, "~bus") {
@@ -159,7 +159,7 @@ func TestLoadMinIOsStartsPerPier(t *testing.T) {
 
 func TestMinioRuntimeFromDockerReturnsErrorWhenCopyRuntimeMissing(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.commandOps = dockerRuntimeCommandOpsStub{}
+	rt.commandOps = RuntimeCommandOps{}
 	minioRt := minioRuntimeFromDocker(rt)
 
 	err := minioRt.CopyFileToVolumeFn("/tmp/policy.json", "/data/", "minio_~zod", "mc_writer", func() (string, error) {
@@ -175,22 +175,28 @@ func TestMinioRuntimeFromDockerReturnsErrorWhenCopyRuntimeMissing(t *testing.T) 
 
 func TestMinioContainerConfBuildsExpectedConfig(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.urbitOps = dockerRuntimeUrbitOpsStub{
+	rt.urbitOps = RuntimeUrbitOps{
 		LoadUrbitConfigFn: func(string) error { return nil },
 		UrbitConfFn: func(string) structs.UrbitDocker {
-			return structs.UrbitDocker{WgURL: "ship.example", WgS3Port: 9000, WgConsolePort: 9001}
+			return structs.UrbitDocker{
+				UrbitNetworkConfig: structs.UrbitNetworkConfig{
+					WgURL:         "ship.example",
+					WgS3Port:      9000,
+					WgConsolePort: 9001,
+				},
+			}
 		},
 		UpdateUrbitFn: func(string, func(*structs.UrbitDocker) error) error {
 			return nil
 		},
 	}
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo/minio", "tag": "latest", "hash": "abcd"}, nil
 		},
 	}
 	var storedName, storedPwd string
-	rt.minioOps = dockerRuntimeMinioOpsStub{
+	rt.minioOps = RuntimeMinioOps{
 		SetMinIOPasswordFn: func(name, pwd string) error {
 			storedName = name
 			storedPwd = pwd
@@ -226,13 +232,13 @@ func TestMinioContainerConfInvalidName(t *testing.T) {
 
 func TestMCContainerConfPollsUntilWireguardUp(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo/mc", "tag": "latest", "hash": "hash"}, nil
 		},
 	}
 	calls := 0
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		GetContainerRunningStatusFn: func(string) (string, error) {
 			calls++
 			if calls < 2 {
@@ -242,7 +248,7 @@ func TestMCContainerConfPollsUntilWireguardUp(t *testing.T) {
 		},
 	}
 	sleepCalls := 0
-	rt.timerOps = dockerRuntimeTimerOpsStub{
+	rt.timerOps = RuntimeTimerOps{
 		SleepFn:        func(time.Duration) { sleepCalls++ },
 		PollIntervalFn: func() time.Duration { return 500 * time.Millisecond },
 	}
@@ -262,27 +268,33 @@ func TestMCContainerConfPollsUntilWireguardUp(t *testing.T) {
 func TestSetMinIOAdminAccountSuccess(t *testing.T) {
 	rt := testMinIORuntime()
 	tmpDockerDir := t.TempDir()
-	rt.contextOps = dockerRuntimeContextOpsStub{
+	rt.contextOps = RuntimeContextOps{
 		DockerDirFn: func() string { return tmpDockerDir },
 	}
-	rt.urbitOps = dockerRuntimeUrbitOpsStub{
-		UrbitConfFn: func(string) structs.UrbitDocker { return structs.UrbitDocker{WgS3Port: 9000} },
+	rt.urbitOps = RuntimeUrbitOps{
+		UrbitConfFn: func(string) structs.UrbitDocker {
+			return structs.UrbitDocker{
+				UrbitNetworkConfig: structs.UrbitNetworkConfig{
+					WgS3Port: 9000,
+				},
+			}
+		},
 	}
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		GetContainerRunningStatusFn: func(string) (string, error) { return "Up", nil },
 	}
-	rt.minioOps = dockerRuntimeMinioOpsStub{
+	rt.minioOps = RuntimeMinioOps{
 		GetMinIOPasswordFn: func(string) (string, error) { return "secret", nil },
 	}
 	var commands [][]string
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		ExecDockerCommandExitFn: func(_ string, cmd []string) (string, int, error) {
 			commands = append(commands, append([]string(nil), cmd...))
 			return "ok", 0, nil
 		},
 	}
 	var scriptPath string
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		WriteFileFn: func(path string, _ []byte, _ os.FileMode) error {
 			scriptPath = path
 			return nil
@@ -307,7 +319,7 @@ func TestSetMinIOAdminAccountSuccess(t *testing.T) {
 func TestCreateMinIOServiceAccountFlow(t *testing.T) {
 	rt := testMinIORuntime()
 	calls := 0
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		RandReadFn: func(dst []byte) (int, error) {
 			for i := range dst {
 				dst[i] = 0xAA
@@ -325,7 +337,7 @@ func TestCreateMinIOServiceAccountFlow(t *testing.T) {
 			return "service account created", 0, nil
 		},
 	}
-		svc, err := createMinIOServiceAccountWithRuntime(minioRuntimeFromDocker(rt), "~zod")
+	svc, err := createMinIOServiceAccountWithRuntime(minioRuntimeFromDocker(rt), "~zod")
 	if err != nil {
 		t.Fatalf("CreateMinIOServiceAccount failed: %v", err)
 	}
@@ -336,7 +348,7 @@ func TestCreateMinIOServiceAccountFlow(t *testing.T) {
 
 func TestCreateMinIOServiceAccountErrors(t *testing.T) {
 	rt := testMinIORuntime()
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		RandReadFn:          func(dst []byte) (int, error) { return len(dst), nil },
 		ExecDockerCommandFn: func(string, []string) (string, error) { return "", errors.New("docker failed") },
 		ExecDockerCommandExitFn: func(string, []string) (string, int, error) {
@@ -348,7 +360,7 @@ func TestCreateMinIOServiceAccountErrors(t *testing.T) {
 	}
 
 	calls := 0
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		RandReadFn: func(dst []byte) (int, error) { return len(dst), nil },
 		ExecDockerCommandExitFn: func(string, []string) (string, int, error) {
 			calls++
@@ -358,7 +370,7 @@ func TestCreateMinIOServiceAccountErrors(t *testing.T) {
 			return "service account created", 0, nil
 		},
 	}
-		_, err := createMinIOServiceAccountWithRuntime(minioRuntimeFromDocker(rt), "~zod")
+	_, err := createMinIOServiceAccountWithRuntime(minioRuntimeFromDocker(rt), "~zod")
 	if err != nil {
 		t.Fatalf("expected remove step warning only and add step success, got %v", err)
 	}

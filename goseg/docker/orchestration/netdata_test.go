@@ -1,7 +1,6 @@
 package orchestration
 
 import (
-	"groundseg/docker/orchestration/container"
 	"errors"
 	"groundseg/structs"
 	"os"
@@ -12,27 +11,27 @@ import (
 
 func testNetdataRuntime() dockerRuntime {
 	rt := newDockerRuntime()
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		OpenFn:      func(string) (*os.File, error) { return nil, nil },
 		ReadFileFn:  func(string) ([]byte, error) { return nil, os.ErrNotExist },
 		WriteFileFn: func(string, []byte, os.FileMode) error { return nil },
 		MkdirAllFn:  func(string, os.FileMode) error { return nil },
 	}
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(string, string) (structs.ContainerState, error) {
 			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
 	}
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo/netdata", "tag": "stable", "hash": "abcd"}, nil
 		},
 		GetLatestContainerImageFn: func(string) (string, error) { return "netdata:latest", nil },
 	}
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		CopyFileToVolumeFn: func(string, string, string, string, volumeWriterImageSelector) error { return nil },
 	}
-	rt.volumeOps = dockerRuntimeVolumeOps{
+	rt.volumeOps = RuntimeVolumeOps{
 		VolumeExistsFn: func(string) (bool, error) { return false, nil },
 		CreateVolumeFn: func(string) error { return nil },
 	}
@@ -41,7 +40,7 @@ func testNetdataRuntime() dockerRuntime {
 
 func TestNetdataContainerConfBuildsExpectedConfig(t *testing.T) {
 	rt := testNetdataRuntime()
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerInfoFn: func(string) (map[string]string, error) {
 			return map[string]string{"repo": "repo/netdata", "tag": "stable", "hash": "abcd"}, nil
 		},
@@ -68,8 +67,8 @@ func TestNetdataContainerConfBuildsExpectedConfig(t *testing.T) {
 func TestWriteNDConfCreatesAndPreservesContent(t *testing.T) {
 	rt := testNetdataRuntime()
 	tmpDockerDir := t.TempDir()
-	rt.contextOps = dockerRuntimeContextOpsStub{DockerDirFn: func() string { return tmpDockerDir }}
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.contextOps = RuntimeContextOps{DockerDirFn: func() string { return tmpDockerDir }}
+	rt.fileOps = RuntimeFileOps{
 		ReadFileFn:  func(string) ([]byte, error) { return nil, os.ErrNotExist },
 		WriteFileFn: os.WriteFile,
 		MkdirAllFn:  os.MkdirAll,
@@ -95,15 +94,15 @@ func TestWriteNDConfCreatesAndPreservesContent(t *testing.T) {
 func TestWriteNDConfToFileFallsBackToVolumeCopy(t *testing.T) {
 	rt := testNetdataRuntime()
 	writeAttempts := 0
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		WriteFileFn: func(string, []byte, os.FileMode) error {
 			writeAttempts++
 			return errors.New("write failed")
 		},
 		MkdirAllFn: func(string, os.FileMode) error { return nil },
 	}
-	rt.containerOps = dockerRuntimeContainerOpsStub{}
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.containerOps = RuntimeContainerOps{}
+	rt.commandOps = RuntimeCommandOps{
 		CopyFileToVolumeFn: func(filePath string, targetPath string, volumeName string, _ string, _ volumeWriterImageSelector) error {
 			if !strings.Contains(targetPath, "/etc/netdata/") || volumeName != "netdata" {
 				t.Fatalf("unexpected copy args: %s %s %s", filePath, targetPath, volumeName)
@@ -122,20 +121,20 @@ func TestWriteNDConfToFileFallsBackToVolumeCopy(t *testing.T) {
 
 func TestLoadNetdataFlowAndStartError(t *testing.T) {
 	rt := testNetdataRuntime()
-	rt.fileOps = dockerRuntimeFileOpsStub{
+	rt.fileOps = RuntimeFileOps{
 		OpenFn: func(string) (*os.File, error) { return nil, os.ErrNotExist },
 	}
 	defaultCalled := false
 	writeCalled := false
-	rt.netdataOps = dockerRuntimeNetdataOpsStub{
+	rt.netdataOps = RuntimeNetdataOps{
 		CreateDefaultNetdataConfFn: func() error { defaultCalled = true; return nil },
-		WriteNDConfFn: func(_ container.NetdataRuntime) error {
+		WriteNDConfFn: func() error {
 			writeCalled = true
 			return nil
 		},
 	}
 	updated := false
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(string, string) (structs.ContainerState, error) {
 			return structs.ContainerState{ActualStatus: "running"}, nil
 		},
@@ -153,7 +152,7 @@ func TestLoadNetdataFlowAndStartError(t *testing.T) {
 		t.Fatalf("expected default/write/update flow, got default=%v write=%v updated=%v", defaultCalled, writeCalled, updated)
 	}
 
-	rt.containerOps = dockerRuntimeContainerOpsStub{
+	rt.containerOps = RuntimeContainerOps{
 		StartContainerFn: func(string, string) (structs.ContainerState, error) {
 			return structs.ContainerState{}, errors.New("start failed")
 		},
@@ -166,7 +165,7 @@ func TestLoadNetdataFlowAndStartError(t *testing.T) {
 func TestCopyNDFileToVolumeDelegatesToVolumeWriter(t *testing.T) {
 	rt := testNetdataRuntime()
 	var gotPath, gotTarget, gotVolume, gotWriter, gotImage string
-	rt.commandOps = dockerRuntimeCommandOpsStub{
+	rt.commandOps = RuntimeCommandOps{
 		CopyFileToVolumeFn: func(filePath string, targetPath string, volumeName string, writer string, selectImage volumeWriterImageSelector) error {
 			gotPath = filePath
 			gotTarget = targetPath
@@ -180,7 +179,7 @@ func TestCopyNDFileToVolumeDelegatesToVolumeWriter(t *testing.T) {
 			return nil
 		},
 	}
-	rt.imageOps = dockerRuntimeImageOpsStub{
+	rt.imageOps = RuntimeImageOps{
 		GetLatestContainerImageFn: func(string) (string, error) { return "netdata:latest", nil },
 	}
 
@@ -194,7 +193,7 @@ func TestCopyNDFileToVolumeDelegatesToVolumeWriter(t *testing.T) {
 
 func TestCopyNDFileToVolumeReturnsErrorWhenCopyRuntimeMissing(t *testing.T) {
 	rt := testNetdataRuntime()
-	rt.commandOps = dockerRuntimeCommandOpsStub{}
+	rt.commandOps = RuntimeCommandOps{}
 	rt.imageOps.GetLatestContainerImageFn = nil
 
 	err := copyNDFileToVolumeWithRuntime(netdataRuntimeFromDocker(rt), "/tmp/netdata.conf", "/etc/netdata/", "netdata")

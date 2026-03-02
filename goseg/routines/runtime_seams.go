@@ -30,14 +30,15 @@ func newVersionRuntime() versionRuntime {
 			debugModeFn: func() bool {
 				return config.RuntimeContextSnapshot().DebugMode
 			},
-			getShipStatusFn:   orchestration.GetShipStatus,
-			startContainerFn:  orchestration.StartContainer,
-			stopContainerFn:   orchestration.StopContainerByName,
-			loadUrbitConfigFn: config.LoadUrbitConfig,
-			urbitConfFn:       config.UrbitConf,
-			waitCompleteFn:    ship.WaitComplete,
-			chopPierFn:        chopsvc.ChopPier,
-			updateUrbitFn:     config.UpdateUrbit,
+			getShipStatusFn:            orchestration.GetShipStatus,
+			startContainerFn:           orchestration.StartContainer,
+			stopContainerFn:            orchestration.StopContainerByName,
+			loadUrbitConfigFn:          config.LoadUrbitConfig,
+			urbitConfFn:                config.UrbitConf,
+			updateUrbitRuntimeConfigFn: config.UpdateUrbitRuntimeConfig,
+			waitCompleteFn:             ship.WaitComplete,
+			chopPierFn:                 chopsvc.ChopPier,
+			updateUrbitFn:              config.UpdateUrbit,
 		},
 		updateOps: versionUpdateOps{
 			updateDockerFn: updateDockerForRuntime,
@@ -61,24 +62,25 @@ type versionChannelOps struct {
 }
 
 type versionConfigOps struct {
-	getConfFn         func() structs.SysConfig
-	getSha256Fn       func(string) (string, error)
-	architectureFn    func() string
-	basePathFn        func() string
-	debugModeFn       func() bool
-	getShipStatusFn   func([]string) (map[string]string, error)
-	startContainerFn  func(string, string) (structs.ContainerState, error)
-	stopContainerFn   func(string) error
-	loadUrbitConfigFn func(string) error
-	urbitConfFn       func(string) structs.UrbitDocker
-	waitCompleteFn    func(string) error
-	chopPierFn        func(string) error
-	updateUrbitFn     func(string, func(*structs.UrbitDocker) error) error
+	getConfFn                  func() structs.SysConfig
+	getSha256Fn                func(string) (string, error)
+	architectureFn             func() string
+	basePathFn                 func() string
+	debugModeFn                func() bool
+	getShipStatusFn            func([]string) (map[string]string, error)
+	startContainerFn           func(string, string) (structs.ContainerState, error)
+	stopContainerFn            func(string) error
+	loadUrbitConfigFn          func(string) error
+	urbitConfFn                func(string) structs.UrbitDocker
+	updateUrbitRuntimeConfigFn func(string, func(*structs.UrbitRuntimeConfig) error) error
+	waitCompleteFn             func(string) error
+	chopPierFn                 func(string) error
+	updateUrbitFn              func(string, func(*structs.UrbitDocker) error) error
 }
 
 type versionUpdateOps struct {
-	updateDockerFn func(versionConfigOps, string, structs.Channel, structs.Channel)
-	updateBinaryFn func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel)
+	updateDockerFn func(versionConfigOps, string, structs.Channel, structs.Channel) error
+	updateBinaryFn func(context.Context, versionUpdateOps, versionConfigOps, string, structs.Channel) error
 	downloadFn     func(context.Context, string) (*http.Response, error)
 }
 

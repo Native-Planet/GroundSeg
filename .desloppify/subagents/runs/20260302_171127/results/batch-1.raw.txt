@@ -1,0 +1,127 @@
+{
+  "batch": "Abstractions & Dependencies",
+  "batch_index": 1,
+  "assessments": {
+    "abstraction_fitness": 61.0
+  },
+  "dimension_notes": {
+    "abstraction_fitness": {
+      "evidence": [
+        "Multiple modules implement large function-bag runtimes plus default/merge helpers (e.g., `StartupRuntime` and `startBackgroundServicesRuntime` in `goseg/startuporchestrator/startup_orchestrator.go`, `workflowRuntime` in `goseg/shipworkflow/operations_runtime.go`, `RectifyRuntime` in `goseg/rectify/rectify.go`, `importerRuntime` in `goseg/importer/importer.go`).",
+        "Two orchestration layers duplicate similar dependency surfaces (`WireguardRuntime`/`UrbitRuntime` in `goseg/docker/orchestration/runtime_docker.go` and `Runtime*Ops` families in `goseg/docker/orchestration/runtime_ops.go`), increasing adapter count and translation paths.",
+        "Some wrappers are nearly pure delegation without additional policy (e.g., many `*WithRuntime` and service pass-through methods in `goseg/system/wifi.go`, plus top-level wrappers in `goseg/docker/network/network.go`).",
+        "Large shared config models (`structs.SysConfig`, embedded `structs.UrbitDocker`) remain broad and cross-cutting (`goseg/structs/configs.go`), while parallel snapshot structs exist in `goseg/config/config.go`, indicating mixed abstraction boundaries rather than one cohesive domain API."
+      ],
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "confidence": "high",
+      "sub_axes": {
+        "abstraction_leverage": 58.0,
+        "indirection_cost": 49.0,
+        "interface_honesty": 76.0
+      }
+    }
+  },
+  "findings": [
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "runtime_bag_overgrowth",
+      "summary": "Runtime dependency injection is implemented as repeated large function bags across modules, creating architectural indirection with limited domain leverage.",
+      "related_files": [
+        "goseg/startuporchestrator/startup_orchestrator.go",
+        "goseg/shipworkflow/operations_runtime.go",
+        "goseg/importer/importer.go",
+        "goseg/rectify/rectify.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`StartupRuntime` embeds multiple runtime structs with many callback fields and relies on `seams.Merge` defaults (`goseg/startuporchestrator/startup_orchestrator.go`).",
+        "`workflowRuntime` similarly embeds multiple callback groups and repeatedly normalizes via `withDefaultsWorkflowRuntime` (`goseg/shipworkflow/operations_runtime.go`).",
+        "`importerRuntime` and `RectifyRuntime` repeat the same pattern: callback bags + nil-guard checks + default builders (`goseg/importer/importer.go`, `goseg/rectify/rectify.go`).",
+        "`main.go` introduces another runtime family (`bootstrapRuntime`, `c2cRuntime`, context structs), extending the same abstraction style at application entrypoint."
+      ],
+      "suggestion": "Define narrower domain services (e.g., `StartupService`, `TransitionService`, `ImportService`) with cohesive method sets and one composition root; keep seam structs internal to tests or construction boundaries rather than passing callback bags through operational code.",
+      "confidence": "high",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "duplicate_orchestration_adapters",
+      "summary": "Docker orchestration maintains parallel adapter surfaces that map the same dependencies twice, increasing drift risk.",
+      "related_files": [
+        "goseg/docker/orchestration/runtime_docker.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/docker/orchestration/runtime_seams_test.go",
+        "goseg/docker/orchestration/wireguard.go"
+      ],
+      "evidence": [
+        "`runtime_docker.go` defines `dockerRuntime` plus exported runtime structs (`WireguardRuntime`, `UrbitRuntime`) and conversion functions like `wireguardRuntimeFromDocker`/`urbitRuntimeFromDocker`.",
+        "`runtime_ops.go` independently defines `RuntimeContainerOps`, `RuntimeUrbitOps`, `RuntimeSnapshotOps`, etc., with overlapping callbacks to the same config/docker functions.",
+        "Both files include separate default constructors that wire the same dependencies (config updates, container operations, network lookups), creating duplicated abstraction layers.",
+        "`runtime_seams_test.go` contains extensive stubs for these parallel surfaces, indicating non-trivial maintenance overhead from duplicate seam APIs."
+      ],
+      "suggestion": "Unify on a single orchestration runtime contract (or a small set of explicit service interfaces) and remove one adapter family; generate or centrally derive specialized views instead of hand-maintaining parallel structs.",
+      "confidence": "high",
+      "impact_scope": "subsystem",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "pass_through_wrapper_chains",
+      "summary": "Several wrapper functions add call depth without behavior, policy, or translation, reducing abstraction payoff.",
+      "related_files": [
+        "goseg/system/wifi.go",
+        "goseg/docker/network/network.go",
+        "goseg/main.go"
+      ],
+      "evidence": [
+        "`wifi.go` defines many wrappers that immediately call `newWiFiService(...).method` (`ifCheckWithRuntime`, `getWifiDeviceWithRuntime`, `ConnectToWifiWithRuntime`, `runCommandWithRuntime`, etc.) with minimal additional semantics.",
+        "`wifiOperations` includes methods (`runCommand`, `execCommand`, `newClient`, `clientInterfaces`, `clientBSS`) that mostly forward directly to runtime function fields.",
+        "`network.go` top-level `CreateVolume`/`DeleteVolume` are thin pass-throughs into `NewNetworkRuntime()` methods, adding a wrapper layer without policy.",
+        "`main.go` contains wrapper construction (`defaultBootstrapRuntime` + `defaultBootstrapRuntimeBase` + `bootstrapRuntimeWith`) that duplicates delegation paths for the same actions."
+      ],
+      "suggestion": "Collapse trivial wrappers by keeping either direct package functions or a focused service object (not both); reserve wrappers for places enforcing concrete policy (validation, retries, metrics, or translation).",
+      "confidence": "high",
+      "impact_scope": "module",
+      "fix_scope": "multi_file_refactor",
+      "root_cause_cluster": "runtime_seam_fragmentation"
+    },
+    {
+      "dimension": "abstraction_fitness",
+      "identifier": "config_boundary_leakage",
+      "summary": "Broad config models are still a cross-module dependency backbone despite newer snapshot abstractions, leaving boundaries mixed.",
+      "related_files": [
+        "goseg/structs/configs.go",
+        "goseg/config/config.go",
+        "goseg/defaults/defaults.go",
+        "goseg/docker/orchestration/runtime_ops.go",
+        "goseg/broadcast/collectors/collectors.go"
+      ],
+      "evidence": [
+        "`structs.SysConfig` and embedded `structs.UrbitDocker` remain very wide and multi-concern in `goseg/structs/configs.go`.",
+        "`config/config.go` introduces narrower snapshot abstractions (`ShipSettings`, `ConnectivitySettings`, `RuntimeContext`), but downstream runtimes still frequently wire broad config callbacks directly (e.g., `UrbitConfFn`, many `UpdateUrbit*` callbacks).",
+        "`defaults/defaults.go` initializes large default config payloads directly from these broad structs, reinforcing single-object coupling.",
+        "`collectors.go` and `runtime_ops.go` continue to pull mixed concerns from config/orchestration through large callback sets rather than focused domain services."
+      ],
+      "suggestion": "Introduce stable, bounded domain ports for each concern (runtime context, ship state, startram state, update policy) and progressively retire direct dependencies on broad config aggregates in orchestration/collector paths.",
+      "confidence": "medium",
+      "impact_scope": "codebase",
+      "fix_scope": "architectural_change",
+      "root_cause_cluster": "config_as_global_contract"
+    }
+  ],
+  "retrospective": {
+    "root_causes": [
+      "Testability seams evolved into primary production abstraction style, creating callback-bag proliferation.",
+      "Config/state access patterns are still organized around broad shared structs, so narrower view models are only partially adopted."
+    ],
+    "likely_symptoms": [
+      "duplicate_orchestration_adapters",
+      "pass_through_wrapper_chains"
+    ],
+    "possible_false_positives": []
+  }
+}
