@@ -34,6 +34,8 @@ var (
 	forceLegacyMigration          bool
 	forceLegacyMigrationConsumed  = make(map[string]bool)
 	forceLegacyMigrationConsumedM sync.Mutex
+	legacyEmptyRetryConsumed      = make(map[string]bool)
+	legacyEmptyRetryConsumedM     sync.Mutex
 )
 
 func SetForceLegacyMigration(force bool) {
@@ -56,6 +58,22 @@ func consumeForceLegacyMigrationForShip(patp string) bool {
 	}
 	forceLegacyMigrationConsumed[patp] = true
 	return true
+}
+
+func consumeLegacyEmptyRetryForShip(patp string) bool {
+	legacyEmptyRetryConsumedM.Lock()
+	defer legacyEmptyRetryConsumedM.Unlock()
+	if legacyEmptyRetryConsumed[patp] {
+		return false
+	}
+	legacyEmptyRetryConsumed[patp] = true
+	return true
+}
+
+func markLegacyEmptyRetryConsumed(patp string) {
+	legacyEmptyRetryConsumedM.Lock()
+	defer legacyEmptyRetryConsumedM.Unlock()
+	legacyEmptyRetryConsumed[patp] = true
 }
 
 func objectStoreContainerInfo() (map[string]string, error) {
@@ -612,7 +630,12 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 				return nil
 			}
 			zap.L().Info(fmt.Sprintf("Ignoring stale migration marker for %s and retrying legacy migration", patp))
-		case "legacy-no-bucket", "legacy-empty":
+		case "legacy-empty":
+			if !consumeLegacyEmptyRetryForShip(patp) {
+				return nil
+			}
+			zap.L().Info(fmt.Sprintf("Retrying legacy migration for %s (previous status: %s, once this run)", patp, markerStatus))
+		case "legacy-no-bucket":
 			zap.L().Info(fmt.Sprintf("Retrying legacy migration for %s (previous status: %s)", patp, markerStatus))
 		}
 
@@ -684,6 +707,7 @@ func maybeMigrateLegacyMinIOData(patp string, urbConf structs.UrbitDocker, targe
 		}
 	}
 	if !nonEmptySource {
+		markLegacyEmptyRetryConsumed(patp)
 		return writeMigrationMarker(targetVolume, "legacy-empty")
 	}
 

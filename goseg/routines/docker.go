@@ -67,9 +67,19 @@ func DockerSubscriptionHandler() {
 			if containerState, exists := config.GetContainerState()[contName]; exists {
 				containerState.ActualStatus = "stopped"
 				config.UpdateContainerState(contName, containerState)
-				// start it again if this isn't what the user wants
+				// start it again if this isn't what the user wants.
+				// delay and re-check to avoid racing deliberate restart operations.
 				if containerState.DesiredStatus != "stopped" {
-					docker.StartContainer(contName, containerState.Type)
+					go func(name, containerType string) {
+						time.Sleep(2 * time.Second)
+						status, err := docker.GetContainerRunningStatus(name)
+						if err == nil && strings.Contains(status, "Up") {
+							return
+						}
+						if _, err := docker.StartContainer(name, containerType); err != nil {
+							zap.L().Warn(fmt.Sprintf("Auto-restart after stop failed for %s: %v", name, err))
+						}
+					}(contName, containerState.Type)
 				}
 				makeBroadcast(contName, string(dockerEvent.Action))
 			}
@@ -98,8 +108,8 @@ func DockerSubscriptionHandler() {
 			}
 
 		case "die":
-			zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 			if containerState, exists := config.GetContainerState()[contName]; exists {
+				zap.L().Warn(fmt.Sprintf("Docker: %s died!", contName))
 				containerState.ActualStatus = "died"
 				config.UpdateContainerState(contName, containerState)
 				if containerState.Type == "vere" {
@@ -133,6 +143,13 @@ func DockerSubscriptionHandler() {
 					}
 				}
 				makeBroadcast(contName, string(dockerEvent.Action))
+			} else {
+				// Temporary migration containers are expected to exit after copy.
+				if strings.HasPrefix(contName, "minio_migrate_") {
+					zap.L().Info(fmt.Sprintf("Docker: %s exited (expected temporary migration container)", contName))
+				} else {
+					zap.L().Debug(fmt.Sprintf("Docker: unmanaged container %s died", contName))
+				}
 			}
 		default:
 			zap.L().Debug(fmt.Sprintf("%s event: %s", contName, dockerEvent.Action))
@@ -183,16 +200,12 @@ func Check502Loop() {
 				continue
 			}
 			shipConf := config.UrbitConf(pier)
-			pierNetwork, err := docker.GetContainerNetwork(pier)
-			if err != nil {
-				zap.L().Warn(fmt.Sprintf("Couldn't get network for %v: %v", pier, err))
-				continue
-			}
 			turnedOn := false
 			if strings.Contains(pierStatus[pier], "Up") {
 				turnedOn = true
 			}
-			if turnedOn && pierNetwork != "default" && conf.WgOn {
+			remoteEnabled := shipConf.Network == "wireguard" && shipConf.WgURL != ""
+			if turnedOn && remoteEnabled && conf.WgOn {
 				if _, err := click.GetLusCode(pier); err != nil {
 					zap.L().Warn(fmt.Sprintf("%v is not booted yet, skipping", pier))
 					continue
